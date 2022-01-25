@@ -6,7 +6,7 @@ import time
 
 import cv2
 import numpy as np
-import pybullet as p
+
 
 from igibson.objects.visual_marker import VisualMarker
 from igibson.utils.constants import ViewerMode

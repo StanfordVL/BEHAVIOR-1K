@@ -5,7 +5,7 @@ import xml.etree.ElementTree as ET
 from collections import Counter
 
 import numpy as np
-import pybullet as p
+
 from bddl.object_taxonomy import ObjectTaxonomy
 from pynput import keyboard
 

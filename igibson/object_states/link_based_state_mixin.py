@@ -1,4 +1,4 @@
-import pybullet as p
+
 
 from igibson.external.pybullet_tools.utils import get_link_state, link_from_name
 

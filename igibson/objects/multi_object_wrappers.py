@@ -1,6 +1,6 @@
 import itertools
 
-import pybullet as p
+
 
 from igibson.object_states.factory import get_state_name
 from igibson.object_states.object_state_base import AbsoluteObjectState, BooleanState

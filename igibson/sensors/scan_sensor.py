@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-import pybullet as p
+
 from transforms3d.quaternions import quat2mat
 
 from igibson.sensors.dropout_sensor_noise import DropoutSensorNoise

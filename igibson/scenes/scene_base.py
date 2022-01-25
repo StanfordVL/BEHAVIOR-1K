@@ -2,9 +2,28 @@ from abc import ABCMeta, abstractmethod
 
 from future.utils import with_metaclass
 
-from igibson.objects.particles import Particle
-from igibson.objects.visual_marker import VisualMarker
-from igibson.robots.robot_base import BaseRobot
+import carb
+from omni.isaac.core.prims.geometry_prim import GeometryPrim
+from omni.isaac.core.prims.rigid_prim import RigidPrim
+from omni.isaac.core.prims.xform_prim import XFormPrim
+from omni.isaac.core.scenes.scene_registry import SceneRegistry
+from omni.isaac.core.objects.ground_plane import GroundPlane
+from omni.isaac.core.articulations.articulation import Articulation
+from omni.isaac.core.robots.robot import Robot
+from omni.isaac.core.utils.prims import get_prim_parent, get_prim_path, is_prim_root_path, is_prim_ancestral
+import omni.usd.commands
+from pxr import Usd, UsdGeom
+import numpy as np
+import builtins
+from omni.isaac.core.utils.stage import get_current_stage, update_stage
+from omni.isaac.core.utils.nucleus import find_nucleus_server
+from omni.isaac.core.utils.stage import add_reference_to_stage
+from typing import Optional, Tuple
+import gc
+
+# from igibson.objects.particles import Particle
+# from igibson.objects.visual_marker import VisualMarker
+# from igibson.robots.robot_base import BaseRobot
 
 
 class Scene(with_metaclass(ABCMeta)):
@@ -14,10 +33,22 @@ class Scene(with_metaclass(ABCMeta)):
     """
 
     def __init__(self):
+        self._scene_registry = SceneRegistry()
+
+
         self.loaded = False
         self.build_graph = False  # Indicates if a graph for shortest path has been built
         self.floor_body_ids = []  # List of ids of the floor_heights
         self.robots = []
+
+    @property
+    def stage(self) -> Usd.Stage:
+        """[summary]
+
+        Returns:
+            Usd.Stage: [description]
+        """
+        return get_current_stage()
 
     @abstractmethod
     def _load(self, simulator):
@@ -44,6 +75,20 @@ class Scene(with_metaclass(ABCMeta)):
 
         self.loaded = True
         return self._load(simulator)
+
+    def object_exists(self, name: str) -> bool:
+        """[summary]
+
+        Args:
+            name (str): [description]
+
+        Returns:
+            XFormPrim: [description]
+        """
+        if self._scene_registry.name_exists(name):
+            return True
+        else:
+            return False
 
     @abstractmethod
     def get_objects(self):
@@ -109,6 +154,35 @@ class Scene(with_metaclass(ABCMeta)):
 
         return body_ids
 
+    def add(self, obj: XFormPrim) -> XFormPrim:
+        """[summary]
+
+        Args:
+            obj (XFormPrim): [description]
+
+        Raises:
+            Exception: [description]
+            Exception: [description]
+
+        Returns:
+            XFormPrim: [description]
+        """
+        if self._scene_registry.name_exists(obj.name):
+            raise Exception("Cannot add the object {} to the scene since its name is not unique".format(obj.name))
+        if isinstance(obj, RigidPrim):
+            self._scene_registry.add_rigid_object(name=obj.name, rigid_object=obj)
+        elif isinstance(obj, GeometryPrim):
+            self._scene_registry.add_geometry_object(name=obj.name, geometry_object=obj)
+        elif isinstance(obj, Robot):
+            self._scene_registry.add_robot(name=obj.name, robot=obj)
+        elif isinstance(obj, Articulation):
+            self._scene_registry.add_articulated_system(name=obj.name, articulated_system=obj)
+        elif isinstance(obj, XFormPrim):
+            self._scene_registry.add_xform(name=obj.name, xform=obj)
+        else:
+            raise Exception("object type is not supported yet")
+        return obj
+
     def get_random_floor(self):
         """
         Sample a random floor among all existing floor_heights in the scene.
@@ -149,10 +223,46 @@ class Scene(with_metaclass(ABCMeta)):
         """
         return 0.0
 
-    def get_body_ids(self):
-        """Returns list of PyBullet body ids for all objects in the scene"""
-        body_ids = []
-        for obj in self.get_objects():
-            if obj.get_body_ids() is not None:
-                body_ids.extend(obj.get_body_ids())
-        return body_ids
+    def add_ground_plane(
+        self,
+        size=None,
+        z_position: float = 0,
+        name="ground_plane",
+        prim_path: str = "/World/groundPlane",
+        static_friction: float = 0.5,
+        dynamic_friction: float = 0.5,
+        restitution: float = 0.8,
+        color=None,
+        visible=True,
+    ) -> None:
+        """[summary]
+
+        Args:
+            size (Optional[float], optional): [description]. Defaults to None.
+            z_position (float, optional): [description]. Defaults to 0.
+            name (str, optional): [description]. Defaults to "ground_plane".
+            prim_path (str, optional): [description]. Defaults to "/World/groundPlane".
+            static_friction (float, optional): [description]. Defaults to 0.5.
+            dynamic_friction (float, optional): [description]. Defaults to 0.5.
+            restitution (float, optional): [description]. Defaults to 0.8.
+            color (Optional[np.ndarray], optional): [description]. Defaults to None.
+            visible (bool): Whether the plane should be visible or not
+
+        Returns:
+            [type]: [description]
+        """
+        if Scene.object_exists(self, name=name):
+            carb.log_info("ground floor already created with name {}.".format(name))
+            return Scene.get_object(self, name=name)
+        plane = GroundPlane(
+            prim_path=prim_path,
+            name=name,
+            z_position=z_position,
+            size=size,
+            color=np.array(color),
+            visible=visible,
+            static_friction=static_friction,
+            dynamic_friction=dynamic_friction,
+            restitution=restitution,
+        )
+        Scene.add(self, plane)

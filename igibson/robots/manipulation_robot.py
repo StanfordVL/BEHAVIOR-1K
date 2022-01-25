@@ -3,7 +3,7 @@ from collections import namedtuple
 from enum import IntEnum
 
 import numpy as np
-import pybullet as p
+
 
 import igibson.utils.transform_utils as T
 from igibson.controllers import (

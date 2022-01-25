@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
-import pybullet as p
+
+import trimesh
 from IPython import embed
 from scipy.spatial.transform import Rotation as R
 

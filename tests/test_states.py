@@ -2,7 +2,7 @@ import os
 
 import networkx as nx
 import numpy as np
-import pybullet as p
+
 
 import igibson
 from igibson import object_states

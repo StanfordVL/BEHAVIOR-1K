@@ -3,7 +3,7 @@ import json
 import os
 
 import numpy as np
-import pybullet as p
+
 from bddl.object_taxonomy import ObjectTaxonomy
 from pynput import keyboard
 

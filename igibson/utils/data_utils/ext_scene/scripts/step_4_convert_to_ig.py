@@ -10,7 +10,7 @@ import xml.etree.ElementTree as ET
 import numpy as np
 
 import igibson
-from igibson.scenes.igibson_indoor_scene import SCENE_SOURCE
+from igibson.scenes.interactive_traversable_scene import SCENE_SOURCE
 from igibson.utils.assets_utils import (
     get_3dfront_scene_path,
     get_cubicasa_scene_path,

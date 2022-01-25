@@ -1,6 +1,6 @@
 import os
 
-import pybullet as p
+
 
 import igibson
 from igibson.objects.stateful_object import StatefulObject

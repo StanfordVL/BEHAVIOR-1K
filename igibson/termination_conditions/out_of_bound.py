@@ -1,4 +1,4 @@
-from igibson.scenes.igibson_indoor_scene import InteractiveIndoorScene
+from igibson.scenes.interactive_traversable_scene import InteractiveIndoorScene
 from igibson.termination_conditions.termination_condition_base import BaseTerminationCondition
 
 

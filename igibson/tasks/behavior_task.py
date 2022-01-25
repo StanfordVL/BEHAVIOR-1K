@@ -3,7 +3,7 @@ import logging
 from collections import OrderedDict
 
 import networkx as nx
-import pybullet as p
+
 from bddl.activity import (
     Conditions,
     evaluate_goal_conditions,
@@ -24,7 +24,8 @@ from igibson.objects.articulated_object import URDFObject
 from igibson.objects.multi_object_wrappers import ObjectGrouper, ObjectMultiplexer
 from igibson.reward_functions.potential_reward import PotentialReward
 from igibson.robots.robot_base import BaseRobot
-from igibson.scenes.igibson_indoor_scene import InteractiveIndoorScene
+from igibson.scenes.interactive_traversable_scene import InteractiveIndoorScene
+from igibson.simulator import Simulator
 from igibson.tasks.bddl_backend import IGibsonBDDLBackend
 from igibson.tasks.task_base import BaseTask
 from igibson.termination_conditions.predicate_goal import PredicateGoal

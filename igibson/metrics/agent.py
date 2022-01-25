@@ -2,6 +2,7 @@ import copy
 
 import numpy as np
 
+
 from igibson.metrics.metric_base import MetricBase
 from igibson.robots.manipulation_robot import IsGraspingState
 

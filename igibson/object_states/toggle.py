@@ -1,4 +1,4 @@
-import pybullet as p
+
 
 from igibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from igibson.object_states.object_state_base import AbsoluteObjectState, BooleanState

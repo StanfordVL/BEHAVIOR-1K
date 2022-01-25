@@ -5,7 +5,7 @@ and adapted by iGibson team.
 from __future__ import print_function
 
 import copy
-import pybullet as p
+
 import random
 import time
 from itertools import islice

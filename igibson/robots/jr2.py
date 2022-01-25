@@ -2,6 +2,7 @@ import os
 
 import numpy as np
 
+
 import igibson
 from igibson.external.pybullet_tools.utils import set_joint_positions
 from igibson.robots.manipulation_robot import ManipulationRobot

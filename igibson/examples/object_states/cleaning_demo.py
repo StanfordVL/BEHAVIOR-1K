@@ -2,7 +2,7 @@ import logging
 
 from igibson import object_states
 from igibson.objects.ycb_object import YCBObject
-from igibson.scenes.igibson_indoor_scene import InteractiveIndoorScene
+from igibson.scenes.interactive_traversable_scene import InteractiveIndoorScene
 from igibson.simulator import Simulator
 
 

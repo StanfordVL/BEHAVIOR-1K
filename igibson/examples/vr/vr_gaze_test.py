@@ -5,7 +5,7 @@ the user is looking.
 import os
 
 import numpy as np
-import pybullet as p
+
 import pybullet_data
 
 import igibson
@@ -13,8 +13,8 @@ from igibson.objects.articulated_object import ArticulatedObject
 from igibson.render.mesh_renderer.mesh_renderer_cpu import MeshRendererSettings
 from igibson.render.mesh_renderer.mesh_renderer_vr import VrSettings
 from igibson.robots.behavior_robot import BehaviorRobot
-from igibson.scenes.igibson_indoor_scene import InteractiveIndoorScene
-from igibson.simulator_vr import SimulatorVR
+from igibson.scenes.interactive_traversable_scene import InteractiveIndoorScene
+from igibson.simulator import Simulator
 
 # HDR files for PBR rendering
 hdr_texture = os.path.join(igibson.ig_dataset_path, "scenes", "background", "probe_02.hdr")

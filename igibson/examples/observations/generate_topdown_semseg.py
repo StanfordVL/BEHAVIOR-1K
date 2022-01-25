@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 
 from igibson.render.mesh_renderer.mesh_renderer_settings import MeshRendererSettings
-from igibson.scenes.igibson_indoor_scene import InteractiveIndoorScene
+from igibson.scenes.interactive_traversable_scene import InteractiveIndoorScene
 from igibson.simulator import Simulator
 from igibson.utils.constants import MAX_CLASS_COUNT
 from igibson.utils.vision_utils import segmentation_to_rgb

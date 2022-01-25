@@ -90,7 +90,7 @@ def vhacd(cmd):
 
 
 def vhacd_windows(name_in, name_out):
-    import pybullet as p
+
 
     p.vhacd(name_in, name_out, "vhacd-log.txt")
 

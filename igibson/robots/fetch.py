@@ -1,7 +1,7 @@
 import os
 
 import numpy as np
-import pybullet as p
+
 
 import igibson
 from igibson.controllers import ControlType

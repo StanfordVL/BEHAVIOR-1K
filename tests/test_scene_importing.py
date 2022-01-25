@@ -1,4 +1,6 @@
-import pybullet as p
+import os
+
+
 
 import igibson
 from igibson.render.mesh_renderer.mesh_renderer_settings import MeshRendererSettings

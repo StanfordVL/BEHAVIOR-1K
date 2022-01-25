@@ -10,7 +10,7 @@ import xml.etree.ElementTree as ET
 import cv2
 import networkx as nx
 import numpy as np
-import pybullet as p
+
 import trimesh
 from scipy.spatial.transform import Rotation
 

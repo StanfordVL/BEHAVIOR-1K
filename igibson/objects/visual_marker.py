@@ -1,4 +1,4 @@
-import pybullet as p
+
 
 from igibson.objects.object_base import BaseObject
 

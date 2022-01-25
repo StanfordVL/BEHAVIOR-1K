@@ -1,7 +1,7 @@
 import json
 import os
 
-import pybullet as p
+
 from bddl.object_taxonomy import ObjectTaxonomy
 from IPython import embed
 

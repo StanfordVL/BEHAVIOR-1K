@@ -9,7 +9,7 @@ import uuid
 
 import bddl
 import numpy as np
-import pybullet as p
+
 from bddl.parsing import construct_full_bddl
 from bddl.utils import UncontrolledCategoryError, UnsupportedPredicateError
 from flask import Flask, Response, render_template, request

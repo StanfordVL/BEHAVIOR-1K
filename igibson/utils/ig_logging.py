@@ -9,7 +9,7 @@ import time
 
 import h5py
 import numpy as np
-import pybullet as p
+
 
 from igibson.robots.behavior_robot import HAND_BASE_ROTS
 from igibson.utils.git_utils import project_git_info

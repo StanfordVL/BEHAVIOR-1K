@@ -1,0 +1,1 @@
+from igibson.scenes.scene_base import Scene

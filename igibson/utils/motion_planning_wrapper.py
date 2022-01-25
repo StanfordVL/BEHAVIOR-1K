@@ -2,7 +2,7 @@ import logging
 from time import sleep, time
 
 import numpy as np
-import pybullet as p
+
 from transforms3d import euler
 
 from igibson.external.pybullet_tools.utils import (
@@ -22,7 +22,7 @@ from igibson.external.pybullet_tools.utils import (
 )
 from igibson.objects.visual_marker import VisualMarker
 from igibson.scenes.gibson_indoor_scene import StaticIndoorScene
-from igibson.scenes.igibson_indoor_scene import InteractiveIndoorScene
+from igibson.scenes.interactive_traversable_scene import InteractiveIndoorScene
 from igibson.utils.utils import l2_distance, quatToXYZW, restoreState, rotate_vector_2d
 
 

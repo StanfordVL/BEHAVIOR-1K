@@ -2,7 +2,7 @@ import logging
 import os
 
 import numpy as np
-import pybullet as p
+
 import pybullet_data
 
 from igibson.scenes.scene_base import Scene
