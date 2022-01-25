@@ -1,5 +1,5 @@
 import numpy as np
-import pybullet as p
+
 
 import igibson.utils.transform_utils as T
 from igibson.controllers import ControlType, ManipulationController

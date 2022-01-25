@@ -4,7 +4,7 @@ from enum import IntEnum
 
 import gym.spaces
 import numpy as np
-import pybullet as p
+
 
 from igibson import object_states
 from igibson.envs.behavior_env import BehaviorEnv

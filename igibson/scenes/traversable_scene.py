@@ -14,9 +14,9 @@ from igibson.scenes.scene_base import Scene
 from igibson.utils.utils import l2_distance
 
 
-class IndoorScene(with_metaclass(ABCMeta, Scene)):
+class TraversableScene(with_metaclass(ABCMeta, Scene)):
     """
-    Indoor scene class for Gibson and iGibson.
+    Traversable scene class.
     Contains the functionalities for navigation such as shortest path computation
     """
 
@@ -31,7 +31,7 @@ class IndoorScene(with_metaclass(ABCMeta, Scene)):
         waypoint_resolution=0.2,
     ):
         """
-        Load an indoor scene and compute traversability
+        Load a traversable scene and compute traversability
 
         :param scene_id: Scene id
         :param trav_map_resolution: traversability map resolution
@@ -41,8 +41,8 @@ class IndoorScene(with_metaclass(ABCMeta, Scene)):
         :param num_waypoints: number of way points returned
         :param waypoint_resolution: resolution of adjacent way points
         """
-        super(IndoorScene, self).__init__()
-        logging.info("IndoorScene model: {}".format(scene_id))
+        super().__init__()
+        logging.info("TraversableScene model: {}".format(scene_id))
         self.scene_id = scene_id
         self.trav_map_default_resolution = 0.01  # each pixel represents 0.01m
         self.trav_map_resolution = trav_map_resolution
@@ -55,6 +55,8 @@ class IndoorScene(with_metaclass(ABCMeta, Scene)):
         self.waypoint_interval = int(waypoint_resolution / trav_map_resolution)
         self.mesh_body_id = None
         self.floor_heights = [0.0]
+        self.floor_map = None
+        self.floor_graph = None
 
     def load_trav_map(self, maps_path):
         """

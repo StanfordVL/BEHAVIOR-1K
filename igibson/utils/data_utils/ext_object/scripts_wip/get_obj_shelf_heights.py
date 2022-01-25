@@ -5,7 +5,7 @@ Credit: Andrey Kurenkov
 import argparse
 import os
 
-import pybullet as pb
+b
 import trimesh
 import yaml
 

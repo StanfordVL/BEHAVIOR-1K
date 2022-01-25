@@ -2,17 +2,16 @@ import logging
 import os
 
 import numpy as np
-import pybullet as p
-import pybullet_data
 
-from igibson.scenes.indoor_scene import IndoorScene
+from igibson.scenes.traversable_scene import TraversableScene
 from igibson.utils.assets_utils import get_scene_path, get_texture_file
 from igibson.utils.constants import SemanticClass
 
+# TODO
 
-class StaticIndoorScene(IndoorScene):
+class StaticTraversableScene(TraversableScene):
     """
-    Static indoor scene class for iGibson.
+    Static traversable scene class for iGibson, where scene is defined by a singular mesh (no intereactable objects).
     Contains the functionalities for navigation such as shortest path computation
     """
 
@@ -25,7 +24,6 @@ class StaticIndoorScene(IndoorScene):
         build_graph=True,
         num_waypoints=10,
         waypoint_resolution=0.2,
-        pybullet_load_texture=True,
         render_floor_plane=False,
     ):
         """
@@ -38,10 +36,9 @@ class StaticIndoorScene(IndoorScene):
         :param build_graph: build connectivity graph
         :param num_waypoints: number of way points returned
         :param waypoint_resolution: resolution of adjacent way points
-        :param pybullet_load_texture: whether to load texture into pybullet. This is for debugging purpose only and does not affect robot's observations
         :param render_floor_plane: whether to render the additionally added floor planes
         """
-        super(StaticIndoorScene, self).__init__(
+        super().__init__(
             scene_id,
             trav_map_resolution,
             trav_map_erosion,
@@ -50,11 +47,8 @@ class StaticIndoorScene(IndoorScene):
             num_waypoints,
             waypoint_resolution,
         )
-        logging.info("StaticIndoorScene scene: {}".format(scene_id))
-        self.pybullet_load_texture = pybullet_load_texture
+        logging.info("StaticTraversableScene scene: {}".format(scene_id))
         self.render_floor_plane = render_floor_plane
-
-        self.objects = []
 
     def load_floor_metadata(self):
         """

@@ -4,7 +4,7 @@ import os
 import random
 
 import numpy as np
-import pybullet as p
+
 import scipy
 import yaml
 from PIL import Image

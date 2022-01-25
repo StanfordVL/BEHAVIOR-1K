@@ -1,7 +1,7 @@
 import os
 
 import numpy as np
-import pybullet as p
+
 
 import igibson
 from igibson.external.pybullet_tools.utils import set_joint_positions

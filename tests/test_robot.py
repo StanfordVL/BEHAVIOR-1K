@@ -1,7 +1,7 @@
 import os
 
 import numpy as np
-import pybullet as p
+
 
 from igibson.robots import REGISTERED_ROBOTS
 from igibson.scenes.stadium_scene import StadiumScene

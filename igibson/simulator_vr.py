@@ -4,7 +4,7 @@ import time
 from time import sleep
 
 import numpy as np
-import pybullet as p
+
 
 from igibson.render.mesh_renderer.mesh_renderer_settings import MeshRendererSettings
 from igibson.render.mesh_renderer.mesh_renderer_vr import MeshRendererVR, VrSettings

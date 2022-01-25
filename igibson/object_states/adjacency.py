@@ -1,7 +1,7 @@
 from collections import namedtuple
 
 import numpy as np
-import pybullet as p
+
 
 from igibson.object_states.object_state_base import CachingEnabledObjectState
 from igibson.object_states.pose import Pose

@@ -2,7 +2,7 @@ import logging
 import os
 
 import numpy as np
-import pybullet as p
+
 
 from igibson import object_states
 from igibson.objects.articulated_object import URDFObject

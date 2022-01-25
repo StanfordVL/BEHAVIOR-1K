@@ -6,7 +6,7 @@ from igibson.robots import REGISTERED_ROBOTS
 from igibson.robots.behavior_robot import BehaviorRobot
 from igibson.scenes.empty_scene import EmptyScene
 from igibson.scenes.gibson_indoor_scene import StaticIndoorScene
-from igibson.scenes.igibson_indoor_scene import InteractiveIndoorScene
+from igibson.scenes.interactive_traversable_scene import InteractiveIndoorScene
 from igibson.scenes.stadium_scene import StadiumScene
 from igibson.simulator import Simulator
 from igibson.simulator_vr import SimulatorVR

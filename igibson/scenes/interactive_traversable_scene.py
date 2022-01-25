@@ -8,26 +8,19 @@ from collections import Counter, defaultdict
 from xml.dom import minidom
 
 import numpy as np
-import pybullet as p
+
 from IPython import embed
 from PIL import Image
 
 import igibson
-from igibson.external.pybullet_tools.utils import (
-    euler_from_quat,
-    get_joint_names,
-    get_joint_positions,
-    get_joint_velocities,
-    get_joints,
-)
-from igibson.object_states.factory import get_state_from_name, get_state_name
-from igibson.object_states.object_state_base import AbsoluteObjectState
-from igibson.objects.articulated_object import URDFObject
-from igibson.objects.multi_object_wrappers import ObjectGrouper, ObjectMultiplexer
-from igibson.robots import REGISTERED_ROBOTS
-from igibson.robots.behavior_robot import BehaviorRobot
-from igibson.robots.robot_base import BaseRobot
-from igibson.scenes.gibson_indoor_scene import StaticIndoorScene
+# from igibson.object_states.factory import get_state_from_name, get_state_name
+# from igibson.object_states.object_state_base import AbsoluteObjectState
+# from igibson.objects.articulated_object import URDFObject
+# from igibson.objects.multi_object_wrappers import ObjectGrouper, ObjectMultiplexer
+# from igibson.robots import REGISTERED_ROBOTS
+# from igibson.robots.behavior_robot import BehaviorRobot
+# from igibson.robots.robot_base import BaseRobot
+from igibson.scenes.traversable_scene import TraversableScene
 from igibson.utils.assets_utils import (
     get_3dfront_scene_path,
     get_cubicasa_scene_path,
@@ -42,7 +35,7 @@ from igibson.utils.utils import NumpyEncoder, restoreState, rotate_vector_3d
 SCENE_SOURCE = ["IG", "CUBICASA", "THREEDFRONT"]
 
 
-class InteractiveIndoorScene(StaticIndoorScene):
+class InteractiveTraversableScene(TraversableScene):
     """
     Create an interactive scene defined with iGibson Scene Description Format (iGSDF).
     iGSDF is an extension of URDF that we use to define an interactive scene.
@@ -104,8 +97,8 @@ class InteractiveIndoorScene(StaticIndoorScene):
         :param rendering_params: additional rendering params to be passed into object initializers (e.g. texture scale)
         :param include_robots: whether to also include the robot(s) defined in the scene
         """
-
-        super(InteractiveIndoorScene, self).__init__(
+        # Run super init first
+        super().__init__(
             scene_id,
             trav_map_resolution,
             trav_map_erosion,

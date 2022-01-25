@@ -6,7 +6,7 @@ corresponding button index mapping can be found in the vr_config.yaml file in th
 """
 import os
 
-import pybullet as p
+
 import pybullet_data
 
 import igibson
@@ -14,7 +14,7 @@ from igibson.objects.articulated_object import ArticulatedObject
 from igibson.objects.ycb_object import YCBObject
 from igibson.render.mesh_renderer.mesh_renderer_cpu import MeshRendererSettings
 from igibson.robots.behavior_robot import BehaviorRobot
-from igibson.scenes.igibson_indoor_scene import InteractiveIndoorScene
+from igibson.scenes.interactive_traversable_scene import InteractiveIndoorScene
 from igibson.simulator import Simulator
 
 # Objects in the benchmark - corresponds to Rs kitchen environment, for range of items and

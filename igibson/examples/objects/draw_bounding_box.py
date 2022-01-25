@@ -3,7 +3,7 @@ import logging
 import os
 
 import numpy as np
-import pybullet as p
+
 import trimesh
 from scipy.spatial.transform import Rotation
 

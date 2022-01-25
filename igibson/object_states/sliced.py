@@ -1,4 +1,4 @@
-import pybullet as p
+
 
 from igibson.object_states import *
 from igibson.object_states.object_state_base import AbsoluteObjectState, BooleanState

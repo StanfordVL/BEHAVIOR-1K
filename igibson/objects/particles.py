@@ -2,7 +2,7 @@ import os
 from collections import deque
 
 import numpy as np
-import pybullet as p
+
 
 import igibson
 from igibson.external.pybullet_tools import utils

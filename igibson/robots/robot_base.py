@@ -5,7 +5,7 @@ from copy import deepcopy
 
 import gym
 import numpy as np
-import pybullet as p
+
 from future.utils import with_metaclass
 
 from igibson.controllers import ControlType, create_controller

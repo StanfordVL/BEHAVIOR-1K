@@ -2,7 +2,7 @@
 import json
 import os
 
-import pybullet as p
+
 
 from igibson.utils.utils import restoreState
 

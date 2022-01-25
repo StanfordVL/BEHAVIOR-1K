@@ -1,5 +1,5 @@
 import numpy as np
-import pybullet as p
+
 
 from igibson.objects.ycb_object import YCBObject
 from igibson.tasks.point_nav_random_task import PointNavRandomTask

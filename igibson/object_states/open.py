@@ -1,6 +1,6 @@
 import random
 
-import pybullet as p
+
 
 from igibson.external.pybullet_tools import utils
 from igibson.object_states.object_state_base import BooleanState, CachingEnabledObjectState

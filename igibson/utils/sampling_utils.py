@@ -2,7 +2,7 @@ import itertools
 from collections import Counter, defaultdict
 
 import numpy as np
-import pybullet as p
+
 import trimesh
 from scipy.spatial.transform import Rotation
 from scipy.stats import truncnorm

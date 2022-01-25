@@ -9,7 +9,7 @@ import time
 
 import h5py
 import numpy as np
-import pybullet as p
+
 
 from igibson.utils.git_utils import project_git_info
 from igibson.utils.utils import dump_config, parse_str_config

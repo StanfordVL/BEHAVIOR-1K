@@ -23,7 +23,7 @@ from collections import OrderedDict
 
 import gym
 import numpy as np
-import pybullet as p
+
 
 from igibson import assets_path
 from igibson.external.pybullet_tools.utils import link_from_name, set_all_collisions

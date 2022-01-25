@@ -6,7 +6,7 @@ from collections import OrderedDict
 
 import gym
 import numpy as np
-import pybullet as p
+
 from transforms3d.euler import euler2quat
 
 from igibson import object_states

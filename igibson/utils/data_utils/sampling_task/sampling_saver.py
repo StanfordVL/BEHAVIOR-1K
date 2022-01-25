@@ -4,7 +4,7 @@ import logging
 import os
 
 import bddl
-import pybullet as p
+
 from IPython import embed
 
 import igibson

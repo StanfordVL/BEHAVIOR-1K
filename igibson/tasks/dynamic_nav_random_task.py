@@ -1,5 +1,5 @@
 import numpy as np
-import pybullet as p
+
 
 from igibson.robots.turtlebot import Turtlebot
 from igibson.tasks.point_nav_random_task import PointNavRandomTask

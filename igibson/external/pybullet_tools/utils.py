@@ -11,7 +11,7 @@ import os
 import pickle
 import platform
 import numpy as np
-import pybullet as p
+
 import random
 import sys
 import time

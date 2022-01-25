@@ -1,12 +1,12 @@
 import numpy as np
-import pybullet as p
+
 
 from igibson.objects.visual_marker import VisualMarker
 from igibson.reward_functions.collision_reward import CollisionReward
 from igibson.reward_functions.point_goal_reward import PointGoalReward
 from igibson.reward_functions.potential_reward import PotentialReward
 from igibson.scenes.gibson_indoor_scene import StaticIndoorScene
-from igibson.scenes.igibson_indoor_scene import InteractiveIndoorScene
+from igibson.scenes.interactive_traversable_scene import InteractiveIndoorScene
 from igibson.tasks.task_base import BaseTask
 from igibson.termination_conditions.max_collision import MaxCollision
 from igibson.termination_conditions.out_of_bound import OutOfBound
