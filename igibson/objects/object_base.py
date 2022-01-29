@@ -68,7 +68,7 @@ class BaseObject(with_metaclass(ABCMeta, XFormPrim)):
 
         self._name = name
         self.category = category
-        
+
         # # TODO
         # # This sets the collision group of the object. In igibson, objects are only permitted to be part of a single
         # # collision group, e.g. the collision group bitvector should only have one bit set to 1.
