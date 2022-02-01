@@ -12,13 +12,14 @@ from omni.isaac.core.utils.prims import is_prim_ancestral, get_prim_type_name, i
 from omni.isaac.core.utils.stage import clear_stage
 from omni.isaac.dynamic_control import _dynamic_control
 import builtins
-from pxr import Usd
+from pxr import Usd, Sdf, UsdPhysics, PhysxSchema
 from omni.kit.viewport import get_viewport_interface
 from omni.isaac.core.utils.viewports import set_camera_view
 from omni.isaac.core.loggers import DataLogger
 from typing import Optional, List
 
 from igibson.scenes import Scene
+from igibson.objects.object_base import BaseObject
 
 
 class Simulator(SimulationContext):
@@ -170,23 +171,23 @@ class Simulator(SimulationContext):
     #     self.particle_systems.append(particle_system)
     #     particle_system.initialize(self)
 
-    # # TODO
-    # def import_object(self, obj):
-    #     """
-    #     Import a non-robot object into the simulator.
-    #
-    #     :param obj: a non-robot object to load
-    #     """
-    #     assert isinstance(obj, BaseObject), "import_object can only be called with BaseObject"
-    #
-    #     if isinstance(obj, VisualMarker) or isinstance(obj, Particle):
-    #         # Marker objects can be imported without a scene.
-    #         obj.load(self)
-    #     else:
-    #         # Non-marker objects require a Scene to be imported.
-    #         # Load the object in pybullet. Returns a pybullet id that we can use to load it in the renderer
-    #         assert self.scene is not None, "import_object needs to be called after import_scene"
-    #         self.scene.add_object(obj, self, _is_call_from_simulator=True)
+    def import_object(self, obj):
+        """
+        Import a non-robot object into the simulator.
+
+        :param obj: BaseObject, a non-robot object to load
+        """
+        assert isinstance(obj, BaseObject), "import_object can only be called with BaseObject"
+
+        # TODO
+        if False:#isinstance(obj, VisualMarker) or isinstance(obj, Particle):
+            # Marker objects can be imported without a scene.
+            obj.load(self)
+        else:
+            # Non-marker objects require a Scene to be imported.
+            # Load the object in pybullet. Returns a pybullet id that we can use to load it in the renderer
+            assert self.scene is not None, "import_object needs to be called after import_scene"
+            self.scene.add_object(obj, self, _is_call_from_simulator=True)
     #
     # # TODO
     # def import_robot(self, robot):
@@ -528,3 +529,39 @@ class Simulator(SimulationContext):
             DataLogger: [description]
         """
         return self._data_logger
+
+    def create_joint(self, prim_path, joint_type, body0=None, body1=None):
+        """
+        Creates a joint between @body0 and @body1 of specified type @joint_type
+
+        :param prim_path: str, absolute path to where the joint will be created
+        :param joint_type: str, type of joint to create. Valid options are:
+            "FixedJoint", "Joint", "PrismaticJoint", "RevoluteJoint", "SphericalJoint"
+        :param body0: str, absolute path to the first body's prim. At least @body0 or @body1 must be specified.
+        :param body1: str, absolute path to the second body's prim. At least @body0 or @body1 must be specified.
+
+        :return UsdPhysics.<JointType>: Created joint
+        """
+        # Make sure we have valid joint_type
+        assert joint_type in {"Joint", "FixedJoint", "PrismaticJoint", "RevoluteJoint", "SphericalJoint"},\
+            f"Invalid joint specified for creation: {joint_type}"
+
+        # Make sure at least body0 or body1 is specified
+        assert body0 is not None and body1 is not None, \
+            f"At least either body0 or body1 must be specified when creating a joint!"
+
+        # Create the joint
+        joint = UsdPhysics.__dict__[joint_type].Define(self.stage, prim_path)
+
+        # Possibly add body0, body1 targets
+        if body0 is not None:
+            joint.GetBody0Rel().SetTargets([Sdf.Path(body0)])
+        if body1 is not None:
+            joint.GetBody1Rel().SetTargets([Sdf.Path(body1)])
+
+        # Apply this joint
+        PhysxSchema.PhysxJointAPI.Apply()
+
+        # Return this joint
+        return joint
+

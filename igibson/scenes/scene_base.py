@@ -137,22 +137,24 @@ class Scene(with_metaclass(ABCMeta)):
         if self.loaded and not _is_call_from_simulator:
             raise ValueError("To add an object to an already-loaded scene, use the Simulator's import_object function.")
 
-        if isinstance(obj, VisualMarker) or isinstance(obj, Particle):
-            raise ValueError("VisualMarker and Particle objects and subclasses should be added directly to simulator.")
+        # TODO
+        # if isinstance(obj, VisualMarker) or isinstance(obj, Particle):
+        #     raise ValueError("VisualMarker and Particle objects and subclasses should be added directly to simulator.")
 
         # If the scene is already loaded, we need to load this object separately. Otherwise, don't do anything now,
         # let scene._load() load the object when called later on.
-        body_ids = None
+        prim = None
         if self.loaded:
-            body_ids = obj.load(simulator)
+            prim = obj.load(simulator)
 
         self._add_object(obj)
 
-        # Keeps track of all the robots separately
-        if isinstance(obj, BaseRobot):
-            self.robots.append(obj)
+        # TODO
+        # # Keeps track of all the robots separately
+        # if isinstance(obj, BaseRobot):
+        #     self.robots.append(obj)
 
-        return body_ids
+        return prim
 
     def add(self, obj: XFormPrim) -> XFormPrim:
         """[summary]

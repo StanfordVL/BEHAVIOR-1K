@@ -9,7 +9,7 @@ from PIL import Image
 from transforms3d.euler import euler2quat
 
 import igibson
-from igibson.objects.articulated_object import ArticulatedObject
+from igibson.objects.usd_object import ArticulatedObject
 from igibson.render.mesh_renderer.mesh_renderer_settings import MeshRendererSettings
 from igibson.render.profiler import Profiler
 from igibson.scenes.empty_scene import EmptyScene

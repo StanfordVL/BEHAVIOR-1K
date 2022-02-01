@@ -8,7 +8,7 @@ import trimesh
 from scipy.spatial.transform import Rotation
 
 import igibson
-from igibson.objects.articulated_object import URDFObject
+from igibson.objects.usd_object import URDFObject
 from igibson.scenes.empty_scene import EmptyScene
 from igibson.simulator import Simulator
 from igibson.utils import utils

@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from igibson.object_states.utils import sample_kinematics
-from igibson.objects.articulated_object import URDFObject
+from igibson.objects.usd_object import URDFObject
 from igibson.render.mesh_renderer.mesh_renderer_settings import MeshRendererSettings
 from igibson.scenes.interactive_traversable_scene import InteractiveIndoorScene
 from igibson.simulator import Simulator

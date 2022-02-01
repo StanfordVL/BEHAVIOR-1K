@@ -32,79 +32,48 @@ from igibson.utils import utils
 from igibson.utils.urdf_utils import add_fixed_link, get_base_link_name, round_up, save_urdfs_without_floating_joints
 from igibson.utils.utils import mat_to_quat_pos, rotate_vector_3d
 
+from omni.isaac.core.utils.stage import add_reference_to_stage
+from omni.isaac.core.utils.prims import get_prim_at_path
 
-class ArticulatedObject(StatefulObject):
+class USDObject(StatefulObject):
     """
-    Articulated objects are defined in URDF files.
-    They are passive (no motors).
-    """
-
-    def __init__(self, filename, scale=1, merge_fixed_links=True, **kwargs):
-        super(ArticulatedObject, self).__init__(**kwargs)
-        self.filename = filename
-        self.scale = scale
-        self.merge_fixed_links = merge_fixed_links
-
-    def _load(self, simulator):
-        """
-        Load the object into pybullet
-        """
-        flags = p.URDF_USE_MATERIAL_COLORS_FROM_MTL | p.URDF_ENABLE_SLEEPING
-        if self.merge_fixed_links:
-            flags |= p.URDF_MERGE_FIXED_LINKS
-
-        body_id = p.loadURDF(self.filename, globalScaling=self.scale, flags=flags)
-
-        self.mass = p.getDynamicsInfo(body_id, -1)[0]
-
-        simulator.load_object_in_renderer(self, body_id, self.class_id, **self._rendering_params)
-
-        return [body_id]
-
-
-class RBOObject(ArticulatedObject):
-    """
-    RBO object from assets/models/rbo
-    Reference: https://tu-rbo.github.io/articulated-objects/
-    """
-
-    def __init__(self, name, scale=1):
-        filename = os.path.join(igibson.assets_path, "models", "rbo", name, "configuration", "{}.urdf".format(name))
-        super(RBOObject, self).__init__(filename, scale)
-
-
-class URDFObject(StatefulObject):
-    """
-    URDFObjects are instantiated from a URDF file. They can be composed of one
+    # TODO: Update
+    USDObjects are instantiated from a USD file. They can be composed of one
     or more links and joints. They should be passive. We use this class to
     parse our modified link tag for URDFs that embed objects into scenes
     """
 
     def __init__(
         self,
-        filename,
+        prim_path,
+        usd_path=None,
+        name=None,
+        category="object",
+        class_id=None,
+        scale=None,
+        rendering_params=None,
+        visible=True,
+        fixed_base=False,
         abilities=None,
         model_path=None,
         bounding_box=None,
-        scale=None,
         fit_avg_dim_volume=False,
-        fixed_base=False,
         avg_obj_dims=None,
         joint_friction=None,
         in_rooms=None,
         texture_randomization=False,
-        overwrite_inertial=True,
+        # overwrite_inertial=True,
         scene_instance_folder=None,
         bddl_object_scope=None,
-        visualize_primitives=False,
-        merge_fixed_links=True,
-        **kwargs,
+        # visualize_primitives=False,
+        # merge_fixed_links=True,
     ):
         """
+        # TODO: Update
         :param filename: urdf file path of that object model
         :param name: object name, unique for each object instance, e.g. door_3
         :param category: object category, e.g. door
-        :param abilities: a list of abilities to instantiate the correspounding object states
+        :param abilities: a list of abilities to instantiate the corresponding object states
         :param model_path: folder path of that object model
         :param bounding_box: bounding box of this object
         :param scale: scaling factor of this object
@@ -122,64 +91,75 @@ class URDFObject(StatefulObject):
             List[Dict[name, Tuple(position, velocity)]]
         :param merge_fixed_links: whether to merge fixed links when importing to pybullet
         """
-        super(URDFObject, self).__init__(**kwargs)
-
+        super().__init__(
+            prim_path=prim_path,
+            name=name,
+            category=category,
+            class_id=class_id,
+            scale=scale,
+            rendering_params=rendering_params,
+            visible=visible,
+            fixed_base=fixed_base,
+            abilities=abilities,
+        )
+        self._usd_path = usd_path
         self.in_rooms = in_rooms
-        self.fixed_base = fixed_base
         self.texture_randomization = texture_randomization
-        self.overwrite_inertial = overwrite_inertial
+        # self.overwrite_inertial = overwrite_inertial
         self.scene_instance_folder = scene_instance_folder
         self.bddl_object_scope = bddl_object_scope
-        self.merge_fixed_links = merge_fixed_links
+        # self.merge_fixed_links = merge_fixed_links
         self.room_floor = None
 
         # Friction for all prismatic and revolute joints
+        # TODO: Shouldn't these be baked into the USD directly?
         if joint_friction is not None:
             self.joint_friction = joint_friction
         else:
             if self.category in ["oven", "dishwasher"]:
-                self.joint_friction = 30
+                self.joint_friction = 30.0
             elif self.category in ["toilet"]:
-                self.joint_friction = 3
+                self.joint_friction = 3.0
             else:
-                self.joint_friction = 10
+                self.joint_friction = 10.0
 
-        # These following fields have exactly the same length (i.e. the number
-        # of sub URDFs in this object)
-        # urdf_paths, string
-        self.urdf_paths = []
-        # local transformations from sub URDFs to the main body
-        self.local_transforms = []
-        # whether these sub URDFs are fixed
-        self.is_fixed = []
-
-        self.main_body = -1
+        # # These following fields have exactly the same length (i.e. the number
+        # # of sub URDFs in this object)
+        # # urdf_paths, string
+        # self.urdf_paths = []
+        # # local transformations from sub URDFs to the main body
+        # self.local_transforms = []
+        # # whether these sub URDFs are fixed
+        # self.is_fixed = []
+        #
+        # self.main_body = -1
 
         logging.info("Category " + self.category)
-        self.filename = filename
-        dirname = os.path.dirname(filename)
-        urdf = os.path.basename(filename)
-        urdf_name, _ = os.path.splitext(urdf)
-        simplified_urdf = os.path.join(dirname, urdf_name + "_simplified.urdf")
-        if os.path.exists(simplified_urdf):
-            self.filename = simplified_urdf
-            filename = simplified_urdf
-        logging.info("Loading the following URDF template " + filename)
-        self.object_tree = ET.parse(filename)  # Parse the URDF
+        # self.filename = filename
+        # dirname = os.path.dirname(filename)
+        # urdf = os.path.basename(filename)
+        # urdf_name, _ = os.path.splitext(urdf)
+        # simplified_urdf = os.path.join(dirname, urdf_name + "_simplified.urdf")
+        # if os.path.exists(simplified_urdf):
+        #     self.filename = simplified_urdf
+        #     filename = simplified_urdf
+        logging.info("Loading the following USD template " + self._usd_path)
+        # self.object_tree = ET.parse(filename)  # Parse the URDF
 
-        if not visualize_primitives:
-            for link in self.object_tree.findall("link"):
-                for element in link:
-                    if element.tag == "visual" and len(element.findall(".//box")) > 0:
-                        link.remove(element)
+        # TODO: May need to come back to this if extra boxes are being visually loaded (e.g.: with the "simplified" objects)
+        # if not visualize_primitives:
+        #     for link in self.object_tree.findall("link"):
+        #         for element in link:
+        #             if element.tag == "visual" and len(element.findall(".//box")) > 0:
+        #                 link.remove(element)
 
         self.model_path = model_path
         if self.model_path is None:
-            self.model_path = os.path.dirname(filename)
+            self.model_path = os.path.dirname(self._usd_path)
 
-        # Change the mesh filenames to include the entire path
-        for mesh in self.object_tree.iter("mesh"):
-            mesh.attrib["filename"] = os.path.join(self.model_path, mesh.attrib["filename"])
+        # # Change the mesh filenames to include the entire path
+        # for mesh in self.object_tree.iter("mesh"):
+        #     mesh.attrib["filename"] = os.path.join(self.model_path, mesh.attrib["filename"])
 
         # Apply the desired bounding box size / scale
         # First obtain the scaling factor
@@ -602,321 +582,338 @@ class URDFObject(StatefulObject):
                 new_origin_xyz = np.array([round_up(val, 10) for val in new_origin_xyz])
                 origin.attrib["xyz"] = " ".join(map(str, new_origin_xyz))
 
-    def remove_floating_joints(self, folder=None):
-        """
-        Split a single urdf to multiple urdfs if there exist floating joints
-        """
-        if folder is None:
-            timestr = time.strftime("%Y%m%d-%H%M%S")
-            folder = os.path.join(
-                igibson.ig_dataset_path,
-                "scene_instances",
-                "{}_{}_{}".format(timestr, random.getrandbits(64), os.getpid()),
-            )
-            os.makedirs(folder, exist_ok=True)
+    # def remove_floating_joints(self, folder=None):
+    #     """
+    #     Split a single urdf to multiple urdfs if there exist floating joints
+    #     """
+    #     if folder is None:
+    #         timestr = time.strftime("%Y%m%d-%H%M%S")
+    #         folder = os.path.join(
+    #             igibson.ig_dataset_path,
+    #             "scene_instances",
+    #             "{}_{}_{}".format(timestr, random.getrandbits(64), os.getpid()),
+    #         )
+    #         os.makedirs(folder, exist_ok=True)
+    #
+    #     # Deal with floating joints inside the embedded urdf
+    #     file_prefix = os.path.join(folder, self.name)
+    #     urdfs_no_floating = save_urdfs_without_floating_joints(self.object_tree, file_prefix)
+    #
+    #     # append a new tuple of file name of the instantiated embedded urdf
+    #     # and the transformation (!= identity if its connection was floating)
+    #     for i, urdf in enumerate(urdfs_no_floating):
+    #         self.urdf_paths.append(urdfs_no_floating[urdf][0])
+    #         self.local_transforms.append(mat_to_quat_pos(urdfs_no_floating[urdf][1]))
+    #         if urdfs_no_floating[urdf][2]:
+    #             self.main_body = i
+    #             self.is_fixed.append(self.fixed_base)
+    #         else:
+    #             self.is_fixed.append(False)
 
-        # Deal with floating joints inside the embedded urdf
-        file_prefix = os.path.join(folder, self.name)
-        urdfs_no_floating = save_urdfs_without_floating_joints(self.object_tree, file_prefix)
+    # def prepare_visual_mesh_to_material(self):
+    #     # mapping between visual objects and possible textures
+    #     # multiple visual objects can share the same material
+    #     # if some sub URDF does not have visual object or this URDF is part of
+    #     # the building structure, it will have an empty dict
+    #     # [
+    #     #     {                                             # 1st sub URDF
+    #     #         'visual_1.obj': randomized_material_1
+    #     #         'visual_2.obj': randomized_material_1
+    #     #     },
+    #     #     {},                                            # 2nd sub URDF
+    #     #     {                                              # 3rd sub URDF
+    #     #         'visual_3.obj': randomized_material_2
+    #     #     }
+    #     # ]
+    #
+    #     self.visual_mesh_to_material = [{} for _ in self.urdf_paths]
+    #
+    #     # a list of all materials used for RandomizedMaterial
+    #     self.randomized_materials = []
+    #     # mapping from material class to friction coefficient
+    #     self.material_to_friction = None
+    #
+    #     # procedural material that can change based on state changes
+    #     self.procedural_material = None
+    #
+    #     self.texture_procedural_generation = False
+    #     for state in self.states:
+    #         if issubclass(state, TextureChangeStateMixin):
+    #             self.texture_procedural_generation = True
+    #             break
+    #
+    #     if self.texture_randomization and self.texture_procedural_generation:
+    #         logging.warn("Cannot support both randomized and procedural texture. Dropping texture randomization.")
+    #         self.texture_randomization = False
+    #
+    #     if self.texture_randomization:
+    #         self.prepare_randomized_texture()
+    #     if self.texture_procedural_generation:
+    #         self.prepare_procedural_texture()
+    #
+    #     self.create_link_name_vm_mapping()
 
-        # append a new tuple of file name of the instantiated embedded urdf
-        # and the transformation (!= identity if its connection was floating)
-        for i, urdf in enumerate(urdfs_no_floating):
-            self.urdf_paths.append(urdfs_no_floating[urdf][0])
-            self.local_transforms.append(mat_to_quat_pos(urdfs_no_floating[urdf][1]))
-            if urdfs_no_floating[urdf][2]:
-                self.main_body = i
-                self.is_fixed.append(self.fixed_base)
-            else:
-                self.is_fixed.append(False)
-
-    def prepare_visual_mesh_to_material(self):
-        # mapping between visual objects and possible textures
-        # multiple visual objects can share the same material
-        # if some sub URDF does not have visual object or this URDF is part of
-        # the building structure, it will have an empty dict
-        # [
-        #     {                                             # 1st sub URDF
-        #         'visual_1.obj': randomized_material_1
-        #         'visual_2.obj': randomized_material_1
-        #     },
-        #     {},                                            # 2nd sub URDF
-        #     {                                              # 3rd sub URDF
-        #         'visual_3.obj': randomized_material_2
-        #     }
-        # ]
-
-        self.visual_mesh_to_material = [{} for _ in self.urdf_paths]
-
-        # a list of all materials used for RandomizedMaterial
-        self.randomized_materials = []
-        # mapping from material class to friction coefficient
-        self.material_to_friction = None
-
-        # procedural material that can change based on state changes
-        self.procedural_material = None
-
-        self.texture_procedural_generation = False
-        for state in self.states:
-            if issubclass(state, TextureChangeStateMixin):
-                self.texture_procedural_generation = True
-                break
-
-        if self.texture_randomization and self.texture_procedural_generation:
-            logging.warn("Cannot support both randomized and procedural texture. Dropping texture randomization.")
-            self.texture_randomization = False
-
-        if self.texture_randomization:
-            self.prepare_randomized_texture()
-        if self.texture_procedural_generation:
-            self.prepare_procedural_texture()
-
-        self.create_link_name_vm_mapping()
-
-    def create_link_name_vm_mapping(self):
-        self.link_name_to_vm = []
-
-        for i in range(len(self.urdf_paths)):
-            link_name_to_vm_urdf = {}
-            sub_urdf_tree = ET.parse(self.urdf_paths[i])
-
-            links = sub_urdf_tree.findall("link")
-            for link in links:
-                name = link.attrib["name"]
-                if name in link_name_to_vm_urdf:
-                    raise ValueError("link name collision")
-                link_name_to_vm_urdf[name] = []
-                for visual_mesh in link.findall("visual/geometry/mesh"):
-                    link_name_to_vm_urdf[name].append(visual_mesh.attrib["filename"])
-
-            if self.merge_fixed_links:
-                # Add visual meshes of the child link to the parent link for fixed joints because they will be merged
-                # by pybullet after loading
-                vms_before_merging = set([item for _, vms in link_name_to_vm_urdf.items() for item in vms])
-                directed_graph = nx.DiGraph()
-                child_to_parent = dict()
-                for joint in sub_urdf_tree.findall("joint"):
-                    if joint.attrib["type"] == "fixed":
-                        child_link_name = joint.find("child").attrib["link"]
-                        parent_link_name = joint.find("parent").attrib["link"]
-                        directed_graph.add_edge(child_link_name, parent_link_name)
-                        child_to_parent[child_link_name] = parent_link_name
-                for child_link_name in list(nx.algorithms.topological_sort(directed_graph)):
-                    if child_link_name in child_to_parent:
-                        parent_link_name = child_to_parent[child_link_name]
-                        link_name_to_vm_urdf[parent_link_name].extend(link_name_to_vm_urdf[child_link_name])
-                        del link_name_to_vm_urdf[child_link_name]
-                vms_after_merging = set([item for _, vms in link_name_to_vm_urdf.items() for item in vms])
-                assert vms_before_merging == vms_after_merging
-
-            self.link_name_to_vm.append(link_name_to_vm_urdf)
-
-    def randomize_texture(self):
-        """
-        Randomize texture and material for each link / visual shape
-        """
-        for material in self.randomized_materials:
-            material.randomize()
-        self.update_friction()
-
-    def update_friction(self):
-        """
-        Update the surface lateral friction for each link based on its material
-        """
-        if self.material_to_friction is None:
-            return
-        for i in range(len(self.urdf_paths)):
-            # if the sub URDF does not have visual meshes
-            if len(self.visual_mesh_to_material[i]) == 0:
-                continue
-            body_id = self.get_body_ids()[i]
-            sub_urdf_tree = ET.parse(self.urdf_paths[i])
-
-            for j in np.arange(-1, p.getNumJoints(body_id)):
-                # base_link
-                if j == -1:
-                    link_name = p.getBodyInfo(body_id)[0].decode("UTF-8")
-                else:
-                    link_name = p.getJointInfo(body_id, j)[12].decode("UTF-8")
-                link = sub_urdf_tree.find(".//link[@name='{}']".format(link_name))
-                link_materials = []
-                for visual_mesh in link.findall("visual/geometry/mesh"):
-                    link_materials.append(self.visual_mesh_to_material[i][visual_mesh.attrib["filename"]])
-                link_frictions = []
-                for link_material in link_materials:
-                    if link_material.random_class is None:
-                        friction = 0.5
-                    elif link_material.random_class not in self.material_to_friction:
-                        friction = 0.5
-                    else:
-                        friction = self.material_to_friction.get(link_material.random_class, 0.5)
-                    link_frictions.append(friction)
-                link_friction = np.mean(link_frictions)
-                p.changeDynamics(body_id, j, lateralFriction=link_friction)
-
-    def prepare_randomized_texture(self):
-        """
-        Set up mapping from visual meshes to randomizable materials
-        """
-        if self.category in ["walls", "floors", "ceilings"]:
-            material_groups_file = os.path.join(
-                self.model_path, "misc", "{}_material_groups.json".format(self.category)
-            )
-        else:
-            material_groups_file = os.path.join(self.model_path, "misc", "material_groups.json")
-
-        assert os.path.isfile(material_groups_file), "cannot find material group: {}".format(material_groups_file)
-        with open(material_groups_file) as f:
-            material_groups = json.load(f)
-
-        # create randomized material for each material group
-        all_material_categories = material_groups[0]
-        all_materials = {}
-        for key in all_material_categories:
-            all_materials[int(key)] = RandomizedMaterial(all_material_categories[key])
-
-        # make visual mesh file path absolute
-        visual_mesh_to_idx = material_groups[1]
-        for old_path in list(visual_mesh_to_idx.keys()):
-            new_path = os.path.join(self.model_path, "shape", "visual", old_path)
-            visual_mesh_to_idx[new_path] = visual_mesh_to_idx[old_path]
-            del visual_mesh_to_idx[old_path]
-
-        # check each visual object belongs to which sub URDF in case of splitting
-        for i, urdf_path in enumerate(self.urdf_paths):
-            sub_urdf_tree = ET.parse(urdf_path)
-            for visual_mesh_path in visual_mesh_to_idx:
-                # check if this visual object belongs to this URDF
-                if sub_urdf_tree.find(".//mesh[@filename='{}']".format(visual_mesh_path)) is not None:
-                    self.visual_mesh_to_material[i][visual_mesh_path] = all_materials[
-                        visual_mesh_to_idx[visual_mesh_path]
-                    ]
-
-        self.randomized_materials = list(all_materials.values())
-
-        friction_json = os.path.join(igibson.ig_dataset_path, "materials", "material_friction.json")
-        if os.path.isfile(friction_json):
-            with open(friction_json) as f:
-                self.material_to_friction = json.load(f)
-
-    def prepare_procedural_texture(self):
-        """
-        Set up mapping from visual meshes to procedural materials
-        Assign all visual meshes to the same ProceduralMaterial
-        """
-        procedural_material = ProceduralMaterial(material_folder=os.path.join(self.model_path, "material"))
-
-        for i, urdf_path in enumerate(self.urdf_paths):
-            sub_urdf_tree = ET.parse(urdf_path)
-            for visual_mesh in sub_urdf_tree.findall("link/visual/geometry/mesh"):
-                filename = visual_mesh.attrib["filename"]
-                self.visual_mesh_to_material[i][filename] = procedural_material
-
-        for state in self.states:
-            if issubclass(state, TextureChangeStateMixin):
-                procedural_material.add_state(state)
-                self.states[state].material = procedural_material
-
-        self.procedural_material = procedural_material
+    # def create_link_name_vm_mapping(self):
+    #     self.link_name_to_vm = []
+    #
+    #     for i in range(len(self.urdf_paths)):
+    #         link_name_to_vm_urdf = {}
+    #         sub_urdf_tree = ET.parse(self.urdf_paths[i])
+    #
+    #         links = sub_urdf_tree.findall("link")
+    #         for link in links:
+    #             name = link.attrib["name"]
+    #             if name in link_name_to_vm_urdf:
+    #                 raise ValueError("link name collision")
+    #             link_name_to_vm_urdf[name] = []
+    #             for visual_mesh in link.findall("visual/geometry/mesh"):
+    #                 link_name_to_vm_urdf[name].append(visual_mesh.attrib["filename"])
+    #
+    #         if self.merge_fixed_links:
+    #             # Add visual meshes of the child link to the parent link for fixed joints because they will be merged
+    #             # by pybullet after loading
+    #             vms_before_merging = set([item for _, vms in link_name_to_vm_urdf.items() for item in vms])
+    #             directed_graph = nx.DiGraph()
+    #             child_to_parent = dict()
+    #             for joint in sub_urdf_tree.findall("joint"):
+    #                 if joint.attrib["type"] == "fixed":
+    #                     child_link_name = joint.find("child").attrib["link"]
+    #                     parent_link_name = joint.find("parent").attrib["link"]
+    #                     directed_graph.add_edge(child_link_name, parent_link_name)
+    #                     child_to_parent[child_link_name] = parent_link_name
+    #             for child_link_name in list(nx.algorithms.topological_sort(directed_graph)):
+    #                 if child_link_name in child_to_parent:
+    #                     parent_link_name = child_to_parent[child_link_name]
+    #                     link_name_to_vm_urdf[parent_link_name].extend(link_name_to_vm_urdf[child_link_name])
+    #                     del link_name_to_vm_urdf[child_link_name]
+    #             vms_after_merging = set([item for _, vms in link_name_to_vm_urdf.items() for item in vms])
+    #             assert vms_before_merging == vms_after_merging
+    #
+    #         self.link_name_to_vm.append(link_name_to_vm_urdf)
+    #
+    # def randomize_texture(self):
+    #     """
+    #     Randomize texture and material for each link / visual shape
+    #     """
+    #     for material in self.randomized_materials:
+    #         material.randomize()
+    #     self.update_friction()
+    #
+    # def update_friction(self):
+    #     """
+    #     Update the surface lateral friction for each link based on its material
+    #     """
+    #     if self.material_to_friction is None:
+    #         return
+    #     for i in range(len(self.urdf_paths)):
+    #         # if the sub URDF does not have visual meshes
+    #         if len(self.visual_mesh_to_material[i]) == 0:
+    #             continue
+    #         body_id = self.get_body_ids()[i]
+    #         sub_urdf_tree = ET.parse(self.urdf_paths[i])
+    #
+    #         for j in np.arange(-1, p.getNumJoints(body_id)):
+    #             # base_link
+    #             if j == -1:
+    #                 link_name = p.getBodyInfo(body_id)[0].decode("UTF-8")
+    #             else:
+    #                 link_name = p.getJointInfo(body_id, j)[12].decode("UTF-8")
+    #             link = sub_urdf_tree.find(".//link[@name='{}']".format(link_name))
+    #             link_materials = []
+    #             for visual_mesh in link.findall("visual/geometry/mesh"):
+    #                 link_materials.append(self.visual_mesh_to_material[i][visual_mesh.attrib["filename"]])
+    #             link_frictions = []
+    #             for link_material in link_materials:
+    #                 if link_material.random_class is None:
+    #                     friction = 0.5
+    #                 elif link_material.random_class not in self.material_to_friction:
+    #                     friction = 0.5
+    #                 else:
+    #                     friction = self.material_to_friction.get(link_material.random_class, 0.5)
+    #                 link_frictions.append(friction)
+    #             link_friction = np.mean(link_frictions)
+    #             p.changeDynamics(body_id, j, lateralFriction=link_friction)
+    #
+    # def prepare_randomized_texture(self):
+    #     """
+    #     Set up mapping from visual meshes to randomizable materials
+    #     """
+    #     if self.category in ["walls", "floors", "ceilings"]:
+    #         material_groups_file = os.path.join(
+    #             self.model_path, "misc", "{}_material_groups.json".format(self.category)
+    #         )
+    #     else:
+    #         material_groups_file = os.path.join(self.model_path, "misc", "material_groups.json")
+    #
+    #     assert os.path.isfile(material_groups_file), "cannot find material group: {}".format(material_groups_file)
+    #     with open(material_groups_file) as f:
+    #         material_groups = json.load(f)
+    #
+    #     # create randomized material for each material group
+    #     all_material_categories = material_groups[0]
+    #     all_materials = {}
+    #     for key in all_material_categories:
+    #         all_materials[int(key)] = RandomizedMaterial(all_material_categories[key])
+    #
+    #     # make visual mesh file path absolute
+    #     visual_mesh_to_idx = material_groups[1]
+    #     for old_path in list(visual_mesh_to_idx.keys()):
+    #         new_path = os.path.join(self.model_path, "shape", "visual", old_path)
+    #         visual_mesh_to_idx[new_path] = visual_mesh_to_idx[old_path]
+    #         del visual_mesh_to_idx[old_path]
+    #
+    #     # check each visual object belongs to which sub URDF in case of splitting
+    #     for i, urdf_path in enumerate(self.urdf_paths):
+    #         sub_urdf_tree = ET.parse(urdf_path)
+    #         for visual_mesh_path in visual_mesh_to_idx:
+    #             # check if this visual object belongs to this URDF
+    #             if sub_urdf_tree.find(".//mesh[@filename='{}']".format(visual_mesh_path)) is not None:
+    #                 self.visual_mesh_to_material[i][visual_mesh_path] = all_materials[
+    #                     visual_mesh_to_idx[visual_mesh_path]
+    #                 ]
+    #
+    #     self.randomized_materials = list(all_materials.values())
+    #
+    #     friction_json = os.path.join(igibson.ig_dataset_path, "materials", "material_friction.json")
+    #     if os.path.isfile(friction_json):
+    #         with open(friction_json) as f:
+    #             self.material_to_friction = json.load(f)
+    #
+    # def prepare_procedural_texture(self):
+    #     """
+    #     Set up mapping from visual meshes to procedural materials
+    #     Assign all visual meshes to the same ProceduralMaterial
+    #     """
+    #     procedural_material = ProceduralMaterial(material_folder=os.path.join(self.model_path, "material"))
+    #
+    #     for i, urdf_path in enumerate(self.urdf_paths):
+    #         sub_urdf_tree = ET.parse(urdf_path)
+    #         for visual_mesh in sub_urdf_tree.findall("link/visual/geometry/mesh"):
+    #             filename = visual_mesh.attrib["filename"]
+    #             self.visual_mesh_to_material[i][filename] = procedural_material
+    #
+    #     for state in self.states:
+    #         if issubclass(state, TextureChangeStateMixin):
+    #             procedural_material.add_state(state)
+    #             self.states[state].material = procedural_material
+    #
+    #     self.procedural_material = procedural_material
 
     def _load(self, simulator):
         """
         Load the object into pybullet and set it to the correct pose
         """
-        body_ids = []
+        # Add reference to stage and grab prim
+        add_reference_to_stage(usd_path=self._usd_path, prim_path=self._prim_path)
+        prim = get_prim_at_path(self._prim_path)
 
-        flags = p.URDF_ENABLE_SLEEPING
-        if self.merge_fixed_links:
-            flags |= p.URDF_MERGE_FIXED_LINKS
+        # body_ids = []
 
-        if igibson.ignore_visual_shape:
-            flags |= p.URDF_IGNORE_VISUAL_SHAPES
+        # flags = p.URDF_ENABLE_SLEEPING
+        # if self.merge_fixed_links:
+        #     flags |= p.URDF_MERGE_FIXED_LINKS
+        #
+        # if igibson.ignore_visual_shape:
+        #     flags |= p.URDF_IGNORE_VISUAL_SHAPES
 
-        for idx in range(len(self.urdf_paths)):
-            logging.info("Loading " + self.urdf_paths[idx])
-            is_fixed = self.is_fixed[idx]
-            body_id = p.loadURDF(self.urdf_paths[idx], flags=flags, useFixedBase=is_fixed)
-            p.changeDynamics(body_id, -1, activationState=p.ACTIVATION_STATE_ENABLE_SLEEPING)
+        # for idx in range(len(self.urdf_paths)):
+        #     logging.info("Loading " + self.urdf_paths[idx])
+        #     is_fixed = self.is_fixed[idx]
+        #     body_id = p.loadURDF(self.urdf_paths[idx], flags=flags, useFixedBase=is_fixed)
+        #     p.changeDynamics(body_id, -1, activationState=p.ACTIVATION_STATE_ENABLE_SLEEPING)
+        #
+        #     # Set joint friction
+        #     for j in range(p.getNumJoints(body_id)):
+        #         info = p.getJointInfo(body_id, j)
+        #         joint_type = info[2]
+        #         if joint_type in [p.JOINT_REVOLUTE, p.JOINT_PRISMATIC]:
+        #             p.setJointMotorControl2(
+        #                 body_id, j, p.VELOCITY_CONTROL, targetVelocity=0.0, force=self.joint_friction
+        #             )
+        #
+        #     simulator.load_object_in_renderer(
+        #         self,
+        #         body_id,
+        #         self.class_id,
+        #         visual_mesh_to_material=self.visual_mesh_to_material[idx],
+        #         link_name_to_vm=self.link_name_to_vm[idx],
+        #         **self._rendering_params
+        #     )
+        #
+        #     body_ids.append(body_id)
 
-            # Set joint friction
-            for j in range(p.getNumJoints(body_id)):
-                info = p.getJointInfo(body_id, j)
-                joint_type = info[2]
-                if joint_type in [p.JOINT_REVOLUTE, p.JOINT_PRISMATIC]:
-                    p.setJointMotorControl2(
-                        body_id, j, p.VELOCITY_CONTROL, targetVelocity=0.0, force=self.joint_friction
-                    )
+        # self.load_supporting_surfaces()
 
-            simulator.load_object_in_renderer(
-                self,
-                body_id,
-                self.class_id,
-                visual_mesh_to_material=self.visual_mesh_to_material[idx],
-                link_name_to_vm=self.link_name_to_vm[idx],
-                **self._rendering_params
-            )
+        return prim
 
-            body_ids.append(body_id)
+    def initialize(self):
+        # Run super method first
+        super().initialize()
 
-        self.load_supporting_surfaces()
-
-        return body_ids
+        # Also set the joint friction values
+        # TODO: Move all joint info to separate class
+        for i in range(self._dc_interface.get_articulation_joint_count(self._handle)):
+            joint_handle = self._dc_interface.get_articulation_joint(self._handle, i)
+            joint_path = self._dc_interface.get_joint_path(joint_handle)
+            joint_prim = get_prim_at_path(joint_path)
+            joint_prim.GetAttribute("physxJoint:jointFriction").Set(self.joint_friction)
 
     def set_bbox_center_position_orientation(self, pos, orn):
+        # TODO
         rotated_offset = p.multiplyTransforms([0, 0, 0], orn, self.scaled_bbxc_in_blf, [0, 0, 0, 1])[0]
         self.set_base_link_position_orientation(pos + rotated_offset, orn)
 
-    def set_position_orientation(self, pos, orn):
-        # TODO: replace this with super() call once URDFObject no longer works with multiple body ids
-        p.resetBasePositionAndOrientation(self.get_body_ids()[self.main_body], pos, orn)
+    # def set_position_orientation(self, pos, orn):
+    #     # TODO: replace this with super() call once URDFObject no longer works with multiple body ids
+    #     p.resetBasePositionAndOrientation(self.get_body_ids()[self.main_body], pos, orn)
+    #
+    #     # Get pose of the main body base link frame.
+    #     dynamics_info = p.getDynamicsInfo(self.get_body_ids()[self.main_body], -1)
+    #     inertial_pos, inertial_orn = dynamics_info[3], dynamics_info[4]
+    #     inv_inertial_pos, inv_inertial_orn = p.invertTransform(inertial_pos, inertial_orn)
+    #     link_frame_pos, link_frame_orn = p.multiplyTransforms(pos, orn, inv_inertial_pos, inv_inertial_orn)
+    #
+    #     # Set the non-main bodies to their original local poses
+    #     for i, body_id in enumerate(self.get_body_ids()):
+    #         if body_id == self.get_body_ids()[self.main_body]:
+    #             continue
+    #
+    #         # Get pose of the sub URDF base link frame
+    #         sub_urdf_pos, sub_urdf_orn = p.multiplyTransforms(link_frame_pos, link_frame_orn, *self.local_transforms[i])
+    #
+    #         # Convert to CoM frame
+    #         dynamics_info = p.getDynamicsInfo(body_id, -1)
+    #         inertial_pos, inertial_orn = dynamics_info[3], dynamics_info[4]
+    #         sub_urdf_pos, sub_urdf_orn = p.multiplyTransforms(sub_urdf_pos, sub_urdf_orn, inertial_pos, inertial_orn)
+    #
+    #         p.resetBasePositionAndOrientation(body_id, sub_urdf_pos, sub_urdf_orn)
+    #
+    #     clear_cached_states(self)
 
-        # Get pose of the main body base link frame.
-        dynamics_info = p.getDynamicsInfo(self.get_body_ids()[self.main_body], -1)
-        inertial_pos, inertial_orn = dynamics_info[3], dynamics_info[4]
-        inv_inertial_pos, inv_inertial_orn = p.invertTransform(inertial_pos, inertial_orn)
-        link_frame_pos, link_frame_orn = p.multiplyTransforms(pos, orn, inv_inertial_pos, inv_inertial_orn)
+    # def set_base_link_position_orientation(self, pos, orn):
+    #     """Set object base link position and orientation in the format of Tuple[Array[x, y, z], Array[x, y, z, w]]"""
+    #     dynamics_info = p.getDynamicsInfo(self.get_body_ids()[self.main_body], -1)
+    #     inertial_pos, inertial_orn = dynamics_info[3], dynamics_info[4]
+    #     pos, orn = p.multiplyTransforms(pos, orn, inertial_pos, inertial_orn)
+    #     self.set_position_orientation(pos, orn)
 
-        # Set the non-main bodies to their original local poses
-        for i, body_id in enumerate(self.get_body_ids()):
-            if body_id == self.get_body_ids()[self.main_body]:
-                continue
-
-            # Get pose of the sub URDF base link frame
-            sub_urdf_pos, sub_urdf_orn = p.multiplyTransforms(link_frame_pos, link_frame_orn, *self.local_transforms[i])
-
-            # Convert to CoM frame
-            dynamics_info = p.getDynamicsInfo(body_id, -1)
-            inertial_pos, inertial_orn = dynamics_info[3], dynamics_info[4]
-            sub_urdf_pos, sub_urdf_orn = p.multiplyTransforms(sub_urdf_pos, sub_urdf_orn, inertial_pos, inertial_orn)
-
-            p.resetBasePositionAndOrientation(body_id, sub_urdf_pos, sub_urdf_orn)
-
-        clear_cached_states(self)
-
-    def set_base_link_position_orientation(self, pos, orn):
-        """Set object base link position and orientation in the format of Tuple[Array[x, y, z], Array[x, y, z, w]]"""
-        dynamics_info = p.getDynamicsInfo(self.get_body_ids()[self.main_body], -1)
-        inertial_pos, inertial_orn = dynamics_info[3], dynamics_info[4]
-        pos, orn = p.multiplyTransforms(pos, orn, inertial_pos, inertial_orn)
-        self.set_position_orientation(pos, orn)
-
-    def add_meta_links(self, meta_links):
-        """
-        Adds the meta links (e.g. heating element position, water source position) from the metadata file
-        into the URDF tree for this object prior to loading.
-
-        :param meta_links: Dictionary of meta links in the form of {link_name: [linkX, linkY, linkZ]}
-        :return: None.
-        """
-        for meta_link_name, link_info in meta_links.items():
-            if link_info["geometry"] is not None:
-                # Objects with geometry actually need to be added into the URDF for collision purposes.
-                # These objects cannot be imported with fixed links.
-                self.merge_fixed_links = False
-                add_fixed_link(self.object_tree, meta_link_name, link_info)
-            else:
-                # Otherwise, the "link" is just an offset, so we save its position.
-                self.meta_links[meta_link_name] = np.array(link_info["xyz"])
+    # def add_meta_links(self, meta_links):
+    #     """
+    #     Adds the meta links (e.g. heating element position, water source position) from the metadata file
+    #     into the URDF tree for this object prior to loading.
+    #
+    #     :param meta_links: Dictionary of meta links in the form of {link_name: [linkX, linkY, linkZ]}
+    #     :return: None.
+    #     """
+    #     for meta_link_name, link_info in meta_links.items():
+    #         if link_info["geometry"] is not None:
+    #             # Objects with geometry actually need to be added into the URDF for collision purposes.
+    #             # These objects cannot be imported with fixed links.
+    #             self.merge_fixed_links = False
+    #             add_fixed_link(self.object_tree, meta_link_name, link_info)
+    #         else:
+    #             # Otherwise, the "link" is just an offset, so we save its position.
+    #             self.meta_links[meta_link_name] = np.array(link_info["xyz"])
 
     # TODO: remove after split floors
     def set_room_floor(self, room_floor):
@@ -931,17 +928,14 @@ class URDFObject(StatefulObject):
                 converted_name = self.get_prefixed_link_name(name)
                 self.unscaled_link_bounding_boxes[converted_name] = bb_data
 
-    def get_base_aligned_bounding_box(
-        self, body_id=None, link_id=None, visual=False, xy_aligned=False, fallback_to_aabb=False
-    ):
-        """Get a bounding box for this object that's axis-aligned in the object's base frame."""
-        if body_id is None:
-            body_id = self.get_body_ids()[self.main_body]
-
+    def get_base_aligned_bounding_box(self, visual=False, xy_aligned=False, fallback_to_aabb=False):
+        """
+        Get a bounding box for this object that's axis-aligned in the object's base frame.
+        """
         bbox_type = "visual" if visual else "collision"
 
         # Get the base position transform.
-        pos, orn = p.getBasePositionAndOrientation(body_id)
+        pos, orn = self.get_position_orientation()
         base_com_to_world = utils.quat_pos_to_mat(pos, orn)
 
         # Compute the world-to-base frame transform.

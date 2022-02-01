@@ -20,7 +20,7 @@ from bddl.object_taxonomy import ObjectTaxonomy
 import igibson
 from igibson.external.pybullet_tools.utils import *
 from igibson.object_states.on_floor import RoomFloor
-from igibson.objects.articulated_object import URDFObject
+from igibson.objects.usd_object import URDFObject
 from igibson.objects.multi_object_wrappers import ObjectGrouper, ObjectMultiplexer
 from igibson.reward_functions.potential_reward import PotentialReward
 from igibson.robots.robot_base import BaseRobot

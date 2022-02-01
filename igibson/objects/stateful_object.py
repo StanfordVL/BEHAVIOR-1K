@@ -1,5 +1,5 @@
+import sys
 import logging
-
 from igibson.object_states.factory import get_state_name, prepare_object_states
 from igibson.object_states.object_state_base import AbsoluteObjectState
 from igibson.object_states.utils import clear_cached_states
@@ -18,8 +18,28 @@ except ImportError:
 class StatefulObject(BaseObject):
     """Objects that support object states."""
 
-    def __init__(self, abilities=None, **kwargs):
-        super(StatefulObject, self).__init__(**kwargs)
+    def __init__(
+            self,
+            prim_path,
+            name=None,
+            category="object",
+            class_id=None,
+            scale=None,
+            rendering_params=None,
+            visible=True,
+            fixed_base=False,
+            abilities=None,
+    ):
+        super().__init__(
+            prim_path=prim_path,
+            name=name,
+            category=category,
+            class_id=class_id,
+            scale=scale,
+            rendering_params=rendering_params,
+            visible=visible,
+            fixed_base=fixed_base,
+        )
 
         # Load abilities from taxonomy if needed & possible
         if abilities is None:
