@@ -14,6 +14,7 @@ from omni.isaac.core.utils.rotations import gf_quat_to_np_array
 from pxr import Gf, UsdPhysics, Usd, UsdGeom
 import numpy as np
 from omni.isaac.dynamic_control import _dynamic_control
+from omni.isaac.contact_sensor import _contact_sensor
 import carb
 
 from igibson.prims.xform_prim import XFormPrim
@@ -47,11 +48,11 @@ class RigidPrim(XFormPrim):
         name,
         load_config=None,
     ):
-        # Get dynamic control interface and store initialized values
-        self._dc = _dynamic_control.acquire_dynamic_control_interface()
-
         # Other values that will be filled in at runtime
+        self._dc = None                     # Dynamic control interface
+        self._cs = None                     # Contact sensor interface
         self._handle = None
+        self._contact_handle = None
         self._body_name = None
         self._rigid_api = None
         self._mass_api = None
@@ -72,17 +73,17 @@ class RigidPrim(XFormPrim):
         self._rigid_api = UsdPhysics.RigidBodyAPI.Apply(self._prim)
         self._mass_api = UsdPhysics.MassAPI.Apply(self._prim)
 
-        # Possibly set the mass
-        if "mass" in self._load_config:
-            self.mass = self._load_config["mass"]
-
-    def _setup_references(self):
+    def _initialize(self):
         # Run super method first
-        super()._setup_references()
+        super()._initialize()
 
-        # Grab handle to this rigid body and get name
-        self._handle = self._dc.get_rigid_body(self._prim_path)
-        self._body_name = self._dc.get_rigid_body_name(self._handle)
+        # Get dynamic control and contact sensing interfaces
+        self._dc = _dynamic_control.acquire_dynamic_control_interface()
+        self._cs = _contact_sensor.acquire_contact_sensor_interface()
+
+        # Possibly set the mass
+        if "mass" in self._load_config and self._load_config["mass"] is not None:
+            self.mass = self._load_config["mass"]
 
         # Create rigid and mass apis if they weren't already created during loading
         self._rigid_api = UsdPhysics.RigidBodyAPI(self._prim) if self._rigid_api is None else self._rigid_api
@@ -90,6 +91,15 @@ class RigidPrim(XFormPrim):
 
         # Add enabled attribute for the rigid body
         self._rigid_api.CreateRigidBodyEnabledAttr(True)
+
+        # # TODO: Creating contact sensor may break the DC interface, the handles seem to change AFTER we create the sensor
+        # # Create contact sensor
+        # self._initialize_contact_sensor()
+
+        # Grab handle to this rigid body and get name
+        self._handle = self._dc.get_rigid_body(self._prim_path)
+        self._body_name = self._dc.get_rigid_body_name(self._handle)
+        print(f"handle: {self._handle}, body name: {self._body_name}")
 
         # Set the default state
         pos, ori = self.get_position_orientation()
@@ -102,6 +112,29 @@ class RigidPrim(XFormPrim):
             angular_velocity=ang_vel,
         )
 
+    def _initialize_contact_sensor(self):
+        """
+        Creates a full-body contact sensor to detect collisions with this rigid body
+        """
+        props = _contact_sensor.SensorProperties()
+        props.radius = -1.0       # Negative value implies full body sensor
+        props.minThreshold = 0          # Minimum force to detect
+        props.maxThreshold = 100000000  # Maximum force to detect
+        props.sensorPeriod = 0.0            # Zero means in sync with the simulation period
+
+        # Create sensor
+        # TODO: Update settings -- why do the custom settings above break?
+        self._contact_handle = self._cs.add_sensor_on_body(self._prim_path, props)
+
+    def contact_list(self):
+        """
+        Get list of all current contacts with this rigid body
+
+        Returns:
+            np.ndarray of CsRawData: raw contact info for this rigid body
+        """
+        return self._cs.get_body_contact_raw_data(self._prim_path)
+
     def set_linear_velocity(self, velocity):
         """Sets the linear velocity of the prim in stage.
 
@@ -109,7 +142,8 @@ class RigidPrim(XFormPrim):
             velocity (np.ndarray): linear velocity to set the rigid prim to. Shape (3,).
         """
         if self._handle is not None and self._dc.is_simulating():
-            self._dc.set_rigid_body_linear_velocity(self._handle, velocity)
+            print("setting rigid velocity")
+            print(self._dc.set_rigid_body_linear_velocity(self._handle, velocity))
         else:
             self._rigid_api.GetVelocityAttr().Set(Gf.Vec3f(velocity.tolist()))
         return
@@ -249,6 +283,15 @@ class RigidPrim(XFormPrim):
         return pos, ori
 
     @property
+    def handle(self):
+        """[summary]
+
+        Returns:
+            int: [description]
+        """
+        return self._handle
+
+    @property
     def body_name(self):
         """
         Returns:
@@ -271,6 +314,41 @@ class RigidPrim(XFormPrim):
             mass (float): mass of the rigid body in kg.
         """
         self._mass_api.GetMassAttr().Set(mass)
+
+    @property
+    def density(self):
+        """
+        Returns:
+            float: density of the rigid body in kg / m^3.
+        """
+        return self._mass_api.GetDensityAttr().Get()
+
+    @density.setter
+    def density(self, density):
+        """
+        Args:
+            density (float): density of the rigid body in kg / m^3.
+        """
+        self._mass_api.GetDensityAttr().Set(density)
+
+    def reset(self):
+        """
+        Resets the prim to its default state.
+        """
+        # Call super method to reset pose
+        super().reset()
+
+        # Also reset the velocity values
+        self.set_linear_velocity(velocity=self._default_state.linear_velocity)
+        self.set_angular_velocity(velocity=self._default_state.angular_velocity)
+
+    def get_default_state(self):
+        """
+        Returns:
+            DynamicState: returns the default state of the prim (position, orientation, linear_velocity and
+                          angular_velocity) that is used after each reset.
+        """
+        return self._default_state
 
     def set_default_state(
         self,
@@ -300,24 +378,14 @@ class RigidPrim(XFormPrim):
             self._default_state.angular_velocity = angular_velocity
         return
 
-    def get_default_state(self):
-        """
-        Returns:
-            DynamicState: returns the default state of the prim (position, orientation, linear_velocity and
-                          angular_velocity) that is used after each reset.
-        """
-        return self._default_state
-
-    def reset(self):
-        """
-        Resets the prim to its default state.
-        """
-        # Call super method to reset pose
-        super().reset()
-
-        # Also reset the velocity values
-        self.set_linear_velocity(velocity=self._default_state.linear_velocity)
-        self.set_angular_velocity(velocity=self._default_state.angular_velocity)
+    def update_default_state(self):
+        pos, ori = self.get_position_orientation()
+        self.set_default_state(
+            position=pos,
+            orientation=ori,
+            linear_velocity=self.get_linear_velocity(),
+            angular_velocity=self.get_angular_velocity(),
+        )
 
     def get_current_dynamic_state(self):
         """
@@ -344,3 +412,16 @@ class RigidPrim(XFormPrim):
         Disable physics for this rigid body
         """
         self._dc.sleep_rigid_body(self._handle)
+
+    def save_state(self):
+        pos, ori = self.get_position_orientation()
+        lin_vel = self.get_linear_velocity()
+        ang_vel = self.get_angular_velocity()
+        return np.concatenate([pos, ori, lin_vel, ang_vel])
+
+    def restore_state(self, state):
+        self.set_position_orientation(state[:3], state[3:7])
+        self.set_linear_velocity(state[7:10])
+        self.set_angular_velocity(state[10:])
+
+

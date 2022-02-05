@@ -25,6 +25,7 @@ from omni.isaac.core.utils.prims import (
 import numpy as np
 import carb
 from omni.isaac.core.utils.stage import get_current_stage
+from igibson import app
 
 
 class BasePrim(metaclass=ABCMeta):
@@ -53,25 +54,36 @@ class BasePrim(metaclass=ABCMeta):
     ):
         self._prim_path = prim_path
         self._name = name
-        self._load_config = load_config
+        self._load_config = {} if load_config is None else load_config
 
         # Other values that will be filled in at runtime
         self._applied_visual_material = None
         self._binding_api = None
-        self._loaded = False
+        self._loaded = False                                # Whether this prim exists in the stage or not
+        self._initialized = False                           # Whether this prim has its internal handles / info initialized or not (occurs AFTER and INDEPENDENTLY from loading!)
         self._prim = None
 
         # Run some post-loading steps if this prim has already been loaded
         if is_prim_path_valid(prim_path=self._prim_path):
+            print(f"prim {name} already exists")
             self._prim = get_prim_at_path(prim_path=self._prim_path)
-            self._setup_references()
             self._loaded = True
 
-    def _setup_references(self):
+    def _initialize(self):
         """
-        Sets up any references necessary post-loading
+        Initializes state of this object and sets up any references necessary post-loading. Should be implemented by
+        sub-class for extended utility
         """
         pass
+
+    def initialize(self):
+        """
+        Initializes state of this object and sets up any references necessary post-loading. Subclasses should
+        implement / extend the _initialize() method.
+        """
+        assert not self._initialized, "Prim can only be initialized once! (It is already initialized)"
+        self._initialize()
+        self._initialized = True
 
     def load(self, simulator=None):
         """
@@ -92,14 +104,6 @@ class BasePrim(metaclass=ABCMeta):
 
         # Load prim
         self._prim = self._load(simulator=simulator)
-
-        # Clear load config (should never be used again, since all these values can be polled in real-time directly
-        # from the stage)
-        self._load_config = None
-
-        # Setup any references
-        self._setup_references()
-
         self._loaded = True
 
         return self._prim
@@ -224,3 +228,38 @@ class BasePrim(metaclass=ABCMeta):
         :return dict: Dictionary of any custom information
         """
         return self._prim.GetCustomData()
+
+    @property
+    def state_size(self):
+        """
+        Returns:
+            int: Size of this object's serialized state
+        """
+        # Default is zero
+        return len(self.save_state())
+
+    @abstractmethod
+    def save_state(self):
+        """
+        Returns:
+            n-array: serialized, 1D numerical np.array capturing critical state of this prim, where n is @self.state_size
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def restore_state(self, state):
+        """
+        Deserializes and restores this prim's state based on @state
+
+        Args:
+            state (n-array): serialized, 1D numerical array capturing critical state of this prim,
+                where n is @self.state_size
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def update_default_state(self):
+        """
+        Updates default state based on current state
+        """
+        raise NotImplementedError

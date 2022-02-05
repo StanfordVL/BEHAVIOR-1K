@@ -127,41 +127,6 @@ def get_object_state_instance(state_class, obj, params=None):
 
     return state_class(obj, **params)
 
-
-def prepare_object_states(obj, abilities=None):
-    """
-    Prepare the state dictionary for an object by generating the appropriate
-    object state instances.
-
-    This uses the abilities of the object and the state dependency graph to
-    find & instantiate all relevant states.
-
-    :param obj: The object to generate states for.
-    :param abilities: dict in the form of {ability: {param: value}} containing
-        object abilities and parameters.
-    """
-    if abilities is None:
-        abilities = {}
-
-    state_types_and_params = [(state, {}) for state in get_default_states()]
-
-    # Map the ability params to the states immediately imported by the abilities
-    for ability, params in abilities.items():
-        state_types_and_params.extend((state_name, params) for state_name in get_states_for_ability(ability))
-
-    # Add the dependencies into the list, too.
-    for state_type, _ in state_types_and_params:
-        # Add each state's dependencies, too. Note that only required dependencies are added.
-        for dependency in state_type.get_dependencies():
-            if all(other_state != dependency for other_state, _ in state_types_and_params):
-                state_types_and_params.append((dependency, {}))
-
-    # Now generate the states in topological order.
-    obj.states = dict()
-    for state_type, params in reversed(state_types_and_params):
-        obj.states[state_type] = get_object_state_instance(state_type, obj, params)
-
-
 def get_state_dependency_graph():
     """
     Produce dependency graph of supported object states.

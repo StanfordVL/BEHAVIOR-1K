@@ -28,6 +28,8 @@ from omni.isaac.core.utils.stage import get_current_stage
 from igibson.prims.prim_base import BasePrim
 from igibson.utils.usd_utils import create_joint
 from igibson.utils.types import JointsState
+from igibson.utils.transform_utils import quat_inverse, quat_multiply
+from igibson.utils.constants import JointType
 
 DEFAULT_MAX_TORQUE = 100.0
 DEFAULT_MAX_WHEEL_VEL = 15.0
@@ -48,12 +50,11 @@ class JointPrim(BasePrim):
             prim_path (str): prim path of the Prim to encapsulate or create.
             name (str): Name for the object. Names need to be unique per scene.
             load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
-                loading this prim at runtime. Note that this is only needed if the prim does not already exist at
-                @prim_path -- it will be ignored if it already exists. For this joint prim, the below values can be
-                specified:
+                loading this prim at runtime. For this joint prim, the below values can be specified:
 
                 joint_type (str): If specified, should be the joint type to create. Valid options are:
-                    {"Joint", "FixedJoint", "PrismaticJoint", "RevoluteJoint", "SphericalJoint"}.
+                    {"Joint", "FixedJoint", "PrismaticJoint", "RevoluteJoint", "SphericalJoint"}
+                    (equivalently, one of JointType)
                 body0 (None or str): If specified, should be the absolute prim path to the parent body that this joint
                     is connected to. None can also be valid, which corresponds to cases where only a single body may be
                     specified (e.g.: fixed joints)
@@ -104,9 +105,7 @@ class JointPrim(BasePrim):
         stage = get_current_stage() if simulator is None else simulator.stage
         self._prim = create_joint(
             prim_path=self._prim_path,
-            joint_type=self._load_config.get("joint_type", "Joint"),
-            body0=self._load_config.get("body0", None),
-            body1=self._load_config.get("body1", None),
+            joint_type=self._load_config.get("joint_type", JointType.JOINT),
             stage=stage,
         )
 
@@ -115,12 +114,18 @@ class JointPrim(BasePrim):
 
         return self._prim
 
-    def _setup_references(self):
+    def _initialize(self):
         # Always run super first
-        super()._setup_references()
+        super()._initialize()
 
         # Get joint info
-        self._joint_type = self._prim.GetTypeName().split("Physics")[-1]
+        self._joint_type = JointType.get_type(self._prim.GetTypeName().split("Physics")[-1])
+
+        # Possibly set the bodies
+        if "body0" in self._load_config and self._load_config["body0"] is not None:
+            self.body0 = self._load_config["body0"]
+        if "body1" in self._load_config and self._load_config["body1"] is not None:
+            self.body1 = self._load_config["body1"]
 
         # Initialize dynamic control references if this joint is articulated
         if self.articulated:
@@ -187,6 +192,9 @@ class JointPrim(BasePrim):
         if efforts is not None:
             self._default_state.efforts = np.array(efforts)
 
+    def update_default_state(self):
+        self.set_default_state(*self.get_state())
+
     @property
     def body0(self):
         """
@@ -235,6 +243,36 @@ class JointPrim(BasePrim):
         assert is_prim_path_valid(body1), f"Invalid body1 path specified: {body1}"
         self._prim.GetRelationship("physics:body1").SetTargets([Sdf.Path(body1)])
 
+    def parent_name(self):
+        """
+        Gets this joint's parent body name, if it exists
+
+        Returns:
+            str: Joint's parent body name
+        """
+        return self._dc.get_rigid_body_name(self._dc.get_joint_parent_body(self._handle))
+
+    def child_name(self):
+        """
+        Gets this joint's child body name, if it exists
+
+        Returns:
+            str: Joint's child body name
+        """
+        return self._dc.get_rigid_body_name(self._dc.get_joint_child_body(self._handle))
+
+    def local_orientation(self):
+        """
+        Returns:
+            4-array: (x,y,z,w) local quaternion orientation of this joint, relative to the parent link
+        """
+        # Grab local rotation to parent and child links
+        quat0 = gf_quat_to_np_array(self.get_attribute("physics:localRot0"))[[1, 2, 3, 0]]
+        quat1 = gf_quat_to_np_array(self.get_attribute("physics:localRot1"))[[1, 2, 3, 0]]
+
+        # Invert the child link relationship, and multiply the two rotations together to get the final rotation
+        return quat_multiply(quaternion1=quat_inverse(quat1), quaternion0=quat0)
+
     @property
     def joint_name(self):
         """
@@ -251,6 +289,7 @@ class JointPrim(BasePrim):
         Returns:
             str: Joint's type. Should be one of:
                 {"FixedJoint", "Joint", "PrismaticJoint", "RevoluteJoint", "SphericalJoint"}
+                    (equivalently, one of JointType)
         """
         return self._joint_type
 
@@ -438,12 +477,14 @@ class JointPrim(BasePrim):
         # Make sure we only call this if we're an articulated joint
         self.assert_articulated()
 
-        state = []
-        for dof_handle in self._dof_handles:
-            state.append(self._dc.get_dof_state(dof_handle, _dynamic_control.STATE_ALL))
+        pos, vel, effort = np.zeros(self.num_dof), np.zeros(self.num_dof), np.zeros(self.num_dof)
+        for i, dof_handle in enumerate(self._dof_handles):
+            dof_state = self._dc.get_dof_state(dof_handle, _dynamic_control.STATE_ALL)
+            pos[i] = dof_state.pos
+            vel[i] = dof_state.vel
+            effort[i] = dof_state.effort
 
-        state = np.array(state)
-        return state[:, 0], state[:, 1], state[:, 2]
+        return pos, vel, effort
 
     def get_relative_state(self):
         """
@@ -529,4 +570,11 @@ class JointPrim(BasePrim):
         for dof_handle, e in zip(self._dof_handles, effort):
             self._dc.set_dof_effort(dof_handle, e)
 
+    def save_state(self):
+        return np.concatenate(self.get_state()) if self.articulated else np.array([])
 
+    def restore_state(self, state):
+        if self.articulated:
+            self.set_pos(state[:self._num_dof])
+            self.set_vel(state[self._num_dof:2*self._num_dof])
+            self.set_effort(state[2*self._num_dof:])

@@ -16,7 +16,6 @@ import re
 import carb
 import omni.kit.app
 import builtins
-import igibson
 
 
 class OmniApp:
@@ -163,6 +162,9 @@ class OmniApp:
         :param launch_config: dict, settings for generating this app
         :param experience: str, path to extension settings file for this app
         """
+        # Load igibson module now to prevent circular imports
+        import igibson
+
         # Sanity check to see if any extra omniverse modules are loaded
         # Warn users if so because this will usually cause issues.
         # Base list of modules that can be loaded before kit app starts, might need to be updated in the future

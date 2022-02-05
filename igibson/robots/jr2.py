@@ -4,7 +4,7 @@ import numpy as np
 
 
 import igibson
-from igibson.external.pybullet_tools.utils import set_joint_positions
+# from igibson.external.pybullet_tools.utils import set_joint_positions
 from igibson.robots.manipulation_robot import ManipulationRobot
 from igibson.robots.two_wheel_robot import TwoWheelRobot
 from igibson.utils.constants import SemanticClass

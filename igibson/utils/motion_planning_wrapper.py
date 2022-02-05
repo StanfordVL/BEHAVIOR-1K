@@ -5,7 +5,7 @@ import numpy as np
 
 from transforms3d import euler
 
-from igibson.external.pybullet_tools.utils import (
+# from igibson.external.pybullet_tools.utils import (
     control_joints,
     get_base_values,
     get_joint_positions,

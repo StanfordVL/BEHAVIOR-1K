@@ -1,6 +1,6 @@
 import numpy as np
 
-from igibson.external.pybullet_tools.utils import aabb_union, get_aabb, get_all_links
+# # from igibson.external.pybullet_tools.utils import aabb_union, get_aabb, get_all_links
 from igibson.object_states.object_state_base import CachingEnabledObjectState
 
 

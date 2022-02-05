@@ -521,6 +521,26 @@ def pose2mat(pose):
     return homo_pose_mat
 
 
+def pose_transform(pos1, quat1, pos0, quat0):
+    """
+    Conducts forward transform from pose (pos0, quat0) to pose (pos1, quat1):
+
+    pose1 @ pose0, NOT pose0 @ pose1
+
+    Args:
+        pos1: (x,y,z) position to transform
+        quat1: (x,y,z,w) orientation to transform
+        pos0: (x,y,z) initial position
+        quat0: (x,y,z,w) initial orientation
+    """
+    # Get poses
+    mat0 = pose2mat((pos0, quat0))
+    mat1 = pose2mat((pos1, quat1))
+
+    # Multiply and convert back to pos, quat
+    return mat2pose(mat1 @ mat0)
+
+
 def quat2mat(quaternion):
     """
     Converts given quaternion to matrix.

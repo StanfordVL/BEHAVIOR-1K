@@ -2,15 +2,15 @@ import random
 
 
 
-from igibson.external.pybullet_tools import utils
+# from igibson.external.pybullet_tools import utils
 from igibson.object_states.object_state_base import BooleanState, CachingEnabledObjectState
 
 # Joint position threshold before a joint is considered open.
 # Should be a number in the range [0, 1] which will be transformed
 # to a position in the joint's min-max range.
 _JOINT_THRESHOLD_BY_TYPE = {
-    p.JOINT_REVOLUTE: 0.05,
-    p.JOINT_PRISMATIC: 0.05,
+    "RevoluteJoint": 0.05,#p.JOINT_REVOLUTE: 0.05,
+    "PrismaticJoint": 0.05,#p.JOINT_PRISMATIC: 0.05,
 }
 _OPEN_SAMPLING_ATTEMPTS = 5
 

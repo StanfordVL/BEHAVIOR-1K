@@ -41,9 +41,7 @@ class XFormPrim(BasePrim):
             prim_path (str): prim path of the Prim to encapsulate or create.
             name (str): Name for the object. Names need to be unique per scene.
             load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
-                loading this prim at runtime. Note that this is only needed if the prim does not already exist at
-                @prim_path -- it will be ignored if it already exists. For this joint prim, the below values can be
-                specified:
+                loading this prim at runtime. For this joint prim, the below values can be specified:
 
                 scale (None or float or 3-array): If specified, sets the scale for this object. A single number corresponds
                     to uniform scaling along the x,y,z axes, whereas a 3-array specifies per-axis scaling.
@@ -72,15 +70,15 @@ class XFormPrim(BasePrim):
         stage = get_current_stage() if simulator is None else simulator.stage
         self._prim = stage.DefinePrim(self._prim_path, "Xform")
 
-        # Optionally set the scale and visibility
-        if "scale" in self._load_config:
-            self.scale = self._load_config["scale"]
-
         return self._prim
 
-    def _setup_references(self):
+    def _initialize(self):
         # Always run super first
-        super()._setup_references()
+        super()._initialize()
+
+        # Optionally set the scale and visibility
+        if "scale" in self._load_config and self._load_config["scale"] is not None:
+            self.scale = self._load_config["scale"]
 
         # Grab default state
         default_pos, default_ori = self.get_position_orientation()
@@ -157,6 +155,9 @@ class XFormPrim(BasePrim):
         if orientation is not None:
             self._default_state.orientation = orientation
         return
+
+    def update_default_state(self):
+        self.set_default_state(*self.get_position_orientation())
 
     def apply_visual_material(self, visual_material, weaker_than_descendants=False):
         """Used to apply visual material to the held prim and optionally its descendants.
@@ -274,7 +275,7 @@ class XFormPrim(BasePrim):
         calculated_translation = transform.GetTranslation()
         calculated_orientation = transform.GetRotation().GetQuat()
         XFormPrim.set_local_pose(
-            self, translation=np.array(calculated_translation), orientation=gf_quat_to_np_array(calculated_orientation)
+            self, translation=np.array(calculated_translation), orientation=gf_quat_to_np_array(calculated_orientation)[[1, 2, 3, 0]]     # Flip from w,x,y,z to x,y,z,w
         )
         return
 
@@ -360,15 +361,14 @@ class XFormPrim(BasePrim):
                 carb.log_error(
                     "Translate property needs to be set for {} before setting its position".format(self.name)
                 )
-            xform_op = self.get_attribute("xformOp:translate")
-            xform_op.Set(translation)
+            self.set_attribute("xformOp:translate", translation)
         if orientation is not None:
             orientation = orientation[[3, 0, 1, 2]]
             if "xformOp:orient" not in properties:
                 carb.log_error(
                     "Orient property needs to be set for {} before setting its orientation".format(self.name)
                 )
-            xform_op = self.get_attribute("xformOp:orient")
+            xform_op = self._prim.GetAttribute("xformOp:orient")
             if xform_op.GetTypeName() == "quatf":
                 rotq = Gf.Quatf(*orientation.tolist())
             else:
@@ -394,8 +394,7 @@ class XFormPrim(BasePrim):
         Returns:
             np.ndarray: scale applied to the prim's dimensions in the local frame. shape is (3, ).
         """
-        xform_op = self.get_attribute("xformOp:scale")
-        return np.array(xform_op.Get())
+        return np.array(self.get_attribute("xformOp:scale"))
 
     @scale.setter
     def scale(self, scale):
@@ -410,6 +409,10 @@ class XFormPrim(BasePrim):
         properties = self.prim.GetPropertyNames()
         if "xformOp:scale" not in properties:
             carb.log_error("Scale property needs to be set for {} before setting its scale".format(self.name))
-        xform_op = self.get_attribute("xformOp:scale")
-        xform_op.Set(scale)
+        self.set_attribute("xformOp:scale", scale)
 
+    def save_state(self):
+        return np.concatenate(self.get_position_orientation())
+
+    def restore_state(self, state):
+        self.set_position_orientation(state[:3], state[3:])

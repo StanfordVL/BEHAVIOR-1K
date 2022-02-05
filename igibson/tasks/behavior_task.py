@@ -18,7 +18,7 @@ from bddl.logic_base import AtomicFormula
 from bddl.object_taxonomy import ObjectTaxonomy
 
 import igibson
-from igibson.external.pybullet_tools.utils import *
+# from igibson.external.pybullet_tools.utils import *
 from igibson.object_states.on_floor import RoomFloor
 from igibson.objects.usd_object import URDFObject
 from igibson.objects.multi_object_wrappers import ObjectGrouper, ObjectMultiplexer

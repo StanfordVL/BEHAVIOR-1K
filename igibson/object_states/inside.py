@@ -2,14 +2,14 @@
 from IPython import embed
 
 import igibson
-from igibson.external.pybullet_tools.utils import aabb_contains_point
+# # from igibson.external.pybullet_tools.utils import aabb_contains_point
 from igibson.object_states.aabb import AABB
 from igibson.object_states.adjacency import HorizontalAdjacency, VerticalAdjacency, flatten_planes
 from igibson.object_states.kinematics import KinematicsMixin
 from igibson.object_states.memoization import PositionalValidationMemoizedObjectStateMixin
 from igibson.object_states.object_state_base import BooleanState, RelativeObjectState
 from igibson.object_states.pose import Pose
-from igibson.object_states.utils import clear_cached_states, sample_kinematics
+from igibson.object_states.utils import sample_kinematics
 from igibson.utils.utils import restoreState
 
 
@@ -26,8 +26,8 @@ class Inside(PositionalValidationMemoizedObjectStateMixin, KinematicsMixin, Rela
                 "inside", self.obj, other, new_value, use_ray_casting_method=use_ray_casting_method
             )
             if sampling_success:
-                clear_cached_states(self.obj)
-                clear_cached_states(other)
+                self.obj.clear_cached_states()
+                other.clear_cached_states()
                 if self.get_value(other) != new_value:
                     sampling_success = False
                 if igibson.debug_sampling:

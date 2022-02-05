@@ -7,9 +7,8 @@ from scipy.spatial.transform import Rotation as R
 
 import igibson
 from igibson import object_states
-from igibson.external.pybullet_tools.utils import get_aabb_center, get_aabb_extent, get_link_pose, matrix_from_quat
+# from igibson.external.pybullet_tools.utils import get_aabb_center, get_aabb_extent, get_link_pose, matrix_from_quat
 from igibson.object_states.aabb import AABB
-from igibson.object_states.object_state_base import CachingEnabledObjectState
 from igibson.utils import sampling_utils
 from igibson.utils.utils import restoreState
 
@@ -37,12 +36,6 @@ def get_center_extent(obj_states):
     aabb = obj_states[AABB].get_value()
     center, extent = get_aabb_center(aabb), get_aabb_extent(aabb)
     return center, extent
-
-
-def clear_cached_states(obj):
-    for _, obj_state in obj.states.items():
-        if isinstance(obj_state, CachingEnabledObjectState):
-            obj_state.clear_cached_value()
 
 
 def detect_closeness(bodyA, distance=0.01):

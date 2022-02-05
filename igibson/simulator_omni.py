@@ -6,11 +6,16 @@
 # distribution of this software and related documentation without an express
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 #
+import logging
+
+import omni
+import carb
 from omni.isaac.core.simulation_context import SimulationContext
 from omni.isaac.core.tasks import BaseTask
-from omni.isaac.core.utils.prims import is_prim_ancestral, get_prim_type_name, is_prim_no_delete
-from omni.isaac.core.utils.stage import clear_stage
+from omni.isaac.core.utils.prims import is_prim_ancestral, get_prim_type_name, is_prim_no_delete, get_prim_at_path
+from omni.isaac.core.utils.stage import clear_stage, save_stage, open_stage
 from omni.isaac.dynamic_control import _dynamic_control
+import omni.kit.loop._loop as omni_loop
 import builtins
 from pxr import Usd, Sdf, UsdPhysics, PhysxSchema
 from omni.kit.viewport import get_viewport_interface
@@ -20,6 +25,8 @@ from typing import Optional, List
 
 from igibson.scenes import Scene
 from igibson.objects.object_base import BaseObject
+
+import numpy as np
 
 
 class Simulator(SimulationContext):
@@ -64,7 +71,7 @@ class Simulator(SimulationContext):
 
     def __init__(
             self,
-            gravity=9.8,
+            gravity=0.0,
             physics_dt: float = 1.0 / 60.0,
             rendering_dt: float = 1.0 / 60.0,
             stage_units_in_meters: float = 1.0,
@@ -133,6 +140,9 @@ class Simulator(SimulationContext):
         Set the physics engine with specified settings
         """
         self._physics_context.set_gravity(value=-self.gravity)
+        # Also make sure we invert the collision group filter settings so that different collision groups cannot
+        # collide with each other
+        self._physics_context._physx_scene_api.GetInvertCollisionGroupFilterAttr().Set(True)
 
     def _set_viewer_settings(self):
         """
@@ -152,9 +162,18 @@ class Simulator(SimulationContext):
 
         :param scene: a scene object to load
         """
+        assert self.is_stopped(), "Simulator must be stopped while importing a scene!"
         assert isinstance(scene, Scene), "import_scene can only be called with Scene"
         scene.load(self)
         self._scene = scene
+
+        # Make sure simulator is not running, stop the sim, then start it, then pause it so we can initialize the scene
+        assert self.is_stopped(), "Simulator must be stopped after importing a scene!"
+        self.play()
+        self.pause()
+
+        # Initialize the scene
+        self._scene.initialize()
 
     # # TODO
     # def import_particle_system(self, particle_system):
@@ -228,13 +247,20 @@ class Simulator(SimulationContext):
         #     if hasattr(obj, "procedural_material") and obj.procedural_material is not None:
         #         obj.procedural_material.update()
 
-    def step(self, render=None):
+    def step(self, render=None, force_playing=False):
         """
         Step the simulation at self.render_timestep
 
-        :param render: None or bool, if set, will override internal rendering such that at every timestep rendering
-            either occurs or does not occur
+        Args:
+            render (None or bool): if set, will override internal rendering such that at every timestep rendering
+                either occurs or does not occur
+            force_playing (bool): If True, will force physics to propagate (i.e.: set simulation, if paused / stopped,
+                to "play" mode)
         """
+        # Possibly force playing
+        if force_playing and not self.is_playing():
+            self.play()
+
         for _ in range(self.n_physics_timesteps_per_render - 1):
             super().step(render=False if render is None else render)
 
@@ -260,6 +286,10 @@ class Simulator(SimulationContext):
     #         self.viewer.update()
     #     if self.first_sync:
     #         self.first_sync = False
+
+    def is_paused(self) -> bool:
+        """Returns: True if the simulator is paused."""
+        return not (self.is_stopped() or self.is_playing())
 
     def gen_assisted_grasping_categories(self):
         """
@@ -306,6 +336,14 @@ class Simulator(SimulationContext):
     def viewer(self):
         return self._viewer
 
+    @property
+    def world_prim(self):
+        """
+        Returns:
+            Usd.Prim: Prim at /World
+        """
+        return get_prim_at_path(prim_path="/World")
+
     def get_current_tasks(self) -> List[BaseTask]:
         """[summary]
 
@@ -330,7 +368,11 @@ class Simulator(SimulationContext):
     def clear(self) -> None:
         """Clears the stage leaving the PhysicsScene only if under /World.
         """
-        self.scene.clear()
+        # Stop the physics
+        self.stop()
+
+        if self.scene is not None:
+            self.scene.clear()
         self._current_tasks = dict()
         self._scene_finalized = False
         self._data_logger = DataLogger()
@@ -530,38 +572,49 @@ class Simulator(SimulationContext):
         """
         return self._data_logger
 
-    def create_joint(self, prim_path, joint_type, body0=None, body1=None):
+    @staticmethod
+    def save_stage(usd_path):
         """
-        Creates a joint between @body0 and @body1 of specified type @joint_type
+        Save the current stage in this simulator to specified @usd_path
 
-        :param prim_path: str, absolute path to where the joint will be created
-        :param joint_type: str, type of joint to create. Valid options are:
-            "FixedJoint", "Joint", "PrismaticJoint", "RevoluteJoint", "SphericalJoint"
-        :param body0: str, absolute path to the first body's prim. At least @body0 or @body1 must be specified.
-        :param body1: str, absolute path to the second body's prim. At least @body0 or @body1 must be specified.
-
-        :return UsdPhysics.<JointType>: Created joint
+        Args:
+            usd_path (str): Absolute filepath to where this stage should be saved
         """
-        # Make sure we have valid joint_type
-        assert joint_type in {"Joint", "FixedJoint", "PrismaticJoint", "RevoluteJoint", "SphericalJoint"},\
-            f"Invalid joint specified for creation: {joint_type}"
+        save_stage(usd_path=usd_path)
 
-        # Make sure at least body0 or body1 is specified
-        assert body0 is not None and body1 is not None, \
-            f"At least either body0 or body1 must be specified when creating a joint!"
+    # TODO: Extend to update internal info
+    def load_stage(self, usd_path):
+        """
+        Open the stage specified by USD file at @usd_path
 
-        # Create the joint
-        joint = UsdPhysics.__dict__[joint_type].Define(self.stage, prim_path)
+        Args:
+            usd_path (str): Absolute filepath to USD stage that should be loaded
+        """
+        # Stop the physics if we're playing
+        if self.is_playing():
+            logging.warning("Stopping simulation in order to load stage.")
+            self.stop()
 
-        # Possibly add body0, body1 targets
-        if body0 is not None:
-            joint.GetBody0Rel().SetTargets([Sdf.Path(body0)])
-        if body1 is not None:
-            joint.GetBody1Rel().SetTargets([Sdf.Path(body1)])
+        open_stage(usd_path=usd_path)
 
-        # Apply this joint
-        PhysxSchema.PhysxJointAPI.Apply()
+        # Re-initialize necessary internal vars
+        self._app = omni.kit.app.get_app_interface()
+        self._framework = carb.get_framework()
+        self._timeline = omni.timeline.get_timeline_interface()
+        self._timeline.set_auto_update(True)
+        self._dynamic_control = _dynamic_control.acquire_dynamic_control_interface()
+        self._cached_rate_limit_enabled = self._settings.get_as_bool("/app/runLoops/main/rateLimitEnabled")
+        self._cached_rate_limit_frequency = self._settings.get_as_int("/app/runLoops/main/rateLimitFrequency")
+        self._cached_min_frame_rate = self._settings.get_as_int("persistent/simulation/minFrameRate")
+        self._loop_runner = omni_loop.acquire_loop_interface()
 
-        # Return this joint
-        return joint
-
+        self._init_stage(
+            physics_dt=self._initial_physics_dt,
+            rendering_dt=self._initial_rendering_dt,
+            stage_units_in_meters=self._stage_units_in_meters,
+        )
+        self._set_physics_engine_settings()
+        self._setup_default_callback_fns()
+        self._stage_open_callback = (
+            omni.usd.get_context().get_stage_event_stream().create_subscription_to_pop(self._stage_open_callback_fn)
+        )

@@ -6,7 +6,7 @@ import numpy as np
 
 import igibson
 from igibson import object_states
-from igibson.external.pybullet_tools.utils import Euler, quat_from_euler
+# from igibson.external.pybullet_tools.utils import Euler, quat_from_euler
 from igibson.object_states.factory import get_state_dependency_graph, get_states_by_dependency_order
 from igibson.objects.usd_object import ArticulatedObject, URDFObject
 from igibson.objects.ycb_object import YCBObject

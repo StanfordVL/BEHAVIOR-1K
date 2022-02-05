@@ -1,4 +1,4 @@
-from igibson.external.pybullet_tools.utils import aabb_contains_point, get_aabb
+# from igibson.external.pybullet_tools.utils import aabb_contains_point, get_aabb
 from igibson.object_states.aabb import AABB
 from igibson.object_states.contact_bodies import ContactBodies
 from igibson.object_states.dirty import Dusty, Stained

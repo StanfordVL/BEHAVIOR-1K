@@ -1,6 +1,6 @@
 
 
-from igibson.external.pybullet_tools.utils import ContactResult
+# from igibson.external.pybullet_tools.utils import ContactResult
 from igibson.object_states.object_state_base import CachingEnabledObjectState
 
 

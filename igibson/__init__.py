@@ -2,8 +2,10 @@ import logging
 import os
 
 import yaml
-from igibson.app_omni import OmniApp
 import builtins
+
+# TODO: Need to fix somehow -- igibson gets imported first BEFORE we can actually modify the macros
+import igibson.macros as m
 
 builtins.ISAAC_LAUNCHED_FROM_JUPYTER = (
     os.getenv("ISAAC_JUPYTER_KERNEL") is not None
@@ -104,3 +106,14 @@ debug_sampling = False
 
 # whether to ignore visual shape when importing to pybullet
 ignore_visual_shape = True
+
+# Finally, we must create the igibson application
+from igibson.app_omni import OmniApp
+
+# Create app as a global reference so any submodule can access it
+app = OmniApp(
+    {
+        "headless": m.HEADLESS,
+    },
+    debug=m.DEBUG,
+)

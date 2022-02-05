@@ -13,7 +13,7 @@ from igibson.controllers import (
     MultiFingerGripperController,
     NullGripperController,
 )
-from igibson.external.pybullet_tools.utils import (
+# from igibson.external.pybullet_tools.utils import (
     ContactResult,
     get_child_frame_pose,
     get_constraint_violation,

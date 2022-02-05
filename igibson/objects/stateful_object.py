@@ -1,8 +1,8 @@
 import sys
 import logging
-from igibson.object_states.factory import get_state_name, prepare_object_states
+from igibson.object_states.factory import get_state_name, get_default_states, get_states_for_ability, get_object_state_instance
 from igibson.object_states.object_state_base import AbsoluteObjectState
-from igibson.object_states.utils import clear_cached_states
+from igibson.object_states.object_state_base import CachingEnabledObjectState
 from igibson.objects.object_base import BaseObject
 
 # Optionally import bddl for object taxonomy.
@@ -28,8 +28,13 @@ class StatefulObject(BaseObject):
             rendering_params=None,
             visible=True,
             fixed_base=False,
+            load_config=None,
             abilities=None,
     ):
+        # Values that will be filled later
+        self._states = None
+
+        # Run super init
         super().__init__(
             prim_path=prim_path,
             name=name,
@@ -39,6 +44,7 @@ class StatefulObject(BaseObject):
             rendering_params=rendering_params,
             visible=visible,
             fixed_base=fixed_base,
+            load_config=load_config,
         )
 
         # Load abilities from taxonomy if needed & possible
@@ -53,24 +59,84 @@ class StatefulObject(BaseObject):
                 abilities = {}
         assert isinstance(abilities, dict), "Object abilities must be in dictionary form."
 
-        prepare_object_states(self, abilities=abilities)
+        self.prepare_object_states(abilities=abilities)
 
-    def load(self, simulator):
-        body_ids = super(StatefulObject, self).load(simulator)
-        for state in self.states.values():
+    def load(self, simulator=None):
+        # Run super method first
+        prim = super().load(simulator)
+
+        # Initialize any states created
+        for state in self._states.values():
             state.initialize(simulator)
 
-        return body_ids
+        return prim
+
+    def initialize_states(self):
+        """
+        Initializes states for this object, and also clears any states that were existing beforehand.
+        """
+        self._states = dict()
+
+    def add_state(self, name, state):
+        """
+        Adds state @state with name @name to self.states.
+
+        Args:
+            name (str): name of the state to add to this object.
+            state (any): state to add
+        """
+
+    @property
+    def states(self):
+        """
+        Get the current states of this object.
+
+        Returns:
+            dict: Keyword-mapped states for this object
+        """
+        return self._states
+
+    def prepare_object_states(self, abilities=None):
+        """
+        Prepare the state dictionary for an object by generating the appropriate
+        object state instances.
+
+        This uses the abilities of the object and the state dependency graph to
+        find & instantiate all relevant states.
+
+        :param abilities: dict in the form of {ability: {param: value}} containing
+            object abilities and parameters.
+        """
+        if abilities is None:
+            abilities = {}
+
+        state_types_and_params = [(state, {}) for state in get_default_states()]
+
+        # Map the ability params to the states immediately imported by the abilities
+        for ability, params in abilities.items():
+            state_types_and_params.extend((state_name, params) for state_name in get_states_for_ability(ability))
+
+        # Add the dependencies into the list, too.
+        for state_type, _ in state_types_and_params:
+            # Add each state's dependencies, too. Note that only required dependencies are added.
+            for dependency in state_type.get_dependencies():
+                if all(other_state != dependency for other_state, _ in state_types_and_params):
+                    state_types_and_params.append((dependency, {}))
+
+        # Now generate the states in topological order.
+        self.initialize_states()
+        for state_type, params in reversed(state_types_and_params):
+            self._states[state_type] = get_object_state_instance(state_type, self, params)
 
     def dump_state(self):
         return {
             get_state_name(state_type): state_instance.dump()
-            for state_type, state_instance in self.states.items()
+            for state_type, state_instance in self._states.items()
             if issubclass(state_type, AbsoluteObjectState)
         }
 
     def load_state(self, dump):
-        for state_type, state_instance in self.states.items():
+        for state_type, state_instance in self._states.items():
             state_name = get_state_name(state_type)
             if issubclass(state_type, AbsoluteObjectState):
                 if state_name in dump:
@@ -78,10 +144,16 @@ class StatefulObject(BaseObject):
                 else:
                     logging.warning("Missing object state [{}] in the state dump".format(state_name))
 
-    def set_position_orientation(self, pos, orn):
-        super(StatefulObject, self).set_position_orientation(pos, orn)
-        clear_cached_states(self)
+    def clear_cached_states(self):
+        for _, obj_state in self._states.items():
+            if isinstance(obj_state, CachingEnabledObjectState):
+                obj_state.clear_cached_value()
 
-    def set_base_link_position_orientation(self, pos, orn):
-        super(StatefulObject, self).set_base_link_position_orientation(pos, orn)
-        clear_cached_states(self)
+    def set_position_orientation(self, position=None, orientation=None):
+        super().set_position_orientation(position=position, orientation=orientation)
+        self.clear_cached_states()
+
+    # TODO: Redundant?
+    def set_base_link_position_orientation(self, position, orientation):
+        super().set_position_orientation(position=position, orientation=orientation)
+        self.clear_cached_states()

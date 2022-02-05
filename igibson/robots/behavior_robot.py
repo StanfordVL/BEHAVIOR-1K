@@ -26,7 +26,6 @@ import numpy as np
 from future.utils import with_metaclass
 
 from igibson import assets_path
-from igibson.object_states.utils import clear_cached_states
 from igibson.objects.visual_marker import VisualMarker
 from igibson.robots.active_camera_robot import ActiveCameraRobot
 from igibson.robots.locomotion_robot import LocomotionRobot
@@ -271,7 +270,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         eye_pos, eye_orn = p.multiplyTransforms(pos, orn, eye_loc_pose[0], eye_loc_pose[1])
         self._parts["eye"].set_position_orientation(eye_pos, eye_orn)
 
-        clear_cached_states(self)
+        self.clear_cached_states()
 
     def reset(self):
         # Move the constraint for each part to the default position.

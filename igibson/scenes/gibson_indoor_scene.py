@@ -123,13 +123,9 @@ class StaticTraversableScene(TraversableScene):
     def _add_object(self, obj):
         self.objects.append(obj)
 
-    def get_random_floor(self):
-        """
-        Get a random floor
-
-        :return: random floor number
-        """
-        return np.random.randint(0, high=len(self.floor_heights))
+    @property
+    def num_floors(self):
+        return len(self.floor_heights)
 
     def reset_floor(self, floor=0, additional_elevation=0.02, height=None):
         """

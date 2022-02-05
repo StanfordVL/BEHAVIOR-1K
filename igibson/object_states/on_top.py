@@ -6,7 +6,7 @@ from igibson.object_states.adjacency import VerticalAdjacency
 from igibson.object_states.memoization import PositionalValidationMemoizedObjectStateMixin
 from igibson.object_states.object_state_base import BooleanState, RelativeObjectState
 from igibson.object_states.touching import Touching
-from igibson.object_states.utils import clear_cached_states, sample_kinematics
+from igibson.object_states.utils import sample_kinematics
 from igibson.utils.utils import restoreState
 
 
@@ -23,8 +23,8 @@ class OnTop(PositionalValidationMemoizedObjectStateMixin, RelativeObjectState, B
                 "onTop", self.obj, other, new_value, use_ray_casting_method=use_ray_casting_method
             )
             if sampling_success:
-                clear_cached_states(self.obj)
-                clear_cached_states(other)
+                self.obj.clear_cached_states()
+                other.clear_cached_states()
                 if self.get_value(other) != new_value:
                     sampling_success = False
                 if igibson.debug_sampling:

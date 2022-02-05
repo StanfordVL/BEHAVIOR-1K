@@ -16,7 +16,7 @@ class VisualMarker(BaseObject):
 
     def __init__(
         self,
-        visual_shape=p.GEOM_SPHERE,
+        visual_shape="sphere",#p.GEOM_SPHERE,
         rgba_color=[1, 0, 0, 0.5],
         radius=1.0,
         half_extents=[1, 1, 1],

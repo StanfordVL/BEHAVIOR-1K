@@ -10,8 +10,7 @@ import numpy as np
 from future.utils import with_metaclass
 
 from igibson.controllers import ControlType, create_controller
-from igibson.external.pybullet_tools.utils import get_joint_info
-from igibson.object_states.utils import clear_cached_states
+# # from igibson.external.pybullet_tools.utils import get_joint_info
 from igibson.objects.stateful_object import StatefulObject
 from igibson.utils.python_utils import assert_valid_key, merge_nested_dicts
 from igibson.utils.utils import rotate_vector_3d
@@ -182,7 +181,7 @@ class BaseRobot(StatefulObject):
         body_ids = super(BaseRobot, self).load(simulator)
 
         # Grab relevant references from the body IDs
-        self._setup_references()
+        self.initialize()
 
         # Disable collisions
         for names in self.disabled_collision_pairs:
@@ -210,7 +209,7 @@ class BaseRobot(StatefulObject):
         # Return the body IDs
         return body_ids
 
-    def _setup_references(self):
+    def initialize(self):
         """
         Parse the set of robot @body_ids to get properties including joint information and mass
         """
@@ -552,7 +551,7 @@ class BaseRobot(StatefulObject):
         :param quat: Array[float], corresponding to (x,y,z,w) global quaternion orientation to set
         """
         p.resetBasePositionAndOrientation(self.base_link.body_id, pos, quat)
-        clear_cached_states(self)
+        self.clear_cached_states()
 
     def get_control_dict(self):
         """

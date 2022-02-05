@@ -20,24 +20,24 @@ from omni.isaac.core.utils.nucleus import find_nucleus_server
 from omni.isaac.core.utils.stage import add_reference_to_stage
 from typing import Optional, Tuple
 import gc
+from igibson.registries.prim_registry import PrimRegistry
 
 # from igibson.objects.particles import Particle
 # from igibson.objects.visual_marker import VisualMarker
 # from igibson.robots.robot_base import BaseRobot
 
 
-class Scene(with_metaclass(ABCMeta)):
+class Scene(metaclass=ABCMeta):
     """
     Base class for all Scene objects.
     Contains the base functionalities and the functions that all derived classes need to implement.
     """
 
     def __init__(self):
-        self._scene_registry = SceneRegistry()
-
-
-        self.loaded = False
-        self.build_graph = False  # Indicates if a graph for shortest path has been built
+        # Store internal variables
+        self._loaded = False                    # Whether this scene exists in the stage or not
+        self._initialized = False               # Whether this scene has its internal handles / info initialized or not (occurs AFTER and INDEPENDENTLY from loading!)
+        self._registry = None
         self.floor_body_ids = []  # List of ids of the floor_heights
         self.robots = []
 
@@ -50,10 +50,42 @@ class Scene(with_metaclass(ABCMeta)):
         """
         return get_current_stage()
 
+    @property
+    def registry(self):
+        """
+        Returns:
+            PrimRegistry: Registry of all objects in this scene
+        """
+        return self._registry
+
+    @property
+    def registry_unique_keys(self):
+        """
+        Returns:
+            list of str: Keys with which to index into the registry. These should be valid public attributes of
+                prims that we can use as unique IDs to reference prims, e.g., prim.prim_path, prim.name, prim.handle, etc.
+        """
+        # Only use name by default, the most general
+        return ["name"]
+
+    @property
+    def registry_group_keys(self):
+        """
+        Returns:
+            list of str: Keys with which to index into the registry. These should be valid public attributes of
+                prims that we can use as grouping IDs to reference prims, e.g., prim.in_rooms
+        """
+        # None by default
+        return []
+
+    @property
+    def loaded(self):
+        return self._loaded
+
     @abstractmethod
     def _load(self, simulator):
         """
-        Load the scene into simulator (pybullet and renderer).
+        Load the scene into simulator
         The elements to load may include: floor, building, objects, etc.
 
         :param simulator: the simulator to load the scene into
@@ -63,18 +95,45 @@ class Scene(with_metaclass(ABCMeta)):
 
     def load(self, simulator):
         """
-        Load the scene into simulator (pybullet and renderer).
+        Load the scene into simulator
         The elements to load may include: floor, building, objects, etc.
 
         :param simulator: the simulator to load the scene into
         :return: a list of pybullet ids of elements composing the scene, including floors, buildings and objects
         """
+        # Make sure simulator is stopped
+        assert simulator.is_stopped(), "Simulator should be stopped when loading this scene!"
+
         # Do not override this function. Override _load instead.
-        if self.loaded:
+        if self._loaded:
             raise ValueError("This scene is already loaded.")
 
-        self.loaded = True
-        return self._load(simulator)
+        # Create registry
+        self._registry = PrimRegistry(
+            unique_prim_keys=self.registry_unique_keys,
+            group_prim_keys=self.registry_group_keys
+        )
+
+        prims = self._load(simulator)
+        self._loaded = True
+
+        return prims
+
+    def _initialize(self):
+        """
+        Initializes state of this scene and sets up any references necessary post-loading. Should be implemented by
+        sub-class for extended utility
+        """
+        pass
+
+    def initialize(self):
+        """
+        Initializes state of this scene and sets up any references necessary post-loading. Subclasses should
+        implement / extend the _initialize() method.
+        """
+        assert not self.initialized, "Scene can only be initialized once! (It is already initialized)"
+        self._initialize()
+        self.initialized = True
 
     def object_exists(self, name: str) -> bool:
         """[summary]
@@ -90,14 +149,13 @@ class Scene(with_metaclass(ABCMeta)):
         else:
             return False
 
-    @abstractmethod
     def get_objects(self):
         """
         Get the objects in the scene.
 
         :return: a list of objects
         """
-        raise NotImplementedError()
+        return self.registry.prims
 
     def get_objects_with_state(self, state):
         """
@@ -108,7 +166,6 @@ class Scene(with_metaclass(ABCMeta)):
         """
         return [item for item in self.get_objects() if hasattr(item, "states") and state in item.states]
 
-    @abstractmethod
     def _add_object(self, obj):
         """
         Add an object to the scene's internal object tracking mechanisms.
@@ -118,7 +175,7 @@ class Scene(with_metaclass(ABCMeta)):
 
         :param obj: the object to load
         """
-        raise NotImplementedError()
+        pass
 
     def add_object(self, obj, simulator, _is_call_from_simulator=False):
         """
@@ -134,7 +191,7 @@ class Scene(with_metaclass(ABCMeta)):
         :return: the body ID(s) of the loaded object if the scene was already loaded, or None if the scene is not loaded
             (in that case, the object is stored to be loaded together with the scene)
         """
-        if self.loaded and not _is_call_from_simulator:
+        if self._loaded and not _is_call_from_simulator:
             raise ValueError("To add an object to an already-loaded scene, use the Simulator's import_object function.")
 
         # TODO
@@ -144,8 +201,11 @@ class Scene(with_metaclass(ABCMeta)):
         # If the scene is already loaded, we need to load this object separately. Otherwise, don't do anything now,
         # let scene._load() load the object when called later on.
         prim = None
-        if self.loaded:
+        if self._loaded:
             prim = obj.load(simulator)
+
+        # Add this object to our registry
+        self._registry.add(obj)
 
         self._add_object(obj)
 
@@ -185,6 +245,24 @@ class Scene(with_metaclass(ABCMeta)):
             raise Exception("object type is not supported yet")
         return obj
 
+    @property
+    def has_connectivity_graph(self):
+        """
+        Returns:
+            bool: Whether this scene has a connectivity graph
+        """
+        # Default is no connectivity graph
+        return False
+
+    @property
+    def num_floors(self):
+        """
+        Returns:
+            int: Number of floors in this scene
+        """
+        # Default is a single floor
+        return 1
+
     def get_random_floor(self):
         """
         Sample a random floor among all existing floor_heights in the scene.
@@ -193,7 +271,7 @@ class Scene(with_metaclass(ABCMeta)):
 
         :return: an integer between 0 and NumberOfFloors-1
         """
-        return 0
+        return np.random.randint(0, self.num_floors)
 
     def get_random_point(self, floor=None):
         """
@@ -268,3 +346,25 @@ class Scene(with_metaclass(ABCMeta)):
             restitution=restitution,
         )
         Scene.add(self, plane)
+
+    def save_state(self):
+        """
+        Save the state of this simulation. Includes core kinematic states of all bodies (links, joints)
+
+        Returns:
+            n-array: serialized, 1D numerical np.array capturing critical state of this simulation
+        """
+        return np.concatenate([obj.save_state() for obj in self.get_objects()])
+
+    def restore_state(self, state):
+        """
+        Restore the state of this simulation. Includes core kinematic states of all bodies (links, joints)
+
+        Args:
+            state (n-array): serialized, 1D numerical np.array capturing critical state of this simulation
+        """
+        idx = 0
+        for obj in self.get_objects():
+            obj_state_size = obj.state_size
+            obj.restore_state(state[idx: idx + obj_state_size])
+            idx += obj_state_size

@@ -5,7 +5,7 @@ import igibson
 from igibson.object_states.adjacency import VerticalAdjacency
 from igibson.object_states.memoization import PositionalValidationMemoizedObjectStateMixin
 from igibson.object_states.object_state_base import BooleanState, RelativeObjectState
-from igibson.object_states.utils import clear_cached_states, sample_kinematics
+from igibson.object_states.utils import sample_kinematics
 from igibson.utils.utils import restoreState
 
 
@@ -20,8 +20,8 @@ class Under(PositionalValidationMemoizedObjectStateMixin, RelativeObjectState, B
         for _ in range(10):
             sampling_success = sample_kinematics("under", self.obj, other, new_value)
             if sampling_success:
-                clear_cached_states(self.obj)
-                clear_cached_states(other)
+                self.obj.clear_cached_states()
+                other.clear_cached_states()
                 if self.get_value(other) != new_value:
                     sampling_success = False
                 if igibson.debug_sampling:

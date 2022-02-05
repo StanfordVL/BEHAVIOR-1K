@@ -33,8 +33,15 @@ def get_ig_avg_category_specs():
     Load average object specs (dimension and mass) for objects
     """
     avg_obj_dim_file = os.path.join(igibson.ig_dataset_path, "metadata", "avg_category_specs.json")
-    with open(avg_obj_dim_file) as f:
-        return json.load(f)
+    if os.path.exists(avg_obj_dim_file):
+        with open(avg_obj_dim_file) as f:
+            return json.load(f)
+    else:
+        logging.warning(
+            "Requested average specs of the object categories in the iGibson Dataset of objects, but the "
+            "file cannot be found. Did you download the dataset? Returning an empty dictionary"
+        )
+        return dict()
 
 
 def get_ig_category_ids():

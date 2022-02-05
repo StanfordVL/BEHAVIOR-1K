@@ -8,7 +8,7 @@ import numpy as np
 
 from igibson import object_states
 from igibson.envs.behavior_env import BehaviorEnv
-from igibson.external.pybullet_tools.utils import CIRCULAR_LIMITS
+# from igibson.external.pybullet_tools.utils import CIRCULAR_LIMITS
 from igibson.object_states.on_floor import RoomFloor
 from igibson.object_states.utils import sample_kinematics
 from igibson.objects.usd_object import URDFObject

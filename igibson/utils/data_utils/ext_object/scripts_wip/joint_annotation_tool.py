@@ -11,7 +11,7 @@ from pynput import keyboard
 
 import igibson
 import igibson.object_states.open as open_state
-from igibson.external.pybullet_tools import utils
+# from igibson.external.pybullet_tools import utils
 from igibson.objects.usd_object import URDFObject
 from igibson.scenes.empty_scene import EmptyScene
 from igibson.simulator import Simulator
