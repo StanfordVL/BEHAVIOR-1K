@@ -468,6 +468,9 @@ class iGibsonObject(USDObject):
         # Set this scale in the load config -- it will automatically scale the object during self.initialize()
         self._load_config["scale"] = scale
 
+        # Set the scale
+        self.scale = scale
+
         # body_ids = []
 
         # flags = p.URDF_ENABLE_SLEEPING
@@ -512,7 +515,6 @@ class iGibsonObject(USDObject):
         rotated_offset = T.pose_transform([0, 0, 0], orn, self.scaled_bbox_center_in_base_frame, [0, 0, 0, 1])[0]
         # self.set_local_pose(pos + rotated_offset, orn)
         self.set_position_orientation(pos + rotated_offset, orn)
-        print(f"setting obj: {self.name}, pos: {pos + rotated_offset}, ori: {orn}")
 
     # def set_position_orientation(self, pos, orn):
     #     # TODO: replace this with super() call once URDFObject no longer works with multiple body ids

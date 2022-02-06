@@ -23,12 +23,6 @@ class EmptyScene(Scene):
         self.floor_plane_visible = floor_plane_visible
         self.floor_plane_color = floor_plane_color
 
-    def get_objects(self):
-        return list(self.objects)
-
-    def _add_object(self, obj):
-        self.objects.append(obj)
-
     def _load(self, simulator):
         # Load ground plane
         self.add_ground_plane(color=self.floor_plane_color, visible=self.floor_plane_visible)

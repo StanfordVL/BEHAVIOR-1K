@@ -109,8 +109,11 @@ class JointPrim(BasePrim):
             stage=stage,
         )
 
-        # Destroy load info
-        self._load_info = None
+        # Possibly set the bodies
+        if "body0" in self._load_config and self._load_config["body0"] is not None:
+            self.body0 = self._load_config["body0"]
+        if "body1" in self._load_config and self._load_config["body1"] is not None:
+            self.body1 = self._load_config["body1"]
 
         return self._prim
 
@@ -120,12 +123,6 @@ class JointPrim(BasePrim):
 
         # Get joint info
         self._joint_type = JointType.get_type(self._prim.GetTypeName().split("Physics")[-1])
-
-        # Possibly set the bodies
-        if "body0" in self._load_config and self._load_config["body0"] is not None:
-            self.body0 = self._load_config["body0"]
-        if "body1" in self._load_config and self._load_config["body1"] is not None:
-            self.body1 = self._load_config["body1"]
 
         # Initialize dynamic control references if this joint is articulated
         if self.articulated:
@@ -569,6 +566,13 @@ class JointPrim(BasePrim):
         # Set the DOF(s) in this joint
         for dof_handle, e in zip(self._dof_handles, effort):
             self._dc.set_dof_effort(dof_handle, e)
+
+    def keep_still(self):
+        """
+        Zero out all velocities for this prim
+        """
+        self.set_vel(np.zeros(self.num_dof))
+        self.set_effort(np.zeros(self.num_dof))
 
     def save_state(self):
         return np.concatenate(self.get_state()) if self.articulated else np.array([])

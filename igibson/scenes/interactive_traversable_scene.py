@@ -265,28 +265,6 @@ class InteractiveTraversableScene(TraversableScene):
         else:
             return []
 
-    def remove_object(self, obj):
-        if hasattr(obj, "name"):
-            prim_path = obj.prim_path
-            self._stage.RemovePrim(prim_path)
-            del self.objects_by_name[obj.name]
-
-        if hasattr(obj, "category"):
-            self.objects_by_category[obj.category].remove(obj)
-
-        if hasattr(obj, "states"):
-            for state in obj.states:
-                self.objects_by_state[state].remove(obj)
-
-        if hasattr(obj, "in_rooms"):
-            in_rooms = obj.in_rooms
-            if in_rooms is not None:
-                for in_room in in_rooms:
-                    self.objects_by_room[in_room].remove(obj)
-
-        del self.objects_by_handle[obj.handle]
-
-    # TODO
     def randomize_texture(self):
         """
         Randomize texture/material for all objects in the scene
@@ -294,8 +272,7 @@ class InteractiveTraversableScene(TraversableScene):
         if not self.texture_randomization:
             logging.warning("calling randomize_texture while texture_randomization is False during initialization.")
             return
-        for int_object in self.objects_by_name:
-            obj = self.objects_by_name[int_object]
+        for obj in self.get_objects():
             obj.randomize_texture()
 
     # TODO
@@ -347,10 +324,10 @@ class InteractiveTraversableScene(TraversableScene):
         # sofas and coffee tables)
         overlapped_objs = []
         for obj1_name, obj2_name in self.overlapped_bboxes:
-            if obj1_name not in self.objects_by_name or obj2_name not in self.objects_by_name:
+            if obj1_name not in self._registry or obj2_name not in self._registry:
                 # This could happen if only part of the scene is loaded (e.g. only a subset of rooms)
                 continue
-            overlapped_objs.append((self.objects_by_name[obj1_name], self.objects_by_name[obj2_name]))
+            overlapped_objs.append((self._registry("name", obj1_name), self._registry("name", obj2_name)))
 
         # TODO -- current method is probably insufficient
         # cache pybullet initial state
@@ -530,9 +507,9 @@ class InteractiveTraversableScene(TraversableScene):
         :param prob: opening probability
         """
         body_joint_pairs = []
-        if category not in self.objects_by_category:
+        if category not in self._registry.get_ids("category"):
             return body_joint_pairs
-        for obj in self.objects_by_category[category]:
+        for obj in self._registry("category", category):
             # open probability
             if np.random.random() > prob:
                 continue
@@ -559,7 +536,9 @@ class InteractiveTraversableScene(TraversableScene):
         """
         return self.open_all_objs_by_category("door", mode="max")
 
-    def restore_object_states_single_object(self, obj, obj_kin_state):
+    def restore_object_states_single_object(self, obj):
+        obj_kin_state = self.object_states(obj.name)
+
         print(f"restoring obj: {obj.name} state")
         # If the object isn't loaded, skip
         if not obj.loaded:
@@ -570,7 +549,6 @@ class InteractiveTraversableScene(TraversableScene):
             return
 
         # TODO: For velocities, we are now storing each body's com. Should we somehow do the same for positions?
-        print(f"setting obj: {obj.name} base pos")
         if obj_kin_state.base_com_pose is not None:
             obj.set_position_orientation(*obj_kin_state.base_com_pose)
         else:
@@ -586,7 +564,7 @@ class InteractiveTraversableScene(TraversableScene):
         if obj_kin_state.base_velocities is not None:
             obj.set_velocities(obj_kin_state.base_velocities)
         else:
-            obj.set_velocities([[0.0] * 3, [0.0] * 3])
+            obj.set_velocities([np.zeros(3), np.zeros(3)])
 
         # Only reset joint states if the object has joint states
         if obj.articulated:
@@ -599,8 +577,8 @@ class InteractiveTraversableScene(TraversableScene):
         if obj_kin_state.non_kinematic_states is not None:
             obj.load_state(obj_kin_state.non_kinematic_states)
 
-    def restore_object_states(self, object_states):
-        for obj_name, obj in self.objects_by_name.items():
+    def restore_object_states(self):
+        for obj in self.get_objects():
             # TODO
             # if not isinstance(obj, ObjectMultiplexer):
             #     self.restore_object_states_single_object(obj, object_states[obj_name])
@@ -611,7 +589,7 @@ class InteractiveTraversableScene(TraversableScene):
             #                 self.restore_object_states_single_object(obj_part, object_states[obj_part.name])
             #         else:
             #             self.restore_object_states_single_object(sub_obj, object_states[sub_obj.name])
-            self.restore_object_states_single_object(obj, object_states(obj_name))
+            self.restore_object_states_single_object(obj)
 
     def _create_obj_from_template_xform(self, simulator, prim):
         """
@@ -827,9 +805,6 @@ class InteractiveTraversableScene(TraversableScene):
         simulator.clear()
         simulator.load_stage(usd_path=self.scene_file)
 
-        # We start playing the simulator, to allow dynamic handles to be received for the imported objects
-        simulator.play()
-
         # Store stage reference
         self._stage = simulator.stage
 
@@ -873,14 +848,12 @@ class InteractiveTraversableScene(TraversableScene):
         if self.has_connectivity_graph:
             self._trav_map.load_trav_map(maps_path)
 
-        # Restore all object states
-        self.restore_object_states(self.object_states)
-
         return list(self.get_objects())
 
     def _initialize(self):
         # First, we initialize all of our objects and add the object
         for obj in self.get_objects():
+
             # Initialize object
             obj.initialize()
 
@@ -894,7 +867,9 @@ class InteractiveTraversableScene(TraversableScene):
             #                 self.restore_object_states_single_object(obj_part, object_states[obj_part.name])
             #         else:
             #             self.restore_object_states_single_object(sub_obj, object_states[sub_obj.name])
-            self.restore_object_states_single_object(obj, self.object_states(obj.name))
+            self.restore_object_states_single_object(obj)
+            obj.keep_still()
+
 
         # Re-initialize our scene registry by handle since now handles are populated
         self._registry.update(prim_keys="handle")
@@ -909,6 +884,11 @@ class InteractiveTraversableScene(TraversableScene):
         # force wake up each body once
         self.wake_scene_objects()
 
+    def _add_object(self, obj):
+        # TODO: Check to see if this works for adding additional objects at runtime
+        # Set the scene pose this object
+        obj.set_bbox_center_position_orientation(*self.object_states(obj.name).bbox_center_pose)
+
     def wake_scene_objects(self):
         """
         Force wakeup sleeping objects
@@ -921,7 +901,7 @@ class InteractiveTraversableScene(TraversableScene):
         Reset the pose and joint configuration of all scene objects.
         Also open all doors if self.should_open_all_doors is True
         """
-        self.restore_object_states(self.object_states)
+        self.restore_object_states()
 
         if self.should_open_all_doors:
             self.wake_scene_objects()
@@ -1145,7 +1125,8 @@ class InteractiveTraversableScene(TraversableScene):
             object_states[object_name]["joint_states"] = json.loads(link.attrib["joint_states"])
             object_states[object_name]["non_kinematic_states"] = json.loads(link.attrib["states"])
 
-        self.restore_object_states(object_states)
+        self.object_states = object_states
+        self.restore_object_states()
 
         if pybullet_filename is not None:
             restoreState(fileName=pybullet_filename)
@@ -1206,13 +1187,13 @@ class InteractiveTraversableScene(TraversableScene):
     def registry_unique_keys(self):
         # Grab all inherited keys and return additional ones
         keys = super().registry_unique_keys
-        return keys + ["category", "handle"]
+        return keys + ["handle"]
 
     @property
     def registry_group_keys(self):
         # Grab all inherited keys and return additional ones
         keys = super().registry_group_keys
-        return keys + ["in_room", "states", "fixed_base"]
+        return keys + ["category", "in_rooms", "states", "fixed_base"]
 
     @property
     def fixed_objects(self):

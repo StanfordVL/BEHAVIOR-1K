@@ -23,7 +23,7 @@ def get_prim_nested_children(prim):
     return prims
 
 
-def create_joint(prim_path, joint_type, body0=None, body1=None, stage=None):
+def create_joint(prim_path, joint_type, body0=None, body1=None, enabled=True, stage=None):
     """
     Creates a joint between @body0 and @body1 of specified type @joint_type
 
@@ -33,6 +33,7 @@ def create_joint(prim_path, joint_type, body0=None, body1=None, stage=None):
                     (equivalently, one of JointType)
     :param body0: str, absolute path to the first body's prim. At least @body0 or @body1 must be specified.
     :param body1: str, absolute path to the second body's prim. At least @body0 or @body1 must be specified.
+    :param enabled: bool, whether to enable this joint or not
     :param stage: Usd.Stage, if specified, should be specific stage to be used to load the joint.
         Otherwise, the current active stage will be used.
 
@@ -65,6 +66,9 @@ def create_joint(prim_path, joint_type, body0=None, body1=None, stage=None):
 
     # Apply joint API interface
     PhysxSchema.PhysxJointAPI.Apply(joint_prim)
+
+    # Possibly (un-/)enable this joint
+    joint_prim.GetAttribute("physics:jointEnabled").Set(enabled)
 
     # Return this joint
     return joint_prim

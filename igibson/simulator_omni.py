@@ -71,7 +71,7 @@ class Simulator(SimulationContext):
 
     def __init__(
             self,
-            gravity=0.0,
+            gravity=9.81,
             physics_dt: float = 1.0 / 60.0,
             rendering_dt: float = 1.0 / 60.0,
             stage_units_in_meters: float = 1.0,
@@ -167,11 +167,10 @@ class Simulator(SimulationContext):
         scene.load(self)
         self._scene = scene
 
-        # Make sure simulator is not running, stop the sim, then start it, then pause it so we can initialize the scene
+        # Make sure simulator is not running, then start it, then pause it so we can initialize the scene
         assert self.is_stopped(), "Simulator must be stopped after importing a scene!"
         self.play()
         self.pause()
-
         # Initialize the scene
         self._scene.initialize()
 
@@ -246,6 +245,20 @@ class Simulator(SimulationContext):
         # for obj in self.scene.get_objects():
         #     if hasattr(obj, "procedural_material") and obj.procedural_material is not None:
         #         obj.procedural_material.update()
+
+    def stop(self):
+        super().stop()
+
+        # TODO: Fix, hacky
+        if self.scene is not None and self.scene.initialized:
+            self.scene.reset_scene_objects()
+
+    def stop_async(self):
+        super().stop_async()
+
+        # TODO: Fix, hacky
+        if self.scene is not None and self.scene.initialized:
+            self.scene.reset_scene_objects()
 
     def step(self, render=None, force_playing=False):
         """
@@ -591,7 +604,7 @@ class Simulator(SimulationContext):
             usd_path (str): Absolute filepath to USD stage that should be loaded
         """
         # Stop the physics if we're playing
-        if self.is_playing():
+        if not self.is_stopped():
             logging.warning("Stopping simulation in order to load stage.")
             self.stop()
 

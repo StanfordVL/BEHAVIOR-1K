@@ -82,6 +82,10 @@ class Scene(metaclass=ABCMeta):
     def loaded(self):
         return self._loaded
 
+    @property
+    def initialized(self):
+        return self._initialized
+
     @abstractmethod
     def _load(self, simulator):
         """
@@ -117,6 +121,10 @@ class Scene(metaclass=ABCMeta):
         prims = self._load(simulator)
         self._loaded = True
 
+        # Always stop the sim if we started it internally
+        if not simulator.is_stopped():
+            simulator.stop()
+
         return prims
 
     def _initialize(self):
@@ -131,9 +139,9 @@ class Scene(metaclass=ABCMeta):
         Initializes state of this scene and sets up any references necessary post-loading. Subclasses should
         implement / extend the _initialize() method.
         """
-        assert not self.initialized, "Scene can only be initialized once! (It is already initialized)"
+        assert not self._initialized, "Scene can only be initialized once! (It is already initialized)"
         self._initialize()
-        self.initialized = True
+        self._initialized = True
 
     def object_exists(self, name: str) -> bool:
         """[summary]
@@ -191,8 +199,8 @@ class Scene(metaclass=ABCMeta):
         :return: the body ID(s) of the loaded object if the scene was already loaded, or None if the scene is not loaded
             (in that case, the object is stored to be loaded together with the scene)
         """
-        if self._loaded and not _is_call_from_simulator:
-            raise ValueError("To add an object to an already-loaded scene, use the Simulator's import_object function.")
+        if self._initialized and not _is_call_from_simulator:
+            raise ValueError("To add an object to an already-initialized scene, use the Simulator's import_object function.")
 
         # TODO
         # if isinstance(obj, VisualMarker) or isinstance(obj, Particle):
@@ -201,7 +209,7 @@ class Scene(metaclass=ABCMeta):
         # If the scene is already loaded, we need to load this object separately. Otherwise, don't do anything now,
         # let scene._load() load the object when called later on.
         prim = None
-        if self._loaded:
+        if self._initialized:
             prim = obj.load(simulator)
 
         # Add this object to our registry
@@ -216,34 +224,47 @@ class Scene(metaclass=ABCMeta):
 
         return prim
 
-    def add(self, obj: XFormPrim) -> XFormPrim:
-        """[summary]
+    def remove_object(self, obj):
+        # Remove from this registry
+        self._registry.remove(obj)
 
-        Args:
-            obj (XFormPrim): [description]
+    # TODO: Integrate good features of this
+    #
+    # def add(self, obj: XFormPrim) -> XFormPrim:
+    #     """[summary]
+    #
+    #     Args:
+    #         obj (XFormPrim): [description]
+    #
+    #     Raises:
+    #         Exception: [description]
+    #         Exception: [description]
+    #
+    #     Returns:
+    #         XFormPrim: [description]
+    #     """
+    #     if self._scene_registry.name_exists(obj.name):
+    #         raise Exception("Cannot add the object {} to the scene since its name is not unique".format(obj.name))
+    #     if isinstance(obj, RigidPrim):
+    #         self._scene_registry.add_rigid_object(name=obj.name, rigid_object=obj)
+    #     elif isinstance(obj, GeometryPrim):
+    #         self._scene_registry.add_geometry_object(name=obj.name, geometry_object=obj)
+    #     elif isinstance(obj, Robot):
+    #         self._scene_registry.add_robot(name=obj.name, robot=obj)
+    #     elif isinstance(obj, Articulation):
+    #         self._scene_registry.add_articulated_system(name=obj.name, articulated_system=obj)
+    #     elif isinstance(obj, XFormPrim):
+    #         self._scene_registry.add_xform(name=obj.name, xform=obj)
+    #     else:
+    #         raise Exception("object type is not supported yet")
+    #     return obj
 
-        Raises:
-            Exception: [description]
-            Exception: [description]
-
-        Returns:
-            XFormPrim: [description]
+    def reset_scene_objects(self):
         """
-        if self._scene_registry.name_exists(obj.name):
-            raise Exception("Cannot add the object {} to the scene since its name is not unique".format(obj.name))
-        if isinstance(obj, RigidPrim):
-            self._scene_registry.add_rigid_object(name=obj.name, rigid_object=obj)
-        elif isinstance(obj, GeometryPrim):
-            self._scene_registry.add_geometry_object(name=obj.name, geometry_object=obj)
-        elif isinstance(obj, Robot):
-            self._scene_registry.add_robot(name=obj.name, robot=obj)
-        elif isinstance(obj, Articulation):
-            self._scene_registry.add_articulated_system(name=obj.name, articulated_system=obj)
-        elif isinstance(obj, XFormPrim):
-            self._scene_registry.add_xform(name=obj.name, xform=obj)
-        else:
-            raise Exception("object type is not supported yet")
-        return obj
+        Reset the pose and joint configuration of all scene objects.
+        Also open all doors if self.should_open_all_doors is True
+        """
+        pass
 
     @property
     def has_connectivity_graph(self):
@@ -331,9 +352,6 @@ class Scene(metaclass=ABCMeta):
         Returns:
             [type]: [description]
         """
-        if Scene.object_exists(self, name=name):
-            carb.log_info("ground floor already created with name {}.".format(name))
-            return Scene.get_object(self, name=name)
         plane = GroundPlane(
             prim_path=prim_path,
             name=name,
@@ -345,7 +363,6 @@ class Scene(metaclass=ABCMeta):
             dynamic_friction=dynamic_friction,
             restitution=restitution,
         )
-        Scene.add(self, plane)
 
     def save_state(self):
         """

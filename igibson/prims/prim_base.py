@@ -83,6 +83,10 @@ class BasePrim(metaclass=ABCMeta):
         """
         assert not self._initialized, "Prim can only be initialized once! (It is already initialized)"
         self._initialize()
+
+        # Update defaults
+        self.update_default_state()
+
         self._initialized = True
 
     def load(self, simulator=None):
@@ -98,9 +102,6 @@ class BasePrim(metaclass=ABCMeta):
         """
         if self._loaded:
             raise ValueError("Cannot load a single prim multiple times.")
-
-        # For generalizability, make sure load_config is a dict even if not specified
-        self._load_config = {} if self._load_config is None else self._load_config
 
         # Load prim
         self._prim = self._load(simulator=simulator)

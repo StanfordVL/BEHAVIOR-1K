@@ -67,11 +67,17 @@ class RigidPrim(XFormPrim):
 
     def _load(self, simulator=None):
         # Run super first
-        super()._load(simulator=simulator)
+        prim = super()._load(simulator=simulator)
 
         # Apply rigid body and mass APIs
         self._rigid_api = UsdPhysics.RigidBodyAPI.Apply(self._prim)
         self._mass_api = UsdPhysics.MassAPI.Apply(self._prim)
+
+        # Possibly set the mass
+        if "mass" in self._load_config and self._load_config["mass"] is not None:
+            self.mass = self._load_config["mass"]
+
+        return prim
 
     def _initialize(self):
         # Run super method first
@@ -80,10 +86,6 @@ class RigidPrim(XFormPrim):
         # Get dynamic control and contact sensing interfaces
         self._dc = _dynamic_control.acquire_dynamic_control_interface()
         self._cs = _contact_sensor.acquire_contact_sensor_interface()
-
-        # Possibly set the mass
-        if "mass" in self._load_config and self._load_config["mass"] is not None:
-            self.mass = self._load_config["mass"]
 
         # Create rigid and mass apis if they weren't already created during loading
         self._rigid_api = UsdPhysics.RigidBodyAPI(self._prim) if self._rigid_api is None else self._rigid_api

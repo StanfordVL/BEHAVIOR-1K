@@ -70,15 +70,15 @@ class XFormPrim(BasePrim):
         stage = get_current_stage() if simulator is None else simulator.stage
         self._prim = stage.DefinePrim(self._prim_path, "Xform")
 
+        # Optionally set the scale and visibility
+        if "scale" in self._load_config and self._load_config["scale"] is not None:
+            self.scale = self._load_config["scale"]
+
         return self._prim
 
     def _initialize(self):
         # Always run super first
         super()._initialize()
-
-        # Optionally set the scale and visibility
-        if "scale" in self._load_config and self._load_config["scale"] is not None:
-            self.scale = self._load_config["scale"]
 
         # Grab default state
         default_pos, default_ori = self.get_position_orientation()

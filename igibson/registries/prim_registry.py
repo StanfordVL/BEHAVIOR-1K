@@ -17,6 +17,11 @@ class PrimRegistry:
     Note that if a prim's attribute is an array of values, then it will be stored under ALL of its values.
         example: prim.in_rooms = ["kitchen", "living_room"], indexing by in_rooms with a value of either kitchen OR
             living room will return this prim as part of its set!
+
+    You can also easily check for membership in this registry, via either the prim's name OR the prim itself, e.g.:
+
+        > prim.name in registry
+        > prim in registry
     """
     def __init__(
             self,
@@ -47,7 +52,7 @@ class PrimRegistry:
 
         # Create the ordered dicts programmatically
         for k in self.unique_prim_keys.union(self.group_prim_keys):
-            self.__setattr__(name=f"_objects_by_{k}", value=OrderedDict())
+            self.__setattr__(f"_objects_by_{k}", OrderedDict())
 
     def add(self, prim):
         """
@@ -70,27 +75,27 @@ class PrimRegistry:
         """
         prim_keys = self.all_prim_keys if prim_keys is None else prim_keys
         for k in prim_keys:
-            prim_attr = prim.__getattribute__(name=k)
+            prim_attr = prim.__getattribute__(k)
             # Standardize input as a list
             prim_attr = prim_attr if isinstance(prim_attr, Iterable) and not isinstance(prim_attr, str) else [prim_attr]
 
             # Loop over all values in this attribute and add to all mappings
             for attr in prim_attr:
-                mapping = self.__getattribute__(name=f"_objects_by_{k}")
+                mapping = self.get_dict(k)
                 if k in self.unique_prim_keys:
                     # Handle unique case
                     if attr in mapping:
-                        logging.warning(f"Prim {k} should be unique for adding to this registry mapping! Existing {k}: " + attr)
+                        logging.warning(f"Prim identifier '{k}' should be unique for adding to this registry mapping! Existing {k}: {attr}")
                         # Special case for "name" attribute, which should ALWAYS be unique
                         if k == "name":
-                            logging.erroor(f"For name attribute, prims MUST be unique. Exiting.")
+                            logging.error(f"For name attribute, prims MUST be unique. Exiting.")
                             exit(-1)
                     mapping[attr] = prim
                 else:
                     # Not unique case
                     # Possibly initialize list
                     if attr not in mapping:
-                        mapping = set()
+                        mapping[attr] = set()
                     mapping[attr].add(prim)
 
     def remove(self, prim):
@@ -101,29 +106,64 @@ class PrimRegistry:
             prim (BasePrim): Prim to remove from this registry
         """
         for k in self.unique_prim_keys:
-            self.__getattribute__(name=f"_objects_by_{k}").pop(prim.__getattribute__(name=k))
+            self.get_dict(k).pop(prim.__getattribute__(k))
         for k in self.group_prim_keys:
-            self.__getattribute__(name=f"_objects_by_{k}")[prim.__getattribute__(name=k)].remove(prim)
+            self.get_dict(k)[prim.__getattribute__(k)].remove(prim)
 
     def update(self, prim_keys=None):
         """
         Updates this registry, refreshing all internal mappings in case an object's value was updated
 
         Args:
-            prim_keys (None or set or list of str): Which prim keys to update. None is default, which corresponds to
-                all keys
+            prim_keys (None or str or set or list of str): Which prim keys to update. None is default, which corresponds
+                to all keys
         """
         prims = self.prims
-        prim_keys = self.all_prim_keys if prim_keys is None else prim_keys
+        prim_keys = self.all_prim_keys if prim_keys is None else \
+            (prim_keys if type(prim_keys) in {tuple, list} else [prim_keys])
 
         # Delete and re-create all prim_keys mappings
         for k in prim_keys:
-            self.__delattr__(name=f"_objects_by_{k}")
-            self.__setattr__(name=f"_objects_by_{k}", value=OrderedDict())
+            self.__delattr__(f"_objects_by_{k}")
+            self.__setattr__(f"_objects_by_{k}", OrderedDict())
 
             # Iterate over all prims and re-populate the mappings
             for prim in prims:
                 self._add(prim=prim, prim_keys=[k])
+
+    def prim_is_registered(self, prim):
+        """
+        Check if a given prim @prim is registered
+
+        Args:
+            prim (Prim): Prim to check if it is internally registered
+        """
+        return prim in self.prims
+
+    def get_dict(self, prim_key):
+        """
+        Specific mapping dictionary within this registry corresponding to the mappings of @prim_key.
+            e.g.: if prim_key = "name", this will return the ordered dictionary mapping prim.name to prims
+
+        Args:
+            prim_key (str): Key with which to grab mapping dict from
+
+        Returns:
+            OrderedDict: Mapping from identifiers to prim(s) based on @prim_key
+        """
+        return self.__getattribute__(f"_objects_by_{prim_key}")
+
+    def get_ids(self, prim_key):
+        """
+        All identifiers within this registry corresponding to the mappings of @prim_key.
+            e.g.: if prim_key = "name", this will return all "names" stored internally that index into a prim
+        Args:
+            prim_key (str): Key with which to grab all identifiers from
+
+        Returns:
+            set: All identifiers within this registry corresponding to the mappings of @prim_key.
+        """
+        return set(self.get_dict(prim_key=prim_key).keys())
 
     @property
     def prims(self):
@@ -133,7 +173,7 @@ class PrimRegistry:
         Returns:
             list of Prim: Prims owned by this registry
         """
-        return list(self.__getattribute__(name="_objects_by_name").values())
+        return list(self.get_dict("name").values())
 
     @property
     def all_prim_keys(self):
@@ -141,7 +181,7 @@ class PrimRegistry:
         Returns:
             set of str: All prim keys that are valid identification methods to index prim(s)
         """
-        return self.unique_prim_keys.intersection(self.group_prim_keys)
+        return self.unique_prim_keys.union(self.group_prim_keys)
 
     def __call__(self, prim_key, prim_value, default_val=None):
         """
@@ -159,5 +199,10 @@ class PrimRegistry:
         assert prim_key in self.all_prim_keys,\
             f"Invalid prim_key requested! Valid options are: {self.all_prim_keys}, got: {prim_key}"
 
-        return self.__getattribute__(name=f"_objects_by_{prim_key}").get(prim_value, default_val)
+        return self.get_dict(prim_key).get(prim_value, default_val)
 
+    def __contains__(self, prim):
+        # Prim can be either a string OR the prim itself
+        if isinstance(prim, str):
+            prim = self("name", prim)
+        return self.prim_is_registered(prim=prim)

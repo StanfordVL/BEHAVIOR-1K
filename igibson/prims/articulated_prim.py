@@ -49,6 +49,7 @@ class ArticulatedPrim(XFormPrim):
         self._dc = None                         # Dynamics control interface
         self._handle = None                     # Handle to this articulation
         self._root_handle = None                # Handle to the root rigid body of this articulation
+        self._root_prim = None
         self._dofs_infos = None
         self._num_dof = None
         self._articulation_controller = None
@@ -68,9 +69,6 @@ class ArticulatedPrim(XFormPrim):
         # Run super method
         super()._initialize()
 
-        from igibson import app
-        app.update()
-
         # Get dynamic control info
         self._dc = _dynamic_control.acquire_dynamic_control_interface()
         self._handle = self._dc.get_articulation(self._prim_path)
@@ -88,10 +86,12 @@ class ArticulatedPrim(XFormPrim):
                 link_handle = self._dc.get_articulation_body(self._handle, i)
                 link_name = self._dc.get_rigid_body_name(link_handle)
                 link_path = self._dc.get_rigid_body_path(link_handle)
-                self._links[link_name] = RigidPrim(
+                link = RigidPrim(
                     prim_path=link_path,
                     name=f"{self._name}:{link_name}",
                 )
+                link.initialize()
+                self._links[link_name] = link
 
             # Additionally grab DOF info if we have non-fixed joints
             if num_dof > 0:
@@ -118,16 +118,16 @@ class ArticulatedPrim(XFormPrim):
                     joint_handle = self._dc.get_articulation_joint(self._handle, i)
                     joint_name = self._dc.get_joint_name(joint_handle)
                     joint_path = self._dc.get_joint_path(joint_handle)
-                    self._joints[joint_name] = JointPrim(
+                    joint = JointPrim(
                         prim_path=joint_path,
                         name=f"{self._name}:{joint_name}",
                         articulation=self._handle,
                     )
+                    joint.initialize()
+                    self._joints[joint_name] = joint
         else:
             # TODO: May need to extend to clusters of rigid bodies, that aren't exactly joined
             # We assume this object contains a single rigid body
-            # TODO: Why do we need to do this?
-            app.update()
 
             body_path = f"{self._prim_path}/base_link"
             root_handle = self._dc.get_rigid_body(body_path)
@@ -141,10 +141,12 @@ class ArticulatedPrim(XFormPrim):
                 # Only process prims that are an Xform
                 if prim.GetPrimTypeInfo().GetTypeName() == "Xform":
                     link_name = prim.GetName()
-                    self._links[link_name] = RigidPrim(
+                    link = RigidPrim(
                         prim_path=prim.GetPrimPath().__str__(),
                         name=f"{self._name}:{link_name}",
                     )
+                    link.initialize()
+                    self._links[link_name] = link
 
         # Store values internally
         self._root_handle = root_handle
@@ -836,6 +838,15 @@ class ArticulatedPrim(XFormPrim):
         else:
             for link in self._links.values():
                 link.sleep()
+
+    def keep_still(self):
+        """
+        Zero out all velocities for this prim
+        """
+        self.set_linear_velocity(velocity=np.zeros(3))
+        self.set_angular_velocity(velocity=np.zeros(3))
+        for joint in self._joints.values():
+            joint.keep_still()
 
     def save_state(self):
         # Iterate over all links and joints

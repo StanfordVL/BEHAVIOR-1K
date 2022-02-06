@@ -98,6 +98,18 @@ class BaseObject(ArticulatedPrim, metaclass=ABCMeta):
         # Run super method
         super()._initialize()
 
+        # TODO: Do we need to explicitly add all links? or is adding articulation root itself sufficient?
+        # # Set the collision group
+        # CollisionAPI.add_to_collision_group(
+        #     col_group=self.collision_group,
+        #     prim_path=self.prim_path,
+        #     create_if_not_exist=True,
+        # )
+
+    def load(self, simulator=None):
+        # Run super first
+        prim = super().load(simulator=simulator)
+
         # Set visibility
         if "visible" in self._load_config and self._load_config["visible"] is not None:
             self.visible = self._load_config["visible"]
@@ -109,16 +121,10 @@ class BaseObject(ArticulatedPrim, metaclass=ABCMeta):
             create_joint(
                 prim_path=f"{self._prim_path}/rootJoint",
                 joint_type="FixedJoint",
-                body1=self._dc.get_rigid_body_path(self._root_handle),
+                body1=f"{self._prim_path}/base_link",
             )
 
-        # TODO: Do we need to explicitly add all links? or is adding articulation root itself sufficient?
-        # Set the collision group
-        CollisionAPI.add_to_collision_group(
-            col_group=self.name + "_col_group", #self.collision_group,
-            prim_path=self.prim_path,
-            create_if_not_exist=True,
-        )
+        return prim
 
     @property
     def mass(self):
@@ -140,7 +146,6 @@ class BaseObject(ArticulatedPrim, metaclass=ABCMeta):
         """Set this object's root body velocity in the format of Tuple[Array[vx, vy, vz], Array[wx, wy, wz]]"""
         lin_vel, ang_vel = velocities
 
-        print(f"obj: {self.name}, old root handle: {self._root_handle}, current root handle: {self._dc.get_rigid_body(f'/World/{self.name}/base_link')}, art handle: {self._dc.get_articulation(f'/World/{self.name}')}")
         self.set_linear_velocity(velocity=lin_vel)
         self.set_angular_velocity(velocity=ang_vel)
 
