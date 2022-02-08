@@ -83,13 +83,11 @@ def import_nested_objs_from_element(element):
             # Skip world link
             if name == "world":
                 pass
-            elif name == "straight_chair_10":
+            # Import building components in different way from default objects
+            elif category in {"ceilings", "walls", "floors"}:
+                import_building_urdf(obj_category=category, obj_model=model, skip_if_exist=False)
+            else:
                 import_obj_urdf(obj_category=category, obj_model=model, skip_if_exist=False)
-            # # Import building components in different way from default objects
-            # elif category in {"ceilings", "walls", "floors"}:
-            #     import_building_urdf(obj_category=category, obj_model=model, skip_if_exist=False)
-            # else:
-            #     import_obj_urdf(obj_category=category, obj_model=model, skip_if_exist=False)
         # If there's children nodes, we iterate over those
         for child in ele:
             import_nested_objs_from_element(child)
