@@ -52,7 +52,7 @@ def create_import_config():
     import_config.set_merge_fixed_joints(False)
     import_config.set_convex_decomp(True)
     import_config.set_fix_base(False)
-    import_config.set_import_inertia_tensor(True)
+    import_config.set_import_inertia_tensor(False)
     import_config.set_distance_scale(1.0)
     import_config.set_density(0.0)
     import_config.set_default_drive_type(drive_mode.JOINT_DRIVE_NONE)
