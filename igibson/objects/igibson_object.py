@@ -445,10 +445,9 @@ class iGibsonObject(USDObject):
             if joint.joint_type != JointType.JOINT_FIXED:
                 joint.friction = friction
 
-    def _load(self, simulator=None):
-        # Run super first
-        prim = super()._load(simulator=simulator)
-
+    def _post_load(self, simulator=None):
+        # We run this post loading first before any others because we're modifying the load config that will be used
+        # downstream
         # Set the scale of this prim according to its bounding box
         if self._load_config["fit_avg_dim_volume"]:
             # By default, we assume scale does not change if no avg obj specs are given, otherwise, scale accordingly
@@ -467,9 +466,6 @@ class iGibsonObject(USDObject):
 
         # Set this scale in the load config -- it will automatically scale the object during self.initialize()
         self._load_config["scale"] = scale
-
-        # Set the scale
-        self.scale = scale
 
         # body_ids = []
 
@@ -508,7 +504,8 @@ class iGibsonObject(USDObject):
 
         # self.load_supporting_surfaces()
 
-        return prim
+        # Run super last
+        super()._post_load(simulator=simulator)
 
     def set_bbox_center_position_orientation(self, pos, orn):
         # TODO - check to make sure works

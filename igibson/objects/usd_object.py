@@ -56,7 +56,7 @@ class USDObject(StatefulObject):
         )
         self._usd_path = usd_path
 
-        logging.info(f"Category: {self.category}" + self.category)
+        logging.info(f"Category: {self.category}")
 
     def _load(self, simulator=None):
         """
@@ -65,6 +65,6 @@ class USDObject(StatefulObject):
         logging.info(f"Loading the following USD: {self._usd_path}")
         # Add reference to stage and grab prim
         add_reference_to_stage(usd_path=self._usd_path, prim_path=self._prim_path)
-        self._prim = get_prim_at_path(self._prim_path)
+        prim = get_prim_at_path(self._prim_path)
 
-        return self._prim
+        return prim

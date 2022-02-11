@@ -7,7 +7,6 @@
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 #
 from typing import Optional, Tuple
-from omni.isaac.core.utils.types import DynamicState
 from omni.isaac.core.utils.prims import get_prim_at_path, get_prim_parent
 from omni.isaac.core.utils.transformations import tf_matrix_from_pose
 from omni.isaac.core.utils.rotations import gf_quat_to_np_array
@@ -18,6 +17,7 @@ from omni.isaac.contact_sensor import _contact_sensor
 import carb
 
 from igibson.prims.xform_prim import XFormPrim
+from igibson.utils.types import DynamicState, CsRawData
 
 
 class RigidPrim(XFormPrim):
@@ -69,15 +69,25 @@ class RigidPrim(XFormPrim):
         # Run super first
         prim = super()._load(simulator=simulator)
 
+        return prim
+
+    def _post_load(self, simulator=None):
+        # run super first
+        super()._post_load(simulator=simulator)
+
         # Apply rigid body and mass APIs
-        self._rigid_api = UsdPhysics.RigidBodyAPI.Apply(self._prim)
-        self._mass_api = UsdPhysics.MassAPI.Apply(self._prim)
+        self._rigid_api = UsdPhysics.RigidBodyAPI(self._prim) if self._prim.HasAPI(UsdPhysics.RigidBodyAPI) else \
+            UsdPhysics.RigidBodyAPI.Apply(self._prim)
+        self._mass_api = UsdPhysics.MassAPI(self._prim) if self._prim.HasAPI(UsdPhysics.MassAPI) else \
+            UsdPhysics.MassAPI.Apply(self._prim)
 
         # Possibly set the mass
         if "mass" in self._load_config and self._load_config["mass"] is not None:
             self.mass = self._load_config["mass"]
 
-        return prim
+        # Create contact sensor
+        self._cs = _contact_sensor.acquire_contact_sensor_interface()
+        self._create_contact_sensor()
 
     def _initialize(self):
         # Run super method first
@@ -85,18 +95,9 @@ class RigidPrim(XFormPrim):
 
         # Get dynamic control and contact sensing interfaces
         self._dc = _dynamic_control.acquire_dynamic_control_interface()
-        self._cs = _contact_sensor.acquire_contact_sensor_interface()
-
-        # Create rigid and mass apis if they weren't already created during loading
-        self._rigid_api = UsdPhysics.RigidBodyAPI(self._prim) if self._rigid_api is None else self._rigid_api
-        self._mass_api = UsdPhysics.MassAPI(self._prim) if self._mass_api is None else self._mass_api
 
         # Add enabled attribute for the rigid body
         self._rigid_api.CreateRigidBodyEnabledAttr(True)
-
-        # # TODO: Creating contact sensor may break the DC interface, the handles seem to change AFTER we create the sensor
-        # # Create contact sensor
-        # self._initialize_contact_sensor()
 
         # Grab handle to this rigid body and get name
         self._handle = self._dc.get_rigid_body(self._prim_path)
@@ -114,7 +115,7 @@ class RigidPrim(XFormPrim):
             angular_velocity=ang_vel,
         )
 
-    def _initialize_contact_sensor(self):
+    def _create_contact_sensor(self):
         """
         Creates a full-body contact sensor to detect collisions with this rigid body
         """
@@ -124,18 +125,24 @@ class RigidPrim(XFormPrim):
         props.maxThreshold = 100000000  # Maximum force to detect
         props.sensorPeriod = 0.0            # Zero means in sync with the simulation period
 
-        # Create sensor
-        # TODO: Update settings -- why do the custom settings above break?
-        self._contact_handle = self._cs.add_sensor_on_body(self._prim_path, props)
+        # TODO: Uncomment later, but this significantly slows down everything
+        # # Create sensor
+        # self._contact_handle = self._cs.add_sensor_on_body(self._prim_path, props)
+
+    def _remove_contact_sensor(self):
+        """
+        remove the contact sensor owned by this body
+        """
+        self._cs.remove_sensor(self._contact_handle)
 
     def contact_list(self):
         """
         Get list of all current contacts with this rigid body
 
         Returns:
-            np.ndarray of CsRawData: raw contact info for this rigid body
+            list of CsRawData: raw contact info for this rigid body
         """
-        return self._cs.get_body_contact_raw_data(self._prim_path)
+        return [CsRawData(*c) for c in self._cs.get_body_contact_raw_data(self._prim_path)]
 
     def set_linear_velocity(self, velocity):
         """Sets the linear velocity of the prim in stage.

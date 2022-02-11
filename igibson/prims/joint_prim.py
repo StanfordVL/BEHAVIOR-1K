@@ -103,19 +103,23 @@ class JointPrim(BasePrim):
 
         # Define a joint prim at the current stage, or the simulator's stage if specified
         stage = get_current_stage() if simulator is None else simulator.stage
-        self._prim = create_joint(
+        prim = create_joint(
             prim_path=self._prim_path,
             joint_type=self._load_config.get("joint_type", JointType.JOINT),
             stage=stage,
         )
+
+        return prim
+
+    def _post_load(self, simulator=None):
+        # run super first
+        super()._post_load(simulator=simulator)
 
         # Possibly set the bodies
         if "body0" in self._load_config and self._load_config["body0"] is not None:
             self.body0 = self._load_config["body0"]
         if "body1" in self._load_config and self._load_config["body1"] is not None:
             self.body1 = self._load_config["body1"]
-
-        return self._prim
 
     def _initialize(self):
         # Always run super first

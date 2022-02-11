@@ -72,26 +72,17 @@ class ArticulatedPrim(XFormPrim):
         # Get dynamic control info
         self._dc = _dynamic_control.acquire_dynamic_control_interface()
         self._handle = self._dc.get_articulation(self._prim_path)
-        self._links = OrderedDict()
         self._joints = OrderedDict()
+
+        # Initialize all the links
+        for link in self._links.values():
+            link.initialize()
 
         # Handle case separately based on whether the handle is valid (i.e.: whether we are actually articulated or not)
         if self._handle != _dynamic_control.INVALID_HANDLE:
             root_handle = self._dc.get_articulation_root_body(self._handle)
             root_prim = get_prim_at_path(self._dc.get_rigid_body_path(root_handle))
             num_dof = self._dc.get_articulation_dof_count(self._handle)
-
-            # Setup links and joints info
-            for i in range(self._dc.get_articulation_body_count(self._handle)):
-                link_handle = self._dc.get_articulation_body(self._handle, i)
-                link_name = self._dc.get_rigid_body_name(link_handle)
-                link_path = self._dc.get_rigid_body_path(link_handle)
-                link = RigidPrim(
-                    prim_path=link_path,
-                    name=f"{self._name}:{link_name}",
-                )
-                link.initialize()
-                self._links[link_name] = link
 
             # Additionally grab DOF info if we have non-fixed joints
             if num_dof > 0:
@@ -128,25 +119,10 @@ class ArticulatedPrim(XFormPrim):
         else:
             # TODO: May need to extend to clusters of rigid bodies, that aren't exactly joined
             # We assume this object contains a single rigid body
-
             body_path = f"{self._prim_path}/base_link"
             root_handle = self._dc.get_rigid_body(body_path)
             root_prim = get_prim_at_path(body_path)
             num_dof = 0
-
-            # Setup links info
-            # We iterate over all children of this object's prim,
-            # and grab any that are presumed to be rigid bodies (i.e.: other Xforms)
-            for prim in self._prim.GetChildren():
-                # Only process prims that are an Xform
-                if prim.GetPrimTypeInfo().GetTypeName() == "Xform":
-                    link_name = prim.GetName()
-                    link = RigidPrim(
-                        prim_path=prim.GetPrimPath().__str__(),
-                        name=f"{self._name}:{link_name}",
-                    )
-                    link.initialize()
-                    self._links[link_name] = link
 
         # Store values internally
         self._root_handle = root_handle
@@ -158,6 +134,32 @@ class ArticulatedPrim(XFormPrim):
     def _load(self, simulator=None):
         # This should not be called, because this prim cannot be instantiated from scratch!
         raise NotImplementedError("By default, an articulated prim cannot be created from scratch.")
+
+    def _post_load(self, simulator=None):
+        # Setup links info FIRST before running any other post loading behavior
+        # We iterate over all children of this object's prim,
+        # and grab any that are presumed to be rigid bodies (i.e.: other Xforms)
+        self._links = OrderedDict()
+        for prim in self._prim.GetChildren():
+            # Only process prims that are an Xform
+            if prim.GetPrimTypeInfo().GetTypeName() == "Xform":
+                link_name = prim.GetName()
+                link = RigidPrim(
+                    prim_path=prim.GetPrimPath().__str__(),
+                    name=f"{self._name}:{link_name}",
+                )
+                self._links[link_name] = link
+
+        # The root prim belongs to the first link
+        self._root_prim = list(self._links.values())[0].prim
+
+        # Disable any requested collision pairs
+        for a_name, b_name in self.disabled_collision_pairs:
+            link_a, link_b = self._links[a_name], self._links[b_name]
+            link_a.add_filtered_collision_pair(prim=link_b)
+
+        # Run super
+        super()._post_load(simulator=simulator)
 
     @property
     def articulated(self):
@@ -247,9 +249,12 @@ class ArticulatedPrim(XFormPrim):
         Get list of all current contacts with this object prim
 
         Returns:
-            np.ndarray of CsRawData: raw contact info for this rigid body
+            list of CsRawData: raw contact info for this rigid body
         """
-        return np.concatenate([link.contact_list for link in self._links.values()])
+        contacts = []
+        for link in self._links.values():
+            contacts += link.contact_list()
+        return contacts
 
     def in_contact_links(self):
         """
@@ -723,6 +728,29 @@ class ArticulatedPrim(XFormPrim):
         if self._handle is None:
             raise Exception("handles are not initialized yet")
         return self._articulation_controller.get_applied_action()
+
+    @property
+    def disabled_collision_pairs(self):
+        """
+        Returns:
+            list of (str, str): List of rigid body collision pairs to disable within this object prim.
+                Default is an empty list (no pairs)
+        """
+        return []
+
+
+    @property
+    def scale(self):
+        # Since all rigid bodies owned by this object prim have the same scale, we simply grab it from the root prim
+        return self.root_link.scale
+
+    @scale.setter
+    def scale(self, scale):
+        # We iterate over all rigid bodies owned by this object prim and set their individual scales
+        # We do this because omniverse cannot scale orientation of an articulated prim, so we get mesh mismatches as
+        # they rotate in the world
+        for link in self._links.values():
+            link.scale = scale
 
     @property
     def solver_position_iteration_count(self) -> int:

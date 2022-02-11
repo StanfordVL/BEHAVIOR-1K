@@ -61,15 +61,13 @@ class StatefulObject(BaseObject):
 
         self.prepare_object_states(abilities=abilities)
 
-    def load(self, simulator=None):
+    def _post_load(self, simulator=None):
         # Run super method first
-        prim = super().load(simulator)
+        super()._post_load(simulator=simulator)
 
         # Initialize any states created
         for state in self._states.values():
             state.initialize(simulator)
-
-        return prim
 
     def initialize_states(self):
         """

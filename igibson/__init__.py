@@ -117,3 +117,10 @@ app = OmniApp(
     },
     debug=m.DEBUG,
 )
+
+from igibson.simulator_omni import Simulator
+
+
+# from omni.isaac.kit import SimulationApp
+# app = SimulationApp({"headless": False})
+# from omni.isaac.core import World as Simulator

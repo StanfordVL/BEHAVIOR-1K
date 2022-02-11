@@ -188,13 +188,14 @@ class PrimRegistry:
         Grab the prim in this registry based on @prim_key and @prim_value
 
         Args:
-            prim_key (str): What identification type to use to grab the requested prim.
-                Should be one of @self.prim_keys.
+            prim_key (str): What identification type to use to grab the requested prim(s).
+                Should be one of @self.all_prim_keys.
             prim_value (any): Value to grab. Should be the value of your requested prim.<prim_key> attribute
             default_val (any): Default value to return if @prim_value is not found
 
         Returns:
-            Prim: requested prim
+            Prim or set of prim: requested unique prim if @prim_key is one of unique_prim_keys, else a set if
+                @prim_key is one of group_prim_keys
         """
         assert prim_key in self.all_prim_keys,\
             f"Invalid prim_key requested! Valid options are: {self.all_prim_keys}, got: {prim_key}"

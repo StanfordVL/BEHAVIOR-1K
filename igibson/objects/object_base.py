@@ -91,24 +91,9 @@ class BaseObject(ArticulatedPrim, metaclass=ABCMeta):
             load_config=load_config,
         )
 
-    def _initialize(self):
-        """
-        Parse this object's articulation hierarchy to get properties including joint information and mass
-        """
-        # Run super method
-        super()._initialize()
-
-        # TODO: Do we need to explicitly add all links? or is adding articulation root itself sufficient?
-        # # Set the collision group
-        # CollisionAPI.add_to_collision_group(
-        #     col_group=self.collision_group,
-        #     prim_path=self.prim_path,
-        #     create_if_not_exist=True,
-        # )
-
-    def load(self, simulator=None):
+    def _post_load(self, simulator=None):
         # Run super first
-        prim = super().load(simulator=simulator)
+        super()._post_load(simulator=simulator)
 
         # Set visibility
         if "visible" in self._load_config and self._load_config["visible"] is not None:
@@ -124,7 +109,13 @@ class BaseObject(ArticulatedPrim, metaclass=ABCMeta):
                 body1=f"{self._prim_path}/base_link",
             )
 
-        return prim
+        # TODO: Do we need to explicitly add all links? or is adding articulation root itself sufficient?
+        # Set the collision group
+        CollisionAPI.add_to_collision_group(
+            col_group=self.collision_group,
+            prim_path=self.prim_path,
+            create_if_not_exist=True,
+        )
 
     @property
     def mass(self):

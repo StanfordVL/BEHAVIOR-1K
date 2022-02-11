@@ -55,8 +55,9 @@ def replace_all_nested_collision_meshes(root_prim):
             replace_all_nested_collision_meshes(prim)
         elif prim.IsA(UsdGeom.Mesh) and prim.GetName() != "visuals":
             # Replace this mesh
-            # setCollider(prim, approximationShape="meshSimplification")
-            setCollider(prim, approximationShape="convexDecomposition")
+            setCollider(prim, approximationShape="meshSimplification")
+            # setCollider(prim, approximationShape="convexDecomposition")
+            # prim.GetProperty("physxConvexDecompositionCollision:shrinkWrap").Set(True)
 
 
 def import_obj_collision_mesh(obj_category, obj_model, name):

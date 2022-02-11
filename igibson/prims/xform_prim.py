@@ -8,7 +8,7 @@
 #
 from collections import Iterable
 from typing import Optional, Tuple
-from pxr import Gf, Usd, UsdGeom, UsdShade
+from pxr import Gf, Usd, UsdGeom, UsdShade, UsdPhysics
 from omni.isaac.core.utils.types import XFormPrimState
 from omni.isaac.core.materials import PreviewSurface, OmniGlass, OmniPBR, VisualMaterial
 from omni.isaac.core.utils.rotations import gf_quat_to_np_array
@@ -57,6 +57,7 @@ class XFormPrim(BasePrim):
         self._default_state = None
         self._applied_visual_material = None
         self._binding_api = None
+        self._collision_filter_api = None
 
         # Run super method
         super().__init__(
@@ -68,13 +69,21 @@ class XFormPrim(BasePrim):
     def _load(self, simulator=None):
         # Define an Xform prim at the current stage, or the simulator's stage if specified
         stage = get_current_stage() if simulator is None else simulator.stage
-        self._prim = stage.DefinePrim(self._prim_path, "Xform")
+        prim = stage.DefinePrim(self._prim_path, "Xform")
+
+        return prim
+
+    def _post_load(self, simulator=None):
+        # run super first
+        super()._post_load(simulator=simulator)
+
+        # Create collision filter API
+        self._collision_filter_api = UsdPhysics.FilteredPairsAPI(self._prim) if \
+            self._prim.HasAPI(UsdPhysics.FilteredPairsAPI) else UsdPhysics.FilteredPairsAPI.Apply(self._prim)
 
         # Optionally set the scale and visibility
         if "scale" in self._load_config and self._load_config["scale"] is not None:
             self.scale = self._load_config["scale"]
-
-        return self._prim
 
     def _initialize(self):
         # Always run super first
@@ -410,6 +419,17 @@ class XFormPrim(BasePrim):
         if "xformOp:scale" not in properties:
             carb.log_error("Scale property needs to be set for {} before setting its scale".format(self.name))
         self.set_attribute("xformOp:scale", scale)
+
+    def add_filtered_collision_pair(self, prim):
+        """
+        Adds a collision filter pair with another prim
+
+        Args:
+            prim (XFormPrim): Another prim to filter collisions with
+        """
+        # Add to both this prim's and the other prim's filtered pair
+        self._collision_filter_api.GetFilteredPairsRel().AddTarget(prim.prim_path)
+        prim._collision_filter_api.GetFilteredPairsRel().AddTarget(self._prim_path)
 
     def save_state(self):
         return np.concatenate(self.get_position_orientation())

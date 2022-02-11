@@ -99,9 +99,10 @@ class CollisionAPI:
                 raise ValueError(f"Collision group {col_group} not found in current registry, and create_if_not_exist"
                                  f"was set to False!")
             # Otherwise, create the new group
-            cls.ACTIVE_COLLISION_GROUPS[col_group] = UsdPhysics.CollisionGroup.Define(
-                get_current_stage(), f"/World/collisionGroup_{col_group}"
-            )
+            col_group_name = f"/World/collisionGroup_{col_group}"
+            group = UsdPhysics.CollisionGroup.Define(get_current_stage(), col_group_name)
+            group.GetFilteredGroupsRel().AddTarget(col_group_name)  # Make sure that we can collide within our own group
+            cls.ACTIVE_COLLISION_GROUPS[col_group] = group
 
         # Add this prim to the collision group
         cls.ACTIVE_COLLISION_GROUPS[col_group].GetCollidersCollectionAPI().GetIncludesRel().AddTarget(prim_path)

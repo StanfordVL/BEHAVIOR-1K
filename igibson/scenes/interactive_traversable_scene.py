@@ -6,6 +6,7 @@ import time
 import xml.etree.ElementTree as ET
 from collections import defaultdict
 from xml.dom import minidom
+from itertools import combinations
 
 import numpy as np
 
@@ -837,11 +838,11 @@ class InteractiveTraversableScene(TraversableScene):
                     # Formally add this object to our scene
                     self.add_object(obj, simulator=simulator)
 
-                    # TODO: Handle collision filtering
-                    # # disable collision between the fixed links of the fixed objects
-                    # for i in range(len(fixed_body_ids)):
-                    #     for j in range(i + 1, len(fixed_body_ids)):
-                    #         p.setCollisionFilterPair(fixed_body_ids[i], fixed_body_ids[j], -1, -1, enableCollision=0)
+        # disable collision between the fixed links of the fixed objects
+        fixed_objs = self._registry("fixed_base", True)
+        # We iterate over all pairwise combinations of fixed objects
+        for obj_a, obj_b in combinations(fixed_objs, 2):
+            obj_a.root_link.add_filtered_collision_pair(obj_b.root_link)
 
         # Load the traversability map
         maps_path = os.path.join(self.scene_dir, "layout")
@@ -869,7 +870,6 @@ class InteractiveTraversableScene(TraversableScene):
             #             self.restore_object_states_single_object(sub_obj, object_states[sub_obj.name])
             self.restore_object_states_single_object(obj)
             obj.keep_still()
-
 
         # Re-initialize our scene registry by handle since now handles are populated
         self._registry.update(prim_keys="handle")

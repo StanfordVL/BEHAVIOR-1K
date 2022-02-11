@@ -68,6 +68,9 @@ class BasePrim(metaclass=ABCMeta):
             print(f"prim {name} already exists")
             self._prim = get_prim_at_path(prim_path=self._prim_path)
             self._loaded = True
+            # Run post load
+            # TODO: This requires simulator! change?
+            self._post_load()
 
     def _initialize(self):
         """
@@ -107,7 +110,18 @@ class BasePrim(metaclass=ABCMeta):
         self._prim = self._load(simulator=simulator)
         self._loaded = True
 
+        # Run any post-loading logic
+        self._post_load(simulator=simulator)
+
         return self._prim
+
+    def _post_load(self, simulator=None):
+        """
+        Any actions that should be taken (e.g.: modifying the object's properties such as scale, visibility, additional
+        joints, etc.) that should be taken after loading the raw object into omniverse but BEFORE we initialize the
+        object and grab its handles and internal references. By default, this is a no-op.
+        """
+        pass
 
     @abstractmethod
     def _load(self, simulator=None):
