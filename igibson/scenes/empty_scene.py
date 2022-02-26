@@ -19,7 +19,6 @@ class EmptyScene(Scene):
             floor_plane_color=(1.0, 1.0, 1.0),
     ):
         super(EmptyScene, self).__init__()
-        self.objects = []
         self.floor_plane_visible = floor_plane_visible
         self.floor_plane_color = floor_plane_color
 

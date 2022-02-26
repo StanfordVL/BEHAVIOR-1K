@@ -118,6 +118,9 @@ class Simulator(SimulationContext):
         self._set_physics_engine_settings()
         self._set_viewer_settings()
 
+        # List of objects that need to be initialized during whenever the next sim step occurs
+        self._objects_to_initialize = []
+
         # TODO: Fix
         # Set of categories that can be grasped by assisted grasping
         self.object_state_types = {} #get_states_by_dependency_order()
@@ -164,8 +167,8 @@ class Simulator(SimulationContext):
         """
         assert self.is_stopped(), "Simulator must be stopped while importing a scene!"
         assert isinstance(scene, Scene), "import_scene can only be called with Scene"
-        scene.load(self)
         self._scene = scene
+        scene.load(self)
 
         # Make sure simulator is not running, then start it, then pause it so we can initialize the scene
         assert self.is_stopped(), "Simulator must be stopped after importing a scene!"
@@ -189,23 +192,44 @@ class Simulator(SimulationContext):
     #     self.particle_systems.append(particle_system)
     #     particle_system.initialize(self)
 
-    def import_object(self, obj):
+    def initialize_object_on_next_sim_step(self, obj):
+        """
+        Initializes the object upon the next simulation step
+
+        Args:
+            obj (BasePrim): Object to initialize as soon as a new sim step is called
+        """
+        self._objects_to_initialize.append(obj)
+
+    def import_object(self, obj, auto_initialize=True):
         """
         Import a non-robot object into the simulator.
 
-        :param obj: BaseObject, a non-robot object to load
+        Args:
+            obj (BaseObject): a non-robot object to load
+            auto_initialize (bool): If True, will auto-initialize the requested object on the next simulation step.
+                Otherwise, we assume that the object will call initialize() on its own!
         """
         assert isinstance(obj, BaseObject), "import_object can only be called with BaseObject"
 
         # TODO
-        if False:#isinstance(obj, VisualMarker) or isinstance(obj, Particle):
-            # Marker objects can be imported without a scene.
-            obj.load(self)
-        else:
-            # Non-marker objects require a Scene to be imported.
-            # Load the object in pybullet. Returns a pybullet id that we can use to load it in the renderer
-            assert self.scene is not None, "import_object needs to be called after import_scene"
-            self.scene.add_object(obj, self, _is_call_from_simulator=True)
+        # if False:#isinstance(obj, VisualMarker) or isinstance(obj, Particle):
+        #     # Marker objects can be imported without a scene.
+        #     obj.load(self)
+        # else:
+
+        # Make sure scene is loaded -- objects should not be loaded unless we have a reference to a scene
+        assert self.scene is not None, "import_object needs to be called after import_scene"
+
+        # Load the object in omniverse by adding it to the scene
+        self.scene.add_object(obj, self, _is_call_from_simulator=True)
+
+        # Lastly, additionally add this object automatically to be initialized as soon as another simulator step occurs
+        # if requested
+        if auto_initialize:
+            print("GOT HERE AUTO INITIALIZE")
+            self.initialize_object_on_next_sim_step(obj=obj)
+
     #
     # # TODO
     # def import_robot(self, robot):
@@ -231,6 +255,12 @@ class Simulator(SimulationContext):
         """
         Complete any non-physics steps such as state updates.
         """
+        # Check to see if any objects should be initialized
+        if len(self._objects_to_initialize) > 0:
+            for obj in self._objects_to_initialize:
+                obj.initialize()
+            self._objects_to_initialize = []
+
         # Step all of the particle systems.
         for particle_system in self.particle_systems:
             particle_system.update(self)
@@ -260,6 +290,15 @@ class Simulator(SimulationContext):
         if self.scene is not None and self.scene.initialized:
             self.scene.reset_scene_objects()
 
+    def play(self):
+        super().play()
+
+        # Check to see if any objects should be initialized
+        if len(self._objects_to_initialize) > 0:
+            for obj in self._objects_to_initialize:
+                obj.initialize()
+            self._objects_to_initialize = []
+
     def step(self, render=None, force_playing=False):
         """
         Step the simulation at self.render_timestep
@@ -274,7 +313,7 @@ class Simulator(SimulationContext):
         if force_playing and not self.is_playing():
             self.play()
 
-        for _ in range(self.n_physics_timesteps_per_render - 1):
+        for i in range(self.n_physics_timesteps_per_render - 1):
             super().step(render=False if render is None else render)
 
         # Render on final step unless input says otherwise
@@ -384,8 +423,8 @@ class Simulator(SimulationContext):
         # Stop the physics
         self.stop()
 
-        if self.scene is not None:
-            self.scene.clear()
+        # if self.scene is not None:
+        #     self.scene.clear()
         self._current_tasks = dict()
         self._scene_finalized = False
         self._data_logger = DataLogger()
@@ -585,14 +624,15 @@ class Simulator(SimulationContext):
         """
         return self._data_logger
 
-    @staticmethod
-    def save_stage(usd_path):
+    def save_stage(self, usd_path):
         """
         Save the current stage in this simulator to specified @usd_path
 
         Args:
             usd_path (str): Absolute filepath to where this stage should be saved
         """
+        # Make sure simulator is stopped
+        assert self.is_stopped(), "Simulator must be stopped before the stage can be saved!"
         save_stage(usd_path=usd_path)
 
     # TODO: Extend to update internal info

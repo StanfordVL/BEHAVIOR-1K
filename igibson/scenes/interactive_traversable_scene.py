@@ -2,25 +2,21 @@ import json
 import logging
 import os
 import random
-import time
 import xml.etree.ElementTree as ET
 from collections import defaultdict
 from xml.dom import minidom
 from itertools import combinations
+from collections import OrderedDict
 
 import numpy as np
-
-from IPython import embed
-from PIL import Image
 
 from pxr.Sdf import ValueTypeNames as VT
 from omni.isaac.core.utils.rotations import gf_quat_to_np_array
 
-import igibson
-from igibson.object_states.scene_states import ObjectSceneStatesRegistry
+from igibson.registries.object_states_registry import ObjectStatesRegistry
 # from igibson.object_states.factory import get_state_from_name, get_state_name
 # from igibson.object_states.object_state_base import AbsoluteObjectState
-from igibson.objects.igibson_object import iGibsonObject
+from igibson.objects.dataset_object import DatasetObject
 # from igibson.objects.multi_object_wrappers import ObjectGrouper, ObjectMultiplexer
 # from igibson.robots import REGISTERED_ROBOTS
 # from igibson.robots.behavior_robot import BehaviorRobot
@@ -30,7 +26,6 @@ from igibson.maps.segmentation_map import SegmentationMap
 from igibson.utils.assets_utils import (
     get_3dfront_scene_path,
     get_cubicasa_scene_path,
-    get_ig_avg_category_specs,
     get_ig_category_ids,
     get_ig_category_path,
     get_ig_model_path,
@@ -171,7 +166,7 @@ class InteractiveTraversableScene(TraversableScene):
         self.object_groupers = defaultdict(dict)
 
         # Store the original states retrieved from the USD
-        self.object_states = ObjectSceneStatesRegistry()
+        self.object_states = ObjectStatesRegistry()
 
     def get_scene_loading_info(self, usd_file=None, usd_path=None):
         """
@@ -212,7 +207,7 @@ class InteractiveTraversableScene(TraversableScene):
 
     def get_objects_with_state(self, state):
         # We overload this method to provide a faster implementation.
-        return self._registry("states", state, [])
+        return self.object_registry("states", state, [])
 
     def filter_rooms_and_object_categories(
         self, load_object_categories, not_load_object_categories, load_room_types, load_room_instances
@@ -273,7 +268,7 @@ class InteractiveTraversableScene(TraversableScene):
         if not self.texture_randomization:
             logging.warning("calling randomize_texture while texture_randomization is False during initialization.")
             return
-        for obj in self.get_objects():
+        for obj in self.objects:
             obj.randomize_texture()
 
     # TODO
@@ -325,10 +320,10 @@ class InteractiveTraversableScene(TraversableScene):
         # sofas and coffee tables)
         overlapped_objs = []
         for obj1_name, obj2_name in self.overlapped_bboxes:
-            if obj1_name not in self._registry or obj2_name not in self._registry:
+            if obj1_name not in self.object_registry or obj2_name not in self.object_registry:
                 # This could happen if only part of the scene is loaded (e.g. only a subset of rooms)
                 continue
-            overlapped_objs.append((self._registry("name", obj1_name), self._registry("name", obj2_name)))
+            overlapped_objs.append((self.object_registry("name", obj1_name), self.object_registry("name", obj2_name)))
 
         # TODO -- current method is probably insufficient
         # cache pybullet initial state
@@ -508,9 +503,9 @@ class InteractiveTraversableScene(TraversableScene):
         :param prob: opening probability
         """
         body_joint_pairs = []
-        if category not in self._registry.get_ids("category"):
+        if category not in self.object_registry.get_ids("category"):
             return body_joint_pairs
-        for obj in self._registry("category", category):
+        for obj in self.object_registry("category", category):
             # open probability
             if np.random.random() > prob:
                 continue
@@ -537,21 +532,27 @@ class InteractiveTraversableScene(TraversableScene):
         """
         return self.open_all_objs_by_category("door", mode="max")
 
-    def restore_object_states_single_object(self, obj):
-        obj_kin_state = self.object_states(obj.name)
+    def restore_object_states_single_object(self, obj, obj_state):
+        """
+        Restores object @obj to the state defined by @object_state.
 
+        Args:
+            obj (DatasetObject): Object to restore state
+            object_state (ObjectSceneState): namedtuple with named parameters corresponding to different states of
+                object @obj
+        """
         print(f"restoring obj: {obj.name} state")
         # If the object isn't loaded, skip
         if not obj.loaded:
             return
 
         # If the object state is empty (which happens if an object is added after the scene URDF is parsed), skip
-        if not obj_kin_state:
+        if not obj_state:
             return
 
         # TODO: For velocities, we are now storing each body's com. Should we somehow do the same for positions?
-        if obj_kin_state.base_com_pose is not None:
-            obj.set_position_orientation(*obj_kin_state.base_com_pose)
+        if obj_state.base_com_pose is not None:
+            obj.set_position_orientation(*obj_state.base_com_pose)
         else:
             # TODO:
             # if isinstance(obj, BaseRobot):
@@ -560,26 +561,36 @@ class InteractiveTraversableScene(TraversableScene):
             # else:
             #     obj.set_bbox_center_position_orientation(*obj_kin_state["bbox_center_pose"])
             # obj.set_position_orientation(*obj_kin_state.bbox_center_pose)
-            obj.set_bbox_center_position_orientation(*obj_kin_state.bbox_center_pose)
+            obj.set_bbox_center_position_orientation(*obj_state.bbox_center_pose)
 
-        if obj_kin_state.base_velocities is not None:
-            obj.set_velocities(obj_kin_state.base_velocities)
-        else:
-            obj.set_velocities([np.zeros(3), np.zeros(3)])
+        # TODO: Change how we do this. Use serialized states instead?
+        # if obj_state.base_velocities is not None:
+        #     obj.set_velocities(obj_state.base_velocities)
+        # else:
+        #     obj.set_velocities([np.zeros(3), np.zeros(3)])
+        #
+        # # Only reset joint states if the object has joint states
+        # if obj.articulated:
+        #     if obj_state.joint_states is not None:
+        #         # TODO: This breaks
+        #         obj.set_joint_states(obj_state.joint_states)
+        #     else:
+        #         obj.reset_joint_states()
+        #
+        # if obj_state.non_kinematic_states is not None:
+        #     obj.load_state(obj_state.non_kinematic_states)
 
-        # Only reset joint states if the object has joint states
-        if obj.articulated:
-            if obj_kin_state.joint_states is not None:
-                # TODO: This breaks
-                obj.set_joint_states(obj_kin_state.joint_states)
-            else:
-                obj.reset_joint_states()
+    def restore_object_states(self, object_states=None):
+        """
+        Restores all scene objects according to the object_states defined in @object_states. If not specified, will
+        assume the internal default self.object_states will be used.
 
-        if obj_kin_state.non_kinematic_states is not None:
-            obj.load_state(obj_kin_state.non_kinematic_states)
-
-    def restore_object_states(self):
-        for obj in self.get_objects():
+        Args:
+            object_states (ObjectSceneStatesRegistry): Registry (dict) storing object-specific information. Maps object
+                name to a namedtuple of object states.
+        """
+        object_states = self.object_states if object_states is None else object_states
+        for obj in self.objects:
             # TODO
             # if not isinstance(obj, ObjectMultiplexer):
             #     self.restore_object_states_single_object(obj, object_states[obj_name])
@@ -590,7 +601,7 @@ class InteractiveTraversableScene(TraversableScene):
             #                 self.restore_object_states_single_object(obj_part, object_states[obj_part.name])
             #         else:
             #             self.restore_object_states_single_object(sub_obj, object_states[sub_obj.name])
-            self.restore_object_states_single_object(obj)
+            self.restore_object_states_single_object(obj, obj_state=object_states(obj.name))
 
     def _create_obj_from_template_xform(self, simulator, prim):
         """
@@ -603,7 +614,7 @@ class InteractiveTraversableScene(TraversableScene):
             prim: Usd.Prim: Object template Xform prim
 
         Returns:
-            iGibsonObject: Created iGibson object
+            DatasetObject: Created iGibson object
         """
         # Extract relevant info from template
         name, prim_path = prim.GetName(), prim.GetPrimPath().__str__()
@@ -683,7 +694,7 @@ class InteractiveTraversableScene(TraversableScene):
                     scale = np.array([1.0, 1.0, 1.0])
 
                 # Create the object (finally!)
-                obj = iGibsonObject(
+                obj = DatasetObject(
                     prim_path=prim_path,
                     usd_path=usd_path,
                     name=name,
@@ -832,14 +843,17 @@ class InteractiveTraversableScene(TraversableScene):
                 # Check if we're using a template -- if so, we need to load the object, otherwise, we simply
                 # add a reference internally
                 if is_template:
-                    # Load this object
+                    # Create the object and load it into the simulator
                     obj = self._create_obj_from_template_xform(simulator=simulator, prim=prim)
-                    obj.load(simulator)
-                    # Formally add this object to our scene
-                    self.add_object(obj, simulator=simulator)
+                    # Note that we don't auto-initialize because of some very specific state-setting logic that
+                    # has to occur a certain way at the start of scene creation (sigh, Omniverse ): )
+                    simulator.import_object(obj, auto_initialize=False)
+                    # We also directly set it's bounding box position since this is a known quantity
+                    # This is also the only time we'll be able to set fixed object poses
+                    obj.set_bbox_center_position_orientation(*self.object_states(obj.name).bbox_center_pose)
 
         # disable collision between the fixed links of the fixed objects
-        fixed_objs = self._registry("fixed_base", True)
+        fixed_objs = self.object_registry("fixed_base", True)
         # We iterate over all pairwise combinations of fixed objects
         for obj_a, obj_b in combinations(fixed_objs, 2):
             obj_a.root_link.add_filtered_collision_pair(obj_b.root_link)
@@ -849,13 +863,13 @@ class InteractiveTraversableScene(TraversableScene):
         if self.has_connectivity_graph:
             self._trav_map.load_trav_map(maps_path)
 
-        return list(self.get_objects())
+        return list(self.objects)
 
     def _initialize(self):
         # First, we initialize all of our objects and add the object
-        for obj in self.get_objects():
+        for obj in self.objects:
 
-            # Initialize object
+            # Initialize objects
             obj.initialize()
 
             # TODO
@@ -868,11 +882,11 @@ class InteractiveTraversableScene(TraversableScene):
             #                 self.restore_object_states_single_object(obj_part, object_states[obj_part.name])
             #         else:
             #             self.restore_object_states_single_object(sub_obj, object_states[sub_obj.name])
-            self.restore_object_states_single_object(obj)
+            self.restore_object_states_single_object(obj, obj_state=self.object_states(obj.name))
             obj.keep_still()
 
-        # Re-initialize our scene registry by handle since now handles are populated
-        self._registry.update(prim_keys="handle")
+        # Re-initialize our scene object registry by handle since now handles are populated
+        self.object_registry.update(keys="handle")
 
         # # TODO: Additional restoring from USD state? Is this even necessary?
         # if self.pybullet_filename is not None:
@@ -884,16 +898,11 @@ class InteractiveTraversableScene(TraversableScene):
         # force wake up each body once
         self.wake_scene_objects()
 
-    def _add_object(self, obj):
-        # TODO: Check to see if this works for adding additional objects at runtime
-        # Set the scene pose this object
-        obj.set_bbox_center_position_orientation(*self.object_states(obj.name).bbox_center_pose)
-
     def wake_scene_objects(self):
         """
         Force wakeup sleeping objects
         """
-        for obj in self.get_objects():
+        for obj in self.objects:
             obj.wake()
 
     def reset_scene_objects(self):
@@ -913,7 +922,7 @@ class InteractiveTraversableScene(TraversableScene):
 
         :return: number of objects
         """
-        return len(self.get_objects())
+        return len(self.objects)
 
     def get_object_handles(self):
         """
@@ -921,7 +930,7 @@ class InteractiveTraversableScene(TraversableScene):
 
         :return: object handles
         """
-        return [obj.handle for obj in self.get_objects()]
+        return [obj.handle for obj in self.objects]
 
     # TODO
     def save_obj_or_multiplexer(self, obj, tree_root, additional_attribs_by_name):
@@ -1114,7 +1123,7 @@ class InteractiveTraversableScene(TraversableScene):
             category = link.attrib["category"]
 
             if category == "multiplexer":
-                self._registry("name", object_name).set_selection(int(link.attrib["current_index"]))
+                self.object_registry("name", object_name).set_selection(int(link.attrib["current_index"]))
 
             if category in ["grouper", "multiplexer"]:
                 continue
@@ -1125,7 +1134,6 @@ class InteractiveTraversableScene(TraversableScene):
             object_states[object_name]["joint_states"] = json.loads(link.attrib["joint_states"])
             object_states[object_name]["non_kinematic_states"] = json.loads(link.attrib["states"])
 
-        self.object_states = object_states
         self.restore_object_states()
 
         if pybullet_filename is not None:
@@ -1156,7 +1164,7 @@ class InteractiveTraversableScene(TraversableScene):
 
         scene_tree = ET.parse(self.scene_file)
         tree_root = scene_tree.getroot()
-        for obj in self.get_objects():
+        for obj in self.objects:
             self.save_obj_or_multiplexer(obj, tree_root, additional_attribs_by_name)
 
         if urdf_path is not None:
@@ -1184,15 +1192,15 @@ class InteractiveTraversableScene(TraversableScene):
         return self._seg_map
 
     @property
-    def registry_unique_keys(self):
+    def object_registry_unique_keys(self):
         # Grab all inherited keys and return additional ones
-        keys = super().registry_unique_keys
+        keys = super().object_registry_unique_keys
         return keys + ["handle"]
 
     @property
-    def registry_group_keys(self):
+    def object_registry_group_keys(self):
         # Grab all inherited keys and return additional ones
-        keys = super().registry_group_keys
+        keys = super().object_registry_group_keys
         return keys + ["category", "in_rooms", "states", "fixed_base"]
 
     @property
@@ -1200,6 +1208,6 @@ class InteractiveTraversableScene(TraversableScene):
         """
         Returns:
             dict: Keyword-mapped objects that are are fixed in the scene. Maps object name to their object class instances
-                (iGibsonObject)
+                (DatasetObject)
         """
-        return {obj.name: obj for obj in self._registry("fixed_base", True)}
+        return {obj.name: obj for obj in self.object_registry("fixed_base", True)}

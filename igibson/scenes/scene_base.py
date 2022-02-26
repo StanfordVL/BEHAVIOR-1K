@@ -1,5 +1,5 @@
 from abc import ABCMeta, abstractmethod
-
+from collections import OrderedDict
 from future.utils import with_metaclass
 
 import carb
@@ -20,14 +20,17 @@ from omni.isaac.core.utils.nucleus import find_nucleus_server
 from omni.isaac.core.utils.stage import add_reference_to_stage
 from typing import Optional, Tuple
 import gc
-from igibson.registries.prim_registry import PrimRegistry
+from igibson.utils.python_utils import Serializable
+from igibson.utils.registry_utils import SerializableRegistry
+from igibson.objects.object_base import BaseObject
+from igibson.systems import SYSTEMS_REGISTRY
 
 # from igibson.objects.particles import Particle
 # from igibson.objects.visual_marker import VisualMarker
 # from igibson.robots.robot_base import BaseRobot
 
 
-class Scene(metaclass=ABCMeta):
+class Scene(Serializable, metaclass=ABCMeta):
     """
     Base class for all Scene objects.
     Contains the base functionalities and the functions that all derived classes need to implement.
@@ -39,7 +42,6 @@ class Scene(metaclass=ABCMeta):
         self._initialized = False               # Whether this scene has its internal handles / info initialized or not (occurs AFTER and INDEPENDENTLY from loading!)
         self._registry = None
         self.floor_body_ids = []  # List of ids of the floor_heights
-        self.robots = []
 
     @property
     def stage(self) -> Usd.Stage:
@@ -54,25 +56,80 @@ class Scene(metaclass=ABCMeta):
     def registry(self):
         """
         Returns:
-            PrimRegistry: Registry of all objects in this scene
+            SerializableRegistry: Master registry containing sub-registries of objects, robots, systems, etc.
         """
         return self._registry
 
     @property
-    def registry_unique_keys(self):
+    def object_registry(self):
         """
         Returns:
-            list of str: Keys with which to index into the registry. These should be valid public attributes of
+            SerializableRegistry: Object registry containing all active standalone objects in the scene
+        """
+        return self._registry(key="name", value="object_registry")
+
+    @property
+    def robot_registry(self):
+        """
+        Returns:
+            SerializableRegistry: Robot registry containing all active robots in the scene
+        """
+        return self._registry(key="name", value="robot_registry")
+
+    @property
+    def system_registry(self):
+        """
+        Returns:
+            SerializableRegistry: System registry containing all physical systems in the scene (e.g.: WaterSystem,
+                DustSystem, etc.)
+        """
+        return self._registry(key="name", value="system_registry")
+
+    @property
+    def objects(self):
+        """
+        Get the objects in the scene.
+
+        Returns:
+            list of BaseObject: Standalone object(s) that are currently in this scene
+        """
+        return self.object_registry.objects
+
+    @property
+    def robots(self):
+        """
+        Robots in the scene
+
+        Returns:
+            list of BaseRobot: Robot(s) that are currently in this scene
+        """
+        return self.robot_registry.objects
+
+    @property
+    def systems(self):
+        """
+        Systems in the scene
+
+        Returns:
+            list of BaseSystem: System(s) that are available to use in this scene
+        """
+        return self.system_registry.objects
+
+    @property
+    def object_registry_unique_keys(self):
+        """
+        Returns:
+            list of str: Keys with which to index into the object registry. These should be valid public attributes of
                 prims that we can use as unique IDs to reference prims, e.g., prim.prim_path, prim.name, prim.handle, etc.
         """
         # Only use name by default, the most general
         return ["name"]
 
     @property
-    def registry_group_keys(self):
+    def object_registry_group_keys(self):
         """
         Returns:
-            list of str: Keys with which to index into the registry. These should be valid public attributes of
+            list of str: Keys with which to index into the object registry. These should be valid public attributes of
                 prims that we can use as grouping IDs to reference prims, e.g., prim.in_rooms
         """
         # None by default
@@ -112,11 +169,31 @@ class Scene(metaclass=ABCMeta):
         if self._loaded:
             raise ValueError("This scene is already loaded.")
 
-        # Create registry
-        self._registry = PrimRegistry(
-            unique_prim_keys=self.registry_unique_keys,
-            group_prim_keys=self.registry_group_keys
+        # Create meta registry and populate with internal registries for robots, objects, and systems
+        self._registry = SerializableRegistry(
+            name="master_registry",
+            class_types=SerializableRegistry,
         )
+
+        # Add registry for objects
+        self._registry.add(obj=SerializableRegistry(
+            name="object_registry",
+            class_types=BaseObject,
+            unique_keys=self.object_registry_unique_keys,
+            group_keys=self.object_registry_group_keys,
+        ))
+
+        # TODO!
+        # # Add registry for robots
+        # self._registry.add(obj=SerializableRegistry(
+        #     name="robot_registry",
+        #     class_types=BaseRobot,
+        #     unique_keys=self.robot_registry_unique_keys,
+        #     group_keys=self.robot_registry_group_keys,
+        # ))
+
+        # Add registry for systems -- this is already created externally, so we just pull it directly
+        self._registry.add(obj=SYSTEMS_REGISTRY)
 
         prims = self._load(simulator)
         self._loaded = True
@@ -157,14 +234,6 @@ class Scene(metaclass=ABCMeta):
         else:
             return False
 
-    def get_objects(self):
-        """
-        Get the objects in the scene.
-
-        :return: a list of objects
-        """
-        return self.registry.prims
-
     def get_objects_with_state(self, state):
         """
         Get the objects with a given state in the scene.
@@ -172,7 +241,7 @@ class Scene(metaclass=ABCMeta):
         :param state: state of the objects to get
         :return: a list of objects with the given state
         """
-        return [item for item in self.get_objects() if hasattr(item, "states") and state in item.states]
+        return [item for item in self.objects if hasattr(item, "states") and state in item.states]
 
     def _add_object(self, obj):
         """
@@ -199,8 +268,8 @@ class Scene(metaclass=ABCMeta):
         :return: the body ID(s) of the loaded object if the scene was already loaded, or None if the scene is not loaded
             (in that case, the object is stored to be loaded together with the scene)
         """
-        if self._initialized and not _is_call_from_simulator:
-            raise ValueError("To add an object to an already-initialized scene, use the Simulator's import_object function.")
+        # Make sure the simulator is the one calling this function
+        assert _is_call_from_simulator, "Use import_object() for adding objects to a simulator and scene!"
 
         # TODO
         # if isinstance(obj, VisualMarker) or isinstance(obj, Particle):
@@ -208,13 +277,12 @@ class Scene(metaclass=ABCMeta):
 
         # If the scene is already loaded, we need to load this object separately. Otherwise, don't do anything now,
         # let scene._load() load the object when called later on.
-        prim = None
-        if self._initialized:
-            prim = obj.load(simulator)
+        prim = obj.load(simulator)
 
         # Add this object to our registry
-        self._registry.add(obj)
+        self.object_registry.add(obj)
 
+        # Run any additional scene-specific logic with the created object
         self._add_object(obj)
 
         # TODO
@@ -224,9 +292,16 @@ class Scene(metaclass=ABCMeta):
 
         return prim
 
+    # def clear(self):
+    #     """
+    #     Clears all scene data from this scene
+    #     """
+    #     # Remove all object, robot, system info
+
+
     def remove_object(self, obj):
         # Remove from this registry
-        self._registry.remove(obj)
+        self.object_registry.remove(obj)
 
     # TODO: Integrate good features of this
     #
@@ -364,24 +439,24 @@ class Scene(metaclass=ABCMeta):
             restitution=restitution,
         )
 
-    def save_state(self):
-        """
-        Save the state of this simulation. Includes core kinematic states of all bodies (links, joints)
+    @property
+    def state_size(self):
+        # Total state size is the state size of our registry
+        return self._registry.state_size
 
-        Returns:
-            n-array: serialized, 1D numerical np.array capturing critical state of this simulation
-        """
-        return np.concatenate([obj.save_state() for obj in self.get_objects()])
+    def _dump_state(self):
+        # Default state for the scene is from the registry alone
+        return self._registry.dump_state(serialized=False)
 
-    def restore_state(self, state):
-        """
-        Restore the state of this simulation. Includes core kinematic states of all bodies (links, joints)
+    def _load_state(self, state):
+        # Default state for the scene is from the registry alone
+        self._registry.load_state(state=state, serialized=False)
 
-        Args:
-            state (n-array): serialized, 1D numerical np.array capturing critical state of this simulation
-        """
-        idx = 0
-        for obj in self.get_objects():
-            obj_state_size = obj.state_size
-            obj.restore_state(state[idx: idx + obj_state_size])
-            idx += obj_state_size
+    def _serialize(self, state):
+        # Default state for the scene is from the registry alone
+        return self._registry.serialize(state=state)
+
+    def _deserialize(self, state):
+        # Default state for the scene is from the registry alone
+        end_idx = self._registry.state_size
+        return self._registry.deserialize(state=state[:end_idx]), end_idx
