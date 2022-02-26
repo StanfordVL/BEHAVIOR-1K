@@ -1,5 +1,5 @@
-
-
+import numpy as np
+from collections import OrderedDict
 from igibson.object_states import *
 from igibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
 
@@ -66,8 +66,19 @@ class Sliced(AbsoluteObjectState, BooleanState):
 
     # For this state, we simply store its value. The ObjectMultiplexer will be
     # loaded separately.
-    def _dump(self):
-        return self.value
 
-    def load(self, data):
-        self.value = data
+    @property
+    def settable(self):
+        return True
+
+    def _dump_state(self):
+        return OrderedDict(sliced=self.value)
+
+    def _load_state(self, state):
+        self.value = state["sliced"]
+
+    def _serialize(self, state):
+        return np.array([float(state["sliced"])])
+
+    def _deserialize(self, state):
+        return OrderedDict(sliced=(state[0] == 1.0)), 1

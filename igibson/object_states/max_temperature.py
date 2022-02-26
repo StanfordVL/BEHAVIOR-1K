@@ -1,5 +1,7 @@
-from igibson.object_states.object_state_base import AbsoluteObjectState
+from igibson.object_states.object_state_base import AbsoluteObjectState, NONE
 from igibson.object_states.temperature import Temperature
+import numpy as np
+from collections import OrderedDict
 
 
 class MaxTemperature(AbsoluteObjectState):
@@ -26,9 +28,18 @@ class MaxTemperature(AbsoluteObjectState):
     def _update(self):
         self.value = max(self.obj.states[Temperature].get_value(), self.value)
 
-    # For our serialization, we just dump the value.
-    def _dump(self):
-        return self.value
+    @property
+    def settable(self):
+        return True
 
-    def load(self, data):
-        self.value = data
+    def _dump_state(self):
+        return OrderedDict(temperature=self.value)
+
+    def _load_state(self, state):
+        self.value = state["temperature"]
+
+    def _serialize(self, state):
+        return np.array([state["temperature"]])
+
+    def _deserialize(self, state):
+        return OrderedDict(temperature=state[0]), 1

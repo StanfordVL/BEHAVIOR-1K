@@ -1,6 +1,6 @@
 import numpy as np
 
-from igibson.object_states.object_state_base import BooleanState, CachingEnabledObjectState
+from igibson.object_states.object_state_base import BooleanState, CachingEnabledObjectState, NONE
 from igibson.object_states.pose import Pose
 from igibson.object_states.room_states import InsideRoomTypes
 from igibson.utils.constants import MAX_INSTANCE_COUNT
@@ -38,13 +38,6 @@ class InReachOfRobot(CachingEnabledObjectState, BooleanState):
     def _set_value(self, new_value):
         raise NotImplementedError("InReachOfRobot state currently does not support setting.")
 
-    # Nothing to do here.
-    def _dump(self):
-        pass
-
-    def load(self, data):
-        pass
-
 
 class InSameRoomAsRobot(CachingEnabledObjectState, BooleanState):
     @staticmethod
@@ -69,13 +62,6 @@ class InSameRoomAsRobot(CachingEnabledObjectState, BooleanState):
     def _set_value(self, new_value):
         raise NotImplementedError("InSameRoomAsRobot state currently does not support setting.")
 
-    # Nothing to do here.
-    def _dump(self):
-        pass
-
-    def load(self, data):
-        pass
-
 
 class InHandOfRobot(CachingEnabledObjectState, BooleanState):
     def _compute_value(self):
@@ -95,13 +81,6 @@ class InHandOfRobot(CachingEnabledObjectState, BooleanState):
     def _set_value(self, new_value):
         raise NotImplementedError("InHandOfRobot state currently does not support setting.")
 
-    # Nothing to do here.
-    def _dump(self):
-        pass
-
-    def load(self, data):
-        pass
-
 
 class InFOVOfRobot(CachingEnabledObjectState, BooleanState):
     @staticmethod
@@ -118,13 +97,6 @@ class InFOVOfRobot(CachingEnabledObjectState, BooleanState):
 
     def _set_value(self, new_value):
         raise NotImplementedError("InFOVOfRobot state currently does not support setting.")
-
-    # Nothing to do here.
-    def _dump(self):
-        pass
-
-    def load(self, data):
-        pass
 
 
 class ObjectsInFOVOfRobot(CachingEnabledObjectState):
@@ -143,10 +115,3 @@ class ObjectsInFOVOfRobot(CachingEnabledObjectState):
 
     def _set_value(self, new_value):
         raise NotImplementedError("ObjectsInFOVOfRobot state currently does not support setting.")
-
-    # Nothing to do here.
-    def _dump(self):
-        pass
-
-    def load(self, data):
-        pass

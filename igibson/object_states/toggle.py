@@ -1,4 +1,5 @@
-
+import numpy as np
+from collections import OrderedDict
 
 from igibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from igibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
@@ -111,11 +112,23 @@ class ToggledOn(AbsoluteObjectState, BooleanState, LinkBasedStateMixin, TextureC
         # make the texture 1.5x brighter
         brighten_texture(diffuse_tex_filename, diffuse_tex_filename_transformed, brightness=1.5)
 
-    # For this state, we simply store its value and the robot_can_toggle steps.
-    def _dump(self):
-        return {"value": self.value, "hand_in_marker_steps": self.robot_can_toggle_steps}
+    @property
+    def settable(self):
+        return True
 
-    def load(self, data):
+    # For this state, we simply store its value and the robot_can_toggle steps.
+    def _dump_state(self):
+        return OrderedDict(value=self.value, hand_in_marker_steps=self.robot_can_toggle_steps)
+
+    def _load_state(self, state):
         # Nothing special to do here when initialized vs. uninitialized
-        self.value = data["value"]
-        self.robot_can_toggle_steps = data["hand_in_marker_steps"]
+        self.value = state["value"]
+        self.robot_can_toggle_steps = state["hand_in_marker_steps"]
+
+    @classmethod
+    def _serialize(cls, state):
+        return np.array([state["value"], state["hand_in_marker_steps"]])
+
+    @classmethod
+    def _deserialize(cls, state):
+        return OrderedDict(value=state[0], hand_in_marker_steps=state[1]), 2

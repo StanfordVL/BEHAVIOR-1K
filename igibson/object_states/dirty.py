@@ -1,11 +1,11 @@
+from igibson.settings import settings
 from igibson.object_states import AABB
 from igibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
-from igibson.objects.particles import Dust, Stain
 from igibson.utils.constants import SemanticClass
+from igibson.systems.particle_system import DustSystem, StainSystem
+import numpy as np
 
-CLEAN_THRESHOLD = 0.5
-FLOOR_CLEAN_THRESHOLD = 0.75
-MIN_PARTICLES_FOR_SAMPLING_SUCCESS = 5
+s = settings.object_states.dirty
 
 
 class _Dirty(AbsoluteObjectState, BooleanState):
@@ -13,6 +13,8 @@ class _Dirty(AbsoluteObjectState, BooleanState):
     This class represents common logic between particle-based dirtyness states like
     dusty and stained. It should not be directly instantiated - use subclasses instead.
     """
+    # This must be filled by subclass!
+    DIRT_CLASS = None
 
     @staticmethod
     def get_dependencies():
@@ -20,55 +22,49 @@ class _Dirty(AbsoluteObjectState, BooleanState):
 
     def __init__(self, obj):
         super(_Dirty, self).__init__(obj)
-        self.dirt = None
-
-        # Keep dump data for when we initialize our dirt.
-        self.initial_dump = None
+        self.dirt_group = None
+        self._max_particles_for_clean = None
 
     def _initialize(self):
-        self.dirt = self.DIRT_CLASS(self.obj, initial_dump=self.initial_dump, class_id=SemanticClass.DIRT)
-        self.simulator.import_particle_system(self.dirt)
+        # Make sure dirt class is filled!
+        assert self.DIRT_CLASS is not None, "Dirt class must be specified to initialize Dirty state!"
+
+        # Create the dirt group
+        self.dirt_group = self.DIRT_CLASS.create_attachment_group(obj=self.obj)
 
     def _get_value(self):
-        clean_threshold = FLOOR_CLEAN_THRESHOLD if self.obj.category == "floors" else CLEAN_THRESHOLD
-        max_particles_for_clean = self.dirt.get_num_particles_activated_at_any_time() * clean_threshold
-        return self.dirt.get_num_active() > max_particles_for_clean
+        return self.DIRT_CLASS.num_group_particles(group=self.dirt_group) > self._max_particles_for_clean
 
     def _set_value(self, new_value):
         if not new_value:
-            for particle in self.dirt.get_active_particles():
-                self.dirt.stash_particle(particle)
+            # We remove all of this group's particles
+            self.DIRT_CLASS.remove_all_group_particles(group=self.dirt_group)
         else:
-            self.dirt.randomize()
+            # Generate dirt particles
+            new_value = self.DIRT_CLASS.generate_particles_on_object(obj=self.obj)
+            # If we succeeded with generating particles (new_value = True), we are dirty, let's store additional info
+            if new_value:
+                # Store how many particles there are now -- this is the "maximum" number possible
+                clean_threshold = s.FLOOR_CLEAN_THRESHOLD if self.obj.category == "floors" else s.CLEAN_THRESHOLD
+                self._max_particles_for_clean = \
+                    self.DIRT_CLASS.num_group_particles(group=self.dirt_group) * clean_threshold
 
-            # If after randomization we have too few particles, stash them and return False.
-            if self.dirt.get_num_particles_activated_at_any_time() < MIN_PARTICLES_FOR_SAMPLING_SUCCESS:
-                for particle in self.dirt.get_active_particles():
-                    self.dirt.stash_particle(particle)
+        return new_value
 
-                return False
+    # TODO!
+    @classmethod
+    def serialize(cls, data):
+        raise NotImplementedError()
+        # return np.array([NONE])
 
-        return True
-
-    def _dump(self):
-        # Note that while we could just return self.dirt.dump() here, a previous version used a dictionary
-        # here and to maintain backwards compatibility we're using the same format.
-        return {
-            "particles": self.dirt.dump(),
-        }
-
-    def load(self, data):
-        if not self._initialized:
-            # If not initialized, store the dump for initialization later.
-            self.initial_dump = data["particles"]
-        else:
-            # Otherwise, let the particle system know it needs to reset.
-            self.dirt.reset_to_dump(data["particles"])
+    @classmethod
+    def deserialize(cls, data):
+        raise NotImplementedError()
 
 
 class Dusty(_Dirty):
-    DIRT_CLASS = Dust
+    DIRT_CLASS = DustSystem
 
 
 class Stained(_Dirty):
-    DIRT_CLASS = Stain
+    DIRT_CLASS = StainSystem

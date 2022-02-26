@@ -127,6 +127,7 @@ def get_object_state_instance(state_class, obj, params=None):
 
     return state_class(obj, **params)
 
+
 def get_state_dependency_graph():
     """
     Produce dependency graph of supported object states.

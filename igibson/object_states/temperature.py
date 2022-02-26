@@ -1,3 +1,5 @@
+import numpy as np
+from collections import OrderedDict
 from igibson.object_states.heat_source_or_sink import HeatSourceOrSink
 from igibson.object_states.inside import Inside
 from igibson.object_states.object_state_base import AbsoluteObjectState
@@ -73,9 +75,19 @@ class Temperature(AbsoluteObjectState):
 
         self.value = new_temperature
 
-    # For this state, we simply store its value.
-    def _dump(self):
-        return self.value
+    @property
+    def settable(self):
+        return True
 
-    def load(self, data):
-        self.value = data
+    # For this state, we simply store its value.
+    def _dump_state(self):
+        return OrderedDict(temperature=self.value)
+
+    def _load_state(self, state):
+        self.value = state["temperature"]
+
+    def _serialize(self, state):
+        return np.array([state["temperature"]])
+
+    def _deserialize(self, state):
+        return OrderedDict(temperature=state[0]), 1

@@ -1,6 +1,6 @@
 import numpy as np
 
-from igibson.object_states.object_state_base import AbsoluteObjectState, BooleanState, CachingEnabledObjectState
+from igibson.object_states.object_state_base import AbsoluteObjectState, BooleanState, CachingEnabledObjectState, NONE
 
 
 class InsideRoomTypes(CachingEnabledObjectState):
@@ -22,13 +22,6 @@ class InsideRoomTypes(CachingEnabledObjectState):
     def _set_value(self, new_value):
         raise NotImplementedError("Room state currently does not support setting.")
 
-    # Nothing to do here.
-    def _dump(self):
-        pass
-
-    def load(self, data):
-        pass
-
 
 class IsInRoomTemplate(AbsoluteObjectState, BooleanState):
     ROOM_TYPE = None
@@ -44,14 +37,8 @@ class IsInRoomTemplate(AbsoluteObjectState, BooleanState):
     def _set_value(self, new_value):
         raise NotImplementedError("IsInRoom states currently does not support setting.")
 
-    # Nothing to do here.
-    def _dump(self):
-        pass
 
-    def load(self, data):
-        pass
-
-
+# TODO: Can we make this automatic in any way?
 IsInBathroom = type("IsInBathroom", (IsInRoomTemplate,), {"ROOM_TYPE": "bathroom"})
 IsInBedroom = type("IsInBedroom", (IsInRoomTemplate,), {"ROOM_TYPE": "bedroom"})
 IsInChildsRoom = type("IsInChildsRoom", (IsInRoomTemplate,), {"ROOM_TYPE": "childs_room"})

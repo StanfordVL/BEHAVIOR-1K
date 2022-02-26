@@ -114,7 +114,7 @@ def sample_kinematics(
                     assert False, "predicate is not onTop or inside: {}".format(predicate)
 
                 # Retrieve base CoM frame-aligned bounding box parallel to the XY plane
-                parallel_bbox_center, parallel_bbox_orn, parallel_bbox_extents, _ = objA.get_base_aligned_bounding_box(
+                parallel_bbox_center, parallel_bbox_orn, parallel_bbox_extents, _ = objA.get_base_aligned_bbox(
                     xy_aligned=True
                 )
 

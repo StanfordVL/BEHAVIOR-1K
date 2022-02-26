@@ -70,12 +70,6 @@ class CleaningTool(AbsoluteObjectState, LinkBasedStateMixin):
     def _get_value(self):
         pass
 
-    def _dump(self):
-        return None
-
-    def load(self, data):
-        return
-
     @staticmethod
     def get_dependencies():
         return AbsoluteObjectState.get_dependencies() + [AABB]

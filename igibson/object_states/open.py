@@ -1,9 +1,9 @@
 import random
-
+import numpy as np
 
 
 # from igibson.external.pybullet_tools import utils
-from igibson.object_states.object_state_base import BooleanState, CachingEnabledObjectState
+from igibson.object_states.object_state_base import BooleanState, CachingEnabledObjectState, NONE
 
 # Joint position threshold before a joint is considered open.
 # Should be a number in the range [0, 1] which will be transformed
@@ -170,9 +170,4 @@ class Open(CachingEnabledObjectState, BooleanState):
         # We exhausted our attempts and could not find a working sample.
         return False
 
-    # We don't need to do anything here - since the joints are saved, this should work directly.
-    def _dump(self):
-        return None
-
-    def load(self, data):
-        return
+    # We don't need to load / save anything since the joints are saved elsewhere

@@ -1,6 +1,6 @@
 import numpy as np
 
-from igibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
+from igibson.object_states.object_state_base import AbsoluteObjectState, BooleanState, NONE
 from igibson.object_states.temperature import Temperature
 from igibson.object_states.texture_change_state_mixin import TextureChangeStateMixin
 from igibson.utils.utils import transform_texture
@@ -43,11 +43,6 @@ class Frozen(AbsoluteObjectState, BooleanState, TextureChangeStateMixin):
         return self.obj.states[Temperature].get_value() <= self.freeze_temperature
 
     # Nothing needs to be done to save/load Frozen since it will happen due to temperature caching.
-    def _dump(self):
-        return None
-
-    def load(self, data):
-        return
 
     def _update(self):
         self.update_texture()

@@ -1,10 +1,12 @@
+import numpy as np
+from collections import OrderedDict
 from igibson.object_states.contact_bodies import ContactBodies
 from igibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
 from igibson.object_states.texture_change_state_mixin import TextureChangeStateMixin
 from igibson.object_states.water_source import WaterSource
 from igibson.utils.utils import transform_texture
 
-
+# TODO: Have BooleanState automatically set the dump / load / serialize / deserialize functions
 class Soaked(AbsoluteObjectState, BooleanState, TextureChangeStateMixin):
     def __init__(self, obj):
         super(Soaked, self).__init__(obj)
@@ -28,12 +30,21 @@ class Soaked(AbsoluteObjectState, BooleanState, TextureChangeStateMixin):
                     self.value = True
         self.update_texture()
 
-    # For this state, we simply store its value.
-    def _dump(self):
-        return self.value
+    @property
+    def settable(self):
+        return True
 
-    def load(self, data):
-        self.value = data
+    def _dump_state(self):
+        return OrderedDict(soaked=self.value)
+
+    def _load_state(self, state):
+        self.value = state["soaked"]
+
+    def _serialize(self, state):
+        return np.array([float(state["soaked"])])
+
+    def _deserialize(self, state):
+        return OrderedDict(soaked=(state[0] == 1.0)), 1
 
     @staticmethod
     def get_optional_dependencies():

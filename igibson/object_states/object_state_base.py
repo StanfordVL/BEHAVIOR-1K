@@ -1,13 +1,49 @@
 from abc import ABCMeta, abstractmethod
+from collections import OrderedDict
+import numpy as np
+from igibson.utils.python_utils import Serializable
 
-from future.utils import with_metaclass
+
+# Hacky method to serialize "None" values as a number -- we choose magic number 400 since:
+# sum([ord(c) for c in "None"]) = 400!
+NONE = 400.0
+
+# Global dicts that will contain mappings
+REGISTERED_OBJECT_STATES = OrderedDict()
+REGISTERED_ABSOLUTE_OBJECT_STATES = OrderedDict()
+OBJECT_STATES_TO_ID = OrderedDict()
+
+# Counter for keeping track of unique object state classes that are created
+_STATE_COUNTER = 0
 
 
-class BaseObjectState(with_metaclass(ABCMeta, object)):
+def register_object_state(cls):
+    global _STATE_COUNTER
+    if cls.__name__ not in REGISTERED_OBJECT_STATES:
+        REGISTERED_OBJECT_STATES[cls.__name__] = cls
+        OBJECT_STATES_TO_ID[cls.__name__] = _STATE_COUNTER
+        _STATE_COUNTER += 1
+
+
+def register_absolute_object_state(cls):
+    if cls.__name__ not in REGISTERED_OBJECT_STATES:
+        REGISTERED_ABSOLUTE_OBJECT_STATES[cls.__name__] = cls
+
+
+class BaseObjectState(Serializable, metaclass=ABCMeta):
     """
     Base ObjectState class. Do NOT inherit from this class directly - use either AbsoluteObjectState or
     RelativeObjectState.
     """
+    def __init_subclass__(cls, **kwargs):
+        """
+        Registers all subclasses as part of this registry. This is useful to decouple internal codebase from external
+        user additions. This way, users can add their custom object state by simply extending this BaseObjectState class,
+        and it will automatically be registered internally. This allows users to then specify their object state
+        directly in string-from in e.g., their config files, without having to manually set the str-to-class mapping
+        in our code.
+        """
+        register_object_state(cls)
 
     @staticmethod
     def get_dependencies():
@@ -39,6 +75,17 @@ class BaseObjectState(with_metaclass(ABCMeta, object)):
         self._initialized = False
         self.simulator = None
 
+    @property
+    def settable(self):
+        """
+        Returns:
+            bool: True if this object has a state that can be directly dumped / loaded via dump_state() and
+                load_state(), otherwise, returns False. Note that any sub object states that are NOT settable do
+                not need to implement any of _dump_state(), _load_state(), _serialize(), or _deserialize()!
+        """
+        # False by default
+        return False
+
     def _update(self):
         """This function will be called once for every simulator step."""
         pass
@@ -62,9 +109,20 @@ class BaseObjectState(with_metaclass(ABCMeta, object)):
         assert self._initialized
         return self._get_value(*args, **kwargs)
 
+    def _get_value(self, *args, **kwargs):
+        raise NotImplementedError
+
     def set_value(self, *args, **kwargs):
         assert self._initialized
         return self._set_value(*args, **kwargs)
+
+    def _set_value(self, *args, **kwargs):
+        raise NotImplementedError
+
+    def dump_state(self, serialized=False):
+        assert self._initialized
+        assert self.settable
+        return super().dump_state(serialized=serialized)
 
 
 class AbsoluteObjectState(BaseObjectState):
@@ -72,6 +130,10 @@ class AbsoluteObjectState(BaseObjectState):
     This class is used to track object states that are absolute, e.g. do not require a second object to compute
     the value.
     """
+    def __init_subclass__(cls, **kwargs):
+        # Register as part of locomotion controllers
+        super().__init_subclass__(**kwargs)
+        register_absolute_object_state(cls)
 
     @abstractmethod
     def _get_value(self):
@@ -79,18 +141,6 @@ class AbsoluteObjectState(BaseObjectState):
 
     @abstractmethod
     def _set_value(self, new_value):
-        raise NotImplementedError()
-
-    @abstractmethod
-    def _dump(self):
-        raise NotImplementedError()
-
-    def dump(self):
-        assert self._initialized
-        return self._dump()
-
-    @abstractmethod
-    def load(self, data):
         raise NotImplementedError()
 
 

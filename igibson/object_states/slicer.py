@@ -1,6 +1,7 @@
+import numpy as np
 from igibson.object_states import ContactBodies, Sliced
 from igibson.object_states.link_based_state_mixin import LinkBasedStateMixin
-from igibson.object_states.object_state_base import AbsoluteObjectState
+from igibson.object_states.object_state_base import AbsoluteObjectState, NONE
 
 _SLICER_LINK_NAME = "slicer"
 
@@ -37,12 +38,6 @@ class Slicer(AbsoluteObjectState, LinkBasedStateMixin):
 
     def _get_value(self):
         pass
-
-    def _dump(self):
-        return None
-
-    def load(self, data):
-        return
 
     @staticmethod
     def get_dependencies():

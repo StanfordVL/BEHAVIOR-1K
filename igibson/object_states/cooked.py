@@ -1,7 +1,9 @@
 from igibson.object_states.max_temperature import MaxTemperature
-from igibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
+from igibson.object_states.object_state_base import AbsoluteObjectState, BooleanState, NONE
 from igibson.object_states.texture_change_state_mixin import TextureChangeStateMixin
 from igibson.utils.utils import transform_texture
+import numpy as np
+
 
 _DEFAULT_COOK_TEMPERATURE = 70
 
@@ -36,11 +38,6 @@ class Cooked(AbsoluteObjectState, BooleanState, TextureChangeStateMixin):
 
     # Nothing needs to be done to save/load Burnt since it will happen due to
     # MaxTemperature caching.
-    def _dump(self):
-        return None
-
-    def load(self, data):
-        return
 
     def _update(self):
         self.update_texture()

@@ -7,7 +7,7 @@ import igibson
 from igibson.object_states.aabb import AABB
 from igibson.object_states.inside import Inside
 from igibson.object_states.link_based_state_mixin import LinkBasedStateMixin
-from igibson.object_states.object_state_base import AbsoluteObjectState
+from igibson.object_states.object_state_base import AbsoluteObjectState, NONE
 from igibson.object_states.open import Open
 from igibson.object_states.toggle import ToggledOn
 
@@ -155,8 +155,3 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin):
 
     # Nothing needs to be done to save/load HeatSource since it's stateless except for
     # the marker.
-    def _dump(self):
-        return None
-
-    def load(self, data):
-        return

@@ -1,7 +1,8 @@
 import numpy as np
+from collections import OrderedDict
 
 # # from igibson.external.pybullet_tools.utils import aabb_union, get_aabb, get_all_links
-from igibson.object_states.object_state_base import CachingEnabledObjectState
+from igibson.object_states.object_state_base import CachingEnabledObjectState, NONE
 
 
 class AABB(CachingEnabledObjectState):
@@ -34,8 +35,3 @@ class AABB(CachingEnabledObjectState):
         raise NotImplementedError("AABB state currently does not support setting.")
 
     # Nothing needs to be done to save/load AABB since it will happen due to pose caching.
-    def _dump(self):
-        return None
-
-    def load(self, data):
-        return

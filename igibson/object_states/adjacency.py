@@ -3,7 +3,7 @@ from collections import namedtuple
 import numpy as np
 
 
-from igibson.object_states.object_state_base import CachingEnabledObjectState
+from igibson.object_states.object_state_base import CachingEnabledObjectState, NONE
 from igibson.object_states.pose import Pose
 
 _MAX_ITERATIONS = 10
@@ -143,11 +143,6 @@ class VerticalAdjacency(CachingEnabledObjectState):
         return CachingEnabledObjectState.get_dependencies() + [Pose]
 
     # Nothing needs to be done to save/load adjacency since it will happen due to pose caching.
-    def _dump(self):
-        return None
-
-    def load(self, data):
-        return
 
 
 class HorizontalAdjacency(CachingEnabledObjectState):
@@ -189,8 +184,3 @@ class HorizontalAdjacency(CachingEnabledObjectState):
         return CachingEnabledObjectState.get_dependencies() + [Pose]
 
     # Nothing needs to be done to save/load adjacency since it will happen due to pose caching.
-    def _dump(self):
-        return None
-
-    def load(self, data):
-        return

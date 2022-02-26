@@ -20,6 +20,8 @@ _OFFSET_FROM_LINK = np.array([0, 0, -0.05])
 _NUM_DROPS = 10
 
 
+# TODO!
+
 class WaterSource(AbsoluteObjectState, LinkBasedStateMixin):
     def __init__(self, obj):
         super(WaterSource, self).__init__(obj)
@@ -82,6 +84,15 @@ class WaterSource(AbsoluteObjectState, LinkBasedStateMixin):
             self.initial_dump = data
         else:
             self.water_stream.reset_to_dump(data)
+
+    # TODO!
+    @classmethod
+    def serialize(cls, data):
+        raise NotImplementedError()
+
+    @classmethod
+    def deserialize(cls, data):
+        raise NotImplementedError()
 
     @staticmethod
     def get_optional_dependencies():

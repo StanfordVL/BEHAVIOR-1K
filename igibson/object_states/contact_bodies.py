@@ -1,7 +1,8 @@
 
 
 # from igibson.external.pybullet_tools.utils import ContactResult
-from igibson.object_states.object_state_base import CachingEnabledObjectState
+from igibson.object_states.object_state_base import CachingEnabledObjectState, NONE
+import numpy as np
 
 
 class ContactBodies(CachingEnabledObjectState):
@@ -14,10 +15,3 @@ class ContactBodies(CachingEnabledObjectState):
 
     def _set_value(self, new_value):
         raise NotImplementedError("ContactBodies state currently does not support setting.")
-
-    # Nothing needs to be done to save/load ContactBodies since it will happen due to pose caching.
-    def _dump(self):
-        return None
-
-    def load(self, data):
-        return
