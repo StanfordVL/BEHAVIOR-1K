@@ -25,10 +25,10 @@ from omni.isaac.core.utils.prims import (
 import numpy as np
 import carb
 from omni.isaac.core.utils.stage import get_current_stage
-from igibson import app
+from igibson.utils.python_utils import Serializable, UniquelyNamed
 
 
-class BasePrim(metaclass=ABCMeta):
+class BasePrim(Serializable, UniquelyNamed, metaclass=ABCMeta):
     """
     Provides high level functions to deal with a basic prim and its attributes/ properties.
         If there is an Xform prim present at the path, it will use it. Otherwise, a new XForm prim at
@@ -62,6 +62,8 @@ class BasePrim(metaclass=ABCMeta):
         self._loaded = False                                # Whether this prim exists in the stage or not
         self._initialized = False                           # Whether this prim has its internal handles / info initialized or not (occurs AFTER and INDEPENDENTLY from loading!)
         self._prim = None
+        self._state_size = None
+        self._n_duplicates = 0                              # Simple counter for keeping track of duplicates for unique name indexing
 
         # Run some post-loading steps if this prim has already been loaded
         if is_prim_path_valid(prim_path=self._prim_path):
@@ -71,6 +73,9 @@ class BasePrim(metaclass=ABCMeta):
             # Run post load
             # TODO: This requires simulator! change?
             self._post_load()
+
+        # Run super init
+        super().__init__()
 
     def _initialize(self):
         """
@@ -87,8 +92,11 @@ class BasePrim(metaclass=ABCMeta):
         assert not self._initialized, "Prim can only be initialized once! (It is already initialized)"
         self._initialize()
 
-        # Update defaults
-        self.update_default_state()
+        # # Update defaults
+        # self.update_default_state()
+
+        # Cache state size
+        self._state_size = len(self.dump_state(serialized=True))
 
         self._initialized = True
 
@@ -132,6 +140,10 @@ class BasePrim(metaclass=ABCMeta):
         return self._loaded
 
     @property
+    def initialized(self):
+        return self._initialized
+
+    @property
     def prim_path(self):
         """
         Returns:
@@ -143,7 +155,7 @@ class BasePrim(metaclass=ABCMeta):
     def name(self):
         """
         Returns:
-            str: name assigned to this prim
+            str: unique name assigned to this prim
         """
         return self._name
 
@@ -154,6 +166,14 @@ class BasePrim(metaclass=ABCMeta):
             Usd.Prim: USD Prim object that this object holds.
         """
         return self._prim
+
+    @property
+    def property_names(self):
+        """
+        Returns:
+            set of str: Set of property names that this prim has (e.g.: visibility, proxyPrim, etc.)
+        """
+        return set(self._prim.GetPropertyNames())
 
     @property
     def visible(self):
@@ -244,37 +264,55 @@ class BasePrim(metaclass=ABCMeta):
         """
         return self._prim.GetCustomData()
 
-    @property
-    def state_size(self):
-        """
-        Returns:
-            int: Size of this object's serialized state
-        """
-        # Default is zero
-        return len(self.save_state())
-
-    @abstractmethod
-    def save_state(self):
-        """
-        Returns:
-            n-array: serialized, 1D numerical np.array capturing critical state of this prim, where n is @self.state_size
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def restore_state(self, state):
-        """
-        Deserializes and restores this prim's state based on @state
-
-        Args:
-            state (n-array): serialized, 1D numerical array capturing critical state of this prim,
-                where n is @self.state_size
-        """
-        raise NotImplementedError
-
-    @abstractmethod
     def update_default_state(self):
         """
         Updates default state based on current state
         """
-        raise NotImplementedError
+        raise NotImplementedError()
+
+    def _create_prim_with_same_kwargs(self, prim_path, name, load_config):
+        """
+        Generates a new instance of this prim's class with specified @prim_path, @name, and @load_config, but otherwise
+        all other kwargs should be identical to this instance's values.
+
+        Args:
+            prim_path (str): Absolute path to the newly generated prim
+            name (str): Name for the newly created prim
+            load_config (dict): Keyword-mapped kwargs to use to set specific attributes for the created prim's instance
+
+        Returns:
+            BasePrim: Generated prim object (not loaded, and not initialized!)
+        """
+        return self.__class__(
+            prim_path=prim_path,
+            name=name,
+            load_config=load_config,
+        )
+
+    def duplicate(self, simulator, prim_path):
+        """
+        Duplicates this object, and generates a new instance at @prim_path.
+        Note that the created object is automatically loaded into the simulator, but is NOT initialized
+        until a sim step occurs!
+
+        Args:
+            simulator (Simulator): simulation instance to load this object
+            prim_path (str): Absolute path to the newly generated prim
+
+        Returns:
+            BasePrim: Generated prim object
+        """
+        new_prim = self._create_prim_with_same_kwargs(
+            prim_path=prim_path,
+            name=f"{self.name}_copy{self._n_duplicates}",
+            load_config=self._load_config,
+        )
+        new_prim.load(simulator=simulator)
+
+        # Increment duplicate count
+        self._n_duplicates += 1
+
+        # Set visibility
+        new_prim.visible = self.visible
+
+        return new_prim

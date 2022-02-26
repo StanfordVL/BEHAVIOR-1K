@@ -6,7 +6,7 @@
 # distribution of this software and related documentation without an express
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 #
-from collections import Iterable
+from collections import Iterable, OrderedDict
 from typing import Optional, Tuple
 from pxr import Gf, Usd, Sdf, UsdGeom, UsdShade, UsdPhysics, PhysxSchema
 from omni.isaac.dynamic_control import _dynamic_control
@@ -244,6 +244,7 @@ class JointPrim(BasePrim):
         assert is_prim_path_valid(body1), f"Invalid body1 path specified: {body1}"
         self._prim.GetRelationship("physics:body1").SetTargets([Sdf.Path(body1)])
 
+    @property
     def parent_name(self):
         """
         Gets this joint's parent body name, if it exists
@@ -253,6 +254,7 @@ class JointPrim(BasePrim):
         """
         return self._dc.get_rigid_body_name(self._dc.get_joint_parent_body(self._handle))
 
+    @property
     def child_name(self):
         """
         Gets this joint's child body name, if it exists
@@ -262,6 +264,7 @@ class JointPrim(BasePrim):
         """
         return self._dc.get_rigid_body_name(self._dc.get_joint_child_body(self._handle))
 
+    @property
     def local_orientation(self):
         """
         Returns:
@@ -576,13 +579,34 @@ class JointPrim(BasePrim):
         Zero out all velocities for this prim
         """
         self.set_vel(np.zeros(self.num_dof))
-        self.set_effort(np.zeros(self.num_dof))
 
-    def save_state(self):
-        return np.concatenate(self.get_state()) if self.articulated else np.array([])
+    def _dump_state(self):
+        pos, vel, effort = self.get_state() if self.articulated else (np.array([]), np.array([]), np.array([]))
+        return OrderedDict(
+            pos=pos,
+            vel=vel,
+            effort=effort,
+        )
 
-    def restore_state(self, state):
+    def _load_state(self, state):
         if self.articulated:
-            self.set_pos(state[:self._num_dof])
-            self.set_vel(state[self._num_dof:2*self._num_dof])
-            self.set_effort(state[2*self._num_dof:])
+            self.set_pos(state["pos"])
+            self.set_vel(state["vel"])
+            self.set_effort(state["effort"])
+
+    def _serialize(self, state):
+        # We serialize by iterating over the keys and adding them to a list that's concatenated at the end
+        # This is a deterministic mapping because we assume the state is an OrderedDict
+        return np.concatenate(list(state.values()))
+
+    def _deserialize(self, state):
+        # We deserialize deterministically by knowing the order of values -- pos, vel, effort
+        return OrderedDict(
+            pos=state[0:self.num_dof],
+            vel=state[self.num_dof:2*self.num_dof],
+            effort=state[2*self.num_dof:3*self.num_dof],
+        ), 3*self.num_dof
+
+    def duplicate(self, simulator, prim_path):
+        # Cannot directly duplicate a joint prim
+        raise NotImplementedError("Cannot directly duplicate a joint prim!")

@@ -1,8 +1,9 @@
 import sys
 import logging
+import numpy as np
+from collections import OrderedDict
 from igibson.object_states.factory import get_state_name, get_default_states, get_states_for_ability, get_object_state_instance
-from igibson.object_states.object_state_base import AbsoluteObjectState
-from igibson.object_states.object_state_base import CachingEnabledObjectState
+from igibson.object_states.object_state_base import CachingEnabledObjectState, REGISTERED_OBJECT_STATES
 from igibson.objects.object_base import BaseObject
 
 # Optionally import bddl for object taxonomy.
@@ -28,6 +29,7 @@ class StatefulObject(BaseObject):
             rendering_params=None,
             visible=True,
             fixed_base=False,
+            visual_only=False,
             load_config=None,
             abilities=None,
     ):
@@ -44,6 +46,7 @@ class StatefulObject(BaseObject):
             rendering_params=rendering_params,
             visible=visible,
             fixed_base=fixed_base,
+            visual_only=visual_only,
             load_config=load_config,
         )
 
@@ -59,6 +62,7 @@ class StatefulObject(BaseObject):
                 abilities = {}
         assert isinstance(abilities, dict), "Object abilities must be in dictionary form."
 
+        self._abilities = abilities
         self.prepare_object_states(abilities=abilities)
 
     def _post_load(self, simulator=None):
@@ -73,7 +77,7 @@ class StatefulObject(BaseObject):
         """
         Initializes states for this object, and also clears any states that were existing beforehand.
         """
-        self._states = dict()
+        self._states = OrderedDict()
 
     def add_state(self, name, state):
         """
@@ -90,7 +94,7 @@ class StatefulObject(BaseObject):
         Get the current states of this object.
 
         Returns:
-            dict: Keyword-mapped states for this object
+            OrderedDict: Keyword-mapped states for this object
         """
         return self._states
 
@@ -126,21 +130,61 @@ class StatefulObject(BaseObject):
         for state_type, params in reversed(state_types_and_params):
             self._states[state_type] = get_object_state_instance(state_type, self, params)
 
-    def dump_state(self):
-        return {
-            get_state_name(state_type): state_instance.dump()
-            for state_type, state_instance in self._states.items()
-            if issubclass(state_type, AbsoluteObjectState)
-        }
+    def _dump_state(self):
+        # Grab state from super class
+        state = super()._dump_state()
 
-    def load_state(self, dump):
+        # Also add non-kinematic states
+        non_kin_states = OrderedDict()
+        for state_type, state_instance in self._states.items():
+            if state_instance.settable:
+                non_kin_states[get_state_name(state_type)] = state_instance.dump_state(serialized=False)
+
+        state["non_kin"] = non_kin_states
+
+        return state
+
+    def _load_state(self, state):
+        # Call super method first
+        super()._load_state(state=state)
+
+        # Load all states that are settable
         for state_type, state_instance in self._states.items():
             state_name = get_state_name(state_type)
-            if issubclass(state_type, AbsoluteObjectState):
-                if state_name in dump:
-                    state_instance.load(dump[state_name])
+            if state_instance.settable:
+                if state_name in state["non_kin"]:
+                    state_instance.load_state(state=state["non_kin"][state_name], serialized=False)
                 else:
                     logging.warning("Missing object state [{}] in the state dump".format(state_name))
+
+    def _serialize(self, state):
+        # Call super method first
+        state_flat = super()._serialize(state=state)
+
+        # Iterate over all states and serialize them individually
+        non_kin_state_flat = np.concatenate([
+            self._states[REGISTERED_OBJECT_STATES[state_name]].serialize(state_dict)
+            for state_name, state_dict in state["non_kin"].items()
+        ]) if len(state["non_kin"]) > 0 else np.array([])
+
+        # Combine these two arrays
+        return np.concatenate([state_flat, non_kin_state_flat])
+
+    def _deserialize(self, state):
+        # TODO: Need to check that self._state_size is accurate at the end of initialize()
+        # Call super method first
+        state_dic, idx = super()._deserialize(state=state)
+
+        # Iterate over all states and deserialize their states if they're settable
+        non_kin_state_dic = OrderedDict()
+        for state_type, state_instance in self._states.items():
+            state_name = get_state_name(state_type)
+            if state_instance.settable:
+                non_kin_state_dic[state_name] = state_instance.deserialize(state[idx:idx+state_instance.state_size])
+                idx += state_instance.state_size
+        state_dic["non_kin"] = non_kin_state_dic
+
+        return state_dic, idx
 
     def clear_cached_states(self):
         for _, obj_state in self._states.items():

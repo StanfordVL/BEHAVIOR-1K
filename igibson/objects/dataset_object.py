@@ -42,9 +42,9 @@ from omni.isaac.core.utils.prims import get_prim_at_path
 
 # TODO: Reset sub-bodies that are floating wrt the root prim (e.g.: pillows from bed)
 
-class iGibsonObject(USDObject):
+class DatasetObject(USDObject):
     """
-    iGibsonObjects are instantiated from a USD file. It is an object that is assumed to come from an iG-supported
+    DatasetObjects are instantiated from a USD file. It is an object that is assumed to come from an iG-supported
     dataset. These objects should contain additional metadata, including aggregate statistics across the
     object's category, e.g., avg dims, bounding boxes, masses, etc.
     """
@@ -60,6 +60,7 @@ class iGibsonObject(USDObject):
         rendering_params=None,
         visible=True,
         fixed_base=False,
+        visual_only=False,
         load_config=None,
         abilities=None,
 
@@ -88,6 +89,7 @@ class iGibsonObject(USDObject):
         @param rendering_params: Any relevant rendering settings for this object.
         @param visible: bool, whether to render this object or not in the stage
         @param fixed_base: bool, whether to fix the base of this object or not
+        visual_only (bool): Whether this object should be visual only (and not collide with any other objects)
         load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
             loading this prim at runtime.
         @param abilities: dict in the form of {ability: {param: value}} containing
@@ -146,7 +148,7 @@ class iGibsonObject(USDObject):
 
         # Make sure only one of bounding_box and scale are specified
         if bounding_box is not None and scale is not None:
-            raise Exception("You cannot define both scale and bounding box size for an iGibsonObject")
+            raise Exception("You cannot define both scale and bounding box size for an DatasetObject")
 
         # Add info to load config
         load_config = dict() if load_config is None else load_config
@@ -188,6 +190,7 @@ class iGibsonObject(USDObject):
             rendering_params=rendering_params,
             visible=visible,
             fixed_base=fixed_base,
+            visual_only=visual_only,
             load_config=load_config,
             abilities=abilities,
         )
@@ -553,24 +556,12 @@ class iGibsonObject(USDObject):
         self.room_floor = room_floor
 
     @property
-    def bbox(self):
-        """
-        Get this object's actual bounding box
-
-        Returns:
-            3-array: (x,y,z) bounding box
-        """
-        return self.native_bbox * self.scale
-
-    @property
     def native_bbox(self):
-        """
-        Get this object's native bounding box
-
-        Returns:
-            3-array: (x,y,z) bounding box
-        """
-        return np.array(self.get_attribute(attr="ig:nativeBB"))
+        # Native bbox must be specified for dataset objects!
+        native_bbox = super().native_bbox
+        assert native_bbox is not None, f"This dataset object '{self.name}' is expected to have native_bbox specified," \
+                                        f" but found none!"
+        return native_bbox
 
     @property
     def base_link_offset(self):
@@ -651,7 +642,6 @@ class iGibsonObject(USDObject):
 
         return scales
 
-    @property
     def get_base_aligned_bbox(self, link_name=None, visual=False, xy_aligned=False, fallback_to_aabb=False):
         """
         Get a bounding box for this object that's axis-aligned in the object's base frame.
@@ -799,6 +789,26 @@ class iGibsonObject(USDObject):
             None or dict: Average object information based on its category
         """
         return AVERAGE_CATEGORY_SPECS.get(self.category, None)
+
+    def _create_prim_with_same_kwargs(self, prim_path, name, load_config):
+        # Add additional kwargs (fit_avg_dim_volume and bounding_box are already captured in load_config)
+        return self.__class__(
+            prim_path=prim_path,
+            usd_path=self._usd_path,
+            name=name,
+            category=self.category,
+            class_id=self.class_id,
+            scale=self.scale,
+            rendering_params=self.rendering_params,
+            visible=self.visible,
+            fixed_base=self.fixed_base,
+            visual_only=self._visual_only,
+            load_config=load_config,
+            abilities=self._abilities,
+            in_rooms=self.in_rooms,
+            texture_randomization=self.texture_randomization,
+            bddl_object_scope=self.bddl_object_scope,
+        )
 
     # @property
     # def meta_links(self):

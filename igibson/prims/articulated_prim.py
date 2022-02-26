@@ -37,6 +37,9 @@ class ArticulatedPrim(XFormPrim):
             loading this prim at runtime. Note that by default, this assumes an articulation already exists (i.e.:
             load() will raise NotImplementedError)! Subclasses must implement _load() for this prim to be able to be
             dynamically loaded after this class is created.
+
+            visual_only (None or bool): If specified, whether this prim should include collisions or not.
+                    Default is True.
         """
 
     def __init__(
@@ -57,6 +60,7 @@ class ArticulatedPrim(XFormPrim):
         self._links = None
         self._joints = None
         self._mass = None
+        self._visual_only = None
 
         # Run super init
         super().__init__(
@@ -136,6 +140,10 @@ class ArticulatedPrim(XFormPrim):
         raise NotImplementedError("By default, an articulated prim cannot be created from scratch.")
 
     def _post_load(self, simulator=None):
+        # Set visual only flag
+        self._visual_only = self._load_config["visual_only"] if \
+            "visual_only" in self._load_config and self._load_config["visual_only"] is not None else False
+
         # Setup links info FIRST before running any other post loading behavior
         # We iterate over all children of this object's prim,
         # and grab any that are presumed to be rigid bodies (i.e.: other Xforms)
@@ -147,6 +155,7 @@ class ArticulatedPrim(XFormPrim):
                 link = RigidPrim(
                     prim_path=prim.GetPrimPath().__str__(),
                     name=f"{self._name}:{link_name}",
+                    load_config={"visual_only": self._visual_only},
                 )
                 self._links[link_name] = link
 
@@ -157,6 +166,10 @@ class ArticulatedPrim(XFormPrim):
         for a_name, b_name in self.disabled_collision_pairs:
             link_a, link_b = self._links[a_name], self._links[b_name]
             link_a.add_filtered_collision_pair(prim=link_b)
+
+        # Possibly disable gravity
+        if self._visual_only:
+            self.disable_gravity()
 
         # Run super
         super()._post_load(simulator=simulator)
@@ -337,12 +350,17 @@ class ArticulatedPrim(XFormPrim):
             str_output += self._read_kinematic_hierarchy(child, indent_level + 4)
         return str_output
 
+    def enable_gravity(self) -> None:
+        """[summary]
+        """
+        for link in self._links.values():
+            link.enable_gravity()
+
     def disable_gravity(self) -> None:
         """[summary]
         """
         for link in self._links.values():
-            self._dc.set_rigid_body_disable_gravity(link.handle, False)
-        return
+            link.disable_gravity()
 
     def set_joint_positions(self, positions: np.ndarray, indices: Optional[Union[List, np.ndarray]] = None) -> None:
         """[summary]
@@ -738,7 +756,6 @@ class ArticulatedPrim(XFormPrim):
         """
         return []
 
-
     @property
     def scale(self):
         # Since all rigid bodies owned by this object prim have the same scale, we simply grab it from the root prim
@@ -876,8 +893,56 @@ class ArticulatedPrim(XFormPrim):
         for joint in self._joints.values():
             joint.keep_still()
 
-    def save_state(self):
-        # Iterate over all links and joints
-        link_states = [link.save_state() for link in self._links.values()]
-        joint_states = [joint.save_state() for joint in self._joints.values()]
-        return np.concatenate([*link_states, *joint_states])
+    # TODO: Remove?
+    # def save_state(self):
+    #     # Iterate over all links and joints
+    #     link_states = [link.save_state() for link in self._links.values()]
+    #     joint_states = [joint.save_state() for joint in self._joints.values()]
+    #     return np.concatenate([*link_states, *joint_states])
+
+    def _dump_state(self):
+        # We don't call super, instead, this state is simply the root link state and all joint states
+        state = OrderedDict(root_link=self.root_link._dump_state())
+        joint_state = OrderedDict()
+        for prim_name, prim in self._joints.items():
+            joint_state[prim_name] = prim._dump_state()
+        state["joints"] = joint_state
+
+        return state
+
+    def _load_state(self, state):
+        # Load base link state and joint states
+        self.root_link._load_state(state=state["root_link"])
+        for joint_name, joint_state in state["joints"].items():
+            self._joints[joint_name]._load_state(state=joint_state)
+
+    def _serialize(self, state):
+        # We serialize by first flattening the root link state and then iterating over all joints and
+        # adding them to the a flattened array
+        state_flat = [self.root_link.serialize(state=state["root_link"])]
+        if self.num_joints > 0:
+            state_flat.append(
+                np.concatenate(
+                    [prim.serialize(state=state["joints"][prim_name]) for prim_name, prim in self._joints.items()]
+                )
+            )
+
+        return np.concatenate(state_flat)
+
+    def _deserialize(self, state):
+        # We deserialize by first de-flattening the root link state and then iterating over all joints and
+        # sequentially grabbing from the flattened state array, incrementing along the way
+        idx = self.root_link.state_size
+        state_dict = self.root_link.deserialize(state=state[:idx])
+        joint_state_dict = OrderedDict()
+        for prim_name, prim in self._joints.items():
+            joint_state_dict[prim_name] = prim.deserialize(state[idx:idx+prim.state_size])
+            idx += prim.state_size
+        state_dict["joints"] = joint_state_dict
+
+        return state_dict, idx
+
+    def _create_prim_with_same_kwargs(self, prim_path, name, load_config):
+        # Subclass must implement this method for duplication functionality
+        raise NotImplementedError("Subclass must implement _create_prim_with_same_kwargs() to enable duplication "
+                                  "functionality for ArticulatedPrim!")

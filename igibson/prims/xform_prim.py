@@ -6,7 +6,7 @@
 # distribution of this software and related documentation without an express
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 #
-from collections import Iterable
+from collections import Iterable, OrderedDict
 from typing import Optional, Tuple
 from pxr import Gf, Usd, UsdGeom, UsdShade, UsdPhysics
 from omni.isaac.core.utils.types import XFormPrimState
@@ -77,12 +77,23 @@ class XFormPrim(BasePrim):
         # run super first
         super()._post_load(simulator=simulator)
 
+        # Make sure all xforms have pose and scaling info
+        self._set_xform_properties()
+
+        # # We need to set the properties if this is not a root link
+        # non_root_link_flag = query_parent_path(
+        #     prim_path=self._prim_path, predicate=lambda a: get_prim_object_type(a) == "articulation"
+        # )
+        # if not non_root_link_flag:
+        #     self._set_xform_properties()
+
         # Create collision filter API
         self._collision_filter_api = UsdPhysics.FilteredPairsAPI(self._prim) if \
             self._prim.HasAPI(UsdPhysics.FilteredPairsAPI) else UsdPhysics.FilteredPairsAPI.Apply(self._prim)
 
         # Optionally set the scale and visibility
         if "scale" in self._load_config and self._load_config["scale"] is not None:
+            print(f"scale: {self._load_config['scale']}")
             self.scale = self._load_config["scale"]
 
     def _initialize(self):
@@ -118,20 +129,21 @@ class XFormPrim(BasePrim):
             xform_op_scale = xformable.AddXformOp(UsdGeom.XformOp.TypeScale, UsdGeom.XformOp.PrecisionDouble, "")
             xform_op_scale.Set(Gf.Vec3d([1.0, 1.0, 1.0]))
         else:
-            xform_op_scale = UsdGeom.XformOp(self.get_attribute("xformOp:scale"))
+            xform_op_scale = UsdGeom.XformOp(self._prim.GetAttribute("xformOp:scale"))
 
         if "xformOp:translate" not in prop_names:
-            xform_op_tranlsate = xformable.AddXformOp(
+            xform_op_translate = xformable.AddXformOp(
                 UsdGeom.XformOp.TypeTranslate, UsdGeom.XformOp.PrecisionDouble, ""
             )
         else:
-            xform_op_tranlsate = UsdGeom.XformOp(self.get_attribute("xformOp:translate"))
+            xform_op_translate = UsdGeom.XformOp(self._prim.GetAttribute("xformOp:translate"))
 
         if "xformOp:orient" not in prop_names:
             xform_op_rot = xformable.AddXformOp(UsdGeom.XformOp.TypeOrient, UsdGeom.XformOp.PrecisionDouble, "")
         else:
-            xform_op_rot = UsdGeom.XformOp(self.get_attribute("xformOp:orient"))
-        xformable.SetXformOpOrder([xform_op_tranlsate, xform_op_rot, xform_op_scale])
+            xform_op_rot = UsdGeom.XformOp(self._prim.GetAttribute("xformOp:orient"))
+        xformable.SetXformOpOrder([xform_op_translate, xform_op_rot, xform_op_scale])
+        # Possibly set position and orientation
         XFormPrim.set_position_orientation(self, position=current_position, orientation=current_orientation)
         return
 
@@ -413,6 +425,7 @@ class XFormPrim(BasePrim):
             scale (float or np.ndarray): scale to be applied to the prim's dimensions. shape is (3, ).
                                           Defaults to None, which means left unchanged.
         """
+        print(f"setting scale: {scale}")
         scale = np.array(scale) if isinstance(scale, Iterable) else np.ones(3) * scale
         scale = Gf.Vec3d(*scale.tolist())
         properties = self.prim.GetPropertyNames()
@@ -431,8 +444,21 @@ class XFormPrim(BasePrim):
         self._collision_filter_api.GetFilteredPairsRel().AddTarget(prim.prim_path)
         prim._collision_filter_api.GetFilteredPairsRel().AddTarget(self._prim_path)
 
-    def save_state(self):
-        return np.concatenate(self.get_position_orientation())
+    def _dump_state(self):
+        pos, ori = self.get_position_orientation()
+        return OrderedDict(pos=pos, ori=ori)
 
-    def restore_state(self, state):
-        self.set_position_orientation(state[:3], state[3:])
+    def _load_state(self, state):
+        self.set_position_orientation(state["pos"], state["ori"])
+
+    def _serialize(self, state):
+        # We serialize by iterating over the keys and adding them to a list that's concatenated at the end
+        # This is a deterministic mapping because we assume the state is an OrderedDict
+        return np.concatenate(list(state.values()))
+
+    def _deserialize(self, state):
+        # We deserialize deterministically by knowing the order of values -- pos, ori
+        return OrderedDict(
+            pos=state[0:3],
+            ori=state[3:6],
+        ), 6

@@ -7,16 +7,18 @@
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 #
 from typing import Optional, Tuple
+from collections import OrderedDict
 from omni.isaac.core.utils.prims import get_prim_at_path, get_prim_parent
 from omni.isaac.core.utils.transformations import tf_matrix_from_pose
 from omni.isaac.core.utils.rotations import gf_quat_to_np_array
-from pxr import Gf, UsdPhysics, Usd, UsdGeom
+from pxr import Gf, UsdPhysics, Usd, UsdGeom, PhysxSchema
 import numpy as np
 from omni.isaac.dynamic_control import _dynamic_control
 from omni.isaac.contact_sensor import _contact_sensor
 import carb
 
 from igibson.prims.xform_prim import XFormPrim
+from igibson.prims.mesh_prim import CollisionMeshPrim, VisualMeshPrim
 from igibson.utils.types import DynamicState, CsRawData
 
 
@@ -40,6 +42,9 @@ class RigidPrim(XFormPrim):
                 scale (None or float or 3-array): If specified, sets the scale for this object. A single number corresponds
                     to uniform scaling along the x,y,z axes, whereas a 3-array specifies per-axis scaling.
                 mass (None or float): If specified, mass of this body in kg
+                density (None or float): If specified, density of this body in kg / m^3
+                visual_only (None or bool): If specified, whether this prim should include collisions or not.
+                    Default is True.
     """
 
     def __init__(
@@ -55,8 +60,12 @@ class RigidPrim(XFormPrim):
         self._contact_handle = None
         self._body_name = None
         self._rigid_api = None
+        self._physx_rigid_api = None
         self._mass_api = None
         self._default_state = None
+        self._visual_only = None
+        self._collision_meshes = None
+        self._visual_meshes = None
 
         # Run super init
         super().__init__(
@@ -78,12 +87,37 @@ class RigidPrim(XFormPrim):
         # Apply rigid body and mass APIs
         self._rigid_api = UsdPhysics.RigidBodyAPI(self._prim) if self._prim.HasAPI(UsdPhysics.RigidBodyAPI) else \
             UsdPhysics.RigidBodyAPI.Apply(self._prim)
+        self._physx_rigid_api = PhysxSchema.PhysxRigidBodyAPI(self._prim) if \
+            self._prim.HasAPI(PhysxSchema.PhysxRigidBodyAPI) else PhysxSchema.PhysxRigidBodyAPI.Apply(self._prim)
         self._mass_api = UsdPhysics.MassAPI(self._prim) if self._prim.HasAPI(UsdPhysics.MassAPI) else \
             UsdPhysics.MassAPI.Apply(self._prim)
 
-        # Possibly set the mass
+        # Store references to owned visual / collision meshes
+        # We iterate over all children of this object's prim,
+        # and grab any that are presumed to be meshes
+        self._collision_meshes, self._visual_meshes = OrderedDict(), OrderedDict()
+        for prim in self._prim.GetChildren():
+            # Only process prims that are an Xform
+            if prim.GetPrimTypeInfo().GetTypeName() == "Mesh":
+                mesh_name, mesh_path = prim.GetName(), prim.GetPrimPath().__str__()
+                mesh_prim = get_prim_at_path(prim_path=mesh_path)
+                mesh_kwargs = {"prim_path": mesh_path, "name": f"{self._name}:{mesh_name}"}
+                if mesh_prim.HasAPI(UsdPhysics.CollisionAPI):
+                    self._collision_meshes[mesh_name] = CollisionMeshPrim(**mesh_kwargs)
+                    # Also set the collision enabling based on whether we're a visual only body
+                    self._collision_meshes[mesh_name].collision_enabled = not self._visual_only
+                else:
+                    self._visual_meshes[mesh_name] = VisualMeshPrim(**mesh_kwargs)
+
+        # Possibly set the mass / density
         if "mass" in self._load_config and self._load_config["mass"] is not None:
             self.mass = self._load_config["mass"]
+        if "density" in self._load_config and self._load_config["density"] is not None:
+            self.density = self._load_config["density"]
+
+        # Set visual only flag
+        self._visual_only = self._load_config["visual_only"] if \
+            "visual_only" in self._load_config and self._load_config["visual_only"] is not None else False
 
         # Create contact sensor
         self._cs = _contact_sensor.acquire_contact_sensor_interface()
@@ -95,6 +129,11 @@ class RigidPrim(XFormPrim):
 
         # Get dynamic control and contact sensing interfaces
         self._dc = _dynamic_control.acquire_dynamic_control_interface()
+
+        # Initialize all owned meshes
+        for mesh_group in (self._collision_meshes, self._visual_meshes):
+            for mesh in mesh_group.values():
+                mesh.initialize()
 
         # Add enabled attribute for the rigid body
         self._rigid_api.CreateRigidBodyEnabledAttr(True)
@@ -114,6 +153,10 @@ class RigidPrim(XFormPrim):
             linear_velocity=lin_vel,
             angular_velocity=ang_vel,
         )
+
+        # Possibly disable gravity
+        if self._visual_only:
+            self.disable_gravity()
 
     def _create_contact_sensor(self):
         """
@@ -309,6 +352,24 @@ class RigidPrim(XFormPrim):
         return self._body_name
 
     @property
+    def collision_meshes(self):
+        """
+        Returns:
+            OrderedDict: Dictionary mapping collision mesh names (str) to mesh prims (CollisionMeshPrim) owned by
+                this rigid body
+        """
+        return self._collision_meshes
+
+    @property
+    def visual_meshes(self):
+        """
+        Returns:
+            OrderedDict: Dictionary mapping visual mesh names (str) to mesh prims (VisualMeshPrim) owned by
+                this rigid body
+        """
+        return self._visual_meshes
+
+    @property
     def mass(self):
         """
         Returns:
@@ -410,6 +471,18 @@ class RigidPrim(XFormPrim):
             angular_velocity=self.get_angular_velocity(),
         )
 
+    def enable_gravity(self):
+        """[summary]
+        """
+        self.set_attribute("physxRigidBody:disableGravity", False)
+        # self._dc.set_rigid_body_disable_gravity(self._handle, False)
+
+    def disable_gravity(self):
+        """[summary]
+        """
+        self.set_attribute("physxRigidBody:disableGravity", True)
+        # self._dc.set_rigid_body_disable_gravity(self._handle, True)
+
     def wake(self):
         """
         Enable physics for this rigid body
@@ -422,15 +495,27 @@ class RigidPrim(XFormPrim):
         """
         self._dc.sleep_rigid_body(self._handle)
 
-    def save_state(self):
-        pos, ori = self.get_position_orientation()
-        lin_vel = self.get_linear_velocity()
-        ang_vel = self.get_angular_velocity()
-        return np.concatenate([pos, ori, lin_vel, ang_vel])
+    def _dump_state(self):
+        # Grab pose from super class
+        state = super()._dump_state()
+        state["lin_vel"] = self.get_linear_velocity()
+        state["ang_vel"] = self.get_angular_velocity()
 
-    def restore_state(self, state):
-        self.set_position_orientation(state[:3], state[3:7])
-        self.set_linear_velocity(state[7:10])
-        self.set_angular_velocity(state[10:])
+        return state
 
+    def _load_state(self, state):
+        # Call super first
+        super()._load_state(state=state)
 
+        # Set velocities
+        self.set_linear_velocity(state["lin_vel"])
+        self.set_angular_velocity(state["ang_vel"])
+
+    def _deserialize(self, state):
+        # Call supermethod first
+        state_dic, idx = super()._deserialize(state=state)
+        # We deserialize deterministically by knowing the order of values -- lin_vel, ang_vel
+        state_dic["lin_vel"] = state[7:10],
+        state_dic["ang_vel"] = state[10:13],
+
+        return state_dic, 13

@@ -1,12 +1,20 @@
 import logging
-import numpy as np
 from igibson.objects.stateful_object import StatefulObject
 
-from omni.isaac.core.utils.stage import add_reference_to_stage
-from omni.isaac.core.utils.prims import get_prim_at_path
+from pxr import Gf, Usd, Sdf, UsdGeom, UsdPhysics, PhysxSchema, UsdShade
+from omni.isaac.core.utils.stage import add_reference_to_stage, get_current_stage
 
 
-class USDObject(StatefulObject):
+PRIMITIVE_OBJECTS = {
+    "Cube",
+    "Sphere",
+    "Cylinder",
+    "Capsule",
+    "Cone",
+}
+
+
+class PrimitiveObject(StatefulObject):
     """
     USDObjects are instantiated from a USD file. They can be composed of one
     or more links and joints. They may or may not be passive.
@@ -15,7 +23,7 @@ class USDObject(StatefulObject):
     def __init__(
         self,
         prim_path,
-        usd_path,
+        primitive_type,
         name=None,
         category="object",
         class_id=None,
@@ -29,7 +37,8 @@ class USDObject(StatefulObject):
     ):
         """
         @param prim_path: str, global path in the stage to this object
-        @param usd_path: str, global path to the USD file to load
+        @param primitive_type: str, type of primitive object to create. Should be one of:
+            {Cube, Sphere, Cylinder, Capsule, Cone}
         @param name: Name for the object. Names need to be unique per scene. If no name is set, a name will be generated
             at the time the object is added to the scene, using the object's category.
         @param category: Category for the object. Defaults to "object".
@@ -39,9 +48,17 @@ class USDObject(StatefulObject):
         @param rendering_params: Any relevant rendering settings for this object.
         @param visible: bool, whether to render this object or not in the stage
         @param fixed_base: bool, whether to fix the base of this object or not
-        visual_only (bool): Whether this object should be visual only (and not collide with any other objects)
+        @param visual_only: whether this object should be a visual-only (i.e.: not affected by collisions / gravity)
+            object or not
         load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
             loading this prim at runtime.
+
+            Can specify:
+                scale (None or float or 3-array): If specified, sets the scale for this object. A single number
+                    corresponds
+                    to uniform scaling along the x,y,z axes, whereas a 3-array specifies per-axis scaling.
+                mass (None or float): If specified, mass of this body in kg
+
         @param abilities: dict in the form of {ability: {param: value}} containing
             object abilities and parameters.
         """
@@ -58,24 +75,35 @@ class USDObject(StatefulObject):
             load_config=load_config,
             abilities=abilities,
         )
-        self._usd_path = usd_path
+        # Make sure primitive type is valid
+        assert primitive_type in PRIMITIVE_OBJECTS, f"Invalid primitive object requested! Valid options are: " \
+                                                    f"{PRIMITIVE_OBJECTS}, got: {primitive_type}"
+        self._primitive_type = primitive_type
 
     def _load(self, simulator=None):
         """
         Load the object into pybullet and set it to the correct pose
         """
-        logging.info(f"Loading the following USD: {self._usd_path}")
-        # Add reference to stage and grab prim
-        add_reference_to_stage(usd_path=self._usd_path, prim_path=self._prim_path)
-        prim = get_prim_at_path(self._prim_path)
+        logging.info(f"Loading the following primitive: {self._primitive_type}")
+
+        # Define an Xform at the specified path
+        stage = get_current_stage() if simulator is None else simulator.stage
+        prim = stage.DefinePrim(self._prim_path, "Xform")
+
+        # Define a nested mesh corresponding to the root link for this prim
+        base_link = stage.DefinePrim(f"{self._prim_path}/base_link", "Xform")
+
+        # Define (finally!) nested meshes corresponding to visual / collision mesh
+        UsdGeom.__dict__[self._primitive_type].Define(stage, f"{self._prim_path}/base_link/visual")
+        UsdGeom.__dict__[self._primitive_type].Define(stage, f"{self._prim_path}/base_link/collision")
 
         return prim
 
     def _create_prim_with_same_kwargs(self, prim_path, name, load_config):
-        # Add additional kwargs
+        # Add additional kwargs (fit_avg_dim_volume and bounding_box are already captured in load_config)
         return self.__class__(
             prim_path=prim_path,
-            usd_path=self._usd_path,
+            primitive_type=self._primitive_type,
             name=name,
             category=self.category,
             class_id=self.class_id,
@@ -83,22 +111,7 @@ class USDObject(StatefulObject):
             rendering_params=self.rendering_params,
             visible=self.visible,
             fixed_base=self.fixed_base,
-            visual_only=self._visual_only,
             load_config=load_config,
             abilities=self._abilities,
+            visual_only=self._visual_only,
         )
-
-    @property
-    def bbox(self):
-        # Override this function to pull directly from the native_bbox property if it exists
-        return super().bbox if self.native_bbox is not None else self.native_bbox * self.scale
-
-    @property
-    def native_bbox(self):
-        """
-        Get this object's native bounding box
-
-        Returns:
-            None or 3-array: (x,y,z) bounding box if it exists, else None
-        """
-        return np.array(self.get_attribute(attr="ig:nativeBB")) if "ig:nativeBB" in self.property_names else None
