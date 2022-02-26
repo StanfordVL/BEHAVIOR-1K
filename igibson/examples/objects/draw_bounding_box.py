@@ -53,7 +53,7 @@ def main(random_selection=False, headless=False, short_exec=False):
             line_idx = 0
             for obj in [banana, door]:
                 # Draw new debug lines for the bounding boxes.
-                bbox_center, bbox_orn, bbox_bf_extent, bbox_wf_extent = obj.get_base_aligned_bounding_box(visual=True)
+                bbox_center, bbox_orn, bbox_bf_extent, bbox_wf_extent = obj.get_base_aligned_bbox(visual=True)
                 bbox_frame_vertex_positions = np.array(list(itertools.product((1, -1), repeat=3))) * (
                     bbox_bf_extent / 2
                 )
