@@ -129,7 +129,7 @@ class BoundingBoxAPI:
         """
         # Create cache if it doesn't already exist
         if cls.CACHE is None:
-            cls.CACHE = create_bbox_cache(use_extents_hint=True)
+            cls.CACHE = create_bbox_cache(use_extents_hint=False)
 
         # Grab aabb
         aabb = compute_aabb(bbox_cache=cls.CACHE, prim_path=prim_path)

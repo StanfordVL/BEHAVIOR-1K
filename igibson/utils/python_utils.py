@@ -1,10 +1,24 @@
 """
 A set of utility functions for general python usage
 """
+from abc import ABCMeta
 import inspect
 from copy import deepcopy
-
 import numpy as np
+from collections import OrderedDict, Iterable
+
+
+# Global dictionary storing all unique names
+NAMES = set()
+
+
+class classproperty:
+
+    def __init__(self, fget):
+        self.fget = fget
+
+    def __get__(self, owner_self, owner_cls):
+        return self.fget(owner_cls)
 
 
 def merge_nested_dicts(base_dict, extra_dict, verbose=False):
@@ -96,3 +110,308 @@ def assert_valid_key(key, valid_keys, name=None):
     if name is None:
         name = "value"
     assert key in valid_keys, "Invalid {} received! Valid options are: {}, got: {}".format(name, valid_keys, key)
+
+
+class UniquelyNamed:
+    """
+    Simple class that implements a name property, that must be implemented by a subclass. Note that any @Named
+    entity must be UNIQUE!
+    """
+    def __init__(self, *args, **kwargs):
+        global NAMES
+        # Register this object, making sure it's name is unique
+        assert self.name not in NAMES, \
+            f"UniquelyNamed object with name {self.name} already exists!"
+        NAMES.add(self.name)
+
+    def __del__(self):
+        # Remove this object name from the registry
+        NAMES.remove(self.name)
+
+    @property
+    def name(self):
+        """
+        Returns:
+            str: Name of this instance. Must be unique!
+        """
+        raise NotImplementedError
+
+
+class UniquelyNamedNonInstance:
+    """
+    Identical to UniquelyNamed, but intended for non-instanceable classes
+    """
+
+    def __init_subclass__(cls, **kwargs):
+        global NAMES
+        # Register this object, making sure it's name is unique
+        assert cls.name not in NAMES, \
+            f"UniquelyNamed class with name {cls.name} already exists!"
+        NAMES.add(cls.name)
+
+    @classproperty
+    def name(cls):
+        """
+        Returns:
+            str: Name of this instance. Must be unique!
+        """
+        raise NotImplementedError
+
+
+class Serializable:
+    """
+    Simple class that provides an abstract interface to dump / load states, optionally with serialized functionality
+    as well.
+    """
+    @property
+    def state_size(self):
+        """
+        Returns:
+            int: Size of this object's serialized state
+        """
+        raise NotImplementedError()
+
+    def _dump_state(self):
+        """
+        Dumps the state of this object in dictionary form (can be empty). Should be implemented by subclass.
+
+        Returns:
+            OrderedDict: Keyword-mapped states of this object
+        """
+        raise NotImplementedError()
+
+    def dump_state(self, serialized=False):
+        """
+        Dumps the state of this object in either dictionary of flattened numerical form.
+
+        Args:
+            serialized (bool): If True, will return the state of this object as a 1D numpy array. Otherewise, will return
+                a (potentially nested) dictionary of states for this object
+
+        Returns:
+            OrderedDict or n-array: Either:
+                - Keyword-mapped states of this object, or
+                - encoded + serialized, 1D numerical np.array capturing this object's state, where n is @self.state_size
+        """
+        state = self._dump_state()
+        return self.serialize(state=state) if serialized else state
+
+    def _load_state(self, state):
+        """
+        Load the internal state to this object as specified by @state. Should be implemented by subclass.
+
+        Args:
+            state (OrderedDict): Keyword-mapped states of this object to set
+        """
+        raise NotImplementedError()
+
+    def load_state(self, state, serialized=False):
+        """
+        Deserializes and loads this object's state based on @state
+
+        Args:
+            state (OrderedDict or n-array): Either:
+                - Keyword-mapped states of this object, or
+                - encoded + serialized, 1D numerical np.array capturing this object's state, where n is @self.state_size
+            serialized (bool): If True, will interpret @state as a 1D numpy array. Otherewise, will assume the input is
+                a (potentially nested) dictionary of states for this object
+        """
+        state = self.deserialize(state=state) if serialized else state
+        self._load_state(state=state)
+
+    def _serialize(self, state):
+        """
+        Serializes nested dictionary state @state into a flattened 1D numpy array for encoding efficiency.
+        Should be implemented by subclass.
+
+        Args:
+            state (OrderedDict): Keyword-mapped states of this object to encode. Should match structure of output from
+                self._dump_state()
+
+        Returns:
+            n-array: encoded + serialized, 1D numerical np.array capturing this object's state
+        """
+        raise NotImplementedError()
+
+    def serialize(self, state):
+        """
+        Serializes nested dictionary state @state into a flattened 1D numpy array for encoding efficiency.
+        Should be implemented by subclass.
+
+        Args:
+            state (OrderedDict): Keyword-mapped states of this object to encode. Should match structure of output from
+                self._dump_state()
+
+        Returns:
+            n-array: encoded + serialized, 1D numerical np.array capturing this object's state
+        """
+        # Simply returns self._serialize() for now. this is for future proofing
+        return self._serialize(state=state)
+
+    def _deserialize(self, state):
+        """
+        De-serializes flattened 1D numpy array @state into nested dictionary state.
+        Should be implemented by subclass.
+
+        Args:
+            state (n-array): encoded + serialized, 1D numerical np.array capturing this object's state
+
+        Returns:
+            2-tuple:
+                - OrderedDict: Keyword-mapped states of this object. Should match structure of output from
+                    self._dump_state()
+                - int: current index of the flattened state vector that is left off. This is helpful for subclasses
+                    that inherit partial deserializations from parent classes, and need to know where the
+                    deserialization left off before continuing.
+        """
+        raise NotImplementedError
+
+    def deserialize(self, state):
+        """
+        De-serializes flattened 1D numpy array @state into nested dictionary state.
+        Should be implemented by subclass.
+
+        Args:
+            state (n-array): encoded + serialized, 1D numerical np.array capturing this object's state
+
+        Returns:
+            OrderedDict: Keyword-mapped states of this object. Should match structure of output from
+                self._dump_state()
+        """
+        # Sanity check the idx with the expected state size
+        state_dict, idx = self._deserialize(state=state)
+        assert idx == self.state_size, f"Invalid state deserialization occurred! Expected {self.state_size} total " \
+                                           f"values to be deserialized, only {idx} were."
+
+        return state_dict
+
+
+class SerializableNonInstance:
+    """
+    Identical to Serializable, but intended for non-instanceable classes
+    """
+    # Size of this object's serialized state. Should be implemented by subclass
+    state_size = None
+
+    @classmethod
+    def _dump_state(cls):
+        """
+        Dumps the state of this object in dictionary form (can be empty). Should be implemented by subclass.
+
+        Returns:
+            OrderedDict: Keyword-mapped states of this object
+        """
+        raise NotImplementedError()
+
+    @classmethod
+    def dump_state(cls, serialized=False):
+        """
+        Dumps the state of this object in either dictionary of flattened numerical form.
+
+        Args:
+            serialized (bool): If True, will return the state of this object as a 1D numpy array. Otherewise, will return
+                a (potentially nested) dictionary of states for this object
+
+        Returns:
+            OrderedDict or n-array: Either:
+                - Keyword-mapped states of this object, or
+                - encoded + serialized, 1D numerical np.array capturing this object's state, where n is @self.state_size
+        """
+        state = cls._dump_state()
+        return cls.serialize(state=state) if serialized else state
+
+    @classmethod
+    def _load_state(cls, state):
+        """
+        Load the internal state to this object as specified by @state. Should be implemented by subclass.
+
+        Args:
+            state (OrderedDict): Keyword-mapped states of this object to set
+        """
+        raise NotImplementedError()
+
+    @classmethod
+    def load_state(cls, state, serialized=False):
+        """
+        Deserializes and loads this object's state based on @state
+
+        Args:
+            state (OrderedDict or n-array): Either:
+                - Keyword-mapped states of this object, or
+                - encoded + serialized, 1D numerical np.array capturing this object's state, where n is @self.state_size
+            serialized (bool): If True, will interpret @state as a 1D numpy array. Otherewise, will assume the input is
+                a (potentially nested) dictionary of states for this object
+        """
+        state = cls.deserialize(state=state) if serialized else state
+        cls._load_state(state=state)
+
+    @classmethod
+    def _serialize(cls, state):
+        """
+        Serializes nested dictionary state @state into a flattened 1D numpy array for encoding efficiency.
+        Should be implemented by subclass.
+
+        Args:
+            state (OrderedDict): Keyword-mapped states of this object to encode. Should match structure of output from
+                self._dump_state()
+
+        Returns:
+            n-array: encoded + serialized, 1D numerical np.array capturing this object's state
+        """
+        raise NotImplementedError()
+
+    @classmethod
+    def serialize(cls, state):
+        """
+        Serializes nested dictionary state @state into a flattened 1D numpy array for encoding efficiency.
+        Should be implemented by subclass.
+
+        Args:
+            state (OrderedDict): Keyword-mapped states of this object to encode. Should match structure of output from
+                self._dump_state()
+
+        Returns:
+            n-array: encoded + serialized, 1D numerical np.array capturing this object's state
+        """
+        # Simply returns self._serialize() for now. this is for future proofing
+        return cls._serialize(state=state)
+
+    @classmethod
+    def _deserialize(cls, state):
+        """
+        De-serializes flattened 1D numpy array @state into nested dictionary state.
+        Should be implemented by subclass.
+
+        Args:
+            state (n-array): encoded + serialized, 1D numerical np.array capturing this object's state
+
+        Returns:
+            2-tuple:
+                - OrderedDict: Keyword-mapped states of this object. Should match structure of output from
+                    self._dump_state()
+                - int: current index of the flattened state vector that is left off. This is helpful for subclasses
+                    that inherit partial deserializations from parent classes, and need to know where the
+                    deserialization left off before continuing.
+        """
+        raise NotImplementedError
+
+    @classmethod
+    def deserialize(cls, state):
+        """
+        De-serializes flattened 1D numpy array @state into nested dictionary state.
+        Should be implemented by subclass.
+
+        Args:
+            state (n-array): encoded + serialized, 1D numerical np.array capturing this object's state
+
+        Returns:
+            OrderedDict: Keyword-mapped states of this object. Should match structure of output from
+                self._dump_state()
+        """
+        # Sanity check the idx with the expected state size
+        state_dict, idx = cls._deserialize(state=state)
+        assert cls.state_size is not None, "State size must be specified by subclass!"
+        assert idx == cls.state_size, f"Invalid state deserialization occurred!Expected {cls.state_size} total " \
+                                      f"values to be deserialized, only {idx} were."
+
+        return state_dict
