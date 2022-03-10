@@ -19,7 +19,7 @@ class DifferentialDriveController(LocomotionController):
         wheel_axle_length,
         control_freq,
         control_limits,
-        joint_idx,
+        dof_idx,
         command_input_limits="default",
         command_output_limits="default",
     ):
@@ -28,16 +28,16 @@ class DifferentialDriveController(LocomotionController):
         :param wheel_axle_length: float, perpendicular distance between the two wheels
         :param control_freq: int, controller loop frequency
         :param control_limits: Dict[str, Tuple[Array[float], Array[float]]]: The min/max limits to the outputted
-            control signal. Should specify per-actuator type limits, i.e.:
+            control signal. Should specify per-dof type limits, i.e.:
 
             "position": [[min], [max]]
             "velocity": [[min], [max]]
-            "torque": [[min], [max]]
+            "effort": [[min], [max]]
             "has_limit": [...bool...]
 
             Values outside of this range will be clipped, if the corresponding joint index in has_limit is True.
             Assumes order is [left_wheel, right_wheel] for each set of values.
-        :param joint_idx: Array[int], specific joint indices controlled by this robot. Used for inferring
+        :param dof_idx: Array[int], specific dof indices controlled by this robot. Used for inferring
             controller-relevant values during control computations
         :param command_input_limits: None or "default" or Tuple[float, float] or Tuple[Array[float], Array[float]],
             if set, is the min/max acceptable inputted command. Values outside of this range will be clipped.
@@ -55,11 +55,11 @@ class DifferentialDriveController(LocomotionController):
 
         # If we're using default command output limits, map this to maximum linear / angular velocities
         if command_output_limits == "default":
-            min_vels = control_limits["velocity"][0][joint_idx]
+            min_vels = control_limits["velocity"][0][dof_idx]
             assert (
                 min_vels[0] == min_vels[1]
             ), "Differential drive requires both wheel joints to have same min velocities!"
-            max_vels = control_limits["velocity"][1][joint_idx]
+            max_vels = control_limits["velocity"][1][dof_idx]
             assert (
                 max_vels[0] == max_vels[1]
             ), "Differential drive requires both wheel joints to have same max velocities!"
@@ -74,7 +74,7 @@ class DifferentialDriveController(LocomotionController):
         super().__init__(
             control_freq=control_freq,
             control_limits=control_limits,
-            joint_idx=joint_idx,
+            dof_idx=dof_idx,
             command_input_limits=command_input_limits,
             command_output_limits=command_output_limits,
         )

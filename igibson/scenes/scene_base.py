@@ -27,7 +27,7 @@ from igibson.systems import SYSTEMS_REGISTRY
 
 # from igibson.objects.particles import Particle
 # from igibson.objects.visual_marker import VisualMarker
-# from igibson.robots.robot_base import BaseRobot
+from igibson.robots.robot_base import BaseRobot
 
 
 class Scene(Serializable, metaclass=ABCMeta):
@@ -179,18 +179,19 @@ class Scene(Serializable, metaclass=ABCMeta):
         self._registry.add(obj=SerializableRegistry(
             name="object_registry",
             class_types=BaseObject,
+            default_key="name",
             unique_keys=self.object_registry_unique_keys,
             group_keys=self.object_registry_group_keys,
         ))
 
-        # TODO!
-        # # Add registry for robots
-        # self._registry.add(obj=SerializableRegistry(
-        #     name="robot_registry",
-        #     class_types=BaseRobot,
-        #     unique_keys=self.robot_registry_unique_keys,
-        #     group_keys=self.robot_registry_group_keys,
-        # ))
+        # Add registry for robots
+        self._registry.add(obj=SerializableRegistry(
+            name="robot_registry",
+            class_types=BaseRobot,
+            default_key="name",
+            unique_keys=None,
+            group_keys=["model_name"],
+        ))
 
         # Add registry for systems -- this is already created externally, so we just pull it directly
         self._registry.add(obj=SYSTEMS_REGISTRY)
@@ -248,7 +249,7 @@ class Scene(Serializable, metaclass=ABCMeta):
         Add an object to the scene's internal object tracking mechanisms.
 
         Note that if the scene is not loaded, it should load this added object alongside its other objects when
-        scene.load() is called. The object should also be accessible through scene.get_objects().
+        scene.load() is called. The object should also be accessible through scene.objects.
 
         :param obj: the object to load
         """
@@ -265,7 +266,7 @@ class Scene(Serializable, metaclass=ABCMeta):
         :param simulator: the simulator to add the object to
         :param _is_call_from_simulator: whether the caller is the simulator. This should
             **not** be set by any callers that are not the Simulator class
-        :return: the body ID(s) of the loaded object if the scene was already loaded, or None if the scene is not loaded
+        :return: the prim of the loaded object if the scene was already loaded, or None if the scene is not loaded
             (in that case, the object is stored to be loaded together with the scene)
         """
         # Make sure the simulator is the one calling this function
@@ -279,16 +280,14 @@ class Scene(Serializable, metaclass=ABCMeta):
         # let scene._load() load the object when called later on.
         prim = obj.load(simulator)
 
-        # Add this object to our registry
-        self.object_registry.add(obj)
+        # Add this object to our registry based on its type
+        if isinstance(obj, BaseRobot):
+            self.robot_registry.add(obj)
+        else:
+            self.object_registry.add(obj)
 
         # Run any additional scene-specific logic with the created object
         self._add_object(obj)
-
-        # TODO
-        # # Keeps track of all the robots separately
-        # if isinstance(obj, BaseRobot):
-        #     self.robots.append(obj)
 
         return prim
 

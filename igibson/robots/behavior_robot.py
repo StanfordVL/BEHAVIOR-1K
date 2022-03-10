@@ -405,7 +405,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
                 "use_delta_commands": True,
                 "motor_type": "position",
                 "compute_delta_in_quat_space": [(3, 4, 5)],
-                "joint_idx": self.arm_control_idx[arm],
+                "dof_idx": self.arm_control_idx[arm],
                 "command_input_limits": (
                     [-HAND_LINEAR_VELOCITY] * 3 + [-HAND_ANGULAR_VELOCITY] * 3,  # Lower limit
                     [HAND_LINEAR_VELOCITY] * 3 + [HAND_ANGULAR_VELOCITY] * 3,  # Upper limit
@@ -423,7 +423,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
                 "control_freq": self.control_freq,
                 "motor_type": "position",
                 "control_limits": self.control_limits,
-                "joint_idx": self.gripper_control_idx[arm],
+                "dof_idx": self.gripper_control_idx[arm],
                 "command_output_limits": "default",
                 "inverted": True,
                 "mode": "smooth",
@@ -440,7 +440,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             "use_delta_commands": True,
             "motor_type": "position",
             "compute_delta_in_quat_space": [(3, 4, 5)],
-            "joint_idx": self.base_control_idx,
+            "dof_idx": self.base_control_idx,
             "command_input_limits": (
                 [-BODY_LINEAR_VELOCITY] * 3 + [-BODY_ANGULAR_VELOCITY] * 3,  # Lower limit
                 [BODY_LINEAR_VELOCITY] * 3 + [BODY_ANGULAR_VELOCITY] * 3,  # Upper limit
@@ -458,7 +458,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             "use_delta_commands": True,
             "motor_type": "position",
             "compute_delta_in_quat_space": [(3, 4, 5)],
-            "joint_idx": self.camera_control_idx,
+            "dof_idx": self.camera_control_idx,
             "command_input_limits": (
                 [-HEAD_LINEAR_VELOCITY] * 3 + [-HEAD_ANGULAR_VELOCITY] * 3,  # Lower limit
                 [HEAD_LINEAR_VELOCITY] * 3 + [HEAD_ANGULAR_VELOCITY] * 3,  # Upper limit
@@ -477,7 +477,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
                 "control_limits": self.control_limits,
                 "motor_type": "position",
                 "use_delta_commands": False,
-                "joint_idx": self.reset_control_idx[arm],
+                "dof_idx": self.reset_control_idx[arm],
                 "command_input_limits": None,
             }
         return dic

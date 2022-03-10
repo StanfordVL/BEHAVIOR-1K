@@ -30,12 +30,17 @@ from igibson.utils.usd_utils import create_joint
 from igibson.utils.types import JointsState
 from igibson.utils.transform_utils import quat_inverse, quat_multiply
 from igibson.utils.constants import JointType
+from igibson.controllers.controller_base import ControlType
 
-DEFAULT_MAX_TORQUE = 100.0
-DEFAULT_MAX_WHEEL_VEL = 15.0
-DEFAULT_MAX_VEL = 1.0
+DEFAULT_MAX_POS = 1000.0
+DEFAULT_MAX_PRISMATIC_VEL = 1.0
+DEFAULT_MAX_REVOLUTE_VEL = 15.0
+DEFAULT_MAX_EFFORT = 100.0
 
 # TODO: Split into non-articulated / articulated Joint Prim classes?
+
+
+# TODO: Add logic for non Prismatic / Revolute joints (D6, spherical)
 
 class JointPrim(BasePrim):
     """
@@ -80,11 +85,13 @@ class JointPrim(BasePrim):
 
         # Other values that will be filled in at runtime
         self._joint_type = None
+        self._control_type = None
+        self._dof_properties = None
 
         # The following values will only be valid if this joint is part of an articulation
         self._dc = None
         self._handle = None
-        self._num_dof = None
+        self._n_dof = None
         self._joint_name = None
         self._dof_handles = None
         self._default_state = None
@@ -142,10 +149,26 @@ class JointPrim(BasePrim):
 
             # Grab DOF info / handles
             self._joint_name = self._dc.get_joint_name(self._handle)
-            self._num_dof = self._dc.get_joint_dof_count(self._handle)
+            self._n_dof = self._dc.get_joint_dof_count(self._handle)
             self._dof_handles = []
-            for i in range(self._num_dof):
-                self._dof_handles.append(self._dc.get_joint_dof(self._handle, i))
+            self._dof_properties = []
+            control_types = []
+            for i in range(self._n_dof):
+                dof_handle = self._dc.get_joint_dof(self._handle, i)
+                dof_props = self._dc.get_dof_properties(dof_handle)
+                self._dof_handles.append(dof_handle)
+                self._dof_properties.append(dof_props)
+                # Infer control type based on whether kp and kd are 0 or not
+                kp, kd = dof_props.stiffness, dof_props.damping
+                if kp == 0.0:
+                    control_type = ControlType.EFFORT if kd == 0.0 else ControlType.VELOCITY
+                else:
+                    control_type = ControlType.POSITION
+                control_types.append(control_type)
+
+            # Make sure all the control types are the same -- if not, we had something go wrong!
+            assert len(set(control_types)) == 1, f"Got multiple control types for this single joint: {control_types}"
+            self._control_type = control_types[0]
 
             # Grab default state
             default_pos, default_vel, default_effort = self.get_state()
@@ -298,6 +321,26 @@ class JointPrim(BasePrim):
         return self._joint_type
 
     @property
+    def control_type(self):
+        """
+        Gets the control types for this joint
+
+        Returns:
+            ControlType: control type for this joint
+        """
+        return self._control_type
+
+    @property
+    def dof_properties(self):
+        """
+        Returns:
+            list of DOFProperties: Per-DOF properties for this joint.
+                See https://docs.omniverse.nvidia.com/py/isaacsim/source/extensions/omni.isaac.dynamic_control/docs/index.html#omni.isaac.dynamic_control._dynamic_control.DofProperties
+                for more information.
+        """
+        return self._dof_properties
+
+    @property
     def max_velocity(self):
         """
         Gets this joint's maximum velocity
@@ -305,7 +348,10 @@ class JointPrim(BasePrim):
         Returns:
             float: maximum velocity for this joint
         """
-        return self.get_attribute("physxJoint:maxJointVelocity")
+        # We either return the raw value or a default value if there is no max specified
+        raw_vel = self.get_attribute("physxJoint:maxJointVelocity")
+        default_max_vel = DEFAULT_MAX_REVOLUTE_VEL if self.joint_type == "RevoluteJoint" else DEFAULT_MAX_PRISMATIC_VEL
+        return default_max_vel if raw_vel in {None, np.inf} else raw_vel
 
     @max_velocity.setter
     def max_velocity(self, vel):
@@ -325,7 +371,9 @@ class JointPrim(BasePrim):
         Returns:
             float: maximum force for this joint
         """
-        return self.get_attribute("physxJoint:maxForce")
+        # We either return the raw value or a default value if there is no max specified
+        raw_force = self.get_attribute("physxJoint:maxForce")
+        return DEFAULT_MAX_EFFORT if raw_force in {None, np.inf} else raw_force
 
     @max_force.setter
     def max_force(self, force):
@@ -405,7 +453,10 @@ class JointPrim(BasePrim):
         Returns:
             float: lower_limit for this joint
         """
-        return self.get_attribute("physxJoint:lowerLimit")
+        # TODO: Add logic for non Prismatic / Revolute joints (D6, spherical)
+        # We either return the raw value or a default value if there is no max specified
+        raw_pos = self.get_attribute("physics:lowerLimit")
+        return -DEFAULT_MAX_POS if raw_pos in {None, -np.inf} else raw_pos
 
     @lower_limit.setter
     def lower_limit(self, lower_limit):
@@ -415,7 +466,7 @@ class JointPrim(BasePrim):
         Args:
             lower_limit (float): lower_limit to set
         """
-        self.set_attribute("physxJoint:lowerLimit", lower_limit)
+        self.set_attribute("physics:lowerLimit", lower_limit)
 
     @property
     def upper_limit(self):
@@ -425,7 +476,9 @@ class JointPrim(BasePrim):
         Returns:
             float: upper_limit for this joint
         """
-        return self.get_attribute("physxJoint:upperLimit")
+        # We either return the raw value or a default value if there is no max specified
+        raw_pos = self.get_attribute("physics:upperLimit")
+        return DEFAULT_MAX_POS if raw_pos in {None, np.inf} else raw_pos
 
     @upper_limit.setter
     def upper_limit(self, upper_limit):
@@ -435,7 +488,7 @@ class JointPrim(BasePrim):
         Args:
             upper_limit (float): upper_limit to set
         """
-        self.set_attribute("physxJoint:upperLimit", upper_limit)
+        self.set_attribute("physics:upperLimit", upper_limit)
 
     @property
     def has_limit(self):
@@ -446,12 +499,12 @@ class JointPrim(BasePrim):
         return self.lower_limit < self.upper_limit
 
     @property
-    def num_dof(self):
+    def n_dof(self):
         """
         Returns:
             int: Number of degrees of freedom this joint has
         """
-        return self._num_dof
+        return self._n_dof
 
     @property
     def articulated(self):
@@ -468,9 +521,13 @@ class JointPrim(BasePrim):
         """
         assert self.articulated, "Tried to call method not intended for non-articulated joint!"
 
-    def get_state(self):
+    def get_state(self, normalized=False):
         """
-        Absolute (pos, vel, effort) state of this joint
+        (pos, vel, effort) state of this joint
+
+        Args:
+            normalized (bool): If True, will return normalized state of this joint, where pos, vel, and effort values
+                are in range [-1, 1].
 
         Returns:
             Tuple:
@@ -481,55 +538,126 @@ class JointPrim(BasePrim):
         # Make sure we only call this if we're an articulated joint
         self.assert_articulated()
 
-        pos, vel, effort = np.zeros(self.num_dof), np.zeros(self.num_dof), np.zeros(self.num_dof)
+        # Grab raw states
+        pos, vel, effort = np.zeros(self.n_dof), np.zeros(self.n_dof), np.zeros(self.n_dof)
         for i, dof_handle in enumerate(self._dof_handles):
             dof_state = self._dc.get_dof_state(dof_handle, _dynamic_control.STATE_ALL)
             pos[i] = dof_state.pos
             vel[i] = dof_state.vel
             effort[i] = dof_state.effort
 
+        # Potentially normalize if requested
+        if normalized:
+            pos, vel, effort = self._normalize_pos(pos), self._normalize_vel(vel), self._normalize_effort(effort)
+
         return pos, vel, effort
 
-    def get_relative_state(self):
+    def _normalize_pos(self, pos):
         """
-        Normalized (pos, vel, effort) state of this joint
+        Normalizes raw joint positions @pos
+
+        Args:
+            pos (n-array): n-DOF raw positions to normalize
 
         Returns:
-            Tuple:
-                - n-array: normalized position of this joint, where n = number of DOF for this joint
-                - n-array: normalized velocity of this joint, where n = number of DOF for this joint
-                - n-array: normalized effort of this joint, where n = number of DOF for this joint
+            n-array: n-DOF normalized positions in range [-1, 1]
         """
-        # Grab normal state
-        pos, vel, effort = self.get_state()
+        low, high = self.lower_limit, self.upper_limit
+        mean = (low + high) / 2.0
+        magnitude = (high - low) / 2.0
+        pos = (pos - mean) / magnitude
 
-        # normalize position to [-1, 1]
-        if self.has_limit:
-            mean = (self.lower_limit + self.upper_limit) / 2.0
-            magnitude = (self.upper_limit - self.lower_limit) / 2.0
-            pos = (pos - mean) / magnitude
+        return pos
 
-        # (trying to) normalize velocity to [-1, 1]
-        vel /= self.max_velocity
+    def _denormalize_pos(self, pos):
+        """
+        De-normalizes joint positions @pos
 
-        # (trying to) normalize torque / force to [-1, 1]
-        effort /= self.max_force
+        Args:
+            pos (n-array): n-DOF normalized positions in range [-1, 1]
 
-        return pos, vel, effort
+        Returns:
+            n-array: n-DOF de-normalized positions
+        """
+        low, high = self.lower_limit, self.upper_limit
+        mean = (low + high) / 2.0
+        magnitude = (high - low) / 2.0
+        pos = pos * magnitude + mean
 
-    def set_pos(self, pos, target=False):
+        return pos
+
+    def _normalize_vel(self, vel):
+        """
+        Normalizes raw joint velocities @vel
+
+        Args:
+            vel (n-array): n-DOF raw velocities to normalize
+
+        Returns:
+            n-array: n-DOF normalized velocities in range [-1, 1]
+        """
+        return vel / self.max_velocity
+
+    def _denormalize_vel(self, vel):
+        """
+        De-normalizes joint velocities @vel
+
+        Args:
+            vel (n-array): n-DOF normalized velocities in range [-1, 1]
+
+        Returns:
+            n-array: n-DOF de-normalized velocities
+        """
+        return vel * self.max_velocity
+
+    def _normalize_effort(self, effort):
+        """
+        Normalizes raw joint effort @effort
+
+        Args:
+            effort (n-array): n-DOF raw effort to normalize
+
+        Returns:
+            n-array: n-DOF normalized effort in range [-1, 1]
+        """
+        return effort / self.max_force
+
+    def _denormalize_effort(self, effort):
+        """
+        De-normalizes joint effort @effort
+
+        Args:
+            effort (n-array): n-DOF normalized effort in range [-1, 1]
+
+        Returns:
+            n-array: n-DOF de-normalized effort
+        """
+        return effort * self.max_force
+
+    def set_pos(self, pos, normalized=False, target=False):
         """
         Set the position of this joint in metric space
 
         Args:
             pos (float or n-array of float): Set the position(s) for this joint. Can be a single float or 1-array of
                 float if the joint only has a single DOF, otherwise it should be an n-array of floats.
+            normalized (bool): Whether the input is normalized to [-1, 1] (in this case, the values will be
+                de-normalized first before being executed). Default is False
             target (bool): Whether the position being set is a target value or manual value to immediately set. Default
                 is False, corresponding to an instantaneous setting of the position
         """
-        # TODO: Can we handle non-articulated case?
+        # Sanity checks -- make sure we're the correct control type if we're setting a target and that we're articulated
+        self.assert_articulated()
+        if target:
+            assert self._control_type == ControlType.POSITION, \
+                "Trying to set joint position target, but control type is not position!"
+
         # Standardize input
-        pos = np.array([pos]) if self._num_dof == 1 and not isinstance(pos, Iterable) else np.array(pos)
+        pos = np.array([pos]) if self._n_dof == 1 and not isinstance(pos, Iterable) else np.array(pos)
+
+        # Potentially de-normalize if the input is normalized
+        if normalized:
+            pos = self._denormalize_pos(pos)
 
         # Set the DOF(s) in this joint
         for dof_handle, p in zip(self._dof_handles, pos):
@@ -538,19 +666,30 @@ class JointPrim(BasePrim):
             else:
                 self._dc.set_dof_position(dof_handle, p)
 
-    def set_vel(self, vel, target=False):
+    def set_vel(self, vel, normalized=False, target=False):
         """
         Set the velocity of this joint in metric space
 
         Args:
             vel (float or n-array of float): Set the velocity(s) for this joint. Can be a single float or 1-array of
                 float if the joint only has a single DOF, otherwise it should be an n-array of floats.
+            normalized (bool): Whether the input is normalized to [-1, 1] (in this case, the values will be
+                de-normalized first before being executed). Default is False
             target (bool): Whether the velocity being set is a target value or manual value to immediately set. Default
                 is False, corresponding to an instantaneous setting of the velocity
         """
-        # TODO: Can we handle non-articulated case?
+        # Sanity checks -- make sure we're the correct control type if we're setting a target and that we're articulated
+        self.assert_articulated()
+        if target:
+            assert self._control_type == ControlType.VELOCITY, \
+                "Trying to set joint velocity target, but control type is not velocity!"
+
         # Standardize input
-        vel = np.array([vel]) if self._num_dof == 1 and not isinstance(vel, Iterable) else np.array(vel)
+        vel = np.array([vel]) if self._n_dof == 1 and not isinstance(vel, Iterable) else np.array(vel)
+
+        # Potentially de-normalize if the input is normalized
+        if normalized:
+            vel = self._denormalize_vel(vel)
 
         # Set the DOF(s) in this joint
         for dof_handle, v in zip(self._dof_handles, vel):
@@ -559,16 +698,27 @@ class JointPrim(BasePrim):
             else:
                 self._dc.set_dof_velocity(dof_handle, v)
 
-    def set_effort(self, effort):
+    def set_effort(self, effort, normalized=False):
         """
         Set the effort of this joint in metric space
 
         Args:
             effort (float or n-array of float): Set the effort(s) for this joint. Can be a single float or 1-array of
                 float if the joint only has a single DOF, otherwise it should be an n-array of floats.
+            normalized (bool): Whether the input is normalized to [-1, 1] (in this case, the values will be
+                de-normalized first before being executed). Default is False
         """
+        # Sanity checks -- make sure we're the correct control type and that we're articulated
+        self.assert_articulated()
+        assert self._control_type == ControlType.VELOCITY, \
+            "Trying to set joint velocity target, but control type is not velocity!"
+
         # Standardize input
-        effort = np.array([effort]) if self._num_dof == 1 and not isinstance(effort, Iterable) else np.array(effort)
+        effort = np.array([effort]) if self._n_dof == 1 and not isinstance(effort, Iterable) else np.array(effort)
+
+        # Potentially de-normalize if the input is normalized
+        if normalized:
+            effort = self._denormalize_vel(effort)
 
         # Set the DOF(s) in this joint
         for dof_handle, e in zip(self._dof_handles, effort):
@@ -578,7 +728,7 @@ class JointPrim(BasePrim):
         """
         Zero out all velocities for this prim
         """
-        self.set_vel(np.zeros(self.num_dof))
+        self.set_vel(np.zeros(self.n_dof))
 
     def _dump_state(self):
         pos, vel, effort = self.get_state() if self.articulated else (np.array([]), np.array([]), np.array([]))
@@ -602,10 +752,10 @@ class JointPrim(BasePrim):
     def _deserialize(self, state):
         # We deserialize deterministically by knowing the order of values -- pos, vel, effort
         return OrderedDict(
-            pos=state[0:self.num_dof],
-            vel=state[self.num_dof:2*self.num_dof],
-            effort=state[2*self.num_dof:3*self.num_dof],
-        ), 3*self.num_dof
+            pos=state[0:self.n_dof],
+            vel=state[self.n_dof:2*self.n_dof],
+            effort=state[2*self.n_dof:3*self.n_dof],
+        ), 3*self.n_dof
 
     def duplicate(self, simulator, prim_path):
         # Cannot directly duplicate a joint prim

@@ -255,7 +255,7 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
 
         # Use default IK controller -- also need to override joint idx being controlled to include trunk in default
         # IK arm controller
-        cfg["arm_{}".format(self.default_arm)]["InverseKinematicsController"]["joint_idx"] = np.concatenate(
+        cfg["arm_{}".format(self.default_arm)]["InverseKinematicsController"]["dof_idx"] = np.concatenate(
             [self.trunk_control_idx, self.arm_control_idx[self.default_arm]]
         )
 

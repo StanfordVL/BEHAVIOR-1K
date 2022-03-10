@@ -37,7 +37,7 @@ class TwoWheelRobot(LocomotionRobot):
         assert max_wheel_joint_vels[0] == max_wheel_joint_vels[1], "Both wheels must have the same max speed!"
         wheel_straight_vel = 0.5 * max_wheel_joint_vels[0]
         wheel_rotate_vel = 0.5
-        if self.controller_config["base"]["name"] == "JointController":
+        if self._controller_config["base"]["name"] == "JointController":
             action_list = [
                 [wheel_straight_vel, wheel_straight_vel],
                 [-wheel_straight_vel, -wheel_straight_vel],
@@ -103,11 +103,11 @@ class TwoWheelRobot(LocomotionRobot):
         """
         return {
             "name": "DifferentialDriveController",
-            "control_freq": self.control_freq,
+            "control_freq": self._control_freq,
             "wheel_radius": self.wheel_radius,
             "wheel_axle_length": self.wheel_axle_length,
             "control_limits": self.control_limits,
-            "joint_idx": self.base_control_idx,
+            "dof_idx": self.base_control_idx,
         }
 
     @property

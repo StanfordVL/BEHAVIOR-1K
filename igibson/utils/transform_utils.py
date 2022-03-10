@@ -620,6 +620,38 @@ def axisangle2quat(vec):
     return q
 
 
+def euler2quat(euler):
+    """
+    Converts euler angles into quaternion form
+
+    Args:
+        euler (np.array): (r,p,y) angles
+
+    Returns:
+        np.array: (x,y,z,w) float quaternion angles
+
+    Raises:
+        AssertionError: [Invalid input shape]
+    """
+    return mat2quat(euler2mat(euler))
+
+
+def quat2euler(quat):
+    """
+    Converts euler angles into quaternion form
+
+    Args:
+        quat (np.array): (x,y,z,w) float quaternion angles
+
+    Returns:
+        np.array: (r,p,y) angles
+
+    Raises:
+        AssertionError: [Invalid input shape]
+    """
+    return mat2euler(quat2mat(quat))
+
+
 def pose_in_A_to_pose_in_B(pose_A, pose_A_in_B):
     """
     Converts a homogenous matrix corresponding to a point C in frame A

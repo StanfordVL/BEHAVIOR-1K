@@ -849,7 +849,7 @@ class ManipulationRobot(BaseRobot):
                 "control_freq": self.control_freq,
                 "motor_type": "velocity",
                 "control_limits": self.control_limits,
-                "joint_idx": self.arm_control_idx[arm],
+                "dof_idx": self.arm_control_idx[arm],
                 "command_output_limits": "default",
                 "use_delta_commands": False,
             }
@@ -872,7 +872,7 @@ class ManipulationRobot(BaseRobot):
                 "default_joint_pos": self.default_joint_pos,
                 "joint_damping": self.joint_damping,
                 "control_limits": self.control_limits,
-                "joint_idx": self.arm_control_idx[arm],
+                "dof_idx": self.arm_control_idx[arm],
                 "command_output_limits": (
                     np.array([-0.2, -0.2, -0.2, -0.5, -0.5, -0.5]),
                     np.array([0.2, 0.2, 0.2, 0.5, 0.5, 0.5]),
@@ -897,7 +897,7 @@ class ManipulationRobot(BaseRobot):
                 "control_freq": self.control_freq,
                 "motor_type": "position",
                 "control_limits": self.control_limits,
-                "joint_idx": self.gripper_control_idx[arm],
+                "dof_idx": self.gripper_control_idx[arm],
                 "command_output_limits": "default",
                 "mode": "binary",
                 "limit_tolerance": 0.001,
@@ -917,7 +917,7 @@ class ManipulationRobot(BaseRobot):
                 "control_freq": self.control_freq,
                 "motor_type": "velocity",
                 "control_limits": self.control_limits,
-                "joint_idx": self.gripper_control_idx[arm],
+                "dof_idx": self.gripper_control_idx[arm],
                 "command_output_limits": "default",
                 "use_delta_commands": False,
             }

@@ -230,27 +230,6 @@ class Simulator(SimulationContext):
             print("GOT HERE AUTO INITIALIZE")
             self.initialize_object_on_next_sim_step(obj=obj)
 
-    #
-    # # TODO
-    # def import_robot(self, robot):
-    #     """
-    #     Import a robot into the simulator.
-    #     :param robot: a robot object to load
-    #     """
-    #     # TODO: Remove this function in favor of unifying with import_object.
-    #     assert isinstance(robot, (BaseRobot, BehaviorRobot)), "import_robot can only be called with Robots"
-    #     assert self.scene is not None, "import_robot needs to be called after import_scene"
-    #
-    #     # TODO: remove this if statement after BehaviorRobot refactoring
-    #     if isinstance(robot, BaseRobot):
-    #         assert (
-    #             robot.control_freq is None
-    #         ), "control_freq should NOT be specified in robot config. Currently this value is automatically inferred from simulator.render_timestep!"
-    #         control_freq = 1.0 / self.render_timestep
-    #         robot.control_freq = control_freq
-    #
-    #     self.scene.add_object(robot, self, _is_call_from_simulator=True)
-
     def _non_physics_step(self):
         """
         Complete any non-physics steps such as state updates.

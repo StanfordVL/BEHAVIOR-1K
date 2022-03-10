@@ -72,7 +72,7 @@ class ActiveCameraRobot(BaseRobot):
             "control_freq": self.control_freq,
             "motor_type": "velocity",
             "control_limits": self.control_limits,
-            "joint_idx": self.camera_control_idx,
+            "dof_idx": self.camera_control_idx,
             "command_output_limits": "default",
             "use_delta_commands": False,
         }

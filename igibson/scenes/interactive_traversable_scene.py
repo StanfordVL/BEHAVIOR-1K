@@ -1054,7 +1054,7 @@ class InteractiveTraversableScene(TraversableScene):
                 link.attrib["bounding_box"] = bounding_box
 
             if hasattr(obj, "model_name"):
-                link.attrib["model"] = obj.model_name
+                link.attrib["model"] = obj.model_name # TODO: Update
             elif hasattr(obj, "model_path"):
                 model = os.path.basename(obj.model_path)
                 link.attrib["model"] = model
@@ -1076,7 +1076,7 @@ class InteractiveTraversableScene(TraversableScene):
 
         # Common logic for objects that are both in the scene & otherwise.
         base_com_pose = (pos, orn)
-        joint_states = obj.get_joint_states()
+        joint_states = obj.get_joint_states()       # TODO: Outdated API. Use get_joints_state() instead
         link.attrib["base_com_pose"] = json.dumps(base_com_pose, cls=NumpyEncoder)
         link.attrib["base_velocities"] = json.dumps(obj.get_velocities(), cls=NumpyEncoder)
         link.attrib["joint_states"] = json.dumps(joint_states, cls=NumpyEncoder)

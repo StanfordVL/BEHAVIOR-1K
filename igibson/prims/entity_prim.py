@@ -7,11 +7,11 @@
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 #
 from typing import Optional, Tuple, Union, List
+from copy import deepcopy
 import numpy as np
 from collections import OrderedDict, Iterable
 from omni.isaac.dynamic_control import _dynamic_control
 from omni.isaac.core.utils.types import DOFInfo
-from omni.isaac.core.utils.types import JointsState, ArticulationAction
 from omni.isaac.core.utils.transformations import tf_matrix_from_pose
 from omni.isaac.core.utils.rotations import gf_quat_to_np_array
 from pxr import Gf, Usd, UsdGeom, UsdPhysics
@@ -22,9 +22,10 @@ from omni.isaac.core.utils.prims import is_prim_path_valid, get_prim_property, s
 from igibson.prims.xform_prim import XFormPrim
 from igibson.prims.rigid_prim import RigidPrim
 from igibson.prims.joint_prim import JointPrim
+from igibson.utils.types import JointsState
 
-# TODO: REname, since not all of these may be articulated. Maybe "ObjectPrim" or something, to denote that this class captures a single entity that owns nested rigid bodies / joints?
-class ArticulatedPrim(XFormPrim):
+
+class EntityPrim(XFormPrim):
     """
     Provides high level functions to deal with an articulation prim and its attributes/ properties. Note that this
     type of prim cannot be created from scratch, and assumes there is already a pre-existing prim tree that should
@@ -54,8 +55,7 @@ class ArticulatedPrim(XFormPrim):
         self._root_handle = None                # Handle to the root rigid body of this articulation
         self._root_prim = None
         self._dofs_infos = None
-        self._num_dof = None
-        self._articulation_controller = None
+        self._n_dof = None
         self._default_joints_state = None
         self._links = None
         self._joints = None
@@ -75,7 +75,7 @@ class ArticulatedPrim(XFormPrim):
 
         # Get dynamic control info
         self._dc = _dynamic_control.acquire_dynamic_control_interface()
-        self._handle = self._dc.get_articulation(self._prim_path)
+        self._handle = self._dc.get_articulation(self.articulation_root_path)
         self._joints = OrderedDict()
 
         # Initialize all the links
@@ -86,58 +86,54 @@ class ArticulatedPrim(XFormPrim):
         if self._handle != _dynamic_control.INVALID_HANDLE:
             root_handle = self._dc.get_articulation_root_body(self._handle)
             root_prim = get_prim_at_path(self._dc.get_rigid_body_path(root_handle))
-            num_dof = self._dc.get_articulation_dof_count(self._handle)
+            n_dof = self._dc.get_articulation_dof_count(self._handle)
 
             # Additionally grab DOF info if we have non-fixed joints
-            if num_dof > 0:
-                self._articulation_controller = ArticulationController()
+            if n_dof > 0:
                 self._dofs_infos = OrderedDict()
                 # Grab DOF info
-                for index in range(num_dof):
+                for index in range(n_dof):
                     dof_handle = self._dc.get_articulation_dof(self._handle, index)
                     dof_name = self._dc.get_dof_name(dof_handle)
                     # add dof to list
                     prim_path = self._dc.get_dof_path(dof_handle)
                     self._dofs_infos[dof_name] = DOFInfo(prim_path=prim_path, handle=dof_handle, prim=self.prim, index=index)
-                # Initialize articulation controller
-                self._articulation_controller.initialize(self._handle, self._dofs_infos)
-                # Default joints state is the info from the USD
-                default_actions = self._articulation_controller.get_applied_action()
-                self._default_joints_state = JointsState(
-                    positions=np.array(default_actions.joint_positions),
-                    velocities=np.array(default_actions.joint_velocities),
-                    efforts=np.zeros_like(default_actions.joint_positions),
-                )
 
                 for i in range(self._dc.get_articulation_joint_count(self._handle)):
                     joint_handle = self._dc.get_articulation_joint(self._handle, i)
                     joint_name = self._dc.get_joint_name(joint_handle)
                     joint_path = self._dc.get_joint_path(joint_handle)
-                    joint = JointPrim(
-                        prim_path=joint_path,
-                        name=f"{self._name}:{joint_name}",
-                        articulation=self._handle,
-                    )
-                    joint.initialize()
-                    self._joints[joint_name] = joint
+                    joint_prim = get_prim_at_path(joint_path)
+                    # Only add the joint if it's not fixed (i.e.: it has DOFs > 0)
+                    if self._dc.get_joint_dof_count(joint_handle) > 0:
+                        joint = JointPrim(
+                            prim_path=joint_path,
+                            name=f"{self._name}:{joint_name}",
+                            articulation=self._handle,
+                        )
+                        joint.initialize()
+                        self._joints[joint_name] = joint
+
+                # Default joints state is our current state for now
+                self._default_joints_state = self.get_joints_state()
         else:
             # TODO: May need to extend to clusters of rigid bodies, that aren't exactly joined
             # We assume this object contains a single rigid body
             body_path = f"{self._prim_path}/base_link"
             root_handle = self._dc.get_rigid_body(body_path)
             root_prim = get_prim_at_path(body_path)
-            num_dof = 0
+            n_dof = 0
 
         # Store values internally
         self._root_handle = root_handle
         self._root_prim = root_prim
-        self._num_dof = num_dof
+        self._n_dof = n_dof
 
         print(f"root handle: {self._root_handle}, root prim path: {self._dc.get_rigid_body_path(self._root_handle)}")
 
     def _load(self, simulator=None):
-        # This should not be called, because this prim cannot be instantiated from scratch!
-        raise NotImplementedError("By default, an articulated prim cannot be created from scratch.")
+        # By default, this prim cannot be instantiated from scratch!
+        raise NotImplementedError("By default, an entity prim cannot be created from scratch.")
 
     def _post_load(self, simulator=None):
         # Set visual only flag
@@ -181,14 +177,23 @@ class ArticulatedPrim(XFormPrim):
              bool: Whether this prim is articulated or not
         """
         # An invalid handle implies that there is no articulation available for this object
-        return self._handle != _dynamic_control.INVALID_HANDLE and self.num_dof > 0
+        return self._handle != _dynamic_control.INVALID_HANDLE and self.n_joints > 0
+
+    @property
+    def articulation_root_path(self):
+        """
+        Returns:
+            str: Absolute USD path to the expected prim that represents the articulation root, if it exists. By default,
+                this corresponds to self.prim_path
+        """
+        return self._prim_path
 
     def assert_articulated(self):
         """
         Sanity check to make sure this joint is articulated. Used as a gatekeeping function to prevent non-intended
         behavior (e.g.: trying to grab this joint's state if it's not articulated)
         """
-        assert self.articulated, "Tried to call method not intended for non-articulated object prim!"
+        assert self.articulated, "Tried to call method not intended for non-articulated entity prim!"
 
     @property
     def root_link(self):
@@ -208,16 +213,16 @@ class ArticulatedPrim(XFormPrim):
         return self._handle
 
     @property
-    def num_dof(self):
+    def n_dof(self):
         """[summary]
 
         Returns:
             int: [description]
         """
-        return self._num_dof
+        return self._n_dof
 
     @property
-    def num_joints(self):
+    def n_joints(self):
         """
         Returns:
             int: Number of joints owned by this articulation
@@ -225,7 +230,7 @@ class ArticulatedPrim(XFormPrim):
         return len(list(self._joints.keys()))
 
     @property
-    def num_links(self):
+    def n_links(self):
         """
         Returns:
             int: Number of links owned by this articulation
@@ -289,7 +294,7 @@ class ArticulatedPrim(XFormPrim):
         specified objects OR the specified links
 
         Args:
-            objects (None or ArticulatedPrim or list of ArticulatedPrim): Object(s) to check for collision with
+            objects (None or EntityPrim or list of EntityPrim): Object(s) to check for collision with
             links (None or RigidPrim or list of RigidPrim): Link(s) to check for collision with
 
         Returns:
@@ -362,99 +367,224 @@ class ArticulatedPrim(XFormPrim):
         for link in self._links.values():
             link.disable_gravity()
 
-    def set_joint_positions(self, positions: np.ndarray, indices: Optional[Union[List, np.ndarray]] = None) -> None:
-        """[summary]
+    def set_joint_positions(self, positions, indices=None, normalized=False):
+        """
+        Set the joint positions (both actual value and target values) in simulation. Note: only works if the simulator
+        is actively running!
 
         Args:
-            positions (np.ndarray): [description]
-            indices (Optional[Union[list, np.ndarray]], optional): [description]. Defaults to None.
-
-        Raises:
-            Exception: [description]
+            positions (np.ndarray): positions to set. This should be n-DOF length if all joints are being set,
+                or k-length (k < n) if specific indices are being set. In this case, the length of @positions must
+                be the same length as @indices!
+            indices (None or k-array): If specified, should be k (k < n) length array of specific DOF positions to set.
+                Default is None, which assumes that all joints are being set.
+            normalized (bool): Whether the inputted joint positions should be interpreted as normalized values. Default
+                is False
         """
-        print(f"name: {self.name}, handle: {self._handle}, num dof: {self.num_dof}")
-        # Only can be called if this is articulated
+        print(f"name: {self.name}, handle: {self._handle}, num dof: {self.n_dof}")
+        # Run sanity checks -- make sure our handle is initialized and that we are articulated
+        assert self._handle is not None, "handles are not initialized yet!"
         self.assert_articulated()
 
-        if isinstance(indices, np.ndarray):
-            indices = indices.tolist()
-        if self._handle is None:
-            raise Exception("handles are not initialized yet")
+        # Possibly de-normalize the inputs
+        if normalized:
+            positions = self._denormalize_positions(positions=positions, indices=indices)
+
+        # Grab current DOF states
         dof_states = self._dc.get_articulation_dof_states(self._handle, _dynamic_control.STATE_POS)
+
+        # Possibly set specific values in the array if indies are specified
         if indices is None:
-            new_joint_positions = positions
+            new_positions = positions
         else:
-            new_joint_positions = self.get_joint_positions()
-            for i in range(len(indices)):
-                new_joint_positions[indices[i]] = positions[i]
-        dof_states["pos"] = new_joint_positions
+            new_positions = dof_states["pos"]
+            new_positions[indices] = positions
+
+        # Set the DOF states
+        dof_states["pos"] = new_positions
         self._dc.set_articulation_dof_states(self._handle, dof_states, _dynamic_control.STATE_POS)
-        self._articulation_controller.apply_action(
-            ArticulationAction(joint_positions=new_joint_positions, joint_velocities=None, joint_efforts=None)
-        )
-        return
 
-    def set_joint_velocities(self, velocities: np.ndarray, indices: Optional[Union[List, np.ndarray]] = None) -> None:
-        """[summary]
+        # Also set the target
+        self._dc.set_articulation_dof_position_targets(self._handle, new_positions.astype(np.float32))
+
+    def set_joint_velocities(self, velocities, indices=None, normalized=False):
+        """
+        Set the joint velocities (both actual value and target values) in simulation. Note: only works if the simulator
+        is actively running!
 
         Args:
-            velocities (np.ndarray): [description]
-            indices (Optional[Union[list, np.ndarray]], optional): [description]. Defaults to None.
-
-        Raises:
-            Exception: [description]
+            velocities (np.ndarray): velocities to set. This should be n-DOF length if all joints are being set,
+                or k-length (k < n) if specific indices are being set. In this case, the length of @velocities must
+                be the same length as @indices!
+            indices (None or k-array): If specified, should be k (k < n) length array of specific DOF velocities to set.
+                Default is None, which assumes that all joints are being set.
+            normalized (bool): Whether the inputted joint velocities should be interpreted as normalized values. Default
+                is False
         """
-        # Only can be called if this is articulated
+        # Run sanity checks -- make sure our handle is initialized and that we are articulated
+        assert self._handle is not None, "handles are not initialized yet!"
         self.assert_articulated()
 
-        if isinstance(indices, np.ndarray):
-            indices = indices.tolist()
-        if self._handle is None:
-            raise Exception("handles are not initialized yet")
+        # Possibly de-normalize the inputs
+        if normalized:
+            velocities = self._denormalize_velocities(velocities=velocities, indices=indices)
+
+        # Grab current DOF states
         dof_states = self._dc.get_articulation_dof_states(self._handle, _dynamic_control.STATE_VEL)
-        if indices is None:
-            new_joint_velocities = velocities
-        else:
-            new_joint_velocities = self.get_joint_velocities()
-            for i in range(len(indices)):
-                new_joint_velocities[indices[i]] = velocities[i]
-        dof_states["vel"] = new_joint_velocities
-        self._dc.set_articulation_dof_states(self._handle, dof_states, _dynamic_control.STATE_VEL)
-        self._articulation_controller.apply_action(
-            ArticulationAction(joint_positions=None, joint_velocities=new_joint_velocities, joint_efforts=None)
-        )
-        return
 
-    def set_joint_efforts(self, efforts: np.ndarray, indices: Optional[Union[List, np.ndarray]] = None) -> None:
-        """[summary]
+        # Possibly set specific values in the array if indies are specified
+        if indices is None:
+            new_velocities = velocities
+        else:
+            new_velocities = dof_states["vel"]
+            new_velocities[indices] = velocities
+
+        # Set the DOF states
+        dof_states["vel"] = new_velocities
+        self._dc.set_articulation_dof_states(self._handle, dof_states, _dynamic_control.STATE_VEL)
+
+        # Also set the target
+        self._dc.set_articulation_dof_velocity_targets(self._handle, new_velocities.astype(np.float32))
+
+    def set_joint_efforts(self, efforts, indices=None, normalized=False):
+        """
+        Set the joint efforts (both actual value and target values) in simulation. Note: only works if the simulator
+        is actively running!
 
         Args:
-            efforts (np.ndarray): [description]
-            indices (Optional[Union[list, np.ndarray]], optional): [description]. Defaults to None.
-
-        Raises:
-            Exception: [description]
+            efforts (np.ndarray): efforts to set. This should be n-DOF length if all joints are being set,
+                or k-length (k < n) if specific indices are being set. In this case, the length of @efforts must
+                be the same length as @indices!
+            indices (None or k-array): If specified, should be k (k < n) length array of specific DOF efforts to set.
+                Default is None, which assumes that all joints are being set.
+            normalized (bool): Whether the inputted joint efforts should be interpreted as normalized values. Default
+                is False
         """
-        # Only can be called if this is articulated
+        # Run sanity checks -- make sure our handle is initialized and that we are articulated
+        assert self._handle is not None, "handles are not initialized yet!"
         self.assert_articulated()
 
-        if isinstance(indices, np.ndarray):
-            indices = indices.tolist()
-        if self._handle is None:
-            raise Exception("handles are not initialized yet")
+        # Possibly de-normalize the inputs
+        if normalized:
+            efforts = self._denormalize_efforts(efforts=efforts, indices=indices)
+
+        # Grab current DOF states
         dof_states = self._dc.get_articulation_dof_states(self._handle, _dynamic_control.STATE_EFFORT)
+
+        # Possibly set specific values in the array if indies are specified
         if indices is None:
-            new_joint_efforts = efforts
+            new_efforts = efforts
         else:
-            new_joint_efforts = [0] * self.num_dof
-            for i in range(len(indices)):
-                new_joint_efforts[indices[i]] = efforts[i]
-        dof_states["effort"] = new_joint_efforts
+            new_efforts = dof_states["effort"]
+            new_efforts[indices] = efforts
+
+        # Set the DOF states
+        dof_states["effort"] = new_efforts
         self._dc.set_articulation_dof_states(self._handle, dof_states, _dynamic_control.STATE_EFFORT)
-        self._articulation_controller.apply_action(
-            ArticulationAction(joint_positions=None, joint_velocities=None, joint_efforts=new_joint_efforts)
-        )
-        return
+
+    def _normalize_positions(self, positions, indices=None):
+        """
+        Normalizes raw joint positions @positions
+
+        Args:
+            positions (n- or k-array): n-DOF raw positions to normalize, or k (k < n) specific positions to normalize.
+                In the latter case, @indices should be specified
+            indices (None or k-array): If specified, should be k (k < n) DOF indices corresponding to the specific
+                positions to normalize. Default is None, which assumes the positions correspond to all DOF being
+                normalized.
+
+        Returns:
+            n- or k-array: normalized positions in range [-1, 1] for the specified DOFs
+        """
+        low, high = self.joint_lower_limits, self.joint_upper_limits
+        mean = (low + high) / 2.0
+        magnitude = (high - low) / 2.0
+        return (positions - mean) / magnitude if indices is None else (positions - mean[indices]) / magnitude[indices]
+
+    def _denormalize_positions(self, positions, indices=None):
+        """
+        De-normalizes joint positions @positions
+
+        Args:
+            positions (n- or k-array): n-DOF normalized positions or k (k < n) specific positions in range [-1, 1]
+                to de-normalize. In the latter case, @indices should be specified
+            indices (None or k-array): If specified, should be k (k < n) DOF indices corresponding to the specific
+                positions to de-normalize. Default is None, which assumes the positions correspond to all DOF being
+                de-normalized.
+
+        Returns:
+            n- or k-array: de-normalized positions for the specified DOFs
+        """
+        low, high = self.joint_lower_limits, self.joint_upper_limits
+        mean = (low + high) / 2.0
+        magnitude = (high - low) / 2.0
+        return positions * magnitude + mean if indices is None else positions * magnitude[indices] + mean[indices]
+
+    def _normalize_velocities(self, velocities, indices=None):
+        """
+        Normalizes raw joint velocities @velocities
+
+        Args:
+            velocities (n- or k-array): n-DOF raw velocities to normalize, or k (k < n) specific velocities to normalize.
+                In the latter case, @indices should be specified
+            indices (None or k-array): If specified, should be k (k < n) DOF indices corresponding to the specific
+                velocities to normalize. Default is None, which assumes the velocities correspond to all DOF being
+                normalized.
+
+        Returns:
+            n- or k-array: normalized velocities in range [-1, 1] for the specified DOFs
+        """
+        return velocities / self.max_joint_velocities if indices is None else \
+            velocities / self.max_joint_velocities[indices]
+
+    def _denormalize_velocities(self, velocities, indices=None):
+        """
+        De-normalizes joint velocities @velocities
+
+        Args:
+            velocities (n- or k-array): n-DOF normalized velocities or k (k < n) specific velocities in range [-1, 1]
+                to de-normalize. In the latter case, @indices should be specified
+            indices (None or k-array): If specified, should be k (k < n) DOF indices corresponding to the specific
+                velocities to de-normalize. Default is None, which assumes the velocities correspond to all DOF being
+                de-normalized.
+
+        Returns:
+            n- or k-array: de-normalized velocities for the specified DOFs
+        """
+        return velocities * self.max_joint_velocities if indices is None else \
+            velocities * self.max_joint_velocities[indices]
+
+    def _normalize_efforts(self, efforts, indices=None):
+        """
+        Normalizes raw joint efforts @efforts
+
+        Args:
+            efforts (n- or k-array): n-DOF raw efforts to normalize, or k (k < n) specific efforts to normalize.
+                In the latter case, @indices should be specified
+            indices (None or k-array): If specified, should be k (k < n) DOF indices corresponding to the specific
+                efforts to normalize. Default is None, which assumes the efforts correspond to all DOF being
+                normalized.
+
+        Returns:
+            n- or k-array: normalized efforts in range [-1, 1] for the specified DOFs
+        """
+        return efforts / self.max_joint_efforts if indices is None else efforts / self.max_joint_efforts[indices]
+
+    def _denormalize_efforts(self, efforts, indices=None):
+        """
+        De-normalizes joint efforts @efforts
+
+        Args:
+            efforts (n- or k-array): n-DOF normalized efforts or k (k < n) specific efforts in range [-1, 1]
+                to de-normalize. In the latter case, @indices should be specified
+            indices (None or k-array): If specified, should be k (k < n) DOF indices corresponding to the specific
+                efforts to de-normalize. Default is None, which assumes the efforts correspond to all DOF being
+                de-normalized.
+
+        Returns:
+            n- or k-array: de-normalized efforts for the specified DOFs
+        """
+        return efforts * self.max_joint_efforts if indices is None else efforts * self.max_joint_efforts[indices]
 
     def update_default_state(self):
         # Iterate over all links and joints and update their default states
@@ -463,59 +593,62 @@ class ArticulatedPrim(XFormPrim):
         for joint in self._joints.values():
             joint.update_default_state()
 
-    def get_joint_positions(self) -> np.ndarray:
-        """[summary]
+    def get_joint_positions(self, normalized=False):
+        """
+        Grabs this entity's joint positions
 
-        Raises:
-            Exception: [description]
+        Args:
+            normalized (bool): Whether returned values should be normalized to range [-1, 1] based on limits or not.
 
         Returns:
-            np.ndarray: [description]
+            n-array: n-DOF length array of positions
         """
-        # Only can be called if this is articulated
+        # Run sanity checks -- make sure our handle is initialized and that we are articulated
+        assert self._handle is not None, "handles are not initialized yet!"
         self.assert_articulated()
 
-        if self._handle is None:
-            raise Exception("handles are not initialized yet")
-        joint_positions = self._dc.get_articulation_dof_states(self._handle, _dynamic_control.STATE_POS)
-        joint_positions = [joint_positions[i][0] for i in range(len(joint_positions))]
-        return np.array(joint_positions)
+        joint_positions = self._dc.get_articulation_dof_states(self._handle, _dynamic_control.STATE_POS)["pos"]
 
-    def get_joint_velocities(self) -> np.ndarray:
-        """[summary]
+        # Possibly normalize values when returning
+        return self._normalize_positions(positions=joint_positions) if normalized else joint_positions
 
-        Raises:
-            Exception: [description]
+    def get_joint_velocities(self, normalized=False):
+        """
+        Grabs this entity's joint velocities
+
+        Args:
+            normalized (bool): Whether returned values should be normalized to range [-1, 1] based on limits or not.
 
         Returns:
-            np.ndarray: [description]
+            n-array: n-DOF length array of velocities
         """
-        # Only can be called if this is articulated
+        # Run sanity checks -- make sure our handle is initialized and that we are articulated
+        assert self._handle is not None, "handles are not initialized yet!"
         self.assert_articulated()
 
-        if self._handle is None:
-            raise Exception("handles are not initialized yet")
-        joint_velocities = self._dc.get_articulation_dof_states(self._handle, _dynamic_control.STATE_VEL)
-        joint_velocities = [joint_velocities[i][1] for i in range(len(joint_velocities))]
-        return np.array(joint_velocities)
+        joint_velocities = self._dc.get_articulation_dof_states(self._handle, _dynamic_control.STATE_VEL)["vel"]
 
-    def get_joint_efforts(self) -> np.ndarray:
-        """[summary]
+        # Possibly normalize values when returning
+        return self._normalize_velocities(velocities=joint_velocities) if normalized else joint_velocities
 
-        Raises:
-            Exception: [description]
+    def get_joint_efforts(self, normalized=False):
+        """
+        Grabs this entity's joint efforts
+
+        Args:
+            normalized (bool): Whether returned values should be normalized to range [-1, 1] based on limits or not.
 
         Returns:
-            np.ndarray: [description]
+            n-array: n-DOF length array of efforts
         """
-        # Only can be called if this is articulated
+        # Run sanity checks -- make sure our handle is initialized and that we are articulated
+        assert self._handle is not None, "handles are not initialized yet!"
         self.assert_articulated()
 
-        if self._handle is None:
-            raise Exception("handles are not initialized yet")
-        joint_efforts = self._dc.get_articulation_dof_states(self._handle, _dynamic_control.STATE_EFFORT)
-        joint_efforts = [joint_efforts[i][2] for i in range(len(joint_efforts))]
-        return joint_efforts
+        joint_efforts = self._dc.get_articulation_dof_states(self._handle, _dynamic_control.STATE_EFFORT)["effort"]
+
+        # Possibly normalize values when returning
+        return self._normalize_efforts(efforts=joint_efforts) if normalized else joint_efforts
 
     def set_joints_default_state(
         self,
@@ -541,20 +674,40 @@ class ArticulatedPrim(XFormPrim):
             self._default_joints_state.efforts = efforts
         return
 
-    def get_joints_state(self) -> JointsState:
-        """[summary]
+    def get_joints_state(self, normalized=False):
+        """
+        Grabs the current joints state of this entity
+
+        Args:
+            normalized (bool): Whether to receive normalized states in range [-1, 1] or not
 
         Returns:
-            JointsState: [description]
+            JointsState: State of this entity's joints
         """
         # Only can be called if this is articulated
         self.assert_articulated()
 
         return JointsState(
-            positions=self.get_joint_positions(),
-            velocities=self.get_joint_velocities(),
-            efforts=self.get_joint_efforts(),
+            positions=self.get_joint_positions(normalized=normalized),
+            velocities=self.get_joint_velocities(normalized=normalized),
+            efforts=self.get_joint_efforts(normalized=normalized),
         )
+
+    def set_joints_state(self, state, normalized=False):
+        """
+        Sets the current joints state of this entity
+
+        Args:
+            state (JointsState): Joint state to set. Any values that are not None will be set.
+            normalized (bool): Whether received states are normalized in range [-1, 1] or not
+        """
+        # Possibly set positions, velocities, and efforts based on received state
+        if state.positions is not None:
+            self.set_joint_positions(positions=state.positions, normalized=normalized)
+        if state.velocities is not None:
+            self.set_joint_velocities(velocities=state.velocities, normalized=normalized)
+        if state.efforts is not None:
+            self.set_joint_efforts(efforts=state.efforts, normalized=normalized)
 
     def reset(self):
         # Run super reset first to reset this articulation's pose
@@ -714,38 +867,87 @@ class ArticulatedPrim(XFormPrim):
         else:
             return super().get_local_pose()
 
-    def apply_action(
-        self, control_actions: ArticulationAction, indices: Optional[Union[List, np.ndarray]] = None
-    ) -> None:
-        """[summary]
+    # TODO: Is the omni joint damping (used for driving motors) same as dissipative joint damping (what we had in pb)?
+    # @property
+    # def joint_damping(self):
+    #     """
+    #     :return: Array[float], joint damping values for this prim
+    #     """
+    #     return np.concatenate([joint.damping for joint in self._joints.values()])
 
-        Args:
-            control_actions (ArticulationAction): actions to be applied for next physics step.
-            indices (Optional[Union[list, np.ndarray]], optional): degree of freedom indices to apply actions to.
-                                                                   Defaults to all degrees of freedom.
-
-        Raises:
-            Exception: [description]
+    @property
+    def joint_lower_limits(self):
         """
-        if isinstance(indices, np.ndarray):
-            indices = indices.tolist()
-        if self._handle is None:
-            raise Exception("handles are not initialized yet")
-        self._articulation_controller.apply_action(control_actions=control_actions, indices=indices)
-        return
-
-    def get_applied_action(self) -> ArticulationAction:
-        """[summary]
-
-        Raises:
-            Exception: [description]
-
-        Returns:
-            ArticulationAction: [description]
+        :return: Array[float], minimum values for this robot's joints. If joint does not have a range, returns -1000
+            for that joint
         """
-        if self._handle is None:
-            raise Exception("handles are not initialized yet")
-        return self._articulation_controller.get_applied_action()
+        print(f"{[joint.lower_limit for joint in self._joints.values()]}")
+        return np.array([joint.lower_limit for joint in self._joints.values()])
+
+    @property
+    def joint_upper_limits(self):
+        """
+        :return: Array[float], maximum values for this robot's joints. If joint does not have a range, returns 1000
+            for that joint
+        """
+        return np.array([joint.upper_limit for joint in self._joints.values()])
+
+    @property
+    def joint_range(self):
+        """
+        :return: Array[float], joint range values for this robot's joints
+        """
+        return self.joint_upper_limits - self.joint_lower_limits
+
+    @property
+    def max_joint_velocities(self):
+        """
+        :return: Array[float], maximum velocities for this robot's joints
+        """
+        return np.array([joint.max_velocity for joint in self._joints.values()])
+
+    @property
+    def max_joint_efforts(self):
+        """
+        :return: Array[float], maximum efforts for this robot's joints
+        """
+        return np.array([joint.max_force for joint in self._joints.values()])
+
+    @property
+    def joint_position_limits(self):
+        """
+        :return Tuple[Array[float], Array[float]]: (min, max) joint position limits, where each is an n-DOF length array
+        """
+        return self.joint_lower_limits, self.joint_upper_limits
+
+    @property
+    def joint_velocity_limits(self):
+        """
+        :return Tuple[Array[float], Array[float]]: (min, max) joint velocity limits, where each is an n-DOF length array
+        """
+        return -self.max_joint_velocities, self.max_joint_velocities
+
+    @property
+    def joint_effort_limits(self):
+        """
+        :return Tuple[Array[float], Array[float]]: (min, max) joint effort limits, where each is an n-DOF length array
+        """
+        return -self.max_joint_efforts, self.max_joint_efforts
+
+    @property
+    def joint_at_limits(self):
+        """
+        :return Array[float]: n-DOF length array specifying whether joint is at its limit,
+            with 1.0 --> at limit, otherwise 0.0
+        """
+        return 1.0 * (np.abs(self.get_joint_positions(normalized=True)) > 0.99)
+
+    @property
+    def joint_has_limits(self):
+        """
+        :return Array[bool]: n-DOF length array specifying whether joint has a limit or not
+        """
+        return np.array([j.has_limit for j in self._joints.values()])
 
     @property
     def disabled_collision_pairs(self):
@@ -776,7 +978,7 @@ class ArticulatedPrim(XFormPrim):
         Returns:
             int: [description]
         """
-        return get_prim_property(self.prim_path, "physxArticulation:solverPositionIterationCount")
+        return get_prim_property(self.articulation_root_path, "physxArticulation:solverPositionIterationCount")
 
     @solver_position_iteration_count.setter
     def solver_position_iteration_count(self, count: int) -> None:
@@ -785,7 +987,7 @@ class ArticulatedPrim(XFormPrim):
         Args:
             count (int): [description]
         """
-        set_prim_property(self.prim_path, "physxArticulation:solverPositionIterationCount", count)
+        set_prim_property(self.articulation_root_path, "physxArticulation:solverPositionIterationCount", count)
         return
 
     @property
@@ -795,7 +997,7 @@ class ArticulatedPrim(XFormPrim):
         Returns:
             int: [description]
         """
-        return get_prim_property(self.prim_path, "physxArticulation:solverVelocityIterationCount")
+        return get_prim_property(self.articulation_root_path, "physxArticulation:solverVelocityIterationCount")
 
     @solver_velocity_iteration_count.setter
     def solver_velocity_iteration_count(self, count: int):
@@ -804,7 +1006,7 @@ class ArticulatedPrim(XFormPrim):
         Args:
             count (int): [description]
         """
-        set_prim_property(self.prim_path, "physxArticulation:solverVelocityIterationCount", count)
+        set_prim_property(self.articulation_root_path, "physxArticulation:solverVelocityIterationCount", count)
         return
 
     @property
@@ -814,7 +1016,7 @@ class ArticulatedPrim(XFormPrim):
         Returns:
             float: [description]
         """
-        return get_prim_property(self.prim_path, "physxArticulation:stabilizationThreshold")
+        return get_prim_property(self.articulation_root_path, "physxArticulation:stabilizationThreshold")
 
     @stabilization_threshold.setter
     def stabilization_threshold(self, threshold: float) -> None:
@@ -823,26 +1025,26 @@ class ArticulatedPrim(XFormPrim):
         Args:
             threshold (float): [description]
         """
-        set_prim_property(self.prim_path, "physxArticulation:stabilizationThreshold", threshold)
+        set_prim_property(self.articulation_root_path, "physxArticulation:stabilizationThreshold", threshold)
         return
 
     @property
-    def enabled_self_collisions(self) -> bool:
+    def self_collisions(self) -> bool:
         """[summary]
 
         Returns:
             bool: [description]
         """
-        return get_prim_property(self.prim_path, "physxArticulation:enabledSelfCollisions")
+        return get_prim_property(self.articulation_root_path, "physxArticulation:enabledSelfCollisions")
 
-    @enabled_self_collisions.setter
-    def enabled_self_collisions(self, flag: bool) -> None:
+    @self_collisions.setter
+    def self_collisions(self, flag: bool) -> None:
         """[summary]
 
         Args:
             flag (bool): [description]
         """
-        set_prim_property(self.prim_path, "physxArticulation:enabledSelfCollisions", flag)
+        set_prim_property(self.articulation_root_path, "physxArticulation:enabledSelfCollisions", flag)
         return
 
     @property
@@ -852,7 +1054,7 @@ class ArticulatedPrim(XFormPrim):
         Returns:
             float: [description]
         """
-        return get_prim_property(self.prim_path, "physxArticulation:sleepThreshold")
+        return get_prim_property(self.articulation_root_path, "physxArticulation:sleepThreshold")
 
     @sleep_threshold.setter
     def sleep_threshold(self, threshold: float) -> None:
@@ -861,7 +1063,7 @@ class ArticulatedPrim(XFormPrim):
         Args:
             threshold (float): [description]
         """
-        set_prim_property(self.prim_path, "physxArticulation:sleepThreshold", threshold)
+        set_prim_property(self.articulation_root_path, "physxArticulation:sleepThreshold", threshold)
         return
 
     def wake(self):
@@ -920,7 +1122,7 @@ class ArticulatedPrim(XFormPrim):
         # We serialize by first flattening the root link state and then iterating over all joints and
         # adding them to the a flattened array
         state_flat = [self.root_link.serialize(state=state["root_link"])]
-        if self.num_joints > 0:
+        if self.n_joints > 0:
             state_flat.append(
                 np.concatenate(
                     [prim.serialize(state=state["joints"][prim_name]) for prim_name, prim in self._joints.items()]
@@ -936,7 +1138,7 @@ class ArticulatedPrim(XFormPrim):
         state_dict = self.root_link.deserialize(state=state[:idx])
         joint_state_dict = OrderedDict()
         for prim_name, prim in self._joints.items():
-            joint_state_dict[prim_name] = prim.deserialize(state[idx:idx+prim.state_size])
+            joint_state_dict[prim_name] = prim.deserialize(state=state[idx:idx+prim.state_size])
             idx += prim.state_size
         state_dict["joints"] = joint_state_dict
 
@@ -945,4 +1147,4 @@ class ArticulatedPrim(XFormPrim):
     def _create_prim_with_same_kwargs(self, prim_path, name, load_config):
         # Subclass must implement this method for duplication functionality
         raise NotImplementedError("Subclass must implement _create_prim_with_same_kwargs() to enable duplication "
-                                  "functionality for ArticulatedPrim!")
+                                  "functionality for EntityPrim!")

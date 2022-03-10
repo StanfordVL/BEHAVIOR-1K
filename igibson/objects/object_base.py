@@ -260,3 +260,10 @@ class BaseObject(EntityPrim, metaclass=ABCMeta):
             self_collisions=self.self_collisions,
             rendering_params=self.rendering_params,
         )
+
+    def update(self):
+        """
+        Runs any relevant updates for this object. This should occur once per simulation step.
+        """
+        pass
+

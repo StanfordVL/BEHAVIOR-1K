@@ -1,8 +1,8 @@
-from collections import Iterable
+from collections import Iterable, OrderedDict
 
 import numpy as np
 
-from igibson.utils.python_utils import assert_valid_key
+from igibson.utils.python_utils import assert_valid_key, Serializable
 
 # Global dicts that will contain mappings
 REGISTERED_CONTROLLERS = {}
@@ -29,11 +29,11 @@ def register_manipulation_controller(cls):
 class ControlType:
     POSITION = 0
     VELOCITY = 1
-    TORQUE = 2
+    EFFORT = 2
     _MAPPING = {
         "position": POSITION,
         "velocity": VELOCITY,
-        "torque": TORQUE,
+        "effort": EFFORT,
     }
     VALID_TYPES = set(_MAPPING.values())
     VALID_TYPES_STR = set(_MAPPING.keys())
@@ -41,7 +41,7 @@ class ControlType:
     @classmethod
     def get_type(cls, type_str):
         """
-        :param type_str: One of "position", "velocity", or "torque" (any case), and maps it
+        :param type_str: One of "position", "velocity", or "effort" (any case), and maps it
         to the corresponding type
 
         :return ControlType: control type corresponding to the associated string
@@ -50,7 +50,7 @@ class ControlType:
         return cls._MAPPING[type_str.lower()]
 
 
-class BaseController:
+class BaseController(Serializable):
     """
     An abstract class with interface for mapping specific types of commands to deployable control signals.
     """
@@ -69,22 +69,22 @@ class BaseController:
         self,
         control_freq,
         control_limits,
-        joint_idx,
+        dof_idx,
         command_input_limits="default",
         command_output_limits="default",
     ):
         """
         :param control_freq: int, controller loop frequency
         :param control_limits: Dict[str, Tuple[Array[float], Array[float]]]: The min/max limits to the outputted
-            control signal. Should specify per-actuator type limits, i.e.:
+            control signal. Should specify per-dof type limits, i.e.:
 
             "position": [[min], [max]]
             "velocity": [[min], [max]]
-            "torque": [[min], [max]]
+            "effort": [[min], [max]]
             "has_limit": [...bool...]
 
             Values outside of this range will be clipped, if the corresponding joint index in has_limit is True.
-        :param joint_idx: Array[int], specific joint indices controlled by this robot. Used for inferring
+        :param dof_idx: Array[int], specific dof indices controlled by this robot. Used for inferring
             controller-relevant values during control computations
         :param command_input_limits: None or "default" or Tuple[float, float] or Tuple[Array[float], Array[float]],
             if set, is the min/max acceptable inputted command. Values outside of this range will be clipped.
@@ -98,7 +98,7 @@ class BaseController:
         # Store arguments
         self.control_freq = control_freq
         self.control_limits = {}
-        for motor_type in {"position", "velocity", "torque"}:
+        for motor_type in {"position", "velocity", "effort"}:
             if motor_type not in control_limits:
                 continue
 
@@ -107,8 +107,8 @@ class BaseController:
                 np.array(control_limits[motor_type][1]),
             ]
         assert "has_limit" in control_limits, "Expected has_limit specified in control_limits, but does not exist."
-        self.joint_has_limits = control_limits["has_limit"]
-        self._joint_idx = joint_idx
+        self.dof_has_limits = control_limits["has_limit"]
+        self._dof_idx = dof_idx
 
         # Initialize some other variables that will be filled in during runtime
         self.control = None
@@ -121,8 +121,8 @@ class BaseController:
         command_input_limits = (-1.0, 1.0) if command_input_limits == "default" else command_input_limits
         command_output_limits = (
             (
-                np.array(self.control_limits[self.control_type][0])[self.joint_idx],
-                np.array(self.control_limits[self.control_type][1])[self.joint_idx],
+                np.array(self.control_limits[self.control_type][0])[self.dof_idx],
+                np.array(self.control_limits[self.control_type][1])[self.dof_idx],
             )
             if command_output_limits == "default"
             else command_output_limits
@@ -199,11 +199,11 @@ class BaseController:
         :return Array[float]: Clipped control signal
         """
         clipped_control = control.clip(
-            self.control_limits[self.control_type][0][self.joint_idx],
-            self.control_limits[self.control_type][1][self.joint_idx],
+            self.control_limits[self.control_type][0][self.dof_idx],
+            self.control_limits[self.control_type][1][self.dof_idx],
         )
         idx = (
-            self.joint_has_limits[self.joint_idx]
+            self.dof_has_limits[self.dof_idx]
             if self.control_type == ControlType.POSITION
             else [True] * self.control_dim
         )
@@ -229,19 +229,25 @@ class BaseController:
         """
         raise NotImplementedError
 
-    def dump_state(self):
-        """
-        :return Any: the state of the object other than what's not included in pybullet state.
-        """
-        return None
+    def state_size(self):
+        # Default is no state, so return 0
+        return 0
 
-    def load_state(self, dump):
-        """
-        Load the state of the object other than what's not included in pybullet state.
+    def _dump_state(self):
+        # Default is no state (empty dict)
+        return OrderedDict()
 
-        :param dump: Any: the dumped state
-        """
-        return
+    def _load_state(self, state):
+        # Default is no state (empty dict), so this is a no-op
+        pass
+
+    def _serialize(self, state):
+        # Default is no state, so do nothing
+        return np.array([])
+
+    def _deserialize(self, state):
+        # Default is no state, so do nothing
+        return OrderedDict(), 0
 
     def _command_to_control(self, command, control_dict):
         """
@@ -263,7 +269,7 @@ class BaseController:
         corresponding dimension size @dim before converting into a numpy array
         Args:
             nums (numeric or Iterable): Either single value or array of numbers
-            dim (int): Size of array to broadcast input to env.sim.data.actuator_force
+            dim (int): Size of array to broadcast input to
         Returns:
             np.array: Array filled with values specified in @nums
         """
@@ -294,14 +300,14 @@ class BaseController:
         """
         :return int: Expected size of outputted controls
         """
-        return len(self.joint_idx)
+        return len(self.dof_idx)
 
     @property
-    def joint_idx(self):
+    def dof_idx(self):
         """
-        :return Array[int]: Joint indices corresponding to the specific joints being controlled by this robot
+        :return Array[int]: DOF indices corresponding to the specific DOFs being controlled by this robot
         """
-        return np.array(self._joint_idx)
+        return np.array(self._dof_idx)
 
 
 class LocomotionController(BaseController):

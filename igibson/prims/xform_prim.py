@@ -26,6 +26,7 @@ import numpy as np
 import carb
 from omni.isaac.core.utils.stage import get_current_stage
 from igibson.prims.prim_base import BasePrim
+from igibson.utils.transform_utils import quat2mat, mat2euler
 
 
 class XFormPrim(BasePrim):
@@ -351,6 +352,15 @@ class XFormPrim(BasePrim):
             4-array: (x,y,z,w) global quaternion orientation of this prim
         """
         return self.get_position_orientation()[1]
+
+    def get_rpy(self):
+        """
+        Get this prim's orientation with respect to the world frame
+
+        Returns:
+            3-array: (roll, pitch, yaw) global euler orientation of this prim
+        """
+        return mat2euler(quat2mat(self.get_orientation()))
 
     def get_local_pose(self):
         """Gets prim's pose with respect to the local frame (the prim's parent frame).
