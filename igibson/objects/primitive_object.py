@@ -32,8 +32,10 @@ class PrimitiveObject(StatefulObject):
         visible=True,
         fixed_base=False,
         visual_only=False,
+        self_collisions=False,
         load_config=None,
         abilities=None,
+        **kwargs,
     ):
         """
         @param prim_path: str, global path in the stage to this object
@@ -50,6 +52,7 @@ class PrimitiveObject(StatefulObject):
         @param fixed_base: bool, whether to fix the base of this object or not
         @param visual_only: whether this object should be a visual-only (i.e.: not affected by collisions / gravity)
             object or not
+        self_collisions (bool): Whether to enable self collisions for this object
         load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
             loading this prim at runtime.
 
@@ -61,6 +64,8 @@ class PrimitiveObject(StatefulObject):
 
         @param abilities: dict in the form of {ability: {param: value}} containing
             object abilities and parameters.
+        kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
+            for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
         """
         super().__init__(
             prim_path=prim_path,
@@ -72,8 +77,10 @@ class PrimitiveObject(StatefulObject):
             visible=visible,
             fixed_base=fixed_base,
             visual_only=visual_only,
+            self_collisions=self_collisions,
             load_config=load_config,
             abilities=abilities,
+            **kwargs,
         )
         # Make sure primitive type is valid
         assert primitive_type in PRIMITIVE_OBJECTS, f"Invalid primitive object requested! Valid options are: " \

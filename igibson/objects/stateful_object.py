@@ -30,9 +30,33 @@ class StatefulObject(BaseObject):
             visible=True,
             fixed_base=False,
             visual_only=False,
+            self_collisions=False,
             load_config=None,
             abilities=None,
+            **kwargs,
     ):
+        """
+        @param prim_path: str, global path in the stage to this object
+        @param name: Name for the object. Names need to be unique per scene. If no name is set, a name will be generated
+            at the time the object is added to the scene, using the object's category.
+        @param category: Category for the object. Defaults to "object".
+        @param class_id: What class ID the object should be assigned in semantic segmentation rendering mode.
+        @param scale: float or 3-array, sets the scale for this object. A single number corresponds to uniform scaling
+            along the x,y,z axes, whereas a 3-array specifies per-axis scaling.
+        @param rendering_params: Any relevant rendering settings for this object.
+        @param visible: bool, whether to render this object or not in the stage
+        @param fixed_base: bool, whether to fix the base of this object or not
+        visual_only (bool): Whether this object should be visual only (and not collide with any other objects)
+        self_collisions (bool): Whether to enable self collisions for this object
+        load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
+            loading this prim at runtime.
+        @param abilities: dict in the form of {ability: {param: value}} containing
+            object abilities and parameters.
+        kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
+            for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
+            Note that this base object does NOT pass kwargs down into the Prim-type super() classes, and we assume
+            that kwargs are only shared between all SUBclasses (children), not SUPERclasses (parents).
+        """
         # Values that will be filled later
         self._states = None
 
@@ -47,7 +71,9 @@ class StatefulObject(BaseObject):
             visible=visible,
             fixed_base=fixed_base,
             visual_only=visual_only,
+            self_collisions=self_collisions,
             load_config=load_config,
+            **kwargs,
         )
 
         # Load abilities from taxonomy if needed & possible

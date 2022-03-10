@@ -12,14 +12,14 @@ from igibson.utils.constants import (
     SPECIAL_COLLISION_GROUPS,
     SemanticClass,
 )
-from pxr import UsdPhysics
+from pxr import UsdPhysics, PhysxSchema
 from igibson.utils.semantics_utils import CLASS_NAME_TO_CLASS_ID
 from igibson.utils.usd_utils import get_prim_nested_children, create_joint, CollisionAPI, BoundingBoxAPI
-from igibson.prims.articulated_prim import ArticulatedPrim
+from igibson.prims.entity_prim import EntityPrim
 from igibson.prims.xform_prim import XFormPrim
 
 
-class BaseObject(ArticulatedPrim, metaclass=ABCMeta):
+class BaseObject(EntityPrim, metaclass=ABCMeta):
     """This is the interface that all iGibson objects must implement."""
 
     def __init__(
@@ -33,7 +33,9 @@ class BaseObject(ArticulatedPrim, metaclass=ABCMeta):
             visible=True,
             fixed_base=False,
             visual_only=False,
+            self_collisions=False,
             load_config=None,
+            **kwargs,
     ):
         """
         Create an object instance with the minimum information of class ID and rendering parameters.
@@ -49,8 +51,13 @@ class BaseObject(ArticulatedPrim, metaclass=ABCMeta):
         @param visible: bool, whether to render this object or not in the stage
         @param fixed_base: bool, whether to fix the base of this object or not
         visual_only (bool): Whether this object should be visual only (and not collide with any other objects)
+        self_collisions (bool): Whether to enable self collisions for this object
         load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
             loading this prim at runtime.
+        kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
+            for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
+            Note that this base object does NOT pass kwargs down into the Prim-type super() classes, and we assume
+            that kwargs are only shared between all SUBclasses (children), not SUPERclasses (parents).
         """
         # Generate a name if necessary. Note that the generation order & set of these names is not deterministic.
         if name is None:
@@ -92,6 +99,7 @@ class BaseObject(ArticulatedPrim, metaclass=ABCMeta):
         load_config["scale"] = scale
         load_config["visible"] = visible
         load_config["visual_only"] = visual_only
+        load_config["self_collisions"] = self_collisions
 
         # Run super init
         super().__init__(
@@ -125,9 +133,26 @@ class BaseObject(ArticulatedPrim, metaclass=ABCMeta):
                 body1=f"{self._prim_path}/base_link",
             )
         else:
-            # Remove the articulation root API if we're floating and with a single link
-            if self._prim.HasAPI(UsdPhysics.ArticulationRootAPI) and len(self._links) == 1:
-                self._prim.RemoveAPI(UsdPhysics.ArticulationRootAPI)
+            if self._prim.HasAPI(UsdPhysics.ArticulationRootAPI):
+                # If we only have a link, remove the articulation root API
+                if self.n_links == 1:
+                    self._prim.RemoveAPI(UsdPhysics.ArticulationRootAPI)
+                    self._prim.RemoveAPI(PhysxSchema.PhysxArticulationAPI)
+                else:
+                    # We need to fix (change) the articulation root
+                    # We have to do something very hacky because omniverse is buggy
+                    # Articulation roots mess up the joint order if it's on a non-fixed base robot, e.g. a
+                    # mobile manipulator. So if we have to move it to the actual root link of the robot instead.
+                    # See https://forums.developer.nvidia.com/t/inconsistent-values-from-isaacsims-dc-get-joint-parent-child-body/201452/2
+                    # for more info
+                    self._prim.RemoveAPI(UsdPhysics.ArticulationRootAPI)
+                    self._prim.RemoveAPI(PhysxSchema.PhysxArticulationAPI)
+                    UsdPhysics.ArticulationRootAPI.Apply(self._root_prim)
+                    PhysxSchema.PhysxArticulationAPI.Apply(self._root_prim)
+
+        # Set self collisions if we have articulation API to set
+        if self._prim.HasAPI(UsdPhysics.ArticulationRootAPI) or self._root_prim.HasAPI(UsdPhysics.ArticulationRootAPI):
+            self.self_collisions = self._load_config["self_collisions"]
 
         # TODO: Do we need to explicitly add all links? or is adding articulation root itself sufficient?
         # Set the collision group
@@ -136,6 +161,17 @@ class BaseObject(ArticulatedPrim, metaclass=ABCMeta):
             prim_path=self.prim_path,
             create_if_not_exist=True,
         )
+
+    @property
+    def articulation_root_path(self):
+        # We override this because omniverse is buggy ):
+        # For non-fixed base objects (e.g.: mobile manipulators), using the default articulation root breaks the
+        # kinematic chain for some reason. So, the current workaround is to set the articulation root to be the
+        # actual base link of the robot instead.
+        # See https://forums.developer.nvidia.com/t/inconsistent-values-from-isaacsims-dc-get-joint-parent-child-body/201452/2
+        # for more info
+        return f"{self._prim_path}/base_link" if \
+            (not self.fixed_base) and (self.n_links > 1) else super().articulation_root_path
 
     @property
     def bbox(self):
@@ -176,30 +212,30 @@ class BaseObject(ArticulatedPrim, metaclass=ABCMeta):
         self.set_linear_velocity(velocity=lin_vel)
         self.set_angular_velocity(velocity=ang_vel)
 
-    def set_joint_states(self, joint_states):
-        """Set object joint states in the format of Dict[String: (q, q_dot)]]"""
-        # Make sure this object is articulated
-        assert self._num_dof > 0, "Can only set joint states for objects that have > 0 DOF!"
-        pos = np.zeros(self._num_dof)
-        vel = np.zeros(self._num_dof)
-        for i, joint_name in enumerate(self._dofs_infos.keys()):
-            pos[i], vel[i] = joint_states[joint_name]
-
-        # Set the joint positions and velocities
-        self.set_joint_positions(positions=pos)
-        self.set_joint_velocities(velocities=vel)
-
-    def get_joint_states(self):
-        """Get object joint states in the format of Dict[String: (q, q_dot)]]"""
-        # Make sure this object is articulated
-        assert self._num_dof > 0, "Can only get joint states for objects that have > 0 DOF!"
-        pos = self.get_joint_positions()
-        vel = self.get_joint_velocities()
-        joint_states = dict()
-        for i, joint_name in enumerate(self._dofs_infos.keys()):
-            joint_states[joint_name] = (pos[i], vel[i])
-
-        return joint_states
+    # def set_joint_states(self, joint_states):
+    #     """Set object joint states in the format of Dict[String: (q, q_dot)]]"""
+    #     # Make sure this object is articulated
+    #     assert self._n_dof > 0, "Can only set joint states for objects that have > 0 DOF!"
+    #     pos = np.zeros(self._n_dof)
+    #     vel = np.zeros(self._n_dof)
+    #     for i, joint_name in enumerate(self._dofs_infos.keys()):
+    #         pos[i], vel[i] = joint_states[joint_name]
+    #
+    #     # Set the joint positions and velocities
+    #     self.set_joint_positions(positions=pos)
+    #     self.set_joint_velocities(velocities=vel)
+    #
+    # def get_joint_states(self):
+    #     """Get object joint states in the format of Dict[String: (q, q_dot)]]"""
+    #     # Make sure this object is articulated
+    #     assert self._n_dof > 0, "Can only get joint states for objects that have > 0 DOF!"
+    #     pos = self.get_joint_positions()
+    #     vel = self.get_joint_velocities()
+    #     joint_states = dict()
+    #     for i, joint_name in enumerate(self._dofs_infos.keys()):
+    #         joint_states[joint_name] = (pos[i], vel[i])
+    #
+    #     return joint_states
 
     # TODO
     def highlight(self):
@@ -209,3 +245,18 @@ class BaseObject(ArticulatedPrim, metaclass=ABCMeta):
     def unhighlight(self):
         for instance in self.renderer_instances:
             instance.set_highlight(False)
+
+    def dump_config(self):
+        """
+        Dumps relevant configuration for this object.
+
+        Returns:
+            OrderedDict: Object configuration.
+        """
+        return OrderedDict(
+            category=self.category,
+            class_id=self.class_id,
+            scale=self.scale,
+            self_collisions=self.self_collisions,
+            rendering_params=self.rendering_params,
+        )

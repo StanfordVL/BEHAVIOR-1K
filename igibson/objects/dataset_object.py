@@ -61,6 +61,7 @@ class DatasetObject(USDObject):
         visible=True,
         fixed_base=False,
         visual_only=False,
+        self_collisions=False,
         load_config=None,
         abilities=None,
 
@@ -76,6 +77,7 @@ class DatasetObject(USDObject):
         # overwrite_inertial=True,
         # visualize_primitives=False,
         # merge_fixed_links=True,
+        **kwargs,
     ):
         """
         @param prim_path: str, global path in the stage to this object
@@ -90,6 +92,7 @@ class DatasetObject(USDObject):
         @param visible: bool, whether to render this object or not in the stage
         @param fixed_base: bool, whether to fix the base of this object or not
         visual_only (bool): Whether this object should be visual only (and not collide with any other objects)
+        self_collisions (bool): Whether to enable self collisions for this object
         load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
             loading this prim at runtime.
         @param abilities: dict in the form of {ability: {param: value}} containing
@@ -107,6 +110,8 @@ class DatasetObject(USDObject):
         :param joint_states: joint positions and velocities, keyed by body index and joint name, in the form of
             List[Dict[name, Tuple(position, velocity)]]
         :param merge_fixed_links: whether to merge fixed links when importing to pybullet
+        kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
+            for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
         """
         self._usd_path = usd_path
         self.in_rooms = in_rooms
@@ -191,8 +196,10 @@ class DatasetObject(USDObject):
             visible=visible,
             fixed_base=fixed_base,
             visual_only=visual_only,
+            self_collisions=self_collisions,
             load_config=load_config,
             abilities=abilities,
+            **kwargs,
         )
 
     def load_supporting_surfaces(self):
