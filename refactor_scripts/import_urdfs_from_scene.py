@@ -132,6 +132,22 @@ def import_building_urdf(obj_category, obj_model, skip_if_exist=False):
         add_reference_to_stage(usd_path=usd_path, import_config=cfg)
 
 
+def import_asset_urdf(obj_category, obj_model, skip_if_exist=True):
+    # Import URDF
+    cfg = create_import_config()
+    # Check if filepath exists
+    usd_path = f"{igibson.assets_path}/models/{obj_category}/usd/{obj_model}.usd"
+    if not (skip_if_exist and exists(usd_path)):
+        print(f"Importing {obj_category}, {obj_model}...")
+        # Only import if it doesn't exist
+        omni.kit.commands.execute(
+            "URDFParseAndImportFile",
+            urdf_path=f"{igibson.assets_path}/models/{obj_category}/{obj_model}.urdf",
+            import_config=cfg,
+            dest_path=usd_path,
+        )
+        add_reference_to_stage(usd_path=usd_path, import_config=cfg)
+
 def add_reference_to_stage(usd_path, import_config):
     stage = Usd.Stage.Open(usd_path)
     prim_name = str(stage.GetDefaultPrim().GetName())
@@ -153,3 +169,10 @@ def add_reference_to_stage(usd_path, import_config):
 if __name__ == "__main__":
     import_objects_from_scene_urdf(urdf=URDF)
     app.close()
+
+## For test_states.py
+#import_objects_from_scene_urdf(urdf=URDF)
+#import_obj_urdf("microwave", "7128")
+#import_obj_urdf("sink", "sink_1")
+#import_asset_urdf("cabinet2", "cabinet_0007")
+#import_asset_urdf("cabinet", "cabinet_0004")
