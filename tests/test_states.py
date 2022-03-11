@@ -5,16 +5,16 @@ import numpy as np
 
 
 import igibson
-from igibson import object_states
+from igibson import object_states, app, ig_dataset_path
 # from igibson.external.pybullet_tools.utils import Euler, quat_from_euler
 from igibson.object_states.factory import get_state_dependency_graph, get_states_by_dependency_order
-from igibson.objects.usd_object import ArticulatedObject, URDFObject
+from igibson.objects.dataset_object import DatasetObject
 from igibson.objects.ycb_object import YCBObject
 from igibson.scenes.empty_scene import EmptyScene
-from igibson.simulator import Simulator
+from igibson.simulator_omni import Simulator
 from igibson.utils.assets_utils import download_assets, get_ig_model_path
 
-download_assets()
+#download_assets()
 
 
 def test_on_top():
@@ -24,14 +24,14 @@ def test_on_top():
         scene = EmptyScene()
         s.import_scene(scene)
 
-        cabinet_0007 = os.path.join(igibson.assets_path, "models/cabinet2/cabinet_0007.urdf")
-        cabinet_0004 = os.path.join(igibson.assets_path, "models/cabinet/cabinet_0004.urdf")
+        cabinet_0007 = os.path.join(igibson.assets_path, "models/cabinet2/usd/cabinet_0007.usd")
+        cabinet_0004 = os.path.join(igibson.assets_path, "models/cabinet/usd/cabinet_0004.usd")
 
-        obj1 = ArticulatedObject(filename=cabinet_0007)
+        obj1 = DatasetObject(usd_path=cabinet_0007)
         s.import_object(obj1)
         obj1.set_position([0, 0, 0.5])
 
-        obj2 = ArticulatedObject(filename=cabinet_0004)
+        obj2 = DatasetObject(usd_path=cabinet_0004)
         s.import_object(obj2)
         obj2.set_position([0, 0, 2])
 
@@ -63,14 +63,14 @@ def test_inside():
         scene = EmptyScene()
         s.import_scene(scene)
 
-        cabinet_0007 = os.path.join(igibson.assets_path, "models/cabinet2/cabinet_0007.urdf")
-        cabinet_0004 = os.path.join(igibson.assets_path, "models/cabinet/cabinet_0004.urdf")
+        cabinet_0007 = os.path.join(igibson.assets_path, "models/cabinet2/usd/cabinet_0007.usd")
+        cabinet_0004 = os.path.join(igibson.assets_path, "models/cabinet/usd/cabinet_0004.usd")
 
-        obj1 = ArticulatedObject(filename=cabinet_0007)
+        obj1 = DatasetObject(usd_path=cabinet_0007)
         s.import_object(obj1)
         obj1.set_position([0, 0, 0.5])
 
-        obj2 = ArticulatedObject(filename=cabinet_0004)
+        obj2 = DatasetObject(usd_path=cabinet_0004)
         s.import_object(obj2)
         obj2.set_position([0, 0, 2])
 
@@ -117,12 +117,11 @@ def test_open():
         scene = EmptyScene()
         s.import_scene(scene)
 
-        microwave_dir = os.path.join(igibson.ig_dataset_path, "objects/microwave/7128/")
-        microwave_filename = os.path.join(microwave_dir, "7128.urdf")
-        obj = URDFObject(
-            filename=microwave_filename,
+        model_path = os.path.join(igibson.ig_dataset_path, "objects/microwave/7128/usd/7128.usd")
+        obj = DatasetObject(
+            usd_path=model_path,
             category="microwave",
-            model_path=microwave_dir,
+            name="microwave_1",
             scale=np.array([0.5, 0.5, 0.5]),
             abilities={"openable": {}},
         )
@@ -191,85 +190,217 @@ def test_state_graph():
         object_states.Inside
     ), "Each state should be preceded by its deps."
 
+    app.close()
+
 
 def test_toggle():
-    s = Simulator(mode="headless")
-
     try:
-        scene = EmptyScene()
-        s.import_scene(scene)
-        model_path = os.path.join(get_ig_model_path("sink", "sink_1"), "sink_1.urdf")
+        obj_category = "sink"
+        obj_model = "sink_1"
+        name = "sink"
 
-        sink = URDFObject(
-            filename=model_path,
-            category="sink",
-            name="sink_1",
+        sim = Simulator()
+        scene = EmptyScene()
+        sim.import_scene(scene)
+
+        model_root_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}"
+        usd_path = f"{model_root_path}/usd/{obj_model}.usd"
+
+        sink = DatasetObject(
+            prim_path=f"/World/{name}",
+            usd_path=usd_path,
+            category=obj_category,
+            name=name,
             scale=np.array([0.8, 0.8, 0.8]),
             abilities={"toggleable": {}},
         )
 
-        s.import_object(sink)
-        sink.set_position([1, 1, 0.8])
+        sim.import_object(sink, auto_initialize=False)
+        sink.states[object_states.ToggledOn].set_value(True)
+        #sink.set_position([1, 1, 0.8])
         assert object_states.ToggledOn in sink.states
 
     finally:
-        s.disconnect()
+        app.close()
 
 
 def test_dirty():
-    s = Simulator(mode="headless")
-
     try:
-        scene = EmptyScene()
-        s.import_scene(scene)
-        model_path = os.path.join(get_ig_model_path("sink", "sink_1"), "sink_1.urdf")
+        obj_category = "sink"
+        obj_model = "sink_1"
+        name = "sink"
 
-        sink = URDFObject(
-            filename=model_path,
-            category="sink",
-            name="sink_1",
+        sim = Simulator()
+        scene = EmptyScene()
+        sim.import_scene(scene)
+
+        model_root_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}"
+        usd_path = f"{model_root_path}/usd/{obj_model}.usd"
+
+        sink = DatasetObject(
+            prim_path=f"/World/{name}",
+            usd_path=usd_path,
+            category=obj_category,
+            name=name,
             scale=np.array([0.8, 0.8, 0.8]),
             abilities={"dustyable": {}},
         )
 
-        s.import_object(sink)
-        sink.set_position([1, 1, 0.8])
+        sim.import_object(sink, auto_initialize=False)
+        #sink.set_position([1, 1, 0.8])
         assert object_states.Dusty in sink.states
 
         for i in range(10):
-            s.step()
+            sim.step()
 
     finally:
-        s.disconnect()
+        app.close()
 
 
 def test_water_source():
-    s = Simulator(mode="headless")
-
     try:
-        scene = EmptyScene()
-        s.import_scene(scene)
-        model_path = os.path.join(get_ig_model_path("sink", "sink_1"), "sink_1.urdf")
+        obj_category = "sink"
+        obj_model = "sink_1"
+        name = "sink"
 
-        sink = URDFObject(
-            filename=model_path,
-            category="sink",
-            name="sink_1",
+        sim = Simulator()
+        scene = EmptyScene()
+        sim.import_scene(scene)
+
+        model_root_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}"
+        usd_path = f"{model_root_path}/usd/{obj_model}.usd"
+
+        sink = DatasetObject(
+            prim_path=f"/World/{name}",
+            usd_path=usd_path,
+            category=obj_category,
+            name=name,
             scale=np.array([0.8, 0.8, 0.8]),
             abilities={"waterSource": {}, "toggleable": {}},
         )
 
-        s.import_object(sink)
+        sim.import_object(sink, auto_initialize=False)
         sink.states[object_states.ToggledOn].set_value(True)
-        sink.set_position([1, 1, 0.8])
+        #sink.set_position([1, 1, 0.8])
         assert object_states.WaterSource in sink.states
 
-        for i in range(2):
-            s.step()
+        for i in range(10):
+            sim.step()
 
         # Check that we have some loaded particles here.
         assert (
             sink.states[object_states.WaterSource].water_stream.get_active_particles()[0].get_body_ids()[0] is not None
         )
+
     finally:
-        s.disconnect()
+        app.close()
+
+
+def test_burnt():
+    try:
+        obj_category = "sink"
+        obj_model = "sink_1"
+        name = "sink"
+
+        sim = Simulator()
+        scene = EmptyScene()
+        sim.import_scene(scene)
+
+        model_root_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}"
+        usd_path = f"{model_root_path}/usd/{obj_model}.usd"
+
+        sink = DatasetObject(
+            prim_path=f"/World/{name}",
+            usd_path=usd_path,
+            category=obj_category,
+            name=name,
+            scale=np.array([0.8, 0.8, 0.8]),
+            abilities={"burnable": {}},
+        )
+
+        sim.import_object(sink, auto_initialize=False)
+        #sink.set_position([1, 1, 0.8])
+        assert object_states.Burnt in sink.states
+
+        for i in range(10):
+            sim.step()
+
+    finally:
+        app.close()
+
+def test_cooked():
+    try:
+        obj_category = "sink"
+        obj_model = "sink_1"
+        name = "sink"
+
+        sim = Simulator()
+        scene = EmptyScene()
+        sim.import_scene(scene)
+
+        model_root_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}"
+        usd_path = f"{model_root_path}/usd/{obj_model}.usd"
+
+        sink = DatasetObject(
+            prim_path=f"/World/{name}",
+            usd_path=usd_path,
+            category=obj_category,
+            name=name,
+            scale=np.array([0.8, 0.8, 0.8]),
+            abilities={"cookable": {}},
+        )
+
+        sim.import_object(sink, auto_initialize=False)
+        #sink.set_position([1, 1, 0.8])
+        assert object_states.Cooked in sink.states
+
+        for i in range(10):
+            sim.step()
+
+    finally:
+        app.close()
+
+
+def test_frozen():
+    try:
+        obj_category = "sink"
+        obj_model = "sink_1"
+        name = "sink"
+
+        sim = Simulator()
+        scene = EmptyScene()
+        sim.import_scene(scene)
+
+        model_root_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}"
+        usd_path = f"{model_root_path}/usd/{obj_model}.usd"
+
+        sink = DatasetObject(
+            prim_path=f"/World/{name}",
+            usd_path=usd_path,
+            category=obj_category,
+            name=name,
+            scale=np.array([0.8, 0.8, 0.8]),
+            abilities={"freezable": {}},
+        )
+
+        sim.import_object(sink, auto_initialize=False)
+        #sink.set_position([1, 1, 0.8])
+        assert object_states.Frozen in sink.states
+
+        for i in range(10):
+            sim.step()
+
+    finally:
+        app.close()
+
+
+## WORKS
+#test_state_graph()
+#test_dirty()
+#test_burnt()
+#test_cooked()
+test_frozen()
+
+## BROKEN
+#test_toggle()
+#test_water_source()
