@@ -6,22 +6,22 @@ class PointGoalReward(BaseRewardFunction):
     """
     Point goal reward
     Success reward for reaching the goal with the robot's base
+
+    Args:
+        pointgoal (PointGoal): Termination condition for checking whether a point goal is reached
+        r_pointgoal (float): Reward for reaching the point goal
     """
 
-    def __init__(self, config):
-        super(PointGoalReward, self).__init__(config)
-        self.success_reward = self.config.get("success_reward", 10.0)
-        self.dist_tol = self.config.get("dist_tol", 0.5)
+    def __init__(self, pointgoal, r_pointgoal=10.0):
+        # Store internal vars
+        self._pointgoal = pointgoal
+        self._r_pointgoal = r_pointgoal
 
-    def get_reward(self, task, env):
-        """
-        Check if the distance between the robot's base and the goal
-        is below the distance threshold
+        # Run super
+        super().__init__()
 
-        :param task: task instance
-        :param env: environment instance
-        :return: reward
-        """
-        success = l2_distance(env.robots[0].get_position()[:2], task.target_pos[:2]) < self.dist_tol
-        reward = self.success_reward if success else 0.0
-        return reward
+    def _step(self, task, env, action):
+        # Reward received the pointgoal success condition is met
+        reward = self._r_pointgoal if self._pointgoal.success else 0.0
+
+        return reward, {}

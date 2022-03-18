@@ -6,22 +6,28 @@ class ReachingGoalReward(BaseRewardFunction):
     """
     Reaching goal reward
     Success reward for reaching the goal with the robot's end-effector
+
+    Args:
+        robot_idn (int): robot identifier to evaluate point goal with. Default is 0, corresponding to the first
+            robot added to the scene
+        r_reach (float): reward for succeeding to reach the goal
+        distance_tol (float): Distance (m) tolerance between goal position and @robot_idn's robot eef position
+            that is accepted as a success
     """
 
-    def __init__(self, config):
-        super(ReachingGoalReward, self).__init__(config)
-        self.success_reward = self.config.get("success_reward", 10.0)
-        self.dist_tol = self.config.get("dist_tol", 0.1)
+    def __init__(self, robot_idn=0, r_reach=10.0, distance_tol=0.1):
+        # Store internal vars
+        self._robot_idn = robot_idn
+        self._r_reach = r_reach
+        self._distance_tol = distance_tol
 
-    def get_reward(self, task, env):
-        """
-        Check if the distance between the robot's end-effector and the goal
-        is below the distance threshold
+        # Run super
+        super().__init__()
 
-        :param task: task instance
-        :param env: environment instance
-        :return: reward
-        """
-        success = l2_distance(env.robots[0].get_end_effector_position(), task.target_pos) < self.dist_tol
-        reward = self.success_reward if success else 0.0
-        return reward
+    def _step(self, task, env, action):
+        # Sparse reward is received if distance between robot_idn robot's eef and goal is below the distance threshold
+        success = l2_distance(env.robots[self._robot_idn].get_end_effector_position(), task.goal_pos) < \
+            self._distance_tol
+        reward = self._r_reach if success else 0.0
+
+        return reward, {}
