@@ -336,8 +336,13 @@ class SerializableNonInstance:
     """
     Identical to Serializable, but intended for non-instanceable classes
     """
-    # Size of this object's serialized state. Should be implemented by subclass
-    state_size = None
+    @classproperty
+    def state_size(cls):
+        """
+        Returns:
+            int: Size of this object's serialized state
+        """
+        raise NotImplementedError()
 
     @classmethod
     def _dump_state(cls):
@@ -457,7 +462,7 @@ class SerializableNonInstance:
         # Sanity check the idx with the expected state size
         state_dict, idx = cls._deserialize(state=state)
         assert cls.state_size is not None, "State size must be specified by subclass!"
-        assert idx == cls.state_size, f"Invalid state deserialization occurred!Expected {cls.state_size} total " \
+        assert idx == cls.state_size, f"Invalid state deserialization occurred! Expected {cls.state_size} total " \
                                       f"values to be deserialized, only {idx} were."
 
         return state_dict
