@@ -6,7 +6,6 @@ import os
 from enum import IntEnum, Enum
 
 import igibson
-from igibson.render.mesh_renderer.mesh_renderer_settings import MeshRendererSettings
 from igibson.utils.assets_utils import get_ig_avg_category_specs
 
 AVAILABLE_MODALITIES = ("rgb", "normal", "3d", "seg", "optical_flow", "scene_flow", "ins_seg")
@@ -180,35 +179,35 @@ light_modulation_map_filename = os.path.join(
 )
 background_texture = os.path.join(igibson.ig_dataset_path, "scenes", "background", "urban_street_01.jpg")
 
-NamedRenderingPresets = {
-    "NO_PBR": MeshRendererSettings(enable_pbr=False, enable_shadow=False),
-    "PBR_NOSHADOW": MeshRendererSettings(enable_pbr=True, enable_shadow=True),
-    "PBR_SHADOW_MSAA": MeshRendererSettings(enable_pbr=True, enable_shadow=True, msaa=True),
-    "NO_PBR_OPT": MeshRendererSettings(enable_pbr=False, enable_shadow=False, optimized=True),
-    "PBR_NOSHADOW_OPT": MeshRendererSettings(enable_pbr=True, enable_shadow=True, optimized=True),
-    "PBR_SHADOW_MSAA_OPT": MeshRendererSettings(enable_pbr=True, enable_shadow=True, msaa=True, optimized=True),
-    "HQ_WITH_BG_OPT": MeshRendererSettings(
-        env_texture_filename=hdr_texture,
-        env_texture_filename2=hdr_texture2,
-        env_texture_filename3=background_texture,
-        light_modulation_map_filename=light_modulation_map_filename,
-        enable_shadow=True,
-        msaa=True,
-        light_dimming_factor=1.0,
-        optimized=True,
-    ),
-    "VISUAL_RL": MeshRendererSettings(enable_pbr=True, enable_shadow=False, msaa=False, optimized=True),
-    "PERCEPTION": MeshRendererSettings(
-        env_texture_filename=hdr_texture,
-        env_texture_filename2=hdr_texture2,
-        env_texture_filename3=background_texture,
-        light_modulation_map_filename=light_modulation_map_filename,
-        enable_shadow=True,
-        msaa=True,
-        light_dimming_factor=1.0,
-        optimized=True,
-    ),
-}
+# NamedRenderingPresets = {
+#     "NO_PBR": MeshRendererSettings(enable_pbr=False, enable_shadow=False),
+#     "PBR_NOSHADOW": MeshRendererSettings(enable_pbr=True, enable_shadow=True),
+#     "PBR_SHADOW_MSAA": MeshRendererSettings(enable_pbr=True, enable_shadow=True, msaa=True),
+#     "NO_PBR_OPT": MeshRendererSettings(enable_pbr=False, enable_shadow=False, optimized=True),
+#     "PBR_NOSHADOW_OPT": MeshRendererSettings(enable_pbr=True, enable_shadow=True, optimized=True),
+#     "PBR_SHADOW_MSAA_OPT": MeshRendererSettings(enable_pbr=True, enable_shadow=True, msaa=True, optimized=True),
+#     "HQ_WITH_BG_OPT": MeshRendererSettings(
+#         env_texture_filename=hdr_texture,
+#         env_texture_filename2=hdr_texture2,
+#         env_texture_filename3=background_texture,
+#         light_modulation_map_filename=light_modulation_map_filename,
+#         enable_shadow=True,
+#         msaa=True,
+#         light_dimming_factor=1.0,
+#         optimized=True,
+#     ),
+#     "VISUAL_RL": MeshRendererSettings(enable_pbr=True, enable_shadow=False, msaa=False, optimized=True),
+#     "PERCEPTION": MeshRendererSettings(
+#         env_texture_filename=hdr_texture,
+#         env_texture_filename2=hdr_texture2,
+#         env_texture_filename3=background_texture,
+#         light_modulation_map_filename=light_modulation_map_filename,
+#         enable_shadow=True,
+#         msaa=True,
+#         light_dimming_factor=1.0,
+#         optimized=True,
+#     ),
+# }
 
 # Encodings
 RAW_ENCODING = 0
