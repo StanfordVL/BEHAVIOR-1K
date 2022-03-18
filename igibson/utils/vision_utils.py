@@ -3,11 +3,27 @@ import random
 
 import numpy as np
 from PIL import Image
+import os
+
+from igibson import app, assets_path
+
+# Make sure synthetic data extension is enabled
+ext_manager = app.app.get_extension_manager()
+ext_manager.set_extension_enabled("omni.syntheticdata", True)
+
+# Continue with omni synethic data imports afterwards
+from omni.syntheticdata import sensors as sensors_util
+import omni.syntheticdata._syntheticdata as sd
+sensor_types = sd.SensorType
 
 try:
     import accimage
 except ImportError:
     accimage = None
+
+
+# This is "the goggle" net. For space-purposes, we only (try to) load this network at runtime on demand
+GOGGLE = None
 
 
 class RandomScale(object):
@@ -89,3 +105,49 @@ def segmentation_to_rgb(seg_im, N, colors=None):
         return (255.0 * use_colors[seg_im]).astype(np.uint8)
     else:
         return (use_colors[seg_im]).astype(np.float)
+
+
+def get_rgb_filled(viewport):
+    rgb = sensors_util.get_rgb(viewport=viewport)
+    return fill_rgb_from_goggle(rgb=rgb)
+
+
+def fill_rgb_from_goggle(rgb):
+    """
+    Fills a given RGB data buffer @rgb by passing it through "the goggle" neural network. Note that this requires torch
+    to be installed!
+
+    Args:
+        rgb (np.array): (H, W, 3) RGB array
+
+    Returns:
+        np.array: RGB array passed through "the goggle" network
+    """
+    global GOGGLE
+
+    # If we haven't loaded the goggle net yet, load it now
+    if GOGGLE is None:
+        # Try to import torch
+        try:
+            import torch
+            import torch.nn as nn
+            from torchvision import transforms
+
+            from igibson.learn.completion import CompletionNet
+        except ImportError:
+            raise Exception(
+                'Trying to use fill_rgb_from_goggle ("the goggle"), but torch is not installed. '
+                'Try "pip install torch torchvision".'
+            )
+
+        # Load the goggle net
+        GOGGLE = CompletionNet(norm=nn.BatchNorm2d, nf=64)
+        GOGGLE = torch.nn.DataParallel(GOGGLE).cuda()
+        GOGGLE.load_state_dict(torch.load(os.path.join(assets_path, "networks", "model.pth")))
+        GOGGLE.eval()
+
+    # Pass the input through the network and return
+    with torch.no_grad():
+        tensor = transforms.ToTensor()((rgb * 255).astype(np.uint8)).cuda()
+        rgb_filled = GOGGLE(tensor[None, :, :, :])[0]
+        return rgb_filled.permute(1, 2, 0).cpu().numpy()
