@@ -1,39 +1,55 @@
 import numpy as np
+from collections import OrderedDict
 
 from igibson.tasks.task_base import BaseTask
+from igibson.scenes.scene_base import Scene
+from igibson.utils.python_utils import classproperty
 
 
 class DummyTask(BaseTask):
     """
-    Point Nav Fixed Task
-    The goal is to navigate to a fixed goal position
+    Dummy task
     """
 
-    def __init__(self, env):
-        super(DummyTask, self).__init__(env)
-        self.task_obs_dim = 0
+    def _load(self, env):
+        # Do nothing here
+        pass
 
-    def reset_scene(self, env):
-        """
-        Task-specific scene reset: reset scene objects or floor plane
+    def _create_termination_conditions(self):
+        # Do nothing
+        return OrderedDict()
 
-        :param env: environment instance
-        """
-        return
+    def _create_reward_functions(self):
+        # Do nothing
+        return OrderedDict()
 
-    def reset_agent(self, env):
-        """
-        Task-specific agent reset: land the robot to initial pose, compute initial potential
+    def _reset_scene(self, env):
+        # Do nothing
+        pass
 
-        :param env: environment instance
-        """
-        return
+    def _reset_agent(self, env):
+        # Do nothing
+        pass
 
-    def get_task_obs(self, env):
-        """
-        Get task-specific observation, including goal position, current velocities, etc.
+    def _get_obs(self, env):
+        # No task-specific obs of any kind
+        return OrderedDict(), OrderedDict()
 
-        :param env: environment instance
-        :return: task-specific observation
-        """
-        return np.zeros(0, dtype=np.float32)
+    def _load_non_low_dim_observation_space(self):
+        # No non-low dim observations so we return an empty dict
+        return OrderedDict()
+
+    @classproperty
+    def valid_scene_types(cls):
+        # Any scene works
+        return {Scene}
+
+    @classproperty
+    def default_termination_config(cls):
+        # Empty dict
+        return {}
+
+    @classproperty
+    def default_reward_config(cls):
+        # Empty dict
+        return {}

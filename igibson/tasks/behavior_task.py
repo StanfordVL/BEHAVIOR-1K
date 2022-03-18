@@ -1,9 +1,11 @@
 import datetime
 import logging
 from collections import OrderedDict
+import os
 
 import networkx as nx
 
+import bddl
 from bddl.activity import (
     Conditions,
     evaluate_goal_conditions,
@@ -24,7 +26,7 @@ from igibson.objects.usd_object import URDFObject
 from igibson.objects.multi_object_wrappers import ObjectGrouper, ObjectMultiplexer
 from igibson.reward_functions.potential_reward import PotentialReward
 from igibson.robots.robot_base import BaseRobot
-from igibson.scenes.interactive_traversable_scene import InteractiveIndoorScene
+from igibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
 from igibson.simulator import Simulator
 from igibson.tasks.bddl_backend import IGibsonBDDLBackend
 from igibson.tasks.task_base import BaseTask
@@ -40,13 +42,42 @@ from igibson.utils.constants import (
     TASK_RELEVANT_OBJS_OBS_DIM,
 )
 from igibson.utils.ig_logging import IGLogWriter
-from igibson.utils.utils import restoreState
+from igibson.utils.python_utils import classproperty, assert_valid_key
 
 KINEMATICS_STATES = frozenset({"inside", "ontop", "under", "onfloor"})
 
 
+# TODO! WIP
 class BehaviorTask(BaseTask):
-    def __init__(self, env):
+    """
+    Task for BEHAVIOR
+
+    Args:
+
+        termination_config (None or dict): Keyword-mapped configuration to use to generate termination conditions. This
+            should be specific to the task class. Default is None, which corresponds to a default config being usd.
+            Note that any keyword required by a specific task class but not specified in the config will automatically
+            be filled in with the default config. See cls.default_termination_config for default values used
+        reward_config (None or dict): Keyword-mapped configuration to use to generate reward functions. This should be
+            specific to the task class. Default is None, which corresponds to a default config being usd. Note that
+            any keyword required by a specific task class but not specified in the config will automatically be filled
+            in with the default config. See cls.default_reward_config for default values used
+    """
+    def __init__(
+            self,
+            task_name=None,
+            task_id=0,
+            predefined_problem=None,
+            load_clutter=True,
+            online_sampling=False,
+            termination_config=None,
+            reward_config=None,
+    ):
+        # Make sure task name is valid
+        with open(os.path.join(os.path.dirname(bddl.__file__), "activity_manifest.txt")) as f:
+            all_activities = {line.strip() for line in f.readlines()}
+            assert_valid_key(key=task_name, valid_keys=all_activities, name="behavior task")
+
         super(BehaviorTask, self).__init__(env)
         self.scene = env.scene
         self.termination_conditions = [
@@ -931,3 +962,20 @@ class BehaviorTask(BaseTask):
     def iterate_instruction(self):
         self.currently_viewed_index = (self.currently_viewed_index + 1) % len(self.conds.parsed_goal_conditions)
         self.currently_viewed_instruction = self.instruction_order[self.currently_viewed_index]
+
+    @classproperty
+    def valid_scene_types(cls):
+        # Must be an interactive traversable scene
+        return {InteractiveTraversableScene}
+
+    @classproperty
+    def default_termination_config(cls):
+        return {
+            "max_steps": 500,
+        }
+
+    @classproperty
+    def default_reward_config(cls):
+        return {
+            "r_potential": 1.0,
+        }
