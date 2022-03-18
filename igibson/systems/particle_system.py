@@ -33,6 +33,13 @@ class ParticleSystem(BaseSystem):
         """
         return len(cls.particles)
 
+    @classproperty
+    def state_size(cls):
+        # We have n_particles (1), each particle pose (7*n), scale (3*n), and
+        # possibly template pose (7), and template scale (3)
+        state_size = 10 * cls.n_particles + 1
+        return state_size if cls.particle_object is None else state_size + 10
+
     @classmethod
     def _dump_state(cls):
         return OrderedDict(
@@ -85,7 +92,7 @@ class ParticleSystem(BaseSystem):
     def _deserialize(cls, state):
         # First index is number of particles, rest are the individual particle poses
         state_dict = OrderedDict()
-        n_particles = state[0]
+        n_particles = int(state[0])
         state_dict["n_particles"] = n_particles
 
         poses, scales = [], []
@@ -101,20 +108,23 @@ class ParticleSystem(BaseSystem):
         state_dict["poses"] = poses
         state_dict["scales"] = scales
 
+        # Update idx -- one from n_particles + 10*n_particles for pose + scale
+        idx = 1 + n_particles * 10
+
         template_pose, template_scale = None, None
         # If we still have more in the array, this corresponds to the template info
-        template_offset_idx = n_particles * 3 + scale_offset_idx
-        if len(state) > template_offset_idx:
+        if len(state) > idx:
             template_pose = [
-                state[template_offset_idx : template_offset_idx + 3],
-                state[template_offset_idx + 3 : template_offset_idx + 7],
+                state[idx : idx + 3],
+                state[idx + 3 : idx + 7],
             ]
-            template_scale = state[template_offset_idx + 7: template_offset_idx + 10]
+            template_scale = state[idx + 7: idx + 10]
+            idx += 10
 
         state_dict["template_pose"] = template_pose
         state_dict["template_scale"] = template_scale
 
-        return state_dict
+        return state_dict, idx
 
     @classmethod
     def set_particle_template_object(cls, obj):
