@@ -1,18 +1,18 @@
 import gym
+from collections import OrderedDict
 
-from igibson.render.mesh_renderer.mesh_renderer_settings import MeshRendererSettings
-from igibson.render.mesh_renderer.mesh_renderer_vr import VrSettings
+# from igibson.render.mesh_renderer.mesh_renderer_settings import MeshRendererSettings
+# from igibson.render.mesh_renderer.mesh_renderer_vr import VrSettings
 from igibson.robots import REGISTERED_ROBOTS
-from igibson.scenes.empty_scene import EmptyScene
-from igibson.scenes.gibson_indoor_scene import StaticIndoorScene
-from igibson.scenes.interactive_traversable_scene import InteractiveIndoorScene
-from igibson.scenes.stadium_scene import StadiumScene
-from igibson.simulator import Simulator
-from igibson.simulator_vr import SimulatorVR
+from igibson.scenes import REGISTERED_SCENES
+from igibson.simulator_omni import Simulator
+# from igibson.simulator_vr import SimulatorVR
+from igibson.utils.gym_utils import GymObservable
 from igibson.utils.utils import parse_config
+from igibson.utils.python_utils import merge_nested_dicts, create_class_from_registry_and_config, Serializable
 
 
-class BaseEnv(gym.Env):
+class BaseEnv(gym.Env, GymObservable, Serializable):
     """
     Base Env class that handles loading scene and robot, following OpenAI Gym interface.
     Functions like reset and step are not implemented.
@@ -20,196 +20,228 @@ class BaseEnv(gym.Env):
 
     def __init__(
         self,
-        config_file,
-        scene_id=None,
-        mode="headless",
+        configs,
+        scene_model=None,
         action_timestep=1 / 10.0,
         physics_timestep=1 / 240.0,
         rendering_settings=None,
+        vr=False,
         vr_settings=None,
         device_idx=0,
-        use_pb_gui=False,
     ):
         """
-        :param config_file: config_file path
-        :param scene_id: override scene_id in config file
-        :param mode: headless, headless_tensor, gui_interactive, gui_non_interactive, vr
+        :param configs (str or list of str): config_file path(s). If multiple configs are specified, they will
+            be merged sequentially in the order specified. This allows procedural generation of a "full" config from
+            small sub-configs.
+        :param scene_model: override scene_model in config file
         :param action_timestep: environment executes action per action_timestep second
         :param physics_timestep: physics timestep for pybullet
         :param rendering_settings: rendering_settings to override the default one
+        vr (bool): Whether we're using VR or not
         :param vr_settings: vr_settings to override the default one
         :param device_idx: device_idx: which GPU to run the simulation and rendering on
-        :param use_pb_gui: concurrently display the interactive pybullet gui (for debugging)
         """
-        self.config = parse_config(config_file)
-        if scene_id is not None:
-            self.config["scene_id"] = scene_id
+        # Call super first
+        super().__init__()
 
-        self.mode = mode
+        # Convert config file(s) into a single parsed dict
+        configs = [configs] if isinstance(configs, str) else configs
+
+        # Initial default config
+        self.config = self.default_config
+
+        # Merge in specified configs
+        for config in configs:
+            merge_nested_dicts(base_dict=self.config, extra_dict=parse_config(config), inplace=True)
+
+        # Possibly override scene_id
+        if scene_model is not None:
+            self.scene_config["model"] = scene_model
+
+        # Store other settings
         self.action_timestep = action_timestep
-        self.physics_timestep = physics_timestep
-        self.rendering_settings = rendering_settings
-        self.vr_settings = vr_settings
-        self.texture_randomization_freq = self.config.get("texture_randomization_freq", None)
-        self.object_randomization_freq = self.config.get("object_randomization_freq", None)
-        self.object_randomization_idx = 0
-        self.num_object_randomization_idx = 10
 
-        default_enable_shadows = False  # What to do if it is not specified in the config file
-        enable_shadow = self.config.get("enable_shadow", default_enable_shadows)
-        default_enable_pbr = False  # What to do if it is not specified in the config file
-        enable_pbr = self.config.get("enable_pbr", default_enable_pbr)
-        texture_scale = self.config.get("texture_scale", 1.0)
+        # TODO! Update
+        self.rendering_settings = None #MeshRendererSettings()
+        # TODO!
+        # # TODO: We currently only support the optimized renderer due to some issues with obj highlighting.
+        # self.rendering_settings = rendering_settings if rendering_settings is not None else \
+        #      MeshRendererSettings(
+        #         enable_shadow=enable_shadow,
+        #         enable_pbr=enable_pbr,
+        #         msaa=False,
+        #         texture_scale=texture_scale,
+        #         optimized=self.config["optimized_renderer"],
+        #         load_textures=self.config["load_texture"],
+        #         hide_robot=self.config["hide_robot"],
+        #     )
 
-        if self.rendering_settings is None:
-            # TODO: We currently only support the optimized renderer due to some issues with obj highlighting.
-            self.rendering_settings = MeshRendererSettings(
-                enable_shadow=enable_shadow,
-                enable_pbr=enable_pbr,
-                msaa=False,
-                texture_scale=texture_scale,
-                optimized=self.config.get("optimized_renderer", True),
-                load_textures=self.config.get("load_texture", True),
-                hide_robot=self.config.get("hide_robot", True),
-            )
+        # Create other placeholders that will be filled in later
+        self._scene = None
+        self._loaded = None
 
-        if mode == "vr":
-            if self.vr_settings is None:
-                self.vr_settings = VrSettings(use_vr=True)
-            self.simulator = SimulatorVR(
+        # Create simulator
+        if vr:
+            raise NotImplementedError("VR must still be implemented")
+            if vr_settings is None:
+                vr_settings = VrSettings(use_vr=True)
+            self._simulator = SimulatorVR(
                 physics_timestep=physics_timestep,
                 render_timestep=action_timestep,
-                image_width=self.config.get("image_width", 128),
-                image_height=self.config.get("image_height", 128),
-                vertical_fov=self.config.get("vertical_fov", 90),
+                image_width=self.config["image_width"],
+                image_height=self.config["image_height"],
+                vertical_fov=self.config["vertical_fov"],
                 device_idx=device_idx,
                 rendering_settings=self.rendering_settings,
-                vr_settings=self.vr_settings,
+                vr_settings=vr_settings,
                 use_pb_gui=use_pb_gui,
             )
         else:
-            self.simulator = Simulator(
-                mode=mode,
-                physics_timestep=physics_timestep,
-                render_timestep=action_timestep,
-                image_width=self.config.get("image_width", 128),
-                image_height=self.config.get("image_height", 128),
-                vertical_fov=self.config.get("vertical_fov", 90),
+            self._simulator = Simulator(
+                physics_dt=physics_timestep,
+                rendering_dt=action_timestep,
+                viewer_width=self.render_config["viewer_width"],
+                viewer_height=self.render_config["viewer_height"],
+                vertical_fov=self.render_config["vertical_fov"],
                 device_idx=device_idx,
-                rendering_settings=self.rendering_settings,
-                use_pb_gui=use_pb_gui,
             )
+
+        # Load this environment
         self.load()
 
-    def reload(self, config_file):
+    def reload(self, configs, overwrite_old=True):
         """
-        Reload another config file.
-        This allows one to change the configuration on the fly.
+        Reload using another set of config file(s).
+        This allows one to change the configuration and hot-reload the environment on the fly.
 
-        :param config_file: new config file path
+        Args:
+            configs (str or list of str): config_file path(s). If multiple configs are specified, they will
+                be merged sequentially in the order specified. This allows procedural generation of a "full" config from
+                small sub-configs.
+            overwrite_old (bool): If True, will overwrite the internal self.config with @configs. Otherwise, will
+                merge in the new config(s) into the pre-existing one. Setting this to False allows for minor
+                modifications to be made without having to specify entire configs during each reload.
         """
-        self.config = parse_config(config_file)
-        self.simulator.reload()
+        # Convert config file(s) into a single parsed dict
+        configs = [configs] if isinstance(configs, str) else configs
+
+        # Initial default config
+        new_config = self.default_config
+
+        # Merge in specified configs
+        for config in configs:
+            merge_nested_dicts(base_dict=new_config, extra_dict=parse_config(config), inplace=True)
+
+        # Either merge in or overwrite the old config
+        if overwrite_old:
+            self.config = new_config
+        else:
+            merge_nested_dicts(base_dict=self.config, extra_dict=new_config, inplace=True)
+
+        # Load this environment again
         self.load()
 
-    def reload_model(self, scene_id):
+    def reload_model(self, scene_model):
         """
         Reload another scene model.
         This allows one to change the scene on the fly.
 
-        :param scene_id: new scene_id
+        :param scene_model: new scene model to load (eg.: Rs_int)
         """
-        self.config["scene_id"] = scene_id
-        self.simulator.reload()
+        self.scene_config["model"] = scene_model
         self.load()
 
-    def reload_model_object_randomization(self):
+    def _load_variables(self):
         """
-        Reload the same model, with the next object randomization random seed.
+        Load variables from config
         """
-        if self.object_randomization_freq is None:
-            return
-        self.object_randomization_idx = (self.object_randomization_idx + 1) % (self.num_object_randomization_idx)
-        self.simulator.reload()
-        self.load()
+        # Default is no-op
+        pass
+
+    def _load_scene(self):
+        """
+        Load the scene and robot specified in the config file.
+        """
+        # Create the scene from our scene config
+        scene = create_class_from_registry_and_config(
+            cls_name=self.scene_config["type"],
+            cls_registry=REGISTERED_SCENES,
+            cfg=self.scene_config,
+            cls_type_descriptor="scene",
+        )
+        self._simulator.import_scene(scene)
+
+        # Save scene internally
+        self._scene = scene
+
+    def _load_robots(self):
+        """
+        Load robots into the scene
+        """
+        # Only actually load robots if no robot has been imported from the scene loading directly yet
+        if len(self._scene.robots) == 0:
+            # Iterate over all robots to generate in the robot config
+            for i, robot_config in enumerate(self.robots_config):
+                # Add a name for the robot if necessary
+                if "name" not in robot_config:
+                    robot_config["name"] = f"robot{i}"
+                # Set prim path
+                robot_config["prim_path"] = f"/World/{robot_config['name']}"
+                # Make sure robot exists, grab its corresponding kwargs, and create / import the robot
+                robot = create_class_from_registry_and_config(
+                    cls_name=robot_config["type"],
+                    cls_registry=REGISTERED_ROBOTS,
+                    cfg=robot_config,
+                    cls_type_descriptor="robot",
+                )
+                # Import the robot into the simulator
+                self._simulator.import_object(robot)
+
+    def _load(self):
+        """
+        Loads this environment. Can be extended by subclass
+        """
+        # Load config variables
+        self._load_variables()
+
+        # Load the scene and robots
+        self._load_scene()
+        self._load_robots()
 
     def load(self):
         """
         Load the scene and robot specified in the config file.
         """
-        if self.config["scene"] == "empty":
-            scene = EmptyScene()
-        elif self.config["scene"] == "stadium":
-            scene = StadiumScene()
-        elif self.config["scene"] == "gibson":
-            scene = StaticIndoorScene(
-                self.config["scene_id"],
-                waypoint_resolution=self.config.get("waypoint_resolution", 0.2),
-                num_waypoints=self.config.get("num_waypoints", 10),
-                build_graph=self.config.get("build_graph", False),
-                trav_map_resolution=self.config.get("trav_map_resolution", 0.1),
-                trav_map_erosion=self.config.get("trav_map_erosion", 2),
-                pybullet_load_texture=self.config.get("pybullet_load_texture", False),
-            )
-        elif self.config["scene"] == "igibson":
-            urdf_file = self.config.get("urdf_file", None)
-            if urdf_file is None and not self.config.get("online_sampling", True):
-                urdf_file = "{}_task_{}_{}_{}_fixed_furniture".format(
-                    self.config["scene_id"],
-                    self.config["task"],
-                    self.config["task_id"],
-                    self.config["instance_id"],
-                )
-            include_robots = self.config.get("include_robots", True)
-            scene = InteractiveIndoorScene(
-                self.config["scene_id"],
-                urdf_file=urdf_file,
-                waypoint_resolution=self.config.get("waypoint_resolution", 0.2),
-                num_waypoints=self.config.get("num_waypoints", 10),
-                build_graph=self.config.get("build_graph", False),
-                trav_map_resolution=self.config.get("trav_map_resolution", 0.1),
-                trav_map_erosion=self.config.get("trav_map_erosion", 2),
-                trav_map_type=self.config.get("trav_map_type", "with_obj"),
-                texture_randomization=self.texture_randomization_freq is not None,
-                object_randomization=self.object_randomization_freq is not None,
-                object_randomization_idx=self.object_randomization_idx,
-                should_open_all_doors=self.config.get("should_open_all_doors", False),
-                load_object_categories=self.config.get("load_object_categories", None),
-                not_load_object_categories=self.config.get("not_load_object_categories", None),
-                load_room_types=self.config.get("load_room_types", None),
-                load_room_instances=self.config.get("load_room_instances", None),
-                merge_fixed_links=self.config.get("merge_fixed_links", True)
-                and not self.config.get("online_sampling", False),
-                include_robots=include_robots,
-            )
-            # TODO: Unify the function import_scene and take out of the if-else clauses.
-            first_n = self.config.get("_set_first_n_objects", -1)
-            if first_n != -1:
-                scene._set_first_n_objects(first_n)
+        # This environment is not loaded
+        self._loaded = False
 
-        self.simulator.import_scene(scene)
+        # Run internal loading
+        self._load()
 
-        # Get robot config
-        robot_config = self.config["robot"]
-
-        # If no robot has been imported from the scene
-        if len(scene.robots) == 0:
-            # Get corresponding robot class
-            robot_name = robot_config.pop("name")
-            assert robot_name in REGISTERED_ROBOTS, "Got invalid robot to instantiate: {}".format(robot_name)
-            robot = REGISTERED_ROBOTS[robot_name](**robot_config)
-
-            self.simulator.import_object(robot)
-
-        self.scene = scene
-        self.robots = scene.robots
+        # Denote that the scene is loaded
+        self._loaded = True
 
     def clean(self):
         """
         Clean up the environment.
         """
-        if self.simulator is not None:
-            self.simulator.disconnect()
+        if self._simulator is not None:
+            self._simulator.close()
+
+    def get_obs(self):
+        """
+        Get the current environment observation.
+
+        Returns:
+            OrderedDict: Keyword-mapped observations, which are possibly nested
+        """
+        # Grab all observations from each robot
+        obs = OrderedDict()
+
+        for robot in self.robots:
+            obs[robot.name] = robot.get_obs()
+
+        return obs
 
     def close(self):
         """
@@ -217,13 +249,14 @@ class BaseEnv(gym.Env):
         """
         self.clean()
 
-    def simulator_step(self):
+    def _simulator_step(self):
         """
         Step the simulation.
         This is different from environment step that returns the next
-        observation, reward, done, info.
+        observation, reward, done, info. This should exclusively run internal simulator stepping and related
+        functionality
         """
-        self.simulator.step()
+        self._simulator.step()
 
     def step(self, action):
         """
@@ -234,5 +267,132 @@ class BaseEnv(gym.Env):
     def reset(self):
         """
         Overwritten by subclasses.
+
+        Returns:
+            OrderedDict: Observations after resetting
         """
         return NotImplementedError()
+
+    @property
+    def simulator(self):
+        """
+        Returns:
+            Simulator: Active simulator instance
+        """
+        return self._simulator
+
+    @property
+    def scene(self):
+        """
+        Returns:
+            Scene: Active scene in this environment
+        """
+        return self._scene
+
+    @property
+    def robots(self):
+        """
+        Returns:
+            list of BaseRobot: Robots in the current scene
+        """
+        return self._scene.robots
+
+    @property
+    def env_config(self):
+        """
+        Returns:
+            dict: Environment-specific configuration kwargs
+        """
+        return self.config["env"]
+
+    @property
+    def render_config(self):
+        """
+        Returns:
+            dict: Render-specific configuration kwargs
+        """
+        return self.config["render"]
+
+    @property
+    def scene_config(self):
+        """
+        Returns:
+            dict: Scene-specific configuration kwargs
+        """
+        print(self.config["scene"])
+        return self.config["scene"]
+
+    @property
+    def robots_config(self):
+        """
+        Returns:
+            dict: Robot-specific configuration kwargs
+        """
+        return self.config["robots"]
+
+    @property
+    def default_config(self):
+        """
+        Returns:
+            dict: Default configuration for this environment. May not be fully specified (i.e.: still requires @config
+                to be specified during environment creation)
+        """
+        return {
+            # Environment kwargs
+            "env": {
+                "online_sampling": True,
+            },
+
+            # Rendering kwargs
+            "render": {
+                "viewer_width": 128,
+                "viewer_height": 128,
+                "vertical_fov": 90,
+                # "optimized_renderer": True,
+            },
+
+            # Scene kwargs
+            "scene": {
+                # Traversibility map kwargs
+                "waypoint_resolution": 0.2,
+                "num_waypoints": 10,
+                "build_graph": False,
+                "trav_map_resolution": 0.1,
+                "trav_map_erosion": 2,
+                "trav_map_with_objects": True,
+            },
+
+            # Robot kwargs
+            "robots": {
+                # no robots by default
+            },
+        }
+
+    @property
+    def state_size(self):
+        # Total state size is the state size of our scene
+        return self._scene.state_size
+
+    def _dump_state(self):
+        # Default state is from the scene
+        return self._scene.dump_state(serialized=False)
+
+    def _load_state(self, state):
+        # Default state is from the scene
+        self._scene.load_state(state=state, serialized=False)
+
+    def load_state(self, state, serialized=False):
+        # Run super first
+        super().load_state(state=state, serialized=serialized)
+
+        # We also need to manually update the simulator app
+        self._simulator.app.update()
+
+    def _serialize(self, state):
+        # Default state is from the scene
+        return self._scene.serialize(state=state)
+
+    def _deserialize(self, state):
+        # Default state is from the scene
+        end_idx = self._scene.state_size
+        return self._scene.deserialize(state=state[:end_idx]), end_idx

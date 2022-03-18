@@ -12,19 +12,15 @@ from transforms3d.euler import euler2quat
 from igibson import object_states
 from igibson.envs.env_base import BaseEnv
 from igibson.robots.robot_base import BaseRobot
-from igibson.sensors.bump_sensor import BumpSensor
-from igibson.sensors.scan_sensor import ScanSensor
-from igibson.sensors.vision_sensor import VisionSensor
-from igibson.tasks.behavior_task import BehaviorTask
-from igibson.tasks.dummy_task import DummyTask
-from igibson.tasks.dynamic_nav_random_task import DynamicNavRandomTask
-from igibson.tasks.interactive_nav_random_task import InteractiveNavRandomTask
-from igibson.tasks.point_nav_fixed_task import PointNavFixedTask
-from igibson.tasks.point_nav_random_task import PointNavRandomTask
-from igibson.tasks.reaching_random_task import ReachingRandomTask
-from igibson.tasks.room_rearrangement_task import RoomRearrangementTask
+from igibson.tasks import REGISTERED_TASKS
+from igibson.scenes import REGISTERED_SCENES
 from igibson.utils.constants import MAX_CLASS_COUNT, MAX_INSTANCE_COUNT
 from igibson.utils.utils import quatToXYZW
+from igibson.utils.python_utils import assert_valid_key, create_class_from_registry_and_config
+
+
+# How many predefined randomized scene object configurations we have per scene
+N_PREDEFINED_OBJ_RANDOMIZATIONS = 10
 
 
 class iGibsonEnv(BaseEnv):
@@ -34,295 +30,281 @@ class iGibsonEnv(BaseEnv):
 
     def __init__(
         self,
-        config_file,
-        scene_id=None,
-        mode="headless",
+        configs,
+        scene_model=None,
         action_timestep=1 / 10.0,
         physics_timestep=1 / 240.0,
         rendering_settings=None,
+        vr=False,
         vr_settings=None,
         device_idx=0,
         automatic_reset=False,
-        use_pb_gui=False,
     ):
         """
-        :param config_file: config_file path
-        :param scene_id: override scene_id in config file
-        :param mode: headless, headless_tensor, gui_interactive, gui_non_interactive, vr
+        :param configs (str or list of str): config_file path(s). If multiple configs are specified, they will
+            be merged sequentially in the order specified. This allows procedural generation of a "full" config from
+            small sub-configs.
+        :param scene_model: override scene_id in config file
         :param action_timestep: environment executes action per action_timestep second
         :param physics_timestep: physics timestep for pybullet
         :param rendering_settings: rendering_settings to override the default one
+        vr (bool): Whether we're using VR or not
         :param vr_settings: vr_settings to override the default one
         :param device_idx: which GPU to run the simulation and rendering on
         :param automatic_reset: whether to automatic reset after an episode finishes
-        :param use_pb_gui: concurrently display the interactive pybullet gui (for debugging)
         """
+        # Store settings and other initialized values
+        self._automatic_reset = automatic_reset
+        self._predefined_object_randomization_idx = 0
+        self._n_predefined_object_randomizations = N_PREDEFINED_OBJ_RANDOMIZATIONS
+
+        # Initialize other placeholders that will be filled in later
+        self._ignore_robot_object_collisions = None         # This will be a list of len(scene.robots) containing sets of objects to ignore collisions for
+        self._ignore_robot_self_collisions = None           # This will be a list of len(scene.robots) containing sets of RigidPrims (robot's links) to ignore collisions for
+        self._initial_pos_z_offset = None                   # how high to offset object placement to account for one action step of dropping
+        self._texture_randomization_freq = None
+        self._object_randomization_freq = None
+        self._task = None
+        self._current_episode = 0
+
+        # Variables reset at the beginning of each episode
+        self._current_collisions = None
+        self._current_step = 0
+        self._collision_step = 0
+
+        # Run super
         super(iGibsonEnv, self).__init__(
-            config_file=config_file,
-            scene_id=scene_id,
-            mode=mode,
+            configs=configs,
+            scene_model=scene_model,
             action_timestep=action_timestep,
             physics_timestep=physics_timestep,
             rendering_settings=rendering_settings,
+            vr=vr,
             vr_settings=vr_settings,
             device_idx=device_idx,
-            use_pb_gui=use_pb_gui,
         )
-        self.automatic_reset = automatic_reset
 
-    def load_task_setup(self):
+    def add_ignore_robot_object_collision(self, robot_idn, obj):
         """
-        Load task setup.
+        Add a new robot-object pair to ignore collisions for
+
+        NOTE: This ignores collisions for the purpose of COUNTING collisions, NOT for the purpose of disabling
+            the actual, physical, collision
+
+        Args:
+            robot_idn (int): Which robot to ignore a collision for
+            obj (BaseObject): Which object to ignore a collision for
         """
-        self.initial_pos_z_offset = self.config.get("initial_pos_z_offset", 0.1)
-        # s = 0.5 * G * (t ** 2)
+        self._ignore_robot_object_collisions[robot_idn].add(obj)
+
+    def add_ignore_robot_self_collision(self, robot_idn, link):
+        """
+        Add a new robot-link self pair to ignore collisions for
+
+        NOTE: This ignores collisions for the purpose of COUNTING collisions, NOT for the purpose of disabling
+            the actual, physical, collision
+
+        Args:
+            robot_idn (int): Which robot to ignore a collision for
+            link (RigidPrim): Which robot link to ignore a collision for
+        """
+        self._ignore_robot_self_collisions[robot_idn].add(link)
+
+    def _load_variables(self):
+        # Store additional variables after config has been loaded fully
+        self._initial_pos_z_offset = self.env_config["initial_pos_z_offset"]
+        self._texture_randomization_freq = self.env_config["texture_randomization_freq"]
+        self._object_randomization_freq = self.env_config["object_randomization_freq"]
+
+        # Set other values
+        self._ignore_robot_object_collisions = [[] for _ in self.robots_config]
+        self._ignore_robot_self_collisions = [[] for _ in self.robots_config]
+
+        # Reset bookkeeping variables
+        self._reset_variables()
+        self._current_episode = 0           # Manually set this to 0 since resetting actually increments this
+
+        # - Potentially overwrite the USD entry for the scene if none is specified and we're online sampling -
+
+        # Make sure the requested scene is valid
+        scene_type = self.scene_config["type"]
+        assert_valid_key(key=scene_type, valid_keys=REGISTERED_SCENES, name="scene type")
+
+        if scene_type == "InteractiveTraversableScene":
+            usd_file = self.scene_config["usd_file"]
+            if usd_file is None and not self.env_config["online_sampling"]:
+                usd_file = "{}_task_{}_{}_{}_fixed_furniture".format(
+                    self.scene_config["model"],
+                    self.task_config["type"],
+                    self.task_config["task_id"],
+                    self.task_config["instance_id"],
+                )
+            # Update the value in the scene config
+            self.scene_config["usd_file"] = usd_file
+
+        # - Additionally run some sanity checks on these values -
+
+        # Check to make sure our z offset is valid -- check that the distance travelled over 1 action timestep is
+        # less than the offset we set (dist = 0.5 * gravity * (t^2))
         drop_distance = 0.5 * 9.8 * (self.action_timestep ** 2)
-        assert drop_distance < self.initial_pos_z_offset, "initial_pos_z_offset is too small for collision checking"
+        assert drop_distance < self._initial_pos_z_offset, "initial_pos_z_offset is too small for collision checking"
 
-        # ignore the agent's collision with these body ids
-        self.collision_ignore_body_b_ids = set(self.config.get("collision_ignore_body_b_ids", []))
-        # ignore the agent's collision with these link ids of itself
-        self.collision_ignore_link_a_ids = set(self.config.get("collision_ignore_link_a_ids", []))
-
-        # discount factor
-        self.discount_factor = self.config.get("discount_factor", 0.99)
-
-        # domain randomization frequency
-        self.texture_randomization_freq = self.config.get("texture_randomization_freq", None)
-        self.object_randomization_freq = self.config.get("object_randomization_freq", None)
-
-        # task
-        if "task" not in self.config:
-            self.task = DummyTask(self)
-        elif self.config["task"] == "point_nav_fixed":
-            self.task = PointNavFixedTask(self)
-        elif self.config["task"] == "point_nav_random":
-            self.task = PointNavRandomTask(self)
-        elif self.config["task"] == "interactive_nav_random":
-            self.task = InteractiveNavRandomTask(self)
-        elif self.config["task"] == "dynamic_nav_random":
-            self.task = DynamicNavRandomTask(self)
-        elif self.config["task"] == "reaching_random":
-            self.task = ReachingRandomTask(self)
-        elif self.config["task"] == "room_rearrangement":
-            self.task = RoomRearrangementTask(self)
-        else:
-            try:
-                import bddl
-
-                with open(os.path.join(os.path.dirname(bddl.__file__), "activity_manifest.txt")) as f:
-                    all_activities = [line.strip() for line in f.readlines()]
-
-                if self.config["task"] in all_activities:
-                    self.task = BehaviorTask(self)
-                else:
-                    raise Exception("Invalid task: {}".format(self.config["task"]))
-            except ImportError:
-                raise Exception("bddl is not available.")
-
-    def build_obs_space(self, shape, low, high):
+    def _load_task(self):
         """
-        Helper function that builds individual observation spaces.
-
-        :param shape: shape of the space
-        :param low: lower bounds of the space
-        :param high: higher bounds of the space
+        Load task
         """
-        return gym.spaces.Box(low=low, high=high, shape=shape, dtype=np.float32)
+        # Sanity check task to make sure it's valid
+        task_type = self.task_config["type"]
+        assert_valid_key(key=task_type, valid_keys=REGISTERED_TASKS, name="task type")
 
-    def load_observation_space(self):
+        # Grab the kwargs relevant for the specific task and create the task
+        self._task = create_class_from_registry_and_config(
+            cls_name=self.task_config["type"],
+            cls_registry=REGISTERED_TASKS,
+            cfg=self.task_config,
+            cls_type_descriptor="task",
+        )
+
+        # Load task
+        # TODO: Does this need to occur somewhere else?
+        self._task.load(env=self)
+
+    def _load_observation_space(self):
+        # Grab robot(s) and task obs spaces
+        obs_space = OrderedDict()
+
+        for robot in self.robots:
+            # Load the observation space for the robot
+            obs_space[robot.name] = robot.load_observation_space()
+
+        # Also load the task obs space
+        obs_space["task"] = self._task.load_observation_space()
+
+    def _load_action_space(self):
         """
-        Load observation space.
+        Load action space for each robot
         """
-        self.output = self.config["output"]
-        self.image_width = self.config.get("image_width", 128)
-        self.image_height = self.config.get("image_height", 128)
-        observation_space = OrderedDict()
-        sensors = OrderedDict()
-        vision_modalities = []
-        scan_modalities = []
-
-        if "task_obs" in self.output:
-            observation_space["task_obs"] = self.build_obs_space(
-                shape=(self.task.task_obs_dim,), low=-np.inf, high=np.inf
-            )
-        if "rgb" in self.output:
-            observation_space["rgb"] = self.build_obs_space(
-                shape=(self.image_height, self.image_width, 3), low=0.0, high=1.0
-            )
-            vision_modalities.append("rgb")
-        if "depth" in self.output:
-            observation_space["depth"] = self.build_obs_space(
-                shape=(self.image_height, self.image_width, 1), low=0.0, high=1.0
-            )
-            vision_modalities.append("depth")
-        if "pc" in self.output:
-            observation_space["pc"] = self.build_obs_space(
-                shape=(self.image_height, self.image_width, 3), low=-np.inf, high=np.inf
-            )
-            vision_modalities.append("pc")
-        if "optical_flow" in self.output:
-            observation_space["optical_flow"] = self.build_obs_space(
-                shape=(self.image_height, self.image_width, 2), low=-np.inf, high=np.inf
-            )
-            vision_modalities.append("optical_flow")
-        if "scene_flow" in self.output:
-            observation_space["scene_flow"] = self.build_obs_space(
-                shape=(self.image_height, self.image_width, 3), low=-np.inf, high=np.inf
-            )
-            vision_modalities.append("scene_flow")
-        if "normal" in self.output:
-            observation_space["normal"] = self.build_obs_space(
-                shape=(self.image_height, self.image_width, 3), low=-np.inf, high=np.inf
-            )
-            vision_modalities.append("normal")
-        if "seg" in self.output:
-            observation_space["seg"] = self.build_obs_space(
-                shape=(self.image_height, self.image_width, 1), low=0.0, high=MAX_CLASS_COUNT
-            )
-            vision_modalities.append("seg")
-        if "ins_seg" in self.output:
-            observation_space["ins_seg"] = self.build_obs_space(
-                shape=(self.image_height, self.image_width, 1), low=0.0, high=MAX_INSTANCE_COUNT
-            )
-            vision_modalities.append("ins_seg")
-        if "rgb_filled" in self.output:  # use filler
-            observation_space["rgb_filled"] = self.build_obs_space(
-                shape=(self.image_height, self.image_width, 3), low=0.0, high=1.0
-            )
-            vision_modalities.append("rgb_filled")
-        if "highlight" in self.output:
-            observation_space["highlight"] = self.build_obs_space(
-                shape=(self.image_height, self.image_width, 1), low=0.0, high=1.0
-            )
-            vision_modalities.append("highlight")
-        if "scan" in self.output:
-            self.n_horizontal_rays = self.config.get("n_horizontal_rays", 128)
-            self.n_vertical_beams = self.config.get("n_vertical_beams", 1)
-            assert self.n_vertical_beams == 1, "scan can only handle one vertical beam for now"
-            observation_space["scan"] = self.build_obs_space(
-                shape=(self.n_horizontal_rays * self.n_vertical_beams, 1), low=0.0, high=1.0
-            )
-            scan_modalities.append("scan")
-        if "occupancy_grid" in self.output:
-            self.grid_resolution = self.config.get("grid_resolution", 128)
-            self.occupancy_grid_space = gym.spaces.Box(
-                low=0.0, high=1.0, shape=(self.grid_resolution, self.grid_resolution, 1)
-            )
-            observation_space["occupancy_grid"] = self.occupancy_grid_space
-            scan_modalities.append("occupancy_grid")
-        if "bump" in self.output:
-            observation_space["bump"] = gym.spaces.Box(low=0.0, high=1.0, shape=(1,))
-            sensors["bump"] = BumpSensor(self)
-        if "proprioception" in self.output:
-            observation_space["proprioception"] = self.build_obs_space(
-                shape=(self.robots[0].proprioception_dim,), low=-np.inf, high=np.inf
-            )
-
-        if len(vision_modalities) > 0:
-            sensors["vision"] = VisionSensor(self, vision_modalities)
-
-        if len(scan_modalities) > 0:
-            sensors["scan_occ"] = ScanSensor(self, scan_modalities)
-
-        self.observation_space = gym.spaces.Dict(observation_space)
-        self.sensors = sensors
-
-    def load_action_space(self):
-        """
-        Load action space.
-        """
-        self.action_space = self.robots[0].action_space
-
-    def load_miscellaneous_variables(self):
-        """
-        Load miscellaneous variables for book keeping.
-        """
-        self.current_step = 0
-        self.collision_step = 0
-        self.current_episode = 0
-        self.collision_links = []
+        self.action_space = gym.spaces.Dict({robot.name: robot.action_space for robot in self.robots})
 
     def load(self):
         """
         Load environment.
         """
-        super(iGibsonEnv, self).load()
-        self.load_task_setup()
+        # Do any normal loading first from the super() call
+        super().load()
+
+        # Load the task
+        self._load_task()
+
+        # Reset the environment
+        self.reset()
+
+        # Load the obs / action spaces
         self.load_observation_space()
-        self.load_action_space()
-        self.load_miscellaneous_variables()
+        self._load_action_space()
 
-    def get_state(self):
+    def reload_model_object_randomization(self, predefined_object_randomization_idx=None):
         """
-        Get the current observation.
+        Reload the same model, with either @object_randomization_idx seed or the next object randomization random seed.
 
-        :return: observation as a dictionary
+        Args:
+            predefined_object_randomization_idx (None or int): If set, specifies the specific pre-defined object
+                randomization instance to use. Otherwise, the current seed will be incremented by 1 and used.
         """
-        state = OrderedDict()
-        if "task_obs" in self.output:
-            state["task_obs"] = self.task.get_task_obs(self)
-        if "vision" in self.sensors:
-            vision_obs = self.sensors["vision"].get_obs(self)
-            for modality in vision_obs:
-                state[modality] = vision_obs[modality]
-        if "scan_occ" in self.sensors:
-            scan_obs = self.sensors["scan_occ"].get_obs(self)
-            for modality in scan_obs:
-                state[modality] = scan_obs[modality]
-        if "bump" in self.sensors:
-            state["bump"] = self.sensors["bump"].get_obs(self)
-        if "proprioception" in self.sensors:
-            state["proprioception"] = np.array(self.robots[0].get_proprioception())
+        assert self._object_randomization_freq is not None, \
+            "object randomization must be active to reload environment with object randomization!"
+        self._predefined_object_randomization_idx = predefined_object_randomization_idx if \
+            predefined_object_randomization_idx is not None else \
+            (self._predefined_object_randomization_idx + 1) % self._n_predefined_object_randomizations
+        self.load()
 
-        return state
+    def get_obs(self):
+        # Grab obs from super call
+        obs = super().get_obs()
 
-    def run_simulation(self):
+        # Add task obs
+        obs["task"] = self._task.get_obs(env=self)
+
+        return obs
+
+    # TODO!! Wait until omni dev team has an answer
+    def update_collisions(self, filtered=True):
         """
-        Run simulation for one action timestep (same as one render timestep in Simulator class).
+        Grab collisions that occurred during the most recent physics timestep
 
-        :return: a list of collisions from the last physics timestep
+        Args:
+            filtered (bool): Whether to filter the raw collisions or not based on
+                self._ignore_robot_[object/self]_collisions
+
+        Returns:
+            set of 2-tuple: Unique collision pairs occurring in the simulation at the current timestep, represented
+                by their prim_paths
         """
-        self.simulator_step()
-        collision_links = [
-            collision for bid in self.robots[0].get_body_ids() for collision in p.getContactPoints(bodyA=bid)
-        ]
-        return self.filter_collision_links(collision_links)
+        collisions = set()
+        self._current_collisions = self._filter_collisions(collisions) if filtered else collisions
+        return self._current_collisions
 
-    def filter_collision_links(self, collision_links):
+    def _filter_collisions(self, collisions):
         """
-        Filter out collisions that should be ignored.
+        Filter out collisions that should be ignored, based on self._ignore_robot_[object/self]_collisions
 
-        :param collision_links: original collisions, a list of collisions
-        :return: filtered collisions
+        Args:
+            collisions (set of 2-tuple): Unique collision pairs occurring in the simulation at the current timestep,
+                represented by their prim_paths
+
+        Returns:
+            set of 2-tuple: Filtered collision pairs occurring in the simulation at the current timestep,
+                represented by their prim_paths
         """
-        # TODO: Improve this to accept multi-body robots.
-        new_collision_links = []
-        for item in collision_links:
-            # ignore collision with body b
-            if item[2] in self.collision_ignore_body_b_ids:
-                continue
+        # Iterate over all robots
+        new_collisions = set()
+        for robot, filtered_links, filtered_objs in zip(
+                self.robots, self._ignore_robot_self_collisions, self._ignore_robot_object_collisions
+        ):
+            # Grab all link prim paths owned by the robot
+            robot_prims = {link.prim_path for link in robot.links.values()}
+            # Loop over all filtered links and compose them
+            filtered_link_prims = {link.prim_path for link in filtered_links}
+            # Loop over all filtered objects and compose them
+            filtered_obj_prims = {link.prim_path for obj in filtered_objs for link in obj.links.values()}
+            # Get union of robot and obj prims
+            filtered_robot_obj_prims = robot_prims.union(filtered_obj_prims)
+            # Iterate over all collision pairs
+            for col_pair in collisions:
+                # First check for self_collision -- we check by first subtracting all filtered links from the col_pair
+                # set and making sure the length is < 2, and then subtracting all robot_prims and making sure that the
+                # length is 0. If both conditions are met, then we know this is a filtered collision!
+                col_pair_set = set(col_pair)
+                if len(col_pair_set - filtered_link_prims) < 2 and len(col_pair_set - robot_prims) == 0:
+                    # Filter this collision
+                    continue
+                # Check for object filtering -- we check by first subtracting all robot links from the col_pair
+                # set and making sure the length is < 2, and then subtracting all filtered_obj_prims and making sure
+                # that the length is < 2. If both conditions are met, this means that this was a collision between
+                # the robot and a filtered object, so we know this is a filtered collision!
+                elif len(col_pair_set - robot_prims) < 2 and len(col_pair_set - filtered_obj_prims) < 2:
+                    # Filter this collision
+                    continue
+                else:
+                    # Add this collision
+                    new_collisions.add(col_pair)
 
-            # ignore collision with robot link a
-            if item[3] in self.collision_ignore_link_a_ids:
-                continue
+            return new_collisions
 
-            # ignore self collision with robot link a (body b is also robot itself)
-            if item[2] == self.robots[0].base_link.body_id and item[4] in self.collision_ignore_link_a_ids:
-                continue
-            new_collision_links.append(item)
-        return new_collision_links
-
-    def populate_info(self, info):
+    def _populate_info(self, info):
         """
         Populate info dictionary with any useful information.
 
-        :param info: the info dictionary to populate
-        """
-        info["episode_length"] = self.current_step
-        info["collision_step"] = self.collision_step
+        Args:
+            info (dict): Information dictionary to populate
 
-    def step(self, action):
+        Returns:
+            dict: Information dictionary with added info
+        """
+        info["episode_length"] = self._current_step
+        info["collision_step"] = self._collision_step
+
+    def step(self, action=None):
         """
         Apply robot's action and return the next state, reward, done and info,
         following OpenAI Gym's convention
@@ -333,127 +315,172 @@ class iGibsonEnv(BaseEnv):
         :return: done: whether the episode is terminated
         :return: info: info dictionary with any useful information
         """
-        self.current_step += 1
+        # Apply actions if specified
         if action is not None:
-            self.robots[0].apply_action(action)
-        collision_links = self.run_simulation()
-        self.collision_links = collision_links
-        self.collision_step += int(len(collision_links) > 0)
+            # Iterate over all robots and apply actions
+            idx = 0
+            for robot in self.robots:
+                action_dim = robot.action_dim
+                robot.apply_action(action[idx: idx + action_dim])
+                idx += action_dim
 
-        state = self.get_state()
-        info = {}
-        reward, info = self.task.get_reward(self, collision_links, action, info)
-        done, info = self.task.get_termination(self, collision_links, action, info)
-        self.task.step(self)
-        self.populate_info(info)
+        # Run simulation step
+        self._simulator_step()
 
-        if done and self.automatic_reset:
-            info["last_observation"] = state
-            state = self.reset()
+        # Grab collisions and store internally
+        collisions = self.update_collisions(filtered=True)
 
-        return state, reward, done, info
+        # Update the collision count
+        self._collision_step += int(len(collisions) > 0)
 
-    def check_collision(self, body_id):
+        # Grab observations
+        obs = self.get_obs()
+
+        # Grab reward, done, and info, and populate with internal info
+        reward, done, info = self.task.step(self, action)
+        self._populate_info(info)
+
+        if done and self._automatic_reset:
+            # Add lost observation to our information dict, and reset
+            info["last_observation"] = obs
+            obs = self.reset()
+
+        # Increment step
+        self._current_step += 1
+
+        return obs, reward, done, info
+
+    def check_collision(self, obj):
         """
-        Check whether the given body_id has collision after one simulator step
+        Check whether the given object @obj has collision after one simulator step
 
-        :param body_id: pybullet body id
-        :return: whether the given body_id has collision
+        Args:
+            obj (EntityPrim): Object to check for collision
+
+        Returns:
+            bool: Whether the object @obj is in collision or not
         """
-        self.simulator_step()
-        collisions = list(p.getContactPoints(bodyA=body_id))
+        # Run simulator step and update contacts
+        self._simulator_step()
+        collisions = self.update_collisions(filtered=True)
 
-        if logging.root.level <= logging.DEBUG:  # Only going into this if it is for logging --> efficiency
+        # Grab all link prim paths owned by the object
+        link_paths = {link.prim_path for link in obj.links.values()}
+
+        # Loop over all current collisions and check for any matches
+        in_collision = False
+        for col_pair in collisions:
+            if len(set(col_pair) - link_paths) < 2:
+                in_collision = True
+                break
+
+        # Only going into this if it is for logging --> efficiency
+        if logging.root.level <= logging.DEBUG:
             for item in collisions:
-                logging.debug("bodyA:{}, bodyB:{}, linkA:{}, linkB:{}".format(item[1], item[2], item[3], item[4]))
+                logging.debug("linkA:{}, linkB:{}".format(item[0], item[1]))
 
-        return len(collisions) > 0
+        return in_collision
 
-    def set_pos_orn_with_z_offset(self, obj, pos, orn=None, offset=None):
+    # TODO!
+    def set_pos_orn_with_z_offset(self, obj, pos, ori=None, offset=None):
         """
-        Reset position and orientation for the robot or the object.
+        Reset position and orientation for the object @obj with optional offset @offset.
 
-        :param obj: an instance of robot or object
-        :param pos: position
-        :param orn: orientation
-        :param offset: z offset
+        Args:
+            obj (BaseObject): Object to place in the environment
+            pos (3-array): Global (x,y,z) location to place the object
+            ori (None or 3-array): Optional (r,p,y) orientation when placing the robot. If None, a random orientation
+                about the z-axis will be sampled
+            offset (None or float): Optional z-offset to place object with. If None, default self._initial_pos_z_offset
+                will be used
         """
-        if orn is None:
-            orn = np.array([0, 0, np.random.uniform(0, np.pi * 2)])
-
-        if offset is None:
-            offset = self.initial_pos_z_offset
+        ori = np.array([0, 0, np.random.uniform(0, np.pi * 2)]) if ori is None else ori
+        offset = self._initial_pos_z_offset if offset is None else offset
 
         # first set the correct orientation
-        obj.set_position_orientation(pos, quatToXYZW(euler2quat(*orn), "wxyz"))
+        obj.set_position_orientation(pos, quatToXYZW(euler2quat(*ori), "wxyz"))
         # get the AABB in this orientation
-        lower, _ = obj.states[object_states.AABB].get_value()
+        # lower, _ = obj.states[object_states.AABB].get_value() # TODO!
+        lower = np.array([0, 0, pos[2]])
         # Get the stable Z
         stable_z = pos[2] + (pos[2] - lower[2])
         # change the z-value of position with stable_z + additional offset
         # in case the surface is not perfect smooth (has bumps)
-        obj.set_position([pos[0], pos[1], stable_z + offset])
+        obj.set_position(np.array([pos[0], pos[1], stable_z + offset]))
 
-    def test_valid_position(self, obj, pos, orn=None):
+    def test_valid_position(self, obj, pos, ori=None):
         """
-        Test if the robot or the object can be placed with no collision.
+        Test if the object can be placed with no collision.
 
-        :param obj: an instance of robot or object
-        :param pos: position
-        :param orn: orientation
-        :return: whether the position is valid
+        Args:
+            obj (BaseObject): Object to place in the environment
+            pos (3-array): Global (x,y,z) location to place the object
+            ori (None or 3-array): Optional (r,p,y) orientation when placing the robot. If None, a random orientation
+                about the z-axis will be sampled
+
+        Returns:
+            bool: Whether the placed object position is valid
         """
+        # Set the position of the object
+        self.set_pos_orn_with_z_offset(obj=obj, pos=pos, ori=ori)
+
+        # If we're placing a robot, make sure it's reset and not moving
+        if isinstance(obj, BaseRobot):
+            obj.reset()
+            obj.keep_still()
+
+        # Valid if there are no collisions
+        return not self.check_collision(obj=obj)
+
+    def land(self, obj, pos, ori):
+        """
+        Land the object at the specified position @pos, given a valid position and orientation.
+
+        Args:
+            obj (BaseObject): Object to place in the environment
+            pos (3-array): Global (x,y,z) location to place the object
+            ori (None or 3-array): Optional (r,p,y) orientation when placing the robot. If None, a random orientation
+                about the z-axis will be sampled
+        """
+        # Set the position of the object
+        self.set_pos_orn_with_z_offset(obj=obj, pos=pos, ori=ori)
+
+        # If we're placing a robot, make sure it's reset and not moving
         is_robot = isinstance(obj, BaseRobot)
-
-        self.set_pos_orn_with_z_offset(obj, pos, orn)
-
         if is_robot:
             obj.reset()
             obj.keep_still()
 
-        has_collision = any(self.check_collision(body_id) for body_id in obj.get_body_ids())
-        return not has_collision
-
-    def land(self, obj, pos, orn):
-        """
-        Land the robot or the object onto the floor, given a valid position and orientation.
-
-        :param obj: an instance of robot or object
-        :param pos: position
-        :param orn: orientation
-        """
-        is_robot = isinstance(obj, BaseRobot)
-
-        self.set_pos_orn_with_z_offset(obj, pos, orn)
-
-        if is_robot:
-            obj.reset()
-            obj.keep_still()
-
-        land_success = False
+        # Check to make sure we landed successfully
         # land for maximum 1 second, should fall down ~5 meters
+        land_success = False
         max_simulator_step = int(1.0 / self.action_timestep)
         for _ in range(max_simulator_step):
-            self.simulator_step()
-            if any(len(p.getContactPoints(bodyA=body_id)) > 0 for body_id in obj.get_body_ids()):
-                land_success = True
+            # Run a sim step and see if we have any contacts
+            self._simulator_step()
+            self.update_collisions(filtered=False)
+            land_success = self.check_collision(obj=obj)
+            if land_success:
+                # Once we're successful, we can break immediately
                 break
 
+        # Print out warning in case we failed to land the object successfully
         if not land_success:
             logging.warning("Object failed to land.")
 
+        # Make sure robot isn't moving at the end if we're a robot
         if is_robot:
             obj.reset()
             obj.keep_still()
 
-    def reset_variables(self):
+    def _reset_variables(self):
         """
         Reset bookkeeping variables for the next new episode.
         """
-        self.current_episode += 1
-        self.current_step = 0
-        self.collision_step = 0
-        self.collision_links = []
+        self._current_episode += 1
+        self._current_collisions = None
+        self._current_step = 0
+        self._collision_step = 0
 
     def randomize_domain(self):
         """
@@ -461,28 +488,83 @@ class iGibsonEnv(BaseEnv):
         Object randomization loads new object models with the same poses.
         Texture randomization loads new materials and textures for the same object models.
         """
-        if self.object_randomization_freq is not None:
-            if self.current_episode % self.object_randomization_freq == 0:
+        if self._object_randomization_freq is not None:
+            if self._current_episode % self._object_randomization_freq == 0:
                 self.reload_model_object_randomization()
-        if self.texture_randomization_freq is not None:
-            if self.current_episode % self.texture_randomization_freq == 0:
-                self.simulator.scene.randomize_texture()
+        if self._texture_randomization_freq is not None:
+            if self._current_episode % self._texture_randomization_freq == 0:
+                self._simulator.scene.randomize_texture()
 
     def reset(self):
         """
         Reset episode.
         """
+        # Stop and restart the simulation
+        self._simulator.stop()
+        self._simulator.play()
+
+        # Do any domain randomization
         self.randomize_domain()
-        # Move robot away from the scene.
-        self.robots[0].set_position([100.0, 100.0, 100.0])
+
+        # Move all robots away from the scene since the task will place the robots anyways
+        for robot in self.robots:
+            robot.set_position([100.0, 100.0, 100.0])
+
+        # Reset the task
         self.task.reset(self)
-        self.simulator.sync(force_sync=True)
-        state = self.get_state()
-        self.reset_variables()
 
-        return state
+        # Reset internal variables
+        self._reset_variables()
 
+        # Run a single simulator step to make sure we can grab updated observations
+        self._simulator_step()
 
+        # Grab and return observations
+        return self.get_obs()
+
+    @property
+    def current_collisions(self):
+        """
+        Returns:
+            set of 2-tuple: Cached collision pairs from the last time self.update_collisions() was called
+        """
+        return self._current_collisions
+
+    @property
+    def task(self):
+        """
+        Returns:
+            BaseTask: Active task instance
+        """
+        return self._task
+
+    @property
+    def task_config(self):
+        """
+        Returns:
+            dict: Task-specific configuration kwargs
+        """
+        return self.config["task"]
+
+    @property
+    def default_config(self):
+        # Call super first to grab initial pre-populated config
+        cfg = super().default_config
+
+        # Add additional values
+        cfg["env"]["initial_pos_z_offset"] = 0.1
+        cfg["env"]["texture_randomization_freq"] = None
+        cfg["env"]["object_randomization_freq"] = None
+        cfg["scene"]["usd_file"] = None
+
+        # Add task kwargs
+        cfg["task"] = {
+            "type": "DummyTask",
+        }
+
+        return cfg
+
+# TODO!
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", "-c", help="which config file to use [default: use yaml files in examples/configs]")
