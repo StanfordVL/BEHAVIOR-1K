@@ -1,7 +1,7 @@
 from abc import ABCMeta, abstractmethod
 from collections import OrderedDict
 import numpy as np
-from igibson.utils.python_utils import Serializable
+from igibson.utils.python_utils import classproperty, Serializable, Registerable
 
 
 # Hacky method to serialize "None" values as a number -- we choose magic number 400 since:
@@ -10,40 +10,13 @@ NONE = 400.0
 
 # Global dicts that will contain mappings
 REGISTERED_OBJECT_STATES = OrderedDict()
-REGISTERED_ABSOLUTE_OBJECT_STATES = OrderedDict()
-OBJECT_STATES_TO_ID = OrderedDict()
-
-# Counter for keeping track of unique object state classes that are created
-_STATE_COUNTER = 0
 
 
-def register_object_state(cls):
-    global _STATE_COUNTER
-    if cls.__name__ not in REGISTERED_OBJECT_STATES:
-        REGISTERED_OBJECT_STATES[cls.__name__] = cls
-        OBJECT_STATES_TO_ID[cls.__name__] = _STATE_COUNTER
-        _STATE_COUNTER += 1
-
-
-def register_absolute_object_state(cls):
-    if cls.__name__ not in REGISTERED_OBJECT_STATES:
-        REGISTERED_ABSOLUTE_OBJECT_STATES[cls.__name__] = cls
-
-
-class BaseObjectState(Serializable, metaclass=ABCMeta):
+class BaseObjectState(Serializable, Registerable, metaclass=ABCMeta):
     """
     Base ObjectState class. Do NOT inherit from this class directly - use either AbsoluteObjectState or
     RelativeObjectState.
     """
-    def __init_subclass__(cls, **kwargs):
-        """
-        Registers all subclasses as part of this registry. This is useful to decouple internal codebase from external
-        user additions. This way, users can add their custom object state by simply extending this BaseObjectState class,
-        and it will automatically be registered internally. This allows users to then specify their object state
-        directly in string-from in e.g., their config files, without having to manually set the str-to-class mapping
-        in our code.
-        """
-        register_object_state(cls)
 
     @staticmethod
     def get_dependencies():
@@ -124,16 +97,25 @@ class BaseObjectState(Serializable, metaclass=ABCMeta):
         assert self.settable
         return super().dump_state(serialized=serialized)
 
+    @classproperty
+    def _do_not_register_classes(cls):
+        # Don't register this class since it's an abstract template
+        classes = super()._do_not_register_classes
+        classes.add("BaseObjectState")
+        return classes
+
+    @classproperty
+    def _cls_registry(cls):
+        # Global registry
+        global REGISTERED_OBJECT_STATES
+        return REGISTERED_OBJECT_STATES
+
 
 class AbsoluteObjectState(BaseObjectState):
     """
     This class is used to track object states that are absolute, e.g. do not require a second object to compute
     the value.
     """
-    def __init_subclass__(cls, **kwargs):
-        # Register as part of locomotion controllers
-        super().__init_subclass__(**kwargs)
-        register_absolute_object_state(cls)
 
     @abstractmethod
     def _get_value(self):
@@ -142,6 +124,13 @@ class AbsoluteObjectState(BaseObjectState):
     @abstractmethod
     def _set_value(self, new_value):
         raise NotImplementedError()
+
+    @classproperty
+    def _do_not_register_classes(cls):
+        # Don't register this class since it's an abstract template
+        classes = super()._do_not_register_classes
+        classes.add("AbsoluteObjectState")
+        return classes
 
 
 class CachingEnabledObjectState(AbsoluteObjectState):
@@ -178,6 +167,13 @@ class CachingEnabledObjectState(AbsoluteObjectState):
         super(CachingEnabledObjectState, self)._update()
         self.clear_cached_value()
 
+    @classproperty
+    def _do_not_register_classes(cls):
+        # Don't register this class since it's an abstract template
+        classes = super()._do_not_register_classes
+        classes.add("CachingEnabledObjectState")
+        return classes
+
 
 class RelativeObjectState(BaseObjectState):
     """
@@ -193,8 +189,15 @@ class RelativeObjectState(BaseObjectState):
     def _set_value(self, other, new_value):
         raise NotImplementedError()
 
+    @classproperty
+    def _do_not_register_classes(cls):
+        # Don't register this class since it's an abstract template
+        classes = super()._do_not_register_classes
+        classes.add("RelativeObjectState")
+        return classes
 
-class BooleanState(object):
+
+class BooleanState:
     """
     This class is a mixin used to indicate that a state has a boolean value.
     """

@@ -5,7 +5,6 @@ import numpy as np
 import igibson
 from igibson.envs.igibson_env import iGibsonEnv
 from igibson.sensors.scan_sensor import ScanSensor
-from igibson.sensors.velodyne_sensor import VelodyneSensor
 from igibson.sensors.vision_sensor import VisionSensor
 from igibson.utils.assets_utils import download_assets, download_demo_data
 from igibson.utils.constants import MAX_CLASS_COUNT
@@ -46,13 +45,3 @@ def test_scan_sensor():
 
     assert scan_obs.shape == (scan_sensor.n_horizontal_rays, scan_sensor.n_vertical_beams)
     assert np.all(0 <= scan_obs) and np.all(scan_obs <= 1.0)
-
-
-def test_velodyne():
-    download_assets()
-    download_demo_data()
-    config_filename = os.path.join(os.path.dirname(__file__), "test_house.yaml")
-    env = iGibsonEnv(config_file=config_filename, mode="headless")
-    velodyne_sensor = VelodyneSensor(env)
-    velodyne_obs = velodyne_sensor.get_obs(env)
-    assert velodyne_obs.shape[1] == 3

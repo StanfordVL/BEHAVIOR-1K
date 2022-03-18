@@ -1,4 +1,4 @@
-from igibson.object_states.object_state_base import REGISTERED_OBJECT_STATES, OBJECT_STATES_TO_ID
+from igibson.object_states.object_state_base import REGISTERED_OBJECT_STATES
 from igibson.object_states.aabb import AABB
 from igibson.object_states.adjacency import HorizontalAdjacency, VerticalAdjacency
 from igibson.object_states.burnt import Burnt
