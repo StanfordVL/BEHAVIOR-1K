@@ -1,26 +1,29 @@
-from igibson.termination_conditions.termination_condition_base import BaseTerminationCondition
+from igibson.termination_conditions.termination_condition_base import SuccessCondition
 from igibson.utils.utils import l2_distance
 
 
-class ReachingGoal(BaseTerminationCondition):
+class ReachingGoal(SuccessCondition):
     """
-    ReachingGoal used for ReachingRandomTask
-    Episode terminates if reaching goal is reached
+    ReachingGoal (success condition) used for reaching-type tasks
+    Episode terminates if reaching goal is reached within @distance_tol by the @robot_idn robot's base
+
+    Args:
+
+    Args:
+        robot_idn (int): robot identifier to evaluate point goal with. Default is 0, corresponding to the first
+            robot added to the scene
+        distance_tol (float): Distance (m) tolerance between goal position and @robot_idn's robot eef position
+            that is accepted as a success
     """
 
-    def __init__(self, config):
-        super(ReachingGoal, self).__init__(config)
-        self.dist_tol = self.config.get("dist_tol", 0.5)
+    def __init__(self, robot_idn=0, distance_tol=0.5):
+        self._robot_idn = robot_idn
+        self._distance_tol = distance_tol
 
-    def get_termination(self, task, env):
-        """
-        Return whether the episode should terminate.
-        Terminate if reaching goal is reached (distance below threshold)
+        # Run super init
+        super().__init__()
 
-        :param task: task instance
-        :param env: environment instance
-        :return: done, info
-        """
-        done = l2_distance(env.robots[0].get_end_effector_position(), task.target_pos) < self.dist_tol
-        success = done
-        return done, success
+    def _step(self, task, env, action):
+        # Terminate if point goal is reached (distance below threshold)
+        return l2_distance(env.scene.robots[self._robot_idn].get_end_effector_position(), task.goal_pos) < \
+               self._distance_tol

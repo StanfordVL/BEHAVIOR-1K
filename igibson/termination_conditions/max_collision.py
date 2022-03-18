@@ -1,26 +1,23 @@
-from igibson.termination_conditions.termination_condition_base import BaseTerminationCondition
+from igibson.termination_conditions.termination_condition_base import FailureCondition
 
 
-class MaxCollision(BaseTerminationCondition):
+class MaxCollision(FailureCondition):
     """
-    MaxCollision used for navigation tasks
+    MaxCollision (failure condition) used for navigation tasks
     Episode terminates if the robot has collided more than
     max_collisions_allowed times
+
+    Args:
+        max_collisions (int): Maximum number of collisions allowed for any robots in the scene before a termination
+            is triggered
     """
 
-    def __init__(self, config):
-        super(MaxCollision, self).__init__(config)
-        self.max_collisions_allowed = self.config.get("max_collisions_allowed", 500)
+    def __init__(self, max_collisions=500):
+        self._max_collisions = max_collisions
 
-    def get_termination(self, task, env):
-        """
-        Return whether the episode should terminate.
-        Terminate if the robot has collided more than self.max_collisions_allowed times
+        # Run super init
+        super().__init__()
 
-        :param task: task instance
-        :param env: environment instance
-        :return: done, info
-        """
-        done = env.collision_step > self.max_collisions_allowed
-        success = False
-        return done, success
+    def _step(self, task, env, action):
+        # Terminate if the robot has collided more than self._max_collisions times
+        return env.collision_step > self._max_collisions

@@ -1,26 +1,34 @@
-from igibson.termination_conditions.termination_condition_base import BaseTerminationCondition
+from igibson.termination_conditions.termination_condition_base import SuccessCondition
 from igibson.utils.utils import l2_distance
 
 
-class PointGoal(BaseTerminationCondition):
+class PointGoal(SuccessCondition):
     """
-    PointGoal used for PointNavFixed/RandomTask
-    Episode terminates if point goal is reached
+    PointGoal (success condition) used for PointNavFixed/RandomTask
+    Episode terminates if point goal is reached within @distance_tol by the @robot_idn robot's base
+
+    Args:
+        robot_idn (int): robot identifier to evaluate point goal with. Default is 0, corresponding to the first
+            robot added to the scene
+        distance_tol (float): Distance (m) tolerance between goal position and @robot_idn's robot base position
+            that is accepted as a success
+        distance_axes (str): Which axes to calculate distances when calculating the goal. Any combination of "x",
+            "y", and "z" is valid (e.g.: "xy" or "xyz" or "y")
     """
 
-    def __init__(self, config):
-        super(PointGoal, self).__init__(config)
-        self.dist_tol = self.config.get("dist_tol", 0.5)
+    def __init__(self, robot_idn=0, distance_tol=0.5, distance_axes="xyz"):
+        self._robot_idn = robot_idn
+        self._distance_tol = distance_tol
+        self._distance_axes = [i for i, axis in enumerate("xyz") if axis in distance_axes]
 
-    def get_termination(self, task, env):
-        """
-        Return whether the episode should terminate.
-        Terminate if point goal is reached (distance below threshold)
+        # Run super init
+        super().__init__()
 
-        :param task: task instance
-        :param env: environment instance
-        :return: done, info
-        """
-        done = l2_distance(env.robots[0].get_position()[:2], task.target_pos[:2]) < self.dist_tol
-        success = done
-        return done, success
+    def _step(self, task, env, action):
+        # Make sure task is of type PointNavigation -- we import at runtime to avoid circular imports
+        from igibson.tasks.point_navigation_task import PointNavigationTask
+        assert isinstance(task, PointNavigationTask), \
+            f"Cannot use {self.__class__.__name__} with a non-PointNavigationTask task instance!"
+        # Terminate if point goal is reached (distance below threshold)
+        return l2_distance(task.get_current_pos(env)[self._distance_axes], task.get_goal_pos()[self._distance_axes]) \
+            < self._distance_tol
