@@ -21,18 +21,19 @@ class classproperty:
         return self.fget(owner_cls)
 
 
-def merge_nested_dicts(base_dict, extra_dict, verbose=False):
+def merge_nested_dicts(base_dict, extra_dict, inplace=False, verbose=False):
     """
     Iteratively updates @base_dict with values from @extra_dict. Note: This generates a new dictionary!
     Args:
         base_dict (dict): Nested base dictionary, which should be updated with all values from @extra_dict
         extra_dict (dict): Nested extra dictionary, whose values will overwrite corresponding ones in @base_dict
+        inplace (bool): Whether to modify @base_dict in place or not
         verbose (bool): If True, will print when keys are mismatched
     Returns:
         dict: Updated dictionary
     """
     # Loop through all keys in @extra_dict and update the corresponding values in @base_dict
-    base_dict = deepcopy(base_dict)
+    base_dict = base_dict if inplace else deepcopy(base_dict)
     for k, v in extra_dict.items():
         if k not in base_dict:
             base_dict[k] = v
@@ -109,7 +110,35 @@ def assert_valid_key(key, valid_keys, name=None):
     """
     if name is None:
         name = "value"
-    assert key in valid_keys, "Invalid {} received! Valid options are: {}, got: {}".format(name, valid_keys, key)
+    assert key in valid_keys, "Invalid {} received! Valid options are: {}, got: {}".format(
+        name, valid_keys.keys() if isinstance(valid_keys, dict) else valid_keys, key)
+
+
+def create_class_from_registry_and_config(cls_name, cls_registry, cfg, cls_type_descriptor):
+    """
+    Helper function to create a class with str type @cls_name, which should be a valid entry in @cls_registry, using
+    kwargs in dictionary form @cfg to pass to the constructor, with @cls_type_name specified for debugging
+
+    Args:
+        cls_name (str): Name of the class to create. This should correspond to the actual class type, in string form
+        cls_registry (dict): Class registry. This should map string names of valid classes to create to the
+            actual class type itself
+        cfg (dict): Any keyword arguments to pass to the class constructor
+        cls_type_descriptor (str): Description of the class type being created. This can be any string and is used
+            solely for debugging purposes
+
+    Returns:
+        any: Created class instance
+    """
+    # Make sure the requested class type is valid
+    assert_valid_key(key=cls_name, valid_keys=cls_registry, name=f"{cls_type_descriptor} type")
+
+    # Grab the kwargs relevant for the specific class
+    cls = cls_registry[cls_name]
+    cls_kwargs = extract_class_init_kwargs_from_dict(cls=cls, dic=cfg, copy=False)
+
+    # Create the class
+    return cls(**cls_kwargs)
 
 
 class UniquelyNamed:
