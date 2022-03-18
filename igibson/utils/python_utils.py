@@ -158,6 +158,52 @@ class UniquelyNamedNonInstance:
         raise NotImplementedError
 
 
+class Registerable:
+    """
+    Simple class template that provides an abstract interface for registering classes.
+    """
+
+    def __init_subclass__(cls, **kwargs):
+        """
+        Registers all subclasses as part of this registry. This is useful to decouple internal codebase from external
+        user additions. This way, users can add their custom subclasses by simply extending this class,
+        and it will automatically be registered internally. This allows users to then specify their classes
+        directly in string-form in e.g., their config files, without having to manually set the str-to-class mapping
+        in our code.
+        """
+        cls._register_cls()
+
+    @classmethod
+    def _register_cls(cls):
+        """
+        Register this class. Can be extended by subclass.
+        """
+        # print(f"registering: {cls.__name__}")
+        # print(f"registry: {cls._cls_registry}", cls.__name__ not in cls._cls_registry)
+        # print(f"do not register: {cls._do_not_register_classes}", cls.__name__ not in cls._do_not_register_classes)
+        # input()
+        if cls.__name__ not in cls._cls_registry and cls.__name__ not in cls._do_not_register_classes:
+            cls._cls_registry[cls.__name__] = cls
+
+    @classproperty
+    def _do_not_register_classes(cls):
+        """
+        Returns:
+            set of str: Name(s) of classes that should not be registered. Default is empty set.
+                Subclasses that shouldn't be added should call super() and then add their own class name to the set
+        """
+        return set()
+
+    @classproperty
+    def _cls_registry(cls):
+        """
+        Returns:
+            OrderedDict: Mapping from all registered class names to their classes. This should be a REFERENCE
+                to some external, global dictionary that will be filled-in at runtime.
+        """
+        raise NotImplementedError()
+
+
 class Serializable:
     """
     Simple class that provides an abstract interface to dump / load states, optionally with serialized functionality
