@@ -144,6 +144,11 @@ class BasePrim(Serializable, UniquelyNamed, metaclass=ABCMeta):
         return self._initialized
 
     @property
+    def state_size(self):
+        # This is the cached value
+        return self._state_size
+
+    @property
     def prim_path(self):
         """
         Returns:

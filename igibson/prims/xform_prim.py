@@ -42,7 +42,7 @@ class XFormPrim(BasePrim):
             prim_path (str): prim path of the Prim to encapsulate or create.
             name (str): Name for the object. Names need to be unique per scene.
             load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
-                loading this prim at runtime. For this joint prim, the below values can be specified:
+                loading this prim at runtime. For this xform prim, the below values can be specified:
 
                 scale (None or float or 3-array): If specified, sets the scale for this object. A single number corresponds
                     to uniform scaling along the x,y,z axes, whereas a 3-array specifies per-axis scaling.
@@ -69,7 +69,7 @@ class XFormPrim(BasePrim):
 
     def _load(self, simulator=None):
         # Define an Xform prim at the current stage, or the simulator's stage if specified
-        stage = get_current_stage() if simulator is None else simulator.stage
+        stage = get_current_stage()
         prim = stage.DefinePrim(self._prim_path, "Xform")
 
         return prim
@@ -106,7 +106,7 @@ class XFormPrim(BasePrim):
         self._default_state = XFormPrimState(position=default_pos, orientation=default_ori)
 
     def _set_xform_properties(self):
-        current_position, current_orientation = XFormPrim.get_position_orientation(self)
+        current_position, current_orientation = self.get_position_orientation()
         properties_to_remove = [
             "xformOp:rotateX",
             "xformOp:rotateXZY",
@@ -145,7 +145,7 @@ class XFormPrim(BasePrim):
             xform_op_rot = UsdGeom.XformOp(self._prim.GetAttribute("xformOp:orient"))
         xformable.SetXformOpOrder([xform_op_translate, xform_op_rot, xform_op_scale])
         # Possibly set position and orientation
-        XFormPrim.set_position_orientation(self, position=current_position, orientation=current_orientation)
+        self.set_position_orientation(position=current_position, orientation=current_orientation)
         return
 
     def reset(self):
@@ -296,8 +296,8 @@ class XFormPrim(BasePrim):
         transform.SetMatrix(Gf.Matrix4d(np.transpose(local_transform)))
         calculated_translation = transform.GetTranslation()
         calculated_orientation = transform.GetRotation().GetQuat()
-        XFormPrim.set_local_pose(
-            self, translation=np.array(calculated_translation), orientation=gf_quat_to_np_array(calculated_orientation)[[1, 2, 3, 0]]     # Flip from w,x,y,z to x,y,z,w
+        self.set_local_pose(
+            translation=np.array(calculated_translation), orientation=gf_quat_to_np_array(calculated_orientation)[[1, 2, 3, 0]]     # Flip from w,x,y,z to x,y,z,w
         )
         return
 
@@ -470,5 +470,5 @@ class XFormPrim(BasePrim):
         # We deserialize deterministically by knowing the order of values -- pos, ori
         return OrderedDict(
             pos=state[0:3],
-            ori=state[3:6],
-        ), 6
+            ori=state[3:7],
+        ), 7

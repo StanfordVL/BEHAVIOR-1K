@@ -108,8 +108,8 @@ class JointPrim(BasePrim):
         assert not self.articulated, "Joint cannot be created, since this is an articulated joint! We are assuming" \
                                      "the joint already exists in the stage."
 
-        # Define a joint prim at the current stage, or the simulator's stage if specified
-        stage = get_current_stage() if simulator is None else simulator.stage
+        # Define a joint prim at the current stage
+        stage = get_current_stage()
         prim = create_joint(
             prim_path=self._prim_path,
             joint_type=self._load_config.get("joint_type", JointType.JOINT),
@@ -708,10 +708,9 @@ class JointPrim(BasePrim):
             normalized (bool): Whether the input is normalized to [-1, 1] (in this case, the values will be
                 de-normalized first before being executed). Default is False
         """
-        # Sanity checks -- make sure we're the correct control type and that we're articulated
+        # Sanity checks -- make sure that we're articulated (no control type check like position and velocity
+        # because we can't set effort targets)
         self.assert_articulated()
-        assert self._control_type == ControlType.VELOCITY, \
-            "Trying to set joint velocity target, but control type is not velocity!"
 
         # Standardize input
         effort = np.array([effort]) if self._n_dof == 1 and not isinstance(effort, Iterable) else np.array(effort)

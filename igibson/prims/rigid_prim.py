@@ -18,8 +18,8 @@ from omni.isaac.contact_sensor import _contact_sensor
 import carb
 
 from igibson.prims.xform_prim import XFormPrim
-from igibson.prims.mesh_prim import CollisionMeshPrim, VisualMeshPrim
-from igibson.utils.types import DynamicState, CsRawData
+from igibson.prims.geom_prim import CollisionGeomPrim, VisualGeomPrim
+from igibson.utils.types import DynamicState, CsRawData, GEOM_TYPES
 
 
 class RigidPrim(XFormPrim):
@@ -98,16 +98,16 @@ class RigidPrim(XFormPrim):
         self._collision_meshes, self._visual_meshes = OrderedDict(), OrderedDict()
         for prim in self._prim.GetChildren():
             # Only process prims that are an Xform
-            if prim.GetPrimTypeInfo().GetTypeName() == "Mesh":
+            if prim.GetPrimTypeInfo().GetTypeName() in GEOM_TYPES:
                 mesh_name, mesh_path = prim.GetName(), prim.GetPrimPath().__str__()
                 mesh_prim = get_prim_at_path(prim_path=mesh_path)
                 mesh_kwargs = {"prim_path": mesh_path, "name": f"{self._name}:{mesh_name}"}
                 if mesh_prim.HasAPI(UsdPhysics.CollisionAPI):
-                    self._collision_meshes[mesh_name] = CollisionMeshPrim(**mesh_kwargs)
+                    self._collision_meshes[mesh_name] = CollisionGeomPrim(**mesh_kwargs)
                     # Also set the collision enabling based on whether we're a visual only body
                     self._collision_meshes[mesh_name].collision_enabled = not self._visual_only
                 else:
-                    self._visual_meshes[mesh_name] = VisualMeshPrim(**mesh_kwargs)
+                    self._visual_meshes[mesh_name] = VisualGeomPrim(**mesh_kwargs)
 
         # Possibly set the mass / density
         if "mass" in self._load_config and self._load_config["mass"] is not None:
@@ -194,7 +194,7 @@ class RigidPrim(XFormPrim):
             velocity (np.ndarray): linear velocity to set the rigid prim to. Shape (3,).
         """
         if self._handle is not None and self._dc.is_simulating():
-            print("setting rigid velocity")
+            print(f"setting rigid velocity: {velocity}")
             print(self._dc.set_rigid_body_linear_velocity(self._handle, velocity))
         else:
             self._rigid_api.GetVelocityAttr().Set(Gf.Vec3f(velocity.tolist()))
@@ -206,9 +206,10 @@ class RigidPrim(XFormPrim):
             np.ndarray: current linear velocity of the the rigid prim. Shape (3,).
         """
         if self._handle is not None and self._dc.is_simulating():
-            return self._dc.get_rigid_body_linear_velocity(self._handle)
+            lin_vel = self._dc.get_rigid_body_linear_velocity(self._handle)
         else:
-            return np.array(self._rigid_api.GetVelocityAttr().Get())
+            lin_vel = self._rigid_api.GetVelocityAttr().Get()
+        return np.array(lin_vel)
 
     def set_angular_velocity(self, velocity):
         """Sets the angular velocity of the prim in stage.
@@ -216,6 +217,7 @@ class RigidPrim(XFormPrim):
         Args:
             velocity (np.ndarray): angular velocity to set the rigid prim to. Shape (3,).
         """
+        print(f"ang vel: {velocity}")
         if self._handle is not None and self._dc.is_simulating():
             self._dc.set_rigid_body_angular_velocity(self._handle, velocity)
         else:
@@ -515,7 +517,7 @@ class RigidPrim(XFormPrim):
         # Call supermethod first
         state_dic, idx = super()._deserialize(state=state)
         # We deserialize deterministically by knowing the order of values -- lin_vel, ang_vel
-        state_dic["lin_vel"] = state[7:10],
-        state_dic["ang_vel"] = state[10:13],
+        state_dic["lin_vel"] = state[7:10]
+        state_dic["ang_vel"] = state[10:13]
 
         return state_dic, 13

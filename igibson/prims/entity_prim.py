@@ -1135,7 +1135,7 @@ class EntityPrim(XFormPrim):
         # We deserialize by first de-flattening the root link state and then iterating over all joints and
         # sequentially grabbing from the flattened state array, incrementing along the way
         idx = self.root_link.state_size
-        state_dict = self.root_link.deserialize(state=state[:idx])
+        state_dict = OrderedDict(root_link=self.root_link.deserialize(state=state[:idx]))
         joint_state_dict = OrderedDict()
         for prim_name, prim in self._joints.items():
             joint_state_dict[prim_name] = prim.deserialize(state=state[idx:idx+prim.state_size])
