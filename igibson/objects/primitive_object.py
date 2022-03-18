@@ -1,4 +1,5 @@
 import logging
+import numpy as np
 from igibson.objects.stateful_object import StatefulObject
 
 from pxr import Gf, Usd, Sdf, UsdGeom, UsdPhysics, PhysxSchema, UsdShade
@@ -35,6 +36,7 @@ class PrimitiveObject(StatefulObject):
         self_collisions=False,
         load_config=None,
         abilities=None,
+        rgba=(0.5, 0.5, 0.5, 1.0),
         **kwargs,
     ):
         """
@@ -64,9 +66,15 @@ class PrimitiveObject(StatefulObject):
 
         @param abilities: dict in the form of {ability: {param: value}} containing
             object abilities and parameters.
+        rgba (4-array): (R, G, B, A) values to set for this object
         kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
             for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
         """
+        # Compose load config and add rgba values
+        load_config = dict() if load_config is None else load_config
+        load_config["color"] = np.array(rgba[:3])
+        load_config["opacity"] = rgba[3]
+
         super().__init__(
             prim_path=prim_path,
             name=name,
@@ -94,17 +102,30 @@ class PrimitiveObject(StatefulObject):
         logging.info(f"Loading the following primitive: {self._primitive_type}")
 
         # Define an Xform at the specified path
-        stage = get_current_stage() if simulator is None else simulator.stage
+        stage = get_current_stage()
         prim = stage.DefinePrim(self._prim_path, "Xform")
 
         # Define a nested mesh corresponding to the root link for this prim
         base_link = stage.DefinePrim(f"{self._prim_path}/base_link", "Xform")
 
         # Define (finally!) nested meshes corresponding to visual / collision mesh
-        UsdGeom.__dict__[self._primitive_type].Define(stage, f"{self._prim_path}/base_link/visual")
-        UsdGeom.__dict__[self._primitive_type].Define(stage, f"{self._prim_path}/base_link/collision")
+        vis_prim = UsdGeom.__dict__[self._primitive_type].Define(stage, f"{self._prim_path}/base_link/visual").GetPrim()
+        col_prim = UsdGeom.__dict__[self._primitive_type].Define(stage, f"{self._prim_path}/base_link/collision").GetPrim()
+
+        # Add collision API to collision geom
+        UsdPhysics.CollisionAPI.Apply(col_prim)
+        UsdPhysics.MeshCollisionAPI.Apply(col_prim)
+        PhysxSchema.PhysxCollisionAPI.Apply(col_prim)
 
         return prim
+
+    def _post_load(self, simulator=None):
+        # Run super first
+        super()._post_load(simulator=simulator)
+
+        # Set color and opacity
+        self.color = self._load_config["color"]
+        self.opacity = self._load_config["opacity"]
 
     def _create_prim_with_same_kwargs(self, prim_path, name, load_config):
         # Add additional kwargs (fit_avg_dim_volume and bounding_box are already captured in load_config)
