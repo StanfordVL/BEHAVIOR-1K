@@ -1,23 +1,93 @@
 from abc import ABCMeta, abstractmethod
+from collections import OrderedDict
+
+from igibson.utils.python_utils import classproperty, Registerable
 
 
-class BaseSensorNoise:
+# Registered sensor noises
+REGISTERED_SENSOR_NOISES = OrderedDict()
+
+
+class BaseSensorNoise(Registerable, metaclass=ABCMeta):
     """
     Base SensorNoise class.
     Sensor noise-specific add_noise method is implemented in subclasses
+
+    Args:
+        enabled (bool): Whether this sensor should be enabled by default
     """
+    def __init__(self, enabled=True):
+        # Store whether this noise model is enabled or not
+        self._enabled = enabled
 
-    __metaclass__ = ABCMeta
+    def __call__(self, obs):
+        """
+        If this noise is enabled, corrupts observation @obs by adding sensor noise to sensor reading. This is an
+        identical call to self.corrupt(...)
 
-    def __init__(self, env):
-        self.config = env.config
+        Args:
+            obs (np.array): observation numpy array of values of arbitrary dimension normalized to range [0.0, 1.0]
+
+        Returns:
+            np.array: Corrupted observation numpy array if self.enabled is True, otherwise this is a pass-through
+        """
+        return self.corrupt(obs=obs)
+
+    def corrupt(self, obs):
+        """
+        If this noise is enabled, corrupts observation @obs by adding sensor noise to sensor reading.
+
+        Args:
+            obs (np.array): observation numpy array of values of arbitrary dimension normalized to range [0.0, 1.0]
+
+        Returns:
+            np.array: Corrupted observation numpy array if self.enabled is True, otherwise this is a pass-through
+        """
+        # Run sanity check to make sure obs is in acceptable range
+        assert len(obs[(obs < 0.0) | (obs > 1.0)]) == 0, "sensor reading has to be between [0.0, 1.0]"
+
+        return self._corrupt(obs=obs) if self._enabled else obs
 
     @abstractmethod
-    def add_noise(self, obs):
+    def _corrupt(self, obs):
         """
-        Add sensor noise to sensor reading
+        Corrupts observation @obs by adding sensor noise to sensor reading
 
-        :param obs: raw observation
-        :return: observation with noise
+        Args:
+            obs (np.array): observation numpy array of values of arbitrary dimension normalized to range [0.0, 1.0]
+
+        Returns:
+            np.array: Corrupted observation numpy array
         """
         raise NotImplementedError()
+
+    @property
+    def enabled(self):
+        """
+        Returns:
+            bool: Whether this noise model is enabled or not
+        """
+        return self._enabled
+
+    @enabled.setter
+    def enabled(self, enabled):
+        """
+        En/disables this noise model
+
+        Args:
+            enabled (bool): Whether this noise model should be enabled or not
+        """
+        self._enabled = enabled
+
+    @classproperty
+    def _do_not_register_classes(cls):
+        # Don't register this class since it's an abstract template
+        classes = super()._do_not_register_classes
+        classes.add("BaseSensorNoise")
+        return classes
+
+    @classproperty
+    def _cls_registry(cls):
+        # Global registry
+        global REGISTERED_SENSOR_NOISES
+        return REGISTERED_SENSOR_NOISES

@@ -1,180 +1,292 @@
 import os
 from collections import OrderedDict
 
+import math
 import numpy as np
+import time
 
-import igibson
-from igibson.robots.behavior_robot import BehaviorRobot
-from igibson.sensors.dropout_sensor_noise import DropoutSensorNoise
+import carb
+from pxr import Gf, Usd, UsdGeom
+import omni.usd
+from omni.isaac.core.utils.stage import get_current_stage
+from omni.kit.viewport import get_viewport_interface
+
+from igibson import app
 from igibson.sensors.sensor_base import BaseSensor
 from igibson.utils.constants import MAX_CLASS_COUNT, MAX_INSTANCE_COUNT
+from igibson.utils.python_utils import assert_valid_key, classproperty
+from igibson.utils.usd_utils import get_camera_params, get_semantic_objects_pose
+from igibson.utils.vision_utils import get_rgb_filled
+from igibson.utils.transform_utils import euler2quat, quat2euler
+
+# Make sure synthetic data extension is enabled
+ext_manager = app.app.get_extension_manager()
+ext_manager.set_extension_enabled("omni.syntheticdata", True)
+
+# Continue with omni synethic data imports afterwards
+from omni.syntheticdata import sensors as sensors_util
+import omni.syntheticdata._syntheticdata as sd
+sensor_types = sd.SensorType
 
 
 class VisionSensor(BaseSensor):
     """
-    Vision sensor (including rgb, rgb_filled, depth, 3d, seg, normal, optical flow, scene flow)
+    Vision sensor that handles a variety of modalities, including:
+
+        - RGB (normal, filled)
+        - Depth (normal, linear)
+        - Normals
+        - Segmentation (semantic, instance)
+        - Optical flow
+        - 2D Bounding boxes (tight, loose)
+        - 3D Bounding boxes
+        - Camera state
+        - Pose of objects with a semantic label
+
+    Args:
+        prim_path (str): prim path of the Prim to encapsulate or create.
+        name (str): Name for the object. Names need to be unique per scene.
+        modalities (str or list of str): Modality(s) supported by this sensor. Default is "all", which corresponds
+            to all modalities being used. Otherwise, valid options should be part of cls.all_modalities.
+            For this vision sensor, this includes any of:
+                {rgb, rgb_filled, depth, depth_linear, normal, seg_semantic, seg_instance, flow, bbox_2d_tight,
+                bbox_2d_loose, bbox_3d, camera, pose}
+        enabled (bool): Whether this sensor should be enabled by default
+        noise (None or BaseSensorNoise): If specified, sensor noise model to apply to this sensor.
+        load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
+            loading this sensor's prim at runtime.
+        image_height (int): Height of generated images, in pixels
+        image_width (int): Width of generated images, in pixels
+
     """
+    _SENSOR_HELPERS = OrderedDict(
+        rgb=sensors_util.get_rgb,
+        rgb_filled=get_rgb_filled,
+        depth=sensors_util.get_depth,
+        depth_linear=sensors_util.get_depth_linear,
+        normal=sensors_util.get_normals,
+        seg_semantic=sensors_util.get_semantic_segmentation,
+        seg_instance=sensors_util.get_instance_segmentation,
+        flow=sensors_util.get_motion_vector,
+        bbox_2d_tight=sensors_util.get_bounding_box_2d_tight,
+        bbox_2d_loose=sensors_util.get_bounding_box_2d_loose,
+        bbox_3d=sensors_util.get_bounding_box_3d,
+        camera=get_camera_params,
+        pose=get_semantic_objects_pose,
+    )
 
-    def __init__(self, env, modalities):
-        super(VisionSensor, self).__init__(env)
-        self.modalities = modalities
-        self.raw_modalities = self.get_raw_modalities(modalities)
-        self.image_width = self.config.get("image_width", 128)
-        self.image_height = self.config.get("image_height", 128)
+    # Define raw sensor types
+    _RAW_SENSOR_TYPES = OrderedDict(
+        rgb=sensor_types.Rgb,
+        depth=sensor_types.Depth,
+        depth_linear=sensor_types.DepthLinear,
+        normal=sensor_types.Normal,
+        seg_semantic=sensor_types.SemanticSegmentation,
+        seg_instance=sensor_types.InstanceSegmentation,
+        flow=sensor_types.MotionVector,
+        bbox_2d_tight=sensor_types.BoundingBox2DTight,
+        bbox_2d_loose=sensor_types.BoundingBox2DLoose,
+        bbox_3d=sensor_types.BoundingBox3D,
+    )
 
-        self.depth_noise_rate = self.config.get("depth_noise_rate", 0.0)
-        self.depth_low = self.config.get("depth_low", 0.5)
-        self.depth_high = self.config.get("depth_high", 5.0)
+    def __init__(
+        self,
+        prim_path,
+        name,
+        modalities="all",
+        enabled=True,
+        noise=None,
+        load_config=None,
+        image_height=128,
+        image_width=128,
+    ):
+        # Create load config from inputs
+        load_config = dict() if load_config is None else load_config
+        load_config["image_height"] = image_height
+        load_config["image_width"] = image_width
 
-        self.noise_model = DropoutSensorNoise(env)
-        self.noise_model.set_noise_rate(self.depth_noise_rate)
-        self.noise_model.set_noise_value(0.0)
+        # Create variables that will be filled in later at runtime
+        self._sd = None             # synthetic data interface
+        self._viewport = None       # Viewport from which to grab data
 
-        if "rgb_filled" in modalities:
-            try:
-                import torch
-                import torch.nn as nn
-                from torchvision import transforms
+        # Run super method
+        super().__init__(
+            prim_path=prim_path,
+            name=name,
+            modalities=modalities,
+            enabled=enabled,
+            noise=noise,
+            load_config=load_config,
+        )
 
-                from igibson.learn.completion import CompletionNet
-            except ImportError:
-                raise Exception(
-                    'Trying to use rgb_filled ("the goggle"), but torch is not installed. Try "pip install torch torchvision".'
+    def _load(self, simulator=None):
+        # Define a new camera prim at the current stage
+        stage = get_current_stage()
+        prim = UsdGeom.Camera.Define(stage, self._prim_path).GetPrim()
+
+        return prim
+
+    def _post_load(self, simulator=None):
+        # Get synthetic data interface
+        self._sd = sd.acquire_syntheticdata_interface()
+
+        # Create a new viewport to link to this camera
+        vp = get_viewport_interface()
+        viewport_handle = vp.create_instance()
+        self._viewport = vp.get_viewport_window(viewport_handle)
+
+        # Link the camera and viewport together
+        self._viewport.set_active_camera(self._prim_path)
+
+        # Set the viewer size
+        self._viewport.set_texture_resolution(self._load_config["image_height"], self._load_config["image_width"])
+
+        # Initialize sensors
+        self._initialize_sensors(names=self._modalities)
+
+    def _initialize_sensors(self, names, timeout=10.0):
+        """Initializes a raw sensor in the simulation.
+
+        Args:
+            names (str or list of str): Name of the raw sensor(s) to initialize.
+                If they are not part of self._RAW_SENSOR_TYPES' keys, we will simply pass over them
+            timeout (int): Maximum time in seconds to attempt to initialize sensors.
+        """
+        # Standardize the input and grab the intersection with all possible raw sensors
+        names = set([names]) if isinstance(names, str) else set(names)
+        names = names.intersection(set(self._RAW_SENSOR_TYPES.keys()))
+
+        # Record the start time so we know how long this takes
+        start = time.time()
+        is_initialized = False
+        sensors = []
+        while not is_initialized and time.time() < (start + timeout):
+            for name in names:
+                sensors.append(sensors_util.create_or_retrieve_sensor(self._viewport, self._RAW_SENSOR_TYPES[name]))
+            app.update()
+            is_initialized = not any([not self._sd.is_sensor_initialized(s) for s in sensors])
+        if not is_initialized:
+            uninitialized = [s for s in sensors if not self._sd.is_sensor_initialized(s)]
+            raise TimeoutError(f"Unable to initialized sensors: [{uninitialized}] within {timeout} seconds.")
+
+        app.update()  # Extra frame required to prevent access violation error
+
+    def _get_obs(self):
+        # Run super first to grab any upstream obs
+        obs = super()._get_obs()
+
+        # Process each sensor modality individually
+        for modality in self.modalities:
+            mod_kwargs = dict()
+            if modality not in {"pose"}:
+                mod_kwargs["viewport"] = self._viewport
+                if modality == "seg_instance":
+                    mod_kwargs.update({"parsed": True, "return_mapping": True})
+                elif modality == "bbox_3d":
+                    mod_kwargs.update({"parsed": True, "return_corners": True})
+            obs[modality] = self._SENSOR_HELPERS[modality](**mod_kwargs)
+
+        return obs
+
+    def add_modality(self, modality):
+        # Check if we already have this modality (if so, no need to initialize it explicitly)
+        should_initialize = modality not in self._modalities
+
+        # Run super
+        super().add_modality(modality=modality)
+
+        # We also need to initialize this new modality
+        if should_initialize:
+            self._initialize_sensors(names=modality)
+
+    def get_local_pose(self):
+        # We have to overwrite this because camera prims can't set their quat for some reason ):
+        xform_translate_op = self.get_attribute("xformOp:translate")
+        xform_orient_op = self.get_attribute("xformOp:rotateXYZ")
+        return np.array(xform_translate_op.Get()), euler2quat(np.array(xform_orient_op.Get()))
+
+    def set_local_pose(self, translation=None, orientation=None):
+        # We have to overwrite this because camera prims can't set their quat for some reason ):
+        properties = self.prim.GetPropertyNames()
+        if translation is not None:
+            translation = Gf.Vec3d(*translation.tolist())
+            if "xformOp:translate" not in properties:
+                carb.log_error(
+                    "Translate property needs to be set for {} before setting its position".format(self.name)
                 )
+            self.set_attribute("xformOp:translate", translation)
+        if orientation is not None:
+            xform_op = self._prim.GetAttribute("xformOp:rotateXYZ")
+            # Convert to euler and set
+            rot_euler = quat2euler(quat=orientation)
+            xform_op.Set(Gf.Vec3f(*rot_euler.tolist()))
 
-            self.comp = CompletionNet(norm=nn.BatchNorm2d, nf=64)
-            self.comp = torch.nn.DataParallel(self.comp).cuda()
-            self.comp.load_state_dict(torch.load(os.path.join(igibson.assets_path, "networks", "model.pth")))
-            self.comp.eval()
+    @property
+    def image_height(self):
+        """
+        Returns:
+            int: Image height of this sensor, in pixels
+        """
+        return self._viewport.get_texture_resolution()[0]
 
-    def get_raw_modalities(self, modalities):
+    @image_height.setter
+    def image_height(self, height):
         """
-        Helper function that gathers raw modalities (e.g. depth is based on 3d)
+        Sets the image height @height for this sensor
 
-        :return: raw modalities to query the renderer
+        Args:
+            height (int): Image height of this sensor, in pixels
         """
-        raw_modalities = []
-        if "rgb" in modalities or "rgb_filled" in modalities or "highlight" in modalities:
-            raw_modalities.append("rgb")
-        if "depth" in modalities or "3d" in modalities:
-            raw_modalities.append("3d")
-        if "seg" in modalities:
-            raw_modalities.append("seg")
-        if "ins_seg" in modalities:
-            raw_modalities.append("ins_seg")
-        if "normal" in modalities:
-            raw_modalities.append("normal")
-        if "optical_flow" in modalities:
-            raw_modalities.append("optical_flow")
-        if "scene_flow" in modalities:
-            raw_modalities.append("scene_flow")
-        return raw_modalities
+        _, width = self._viewport.get_texture_resolution()
+        self._viewport.set_texture_resolution(height, width)
 
-    def get_rgb(self, raw_vision_obs):
+    @property
+    def image_width(self):
         """
-        :return: RGB sensor reading, normalized to [0.0, 1.0]
+        Returns:
+            int: Image width of this sensor, in pixels
         """
-        return raw_vision_obs["rgb"][:, :, :3]
+        return self._viewport.get_texture_resolution()[1]
 
-    def get_highlight(self, raw_vision_obs):
-        if not "rgb" in raw_vision_obs:
-            raise ValueError("highlight depends on rgb")
+    @image_width.setter
+    def image_width(self, width):
+        """
+        Sets the image width @width for this sensor
 
-        return (raw_vision_obs["rgb"][:, :, 3:4] > 0).astype(np.float32)
+        Args:
+            width (int): Image width of this sensor, in pixels
+        """
+        height, _ = self._viewport.get_texture_resolution()
+        self._viewport.set_texture_resolution(height, width)
 
-    def get_rgb_filled(self, raw_vision_obs):
-        """
-        :return: RGB-filled sensor reading by passing through the "Goggle" neural network
-        """
-        rgb = self.get_rgb(raw_vision_obs)
-        with torch.no_grad():
-            tensor = transforms.ToTensor()((rgb * 255).astype(np.uint8)).cuda()
-            rgb_filled = self.comp(tensor[None, :, :, :])[0]
-            return rgb_filled.permute(1, 2, 0).cpu().numpy()
+    @property
+    def _obs_space_mapping(self):
+        # Make sure bbox obs aren't being used, since they are variable in size!
+        for modality in {"bbox_2d_tight", "bbox_2d_loose", "bbox_3d", "camera", "pose"}:
+            assert modality not in self._modalities, \
+                f"Cannot use bounding box, camera, or pose modalities for observation space " \
+                f"because it is variable in size!"
 
-    def get_depth(self, raw_vision_obs):
-        """
-        :return: depth sensor reading, normalized to [0.0, 1.0]
-        """
-        depth = -raw_vision_obs["3d"][:, :, 2:3]
-        # 0.0 is a special value for invalid entries
-        depth[depth < self.depth_low] = 0.0
-        depth[depth > self.depth_high] = 0.0
+        # Set the remaining modalities' values
+        # (shape, low, high)
+        obs_space_mapping = OrderedDict(
+            rgb=((self.image_height, self.image_width, 3), 0.0, 1.0),
+            rgb_filled=((self.image_height, self.image_width, 3), 0.0, 1.0),
+            depth=((self.image_height, self.image_width, 1), 0.0, 1.0),
+            depth_linear=((self.image_height, self.image_width, 1), 0.0, np.inf),
+            normal=((self.image_height, self.image_width, 3), -1.0, 1.0),
+            seg_semantic=((self.image_height, self.image_width), 0.0, np.inf),
+            seg_instance=((self.image_height, self.image_width), 0.0, np.inf),
+            flow=((self.image_height, self.image_width, 3), -np.inf, np.inf),
+        )
 
-        # re-scale depth to [0.0, 1.0]
-        depth /= self.depth_high
-        depth = self.noise_model.add_noise(depth)
+        return obs_space_mapping
 
-        return depth
+    @classproperty
+    def all_modalities(cls):
+        return {k for k in cls._SENSOR_HELPERS.keys()}
 
-    def get_pc(self, raw_vision_obs):
-        """
-        :return: pointcloud sensor reading
-        """
-        return raw_vision_obs["3d"][:, :, :3]
-
-    def get_optical_flow(self, raw_vision_obs):
-        """
-        :return: optical flow sensor reading
-        """
-        return raw_vision_obs["optical_flow"][:, :, :2]
-
-    def get_scene_flow(self, raw_vision_obs):
-        """
-        :return: scene flow sensor reading
-        """
-        return raw_vision_obs["scene_flow"][:, :, :3]
-
-    def get_normal(self, raw_vision_obs):
-        """
-        :return: surface normal reading
-        """
-        return raw_vision_obs["normal"][:, :, :3]
-
-    def get_seg(self, raw_vision_obs):
-        """
-        :return: semantic segmentation mask, between 0 and MAX_CLASS_COUNT
-        """
-        seg = np.round(raw_vision_obs["seg"][:, :, 0:1] * MAX_CLASS_COUNT).astype(np.int32)
-        return seg
-
-    def get_ins_seg(self, raw_vision_obs):
-        """
-        :return: semantic segmentation mask, between 0 and MAX_INSTANCE_COUNT
-        """
-        seg = np.round(raw_vision_obs["ins_seg"][:, :, 0:1] * MAX_INSTANCE_COUNT).astype(np.int32)
-        return seg
-
-    def get_obs(self, env):
-        """
-        Get vision sensor reading
-
-        :return: vision sensor reading
-        """
-        raw_vision_obs = env.simulator.renderer.render_robot_cameras(modes=self.raw_modalities)
-
-        raw_vision_obs = {mode: value for mode, value in zip(self.raw_modalities, raw_vision_obs)}
-
-        vision_obs = OrderedDict()
-        if "rgb" in self.modalities:
-            vision_obs["rgb"] = self.get_rgb(raw_vision_obs)
-        if "rgb_filled" in self.modalities:
-            vision_obs["rgb_filled"] = self.get_rgb_filled(raw_vision_obs)
-        if "depth" in self.modalities:
-            vision_obs["depth"] = self.get_depth(raw_vision_obs)
-        if "pc" in self.modalities:
-            vision_obs["pc"] = self.get_pc(raw_vision_obs)
-        if "optical_flow" in self.modalities:
-            vision_obs["optical_flow"] = self.get_optical_flow(raw_vision_obs)
-        if "scene_flow" in self.modalities:
-            vision_obs["scene_flow"] = self.get_scene_flow(raw_vision_obs)
-        if "normal" in self.modalities:
-            vision_obs["normal"] = self.get_normal(raw_vision_obs)
-        if "seg" in self.modalities:
-            vision_obs["seg"] = self.get_seg(raw_vision_obs)
-        if "ins_seg" in self.modalities:
-            vision_obs["ins_seg"] = self.get_ins_seg(raw_vision_obs)
-        if "highlight" in self.modalities:
-            vision_obs["highlight"] = self.get_highlight(raw_vision_obs)
-
-        return vision_obs
+    @classproperty
+    def no_noise_modalities(cls):
+        # bounding boxes, camera state, and pose should not have noise
+        return {"bbox_2d_tight", "bbox_2d_loose", "bbox_3d", "camera", "pose"}

@@ -6,43 +6,75 @@ from igibson.sensors.sensor_noise_base import BaseSensorNoise
 class DropoutSensorNoise(BaseSensorNoise):
     """
     Naive dropout sensor noise model
+
+    Args:
+        dropout_prob (float): Value in [0.0, 1.0] representing fraction of a single observation to be replaced
+            with @dropout_value
+        dropout_value (float): Value in [0.0, 1.0] to replace observations selected to be dropped out
+        enabled (bool): Whether this sensor should be enabled by default
     """
 
-    def __init__(self, env):
-        super(DropoutSensorNoise, self).__init__(env)
-        self.noise_rate = 0.0
-        self.noise_value = 1.0
+    def __init__(
+            self,
+            dropout_prob=0.05,
+            dropout_value=1.0,
+            enabled=True,
+    ):
+        # Store args, and make sure values are in acceptable range
+        for name, val in zip(("dropout_prob", "dropout_value"), (dropout_prob, dropout_value)):
+            assert 0.0 <= val <= 1.0, f"{name} should be in range [0.0, 1.0], got: {val}"
+        self._dropout_prob = dropout_prob
+        self._dropout_value = dropout_value
 
-    def set_noise_rate(self, noise_rate):
-        """
-        Set noise rate
+        # Run super method
+        super().__init__(enabled=enabled)
 
-        :param noise_rate: noise rate
-        """
-        self.noise_rate = noise_rate
-
-    def set_noise_value(self, noise_value):
-        """
-        Set noise value
-
-        :param noise_value: noise value
-        """
-        self.noise_value = noise_value
-
-    def add_noise(self, obs):
-        """
-        Add naive sensor dropout to perceptual sensor, such as RGBD and LiDAR scan
-
-        :param sensor_reading: raw sensor reading, range must be between [0.0, 1.0]
-        :param noise_rate: how much noise to inject, 0.05 means 5% of the data will be replaced with noise_value
-        :param noise_value: noise_value to overwrite raw sensor reading
-        :return: sensor reading corrupted with noise
-        """
-        if self.noise_rate <= 0.0:
+    def _corrupt(self, obs):
+        # If our noise rate is 0, we just return the obs
+        if self._dropout_prob == 0.0:
             return obs
 
-        assert len(obs[(obs < 0.0) | (obs > 1.0)]) == 0, "sensor reading has to be between [0.0, 1.0]"
-
-        valid_mask = np.random.choice(2, obs.shape, p=[self.noise_rate, 1.0 - self.noise_rate])
-        obs[valid_mask == 0] = self.noise_value
+        # Corrupt with randomized dropout
+        valid_mask = np.random.choice(2, obs.shape, p=[self._dropout_prob, 1.0 - self._dropout_prob])
+        obs[valid_mask == 0] = self._dropout_value
         return obs
+
+    @property
+    def dropout_prob(self):
+        """
+        Returns:
+            float: Value in [0.0, 1.0] representing fraction of a single observation to be replaced
+                with self.dropout_value
+        """
+        return self._dropout_prob
+
+    @dropout_prob.setter
+    def dropout_prob(self, p):
+        """
+        Set the dropout probability for this noise model.
+
+        Args:
+            p (float): Value in [0.0, 1.0] representing fraction of a single observation to be replaced
+                with self.dropout_value
+        """
+        assert 0.0 <= p <= 1.0, f"dropout_prob should be in range [0.0, 1.0], got: {p}"
+        self._dropout_prob = p
+
+    @property
+    def dropout_value(self):
+        """
+        Returns:
+            float: Value in [0.0, 1.0] to replace observations selected to be dropped out
+        """
+        return self._dropout_value
+
+    @dropout_value.setter
+    def dropout_value(self, val):
+        """
+        Set the dropout value for this noise model.
+
+        Args:
+            val (float): Value in [0.0, 1.0] to replace observations selected to be dropped out
+        """
+        assert 0.0 <= val <= 1.0, f"dropout_value should be in range [0.0, 1.0], got: {val}"
+        self._dropout_value = val
