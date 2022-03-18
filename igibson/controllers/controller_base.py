@@ -2,17 +2,12 @@ from collections import Iterable, OrderedDict
 
 import numpy as np
 
-from igibson.utils.python_utils import assert_valid_key, Serializable
+from igibson.utils.python_utils import classproperty, assert_valid_key, Serializable, Registerable
 
 # Global dicts that will contain mappings
-REGISTERED_CONTROLLERS = {}
-REGISTERED_LOCOMOTION_CONTROLLERS = {}
-REGISTERED_MANIPULATION_CONTROLLERS = {}
-
-
-def register_controller(cls):
-    if cls.__name__ not in REGISTERED_CONTROLLERS:
-        REGISTERED_CONTROLLERS[cls.__name__] = cls
+REGISTERED_CONTROLLERS = OrderedDict()
+REGISTERED_LOCOMOTION_CONTROLLERS = OrderedDict()
+REGISTERED_MANIPULATION_CONTROLLERS = OrderedDict()
 
 
 def register_locomotion_controller(cls):
@@ -50,20 +45,10 @@ class ControlType:
         return cls._MAPPING[type_str.lower()]
 
 
-class BaseController(Serializable):
+class BaseController(Serializable, Registerable):
     """
     An abstract class with interface for mapping specific types of commands to deployable control signals.
     """
-
-    def __init_subclass__(cls, **kwargs):
-        """
-        Registers all subclasses as part of this registry. This is useful to decouple internal codebase from external
-        user additions. This way, users can add their custom controller by simply extending this Controller class,
-        and it will automatically be registered internally. This allows users to then specify their controller
-        directly in string-from in e.g., their config files, without having to manually set the str-to-class mapping
-        in our code.
-        """
-        register_controller(cls)
 
     def __init__(
         self,
@@ -229,10 +214,6 @@ class BaseController(Serializable):
         """
         raise NotImplementedError
 
-    def state_size(self):
-        # Default is no state, so return 0
-        return 0
-
     def _dump_state(self):
         # Default is no state (empty dict)
         return OrderedDict()
@@ -282,6 +263,11 @@ class BaseController(Serializable):
         return np.array(nums) if isinstance(nums, Iterable) else np.ones(dim) * nums
 
     @property
+    def state_size(self):
+        # Default is no state, so return 0
+        return 0
+
+    @property
     def control_type(self):
         """
         :return ControlType: Type of control returned by this controller
@@ -309,6 +295,19 @@ class BaseController(Serializable):
         """
         return np.array(self._dof_idx)
 
+    @classproperty
+    def _do_not_register_classes(cls):
+        # Don't register this class since it's an abstract template
+        classes = super()._do_not_register_classes
+        classes.add("BaseController")
+        return classes
+
+    @classproperty
+    def _cls_registry(cls):
+        # Global registry
+        global REGISTERED_CONTROLLERS
+        return REGISTERED_CONTROLLERS
+
 
 class LocomotionController(BaseController):
     """
@@ -321,6 +320,13 @@ class LocomotionController(BaseController):
         super().__init_subclass__(**kwargs)
         register_locomotion_controller(cls)
 
+    @classproperty
+    def _do_not_register_classes(cls):
+        # Don't register this class since it's an abstract template
+        classes = super()._do_not_register_classes
+        classes.add("LocomotionController")
+        return classes
+
 
 class ManipulationController(BaseController):
     """
@@ -332,3 +338,10 @@ class ManipulationController(BaseController):
         # Register as part of locomotion controllers
         super().__init_subclass__(**kwargs)
         register_manipulation_controller(cls)
+
+    @classproperty
+    def _do_not_register_classes(cls):
+        # Don't register this class since it's an abstract template
+        classes = super()._do_not_register_classes
+        classes.add("ManipulationController")
+        return classes
