@@ -3,6 +3,7 @@ from abc import abstractmethod
 import numpy as np
 
 from igibson.robots.robot_base import BaseRobot
+from igibson.utils.python_utils import classproperty
 
 
 class ActiveCameraRobot(BaseRobot):
@@ -96,3 +97,10 @@ class ActiveCameraRobot(BaseRobot):
         :return Array[int]: Indices in low-level control vector corresponding to camera joints.
         """
         raise NotImplementedError
+
+    @classproperty
+    def _do_not_register_classes(cls):
+        # Don't register this class since it's an abstract template
+        classes = super()._do_not_register_classes
+        classes.add("ActiveCameraRobot")
+        return classes

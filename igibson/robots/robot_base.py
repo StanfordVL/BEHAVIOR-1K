@@ -11,47 +11,29 @@ from future.utils import with_metaclass
 
 from igibson.controllers import ControlType, create_controller
 # # from igibson.external.pybullet_tools.utils import get_joint_info
+from igibson.sensors import create_sensor, SENSOR_PRIMS_TO_SENSOR_CLS, ALL_SENSOR_MODALITIES
 from igibson.objects.usd_object import USDObject
 from igibson.objects.controllable_object import ControllableObject
-from igibson.utils.python_utils import assert_valid_key, merge_nested_dicts
+from igibson.utils.gym_utils import GymObservable
+from igibson.utils.python_utils import classproperty, assert_valid_key, merge_nested_dicts, Registerable
 from igibson.utils.utils import rotate_vector_3d
 
 from pxr import UsdPhysics
 
 # Global dicts that will contain mappings
-REGISTERED_ROBOTS = {}
-ROBOT_TEMPLATE_CLASSES = {
-    "BaseRobot",
-    "ActiveCameraRobot",
-    "TwoWheelRobot",
-    "ManipulationRobot",
-    "LocomotionRobot",
-}
+REGISTERED_ROBOTS = OrderedDict()
+
+# Add proprio sensor modality to ALL_SENSOR_MODALITIES
+ALL_SENSOR_MODALITIES.add("proprio")
 
 
-def register_robot(cls):
-    if cls.__name__ not in REGISTERED_ROBOTS and cls.__name__ not in ROBOT_TEMPLATE_CLASSES:
-        REGISTERED_ROBOTS[cls.__name__] = cls
-
-
-class BaseRobot(USDObject, ControllableObject):
+class BaseRobot(USDObject, ControllableObject, GymObservable, Registerable):
     """
     Base class for USD-based robot agents.
 
     This class handles object loading, and provides method interfaces that should be
     implemented by subclassed robots.
     """
-
-    def __init_subclass__(cls, **kwargs):
-        """
-        Registers all subclasses as part of this registry. This is useful to decouple internal codebase from external
-        user additions. This way, users can add their custom robot by simply extending this Robot class,
-        and it will automatically be registered internally. This allows users to then specify their robot
-        directly in string-from in e.g., their config files, without having to manually set the str-to-class mapping
-        in our code.
-        """
-        if not inspect.isabstract(cls):
-            register_robot(cls)
 
     def __init__(
         self,
@@ -79,6 +61,7 @@ class BaseRobot(USDObject, ControllableObject):
         reset_joint_pos=None,
 
         # Unique to this class
+        obs_modalities="all",
         proprio_obs="default",
 
         **kwargs,
@@ -107,6 +90,9 @@ class BaseRobot(USDObject, ControllableObject):
         :param action_type: str, one of {discrete, continuous} - what type of action space to use
         :param action_normalize: bool, whether to normalize inputted actions. This will override any default values
          specified by this class.
+        obs_modalities (str or list of str): Observation modalities to use for this robot. Default is "all", which
+            corresponds to all modalities being used.
+            Otherwise, valid options should be part of igibson.sensors.ALL_SENSOR_MODALITIES.
         :param proprio_obs: str or tuple of str, proprioception observation key(s) to use for generating proprioceptive
             observations. If str, should be exactly "default" -- this results in the default proprioception observations
             being used, as defined by self.default_proprio_obs. See self._get_proprioception_dict for valid key choices
@@ -116,6 +102,8 @@ class BaseRobot(USDObject, ControllableObject):
             for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
         """
         # Store inputs
+        self._obs_modalities = obs_modalities if obs_modalities == "all" else \
+            {obs_modalities} if isinstance(obs_modalities, str) else set(obs_modalities)              # this will get updated later when we fill in our sensors
         self._proprio_obs = self.default_proprio_obs if proprio_obs == "default" else list(proprio_obs)
 
         # Process abilities
@@ -123,6 +111,7 @@ class BaseRobot(USDObject, ControllableObject):
         abilities = robot_abilities if abilities is None else robot_abilities.update(abilities)
 
         # Initialize internal attributes that will be loaded later
+        self._sensors = None                     # e.g.: scan sensor, vision sensor
         self._simulator = None                   # Required for AG by ManipulationRobot
 
         # Run super init
@@ -152,12 +141,45 @@ class BaseRobot(USDObject, ControllableObject):
         # Run super post load first
         super()._post_load(simulator=simulator)
 
+        # Search for any sensors this robot might have attached to any of its links
+        self._sensors = OrderedDict()
+        obs_modalities = set()
+        for link_name, link in self._links.items():
+            # Search through all children prims and see if we find any sensor
+            for prim in link.prim.GetChildren():
+                prim_type = prim.GetPrimTypeInfo().GetTypeName()
+                if prim_type in SENSOR_PRIMS_TO_SENSOR_CLS:
+                    # Infer what obs modalities to use for this sensor
+                    sensor_cls = SENSOR_PRIMS_TO_SENSOR_CLS[prim_type]
+                    modalities = sensor_cls.all_modalities if self._obs_modalities == "all" else \
+                        sensor_cls.all_modalities.intersection(self._obs_modalities)
+                    obs_modalities = obs_modalities.union(modalities)
+                    # Create the sensor and store it internally
+                    sensor = create_sensor(
+                        sensor_type=prim_type,
+                        prim_path=str(prim.GetPrimPath()),
+                        name=f"{self.name}:{link_name}_{prim_type}_sensor",
+                        modalities=modalities,
+                    )
+                    self._sensors[sensor.name] = sensor
+
+        # Since proprioception isn't an actual sensor, we need to possibly manually add it here as well
+        if self._obs_modalities == "all":
+            obs_modalities.add("proprio")
+
+        # Update our overall obs modalities
+        self._obs_modalities = obs_modalities
+
         # A persistent reference to simulator is needed for AG in ManipulationRobot
         self._simulator = simulator
 
     def _initialize(self):
         # Run super first
         super()._initialize()
+
+        # Initialize all sensors
+        for sensor in self._sensors.values():
+            sensor.initialize()
 
         # Validate this robot configuration
         self._validate_configuration()
@@ -203,6 +225,29 @@ class BaseRobot(USDObject, ControllableObject):
         """
         return False
 
+    def get_obs(self):
+        """
+        Grabs all observations from the robot. This is keyword-mapped based on each observation modality
+            (e.g.: proprio, rgb, etc.)
+
+        Returns:
+            OrderedDict: Keyword-mapped dictionary mapping observation modality names to
+                observations (usually np arrays)
+        """
+        # Our sensors already know what observation modalities it has, so we simply iterate over all of them
+        # and grab their observations, processing them into a flat dict
+        obs_dict = OrderedDict()
+        for sensor_name, sensor in self._sensors.items():
+            sensor_obs = sensor.get_obs()
+            for obs_modality, obs in sensor_obs.items():
+                obs_dict[f"{sensor_name}_{obs_modality}"] = obs
+
+        # Have to handle proprio separately since it's not an actual sensor
+        if "proprio" in self._obs_modalities:
+            obs_dict["proprio"] = self.get_proprioception()
+
+        return obs_dict
+
     def get_proprioception(self):
         """
         :return Array[float]: numpy array of all robot-specific proprioceptive observations.
@@ -237,6 +282,66 @@ class BaseRobot(USDObject, ControllableObject):
             "robot_lin_vel": self.get_linear_velocity(),
             "robot_ang_vel": self.get_angular_velocity(),
         }
+
+    def _load_observation_space(self):
+        # We compile observation spaces from our sensors
+        obs_space = OrderedDict()
+
+        for sensor_name, sensor in self._sensors.items():
+            # Load the sensor observation space
+            sensor_obs_space = sensor.load_observation_space()
+            for obs_modality, obs_modality_space in sensor_obs_space.items():
+                obs_space[f"{sensor_name}_{obs_modality}"] = obs_modality_space
+
+        # Have to handle proprio separately since it's not an actual sensor
+        if "proprio" in self._obs_modalities:
+            obs_space["proprio"] = self._build_obs_box_space(shape=(self.proprioception_dim,), low=-np.inf, high=np.inf)
+
+        return obs_space
+
+    def add_obs_modality(self, modality):
+        """
+        Adds observation modality @modality to this robot. Note: Should be one of igibson.sensors.ALL_SENSOR_MODALITIES
+
+        Args:
+            modality (str): Observation modality to add to this robot
+        """
+        # Iterate over all sensors we own, and if the requested modality is a part of its possible valid modalities,
+        # then we add it
+        for sensor in self._sensors.values():
+            if modality in sensor.all_modalities:
+                sensor.add_modality(modality=modality)
+
+    def remove_obs_modality(self, modality):
+        """
+        Remove observation modality @modality from this robot. Note: Should be one of
+        igibson.sensors.ALL_SENSOR_MODALITIES
+
+        Args:
+            modality (str): Observation modality to remove from this robot
+        """
+        # Iterate over all sensors we own, and if the requested modality is a part of its possible valid modalities,
+        # then we remove it
+        for sensor in self._sensors.values():
+            if modality in sensor.all_modalities:
+                sensor.remove_modality(modality=modality)
+
+    @property
+    def sensors(self):
+        """
+        Returns:
+            OrderedDict: Keyword-mapped dictionary mapping sensor names to BaseSensor instances owned by this robot
+        """
+        return self._sensors
+
+    @property
+    def obs_modalities(self):
+        """
+        Returns:
+            set of str: Observation modalities used for this robot (e.g.: proprio, rgb, etc.)
+        """
+        assert self._loaded, "Cannot check observation modalities until we load this robot!"
+        return self._obs_modalities
 
     @property
     def proprioception_dim(self):
@@ -282,3 +387,16 @@ class BaseRobot(USDObject, ControllableObject):
         :return str: absolute path to robot model's URDF / MJCF file
         """
         raise NotImplementedError
+
+    @classproperty
+    def _do_not_register_classes(cls):
+        # Don't register this class since it's an abstract template
+        classes = super()._do_not_register_classes
+        classes.add("BaseRobot")
+        return classes
+
+    @classproperty
+    def _cls_registry(cls):
+        # Global robot registry
+        global REGISTERED_ROBOTS
+        return REGISTERED_ROBOTS

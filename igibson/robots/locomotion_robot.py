@@ -6,6 +6,7 @@ from transforms3d.quaternions import qmult, quat2mat
 
 from igibson.controllers import LocomotionController
 from igibson.robots.robot_base import BaseRobot
+from igibson.utils.python_utils import classproperty
 
 
 class LocomotionRobot(BaseRobot):
@@ -164,3 +165,10 @@ class LocomotionRobot(BaseRobot):
         :return Array[int]: Indices in low-level control vector corresponding to base joints.
         """
         raise NotImplementedError
+
+    @classproperty
+    def _do_not_register_classes(cls):
+        # Don't register this class since it's an abstract template
+        classes = super()._do_not_register_classes
+        classes.add("LocomotionRobot")
+        return classes

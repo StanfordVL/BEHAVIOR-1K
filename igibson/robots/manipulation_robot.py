@@ -20,7 +20,7 @@ from igibson.controllers import (
     get_link_pose,
 )
 from igibson.robots.robot_base import BaseRobot
-from igibson.utils.python_utils import assert_valid_key
+from igibson.utils.python_utils import classproperty, assert_valid_key
 
 
 class IsGraspingState(IntEnum):
@@ -1217,3 +1217,10 @@ class ManipulationRobot(BaseRobot):
                 if np.linalg.norm(np.array(link_pos) - np.array(toggle_position)) < toggle_distance_threshold:
                     return True
         return False
+
+    @classproperty
+    def _do_not_register_classes(cls):
+        # Don't register this class since it's an abstract template
+        classes = super()._do_not_register_classes
+        classes.add("ManipulationRobot")
+        return classes
