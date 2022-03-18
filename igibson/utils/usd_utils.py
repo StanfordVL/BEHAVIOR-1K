@@ -1,7 +1,12 @@
+import math
+import numpy as np
+
+import omni.usd
 from omni.isaac.core.utils.prims import get_prim_at_path, get_prim_path, is_prim_path_valid, get_prim_children
 from omni.isaac.core.utils.carb import set_carb_setting
 from omni.isaac.core.utils.stage import get_current_stage, get_stage_units, traverse_stage
 from omni.isaac.core.utils.bounds import compute_aabb, create_bbox_cache
+from omni.syntheticdata import helpers
 from pxr import Gf, Usd, Sdf, UsdGeom, UsdShade, UsdPhysics, PhysxSchema
 
 from igibson.utils.constants import JointType
@@ -21,6 +26,52 @@ def get_prim_nested_children(prim):
         prims += get_prim_nested_children(prim=child)
 
     return prims
+
+
+def get_camera_params(viewport):
+    """Get active camera intrinsic and extrinsic parameters.
+
+    Returns:
+        dict: Keyword-mapped values of the active camera's parameters:
+
+            pose (numpy.ndarray): camera position in world coordinates,
+            fov (float): horizontal field of view in radians
+            focal_length (float)
+            horizontal_aperture (float)
+            view_projection_matrix (numpy.ndarray(dtype=float64, shape=(4, 4)))
+            resolution (dict): resolution as a dict with 'width' and 'height'.
+            clipping_range (tuple(float, float)): Near and Far clipping values.
+    """
+    stage = omni.usd.get_context().get_stage()
+    prim = stage.GetPrimAtPath(viewport.get_active_camera())
+    prim_tf = omni.usd.get_world_transform_matrix(prim)
+    view_params = helpers.get_view_params(viewport)
+    fov = 2 * math.atan(view_params["horizontal_aperture"] / (2 * view_params["focal_length"]))
+    view_proj_mat = helpers.get_view_proj_mat(view_params)
+
+    return {
+        "pose": np.array(prim_tf),
+        "fov": fov,
+        "focal_length": view_params["focal_length"],
+        "horizontal_aperture": view_params["horizontal_aperture"],
+        "view_projection_matrix": view_proj_mat,
+        "resolution": {"width": view_params["width"], "height": view_params["height"]},
+        "clipping_range": view_params["clipping_range"],
+    }
+
+
+def get_semantic_objects_pose():
+    """Get pose of all objects with a semantic label.
+    """
+    stage = omni.usd.get_context().get_stage()
+    mappings = helpers.get_instance_mappings()
+    pose = []
+    for m in mappings:
+        prim_path = m[1]
+        prim = stage.GetPrimAtPath(prim_path)
+        prim_tf = omni.usd.get_world_transform_matrix(prim)
+        pose.append((str(prim_path), m[2], str(m[3]), np.array(prim_tf)))
+    return pose
 
 
 def create_joint(prim_path, joint_type, body0=None, body1=None, enabled=True, stage=None):
