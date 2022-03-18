@@ -32,6 +32,7 @@ from igibson.utils.assets_utils import (
     get_ig_scene_path,
 )
 from igibson.utils.utils import NumpyEncoder, restoreState, rotate_vector_3d
+from igibson.utils.registry_utils import SerializableRegistry
 from igibson.utils.constants import JointType
 
 SCENE_SOURCE_PATHS = {
@@ -52,7 +53,7 @@ class InteractiveTraversableScene(TraversableScene):
 
     def __init__(
         self,
-        scene_id,
+        scene_model,
         usd_file=None,
         usd_path=None,
         # pybullet_filename=None,
@@ -63,9 +64,9 @@ class InteractiveTraversableScene(TraversableScene):
         num_waypoints=10,
         waypoint_resolution=0.2,
         texture_randomization=False,
-        link_collision_tolerance=0.03,
         object_randomization=False,
-        object_randomization_idx=None,
+        link_collision_tolerance=0.03,
+        predefined_object_randomization_idx=None,
         should_open_all_doors=False,
         load_object_categories=None,
         not_load_object_categories=None,
@@ -79,8 +80,8 @@ class InteractiveTraversableScene(TraversableScene):
     ):
         """
         # TODO: Update
-        :param scene_id: Scene id, e.g.: Rs_int
-        :param usd_file: name of ursd file to load (without .urdf), default to ig_dataset/scenes/<scene_id>/urdf/<urdf_file>.urdf
+        :param scene_model: Scene model, e.g.: Rs_int
+        :param usd_file: name of ursd file to load (without .urdf), default to ig_dataset/scenes/<scene_model>/urdf/<urdf_file>.urdf
         :param usd_path: full path of URDF file to load (with .urdf)
         # :param pybullet_filename: optional specification of which pybullet file to restore after initialization
         :param trav_map_resolution: traversability map resolution
@@ -90,9 +91,10 @@ class InteractiveTraversableScene(TraversableScene):
         :param num_waypoints: number of way points returned
         :param waypoint_resolution: resolution of adjacent way points
         :param texture_randomization: whether to randomize material/texture
-        :param link_collision_tolerance: tolerance of the percentage of links that cannot be fully extended after object randomization
         :param object_randomization: whether to randomize object
-        :param object_randomization_idx: index of a pre-computed object randomization model that guarantees good scene quality
+        :param link_collision_tolerance: tolerance of the percentage of links that cannot be fully extended after object randomization
+        :param predefined_object_randomization_idx: None or int, index of a pre-computed object randomization model that guarantees good scene quality.
+            If None, a fully random sampling from object categories will be used.
         :param should_open_all_doors: whether to open all doors after episode reset (usually required for navigation tasks)
         :param load_object_categories: only load these object categories into the scene (a list of str)
         :param not_load_object_categories: do not load these object categories into the scene (a list of str)
@@ -106,7 +108,7 @@ class InteractiveTraversableScene(TraversableScene):
         """
         # Run super init first
         super().__init__(
-            scene_id=scene_id,
+            scene_model=scene_model,
             trav_map_resolution=trav_map_resolution,
             trav_map_erosion=trav_map_erosion,
             trav_map_with_objects=trav_map_with_objects,
@@ -118,7 +120,7 @@ class InteractiveTraversableScene(TraversableScene):
         # Store attributes from inputs
         self.texture_randomization = texture_randomization
         self.object_randomization = object_randomization
-        self.object_randomization_idx = object_randomization_idx
+        self.predefined_object_randomization_idx = predefined_object_randomization_idx
         self.rendering_params = rendering_params
         self.should_open_all_doors = should_open_all_doors
         self.scene_source = scene_source
@@ -172,17 +174,17 @@ class InteractiveTraversableScene(TraversableScene):
         """
         Gets scene loading info to know what single USD file to load, either specified indirectly via @usd_file or
         directly by the fpath from @usd_path. Note that if both are specified, @usd_path takes precidence.
-        If neither are specified, then a file will automatically be chosen based on self.scene_id and
+        If neither are specified, then a file will automatically be chosen based on self.scene_model and
         self.object_randomization
 
         Args:
             usd_file (None or str): If specified, should be name of usd file to load. (without .usd), default to
-                ig_dataset/scenes/<scene_id>/usd/<usd_file>.usd
+                ig_dataset/scenes/<scene_model>/usd/<usd_file>.usd
             usd_path (None or str): If specified, should be absolute filepath to the USD file to load (with .usd)
         """
         # Grab scene source path
         assert self.scene_source in SCENE_SOURCE_PATHS, f"Unsupported scene source: {self.scene_source}"
-        self.scene_dir = SCENE_SOURCE_PATHS[self.scene_source](self.scene_id)
+        self.scene_dir = SCENE_SOURCE_PATHS[self.scene_source](self.scene_model)
 
         fname = None
         scene_file = usd_path
@@ -192,13 +194,10 @@ class InteractiveTraversableScene(TraversableScene):
                 fname = usd_file
             else:
                 if not self.object_randomization:
-                    fname = "{}_best".format(self.scene_id)
+                    fname = "{}_best".format(self.scene_model)
                 else:
-                    if self.object_randomization_idx is None:
-                        fname = self.scene_id
-                    else:
-                        fname = "{}_random_{}".format(self.scene_id, self.object_randomization_idx)
-            fname = fname
+                    fname = self.scene_model if self.predefined_object_randomization_idx is None else \
+                        "{}_random_{}".format(self.scene_model, self.predefined_object_randomization_idx)
             scene_file = os.path.join(self.scene_dir, "usd", "{}.usd".format(fname))
 
         # Store values internally
@@ -494,25 +493,32 @@ class InteractiveTraversableScene(TraversableScene):
 
         return body_joint_pairs
 
-    def open_all_objs_by_category(self, category, mode="random", prob=1.0):
+    # TODO! Signature is correct tho
+    def open_all_objs_by_category(self, category, mode="random", p=1.0):
         """
         Attempt to open all objects of a certain category without collision
 
-        :param category: object category (str)
-        :param mode: opening mode (zero, max, or random)
-        :param prob: opening probability
-        """
-        body_joint_pairs = []
-        if category not in self.object_registry.get_ids("category"):
-            return body_joint_pairs
-        for obj in self.object_registry("category", category):
-            # open probability
-            if np.random.random() > prob:
-                continue
-            for body_id in obj.get_body_ids():
-                body_joint_pairs += self.open_one_obj(body_id, mode=mode)
-        return body_joint_pairs
+        Args:
+            category (str): Object category to check for opening joints
+            mode (str): Opening mode, one of {zero, max, random}
+            p (float): Probability in range [0, 1] for opening a given object
 
+        Returns:
+            list of DatasetObject: Object(s) whose joints were "opened"
+        """
+        return []
+        # body_joint_pairs = []
+        # if category not in self.object_registry.get_ids("category"):
+        #     return body_joint_pairs
+        # for obj in self.object_registry("category", category):
+        #     # open probability
+        #     if np.random.random() > prob:
+        #         continue
+        #     for body_id in obj.get_body_ids():
+        #         body_joint_pairs += self.open_one_obj(body_id, mode=mode)
+        # return body_joint_pairs
+
+    # TODO
     def open_all_objs_by_categories(self, categories, mode="random", prob=1.0):
         """
         Attempt to open all objects of a number of categories without collision
@@ -521,10 +527,11 @@ class InteractiveTraversableScene(TraversableScene):
         :param mode: opening mode (zero, max, or random)
         :param prob: opening probability
         """
-        body_joint_pairs = []
-        for category in categories:
-            body_joint_pairs += self.open_all_objs_by_category(category, mode=mode, prob=prob)
-        return body_joint_pairs
+        return []
+        # body_joint_pairs = []
+        # for category in categories:
+        #     body_joint_pairs += self.open_all_objs_by_category(category, mode=mode, prob=prob)
+        # return body_joint_pairs
 
     def open_all_doors(self):
         """
@@ -905,13 +912,11 @@ class InteractiveTraversableScene(TraversableScene):
         for obj in self.objects:
             obj.wake()
 
-    def reset_scene_objects(self):
-        """
-        Reset the pose and joint configuration of all scene objects.
-        Also open all doors if self.should_open_all_doors is True
-        """
+    def reset(self):
+        # Reset the pose and joint configuration of all scene objects
         self.restore_object_states()
 
+        # Also open all doors if self.should_open_all_doors is True
         if self.should_open_all_doors:
             self.wake_scene_objects()
             self.open_all_doors()
@@ -1098,7 +1103,7 @@ class InteractiveTraversableScene(TraversableScene):
         The kinematic states (e.g. pose, joint states) will be loaded from the URDF file OR pybullet state / filename (if provided, for better determinism)
         This function assume the given URDF and pybullet_filename or pybullet_state_id contains the exact same objects as the current scene, and only their states will be restored.
 
-        :param urdf_name: name of urdf file to save (without .urdf), default to ig_dataset/scenes/<scene_id>/urdf/<urdf_name>.urdf
+        :param urdf_name: name of urdf file to save (without .urdf), default to ig_dataset/scenes/<scene_model>/urdf/<urdf_name>.urdf
         :param urdf_path: full path of URDF file to save (with .urdf)
         :param scene_tree: already-loaded URDF file stored in memory
         :param pybullet_filename: optional specification of which pybullet file to save to
@@ -1153,7 +1158,7 @@ class InteractiveTraversableScene(TraversableScene):
         """
         Saves a modified URDF file in the scene urdf directory having all objects added to the scene.
 
-        :param urdf_name: name of urdf file to save (without .urdf), default to ig_dataset/scenes/<scene_id>/urdf/<urdf_name>.urdf
+        :param urdf_name: name of urdf file to save (without .urdf), default to ig_dataset/scenes/<scene_model>/urdf/<urdf_name>.urdf
         :param urdf_path: full path of URDF file to save (with .urdf), assumes higher priority than urdf_name
         :param pybullet_filename: optional specification of which pybullet file to save to
         :param pybullet_save_state: whether to save to pybullet state
@@ -1193,15 +1198,13 @@ class InteractiveTraversableScene(TraversableScene):
 
     @property
     def object_registry_unique_keys(self):
-        # Grab all inherited keys and return additional ones
-        keys = super().object_registry_unique_keys
-        return keys + ["handle"]
+        # Grab from super and add handle for objects
+        return super().object_registry_unique_keys + ["handle"]
 
     @property
     def object_registry_group_keys(self):
-        # Grab all inherited keys and return additional ones
-        keys = super().object_registry_group_keys
-        return keys + ["category", "in_rooms", "states", "fixed_base"]
+        # Grab from super and add additional keys for the dataset scene objects
+        return super().object_registry_group_keys + ["category", "fixed_base", "in_rooms", "states"]
 
     @property
     def fixed_objects(self):

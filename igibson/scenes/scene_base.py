@@ -20,17 +20,21 @@ from omni.isaac.core.utils.nucleus import find_nucleus_server
 from omni.isaac.core.utils.stage import add_reference_to_stage
 from typing import Optional, Tuple
 import gc
-from igibson.utils.python_utils import Serializable
+from igibson.utils.python_utils import classproperty, Serializable, Registerable
 from igibson.utils.registry_utils import SerializableRegistry
 from igibson.objects.object_base import BaseObject
+from igibson.objects.dataset_object import DatasetObject
 from igibson.systems import SYSTEMS_REGISTRY
 
 # from igibson.objects.particles import Particle
 # from igibson.objects.visual_marker import VisualMarker
 from igibson.robots.robot_base import BaseRobot
 
+# Global dicts that will contain mappings
+REGISTERED_SCENES = OrderedDict()
 
-class Scene(Serializable, metaclass=ABCMeta):
+
+class Scene(Serializable, Registerable, metaclass=ABCMeta):
     """
     Base class for all Scene objects.
     Contains the base functionalities and the functions that all derived classes need to implement.
@@ -169,32 +173,8 @@ class Scene(Serializable, metaclass=ABCMeta):
         if self._loaded:
             raise ValueError("This scene is already loaded.")
 
-        # Create meta registry and populate with internal registries for robots, objects, and systems
-        self._registry = SerializableRegistry(
-            name="master_registry",
-            class_types=SerializableRegistry,
-        )
-
-        # Add registry for objects
-        self._registry.add(obj=SerializableRegistry(
-            name="object_registry",
-            class_types=BaseObject,
-            default_key="name",
-            unique_keys=self.object_registry_unique_keys,
-            group_keys=self.object_registry_group_keys,
-        ))
-
-        # Add registry for robots
-        self._registry.add(obj=SerializableRegistry(
-            name="robot_registry",
-            class_types=BaseRobot,
-            default_key="name",
-            unique_keys=None,
-            group_keys=["model_name"],
-        ))
-
-        # Add registry for systems -- this is already created externally, so we just pull it directly
-        self._registry.add(obj=SYSTEMS_REGISTRY)
+        # Creat the registry for tracking all objects in the scene
+        self._registry = self._create_registry()
 
         prims = self._load(simulator)
         self._loaded = True
@@ -220,6 +200,43 @@ class Scene(Serializable, metaclass=ABCMeta):
         assert not self._initialized, "Scene can only be initialized once! (It is already initialized)"
         self._initialize()
         self._initialized = True
+
+    def _create_registry(self):
+        """
+        Creates the internal registry used for tracking all objects
+
+        Returns:
+            SerializableRegistry: registry for tracking all objects
+        """
+
+        # Create meta registry and populate with internal registries for robots, objects, and systems
+        registry = SerializableRegistry(
+            name="master_registry",
+            class_types=SerializableRegistry,
+        )
+
+        # Add registry for objects
+        registry.add(obj=SerializableRegistry(
+            name="object_registry",
+            class_types=BaseObject,
+            default_key="name",
+            unique_keys=self.object_registry_unique_keys,
+            group_keys=self.object_registry_group_keys,
+        ))
+
+        # Add registry for robots
+        registry.add(obj=SerializableRegistry(
+            name="robot_registry",
+            class_types=BaseRobot,
+            default_key="name",
+            unique_keys=None,
+            group_keys=["model_name"],
+        ))
+
+        # Add registry for systems -- this is already created externally, so we just pull it directly
+        registry.add(obj=SYSTEMS_REGISTRY)
+
+        return registry
 
     def object_exists(self, name: str) -> bool:
         """[summary]
@@ -333,10 +350,9 @@ class Scene(Serializable, metaclass=ABCMeta):
     #         raise Exception("object type is not supported yet")
     #     return obj
 
-    def reset_scene_objects(self):
+    def reset(self):
         """
-        Reset the pose and joint configuration of all scene objects.
-        Also open all doors if self.should_open_all_doors is True
+        Resets this scene. Default is no-op
         """
         pass
 
@@ -459,3 +475,16 @@ class Scene(Serializable, metaclass=ABCMeta):
         # Default state for the scene is from the registry alone
         end_idx = self._registry.state_size
         return self._registry.deserialize(state=state[:end_idx]), end_idx
+
+    @classproperty
+    def _do_not_register_classes(cls):
+        # Don't register this class since it's an abstract template
+        classes = super()._do_not_register_classes
+        classes.add("Scene")
+        return classes
+
+    @classproperty
+    def _cls_registry(cls):
+        # Global registry
+        global REGISTERED_SCENES
+        return REGISTERED_SCENES

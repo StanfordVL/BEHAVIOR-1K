@@ -12,7 +12,7 @@ from PIL import Image
 
 from igibson.scenes.scene_base import Scene
 from igibson.maps.traversable_map import TraversableMap
-from igibson.utils.utils import l2_distance
+from igibson.utils.python_utils import classproperty
 
 
 class TraversableScene(Scene, metaclass=ABCMeta):
@@ -23,7 +23,7 @@ class TraversableScene(Scene, metaclass=ABCMeta):
 
     def __init__(
         self,
-        scene_id,
+        scene_model,
         trav_map_resolution=0.1,
         trav_map_erosion=2,
         trav_map_with_objects=True,
@@ -34,7 +34,7 @@ class TraversableScene(Scene, metaclass=ABCMeta):
         """
         Load a traversable scene and compute traversability
 
-        :param scene_id: Scene id
+        :param scene_model: Scene model
         :param trav_map_resolution: traversability map resolution
         :param trav_map_erosion: erosion radius of traversability areas, should be robot footprint radius
         :param trav_map_with_objects: whether to use objects or not when constructing graph
@@ -43,8 +43,8 @@ class TraversableScene(Scene, metaclass=ABCMeta):
         :param waypoint_resolution: resolution of adjacent way points
         """
         super().__init__()
-        logging.info("TraversableScene model: {}".format(scene_id))
-        self.scene_id = scene_id
+        logging.info("TraversableScene model: {}".format(scene_model))
+        self.scene_model = scene_model
 
         # Create traversable map
         self._trav_map = TraversableMap(
@@ -98,3 +98,10 @@ class TraversableScene(Scene, metaclass=ABCMeta):
             target_world=target_world,
             entire_path=entire_path,
         )
+
+    @classproperty
+    def _do_not_register_classes(cls):
+        # Don't register this class since it's an abstract template
+        classes = super()._do_not_register_classes
+        classes.add("TraversableScene")
+        return classes
