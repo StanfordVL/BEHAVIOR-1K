@@ -8,6 +8,10 @@ from collections import OrderedDict, Iterable
 from igibson.utils.python_utils import Serializable, SerializableNonInstance, UniquelyNamed
 
 
+# Token identifier for default values if a key doesn't exist in a given object
+DOES_NOT_EXIST = "DOES_NOT_EXIST"
+
+
 class Registry(UniquelyNamed):
     """
     Simple class for easily registering and tracking arbitrary objects of the same (or very similar) class types.
@@ -41,6 +45,7 @@ class Registry(UniquelyNamed):
             default_key="name",
             unique_keys=None,
             group_keys=None,
+            default_value=DOES_NOT_EXIST,
     ):
         """
         Args:
@@ -62,19 +67,23 @@ class Registry(UniquelyNamed):
                 i.e.: these keys can map to multiple objects
 
                 e.g.: default is "name" key only, so we will store objects by their object.name attribute
+
+            default_value (any): Default value to use if the attribute @key does not exist in the object
         """
         self._name = name
         self.class_types = class_types if isinstance(class_types, Iterable) else [class_types]
         self.default_key = default_key
         self.unique_keys = set([] if unique_keys is None else unique_keys)
         self.group_keys = set([] if group_keys is None else group_keys)
+        self.default_value = default_value
 
         # We always add in the "name" attribute as well
         self.unique_keys.add(self.default_key)
 
         # Make sure there's no overlap between the unique and group keys
         assert len(self.unique_keys.intersection(self.group_keys)) == 0,\
-            "Cannot create registry with unique and group object keys that are the same!"
+            f"Cannot create registry with unique and group object keys that are the same! " \
+            f"Unique keys: {self.unique_keys}, group keys: {self.group_keys}"
 
         # Create the ordered dicts programmatically
         for k in self.unique_keys.union(self.group_keys):
@@ -202,8 +211,7 @@ class Registry(UniquelyNamed):
         """
         return set(self.get_dict(key=key).keys())
 
-    @staticmethod
-    def _get_obj_attr(obj, attr):
+    def _get_obj_attr(self, obj, attr):
         """
         Grabs object's @obj's attribute @attr. Additionally checks to see if @obj is a class or a class instance, and
         uses the correct logic
@@ -215,8 +223,13 @@ class Registry(UniquelyNamed):
         Return:
             any: Attribute @k of @obj
         """
-        # Check if the object is a class or an instance of a class, and use the correct logic to grab the attribute
-        return obj.__getattribute__(obj, attr) if isclass(obj) else obj.__getattribute__(attr)
+        # Make sure the attribute exists, otherwise we return the default value
+        if attr not in dir(obj):
+            print(f"dir: {dir(obj)}")
+            return self.default_value
+        else:
+            # Check if the object is a class or an instance of a class, and use the correct logic to grab the attribute
+            return obj.__getattribute__(obj, attr) if isclass(obj) else obj.__getattribute__(attr)
 
     @property
     def objects(self):
@@ -280,6 +293,9 @@ class SerializableRegistry(Registry, Serializable):
     @property
     def state_size(self):
         # Total state size is the sum of all individual states from each object
+        for obj in self.objects:
+            print(obj.name)
+            print(obj.state_size)
         return sum(obj.state_size for obj in self.objects)
 
     def _dump_state(self):
@@ -291,6 +307,7 @@ class SerializableRegistry(Registry, Serializable):
 
     def _load_state(self, state):
         # Iterate over all objects and load their states
+        print(f"registry: {self.name}")
         for obj in self.objects:
             obj.load_state(state[obj.name], serialized=False)
 
@@ -304,7 +321,8 @@ class SerializableRegistry(Registry, Serializable):
         # along the way
         idx = 0
         for obj in self.objects:
+            print(f"obj: {obj.name}, state size: {obj.state_size}")
             state_dict[obj.name] = obj.deserialize(state[idx:idx+obj.state_size])
             idx += obj.state_size
-        return OrderedDict(objects=state_dict), idx
+        return state_dict, idx
 
