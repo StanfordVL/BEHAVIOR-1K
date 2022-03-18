@@ -12,12 +12,13 @@ import omni
 import carb
 from omni.isaac.core.simulation_context import SimulationContext
 from omni.isaac.core.tasks import BaseTask
-from omni.isaac.core.utils.prims import is_prim_ancestral, get_prim_type_name, is_prim_no_delete, get_prim_at_path
+from omni.isaac.core.utils.prims import is_prim_ancestral, get_prim_type_name, is_prim_no_delete, get_prim_at_path, \
+    is_prim_path_valid
 from omni.isaac.core.utils.stage import clear_stage, save_stage, open_stage
 from omni.isaac.dynamic_control import _dynamic_control
 import omni.kit.loop._loop as omni_loop
 import builtins
-from pxr import Usd, Sdf, UsdPhysics, PhysxSchema
+from pxr import Usd, UsdGeom, Sdf, UsdPhysics, PhysxSchema
 from omni.kit.viewport import get_viewport_interface
 from omni.isaac.core.utils.viewports import set_camera_view
 from omni.isaac.core.loggers import DataLogger
@@ -61,8 +62,8 @@ class Simulator(SimulationContext):
                                                        Defaults to 1.0 / 60.0.
             stage_units_in_meters (float, optional): The metric units of assets. This will affect gravity value..etc.
                                                       Defaults to 0.01.
-            :param image_width: width of the camera image
-            :param image_height: height of the camera image
+            :param viewer_width: width of the camera image
+            :param viewer_height: height of the camera image
             :param vertical_fov: vertical field of view of the camera image in degrees
             :param device_idx: GPU device index to run rendering on
         """
@@ -75,8 +76,8 @@ class Simulator(SimulationContext):
             physics_dt: float = 1.0 / 60.0,
             rendering_dt: float = 1.0 / 60.0,
             stage_units_in_meters: float = 1.0,
-            image_width=1280,
-            image_height=720,
+            viewer_width=1280,
+            viewer_height=720,
             vertical_fov=90,
             device_idx=0,
     ) -> None:
@@ -101,13 +102,14 @@ class Simulator(SimulationContext):
         assert n_physics_timesteps_per_render.is_integer(), "render_timestep must be a multiple of physics_timestep"
         self.n_physics_timesteps_per_render = int(n_physics_timesteps_per_render)
         self.gravity = gravity
-        self.image_width = image_width
-        self.image_height = image_height
-        self.vertical_fov = vertical_fov
-        self.device_idx = device_idx
+        self.viewer_width = viewer_width
+        self.viewer_height = viewer_height
+        self.vertical_fov = vertical_fov        # TODO: This currently does nothing
+        self.device_idx = device_idx            # TODO: This currently does nothing
 
         # Store other references to variables that will be initialized later
         self._viewer = None
+        self._viewer_camera = None
         self._scene = None
         self.particle_systems = []
         self.frame_count = 0
@@ -129,6 +131,23 @@ class Simulator(SimulationContext):
         # self.assist_grasp_category_allow_list = self.gen_assisted_grasping_categories()
         # self.assist_grasp_mass_thresh = 10.0
 
+    def __new__(
+        cls,
+        physics_dt: float = 1.0 / 60.0,
+        rendering_dt: float = 1.0 / 60.0,
+        stage_units_in_meters: float = 0.01,
+        viewer_width=1280,
+        viewer_height=720,
+        vertical_fov=90,
+        device_idx=0,
+    ) -> None:
+        # Overwrite since we have different kwargs
+        if Simulator._instance is None:
+            Simulator._instance = object.__new__(cls)
+        else:
+            carb.log_info("Simulator is defined already, returning the previously defined one")
+        return Simulator._instance
+
     def _reset_variables(self):
         """
         Reset state of internal variables
@@ -137,6 +156,18 @@ class Simulator(SimulationContext):
         self.frame_count = 0
         self.body_links_awake = 0
         self.first_sync = True          # First sync always sync all objects (regardless of their sleeping states)
+
+    def _set_viewer_camera(self, prim_path="/World/viewer_camera"):
+        """
+        Creates a camera prim dedicated for this viewer at @prim_path if it doesn't exist,
+        and sets this camera as the active camera for the viewer
+
+        Args:
+            prim_path (str): Path to check for / create the viewer camera
+        """
+        self._viewer_camera = get_prim_at_path(prim_path=prim_path) if is_prim_path_valid(prim_path=prim_path) else \
+            UsdGeom.Camera.Define(self.stage, "/World/viewer_camera").GetPrim()
+        self._viewer.set_active_camera(str(self._viewer_camera.GetPrimPath()))
 
     def _set_physics_engine_settings(self):
         """
@@ -156,8 +187,9 @@ class Simulator(SimulationContext):
         viewport_handle = viewport.get_instance("Viewport")
         self._viewer = viewport.get_viewport_window(viewport_handle)
 
-        # Set viewer frame size
-        self._viewer.set_texture_resolution(self.image_width, self.image_height)
+        # Set viewer camera and frame size
+        self._set_viewer_camera()
+        self._viewer.set_texture_resolution(self.viewer_width, self.viewer_height)
 
     def import_scene(self, scene):
         """
@@ -239,6 +271,9 @@ class Simulator(SimulationContext):
             for obj in self._objects_to_initialize:
                 obj.initialize()
             self._objects_to_initialize = []
+            # Also update the scene registry
+            # TODO: A better place to put this perhaps?
+            self._scene.object_registry.update(keys="handle")
 
         # Step all of the particle systems.
         for particle_system in self.particle_systems:
@@ -260,14 +295,14 @@ class Simulator(SimulationContext):
 
         # TODO: Fix, hacky
         if self.scene is not None and self.scene.initialized:
-            self.scene.reset_scene_objects()
+            self.scene.reset()
 
     def stop_async(self):
         super().stop_async()
 
         # TODO: Fix, hacky
         if self.scene is not None and self.scene.initialized:
-            self.scene.reset_scene_objects()
+            self.scene.reset()
 
     def play(self):
         super().play()
@@ -650,3 +685,12 @@ class Simulator(SimulationContext):
         self._stage_open_callback = (
             omni.usd.get_context().get_stage_event_stream().create_subscription_to_pop(self._stage_open_callback_fn)
         )
+
+        # Set the viewer camera
+        self._set_viewer_camera()
+
+    def close(self):
+        """
+        Shuts down the iGibson application
+        """
+        self._app.close()
