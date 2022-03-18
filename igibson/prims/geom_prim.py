@@ -27,11 +27,12 @@ from omni.isaac.core.utils.stage import get_current_stage
 from omni.isaac.core.materials import PhysicsMaterial
 from igibson.prims.prim_base import BasePrim
 
-class MeshPrim(BasePrim):
+
+class GeomPrim(BasePrim):
     """
-    Provides high level functions to deal with a mesh prim and its attributes/ properties.
-    If there is an mesh prim present at the path, it will use it. Otherwise, a new mesh prim at
-    the specified prim path will be created when self.load(...) is called.
+    Provides high level functions to deal with a geom prim and its attributes / properties.
+    If there is an geom prim present at the path, it will use it. By default, a geom prim cannot be directly
+    created from scratch.at
 
         Args:
             prim_path (str): prim path of the Prim to encapsulate or create.
@@ -56,7 +57,7 @@ class MeshPrim(BasePrim):
 
     def _load(self, simulator=None):
         # This should not be called, because this prim cannot be instantiated from scratch!
-        raise NotImplementedError("By default, a mesh prim cannot be created from scratch.")
+        raise NotImplementedError("By default, a geom prim cannot be created from scratch.")
 
     def _dump_state(self):
         # No state to dump
@@ -76,10 +77,10 @@ class MeshPrim(BasePrim):
 
     def duplicate(self, simulator, prim_path):
         # Cannot directly duplicate a mesh prim
-        raise NotImplementedError("Cannot directly duplicate a mesh prim!")
+        raise NotImplementedError("Cannot directly duplicate a geom prim!")
 
 
-class CollisionMeshPrim(MeshPrim):
+class CollisionGeomPrim(GeomPrim):
 
     def __init__(
         self,
@@ -106,10 +107,13 @@ class CollisionMeshPrim(MeshPrim):
         # Create API references
         self._collision_api = UsdPhysics.CollisionAPI(self._prim) if \
             self._prim.HasAPI(UsdPhysics.CollisionAPI) else UsdPhysics.CollisionAPI.Apply(self._prim)
-        self._mesh_collision_api = UsdPhysics.MeshCollisionAPI(self._prim) if \
-            self._prim.HasAPI(UsdPhysics.MeshCollisionAPI) else UsdPhysics.MeshCollisionAPI.Apply(self._prim)
         self._physx_collision_api = PhysxSchema.PhysxCollisionAPI(self._prim) if \
             self._prim.HasAPI(PhysxSchema.PhysxCollisionAPI) else PhysxSchema.PhysxCollisionAPI.Apply(self._prim)
+
+        # Optionally add mesh collision API if this is a mesh
+        if self._prim.GetPrimTypeInfo().GetTypeName() == "Mesh":
+            self._mesh_collision_api = UsdPhysics.MeshCollisionAPI(self._prim) if \
+                self._prim.HasAPI(UsdPhysics.MeshCollisionAPI) else UsdPhysics.MeshCollisionAPI.Apply(self._prim)
 
     @property
     def collision_enabled(self):
@@ -198,6 +202,7 @@ class CollisionMeshPrim(MeshPrim):
         Args:
             approximation_type (str): approximation used for collision, could be "none", "convexHull" or "convexDecomposition"
         """
+        assert self._mesh_collision_api is not None, "collision_approximation only applicable for meshes!"
         self._mesh_collision_api.GetApproximationAttr().Set(approximation_type)
         return
 
@@ -206,6 +211,7 @@ class CollisionMeshPrim(MeshPrim):
         Returns:
             str: approximation used for collision, could be "none", "convexHull" or "convexDecomposition"
         """
+        assert self._mesh_collision_api is not None, "collision_approximation only applicable for meshes!"
         return self._mesh_collision_api.GetApproximationAttr().Get()
 
     def apply_physics_material(self, physics_material, weaker_than_descendants=False):
@@ -261,7 +267,7 @@ class CollisionMeshPrim(MeshPrim):
                 return self._applied_physics_material
 
 
-class VisualMeshPrim(MeshPrim):
+class VisualGeomPrim(GeomPrim):
 
     def __init__(
             self,
@@ -281,7 +287,7 @@ class VisualMeshPrim(MeshPrim):
     def color(self):
         """
         Returns:
-            None or 3-array: If set, the default RGB color used for this visual mesh
+            None or 3-array: If set, the default RGB color used for this visual geom
         """
         color = self.get_attribute("primvars:displayColor")
         return None if color is None else np.array(color)[0]
@@ -292,7 +298,7 @@ class VisualMeshPrim(MeshPrim):
         Sets the RGB color of this visual mesh
 
         Args:
-            3-array: The default RGB color used for this visual mesh
+            3-array: The default RGB color used for this visual geom
         """
         self.set_attribute("primvars:displayColor", np.array(rgb))
 
@@ -300,7 +306,7 @@ class VisualMeshPrim(MeshPrim):
     def opacity(self):
         """
         Returns:
-            None or 3-array: If set, the default opacity used for this visual mesh
+            None or float: If set, the default opacity used for this visual geom
         """
         opacity = self.get_attribute("primvars:displayOpacity")
         return None if opacity is None else np.array(opacity)[0]
@@ -311,6 +317,6 @@ class VisualMeshPrim(MeshPrim):
         Sets the opacity of this visual mesh
 
         Args:
-            3-array: The default opacity used for this visual mesh
+            opacity: The default opacity used for this visual geom
         """
         self.set_attribute("primvars:displayOpacity", np.array([opacity]))
