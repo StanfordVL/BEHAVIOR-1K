@@ -263,9 +263,10 @@ def raytest(
                     "collision": hit.collision,
                     "rigidBody": hit.rigid_body,
                 })
-                return True
-            else:
-                return False
+            # If we haven't hit enough objects with this ray, continue traversal
+            # True means contiue traversing; False means stop
+            return len(hits) <= hit_number
+
 
         # Grab all collisions
         get_physx_scene_query_interface().raycast_all(
