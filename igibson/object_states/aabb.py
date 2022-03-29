@@ -1,16 +1,13 @@
 import numpy as np
 from collections import OrderedDict
 
-# # from igibson.external.pybullet_tools.utils import aabb_union, get_aabb, get_all_links
+from igibson.utils.usd_utils import BoundingBoxAPI
 from igibson.object_states.object_state_base import CachingEnabledObjectState, NONE
 
 
 class AABB(CachingEnabledObjectState):
     def _compute_value(self):
-        # TODO: On a multi-body URDFObject, this now returns the combined AABB. Should we special-case?
-        all_links = [(body_id, link_id) for body_id in self.obj.get_body_ids() for link_id in get_all_links(body_id)]
-        aabbs = [get_aabb(body_id, link=link_id) for (body_id, link_id) in all_links]
-        aabb_low, aabb_hi = aabb_union(aabbs)
+        aabb_low, aabb_hi = BoundingBoxAPI.union(self.obj.get_body_ids())
 
         if not hasattr(self.obj, "category") or self.obj.category != "floors" or self.obj.room_floor is None:
             return np.array(aabb_low), np.array(aabb_hi)

@@ -5,10 +5,11 @@ import numpy as np
 
 from igibson.object_states.object_state_base import CachingEnabledObjectState, NONE
 from igibson.object_states.pose import Pose
+from igibson.utils.sampling_utils import raytest_batch
 
 _MAX_ITERATIONS = 10
 _MAX_DISTANCE_VERTICAL = 5.0
-_MAX_DISTANCE_HORIZONTAL = 1.0
+_MAX_DISTANCE_HORIZONTAL = 5.0
 
 # How many 2-D bases to try during horizontal adjacency check. When 1, only the standard axes will be considered.
 # When 2, standard axes + 45 degree rotated will be considered. The tried axes will be equally spaced. The higher
@@ -82,8 +83,8 @@ def compute_adjacencies(obj, axes, max_distance):
     # Cast rays repeatedly until the max number of casting is reached
     for i in range(_MAX_ITERATIONS):
         # Find which directions still need ray casting
-        unfinished_directions = finalized != True
-        num_directions_to_cast = np.count_nonzero(unfinished_directions)
+        unfinished_directions = np.nonzero(finalized != True)[0]
+        num_directions_to_cast = unfinished_directions.shape[0]
 
         # If all directions are ready, stop.
         if num_directions_to_cast == 0:
@@ -95,24 +96,23 @@ def compute_adjacencies(obj, axes, max_distance):
         ray_endpoints = ray_starts + (ray_directions * max_distance)
 
         # Cast time.
-        ray_results = p.rayTestBatch(
+        ray_results = raytest_batch(
             ray_starts,
             ray_endpoints,
-            reportHitNumber=i,
-            fractionEpsilon=1,
-            numThreads=0,
+            hit_number=i,
+            ignore_bodies=body_ids,
+            ignore_collisions=body_ids
         )
 
-        # Get the object IDs per axis and filter out self-hit cases.
-        obj_ids = np.array([result[0] for result in ray_results], dtype=np.int)
-
         # Add the results to the appropriate lists
-        for direction_idx, result in enumerate(obj_ids):
-            if result != -1 and result not in body_ids:
-                bodies_by_direction[direction_idx].append(result)
-
-        # Set the finalization status of no-hit directions
-        finalized[unfinished_directions][obj_ids == -1] = True
+        for idx, result in enumerate(ray_results):
+            axis_idx = unfinished_directions[idx]
+            if result["hit"]:
+                if result["rigidBody"] not in body_ids:
+                    bodies_by_direction[axis_idx].append(result["rigidBody"])
+            else:
+                # Set the finalization status of no-hit directions
+                finalized[axis_idx] = True
 
     # Reshape so that these have the following indices:
     # (axis_idx, direction-one-or-zero, hit_idx)
