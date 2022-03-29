@@ -33,7 +33,8 @@ class OnFloor(RelativeObjectState, KinematicsMixin, BooleanState):
         if not isinstance(other, RoomFloor):
             return False
 
-        state_id = p.saveState()
+        state = self.simulator.dump_state(serialized=True)
+
         for _ in range(10):
             sampling_success = sample_kinematics("onFloor", self.obj, other, new_value)
             if sampling_success:
@@ -46,9 +47,7 @@ class OnFloor(RelativeObjectState, KinematicsMixin, BooleanState):
             if sampling_success:
                 break
             else:
-                restoreState(state_id)
-
-        p.removeState(state_id)
+                self.simulator.load_state(state, serialized=True)
 
         return sampling_success
 

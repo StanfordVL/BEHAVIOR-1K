@@ -16,7 +16,7 @@ class OnTop(PositionalValidationMemoizedObjectStateMixin, RelativeObjectState, B
         return RelativeObjectState.get_dependencies() + [Touching, VerticalAdjacency]
 
     def _set_value(self, other, new_value, use_ray_casting_method=False):
-        state_id = p.saveState()
+        state = self.simulator.dump_state(serialized=True)
 
         for _ in range(10):
             sampling_success = sample_kinematics(
@@ -33,9 +33,7 @@ class OnTop(PositionalValidationMemoizedObjectStateMixin, RelativeObjectState, B
             if sampling_success:
                 break
             else:
-                restoreState(state_id)
-
-        p.removeState(state_id)
+                self.simulator.load_state(state, serialized=True)
 
         return sampling_success
 
