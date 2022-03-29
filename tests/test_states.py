@@ -394,12 +394,170 @@ def test_frozen():
         app.close()
 
 
+def test_vertical_adjacency():
+    try:
+        obj_category = "sink"
+        obj_model = "sink_1"
+        name = "sink"
+
+        sim = Simulator()
+        scene = EmptyScene()
+        sim.import_scene(scene)
+
+        model_root_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}"
+        usd_path = f"{model_root_path}/usd/{obj_model}.usd"
+
+        sink_1 = DatasetObject(
+            prim_path=f"/World/{name}_1",
+            usd_path=usd_path,
+            category=obj_category,
+            name=f"{name}_1",
+            scale=np.array([0.8, 0.8, 0.8]),
+            abilities={},
+        )
+
+        sink_2 = DatasetObject(
+            prim_path=f"/World/{name}_2",
+            usd_path=usd_path,
+            category=obj_category,
+            name=f"{name}_2",
+            scale=np.array([0.8, 0.8, 0.8]),
+            abilities={},
+        )
+
+        sink_3 = DatasetObject(
+            prim_path=f"/World/{name}_3",
+            usd_path=usd_path,
+            category=obj_category,
+            name=f"{name}_3",
+            scale=np.array([0.8, 0.8, 0.8]),
+            abilities={},
+        )
+
+        sim.import_object(sink_1, auto_initialize=False)
+        sink_1.set_position_orientation(position=np.array([0, 0, 1]))
+
+        sim.import_object(sink_2, auto_initialize=False)
+        sink_2.set_position_orientation(position=np.array([0, 0, 3]))
+        
+        sim.import_object(sink_3, auto_initialize=False)
+        sink_3.set_position_orientation(position=np.array([0, 0, 5]))
+
+        # needs 1 physics step to activate collision meshes for raycasting
+        sim.step(force_playing=True)
+        sim.pause()
+
+        # adjacency = sink_1.states[object_states.VerticalAdjacency].get_value()
+        # print(adjacency)
+
+        # adjacency = sink_2.states[object_states.VerticalAdjacency].get_value()
+        # print(adjacency)
+
+        # adjacency = sink_3.states[object_states.VerticalAdjacency].get_value()
+        # print(adjacency)
+
+        assert sink_1.states[object_states.Under].get_value(sink_2)
+        assert sink_1.states[object_states.Under].get_value(sink_3)
+
+        assert sink_2.states[object_states.OnTop].get_value(sink_1)
+        assert sink_2.states[object_states.Under].get_value(sink_3)
+
+        assert sink_3.states[object_states.OnTop].get_value(sink_1)
+        assert sink_3.states[object_states.OnTop].get_value(sink_2)
+        
+        for i in range(1000000):
+            sim.step()
+
+    finally:
+        app.close()
+
+
+def test_horizontal_adjacency():
+    try:
+        obj_category = "sink"
+        obj_model = "sink_1"
+        name = "sink"
+
+        sim = Simulator()
+        scene = EmptyScene()
+        sim.import_scene(scene)
+
+        model_root_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}"
+        usd_path = f"{model_root_path}/usd/{obj_model}.usd"
+
+        sink_1 = DatasetObject(
+            prim_path=f"/World/{name}_1",
+            usd_path=usd_path,
+            category=obj_category,
+            name=f"{name}_1",
+            scale=np.array([0.8, 0.8, 0.8]),
+            abilities={},
+        )
+
+        sink_2 = DatasetObject(
+            prim_path=f"/World/{name}_2",
+            usd_path=usd_path,
+            category=obj_category,
+            name=f"{name}_2",
+            scale=np.array([0.8, 0.8, 0.8]),
+            abilities={},
+        )
+
+        sink_3 = DatasetObject(
+            prim_path=f"/World/{name}_3",
+            usd_path=usd_path,
+            category=obj_category,
+            name=f"{name}_3",
+            scale=np.array([0.8, 0.8, 0.8]),
+            abilities={},
+        )
+
+        sim.import_object(sink_1, auto_initialize=False)
+        sink_1.set_position_orientation(position=np.array([0, 0, 1]))
+
+        sim.import_object(sink_2, auto_initialize=False)
+        sink_2.set_position_orientation(position=np.array([2, 0, 1]))
+        
+        sim.import_object(sink_3, auto_initialize=False)
+        sink_3.set_position_orientation(position=np.array([0, 1, 1]))
+
+        # needs 1 physics step to activate collision meshes for raycasting
+        sim.step(force_playing=True)
+        sim.pause()
+
+        # adjacency = sink_1.states[object_states.HorizontalAdjacency].get_value()
+        # print(adjacency)
+
+        # adjacency = sink_2.states[object_states.HorizontalAdjacency].get_value()
+        # print(adjacency)
+
+        # adjacency = sink_3.states[object_states.HorizontalAdjacency].get_value()
+        # print(adjacency)
+
+        assert sink_1.states[object_states.NextTo].get_value(sink_2)
+        assert sink_1.states[object_states.NextTo].get_value(sink_3)
+
+        assert sink_2.states[object_states.NextTo].get_value(sink_1)
+        assert sink_2.states[object_states.NextTo].get_value(sink_3)
+
+        assert sink_3.states[object_states.NextTo].get_value(sink_1)
+        assert sink_3.states[object_states.NextTo].get_value(sink_2)
+        
+        for i in range(1000000):
+            sim.step()
+
+    finally:
+        app.close()
+
 ## WORKS
 #test_state_graph()
 #test_dirty()
 #test_burnt()
 #test_cooked()
-test_frozen()
+#test_frozen()
+#test_vertical_adjacency()
+
+test_horizontal_adjacency()
 
 ## BROKEN
 #test_toggle()

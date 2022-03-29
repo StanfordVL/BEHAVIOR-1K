@@ -39,16 +39,7 @@ class OnTop(PositionalValidationMemoizedObjectStateMixin, RelativeObjectState, B
 
         return sampling_success
 
-    def _get_value(self, other, use_ray_casting_method=False):
-        del use_ray_casting_method
-
-        # Touching is the less costly of our conditions.
-        # Check it first.
-        if not self.obj.states[Touching].get_value(other):
-            return False
-
-        # Then check vertical adjacency - it's the second least
-        # costly.
+    def _get_value(self, other):
         other_bids = set(other.get_body_ids())
         adjacency = self.obj.states[VerticalAdjacency].get_value()
         return not other_bids.isdisjoint(adjacency.negative_neighbors) and other_bids.isdisjoint(
