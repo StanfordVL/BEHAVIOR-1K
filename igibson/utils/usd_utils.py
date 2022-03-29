@@ -9,6 +9,7 @@ from omni.isaac.core.utils.stage import get_current_stage, get_stage_units, trav
 from omni.isaac.core.utils.bounds import compute_aabb, create_bbox_cache, compute_combined_aabb
 from omni.syntheticdata import helpers
 from pxr import Gf, Vt, Usd, Sdf, UsdGeom, UsdShade, UsdPhysics, PhysxSchema
+import numpy as np
 
 from igibson.utils.constants import JointType
 from igibson.utils.python_utils import assert_valid_key
@@ -285,6 +286,23 @@ class BoundingBoxAPI:
         aabb = compute_combined_aabb(bbox_cache=cls.CACHE, prim_paths=prim_paths)
 
         return aabb[:3], aabb[3:]
+
+    @classmethod
+    def aabb_contains_point(cls, point, container):
+        """
+        Returns true if the point is contained in the container AABB
+
+        Args:
+            point (tuple): (x,y,z) position in world-coordinates
+            container (tuple):
+                - 3-array: start (x,y,z) corner of world-coordinate frame aligned bounding box
+                - 3-array: end (x,y,z) corner of world-coordinate frame aligned bounding box
+
+        Returns:
+            bool
+        """
+        lower, upper = container
+        return np.less_equal(lower, point).all() and np.less_equal(point, upper).all()
 
 def clear():
     """

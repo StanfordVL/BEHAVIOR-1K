@@ -2,7 +2,6 @@
 from IPython import embed
 
 import igibson
-# # from igibson.external.pybullet_tools.utils import aabb_contains_point
 from igibson.object_states.aabb import AABB
 from igibson.object_states.adjacency import HorizontalAdjacency, VerticalAdjacency, flatten_planes
 from igibson.object_states.kinematics import KinematicsMixin
@@ -10,6 +9,7 @@ from igibson.object_states.memoization import PositionalValidationMemoizedObject
 from igibson.object_states.object_state_base import BooleanState, RelativeObjectState
 from igibson.object_states.pose import Pose
 from igibson.object_states.utils import sample_kinematics
+from igibson.utils.usd_utils import BoundingBoxAPI
 from igibson.utils.utils import restoreState
 
 
@@ -52,7 +52,7 @@ class Inside(PositionalValidationMemoizedObjectStateMixin, KinematicsMixin, Rela
         inner_object_pos, _ = self.obj.states[Pose].get_value()
         outer_object_AABB = other.states[AABB].get_value()
 
-        if not aabb_contains_point(inner_object_pos, outer_object_AABB):
+        if not BoundingBoxAPI.aabb_contains_point(inner_object_pos, outer_object_AABB):
             return False
 
         # Our definition of inside: an object A is inside an object B if there
