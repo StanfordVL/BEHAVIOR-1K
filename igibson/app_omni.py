@@ -83,7 +83,7 @@ class OmniApp:
         window_height (int): Height of the application window, independent of viewport, defaults to 900,
         display_options (int): used to specify whats visible in the stage by default. Defaults to 3094 so extra objects do not appear in synthetic data. 3286 is another good default, used for the regular isaac-sim editor experience
         subdiv_refinement_level (int): Number of subdivisons to perform on supported geometry. Defaults to 0
-        renderer (str): Rendering mode, can be  `RayTracedLighting` or `PathTracing`. Defaults to `PathTracing`
+        renderer (str): Rendering mode, can be  `RayTracedLighting` or `PathTracing`. Defaults to `RayTracedLighting`
         anti_aliasing (int): Antialiasing mode, 0: Disabled, 1: TAA, 2: FXAA, 3: DLSS, 4:RTXAA
         samples_per_pixel_per_frame (int): The number of samples to render per frame, increase for improved quality, used for `PathTracing` only. Defaults to 64
         denoiser (bool):  Enable this to use AI denoising to improve image quality, used for `PathTracing` only. Defaults to True

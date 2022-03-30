@@ -24,6 +24,9 @@ from omni.isaac.core.utils.viewports import set_camera_view
 from omni.isaac.core.loggers import DataLogger
 from typing import Optional, List
 
+from igibson import assets_path
+from igibson.utils.python_utils import clear as clear_pu
+from igibson.utils.usd_utils import clear as clear_uu
 from igibson.scenes import Scene
 from igibson.objects.object_base import BaseObject
 
@@ -437,26 +440,36 @@ class Simulator(SimulationContext):
         # Stop the physics
         self.stop()
 
+        # TODO: Handle edge-case for when we clear sim without loading new scene in. self._scene should be None
+        # but scene.load(sim) requires scene to be defined!
+
+        # Clear uniquely named items and other internal states
+        clear_pu()
+        clear_uu()
+
         # if self.scene is not None:
         #     self.scene.clear()
         self._current_tasks = dict()
         self._scene_finalized = False
         self._data_logger = DataLogger()
 
-        def check_deletable_prim(prim_path):
-            if is_prim_no_delete(prim_path):
-                return False
-            if is_prim_ancestral(prim_path):
-                return False
-            if get_prim_type_name(prim_path=prim_path) == "PhysicsScene":
-                return False
-            if prim_path == "/World":
-                return False
-            if prim_path == "/":
-                return False
-            return True
+        # def check_deletable_prim(prim_path):
+        #     print(f"checking prim path: {prim_path}")
+        #     if is_prim_no_delete(prim_path):
+        #         return False
+        #     if is_prim_ancestral(prim_path):
+        #         return False
+        #     if get_prim_type_name(prim_path=prim_path) == "PhysicsScene":
+        #         return False
+        #     if prim_path == "/World":
+        #         return False
+        #     if prim_path == "/":
+        #         return False
+        #     return True
+        #
+        # clear_stage(predicate=check_deletable_prim)
+        self.load_stage(usd_path=f"{assets_path}/models/misc/clear_stage.usd")
 
-        clear_stage(predicate=check_deletable_prim)
         return
 
     def reset(self) -> None:

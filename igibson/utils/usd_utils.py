@@ -158,6 +158,13 @@ class CollisionAPI:
         # Add this prim to the collision group
         cls.ACTIVE_COLLISION_GROUPS[col_group].GetCollidersCollectionAPI().GetIncludesRel().AddTarget(prim_path)
 
+    @classmethod
+    def clear(cls):
+        """
+        Clears the internal state of this CollisionAPI
+        """
+        cls.ACTIVE_COLLISION_GROUPS = {}
+
 
 class BoundingBoxAPI:
     """
@@ -204,3 +211,18 @@ class BoundingBoxAPI:
         low, high = cls.compute_aabb(prim_path=prim_path)
 
         return (low + high) / 2.0, high - low
+
+    @classmethod
+    def clear(cls):
+        """
+        Clears the internal state of this BoundingBoxAPI
+        """
+        cls.CACHE = None
+
+
+def clear():
+    """
+    Clear state tied to singleton classes
+    """
+    CollisionAPI.clear()
+    BoundingBoxAPI.clear()

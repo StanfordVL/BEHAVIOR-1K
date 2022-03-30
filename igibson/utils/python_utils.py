@@ -10,6 +10,7 @@ from collections import OrderedDict, Iterable
 
 # Global dictionary storing all unique names
 NAMES = set()
+CLASS_NAMES = set()
 
 
 class classproperty:
@@ -154,8 +155,9 @@ class UniquelyNamed:
         NAMES.add(self.name)
 
     def __del__(self):
-        # Remove this object name from the registry
-        NAMES.remove(self.name)
+        # Remove this object name from the registry if it's still there
+        if self.name in NAMES:
+            NAMES.remove(self.name)
 
     @property
     def name(self):
@@ -172,11 +174,11 @@ class UniquelyNamedNonInstance:
     """
 
     def __init_subclass__(cls, **kwargs):
-        global NAMES
+        global CLASS_NAMES
         # Register this object, making sure it's name is unique
-        assert cls.name not in NAMES, \
+        assert cls.name not in CLASS_NAMES, \
             f"UniquelyNamed class with name {cls.name} already exists!"
-        NAMES.add(cls.name)
+        CLASS_NAMES.add(cls.name)
 
     @classproperty
     def name(cls):
@@ -495,3 +497,10 @@ class SerializableNonInstance:
                                       f"values to be deserialized, only {idx} were."
 
         return state_dict
+
+
+def clear():
+    """
+    Clear state tied to singleton classes
+    """
+    NAMES.clear()

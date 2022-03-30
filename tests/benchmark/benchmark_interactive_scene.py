@@ -98,6 +98,7 @@ def main():
         viewer_height=512,
     )
     benchmark_scene(sim, "Rs_int", optimized=True, import_robot=True)
+    sim.stop()
     benchmark_scene(sim, "Rs_int", optimized=True, import_robot=False)
 
     # scenes = ["Beechwood_0_int",
@@ -118,6 +119,8 @@ def main():
 
     # for scene in scenes:
     #     benchmark_scene(scene, True)
+
+    app.close()
 
 
 if __name__ == "__main__":
