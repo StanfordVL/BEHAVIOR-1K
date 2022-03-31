@@ -38,10 +38,10 @@ def benchmark_scene(sim, scene_name, optimized=False, import_robot=True):
         # if i % 100 == 0:
         #     scene.randomize_texture()
         start = time.time()
-        sim.step()
         if import_robot:
             # apply random actions
             turtlebot.apply_action(turtlebot.action_space.sample())
+        sim.step(render=False)
         physics_end = time.time()
         
         # TODO: We need a way to measure rendering time. Currently omni already renders when we call s.step()
@@ -49,6 +49,7 @@ def benchmark_scene(sim, scene_name, optimized=False, import_robot=True):
         #     _ = s.renderer.render_robot_cameras(modes=("rgb"))
         # else:
         #     _ = s.renderer.render(modes=("rgb"))
+        sim.render()
         end = time.time()
 
         # print("Elapsed time: ", end - start)

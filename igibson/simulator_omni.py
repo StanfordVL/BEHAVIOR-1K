@@ -331,10 +331,11 @@ class Simulator(SimulationContext):
             self.play()
 
         for i in range(self.n_physics_timesteps_per_render - 1):
-            super().step(render=False if render is None else render)
+            # No rendering for intermediate steps for efficiency
+            super().step(render=False)
 
         # Render on final step unless input says otherwise
-        super().step(render=True if render is None else render)
+        super().step(render=render)
 
         self._non_physics_step()
         # self.sync()
