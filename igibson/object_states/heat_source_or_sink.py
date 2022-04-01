@@ -124,28 +124,34 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin):
     def _initialize(self):
         super(HeatSourceOrSink, self)._initialize()
         self.initialize_link_mixin()
-        self.marker = VisualMarker(
-            visual_shape=p.GEOM_MESH,
-            filename=_HEATING_ELEMENT_MARKER_FILENAME,
-            scale=_HEATING_ELEMENT_MARKER_SCALE,
+
+        # Import at runtime to prevent circular imports
+        from igibson.objects.usd_object import USDObject
+        self.marker = USDObject(
+            prim_path=f"{self.obj.prim_path}/heat_source_marker",
+            usd_path=_HEATING_ELEMENT_MARKER_FILENAME,
+            name="heat_source_marker",
             class_id=SemanticClass.HEAT_SOURCE_MARKER,
-            rendering_params={"shadow_caster": True},
+            scale=_HEATING_ELEMENT_MARKER_SCALE,
+            visible=True,
+            fixed_base=False,
+            visual_only=True,
         )
-        self.simulator.import_object(self.marker)
-        self.marker.set_position([0, 0, -100])
+
+        self.marker.load(simulator=self.simulator)
+        self.marker.set_position(np.array([0, 0, -100]))
 
     def _update(self):
         self.status, self.position = self._compute_state_and_position()
 
         # Move the marker.
-        marker_position = [0, 0, -100]
+        marker_position = np.array([0, 0, -100])
         if self.position is not None:
             marker_position = self.position
 
         # Lazy update of marker position
         if not np.all(np.isclose(marker_position, self.marker.get_position())):
             self.marker.set_position(marker_position)
-            self.marker.force_wakeup()
 
     def _get_value(self):
         return self.status, self.position
