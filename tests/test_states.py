@@ -606,7 +606,7 @@ def test_inside():
     finally:
         app.close()
 
-def test_heat():
+def test_heat_source():
     try:
         obj_category = "stove"
         obj_model = "101908"
@@ -649,6 +649,47 @@ def test_heat():
         app.close()
 
 
+def test_temperature():
+    try:
+        obj_category = "apple"
+        obj_model = "00_0"
+        name = "apple"
+
+        sim = Simulator()
+        scene = EmptyScene()
+        sim.import_scene(scene)
+
+        model_root_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}"
+        usd_path = f"{model_root_path}/usd/{obj_model}.usd"
+
+        apple = DatasetObject(
+            prim_path=f"/World/{name}",
+            usd_path=usd_path,
+            category=obj_category,
+            name=f"{name}",
+            scale=np.array([1.0, 1.0, 1.0]),
+            abilities={"freezable": {}, "cookable": {}, "burnable": {}},
+        )
+
+        sim.import_object(apple, auto_initialize=False)
+        apple.set_position_orientation(position=np.array([0, 0, 0.2]))
+
+        # Manually increase the temperature of the apple
+        apple.states[object_states.Burnt].burn_temperature = 200
+        for i in range(-10, 100):
+            temp = i * 5
+            print("Apple temperature: {} degrees Celsius".format(temp))
+            apple.states[object_states.Temperature].set_value(temp)
+            print("Frozen(Apple)? {}".format(apple.states[object_states.Frozen].get_value()))
+            print("Cooked(Apple)? {}".format(apple.states[object_states.Cooked].get_value()))
+            print("Burnt(Apple)? {}".format(apple.states[object_states.Burnt].get_value()))
+            for j in range(10):
+                sim.step()
+    
+    finally:
+        app.close()
+
+
 ## WORKS
 #test_state_graph()
 #test_dirty()
@@ -658,8 +699,9 @@ def test_heat():
 #test_vertical_adjacency()
 #test_horizontal_adjacency()
 #test_inside()
+#test_heat_source()
 
-test_heat()
+test_temperature()
 
 ## BROKEN
 #test_toggle()
