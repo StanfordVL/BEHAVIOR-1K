@@ -176,3 +176,4 @@ if __name__ == "__main__":
 #import_asset_urdf("cabinet2", "cabinet_0007")
 #import_asset_urdf("cabinet", "cabinet_0004")
 #import_obj_urdf("stove", "101908")
+#import_obj_urdf("apple", "00_0")
