@@ -20,5 +20,5 @@ class CollisionReward(BaseRewardFunction):
 
     def _step(self, task, env, action):
         # Penalty is Reward is -self._r_collision if there were any collisions in the last timestep
-        reward = float(len(env.collision_links) > 0) * -self._r_collision
+        reward = float(len(env.current_collisions) > 0) * -self._r_collision
         return reward, {}

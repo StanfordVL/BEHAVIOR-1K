@@ -523,6 +523,22 @@ class iGibsonEnv(BaseEnv):
         return self.get_obs()
 
     @property
+    def episode_steps(self):
+        """
+        Returns:
+            int: Current number of steps in episode
+        """
+        return self._current_step
+
+    @property
+    def episode_collisions(self):
+        """
+        Returns:
+            int: Total number of collisions in current episode
+        """
+        return self._collision_step
+
+    @property
     def current_collisions(self):
         """
         Returns:
@@ -590,5 +606,5 @@ if __name__ == "__main__":
             print("reward", reward)
             if done:
                 break
-        print("Episode finished after {} timesteps, took {} seconds.".format(env.current_step, time.time() - start))
+        print("Episode finished after {} timesteps, took {} seconds.".format(env.episode_steps, time.time() - start))
     env.close()

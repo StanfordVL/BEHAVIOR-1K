@@ -38,6 +38,7 @@ def import_nested_models_metadata_from_element(element, model_pose_info):
     for ele in element:
         if ele.tag == "joint":
             name, pos, quat = get_joint_info(ele)
+            name = name.replace("-", "_")
             model_pose_info[name] = {
                 "pos": pos,
                 "quat": quat,
@@ -47,7 +48,7 @@ def import_nested_models_metadata_from_element(element, model_pose_info):
     for ele in element:
         if ele.tag == "link":
             # This is a valid object, import the model
-            name = ele.get("name")
+            name = ele.get("name").replace("-", "_")
             category = ele.get("category")
             model = ele.get("model")
             if name == "world":
@@ -215,8 +216,6 @@ def recursively_replace_list_of_dict(dic):
 
 
 def import_building_metadata(obj_category, obj_model, name):
-    global sim
-
     # Check if filepath exists
     model_root_path = f"{ig_dataset_path}/scenes/{obj_model}"
     usd_path = f"{model_root_path}/usd/{obj_category}/{obj_model}_{obj_category}.usd"
@@ -243,12 +242,18 @@ def import_building_metadata(obj_category, obj_model, name):
     # Iterate over dict and replace any lists of dicts as dicts of dicts (with each dict being indexed by an integer)
     data = recursively_replace_list_of_dict(data)
 
+    # Store attributes
+    prim.CreateAttribute("ig:category", VT.String)
+    prim.CreateAttribute("ig:model", VT.String)
+    prim.GetAttribute("ig:category").Set(obj_category)
+    prim.GetAttribute("ig:model").Set(obj_model)
+
     # Store remaining data as metadata
     prim.SetCustomData(data)
 
     # Save stage
     stage.Save()
 
-import_models_metadata_from_scene(urdf=URDF)
-
-app.close()
+if __name__ == "__main__":
+    import_models_metadata_from_scene(urdf=URDF)
+    app.close()

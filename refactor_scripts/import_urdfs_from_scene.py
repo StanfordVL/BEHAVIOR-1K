@@ -13,13 +13,11 @@ from omni.client._omniclient import Result
 import omni.client
 from omni.physx.scripts import utils
 
+from refactor_scripts.expand_collision_obj_and_urdf import split_objs_in_urdf
+
 ##### SET THIS ######
 URDF = f"{ig_dataset_path}/scenes/Rs_int/urdf/Rs_int_best.urdf"
 #### YOU DONT NEED TO TOUCH ANYTHING BELOW HERE IDEALLY :) #####
-
-
-# Create simulator
-sim = Simulator()
 
 
 def create_import_config():
@@ -78,7 +76,7 @@ def import_nested_objs_from_element(element):
             # This is a valid object, import the model
             category = ele.get("category")
             model = ele.get("model")
-            name = ele.get("name")
+            name = ele.get("name").replace("-", "_")
             print(f"Link: name: {name}, category: {category}, model: {model}")
             # Skip world link
             if name == "world":
@@ -92,35 +90,42 @@ def import_nested_objs_from_element(element):
         for child in ele:
             import_nested_objs_from_element(child)
 
-def import_obj_urdf(obj_category, obj_model, skip_if_exist=True):
+
+def import_obj_urdf(obj_category, obj_model, skip_if_exist=False):
     # Import URDF
     cfg = create_import_config()
     # Check if filepath exists
     usd_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}/usd/{obj_model}.usd"
     if not (skip_if_exist and exists(usd_path)):
+        urdf_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}/{obj_model}.urdf"
+        print(f"Converting collision meshes from {obj_category}, {obj_model}...")
+        urdf_path = split_objs_in_urdf(urdf_fpath=urdf_path, name_suffix="split")
         print(f"Importing {obj_category}, {obj_model}...")
         # Only import if it doesn't exist
         omni.kit.commands.execute(
             "URDFParseAndImportFile",
-            urdf_path=f"{ig_dataset_path}/objects/{obj_category}/{obj_model}/{obj_model}.urdf",
+            urdf_path=urdf_path,
             import_config=cfg,
             dest_path=usd_path,
         )
         add_reference_to_stage(usd_path=usd_path, import_config=cfg)
 
 
-def import_building_urdf(obj_category, obj_model, skip_if_exist=True):
+def import_building_urdf(obj_category, obj_model, skip_if_exist=False):
     # For floors, ceilings, walls
     # Import URDF
     cfg = create_import_config()
     # Check if filepath exists
     usd_path = f"{ig_dataset_path}/scenes/{obj_model}/usd/{obj_category}/{obj_model}_{obj_category}.usd"
     if not (skip_if_exist and exists(usd_path)):
+        urdf_path = f"{ig_dataset_path}/scenes/{obj_model}/urdf/{obj_model}_{obj_category}.urdf"
+        print(f"Converting collision meshes from {obj_category}, {obj_model}...")
+        urdf_path = split_objs_in_urdf(urdf_fpath=urdf_path, name_suffix="split", mesh_fpath_offset="..")
         print(f"Importing {obj_category}, {obj_model}...")
         # Only import if it doesn't exist
         omni.kit.commands.execute(
             "URDFParseAndImportFile",
-            urdf_path=f"{ig_dataset_path}/scenes/{obj_model}/urdf/{obj_model}_{obj_category}.urdf",
+            urdf_path=urdf_path,
             import_config=cfg,
             dest_path=usd_path,
         )
@@ -145,6 +150,6 @@ def add_reference_to_stage(usd_path, import_config):
         if import_config.create_physics_scene:
             UsdPhysics.Scene.Define(current_stage, Sdf.Path("/physicsScene"))
 
-import_objects_from_scene_urdf(urdf=URDF)
-
-app.close()
+if __name__ == "__main__":
+    import_objects_from_scene_urdf(urdf=URDF)
+    app.close()

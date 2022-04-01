@@ -190,7 +190,7 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
         # Get all dones and successes from individual termination conditions
         dones = []
         successes = []
-        for termination_condition in self._termination_conditions:
+        for termination_condition in self._termination_conditions.values():
             d, s = termination_condition.step(self, env, action)
             dones.append(d)
             successes.append(s)
@@ -223,13 +223,13 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
         # Aggregate rewards over all reward functions
         total_reward = 0.0
         for reward_name, reward_function in self._reward_functions.items():
-            reward, info = reward_function.step(self, env, action)
+            reward, reward_info = reward_function.step(self, env, action)
             total_reward += reward
             breakdown_dict[reward_name] = reward
-            info[reward_name] = info
+            total_info[reward_name] = reward_info
 
         # Store breakdown dict
-        info["reward_breakdown"] = breakdown_dict
+        total_info["reward_breakdown"] = breakdown_dict
 
         return total_reward, total_info
 

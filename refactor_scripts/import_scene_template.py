@@ -21,7 +21,7 @@ URDF = f"{ig_dataset_path}/scenes/Rs_int/urdf/Rs_int_best.urdf"
 USD_TEMPLATE_FILE = f"{ig_dataset_path}/scenes/Rs_int/urdf/Rs_int_best_template.usd"
 #### YOU DONT NEED TO TOUCH ANYTHING BELOW HERE IDEALLY :) #####
 
-sim = Simulator()
+sim = None
 
 def string_to_array(string):
     """
@@ -36,10 +36,22 @@ def string_to_array(string):
     return np.array([float(x) for x in string.split(" ")])
 
 
-def import_models_template_from_scene(urdf):
+def import_models_template_from_scene(urdf, usd_out):
+    global sim
+    sim = Simulator()
+    sim.clear()
+
     tree = ET.parse(urdf)
     root = tree.getroot()
     import_nested_models_template_from_element(root, model_pose_info={})
+
+    # Add template attribute to world
+    world = get_prim_at_path("/World")
+    world.CreateAttribute("ig:isTemplate", VT.Bool)
+    world.GetAttribute("ig:isTemplate").Set(True)
+
+    # Save scene
+    sim.save_stage(usd_out)
 
 
 def import_nested_models_template_from_element(element, model_pose_info):
@@ -47,6 +59,7 @@ def import_nested_models_template_from_element(element, model_pose_info):
     for ele in element:
         if ele.tag == "joint":
             name, pos, quat, fixed_jnt = get_joint_info(ele)
+            name = name.replace("-", "_")
             model_pose_info[name] = {
                 "pos": pos,
                 "quat": quat,
@@ -57,7 +70,7 @@ def import_nested_models_template_from_element(element, model_pose_info):
     for ele in element:
         if ele.tag == "link":
             # This is a valid object, import the model
-            name = ele.get("name")
+            name = ele.get("name").replace("-", "_")
             category = ele.get("category")
             model = ele.get("model")
             if name == "world":
@@ -72,7 +85,7 @@ def import_nested_models_template_from_element(element, model_pose_info):
                 pos = model_pose_info[name]["pos"]
                 quat = model_pose_info[name]["quat"]
                 fixed_jnt = model_pose_info[name]["fixed_jnt"]
-                room = ele.get("room")
+                room = ele.get("room", "")
                 random_group = ele.get("random_group", None)
                 scale = string_to_array(ele.get("scale")) if "scale" in ele.keys() else None
                 obj_scope = ele.get("object_scope", None)
@@ -131,7 +144,7 @@ def import_obj_template(obj_category, obj_model, name, bb, pos, quat, fixed_jnt,
     print(f"obj: {name}, fixed jnt: {fixed_jnt}")
 
     # Create new Xform prim that will contain info
-    obj = sim.stage.DefinePrim(f"/World/{name}", "Xform")
+    obj = sim.stage.DefinePrim(f"/World/{name.replace('-', '_')}", "Xform")
     obj.CreateAttribute("ig:category", VT.String)
     obj.CreateAttribute("ig:model", VT.String)
     obj.CreateAttribute("ig:fixedJoint", VT.Bool)
@@ -166,19 +179,10 @@ def import_obj_template(obj_category, obj_model, name, bb, pos, quat, fixed_jnt,
 
 
 
+if __name__ == "__main__":
+    import_models_template_from_scene(urdf=URDF, usd_out=USD_TEMPLATE_FILE)
 
-
-import_models_template_from_scene(urdf=URDF)
-
-# Add template attribute to world
-world = get_prim_at_path("/World")
-world.CreateAttribute("ig:isTemplate", VT.Bool)
-world.GetAttribute("ig:isTemplate").Set(True)
-
-# Save scene
-sim.save_stage(USD_TEMPLATE_FILE)
-
-# Close app
-app.close()
+    # Close app
+    app.close()
 
 

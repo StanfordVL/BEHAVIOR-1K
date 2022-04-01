@@ -148,11 +148,11 @@ class XFormPrim(BasePrim):
         self.set_position_orientation(position=current_position, orientation=current_orientation)
         return
 
-    def reset(self):
-        """
-        Resets the prim to its default state (position and orientation).
-        """
-        self.set_position_orientation(self._default_state.position, self._default_state.orientation)
+    # def reset(self):
+    #     """
+    #     Resets the prim to its default state (position and orientation).
+    #     """
+    #     self.set_position_orientation(self._default_state.position, self._default_state.orientation)
 
     def get_default_state(self):
         """

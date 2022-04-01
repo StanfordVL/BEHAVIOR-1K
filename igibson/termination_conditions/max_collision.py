@@ -20,4 +20,4 @@ class MaxCollision(FailureCondition):
 
     def _step(self, task, env, action):
         # Terminate if the robot has collided more than self._max_collisions times
-        return env.collision_step > self._max_collisions
+        return env.episode_collisions > self._max_collisions

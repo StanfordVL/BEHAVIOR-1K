@@ -710,8 +710,8 @@ class EntityPrim(XFormPrim):
             self.set_joint_efforts(efforts=state.efforts, normalized=normalized)
 
     def reset(self):
-        # Run super reset first to reset this articulation's pose
-        super().reset()
+        # # Run super reset first to reset this articulation's pose
+        # super().reset()
 
         # Reset joint state if we're articulated
         if self.articulated:

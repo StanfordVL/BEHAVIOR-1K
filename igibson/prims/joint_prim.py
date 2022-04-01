@@ -174,15 +174,15 @@ class JointPrim(BasePrim):
             default_pos, default_vel, default_effort = self.get_state()
             self._default_state = JointsState(positions=default_pos, velocities=default_vel, efforts=default_effort)
 
-    def reset(self):
-        """
-        Resets the prim to its default state (position and orientation).
-        """
-        if self.articulated:
-            # TODO: Do we also need to reset targets here?
-            self.set_pos(pos=self._default_state.positions, target=False)
-            self.set_vel(vel=self._default_state.velocities, target=False)
-            self.set_effort(effort=self._default_state.efforts)
+    # def reset(self):
+    #     """
+    #     Resets the prim to its default state (position and orientation).
+    #     """
+    #     if self.articulated:
+    #         # TODO: Do we also need to reset targets here?
+    #         self.set_pos(pos=self._default_state.positions, target=False)
+    #         self.set_vel(vel=self._default_state.velocities, target=False)
+    #         self.set_effort(effort=self._default_state.efforts)
 
     def get_default_state(self):
         """

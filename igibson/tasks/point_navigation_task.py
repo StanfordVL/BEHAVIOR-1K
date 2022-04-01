@@ -281,6 +281,9 @@ class PointNavigationTask(BaseTask):
         env.scene.reset()
 
     def _reset_agent(self, env):
+        # Reset agent
+        env.robots[self._robot_idn].reset()
+
         # We attempt to sample valid initial poses and goal positions
         success, max_trials = False, 100
 
@@ -426,10 +429,10 @@ class PointNavigationTask(BaseTask):
             num_nodes = min(self._n_vis_waypoints, shortest_path.shape[0])
             for i in range(num_nodes):
                 self._waypoint_markers[i].set_position(
-                    pos=np.array([shortest_path[i][0], shortest_path[i][1], floor_height])
+                    position=np.array([shortest_path[i][0], shortest_path[i][1], floor_height])
                 )
             for i in range(num_nodes, self._n_vis_waypoints):
-                self._waypoint_markers[i].set_position(pos=np.array([0.0, 0.0, 100.0]))
+                self._waypoint_markers[i].set_position(position=np.array([0.0, 0.0, 100.0]))
 
     def step(self, env, action):
         # Run super method first

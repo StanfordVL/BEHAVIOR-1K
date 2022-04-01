@@ -7,6 +7,7 @@ NOTE: convention for quaternions is (x, y, z, w)
 import math
 
 import numpy as np
+from scipy.spatial.transform import Rotation as R
 
 PI = np.pi
 EPS = np.finfo(float).eps * 4.0
@@ -388,42 +389,16 @@ def mat2quat(rmat):
         np.array: (x,y,z,w) float quaternion angles
     """
     M = np.asarray(rmat).astype(np.float32)[:3, :3]
-
-    m00 = M[0, 0]
-    m01 = M[0, 1]
-    m02 = M[0, 2]
-    m10 = M[1, 0]
-    m11 = M[1, 1]
-    m12 = M[1, 2]
-    m20 = M[2, 0]
-    m21 = M[2, 1]
-    m22 = M[2, 2]
-    # symmetric matrix K
-    K = np.array(
-        [
-            [m00 - m11 - m22, np.float32(0.0), np.float32(0.0), np.float32(0.0)],
-            [m01 + m10, m11 - m00 - m22, np.float32(0.0), np.float32(0.0)],
-            [m02 + m20, m12 + m21, m22 - m00 - m11, np.float32(0.0)],
-            [m21 - m12, m02 - m20, m10 - m01, m00 + m11 + m22],
-        ]
-    )
-    K /= 3.0
-    # quaternion is Eigen vector of K that corresponds to largest eigenvalue
-    w, V = np.linalg.eigh(K)
-    inds = np.array([3, 0, 1, 2])
-    q1 = V[inds, np.argmax(w)]
-    if q1[0] < 0.0:
-        np.negative(q1, q1)
-    inds = np.array([1, 2, 3, 0])
-    return q1[inds]
+    return R.from_matrix(M).as_quat()
 
 
-def euler2mat(euler):
+def euler2mat(euler, seq="xyz"):
     """
     Converts euler angles into rotation matrix form
 
     Args:
         euler (np.array): (r,p,y) angles
+        seq (str): Order sequence of the euler angle rotation. Default is "xyz"
 
     Returns:
         np.array: 3x3 rotation matrix
@@ -435,72 +410,22 @@ def euler2mat(euler):
     euler = np.asarray(euler, dtype=np.float64)
     assert euler.shape[-1] == 3, "Invalid shaped euler {}".format(euler)
 
-    ai, aj, ak = -euler[..., 2], -euler[..., 1], -euler[..., 0]
-    si, sj, sk = np.sin(ai), np.sin(aj), np.sin(ak)
-    ci, cj, ck = np.cos(ai), np.cos(aj), np.cos(ak)
-    cc, cs = ci * ck, ci * sk
-    sc, ss = si * ck, si * sk
-
-    mat = np.empty(euler.shape[:-1] + (3, 3), dtype=np.float64)
-    mat[..., 2, 2] = cj * ck
-    mat[..., 2, 1] = sj * sc - cs
-    mat[..., 2, 0] = sj * cc + ss
-    mat[..., 1, 2] = cj * sk
-    mat[..., 1, 1] = sj * ss + cc
-    mat[..., 1, 0] = sj * cs - sc
-    mat[..., 0, 2] = -sj
-    mat[..., 0, 1] = cj * si
-    mat[..., 0, 0] = cj * ci
-    return mat
+    return R.from_euler(seq, euler).as_matrix()
 
 
-def mat2euler(rmat, axes="sxyz"):
+def mat2euler(rmat, seq="xyz"):
     """
     Converts given rotation matrix to euler angles in radian.
 
     Args:
         rmat (np.array): 3x3 rotation matrix
-        axes (str): One of 24 axis sequences as string or encoded tuple (see top of this module)
+        seq (str): Order sequence of the euler angle rotation. Default is "xyz"
 
     Returns:
         np.array: (r,p,y) converted euler angles in radian vec3 float
     """
-    try:
-        firstaxis, parity, repetition, frame = _AXES2TUPLE[axes.lower()]
-    except (AttributeError, KeyError):
-        firstaxis, parity, repetition, frame = axes
-
-    i = firstaxis
-    j = _NEXT_AXIS[i + parity]
-    k = _NEXT_AXIS[i - parity + 1]
-
     M = np.array(rmat, dtype=np.float32, copy=False)[:3, :3]
-    if repetition:
-        sy = math.sqrt(M[i, j] * M[i, j] + M[i, k] * M[i, k])
-        if sy > EPS:
-            ax = math.atan2(M[i, j], M[i, k])
-            ay = math.atan2(sy, M[i, i])
-            az = math.atan2(M[j, i], -M[k, i])
-        else:
-            ax = math.atan2(-M[j, k], M[j, j])
-            ay = math.atan2(sy, M[i, i])
-            az = 0.0
-    else:
-        cy = math.sqrt(M[i, i] * M[i, i] + M[j, i] * M[j, i])
-        if cy > EPS:
-            ax = math.atan2(M[k, j], M[k, k])
-            ay = math.atan2(-M[k, i], cy)
-            az = math.atan2(M[j, i], M[i, i])
-        else:
-            ax = math.atan2(-M[j, k], M[j, j])
-            ay = math.atan2(-M[k, i], cy)
-            az = 0.0
-
-    if parity:
-        ax, ay, az = -ax, -ay, -az
-    if frame:
-        ax, az = az, ax
-    return vec((ax, ay, az))
+    return R.from_matrix(M).as_euler(seq)
 
 
 def pose2mat(pose):
@@ -551,22 +476,7 @@ def quat2mat(quaternion):
     Returns:
         np.array: 3x3 rotation matrix
     """
-    # awkward semantics for use with numba
-    inds = np.array([3, 0, 1, 2])
-    q = np.asarray(quaternion).copy().astype(np.float32)[inds]
-
-    n = np.dot(q, q)
-    if n < EPS:
-        return np.identity(3)
-    q *= math.sqrt(2.0 / n)
-    q2 = np.outer(q, q)
-    return np.array(
-        [
-            [1.0 - q2[2, 2] - q2[3, 3], q2[1, 2] - q2[3, 0], q2[1, 3] + q2[2, 0]],
-            [q2[1, 2] + q2[3, 0], 1.0 - q2[1, 1] - q2[3, 3], q2[2, 3] - q2[1, 0]],
-            [q2[1, 3] - q2[2, 0], q2[2, 3] + q2[1, 0], 1.0 - q2[1, 1] - q2[2, 2]],
-        ]
-    )
+    return R.from_quat(quaternion).as_matrix()
 
 
 def quat2axisangle(quat):
@@ -580,18 +490,7 @@ def quat2axisangle(quat):
     Returns:
         np.array: (ax,ay,az) axis-angle exponential coordinates
     """
-    # clip quaternion
-    if quat[3] > 1.0:
-        quat[3] = 1.0
-    elif quat[3] < -1.0:
-        quat[3] = -1.0
-
-    den = np.sqrt(1.0 - quat[3] * quat[3])
-    if math.isclose(den, 0.0):
-        # This is (close to) a zero degree rotation, immediately return
-        return np.zeros(3)
-
-    return (quat[:3] * 2.0 * math.acos(quat[3])) / den
+    return R.from_quat(quat).as_rotvec()
 
 
 def axisangle2quat(vec):
@@ -611,21 +510,17 @@ def axisangle2quat(vec):
     if math.isclose(angle, 0.0):
         return np.array([0.0, 0.0, 0.0, 1.0])
 
-    # make sure that axis is a unit vector
-    axis = vec / angle
-
-    q = np.zeros(4)
-    q[3] = np.cos(angle / 2.0)
-    q[:3] = axis * np.sin(angle / 2.0)
-    return q
+    # otherwise convert like normal
+    return R.from_rotvec(vec).as_quat()
 
 
-def euler2quat(euler):
+def euler2quat(euler, seq="xyz"):
     """
     Converts euler angles into quaternion form
 
     Args:
         euler (np.array): (r,p,y) angles
+        seq (str): Order sequence of the euler angle rotation. Default is "xyz"
 
     Returns:
         np.array: (x,y,z,w) float quaternion angles
@@ -633,15 +528,16 @@ def euler2quat(euler):
     Raises:
         AssertionError: [Invalid input shape]
     """
-    return mat2quat(euler2mat(euler))
+    return R.from_euler(seq, euler).as_quat()
 
 
-def quat2euler(quat):
+def quat2euler(quat, seq="xyz"):
     """
     Converts euler angles into quaternion form
 
     Args:
         quat (np.array): (x,y,z,w) float quaternion angles
+        seq (str): Order sequence of the euler angle rotation. Default is "xyz"
 
     Returns:
         np.array: (r,p,y) angles
@@ -649,7 +545,7 @@ def quat2euler(quat):
     Raises:
         AssertionError: [Invalid input shape]
     """
-    return mat2euler(quat2mat(quat))
+    return R.from_quat(quat).as_euler(seq)
 
 
 def pose_in_A_to_pose_in_B(pose_A, pose_A_in_B):

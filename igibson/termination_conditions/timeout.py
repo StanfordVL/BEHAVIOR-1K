@@ -19,4 +19,4 @@ class Timeout(FailureCondition):
 
     def _step(self, task, env, action):
         # Terminate if number of steps passed exceeds threshold
-        return env.current_step >= self._max_steps
+        return env.episode_steps >= self._max_steps

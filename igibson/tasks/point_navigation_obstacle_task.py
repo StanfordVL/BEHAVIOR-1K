@@ -281,7 +281,7 @@ class PointNavigationDynamicObstacleTask(PointNavigationObstacleTask):
         # Run super method first
         reward, done, info = super().step(env=env, action=action)
         # Apply actions for each dynamic obstacle
-        if env.current_step % self._n_obstacle_action_repeat == 0:
+        if env.episode_steps % self._n_obstacle_action_repeat == 0:
             self._current_obstacle_actions = [robot.action_space.sample() for robot in self._obstacles]
         for robot, action in zip(self._obstacles, self._current_obstacle_actions):
             robot.apply_action(action)
