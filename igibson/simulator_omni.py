@@ -29,6 +29,7 @@ from igibson.utils.python_utils import clear as clear_pu
 from igibson.utils.usd_utils import clear as clear_uu
 from igibson.scenes import Scene
 from igibson.objects.object_base import BaseObject
+from igibson.object_states.factory import get_states_by_dependency_order
 
 import numpy as np
 
@@ -128,7 +129,7 @@ class Simulator(SimulationContext):
 
         # TODO: Fix
         # Set of categories that can be grasped by assisted grasping
-        self.object_state_types = {} #get_states_by_dependency_order()
+        self.object_state_types = get_states_by_dependency_order()
 
         # TODO: Once objects are in place, uncomment and test this
         # self.assist_grasp_category_allow_list = self.gen_assisted_grasping_categories()

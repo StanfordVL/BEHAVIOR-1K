@@ -254,6 +254,19 @@ def import_obj_metadata(obj_category, obj_model, name, import_render_channels=Fa
     base_link_offset = data["metadata"].pop("base_link_offset")
     default_bb = data["metadata"].pop("bbox_size")
 
+    # Pop meta links
+    meta_links = data["metadata"].pop("links")
+    print("meta_links:", meta_links)
+    for link_name,atrr in meta_links.items():
+        # Create new Xform prim that will contain info
+        link_prim = stage.DefinePrim(f"{prim.GetPath()}/{link_name}", "Xform")
+        
+        link_prim.CreateAttribute("ig:position", VT.Vector3f)
+        # link_prim.CreateAttribute("ig:orientation", VT.Quatf)
+
+        link_prim.GetAttribute("ig:position").Set(Gf.Vec3f(*atrr["xyz"]))
+        # link_prim.GetAttribute("ig:orientation").Set(Gf.Quatf(*atrr["rpy"]))
+
     # Manually modify material groups info
     if "material_groups" in data:
         data["material_groups"] = {
@@ -433,3 +446,7 @@ def import_building_metadata(obj_category, obj_model, name, import_render_channe
 if __name__ == "__main__":
     import_models_metadata_from_scene(urdf=URDF, import_render_channels=False)
     app.close()
+
+## For test_states.py
+#import_obj_metadata("stove", "101908", "stove")
+#import_obj_metadata("microwave", "7128", "microwave")

@@ -171,8 +171,8 @@ if __name__ == "__main__":
     app.close()
 
 ## For test_states.py
-#import_objects_from_scene_urdf(urdf=URDF)
 #import_obj_urdf("microwave", "7128")
 #import_obj_urdf("sink", "sink_1")
 #import_asset_urdf("cabinet2", "cabinet_0007")
 #import_asset_urdf("cabinet", "cabinet_0004")
+#import_obj_urdf("stove", "101908")

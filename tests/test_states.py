@@ -606,6 +606,48 @@ def test_inside():
     finally:
         app.close()
 
+def test_heat():
+    try:
+        obj_category = "stove"
+        obj_model = "101908"
+        name = "stove"
+
+        sim = Simulator()
+        scene = EmptyScene()
+        sim.import_scene(scene)
+
+        model_root_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}"
+        usd_path = f"{model_root_path}/usd/{obj_model}.usd"
+
+        stove = DatasetObject(
+            prim_path=f"/World/{name}",
+            usd_path=usd_path,
+            category=obj_category,
+            name=f"{name}",
+            scale=np.array([0.5, 0.5, 0.5]),
+            abilities={"heatSource": {}},
+        )
+
+        sim.import_object(stove, auto_initialize=False)
+        stove.set_position_orientation(position=np.array([0, 0, 0.5]))
+        
+
+        # needs 1 physics step to activate collision meshes for raycasting
+        sim.step(force_playing=True)
+        sim.pause()
+
+        heat_source = stove.states[object_states.HeatSourceOrSink]
+        heat_source_state, heat_source_position = heat_source.get_value()
+        print(heat_source_state, heat_source_position)
+
+        assert heat_source_state
+        
+        for i in range(1000000):
+            sim.step()
+
+    finally:
+        app.close()
+
 
 ## WORKS
 #test_state_graph()
@@ -615,8 +657,9 @@ def test_inside():
 #test_frozen()
 #test_vertical_adjacency()
 #test_horizontal_adjacency()
+#test_inside()
 
-test_inside()
+test_heat()
 
 ## BROKEN
 #test_toggle()
