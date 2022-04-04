@@ -621,8 +621,10 @@ class InteractiveTraversableScene(TraversableScene):
             prim: Usd.Prim: Object template Xform prim
 
         Returns:
-            DatasetObject: Created iGibson object
+            None or DatasetObject: Created iGibson object if a valid objet is found at @prim
         """
+        obj = None
+
         # Extract relevant info from template
         name, prim_path = prim.GetName(), prim.GetPrimPath().__str__()
         category, model, bbox, bbox_center_pos, bbox_center_ori, fixed, in_rooms, random_group, scale, bddl_obj_scope = self._extract_obj_info_from_template_xform(prim=prim)
@@ -843,8 +845,9 @@ class InteractiveTraversableScene(TraversableScene):
             # Only process prims that are an Xform
             if prim.GetPrimTypeInfo().GetTypeName() == "Xform":
                 name = prim.GetName()
+                category = prim.GetAttribute("ig:category").Get()
                 # Skip over the wall, floor, or ceilings (#TODO: Can we make this more elegant?)
-                if name in {"walls", "floors", "ceilings"}:
+                if category in {"walls", "floors", "ceilings"}:
                     continue
 
                 # Check if we're using a template -- if so, we need to load the object, otherwise, we simply
@@ -852,18 +855,21 @@ class InteractiveTraversableScene(TraversableScene):
                 if is_template:
                     # Create the object and load it into the simulator
                     obj = self._create_obj_from_template_xform(simulator=simulator, prim=prim)
-                    # Note that we don't auto-initialize because of some very specific state-setting logic that
-                    # has to occur a certain way at the start of scene creation (sigh, Omniverse ): )
-                    simulator.import_object(obj, auto_initialize=False)
-                    # We also directly set it's bounding box position since this is a known quantity
-                    # This is also the only time we'll be able to set fixed object poses
-                    obj.set_bbox_center_position_orientation(*self.object_states(obj.name).bbox_center_pose)
+                    # Only import the object if we received a valid object
+                    if obj is not None:
+                        # Note that we don't auto-initialize because of some very specific state-setting logic that
+                        # has to occur a certain way at the start of scene creation (sigh, Omniverse ): )
+                        simulator.import_object(obj, auto_initialize=False)
+                        # We also directly set it's bounding box position since this is a known quantity
+                        # This is also the only time we'll be able to set fixed object poses
+                        obj.set_bbox_center_position_orientation(*self.object_states(obj.name).bbox_center_pose)
 
         # disable collision between the fixed links of the fixed objects
-        fixed_objs = self.object_registry("fixed_base", True)
-        # We iterate over all pairwise combinations of fixed objects
-        for obj_a, obj_b in combinations(fixed_objs, 2):
-            obj_a.root_link.add_filtered_collision_pair(obj_b.root_link)
+        fixed_objs = self.object_registry("fixed_base", True, default_val=[])
+        if len(fixed_objs) > 1:
+            # We iterate over all pairwise combinations of fixed objects
+            for obj_a, obj_b in combinations(fixed_objs, 2):
+                obj_a.root_link.add_filtered_collision_pair(obj_b.root_link)
 
         # Load the traversability map
         maps_path = os.path.join(self.scene_dir, "layout")
