@@ -108,7 +108,7 @@ class EntityPrim(XFormPrim):
                     if self._dc.get_joint_dof_count(joint_handle) > 0:
                         joint = JointPrim(
                             prim_path=joint_path,
-                            name=f"{self._name}:{joint_name}",
+                            name=f"{self._name}:joint_{joint_name}",
                             articulation=self._handle,
                         )
                         joint.initialize()
