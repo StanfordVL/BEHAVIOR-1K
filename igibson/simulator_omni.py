@@ -316,13 +316,12 @@ class Simulator(SimulationContext):
                 obj.initialize()
             self._objects_to_initialize = []
 
-    def step(self, render=None, force_playing=False):
+    def step(self, render=True, force_playing=False):
         """
         Step the simulation at self.render_timestep
 
         Args:
-            render (None or bool): if set, will override internal rendering such that at every timestep rendering
-                either occurs or does not occur
+            render (bool): Whether rendering should occur or not
             force_playing (bool): If True, will force physics to propagate (i.e.: set simulation, if paused / stopped,
                 to "play" mode)
         """
