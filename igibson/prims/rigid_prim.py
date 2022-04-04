@@ -17,6 +17,7 @@ from omni.isaac.dynamic_control import _dynamic_control
 from omni.isaac.contact_sensor import _contact_sensor
 import carb
 
+import igibson.macros as m
 from igibson.prims.xform_prim import XFormPrim
 from igibson.prims.geom_prim import CollisionGeomPrim, VisualGeomPrim
 from igibson.utils.types import DynamicState, CsRawData, GEOM_TYPES
@@ -61,6 +62,7 @@ class RigidPrim(XFormPrim):
         self._body_name = None
         self._rigid_api = None
         self._physx_rigid_api = None
+        self._physx_contact_report_api = None
         self._mass_api = None
         self._default_state = None
         self._visual_only = None
@@ -84,6 +86,10 @@ class RigidPrim(XFormPrim):
         # run super first
         super()._post_load(simulator=simulator)
 
+        # Set visual only flag
+        self._visual_only = self._load_config["visual_only"] if \
+            "visual_only" in self._load_config and self._load_config["visual_only"] is not None else False
+
         # Apply rigid body and mass APIs
         self._rigid_api = UsdPhysics.RigidBodyAPI(self._prim) if self._prim.HasAPI(UsdPhysics.RigidBodyAPI) else \
             UsdPhysics.RigidBodyAPI.Apply(self._prim)
@@ -91,6 +97,18 @@ class RigidPrim(XFormPrim):
             self._prim.HasAPI(PhysxSchema.PhysxRigidBodyAPI) else PhysxSchema.PhysxRigidBodyAPI.Apply(self._prim)
         self._mass_api = UsdPhysics.MassAPI(self._prim) if self._prim.HasAPI(UsdPhysics.MassAPI) else \
             UsdPhysics.MassAPI.Apply(self._prim)
+
+        # Only create contact report api if we're not visual only
+        if not self._visual_only and m.ENABLE_CONTACT_REPORTING:
+            self._physx_rigid_api = PhysxSchema.PhysxContactReportAPI(self._prim) if \
+                self._prim.HasAPI(PhysxSchema.PhysxContactReportAPI) else \
+                PhysxSchema.PhysxContactReportAPI.Apply(self._prim)
+
+        # Possibly set the mass / density
+        if "mass" in self._load_config and self._load_config["mass"] is not None:
+            self.mass = self._load_config["mass"]
+        if "density" in self._load_config and self._load_config["density"] is not None:
+            self.density = self._load_config["density"]
 
         # Store references to owned visual / collision meshes
         # We iterate over all children of this object's prim,
@@ -109,19 +127,9 @@ class RigidPrim(XFormPrim):
                 else:
                     self._visual_meshes[mesh_name] = VisualGeomPrim(**mesh_kwargs)
 
-        # Possibly set the mass / density
-        if "mass" in self._load_config and self._load_config["mass"] is not None:
-            self.mass = self._load_config["mass"]
-        if "density" in self._load_config and self._load_config["density"] is not None:
-            self.density = self._load_config["density"]
-
-        # Set visual only flag
-        self._visual_only = self._load_config["visual_only"] if \
-            "visual_only" in self._load_config and self._load_config["visual_only"] is not None else False
-
         # Create contact sensor
         self._cs = _contact_sensor.acquire_contact_sensor_interface()
-        self._create_contact_sensor()
+        # self._create_contact_sensor()
 
     def _initialize(self):
         # Run super method first
@@ -158,25 +166,27 @@ class RigidPrim(XFormPrim):
         if self._visual_only:
             self.disable_gravity()
 
-    def _create_contact_sensor(self):
-        """
-        Creates a full-body contact sensor to detect collisions with this rigid body
-        """
-        props = _contact_sensor.SensorProperties()
-        props.radius = -1.0       # Negative value implies full body sensor
-        props.minThreshold = 0          # Minimum force to detect
-        props.maxThreshold = 100000000  # Maximum force to detect
-        props.sensorPeriod = 0.0            # Zero means in sync with the simulation period
+    # def _create_contact_sensor(self):
+    #     """
+    #     Creates a full-body contact sensor to detect collisions with this rigid body
+    #     """
+    #     props = _contact_sensor.SensorProperties()
+    #     props.radius = -1.0       # Negative value implies full body sensor
+    #     props.minThreshold = 0          # Minimum force to detect
+    #     props.maxThreshold = 100000000  # Maximum force to detect
+    #     props.sensorPeriod = 0.0            # Zero means in sync with the simulation period
+    #
+    #     # TODO: Uncomment later, but this significantly slows down everything
+    #     # Create sensor
+    #     self._contact_handle = self._cs.add_sensor_on_body(self._prim_path, props)
 
-        # TODO: Uncomment later, but this significantly slows down everything
-        # # Create sensor
-        # self._contact_handle = self._cs.add_sensor_on_body(self._prim_path, props)
 
-    def _remove_contact_sensor(self):
-        """
-        remove the contact sensor owned by this body
-        """
-        self._cs.remove_sensor(self._contact_handle)
+
+    # def _remove_contact_sensor(self):
+    #     """
+    #     remove the contact sensor owned by this body
+    #     """
+    #     self._cs.remove_sensor(self._contact_handle)
 
     def contact_list(self):
         """
@@ -185,6 +195,9 @@ class RigidPrim(XFormPrim):
         Returns:
             list of CsRawData: raw contact info for this rigid body
         """
+        # # Make sure we have the ability to grab contacts for this object
+        # assert self._physx_contact_report_api is not None, \
+        #     "Cannot grab contacts for this rigid prim without Physx's contact report API being added!"
         return [CsRawData(*c) for c in self._cs.get_body_contact_raw_data(self._prim_path)]
 
     def set_linear_velocity(self, velocity):
@@ -403,16 +416,16 @@ class RigidPrim(XFormPrim):
         """
         self._mass_api.GetDensityAttr().Set(density)
 
-    def reset(self):
-        """
-        Resets the prim to its default state.
-        """
-        # Call super method to reset pose
-        super().reset()
-
-        # Also reset the velocity values
-        self.set_linear_velocity(velocity=self._default_state.linear_velocity)
-        self.set_angular_velocity(velocity=self._default_state.angular_velocity)
+    # def reset(self):
+    #     """
+    #     Resets the prim to its default state.
+    #     """
+    #     # Call super method to reset pose
+    #     super().reset()
+    #
+    #     # Also reset the velocity values
+    #     self.set_linear_velocity(velocity=self._default_state.linear_velocity)
+    #     self.set_angular_velocity(velocity=self._default_state.angular_velocity)
 
     def get_default_state(self):
         """
