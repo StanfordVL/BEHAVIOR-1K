@@ -124,8 +124,9 @@ class PrimitiveObject(StatefulObject):
         super()._post_load(simulator=simulator)
 
         # Set color and opacity
-        self.color = self._load_config["color"]
-        self.opacity = self._load_config["opacity"]
+        for mesh in self._links["base_link"].visual_meshes.values():
+            mesh.color = self._load_config["color"]
+            mesh.opacity = self._load_config["opacity"]
 
     def _create_prim_with_same_kwargs(self, prim_path, name, load_config):
         # Add additional kwargs (fit_avg_dim_volume and bounding_box are already captured in load_config)
