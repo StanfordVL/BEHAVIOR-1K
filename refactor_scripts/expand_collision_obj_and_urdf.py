@@ -1,6 +1,7 @@
 import xml.etree.ElementTree as ET
 import numpy as np
 from copy import deepcopy
+import trimesh
 
 
 def string_to_array(string, num_type):
@@ -33,44 +34,22 @@ def split_obj_file(obj_fpath):
     """
     Splits obj file at @obj_fpath into individual obj files
     """
-    with open(obj_fpath, "r") as f:
-        lines = f.readlines()
+    # Open file in trimesh
+    obj = trimesh.load(obj_fpath)
 
-    sub_obj_lines = []
-    obj_idx = -1
-    max_idx = 0
-    offset_idx = 0
-    for line in lines:
-        # Every time we come across the geom header "o "..., we add to a new file
-        if line[0] == "o":
-            # Create a new list of lines we'll add to
-            obj_idx += 1
-            offset_idx = max_idx
-            sub_obj_lines.append([])
-        elif line[0] == "f":
-            # Update biggest offset
-            idxs = string_to_array(line[2:-2], num_type=int)
-            max_idx = max(idxs.tolist() + [max_idx])
-            # Need to potentially offset face indices
-            idxs -= offset_idx
-            # Update line
-            line = f"f {array_to_string(idxs)} \n"
-        sub_obj_lines[obj_idx].append(line)
-
-    # Make sure idx is not -1
-    assert obj_idx >= 0, "No valid geoms found in obj file!"
+    # Split to grab all individual bodies
+    obj_bodies = obj.split()
 
     # Procedurally create new files in the same folder as obj_fpath
     out_fpath = "/".join(obj_fpath.split("/")[:-1])
     out_fname_root = obj_fpath.split("/")[-1].split(".")[0]
 
-    for i, new_lines in enumerate(sub_obj_lines):
-        # Open a new file and write the lines to it
-        with open(f"{out_fpath}/{out_fname_root}_{i}.obj", "w+") as f_out:
-            f_out.writelines(new_lines)
+    for i, obj_body in enumerate(obj_bodies):
+        # Write to a new file
+        obj_body.export(f"{out_fpath}/{out_fname_root}_{i}.obj", "obj")
 
     # We return the number of splits we had
-    return obj_idx + 1
+    return len(obj_bodies)
 
 
 def split_objs_in_urdf(urdf_fpath, name_suffix="split", mesh_fpath_offset="."):
