@@ -22,6 +22,15 @@ from igibson.utils.python_utils import assert_valid_key, create_class_from_regis
 # How many predefined randomized scene object configurations we have per scene
 N_PREDEFINED_OBJ_RANDOMIZATIONS = 10
 
+# def contains(self, x):
+#     if not isinstance(x, dict) or len(x) != len(self.spaces):
+#         return False
+#     for k, space in self.spaces.items():
+#         if k not in x:
+#             return False
+#         if not space.contains(x[k]):
+#             return False
+#     return True
 
 class iGibsonEnv(BaseEnv):
     """
@@ -179,6 +188,7 @@ class iGibsonEnv(BaseEnv):
 
         # Also load the task obs space
         obs_space["task"] = self._task.load_observation_space()
+        return obs_space
 
     def _load_action_space(self):
         """
@@ -202,6 +212,14 @@ class iGibsonEnv(BaseEnv):
         # Load the obs / action spaces
         self.load_observation_space()
         self._load_action_space()
+
+    @property
+    def observation_space(self):
+        """
+        Returns:
+            gym.spaces.Dict: Keyword-mapped observation space for this object
+        """
+        return self._observation_space
 
     def reload_model_object_randomization(self, predefined_object_randomization_idx=None):
         """
@@ -321,7 +339,7 @@ class iGibsonEnv(BaseEnv):
             idx = 0
             for robot in self.robots:
                 action_dim = robot.action_dim
-                robot.apply_action(action[idx: idx + action_dim])
+                robot.apply_action(action[robot.name][idx: idx + action_dim])
                 idx += action_dim
 
         # Run simulation step
@@ -347,6 +365,7 @@ class iGibsonEnv(BaseEnv):
 
         # Increment step
         self._current_step += 1
+
 
         return obs, reward, done, info
 
@@ -520,7 +539,18 @@ class iGibsonEnv(BaseEnv):
         self._simulator_step()
 
         # Grab and return observations
-        return self.get_obs()
+        obs = self.get_obs()
+
+        if self.observation_space != None and not self.observation_space.contains(obs):
+            print("Error: Observation space does not match returned observation")
+            for key, value in self.observation_space['robot0'].items():
+                print(key, value.dtype, value.shape)
+                print('obs', obs['robot0'][key].dtype, obs['robot0'][key].shape)
+            for key, value in self.observation_space['task'].items():
+                print(key, value.dtype, value.shape)
+                print('obs', obs['task'][key].dtype, obs['task'][key].shape)
+
+        return obs
 
     @property
     def episode_steps(self):

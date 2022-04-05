@@ -144,8 +144,8 @@ class ScanSensor(BaseSensor):
         # Set the remaining modalities' values
         # (obs modality, shape, low, high)
         obs_space_mapping = OrderedDict(
-            scan=((self.n_horizontal_rays, self.n_vertical_rays), 0.0, 1.0),
-            occupancy_grid=((self._occupancy_grid_resolution, self._occupancy_grid_resolution, 1), 0.0, 1.0),
+            scan=((self.n_horizontal_rays, self.n_vertical_rays), 0.0, 1.0, np.float32),
+            occupancy_grid=((self._occupancy_grid_resolution, self._occupancy_grid_resolution, 1), 0.0, 1.0, np.float32),
         )
 
         return obs_space_mapping

@@ -35,7 +35,7 @@ class GymObservable(metaclass=ABCMeta):
         raise NotImplementedError()
 
     @staticmethod
-    def _build_obs_box_space(shape, low, high):
+    def _build_obs_box_space(shape, low, high, dtype=np.float32):
         """
         Helper function that builds individual observation box spaces.
 
@@ -47,7 +47,7 @@ class GymObservable(metaclass=ABCMeta):
         Returns:
             gym.spaces.Box: Generated gym box observation space
         """
-        return gym.spaces.Box(low=low, high=high, shape=shape, dtype=np.float32)
+        return gym.spaces.Box(low=low, high=high, shape=shape, dtype=dtype)
 
     @abstractmethod
     def _load_observation_space(self):
@@ -71,10 +71,3 @@ class GymObservable(metaclass=ABCMeta):
 
         return self._observation_space
 
-    @property
-    def observation_space(self):
-        """
-        Returns:
-            gym.spaces.Dict: Keyword-mapped observation space for this object
-        """
-        return self._observation_space
