@@ -22,15 +22,6 @@ from igibson.utils.python_utils import assert_valid_key, create_class_from_regis
 # How many predefined randomized scene object configurations we have per scene
 N_PREDEFINED_OBJ_RANDOMIZATIONS = 10
 
-# def contains(self, x):
-#     if not isinstance(x, dict) or len(x) != len(self.spaces):
-#         return False
-#     for k, space in self.spaces.items():
-#         if k not in x:
-#             return False
-#         if not space.contains(x[k]):
-#             return False
-#     return True
 
 class iGibsonEnv(BaseEnv):
     """
@@ -213,14 +204,6 @@ class iGibsonEnv(BaseEnv):
         self.load_observation_space()
         self._load_action_space()
 
-    @property
-    def observation_space(self):
-        """
-        Returns:
-            gym.spaces.Dict: Keyword-mapped observation space for this object
-        """
-        return self._observation_space
-
     def reload_model_object_randomization(self, predefined_object_randomization_idx=None):
         """
         Reload the same model, with either @object_randomization_idx seed or the next object randomization random seed.
@@ -327,7 +310,7 @@ class iGibsonEnv(BaseEnv):
         Apply robot's action and return the next state, reward, done and info,
         following OpenAI Gym's convention
 
-        :param action: robot actions
+        :param action: gym.spaces.Dict, dict, np.array, or None, robot actions
         :return: state: next observation
         :return: reward: reward of this time step
         :return: done: whether the episode is terminated
@@ -335,12 +318,21 @@ class iGibsonEnv(BaseEnv):
         """
         # Apply actions if specified
         if action is not None:
+            # If the action is not a dictionary, convert into a dictionary
+            if not isinstance(action, dict) and not isinstance(action, gym.spaces.Dict):
+                action_dict = OrderedDict()
+                idx = 0
+                for robot in self.robots:
+                    action_dim = robot.action_dim
+                    action_dict[robot.name] = action[idx: idx + action_dim]
+                    idx += action_dim
+            else:
+                # Our inputted action is the action dictionary
+                action_dict = action
+
             # Iterate over all robots and apply actions
-            idx = 0
             for robot in self.robots:
-                action_dim = robot.action_dim
-                robot.apply_action(action[robot.name][idx: idx + action_dim])
-                idx += action_dim
+                robot.apply_action(action_dict[robot.name])
 
         # Run simulation step
         self._simulator_step()
@@ -541,11 +533,13 @@ class iGibsonEnv(BaseEnv):
         # Grab and return observations
         obs = self.get_obs()
 
-        if self.observation_space != None and not self.observation_space.contains(obs):
-            print("Error: Observation space does not match returned observation")
-            for key, value in self.observation_space['robot0'].items():
-                print(key, value.dtype, value.shape)
-                print('obs', obs['robot0'][key].dtype, obs['robot0'][key].shape)
+        if self.observation_space is not None and not self.observation_space.contains(obs):
+            print("Error: Observation space does not match returned observations!")
+            # Print out all observations for all robots and task
+            for robot in self.robots:
+                for key, value in self.observation_space[robot.name].items():
+                    print(key, value.dtype, value.shape)
+                    print('obs', obs['robot0'][key].dtype, obs[robot.name][key].shape)
             for key, value in self.observation_space['task'].items():
                 print(key, value.dtype, value.shape)
                 print('obs', obs['task'][key].dtype, obs['task'][key].shape)

@@ -71,3 +71,10 @@ class GymObservable(metaclass=ABCMeta):
 
         return self._observation_space
 
+    @property
+    def observation_space(self):
+        """
+        Returns:
+            gym.spaces.Dict: Keyword-mapped observation space for this object
+        """
+        return self._observation_space
