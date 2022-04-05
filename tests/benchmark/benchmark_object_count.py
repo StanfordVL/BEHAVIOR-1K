@@ -71,7 +71,7 @@ def benchmark_scene(sim):
     ax = plt.subplot(1, 1, 1)
     plt.errorbar(xs, ys, yerr=yerrs, elinewidth=0.75)
     ax.set_xlabel("No. of objects")
-    ax.set_ylabel("Render fps")
+    ax.set_ylabel("Step fps")
     ax.set_title(f"Version {assets_version}")
     plt.tight_layout()
     plt.savefig(os.path.join(
