@@ -67,14 +67,6 @@ class GymObservable(metaclass=ABCMeta):
             gym.spaces.Dict: Loaded observation space for this object
         """
         # Load the observation space and convert it into a gym-compatible dictionary
-        self._observation_space = gym.spaces.Dict(self._load_observation_space())
+        self.observation_space = gym.spaces.Dict(self._load_observation_space())
 
-        return self._observation_space
-
-    @property
-    def observation_space(self):
-        """
-        Returns:
-            gym.spaces.Dict: Keyword-mapped observation space for this object
-        """
-        return self._observation_space
+        return self.observation_space
