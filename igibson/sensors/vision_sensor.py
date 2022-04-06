@@ -270,14 +270,14 @@ class VisionSensor(BaseSensor):
         # Set the remaining modalities' values
         # (shape, low, high)
         obs_space_mapping = OrderedDict(
-            rgb=((self.image_height, self.image_width, 3), 0.0, 1.0),
-            rgb_filled=((self.image_height, self.image_width, 3), 0.0, 1.0),
-            depth=((self.image_height, self.image_width, 1), 0.0, 1.0),
-            depth_linear=((self.image_height, self.image_width, 1), 0.0, np.inf),
-            normal=((self.image_height, self.image_width, 3), -1.0, 1.0),
-            seg_semantic=((self.image_height, self.image_width), 0.0, np.inf),
-            seg_instance=((self.image_height, self.image_width), 0.0, np.inf),
-            flow=((self.image_height, self.image_width, 3), -np.inf, np.inf),
+            rgb=((self.image_height, self.image_width, 4), 0, 255, np.uint8),
+            rgb_filled=((self.image_height, self.image_width, 3), 0, 255, np.uint8),
+            depth=((self.image_height, self.image_width, 1), 0.0, 1.0, np.float32),
+            depth_linear=((self.image_height, self.image_width, 1), 0.0, np.inf, np.float32),
+            normal=((self.image_height, self.image_width, 3), -1.0, 1.0, np.float32),
+            seg_semantic=((self.image_height, self.image_width), 0.0, np.inf, np.float32),
+            seg_instance=((self.image_height, self.image_width), 0.0, np.inf, np.float32),
+            flow=((self.image_height, self.image_width, 3), -np.inf, np.inf, np.float32),
         )
 
         return obs_space_mapping

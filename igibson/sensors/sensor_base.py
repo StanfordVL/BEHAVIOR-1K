@@ -95,9 +95,9 @@ class BaseSensor(XFormPrim, GymObservable, Registerable, metaclass=ABCMeta):
     def _load_observation_space(self):
         # Fill in observation space based on mapping and active modalities
         obs_space = OrderedDict()
-        for modality, (shape, low, high) in self._obs_space_mapping.items():
+        for modality, (shape, low, high, dtype) in self._obs_space_mapping.items():
             if modality in self._modalities:
-                obs_space[modality] = self._build_obs_box_space(shape=shape, low=low, high=high)
+                obs_space[modality] = self._build_obs_box_space(shape=shape, low=low, high=high, dtype=dtype)
 
         return obs_space
 
