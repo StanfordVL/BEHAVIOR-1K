@@ -155,8 +155,9 @@ class EntityPrim(XFormPrim):
                 )
                 self._links[link_name] = link
 
-        # The root prim belongs to the first link
-        self._root_prim = list(self._links.values())[0].prim
+        # The root prim belongs to the base link, not to the first link
+        # self._root_prim = list(self._links.values())[0].prim
+        self._root_prim = self._links["base_link"].prim
 
         # Disable any requested collision pairs
         for a_name, b_name in self.disabled_collision_pairs:

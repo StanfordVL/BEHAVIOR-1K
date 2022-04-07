@@ -179,6 +179,7 @@ class iGibsonEnv(BaseEnv):
 
         # Also load the task obs space
         obs_space["task"] = self._task.load_observation_space()
+        return obs_space
 
     def _load_action_space(self):
         """
@@ -309,7 +310,7 @@ class iGibsonEnv(BaseEnv):
         Apply robot's action and return the next state, reward, done and info,
         following OpenAI Gym's convention
 
-        :param action: robot actions
+        :param action: gym.spaces.Dict, dict, np.array, or None, robot actions
         :return: state: next observation
         :return: reward: reward of this time step
         :return: done: whether the episode is terminated
@@ -317,12 +318,21 @@ class iGibsonEnv(BaseEnv):
         """
         # Apply actions if specified
         if action is not None:
+            # If the action is not a dictionary, convert into a dictionary
+            if not isinstance(action, dict) and not isinstance(action, gym.spaces.Dict):
+                action_dict = OrderedDict()
+                idx = 0
+                for robot in self.robots:
+                    action_dim = robot.action_dim
+                    action_dict[robot.name] = action[idx: idx + action_dim]
+                    idx += action_dim
+            else:
+                # Our inputted action is the action dictionary
+                action_dict = action
+
             # Iterate over all robots and apply actions
-            idx = 0
             for robot in self.robots:
-                action_dim = robot.action_dim
-                robot.apply_action(action[idx: idx + action_dim])
-                idx += action_dim
+                robot.apply_action(action_dict[robot.name])
 
         # Run simulation step
         self._simulator_step()
@@ -347,6 +357,7 @@ class iGibsonEnv(BaseEnv):
 
         # Increment step
         self._current_step += 1
+
 
         return obs, reward, done, info
 
@@ -520,7 +531,20 @@ class iGibsonEnv(BaseEnv):
         self._simulator_step()
 
         # Grab and return observations
-        return self.get_obs()
+        obs = self.get_obs()
+
+        if self.observation_space is not None and not self.observation_space.contains(obs):
+            print("Error: Observation space does not match returned observations!")
+            # Print out all observations for all robots and task
+            for robot in self.robots:
+                for key, value in self.observation_space[robot.name].items():
+                    print(key, value.dtype, value.shape)
+                    print('obs', obs['robot0'][key].dtype, obs[robot.name][key].shape)
+            for key, value in self.observation_space['task'].items():
+                print(key, value.dtype, value.shape)
+                print('obs', obs['task'][key].dtype, obs['task'][key].shape)
+
+        return obs
 
     @property
     def episode_steps(self):

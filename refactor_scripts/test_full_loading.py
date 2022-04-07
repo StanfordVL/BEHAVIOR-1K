@@ -52,7 +52,7 @@ sim.play()
 sim.step()
 obs = robot.get_obs()
 rgb = obs["robot:eyes_Camera_sensor_rgb"]
-plt.imsave("/cvgl2/u/jdwong/tmp/test6.png", rgb)
+# plt.imsave("/cvgl2/u/jdwong/tmp/test6.png", rgb)
 
 
 # toggle = 1
