@@ -256,11 +256,11 @@ class InverseKinematicsController(ManipulationController):
                 endEffectorLinkIndex=self.task_link_id,
                 targetPosition=target_pos.tolist(),
                 targetOrientation=target_quat.tolist(),
-                lowerLimits=(self.control_limits[ControlType.POSITION][0] - self.joint_range_tolerance).tolist(),
-                upperLimits=(self.control_limits[ControlType.POSITION][1] + self.joint_range_tolerance).tolist(),
+                lowerLimits=(self._control_limits[ControlType.POSITION][0] - self.joint_range_tolerance).tolist(),
+                upperLimits=(self._control_limits[ControlType.POSITION][1] + self.joint_range_tolerance).tolist(),
                 jointRanges=(
-                    self.control_limits[ControlType.POSITION][1]
-                    - self.control_limits[ControlType.POSITION][0]
+                    self._control_limits[ControlType.POSITION][1]
+                    - self._control_limits[ControlType.POSITION][0]
                     + 2 * self.joint_range_tolerance
                 ).tolist(),
                 restPoses=self.default_joint_pos.tolist(),

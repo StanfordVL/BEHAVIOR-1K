@@ -446,26 +446,6 @@ def pose2mat(pose):
     return homo_pose_mat
 
 
-def pose_transform(pos1, quat1, pos0, quat0):
-    """
-    Conducts forward transform from pose (pos0, quat0) to pose (pos1, quat1):
-
-    pose1 @ pose0, NOT pose0 @ pose1
-
-    Args:
-        pos1: (x,y,z) position to transform
-        quat1: (x,y,z,w) orientation to transform
-        pos0: (x,y,z) initial position
-        quat0: (x,y,z,w) initial orientation
-    """
-    # Get poses
-    mat0 = pose2mat((pos0, quat0))
-    mat1 = pose2mat((pos1, quat1))
-
-    # Multiply and convert back to pos, quat
-    return mat2pose(mat1 @ mat0)
-
-
 def quat2mat(quaternion):
     """
     Converts given quaternion to matrix.
@@ -569,13 +549,13 @@ def pose_in_A_to_pose_in_B(pose_A, pose_A_in_B):
     return pose_A_in_B.dot(pose_A)
 
 
-def pose_inv(pose):
+def pose_inv(pose_mat):
     """
     Computes the inverse of a homogeneous matrix corresponding to the pose of some
     frame B in frame A. The inverse is the pose of frame A in frame B.
 
     Args:
-        pose (np.array): 4x4 matrix for the pose to inverse
+        pose_mat (np.array): 4x4 matrix for the pose to inverse
 
     Returns:
         np.array: 4x4 matrix for the inverse pose
@@ -592,10 +572,50 @@ def pose_inv(pose):
     # R-1 to align the axis again.
 
     pose_inv = np.zeros((4, 4))
-    pose_inv[:3, :3] = pose[:3, :3].T
-    pose_inv[:3, 3] = -pose_inv[:3, :3].dot(pose[:3, 3])
+    pose_inv[:3, :3] = pose_mat[:3, :3].T
+    pose_inv[:3, 3] = -pose_inv[:3, :3].dot(pose_mat[:3, 3])
     pose_inv[3, 3] = 1.0
     return pose_inv
+
+
+def pose_transform(pos1, quat1, pos0, quat0):
+    """
+    Conducts forward transform from pose (pos0, quat0) to pose (pos1, quat1):
+
+    pose1 @ pose0, NOT pose0 @ pose1
+
+    Args:
+        pos1: (x,y,z) position to transform
+        quat1: (x,y,z,w) orientation to transform
+        pos0: (x,y,z) initial position
+        quat0: (x,y,z,w) initial orientation
+    """
+    # Get poses
+    mat0 = pose2mat((pos0, quat0))
+    mat1 = pose2mat((pos1, quat1))
+
+    # Multiply and convert back to pos, quat
+    return mat2pose(mat1 @ mat0)
+
+
+def relative_pose_transform(pos1, quat1, pos0, quat0):
+    """
+    Computes relative forward transform from pose (pos0, quat0) to pose (pos1, quat1), i.e.: solves:
+
+    pose1 = transform @ pose0
+
+    Args:
+        pos1: (x,y,z) position to transform
+        quat1: (x,y,z,w) orientation to transform
+        pos0: (x,y,z) initial position
+        quat0: (x,y,z,w) initial orientation
+    """
+    # Get poses
+    mat0 = pose2mat((pos0, quat0))
+    mat1 = pose2mat((pos1, quat1))
+
+    # Invert pose0 and calculate transform
+    return mat2pose(mat1 @ pose_inv(mat0))
 
 
 def _skew_symmetric_translation(pos_A_in_B):

@@ -124,6 +124,11 @@ class EntityPrim(XFormPrim):
             root_prim = get_prim_at_path(body_path)
             n_dof = 0
 
+        # Make sure root prim stored is the same as the one found during initialization
+        assert self._root_prim == root_prim, \
+            f"Mismatch in root prims! Original was {self._root_prim.GetPrimPath()}, " \
+            f"initialized is {root_prim.GetPrimPath()}!"
+
         # Store values internally
         self._root_handle = root_handle
         self._root_prim = root_prim
@@ -869,12 +874,12 @@ class EntityPrim(XFormPrim):
             return super().get_local_pose()
 
     # TODO: Is the omni joint damping (used for driving motors) same as dissipative joint damping (what we had in pb)?
-    # @property
-    # def joint_damping(self):
-    #     """
-    #     :return: Array[float], joint damping values for this prim
-    #     """
-    #     return np.concatenate([joint.damping for joint in self._joints.values()])
+    @property
+    def joint_damping(self):
+        """
+        :return: Array[float], joint damping values for this prim
+        """
+        return np.concatenate([joint.damping for joint in self._joints.values()])
 
     @property
     def joint_lower_limits(self):

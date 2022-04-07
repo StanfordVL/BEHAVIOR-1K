@@ -36,10 +36,11 @@ class ActiveCameraRobot(BaseRobot):
         dic = super()._get_proprioception_dict()
 
         # Add camera pos info
-        dic["camera_qpos"] = self.joint_positions[self.camera_control_idx]
-        dic["camera_qpos_sin"] = np.sin(self.joint_positions[self.camera_control_idx])
-        dic["camera_qpos_cos"] = np.cos(self.joint_positions[self.camera_control_idx])
-        dic["camera_qvel"] = self.joint_velocities[self.camera_control_idx]
+        joints_state = self.get_joints_state(normalized=False)
+        dic["camera_qpos"] = joints_state.positions[self.camera_control_idx]
+        dic["camera_qpos_sin"] = np.sin(joints_state.positions[self.camera_control_idx])
+        dic["camera_qpos_cos"] = np.cos(joints_state.positions[self.camera_control_idx])
+        dic["camera_qvel"] = joints_state.velocities[self.camera_control_idx]
 
         return dic
 
@@ -70,7 +71,7 @@ class ActiveCameraRobot(BaseRobot):
         """
         return {
             "name": "JointController",
-            "control_freq": self.control_freq,
+            "control_freq": self._control_freq,
             "motor_type": "velocity",
             "control_limits": self.control_limits,
             "dof_idx": self.camera_control_idx,

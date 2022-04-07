@@ -50,8 +50,8 @@ class DifferentialDriveController(LocomotionController):
             @control_limits velocity limits entry
         """
         # Store internal variables
-        self.wheel_radius = wheel_radius
-        self.wheel_axle_halflength = wheel_axle_length / 2.0
+        self._wheel_radius = wheel_radius
+        self._wheel_axle_halflength = wheel_axle_length / 2.0
 
         # If we're using default command output limits, map this to maximum linear / angular velocities
         if command_output_limits == "default":
@@ -100,8 +100,8 @@ class DifferentialDriveController(LocomotionController):
         lin_vel, ang_vel = command
 
         # Convert to wheel velocities
-        left_wheel_joint_vel = (lin_vel - ang_vel * self.wheel_axle_halflength) / self.wheel_radius
-        right_wheel_joint_vel = (lin_vel + ang_vel * self.wheel_axle_halflength) / self.wheel_radius
+        left_wheel_joint_vel = (lin_vel - ang_vel * self._wheel_axle_halflength) / self._wheel_radius
+        right_wheel_joint_vel = (lin_vel + ang_vel * self._wheel_axle_halflength) / self._wheel_radius
 
         # Return desired velocities
         return np.array([left_wheel_joint_vel, right_wheel_joint_vel])

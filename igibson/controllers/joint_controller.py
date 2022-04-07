@@ -1,11 +1,12 @@
 import numpy as np
 
-from igibson.controllers import ControlType, LocomotionController, ManipulationController
+from igibson.controllers import IsGraspingState, ControlType, LocomotionController, ManipulationController, \
+    GripperController
 from igibson.utils.python_utils import assert_valid_key
 import igibson.utils.transform_utils as T
 
 
-class JointController(LocomotionController, ManipulationController):
+class JointController(LocomotionController, ManipulationController, GripperController):
     """
     Controller class for joint control. Because omniverse can handle direct position / velocity / effort
     control signals, this is merely a pass-through operation from command to control (with clipping / scaling built in).
@@ -57,14 +58,14 @@ class JointController(LocomotionController, ManipulationController):
         """
         # Store arguments
         assert_valid_key(key=motor_type.lower(), valid_keys=ControlType.VALID_TYPES_STR, name="motor_type")
-        self.motor_type = motor_type.lower()
-        self.use_delta_commands = use_delta_commands
-        self.compute_delta_in_quat_space = [] if compute_delta_in_quat_space is None else compute_delta_in_quat_space
+        self._motor_type = motor_type.lower()
+        self._use_delta_commands = use_delta_commands
+        self._compute_delta_in_quat_space = [] if compute_delta_in_quat_space is None else compute_delta_in_quat_space
 
         # When in delta mode, it doesn't make sense to infer output range using the joint limits (since that's an
         # absolute range and our values are relative). So reject the default mode option in that case.
         assert not (
-            self.use_delta_commands and command_output_limits == "default"
+            self._use_delta_commands and command_output_limits == "default"
         ), "Cannot use 'default' command output limits in delta commands mode of JointController. Try None instead."
 
         # Run super init
@@ -94,15 +95,15 @@ class JointController(LocomotionController, ManipulationController):
         :return: Array[float], outputted (non-clipped!) control signal to deploy
         """
         # If we're using delta commands, add this value
-        if self.use_delta_commands:
+        if self._use_delta_commands:
             # Compute the base value for the command.
-            base_value = control_dict["joint_{}".format(self.motor_type)][self.dof_idx]
+            base_value = control_dict["joint_{}".format(self._motor_type)][self.dof_idx]
 
             # Apply the command to the base value.
             u = base_value + command
 
             # Correct any gimbal lock issues using the compute_delta_in_quat_space group.
-            for rx_ind, ry_ind, rz_ind in self.compute_delta_in_quat_space:
+            for rx_ind, ry_ind, rz_ind in self._compute_delta_in_quat_space:
                 # Grab the starting rotations of these joints.
                 start_rots = base_value[[rx_ind, ry_ind, rz_ind]]
 
@@ -124,9 +125,13 @@ class JointController(LocomotionController, ManipulationController):
         # Return control
         return u
 
+    def is_grasping(self):
+        # No good heuristic to determine grasping, so return UNKNOWN
+        return IsGraspingState.UNKNOWN
+
     @property
     def control_type(self):
-        return ControlType.get_type(type_str=self.motor_type)
+        return ControlType.get_type(type_str=self._motor_type)
 
     @property
     def command_dim(self):

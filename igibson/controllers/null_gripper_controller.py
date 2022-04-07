@@ -1,6 +1,6 @@
 import numpy as np
 
-from igibson.controllers import ControlType, ManipulationController
+from igibson.controllers import IsGraspingState, ControlType, GripperController
 
 VALID_MODES = {
     "binary",
@@ -9,7 +9,7 @@ VALID_MODES = {
 }
 
 
-class NullGripperController(ManipulationController):
+class NullGripperController(GripperController):
     """
     Dummy Controller class for non-prehensile gripper control (i.e.: no control).
     This class has a zero-size command space, and returns an empty array for control
@@ -48,7 +48,7 @@ class NullGripperController(ManipulationController):
         super().__init__(
             control_freq=control_freq,
             control_limits=control_limits,
-            joint_idx=np.array([], dtype=np.int),  # no joints controlled
+            dof_idx=np.array([], dtype=np.int),  # no joints controlled
             command_input_limits=command_input_limits,
             command_output_limits=command_output_limits,
         )
@@ -79,6 +79,10 @@ class NullGripperController(ManipulationController):
         :return: Array[float], outputted (non-clipped!) control signal to deploy. This is an empty np.array
         """
         return np.array([])
+
+    def is_grasping(self):
+        # Null gripper cannot grasp anything
+        return IsGraspingState.FALSE
 
     @property
     def control_type(self):

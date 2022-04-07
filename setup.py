@@ -21,7 +21,7 @@ setup(
     zip_safe=False,
     packages=find_packages(),
     install_requires=[
-        "gym>=0.12",
+        "gym>=0.23",
         "numpy>=1.16.0",
         # "scipy>=1.4",
         # "pybullet-svl>=3.1.6",

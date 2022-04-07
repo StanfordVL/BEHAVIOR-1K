@@ -2,9 +2,11 @@ from igibson.controllers.controller_base import (
     REGISTERED_CONTROLLERS,
     REGISTERED_LOCOMOTION_CONTROLLERS,
     REGISTERED_MANIPULATION_CONTROLLERS,
+    IsGraspingState,
     ControlType,
     LocomotionController,
     ManipulationController,
+    GripperController,
 )
 from igibson.controllers.dd_controller import DifferentialDriveController
 from igibson.controllers.ik_controller import InverseKinematicsController

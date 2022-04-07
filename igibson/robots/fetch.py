@@ -10,6 +10,7 @@ from igibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
 from igibson.robots.two_wheel_robot import TwoWheelRobot
 from igibson.utils.constants import SemanticClass
 from igibson.utils.python_utils import assert_valid_key
+from igibson.utils.usd_utils import JointType
 
 DEFAULT_ARM_POSES = {
     "vertical",
@@ -33,47 +34,75 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
 
     def __init__(
         self,
+        # Shared kwargs in hierarchy
+        prim_path,
         name=None,
+        category="agent",
+        class_id=None,
+        scale=None,
+        rendering_params=None,
+        visible=True,
+        fixed_base=False,
+        visual_only=False,
+        self_collisions=False,
+        load_config=None,
+
+        # Unique to USDObject hierarchy
+        abilities=None,
+
+        # Unique to ControllableObject hierarchy
         control_freq=None,
+        controller_config=None,
         action_type="continuous",
         action_normalize=True,
-        proprio_obs="default",
         reset_joint_pos=None,
-        controller_config=None,
-        base_name=None,
-        scale=1.0,
-        self_collision=True,
-        class_id=None,
-        rendering_params=None,
+
+        # Unique to BaseRobot
+        obs_modalities="all",
+        proprio_obs="default",
+
+        # Unique to ManipulationRobot
         grasping_mode="physical",
+
+        # Unique to Fetch
         rigid_trunk=False,
         default_trunk_offset=0.365,
         default_arm_pose="vertical",
+
+        **kwargs,
     ):
         """
-        :param name: None or str, name of the robot object
+        @param prim_path: str, global path in the stage to this object
+        @param name: Name for the object. Names need to be unique per scene. If no name is set, a name will be generated
+            at the time the object is added to the scene, using the object's category.
+        @param category: Category for the object. Defaults to "object".
+        @param class_id: What class ID the object should be assigned in semantic segmentation rendering mode.
+        @param scale: float or 3-array, sets the scale for this object. A single number corresponds to uniform scaling
+            along the x,y,z axes, whereas a 3-array specifies per-axis scaling.
+        @param rendering_params: Any relevant rendering settings for this object.
+        @param visible: bool, whether to render this object or not in the stage
+        @param fixed_base: bool, whether to fix the base of this object or not
+        visual_only (bool): Whether this object should be visual only (and not collide with any other objects)
+        self_collisions (bool): Whether to enable self collisions for this object
+        load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
+            loading this prim at runtime.
+        @param abilities: dict in the form of {ability: {param: value}} containing
+            robot abilities and parameters.
         :param control_freq: float, control frequency (in Hz) at which to control the robot. If set to be None,
             simulator.import_object will automatically set the control frequency to be 1 / render_timestep by default.
+        :param controller_config: None or Dict[str, ...], nested dictionary mapping controller name(s) to specific
+            controller configurations for this object. This will override any default values specified by this class.
         :param action_type: str, one of {discrete, continuous} - what type of action space to use
         :param action_normalize: bool, whether to normalize inputted actions. This will override any default values
          specified by this class.
+        obs_modalities (str or list of str): Observation modalities to use for this robot. Default is "all", which
+            corresponds to all modalities being used.
+            Otherwise, valid options should be part of igibson.sensors.ALL_SENSOR_MODALITIES.
         :param proprio_obs: str or tuple of str, proprioception observation key(s) to use for generating proprioceptive
             observations. If str, should be exactly "default" -- this results in the default proprioception observations
             being used, as defined by self.default_proprio_obs. See self._get_proprioception_dict for valid key choices
-        :param reset_joint_pos: None or str or Array[float], if specified, should be the joint positions that the robot
-            should be set to during a reset. If str, should be one of {tuck, untuck}, corresponds to default
-            configurations for un/tucked modes. If None (default), self.default_joint_pos (untuck mode) will be used
-            instead.
-        :param controller_config: None or Dict[str, ...], nested dictionary mapping controller name(s) to specific controller
-            configurations for this robot. This will override any default values specified by this class.
-        :param base_name: None or str, robot link name that will represent the entire robot's frame of reference. If not None,
-            this should correspond to one of the link names found in this robot's corresponding URDF / MJCF file.
-            None defaults to the first link name used in @model_file
-        :param scale: int, scaling factor for model (default is 1)
-        :param self_collision: bool, whether to enable self collision
-        :param class_id: SemanticClass, semantic class this robot belongs to. Default is SemanticClass.ROBOTS.
-        :param rendering_params: None or Dict[str, Any], If not None, should be keyword-mapped rendering options to set.
-            See DEFAULT_RENDERING_PARAMS for the values passed by default.
+        :param reset_joint_pos: None or Array[float], if specified, should be the joint positions that the robot should
+            be set to during a reset. If None (default), self.default_joint_pos will be used instead.
         :param grasping_mode: None or str, One of {"physical", "assisted", "sticky"}.
             If "physical", no assistive grasping will be applied (relies on contact friction + finger force).
             If "assisted", will magnetize any object touching and within the gripper's fingers.
@@ -82,6 +111,8 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         :param default_trunk_offset: float, sets the default height of the robot's trunk
         :param default_arm_pose: Default pose for the robot arm. Should be one of {"vertical", "diagonal15",
             "diagonal30", "diagonal45", "horizontal"}
+        kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
+            for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
         """
         # Store args
         self.rigid_trunk = rigid_trunk
@@ -100,19 +131,27 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
 
         # Run super init
         super().__init__(
+            prim_path=prim_path,
             name=name,
+            category=category,
+            class_id=class_id,
+            scale=scale,
+            rendering_params=rendering_params,
+            visible=visible,
+            fixed_base=fixed_base,
+            visual_only=visual_only,
+            self_collisions=self_collisions,
+            load_config=load_config,
+            abilities=abilities,
             control_freq=control_freq,
+            controller_config=controller_config,
             action_type=action_type,
             action_normalize=action_normalize,
-            proprio_obs=proprio_obs,
             reset_joint_pos=reset_joint_pos,
-            controller_config=controller_config,
-            base_name=base_name,
-            scale=scale,
-            self_collision=self_collision,
-            class_id=class_id,
-            rendering_params=rendering_params,
+            obs_modalities=obs_modalities,
+            proprio_obs=proprio_obs,
             grasping_mode=grasping_mode,
+            **kwargs,
         )
 
     @property
@@ -192,17 +231,15 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         """
         self.set_joint_positions(self.untucked_default_joint_pos)
 
-    def load(self, simulator):
-        # Run super method
-        ids = super().load(simulator)
+    def _initialize(self):
+        # Run super method first
+        super()._initialize()
 
-        assert len(ids) == 1, "Fetch robot is expected to have only one body ID."
-
-        # Extend super method by increasing laterial friction for EEF
-        for link in self.finger_joint_ids[self.default_arm]:
-            p.changeDynamics(self.base_link.body_id, link, lateralFriction=500)
-
-        return ids
+        # Set the joint friction for EEF to be higher
+        for arm in self.arm_names:
+            for joint in self.finger_joints[arm]:
+                if joint.joint_type != JointType.JOINT_FIXED:
+                    joint.friction = 500
 
     def _actions_to_control(self, action):
         # Run super method first
@@ -220,8 +257,9 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         dic = super()._get_proprioception_dict()
 
         # Add trunk info
-        dic["trunk_qpos"] = self.joint_positions[self.trunk_control_idx]
-        dic["trunk_qvel"] = self.joint_velocities[self.trunk_control_idx]
+        joints_state = self.get_joints_state(normalized=False)
+        dic["trunk_qpos"] = joints_state.positions[self.trunk_control_idx]
+        dic["trunk_qvel"] = joints_state.velocities[self.trunk_control_idx]
 
         return dic
 
@@ -243,7 +281,8 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         # We use multi finger gripper, differential drive, and IK controllers as default
         controllers["base"] = "DifferentialDriveController"
         controllers["camera"] = "JointController"
-        controllers["arm_{}".format(self.default_arm)] = "InverseKinematicsController"
+        # TODO: Revert to IK once implemented
+        controllers["arm_{}".format(self.default_arm)] = "JointController" #"InverseKinematicsController"
         controllers["gripper_{}".format(self.default_arm)] = "MultiFingerGripperController"
 
         return controllers
@@ -371,16 +410,13 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
 
     @property
     def model_file(self):
-        return os.path.join(igibson.assets_path, "models/fetch/fetch_gripper.urdf")
+        return os.path.join(igibson.assets_path, "models/fetch/fetch/fetch.usd")
 
     def dump_config(self):
-        """Dump robot config"""
-        dump = super(Fetch, self).dump_config()
-        dump.update(
-            {
-                "rigid_trunk": self.rigid_trunk,
-                "default_trunk_offset": self.default_trunk_offset,
-                "default_arm_pose": self.default_arm_pose,
-            }
-        )
-        return dump
+        cfg = super().dump_config()
+
+        cfg["rigid_trunk"] = self.rigid_trunk
+        cfg["default_trunk_offset"] = self.default_trunk_offset
+        cfg["default_arm_pose"] = self.default_arm_pose
+
+        return cfg
