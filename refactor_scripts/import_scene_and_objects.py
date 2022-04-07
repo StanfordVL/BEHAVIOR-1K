@@ -9,6 +9,8 @@ from refactor_scripts.import_scene_template import import_models_template_from_s
 
 ##### SET THIS ######
 SCENE = "Rs_int"
+
+IMPORT_RENDER_CHANNELS = True
 #### YOU DONT NEED TO TOUCH ANYTHING BELOW HERE IDEALLY :) #####
 
 
@@ -17,7 +19,7 @@ if __name__ == "__main__":
     usd_out = f"{ig_dataset_path}/scenes/{SCENE}/urdf/{SCENE}_best_template.usd"
 
     import_objects_from_scene_urdf(urdf=urdf)
-    import_models_metadata_from_scene(urdf=urdf)
+    import_models_metadata_from_scene(urdf=urdf, import_render_channels=IMPORT_RENDER_CHANNELS)
     import_models_template_from_scene(urdf=urdf, usd_out=usd_out)
 
     app.close()

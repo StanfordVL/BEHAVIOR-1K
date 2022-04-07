@@ -2,17 +2,92 @@ from igibson import app, ig_dataset_path
 import igibson.utils.transform_utils as T
 import pxr.Vt
 from pxr import Usd
-from pxr import Gf
+from pxr import Gf, UsdShade
 from pxr.Sdf import ValueTypeNames as VT
 import numpy as np
 import xml.etree.ElementTree as ET
 import json
 from os.path import exists
 from pxr.UsdGeom import Tokens
+from omni.usd import create_material_input, get_shader_from_material
+from omni.isaac.core.utils.prims import get_prim_at_path
+import os
+import shutil
+import omni
+from copy import deepcopy
+from omni.isaac.core.utils.stage import open_stage, get_current_stage, close_stage
 
 ##### SET THIS ######
 URDF = f"{ig_dataset_path}/scenes/Rs_int/urdf/Rs_int_best.urdf"
 #### YOU DONT NEED TO TOUCH ANYTHING BELOW HERE IDEALLY :) #####
+
+
+def set_mtl_albedo(mtl_prim, texture):
+    mtl = "diffuse_texture"
+    create_material_input(mtl_prim, mtl, texture, VT.Asset)
+    # Verify it was set
+    shade = get_shader_from_material(mtl_prim)
+    print(f"mtl {mtl}: {shade.GetInput(mtl).Get()}")
+
+def set_mtl_normal(mtl_prim, texture):
+    mtl = "normalmap_texture"
+    create_material_input(mtl_prim, mtl, texture, VT.Asset)
+    # Verify it was set
+    shade = get_shader_from_material(mtl_prim)
+    print(f"mtl {mtl}: {shade.GetInput(mtl).Get()}")
+
+def set_mtl_ao(mtl_prim, texture):
+    mtl = "ao_texture"
+    create_material_input(mtl_prim, mtl, texture, VT.Asset)
+    # Verify it was set
+    shade = get_shader_from_material(mtl_prim)
+    print(f"mtl {mtl}: {shade.GetInput(mtl).Get()}")
+
+def set_mtl_roughness(mtl_prim, texture):
+    mtl = "reflectionroughness_texture"
+    create_material_input(mtl_prim, mtl, texture, VT.Asset)
+    create_material_input(mtl_prim, "reflection_roughness_texture_influence", 1.0, VT.Float)
+    # Verify it was set
+    shade = get_shader_from_material(mtl_prim)
+    print(f"mtl {mtl}: {shade.GetInput(mtl).Get()}")
+
+def set_mtl_metalness(mtl_prim, texture):
+    mtl = "metallic_texture"
+    create_material_input(mtl_prim, mtl, texture, VT.Asset)
+    create_material_input(mtl_prim, "metallic_texture_influence", 1.0, VT.Float)
+    # Verify it was set
+    shade = get_shader_from_material(mtl_prim)
+    print(f"mtl {mtl}: {shade.GetInput(mtl).Get()}")
+
+def set_mtl_opacity(mtl_prim, texture):
+    mtl = "opacity_texture"
+    create_material_input(mtl_prim, mtl, texture, VT.Asset)
+    create_material_input(mtl_prim, "enable_opacity", True, VT.Bool)
+    create_material_input(mtl_prim, "enable_opacity_texture", True, VT.Bool)
+    # Verify it was set
+    shade = get_shader_from_material(mtl_prim)
+    print(f"mtl {mtl}: {shade.GetInput(mtl).Get()}")
+
+def set_mtl_emission(mtl_prim, texture):
+    mtl = "emissive_color_texture"
+    create_material_input(mtl_prim, mtl, texture, VT.Asset)
+    create_material_input(mtl_prim, "enable_emission", True, VT.Bool)
+    # Verify it was set
+    shade = get_shader_from_material(mtl_prim)
+    print(f"mtl {mtl}: {shade.GetInput(mtl).Get()}")
+
+
+
+RENDERING_CHANNEL_MAPPINGS = {
+    "albedo": set_mtl_albedo,
+    "normal": set_mtl_normal,
+    "ao": set_mtl_ao,
+    "roughness": set_mtl_roughness,
+    "metalness": set_mtl_metalness,
+    "opacity": set_mtl_opacity,
+    "emission": set_mtl_emission,
+}
+
 
 def string_to_array(string):
     """
@@ -27,13 +102,13 @@ def string_to_array(string):
     return np.array([float(x) for x in string.split(" ")])
 
 
-def import_models_metadata_from_scene(urdf):
+def import_models_metadata_from_scene(urdf, import_render_channels=False):
     tree = ET.parse(urdf)
     root = tree.getroot()
-    import_nested_models_metadata_from_element(root, model_pose_info={})
+    import_nested_models_metadata_from_element(root, model_pose_info={}, import_render_channels=import_render_channels)
 
 
-def import_nested_models_metadata_from_element(element, model_pose_info):
+def import_nested_models_metadata_from_element(element, model_pose_info, import_render_channels=False):
     # First pass through, populate the joint pose info
     for ele in element:
         if ele.tag == "joint":
@@ -56,13 +131,13 @@ def import_nested_models_metadata_from_element(element, model_pose_info):
                 pass
             # Process ceiling, walls, floor separately
             elif category in {"ceilings", "walls", "floors"}:
-                import_building_metadata(obj_category=category, obj_model=model, name=name)
+                import_building_metadata(obj_category=category, obj_model=model, name=name, import_render_channels=import_render_channels)
             else:
                 print(name)
                 bb = string_to_array(ele.get("bounding_box"))
                 pos = model_pose_info[name]["pos"]
                 quat = model_pose_info[name]["quat"]
-                import_obj_metadata(obj_category=category, obj_model=model, name=name)
+                import_obj_metadata(obj_category=category, obj_model=model, name=name, import_render_channels=import_render_channels)
 
         # If there's children nodes, we iterate over those
         for child in ele:
@@ -80,15 +155,91 @@ def get_joint_info(joint_element):
     return child, pos, quat
 
 
+def rename_prim(prim, name):
+    path_from = prim.GetPrimPath().pathString
+    path_to = f"{'/'.join(path_from.split('/')[:-1])}/{name}"
+    omni.kit.commands.execute("MovePrim", path_from=path_from, path_to=path_to)
+    return get_prim_at_path(path_to)
+
+
+def import_rendering_channels(obj_prim, model_root_path, usd_path):
+    usd_dir = "/".join(usd_path.split("/")[:-1])
+    mat_dir = f"{model_root_path}/material"
+
+    # Compile all material files we have
+    mat_files = set(os.listdir(mat_dir))
+
+    # Iterate over all children of the object prim, if /<obj_name>/<link_name>/visual exists, then we
+    # know <link_name> is a valid link, and we check explicitly for these material files in our set
+    # Note: we assume that the link name is included as a string within the mat_file!
+    for prim in obj_prim.GetChildren():
+        if prim.GetPrimTypeInfo().GetTypeName() == "Xform":
+            # This could be a link, check if it owns a visual subprim
+            link_name = prim.GetName()
+            visual_prim = get_prim_at_path(f"{prim.GetPrimPath().pathString}/visuals")
+            print(f"path: {prim.GetPrimPath().pathString}/visuals")
+            print(f"visual prim: {visual_prim}")
+
+            if visual_prim:
+                # Aggregate all material files for this prim
+                link_mat_files = []
+                for mat_file in deepcopy(mat_files):
+                    if link_name in mat_file:
+                        # Add this mat file and remove it from the set
+                        link_mat_files.append(mat_file)
+                        mat_files.remove(mat_file)
+                # Potentially write material files for this prim if we have any valid materials
+                if len(link_mat_files) > 0:
+                    # Create new material for this link
+                    mtl_created_list = []
+
+                    omni.kit.commands.execute(
+                        "CreateAndBindMdlMaterialFromLibrary",
+                        mdl_name="OmniPBR.mdl",
+                        mtl_name="OmniPBR",
+                        mtl_created_list=mtl_created_list,
+                    )
+                    mat = get_prim_at_path(mtl_created_list[0])
+
+                    shade = UsdShade.Material(mat)
+                    # Bind this material to the visual prim
+                    UsdShade.MaterialBindingAPI(visual_prim).Bind(shade, UsdShade.Tokens.strongerThanDescendants)
+
+                    # Iterate over all material channels and write them to the material
+                    for link_mat_file in link_mat_files:
+                        # Copy this file into the materials folder
+                        mat_fpath = os.path.join(usd_dir, "materials")
+                        shutil.copy(os.path.join(mat_dir, link_mat_file), mat_fpath)
+                        # Check if any valid rendering channel
+                        mat_type = link_mat_file.split("_")[-1].split(".")[0]
+                        # Apply the material
+                        RENDERING_CHANNEL_MAPPINGS[mat_type](mat, os.path.join(mat_fpath, link_mat_file))
+
+                    # Rename material
+                    mat = rename_prim(prim=mat, name=f"material_{link_name}")
+
+    # For any remaining materials, we write them to the default material
+    default_mat = get_prim_at_path(f"{obj_prim.GetPrimPath().pathString}/Looks/material_material_0")
+    for mat_file in mat_files:
+        # Copy this file into the materials folder
+        mat_fpath = os.path.join(usd_dir, "materials")
+        shutil.copy(os.path.join(mat_dir, mat_file), mat_fpath)
+        # Check if any valid rendering channel
+        mat_type = mat_file.split("_")[-1].split(".")[0]
+        # Apply the material
+        RENDERING_CHANNEL_MAPPINGS[mat_type](default_mat, os.path.join(mat_fpath, mat_file))
+
+
 # TODO: Handle metalinks
 # TODO: Import heights per link folder into USD folder
-def import_obj_metadata(obj_category, obj_model, name):
+def import_obj_metadata(obj_category, obj_model, name, import_render_channels=False):
     # Check if filepath exists
     model_root_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}"
     usd_path = f"{model_root_path}/usd/{obj_model}.usd"
 
     # Load model
-    stage = Usd.Stage.Open(usd_path)
+    open_stage(usd_path)
+    stage = get_current_stage()
     prim = stage.GetDefaultPrim()
 
     data = dict()
@@ -145,8 +296,22 @@ def import_obj_metadata(obj_category, obj_model, name):
     #     # else:
     #     #     prim.SetCustomDataByKey(k, v)
 
+    # Add material channels
+    # print(f"prim children: {prim.GetChildren()}")
+    # looks_prim_path = f"{str(prim.GetPrimPath())}/Looks"
+    # looks_prim = prim.GetChildren()[0] #get_prim_at_path(looks_prim_path)
+    # mat_prim_path = f"{str(prim.GetPrimPath())}/Looks/material_material_0"
+    # mat_prim = looks_prim.GetChildren()[0] #get_prim_at_path(mat_prim_path)
+    # print(f"looks children: {looks_prim.GetChildren()}")
+    # print(f"mat prim: {mat_prim}")
+    if import_render_channels:
+        import_rendering_channels(obj_prim=prim, model_root_path=model_root_path, usd_path=usd_path)
+
     # Save stage
     stage.Save()
+
+    # Delete stage reference
+    del stage
 
 
 def recursively_replace_list_of_dict(dic):
@@ -215,13 +380,14 @@ def recursively_replace_list_of_dict(dic):
     return dic
 
 
-def import_building_metadata(obj_category, obj_model, name):
+def import_building_metadata(obj_category, obj_model, name, import_render_channels=False):
     # Check if filepath exists
     model_root_path = f"{ig_dataset_path}/scenes/{obj_model}"
     usd_path = f"{model_root_path}/usd/{obj_category}/{obj_model}_{obj_category}.usd"
 
     # Load model
-    stage = Usd.Stage.Open(usd_path)
+    open_stage(usd_path)
+    stage = get_current_stage()
     prim = stage.GetDefaultPrim()
 
     data = dict()
@@ -251,9 +417,19 @@ def import_building_metadata(obj_category, obj_model, name):
     # Store remaining data as metadata
     prim.SetCustomData(data)
 
+    # Add material channels
+    # mat_prim_path = f"{str(prim.GetPrimPath())}/Looks/material_material_0"
+    # mat_prim = get_prim_at_path(mat_prim_path)
+    # print(f"mat prim: {mat_prim}")
+    if import_render_channels:
+        import_rendering_channels(obj_prim=prim, model_root_path=model_root_path, usd_path=usd_path)
+
     # Save stage
     stage.Save()
 
+    # Delete stage reference
+    del stage
+
 if __name__ == "__main__":
-    import_models_metadata_from_scene(urdf=URDF)
+    import_models_metadata_from_scene(urdf=URDF, import_render_channels=False)
     app.close()
