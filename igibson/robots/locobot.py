@@ -40,4 +40,4 @@ class Locobot(TwoWheelRobot):
 
     @property
     def model_file(self):
-        return os.path.join(igibson.assets_path, "models/locobot/locobot.urdf")
+        return os.path.join(igibson.assets_path, "models/locobot/locobot/locobot.usd")
