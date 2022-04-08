@@ -17,8 +17,7 @@ PRIMITIVE_OBJECTS = {
 
 class PrimitiveObject(StatefulObject):
     """
-    USDObjects are instantiated from a USD file. They can be composed of one
-    or more links and joints. They may or may not be passive.
+    PrimitiveObjects are objects defined by a single geom, e.g: sphere, mesh, cube, etc.
     """
 
     def __init__(
