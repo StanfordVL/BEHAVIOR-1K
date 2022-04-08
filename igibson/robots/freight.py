@@ -41,4 +41,4 @@ class Freight(TwoWheelRobot):
 
     @property
     def model_file(self):
-        return os.path.join(igibson.assets_path, "models/fetch/freight.urdf")
+        return os.path.join(igibson.assets_path, "models/fetch/freight/freight.usd")

@@ -32,4 +32,4 @@ class Husky(LocomotionRobot):
 
     @property
     def model_file(self):
-        return os.path.join(igibson.assets_path, "models/husky/husky.urdf")
+        return os.path.join(igibson.assets_path, "models/husky/husky/husky.usd")
