@@ -7,6 +7,7 @@ from igibson.object_states.object_state_base import AbsoluteObjectState
 from igibson.object_states.soaked import Soaked
 from igibson.object_states.toggle import ToggledOn
 from igibson.objects.particles import Dust, Stain
+from igibson.utils.usd_utils import BoundingBoxAPI
 
 _LINK_NAME = "cleaning_tool_area"
 
@@ -44,16 +45,16 @@ class CleaningTool(AbsoluteObjectState, LinkBasedStateMixin):
             # cleaning link.
             contact_bodies = self.obj.states[ContactBodies].get_value()
             touching_body = [
-                cb for cb in contact_bodies if cb.bodyUniqueIdB in particle_system.parent_obj.get_body_ids()
+                cb for cb in contact_bodies if cb.body1 in particle_system.parent_obj.get_body_ids()
             ]
-            touching_link = any(self.link_id is None or cb.linkIndexA == self.link_id for cb in touching_body)
+            touching_link = any(self.link is None or cb.body0 == self.link.prim_path for cb in touching_body)
             if not touching_link:
                 continue
 
             # Time to check for colliding particles in our AABB.
-            if self.link_id is not None:
+            if self.link is not None:
                 # If we have a cleaning link, use it.
-                aabb = get_aabb(self.body_id, link=self.link_id)
+                aabb = BoundingBoxAPI.compute_aabb(self.link.prim_path())
             else:
                 # Otherwise, use the full-object AABB.
                 aabb = self.obj.states[AABB].get_value()
@@ -61,7 +62,7 @@ class CleaningTool(AbsoluteObjectState, LinkBasedStateMixin):
             # Find particles in the AABB.
             for particle in particle_system.get_active_particles():
                 pos = particle.get_position()
-                if aabb_contains_point(pos, aabb):
+                if BoundingBoxAPI.aabb_contains_point(pos, aabb):
                     particle_system.stash_particle(particle)
 
     def _set_value(self, new_value):
