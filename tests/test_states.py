@@ -689,6 +689,70 @@ def test_temperature():
     finally:
         app.close()
 
+def test_touching():
+    try:
+        obj_category = "apple"
+        obj_model = "00_0"
+        name = "apple"
+
+        sim = Simulator()
+        scene = EmptyScene()
+        sim.import_scene(scene)
+
+        model_root_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}"
+        usd_path = f"{model_root_path}/usd/{obj_model}.usd"
+
+        apple_1 = DatasetObject(
+            prim_path=f"/World/{name}_1",
+            usd_path=usd_path,
+            category=obj_category,
+            name=f"{name}_1",
+            scale=np.array([10.0, 10.0, 10.0]),
+            abilities={},
+        )
+
+        apple_2 = DatasetObject(
+            prim_path=f"/World/{name}_2",
+            usd_path=usd_path,
+            category=obj_category,
+            name=f"{name}_2",
+            scale=np.array([10.0, 10.0, 10.0]),
+            abilities={},
+        )
+
+        sim.import_object(apple_1, auto_initialize=True)
+        apple_1.set_position_orientation(position=np.array([0, 0, 0]))
+
+        sim.import_object(apple_2, auto_initialize=True)
+        apple_2.set_position_orientation(position=np.array([0.5, 0, 0]))
+
+        # needs 1 physics step to activate collision meshes for raycasting
+        sim.step(force_playing=True)
+        # sim.pause()
+
+        # take enough steps for the apples to separate and sit tangent to each other
+        for i in range(100):
+            sim.step()
+
+        assert apple_1.states[object_states.Touching].get_value(apple_2)
+        assert apple_2.states[object_states.Touching].get_value(apple_1)
+        
+        for i in range(1000000):
+            sim.step()
+
+            # touching = apple_1.states[object_states.Touching].get_value(apple_2)
+            # print("apple 1 is touching apple 2:", touching)
+            # # floor = apple_1.states[object_states.OnFloor].get_value(apple_1.room_floor)
+            # # print("apple 1 is on the floor:", floor)
+
+            # touching = apple_2.states[object_states.Touching].get_value(apple_1)
+            # print("apple 2 is touching apple 1:", touching)
+            # # floor = apple_2.states[object_states.OnFloor].get_value(apple_2.room_floor)
+            # # print("apple 2 is on the floor:", floor)
+            # print()
+
+    finally:
+        app.close()
 
 ## WORKS
 #test_state_graph()
@@ -700,8 +764,9 @@ def test_temperature():
 #test_horizontal_adjacency()
 #test_inside()
 #test_heat_source()
+#test_temperature()
 
-test_temperature()
+test_touching()
 
 ## BROKEN
 #test_toggle()

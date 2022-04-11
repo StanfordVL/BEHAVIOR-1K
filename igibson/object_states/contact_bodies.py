@@ -7,11 +7,7 @@ import numpy as np
 
 class ContactBodies(CachingEnabledObjectState):
     def _compute_value(self):
-        return [
-            ContactResult(*item[:10])
-            for body_id in self.obj.get_body_ids()
-            for item in p.getContactPoints(bodyA=body_id)
-        ]
+        return self.obj.contact_list()
 
     def _set_value(self, new_value):
         raise NotImplementedError("ContactBodies state currently does not support setting.")
