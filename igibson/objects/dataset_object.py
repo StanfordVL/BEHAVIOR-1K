@@ -563,6 +563,11 @@ class DatasetObject(USDObject):
         self.room_floor = room_floor
 
     @property
+    def root_link_name(self):
+        # Most objects have base_link as the root_link defined. If it exists, we use that, otherwise, we use the default
+        return "base_link" if "base_link" in self._links else super().root_link_name
+
+    @property
     def native_bbox(self):
         # Native bbox must be specified for dataset objects!
         native_bbox = super().native_bbox

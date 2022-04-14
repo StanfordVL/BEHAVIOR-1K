@@ -53,7 +53,6 @@ class EntityPrim(XFormPrim):
         self._dc = None                         # Dynamics control interface
         self._handle = None                     # Handle to this articulation
         self._root_handle = None                # Handle to the root rigid body of this articulation
-        self._root_prim = None
         self._dofs_infos = None
         self._n_dof = None
         self._default_joints_state = None
@@ -125,13 +124,12 @@ class EntityPrim(XFormPrim):
             n_dof = 0
 
         # Make sure root prim stored is the same as the one found during initialization
-        assert self._root_prim == root_prim, \
-            f"Mismatch in root prims! Original was {self._root_prim.GetPrimPath()}, " \
+        assert self.root_prim == root_prim, \
+            f"Mismatch in root prims! Original was {self.root_prim.GetPrimPath()}, " \
             f"initialized is {root_prim.GetPrimPath()}!"
 
         # Store values internally
         self._root_handle = root_handle
-        self._root_prim = root_prim
         self._n_dof = n_dof
 
         print(f"root handle: {self._root_handle}, root prim path: {self._dc.get_rigid_body_path(self._root_handle)}")
@@ -159,10 +157,6 @@ class EntityPrim(XFormPrim):
                     load_config={"visual_only": self._visual_only},
                 )
                 self._links[link_name] = link
-
-        # The root prim belongs to the base link, not to the first link
-        # self._root_prim = list(self._links.values())[0].prim
-        self._root_prim = self._links["base_link"].prim
 
         # Disable any requested collision pairs
         for a_name, b_name in self.disabled_collision_pairs:
@@ -202,12 +196,30 @@ class EntityPrim(XFormPrim):
         assert self.articulated, "Tried to call method not intended for non-articulated entity prim!"
 
     @property
+    def root_link_name(self):
+        """
+        Returns:
+            str: Name of this entity's root link
+        """
+        # Default is the first entry in the links array
+        return list(self._links.keys())[0]
+
+    @property
     def root_link(self):
         """
         Returns:
             RigidPrim: Root link of this object prim
         """
-        return self._links[self._root_prim.GetName()]
+        return self._links[self.root_link_name]
+
+    @property
+    def root_prim(self):
+        """
+        Returns:
+            UsdPrim: Root prim object associated with the root link of this object prim
+        """
+        # The root prim belongs to the link with name root_link_name
+        return self._links[self.root_link_name].prim
 
     @property
     def handle(self):

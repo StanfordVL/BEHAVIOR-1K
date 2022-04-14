@@ -147,11 +147,11 @@ class BaseObject(EntityPrim, metaclass=ABCMeta):
                     # for more info
                     self._prim.RemoveAPI(UsdPhysics.ArticulationRootAPI)
                     self._prim.RemoveAPI(PhysxSchema.PhysxArticulationAPI)
-                    UsdPhysics.ArticulationRootAPI.Apply(self._root_prim)
-                    PhysxSchema.PhysxArticulationAPI.Apply(self._root_prim)
+                    UsdPhysics.ArticulationRootAPI.Apply(self.root_prim)
+                    PhysxSchema.PhysxArticulationAPI.Apply(self.root_prim)
 
         # Set self collisions if we have articulation API to set
-        if self._prim.HasAPI(UsdPhysics.ArticulationRootAPI) or self._root_prim.HasAPI(UsdPhysics.ArticulationRootAPI):
+        if self._prim.HasAPI(UsdPhysics.ArticulationRootAPI) or self.root_prim.HasAPI(UsdPhysics.ArticulationRootAPI):
             self.self_collisions = self._load_config["self_collisions"]
 
         # TODO: Do we need to explicitly add all links? or is adding articulation root itself sufficient?
