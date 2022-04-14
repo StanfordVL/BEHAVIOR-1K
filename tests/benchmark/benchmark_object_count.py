@@ -16,6 +16,8 @@ from igibson.utils.assets_utils import get_ig_assets_version
 MAX_NUM_OBJS = 1000      # Maximum no. of objects to add.
 NUM_OBJS_PER_ITER = 20   # No. of objects to add per iteration.
 NUM_STEPS_PER_ITER = 30  # No. of steps to take for each n of objects.
+OBJ_SCALE = 0.05         # Object scale to be set appropriately to sim collisions.
+RAND_POSITION = False    # True to randomize positions.
 OUTPUT_DIR = os.path.join(os.path.expanduser("~"), "Desktop")
 
 # Internal constants.
@@ -23,6 +25,16 @@ _N_PER_ROW = int(np.sqrt(MAX_NUM_OBJS))
 _MIN_VAL = -2.0
 _MAX_VAL = 2.0
 _STEP_SIZE = (_MAX_VAL - _MIN_VAL) / _N_PER_ROW
+
+
+def _get_position(obj_idx, is_random=False):
+    if is_random:
+        pos_arange = np.arange(_MIN_VAL, _MAX_VAL, step=0.1, dtype=np.float32)
+        x, y, z = np.random.choice(pos_arange, size=3)
+        return x, y, z
+    x = _MIN_VAL + _STEP_SIZE * (obj_idx % _N_PER_ROW)
+    y = _MIN_VAL + _STEP_SIZE * (obj_idx // _N_PER_ROW)
+    return x, y, 0.1
 
 
 def benchmark_scene(sim):
@@ -44,13 +56,12 @@ def benchmark_scene(sim):
                 prim_path=f"/World/obj{obj_idx}",
                 primitive_type="Sphere",
                 name=f"obj{obj_idx}",
-                scale=0.05,
+                scale=OBJ_SCALE,
                 visual_only=False,
             )
             sim.import_object(obj=obj, auto_initialize=False)
-            x = _MIN_VAL + _STEP_SIZE * (obj_idx % _N_PER_ROW)
-            y = _MIN_VAL + _STEP_SIZE * (obj_idx // _N_PER_ROW)
-            obj.set_position(position=np.array([x, y, 0.1]))
+            x, y, z = _get_position(obj_idx, RAND_POSITION)
+            obj.set_position(position=np.array([x, y, z]))
             new_objs.append(obj)
 
         # Take a step to initialize the new objects (done in _non_physics_step()).
@@ -75,7 +86,7 @@ def benchmark_scene(sim):
     ax.set_title(f"Version {assets_version}")
     plt.tight_layout()
     plt.savefig(os.path.join(
-        OUTPUT_DIR, f"scene_objs_benchmark_{MAX_NUM_OBJS}.png"))
+        OUTPUT_DIR, f"scene_objs_benchmark_{MAX_NUM_OBJS}_{OBJ_SCALE}.png"))
 
 
 def main():
