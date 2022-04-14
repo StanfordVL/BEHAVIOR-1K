@@ -661,10 +661,10 @@ class JointPrim(BasePrim):
 
         # Set the DOF(s) in this joint
         for dof_handle, p in zip(self._dof_handles, pos):
-            if target:
-                self._dc.set_dof_position_target(dof_handle, p)
-            else:
+            if not target:
                 self._dc.set_dof_position(dof_handle, p)
+            # We set the position in either case
+            self._dc.set_dof_position(dof_handle, p)
 
     def set_vel(self, vel, normalized=False, target=False):
         """
@@ -693,10 +693,10 @@ class JointPrim(BasePrim):
 
         # Set the DOF(s) in this joint
         for dof_handle, v in zip(self._dof_handles, vel):
-            if target:
-                self._dc.set_dof_velocity_target(dof_handle, v)
-            else:
+            if not target:
                 self._dc.set_dof_velocity(dof_handle, v)
+            # We set the target in either case
+            self._dc.set_dof_velocity_target(dof_handle, v)
 
     def set_effort(self, effort, normalized=False):
         """
