@@ -754,6 +754,53 @@ def test_touching():
     finally:
         app.close()
 
+def test_open():
+    try:
+        obj_category = "microwave"
+        obj_model = "7128"
+        name = "microwave"
+
+        sim = Simulator()
+        scene = EmptyScene()
+        sim.import_scene(scene)
+
+        model_root_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}"
+        usd_path = f"{model_root_path}/usd/{obj_model}.usd"
+
+        microwave = DatasetObject(
+            prim_path=f"/World/{name}",
+            usd_path=usd_path,
+            category=obj_category,
+            name=f"{name}",
+            scale=np.array([0.5, 0.5, 0.5]),
+            abilities={"openable":{}},
+        )
+
+        sim.import_object(microwave, auto_initialize=True)
+        microwave.set_position_orientation(position=np.array([0, 0, 0.5]))
+        
+
+        # needs 1 physics step to activate collision meshes for raycasting
+        sim.step(force_playing=True)
+        #sim.pause()
+        
+        for i in range(1000000):
+            sim.step()
+            
+            # every second, alternate between opening and closing the door
+            if i % 1000 == 0:
+                if (i // 1000) % 2 == 0:
+                    print("opening microwave")
+                    microwave.states[object_states.Open].set_value(new_value=True, fully=True)
+                elif (i // 1000) % 2 == 1:
+                    print("closing microwave")
+                    microwave.states[object_states.Open].set_value(new_value=False, fully=True)
+                is_open = microwave.states[object_states.Open].get_value()
+                print(is_open)
+
+    finally:
+        app.close()
+
 ## WORKS
 #test_state_graph()
 #test_dirty()
@@ -765,8 +812,9 @@ def test_touching():
 #test_inside()
 #test_heat_source()
 #test_temperature()
+#test_touching()
 
-test_touching()
+test_open()
 
 ## BROKEN
 #test_toggle()
