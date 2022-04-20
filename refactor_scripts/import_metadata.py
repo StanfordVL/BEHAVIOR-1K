@@ -263,17 +263,18 @@ def import_obj_metadata(obj_category, obj_model, name, import_render_channels=Fa
     default_bb = data["metadata"].pop("bbox_size")
 
     # Pop meta links
-    meta_links = data["metadata"].pop("links")
-    print("meta_links:", meta_links)
-    for link_name,atrr in meta_links.items():
-        # Create new Xform prim that will contain info
-        link_prim = stage.DefinePrim(f"{prim.GetPath()}/{link_name}", "Xform")
-        
-        link_prim.CreateAttribute("ig:position", VT.Vector3f)
-        # link_prim.CreateAttribute("ig:orientation", VT.Quatf)
+    if "links" in data["metadata"]:
+        meta_links = data["metadata"].pop("links")
+        print("meta_links:", meta_links)
+        for link_name,atrr in meta_links.items():
+            # Create new Xform prim that will contain info
+            link_prim = stage.DefinePrim(f"{prim.GetPath()}/{link_name}", "Xform")
 
-        link_prim.GetAttribute("ig:position").Set(Gf.Vec3f(*atrr["xyz"]))
-        # link_prim.GetAttribute("ig:orientation").Set(Gf.Quatf(*atrr["rpy"]))
+            link_prim.CreateAttribute("ig:position", VT.Vector3f)
+            # link_prim.CreateAttribute("ig:orientation", VT.Quatf)
+
+            link_prim.GetAttribute("ig:position").Set(Gf.Vec3f(*atrr["xyz"]))
+            # link_prim.GetAttribute("ig:orientation").Set(Gf.Quatf(*atrr["rpy"]))
 
     # Manually modify material groups info
     if "material_groups" in data:
@@ -371,8 +372,7 @@ def recursively_replace_list_of_dict(dic):
             dic[k] = Tokens.none
         elif isinstance(v, list) or isinstance(v, tuple):
             if len(v) == 0:
-                # Empty array
-                dic[k] = pxr.Vt.FloatArray()
+                dic[k] = pxr.Vt.Vec3fArray()
             elif isinstance(v[0], dict):
                 # Replace with dict in place
                 v = {str(i): vv for i, vv in enumerate(v)}
