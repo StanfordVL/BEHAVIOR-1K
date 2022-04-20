@@ -897,6 +897,65 @@ def test_demo():
     finally:
         app.close()
 
+def test_sliced():
+    try:
+        obj_category = "apple"
+        obj_model = "00_0"
+        name = "apple"
+
+        sim = Simulator()
+        scene = EmptyScene()
+        sim.import_scene(scene)
+
+        model_root_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}"
+        usd_path = f"{model_root_path}/usd/{obj_model}.usd"
+
+        # Create an dataset object of an apple, but doesn't load it in the simulator
+        whole_obj = DatasetObject(
+            prim_path=f"/World/{name}",
+            usd_path=usd_path,
+            category=obj_category,
+            name=f"{name}",
+            scale=np.array([10.0, 10.0, 10.0]),
+            abilities={"sliceable":{}},
+        )
+
+        sim.import_object(whole_obj, auto_initialize=True)
+        whole_obj.set_position_orientation(position=np.array([0, 0, 0]))
+
+        # needs 1 physics step to activate collision meshes for raycasting
+        sim.step(force_playing=True)
+        
+        # Let the apple get stable
+        print("Countdown to slice...")
+        for i in range(3000):
+            if i % 1000 == 0:
+                print(3 - i//1000)
+            sim.step()
+        
+        # # Save the initial state.
+        # initial_state = sim.dump_state(serialized=True)
+
+        print("Slicing the apple...")
+        
+        assert not whole_obj.states[object_states.Sliced].get_value()
+        whole_obj.states[object_states.Sliced].set_value(True)
+        assert whole_obj.states[object_states.Sliced].get_value()
+
+        print("Success!")
+        
+        for i in range(1000000):
+            sim.step()
+
+        # print("Restoring the state")
+        # # Restore the state
+        # sim.load_state(initial_state)
+
+        # The apple should become whole again
+
+    finally:
+        app.close()
+
 ## WORKS
 #test_state_graph()
 #test_dirty()
@@ -910,7 +969,9 @@ def test_demo():
 #test_temperature()
 #test_touching()
 #test_open()
-test_toggle()
+#test_toggle()
+
+test_sliced()
 
 # test_demo()
 

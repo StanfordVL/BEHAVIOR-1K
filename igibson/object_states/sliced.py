@@ -1,5 +1,7 @@
 import numpy as np
 from collections import OrderedDict
+from igibson import ig_dataset_path
+import igibson.utils.transform_utils as T
 from igibson.object_states import *
 from igibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
 
@@ -26,46 +28,49 @@ class Sliced(AbsoluteObjectState, BooleanState):
 
         self.value = new_value
 
-        # We want to return early if set_value(True) is called on a URDFObject
-        # (an object part) that does not have multiplexer registered. This is
-        # used when we propagate sliced=True from the whole object to all the
-        # object parts.
-        if not hasattr(self.obj, "multiplexer"):
-            return True
-
         # Object parts offset annotation are w.r.t the base link of the whole object
         pos, orn = self.obj.get_position_orientation()
         body_ids = self.obj.get_body_ids()
-        assert len(body_ids) == 1, "Sliceable is expected to be single-body."
-        body_id = body_ids[0]
-        dynamics_info = p.getDynamicsInfo(body_id, -1)
-        inertial_pos = dynamics_info[3]
-        inertial_orn = dynamics_info[4]
-        inv_inertial_pos, inv_inertial_orn = p.invertTransform(inertial_pos, inertial_orn)
-        pos, orn = p.multiplyTransforms(pos, orn, inv_inertial_pos, inv_inertial_orn)
-        self.obj.set_position(_STASH_POSITION)
+        # assert len(body_ids) == 1, "Sliceable is expected to be single-body."
+        inertial_pos, inertial_orn = self.obj.get_local_pose()
+        # takes care of inversion of inertial pos/orn
+        pos, orn = T.relative_pose_transform(pos, orn, inertial_pos, inertial_orn)
 
-        # force_wakeup is needed to properly update the self.obj pose in the renderer
-        self.obj.force_wakeup()
+        # load object parts
+        for _, part_idx in enumerate(self.obj.metadata["object_parts"]):
+            # list of dicts gets replaced by {'0':dict, '1':dict, ...}
+            part = self.obj.metadata["object_parts"][part_idx]
+            part_category = part["category"]
+            part_model = part["model"]
+            # Scale the offset accordingly
+            part_pos = part["pos"] * self.obj.scale
+            part_orn = part["orn"]
+            part_obj_name = f"{self.obj.name}_part_{part_idx}"
+            model_root_path = f"{ig_dataset_path}/objects/{part_category}/{part_model}"
+            usd_path = f"{model_root_path}/usd/{part_model}.usd"
 
-        # Dump the current object's states, for setting on the new object. Note that this might not make sense for
-        # things like stains etc. where the halves are supposed to split the state rather than each get an exact copy.
-        state_dump = self.obj.dump_state()
+            # circular import
+            from igibson.objects.dataset_object import DatasetObject
 
-        self.obj.multiplexer.set_selection(int(self.value))
+            part_obj = DatasetObject(
+                prim_path=f"/World/{part_obj_name}",
+                usd_path=usd_path,
+                category=part_category,
+                name=part_obj_name,
+                scale=self.obj.scale,
+                abilities={}
+            )
+            
+            # add to stage
+            self.simulator.import_object(part_obj, auto_initialize=False)
+            # inherit parent position and orientation
+            part_obj.set_position_orientation(position=np.array(part_pos),
+                                              orientation=np.array(part_orn))
 
-        # set the object parts to the base link pose of the whole object
-        # ObjectGrouper internally manages the pose offsets of each part
-        self.obj.multiplexer.set_base_link_position_orientation(pos, orn)
-
-        # Propagate the original object's states to the halves (the ObjectGrouper takes care of propagating this call
-        # to both of its objects).
-        self.obj.multiplexer.current_selection().load_state(state_dump)
+        # delete original object from stage
+        self.simulator.stage.RemovePrim(self.obj.prim_path)
 
         return True
-
-    # For this state, we simply store its value. The ObjectMultiplexer will be
-    # loaded separately.
 
     @property
     def settable(self):

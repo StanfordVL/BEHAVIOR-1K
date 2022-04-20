@@ -11,6 +11,7 @@ test_objects = [("sink", "sink_1"),
                 ("fridge", "12252"),
                 ("bottom_cabinet", "46380"),
                 ("apple", "00_0"),
+                ("apple", "00_1"),
                 ("milk", "milk_000")]
 for category, model in test_objects:
     import_obj_urdf(obj_category=category, obj_model=model, skip_if_exist=False)
