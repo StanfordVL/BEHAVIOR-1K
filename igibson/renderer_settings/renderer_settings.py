@@ -1,9 +1,10 @@
+import carb
 from omni.rtx.window.settings import RendererSettingsFactory
+
 from igibson.renderer_settings.common_settings import CommonSettings
 from igibson.renderer_settings.path_tracing_settings import PathTracedFogSettings
 from igibson.renderer_settings.post_processing_settings import PostProcessingSettings
 from igibson.renderer_settings.real_time_settings import RealTimeSettings
-import carb
 
 
 class RendererSettings:

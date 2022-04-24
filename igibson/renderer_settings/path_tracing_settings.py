@@ -1,6 +1,7 @@
-from igibson.renderer_settings.settings_base import SettingsBase, SubSettingsBase, SettingItem
-from omni.kit.settings import SettingType
 import carb
+from omni.kit.settings import SettingType
+
+from igibson.renderer_settings.settings_base import SettingItem, SettingsBase, SubSettingsBase
 
 
 class CommonSettings(SettingsBase):

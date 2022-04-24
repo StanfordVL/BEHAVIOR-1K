@@ -1,8 +1,8 @@
 from abc import ABCMeta, abstractmethod
+
+import carb
 import numpy as np
 from omni.kit.settings import SettingType
-from omni.isaac.core.utils.carb import set_carb_setting
-import carb
 
 
 class SettingsBase(metaclass=ABCMeta):
