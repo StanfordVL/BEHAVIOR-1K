@@ -801,6 +801,89 @@ def test_open():
     finally:
         app.close()
 
+def test_demo():
+    try:
+        sim = Simulator()
+        scene = EmptyScene()
+        sim.import_scene(scene)
+
+        obj_category = "apple"
+        obj_model = "00_0"
+        name = "apple"
+
+        model_root_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}"
+        usd_path = f"{model_root_path}/usd/{obj_model}.usd"
+
+        apple = DatasetObject(
+            prim_path=f"/World/{name}",
+            usd_path=usd_path,
+            category=obj_category,
+            name=f"{name}",
+            scale=np.array([2.0, 2.0, 2.0]),
+            abilities={"freezable": {}, "cookable": {}, "burnable": {}},
+        )
+
+        obj_category = "stove"
+        obj_model = "101908"
+        name = "stove"
+
+        model_root_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}"
+        usd_path = f"{model_root_path}/usd/{obj_model}.usd"
+
+        stove = DatasetObject(
+            prim_path=f"/World/{name}",
+            usd_path=usd_path,
+            category=obj_category,
+            name=f"{name}",
+            scale=np.array([0.5, 0.5, 0.5]),
+            abilities={"heatSource": {
+                            "temperature": 250,
+                            "heating_rate": 0.2,
+                            "distance_threshold": 0.5,
+                        }, "openable": {}, "toggleable": {}
+            },
+        )
+
+        sim.import_object(apple, auto_initialize=True)
+        apple.set_position_orientation(position=np.array([0, -1, 0]))
+        
+        sim.import_object(stove, auto_initialize=True)
+        stove.set_position_orientation(position=np.array([0, 0, 0]))
+
+        # needs 1 physics step to activate collision meshes for raycasting
+        sim.step(force_playing=True)
+        # sim.pause()
+        
+        # setup apple
+        apple.states[object_states.Temperature].set_value(-50)
+        apple.states[object_states.Burnt].burn_temperature = 200
+        
+        # setup stove
+        stove.states[object_states.ToggledOn].set_value(True)
+        print("Stove is ToggledOn:", stove.states[object_states.ToggledOn].get_value())
+
+        heat_source_state, heat_source_position = stove.states[object_states.HeatSourceOrSink].get_value()
+        print("Stove is a HeatSource:", heat_source_state)
+        
+        for i in range(1000000):
+            sim.step()
+
+            if i % 100 == 0:
+                print("Apple is...\n\tTouching: %r\n\tOnTop: %r\n\tInside: %r\n\tTemperature: %.2f\n\tFrozen: %r\n\tCooked: %r\n\tBurnt: %r\n"
+                    % (
+                        apple.states[object_states.Touching].get_value(stove),
+                        apple.states[object_states.OnTop].get_value(stove),
+                        apple.states[object_states.Inside].get_value(stove),
+                        apple.states[object_states.Temperature].get_value(),
+                        apple.states[object_states.Frozen].get_value(),
+                        apple.states[object_states.Cooked].get_value(),
+                        apple.states[object_states.Burnt].get_value(),
+                    )
+                )
+
+    finally:
+        app.close()
+
 ## WORKS
 #test_state_graph()
 #test_dirty()
@@ -813,8 +896,9 @@ def test_open():
 #test_heat_source()
 #test_temperature()
 #test_touching()
+#test_open()
 
-test_open()
+test_demo()
 
 ## BROKEN
 #test_toggle()

@@ -2,8 +2,8 @@ from igibson.object_states.object_state_base import BaseObjectState
 
 
 class TextureChangeStateMixin(BaseObjectState):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, obj):
+        super(TextureChangeStateMixin, self).__init__(obj)
         self.material = None
 
     def update_texture(self):

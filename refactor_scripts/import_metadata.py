@@ -262,7 +262,7 @@ def import_obj_metadata(obj_category, obj_model, name, import_render_channels=Fa
     base_link_offset = data["metadata"].pop("base_link_offset")
     default_bb = data["metadata"].pop("bbox_size")
 
-    # Pop meta links
+    # Pop meta inks
     if "links" in data["metadata"]:
         meta_links = data["metadata"].pop("links")
         print("meta_links:", meta_links)
@@ -270,10 +270,13 @@ def import_obj_metadata(obj_category, obj_model, name, import_render_channels=Fa
             # Create new Xform prim that will contain info
             link_prim = stage.DefinePrim(f"{prim.GetPath()}/{link_name}", "Xform")
 
-            link_prim.CreateAttribute("ig:position", VT.Vector3f)
-            # link_prim.CreateAttribute("ig:orientation", VT.Quatf)
+            link_prim.CreateAttribute("ig:is_metalink", VT.Bool)
+            link_prim.GetAttribute("ig:is_metalink").Set(True)
 
+            link_prim.CreateAttribute("ig:position", VT.Vector3f)
             link_prim.GetAttribute("ig:position").Set(Gf.Vec3f(*atrr["xyz"]))
+
+            # link_prim.CreateAttribute("ig:orientation", VT.Quatf)
             # link_prim.GetAttribute("ig:orientation").Set(Gf.Quatf(*atrr["rpy"]))
 
     # Manually modify material groups info
@@ -483,9 +486,11 @@ def import_building_metadata(obj_category, obj_model, name, import_render_channe
     del stage
 
 if __name__ == "__main__":
-    import_models_metadata_from_scene(urdf=URDF, import_render_channels=False)
+    # import_models_metadata_from_scene(urdf=URDF, import_render_channels=False)
+    import_obj_metadata("stove", "101908", "stove")
     app.close()
 
 ## For test_states.py
-#import_obj_metadata("stove", "101908", "stove")
+
 #import_obj_metadata("microwave", "7128", "microwave")
+#import_obj_metadata("fridge", "12252", "fridge")

@@ -167,7 +167,8 @@ def add_reference_to_stage(usd_path, import_config):
             UsdPhysics.Scene.Define(current_stage, Sdf.Path("/physicsScene"))
 
 if __name__ == "__main__":
-    import_objects_from_scene_urdf(urdf=URDF)
+    # import_objects_from_scene_urdf(urdf=URDF)
+    import_obj_urdf("stove", "101908")
     app.close()
 
 ## For test_states.py
@@ -175,5 +176,6 @@ if __name__ == "__main__":
 #import_obj_urdf("sink", "sink_1")
 #import_asset_urdf("cabinet2", "cabinet_0007")
 #import_asset_urdf("cabinet", "cabinet_0004")
-#import_obj_urdf("stove", "101908")
+
 #import_obj_urdf("apple", "00_0")
+#import_obj_urdf("fridge", "12252")
