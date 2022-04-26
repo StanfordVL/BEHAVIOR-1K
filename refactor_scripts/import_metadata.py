@@ -487,7 +487,8 @@ def import_building_metadata(obj_category, obj_model, name, import_render_channe
 
 if __name__ == "__main__":
     # import_models_metadata_from_scene(urdf=URDF, import_render_channels=False)
-    import_obj_metadata("stove", "101908", "stove")
+    #import_obj_metadata("stove", "101908", "stove")
+    import_obj_metadata("bottom_cabinet", "46380", "cabinet")
     app.close()
 
 ## For test_states.py
