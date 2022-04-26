@@ -123,7 +123,8 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin):
 
     def _initialize(self):
         super(HeatSourceOrSink, self)._initialize()
-        self.initialize_link_mixin()
+        if not self.requires_inside:
+            self.initialize_link_mixin()
 
         # Import at runtime to prevent circular imports
         from igibson.objects.usd_object import USDObject

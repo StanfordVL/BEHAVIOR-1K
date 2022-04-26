@@ -1,4 +1,4 @@
-
+import numpy as np
 
 class LinkBasedStateMixin(object):
     def __init__(self):
@@ -26,4 +26,4 @@ class LinkBasedStateMixin(object):
             return
 
         pos, orn = self.link.get_position_orientation()
-        return pos
+        return np.array(pos)

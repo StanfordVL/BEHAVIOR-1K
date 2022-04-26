@@ -4,18 +4,17 @@ from collections import OrderedDict
 from igibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from igibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
 from igibson.object_states.texture_change_state_mixin import TextureChangeStateMixin
-from igibson.objects.visual_marker import VisualMarker
-from igibson.utils.constants import PyBulletSleepState, SemanticClass, SimulatorMode
+from igibson.utils.constants import SemanticClass, SimulatorMode
 from igibson.utils.utils import brighten_texture
 
 _TOGGLE_DISTANCE_THRESHOLD = 0.1
 _TOGGLE_LINK_NAME = "toggle_button"
-_TOGGLE_BUTTON_RADIUS = 0.05
-_TOGGLE_MARKER_OFF_POSITION = [0, 0, -100]
+_TOGGLE_BUTTON_SCALE = [0.05, 0.05, 0.05]
+_TOGGLE_MARKER_OFF_POSITION = np.array([0, 0, -100])
 _CAN_TOGGLE_STEPS = 5
 
 
-class ToggledOn(AbsoluteObjectState, BooleanState, LinkBasedStateMixin, TextureChangeStateMixin):
+class ToggledOn(AbsoluteObjectState, BooleanState, TextureChangeStateMixin, LinkBasedStateMixin):
     def __init__(self, obj):
         super(ToggledOn, self).__init__(obj)
         self.value = False
@@ -35,17 +34,29 @@ class ToggledOn(AbsoluteObjectState, BooleanState, LinkBasedStateMixin, TextureC
     def _initialize(self):
         super(ToggledOn, self)._initialize()
         if self.initialize_link_mixin():
-            self.visual_marker_on = VisualMarker(
-                rgba_color=[0, 1, 0, 0.5],
-                radius=_TOGGLE_BUTTON_RADIUS,
+            # Import at runtime to prevent circular imports
+            from igibson.objects.primitive_object import PrimitiveObject
+            self.visual_marker_on = PrimitiveObject(
+                prim_path=f"{self.obj.prim_path}/visual_marker_on",
+                primitive_type="Sphere",
+                name="visual_marker_on",
                 class_id=SemanticClass.TOGGLE_MARKER,
-                rendering_params={"use_pbr": True, "use_pbr_mapping": True},
+                scale=_TOGGLE_BUTTON_SCALE,
+                visible=True,
+                fixed_base=False,
+                visual_only=True,
+                rgba=[0, 1, 0, 0.5],
             )
-            self.visual_marker_off = VisualMarker(
-                rgba_color=[1, 0, 0, 0.5],
-                radius=_TOGGLE_BUTTON_RADIUS,
+            self.visual_marker_off = PrimitiveObject(
+                prim_path=f"{self.obj.prim_path}/visual_marker_off",
+                primitive_type="Sphere",
+                name="visual_marker_off",
                 class_id=SemanticClass.TOGGLE_MARKER,
-                rendering_params={"use_pbr": True, "use_pbr_mapping": True},
+                scale=_TOGGLE_BUTTON_SCALE,
+                visible=True,
+                fixed_base=False,
+                visual_only=True,
+                rgba=[1, 0, 0, 0.5],
             )
             self.simulator.import_object(self.visual_marker_on)
             self.visual_marker_on.set_position(_TOGGLE_MARKER_OFF_POSITION)
@@ -74,38 +85,31 @@ class ToggledOn(AbsoluteObjectState, BooleanState, LinkBasedStateMixin, TextureC
 
         # swap two types of markers when toggled
         # when hud overlay is on, we show the toggle buttons, otherwise the buttons are hidden
-        if self.simulator.mode == SimulatorMode.VR:
-            hud_overlay_show_state = self.simulator.get_hud_show_state()
-        else:
-            hud_overlay_show_state = False
+        # if self.simulator.mode == SimulatorMode.VR:
+        #     hud_overlay_show_state = self.simulator.get_hud_show_state()
+        # else:
+        #     hud_overlay_show_state = False
+
 
         # Choose which marker to put on object vs which to put away
         show_marker = self.visual_marker_on if self.get_value() else self.visual_marker_off
         hidden_marker = self.visual_marker_off if self.get_value() else self.visual_marker_on
 
-        # update toggle button position depending if parent is awake
-        dynamics_info = p.getDynamicsInfo(self.body_id, -1)
+        # update toggle button position
+        show_marker.set_position(button_position_on_object)
+        hidden_marker.set_position(button_position_on_object)
 
-        if len(dynamics_info) == 13:
-            activation_state = dynamics_info[12]
-        else:
-            activation_state = PyBulletSleepState.AWAKE
+        # if hud_overlay_show_state:
+        #     for instance in show_marker.renderer_instances:
+        #         instance.hidden = False
+        # else:
+        #     for instance in show_marker.renderer_instances:
+        #         instance.hidden = True
 
-        if activation_state in [PyBulletSleepState.AWAKE, PyBulletSleepState.ISLAND_AWAKE]:
-            show_marker.set_position(button_position_on_object)
-            hidden_marker.set_position(button_position_on_object)
+        # for instance in hidden_marker.renderer_instances:
+        #     instance.hidden = True
 
-        if hud_overlay_show_state:
-            for instance in show_marker.renderer_instances:
-                instance.hidden = False
-        else:
-            for instance in show_marker.renderer_instances:
-                instance.hidden = True
-
-        for instance in hidden_marker.renderer_instances:
-            instance.hidden = True
-
-        self.update_texture()
+        # self.update_texture()
 
     @staticmethod
     def create_transformed_texture(diffuse_tex_filename, diffuse_tex_filename_transformed):
