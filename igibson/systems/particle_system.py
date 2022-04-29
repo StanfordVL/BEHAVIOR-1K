@@ -1,11 +1,13 @@
 import os
 from igibson import assets_path
+from igibson.utils.usd_utils import create_joint
 from igibson.systems.system_base import BaseSystem
 from igibson.utils.constants import SemanticClass
 from igibson.utils.python_utils import classproperty
 from igibson.utils.sampling_utils import sample_cuboid_on_object
 from collections import OrderedDict
 import numpy as np
+from pxr import Gf
 import logging
 
 
@@ -319,7 +321,7 @@ class AttachedParticleSystem(ParticleSystem):
     def create_attachment_group(cls, obj):
         """
         Creates an attachment group internally for object @obj. Note that this does NOT automatically generate particles
-        for this object (should call generate_particles_on_object(...) ).
+        for this object (should call generate_group_particles(...) ).
 
         Args:
             obj (BaseObject): Object for which a new particle attachment group will be created for
@@ -372,7 +374,7 @@ class AttachedParticleSystem(ParticleSystem):
         that if any objects are in the group already, they will be removed
 
         Args:
-            group (BaseObject): Object on which to sample particle locations
+            group (str): Object on which to sample particle locations
             n_particles (int): Number of particles to sample on the surface of @obj
             min_particles_for_success (int): Minimum number of particles required to be sampled successfully in order
                 for this generation process to be considered successful
@@ -440,6 +442,19 @@ class AttachedParticleSystem(ParticleSystem):
                         surface_point -= normal * cuboid_base_to_center
                     # Set the pose for this particle
                     particle.set_position_orientation(position=position, orientation=quaternion)
+                    # Fix to the hit link as well
+                    joint_prim = create_joint(
+                        prim_path=f"{particle.prim_path}/rootJoint",
+                        joint_type="FixedJoint",
+                        body0=hit_link,
+                        body1=f"{particle.prim_path}/base_link",
+                    )
+                    # Make sure to offset this prim's position and orientation accordingly
+                    # We use the raw local transforms from omni, NOT the inferred physical transforms
+                    raw_relative_pos = particle.get_attribute("xformOp:translate")
+                    raw_relative_quat = Gf.Quatf(particle.get_attribute("xformOp:orient"))
+                    joint_prim.GetAttribute("physics:localPos0").Set(raw_relative_pos)
+                    joint_prim.GetAttribute("physics:localRot0").Set(raw_relative_quat)
                 else:
                     # Delete this object after we're done
                     # TODO: Figure out better way to do this

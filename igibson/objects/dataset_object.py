@@ -667,10 +667,10 @@ class DatasetObject(USDObject):
 
         # Get the base position transform.
         pos, orn = self.get_position_orientation()
-        base_com_to_world = T.pose2mat((pos, orn))
+        base_frame_to_world = T.pose2mat((pos, orn))
 
         # Compute the world-to-base frame transform.
-        world_to_base_com = trimesh.transformations.inverse_matrix(base_com_to_world)
+        world_to_base_frame = trimesh.transformations.inverse_matrix(base_frame_to_world)
 
         # Grab the corners of all the different links' bounding boxes. We will later fit a bounding box to
         # this set of points to get our final, base-frame bounding box.
@@ -706,12 +706,14 @@ class DatasetObject(USDObject):
                 extent_in_bbox_frame = np.array(bb_data["extent"])
                 bbox_to_link_origin = np.array(bb_data["transform"])
 
-                # Get the link's pose in the base frame.
-                if link.name == self.root_link.name:
-                    link_com_to_base_com = np.eye(4)
-                else:
-                    link_com_to_world = T.pose2mat(link.get_position_orientation())
-                    link_com_to_base_com = world_to_base_com @ link_com_to_world
+                # # Get the link's pose in the base frame.
+                # if link.name == self.root_link.name:
+                #     link_com_to_base_com = np.eye(4)
+                # else:
+                #     link_com_to_world = T.pose2mat(link.get_position_orientation())
+                #     link_com_to_base_com = world_to_base_com @ link_com_to_world
+                link_frame_to_world = T.pose2mat(link.get_position_orientation())
+                link_frame_to_base_frame = world_to_base_frame @ link_frame_to_world
 
                 # Scale the bounding box in link origin frame. Here we create a transform that first puts the bounding
                 # box's vertices into the link frame, and then scales them to match the scale applied to this object.
@@ -721,31 +723,31 @@ class DatasetObject(USDObject):
                 scale_in_link_frame = np.diag(np.concatenate([self.scales_in_link_frame[link_name], [1]]))
                 bbox_to_scaled_link_origin = np.dot(scale_in_link_frame, bbox_to_link_origin)
 
-                # Account for the link vs. center-of-mass.
-                # TODO: is this the same as local pose?
-                local_pos, local_ori = self.get_local_pose()
-                inertial_pos, inertial_ori = T.mat2pose(T.pose_inv(T.pose2mat((local_pos, local_ori))))
-                # dynamics_info = p.getDynamicsInfo(body_id, link)
-                # inertial_pos, inertial_orn = p.invertTransform(dynamics_info[3], dynamics_info[4])
-                link_origin_to_link_com = utils.quat_pos_to_mat(inertial_pos, inertial_ori)
+                # # Account for the link vs. center-of-mass.
+                # # TODO: is this the same as local pose?
+                # local_pos, local_ori = self.get_local_pose()
+                # inertial_pos, inertial_ori = T.mat2pose(T.pose_inv(T.pose2mat((local_pos, local_ori))))
+                # # dynamics_info = p.getDynamicsInfo(body_id, link)
+                # # inertial_pos, inertial_orn = p.invertTransform(dynamics_info[3], dynamics_info[4])
+                # link_origin_to_link_com = utils.quat_pos_to_mat(inertial_pos, inertial_ori)
 
                 # Compute the bounding box vertices in the base frame.
-                bbox_to_link_com = np.dot(link_origin_to_link_com, bbox_to_scaled_link_origin)
-                bbox_center_in_base_com = np.dot(link_com_to_base_com, bbox_to_link_com)
-                vertices_in_base_com = np.array(list(itertools.product((1, -1), repeat=3))) * (extent_in_bbox_frame / 2)
+                # bbox_to_link_com = np.dot(link_origin_to_link_com, bbox_to_scaled_link_origin)
+                bbox_center_in_base_frame = np.dot(link_frame_to_base_frame, bbox_to_scaled_link_origin)
+                vertices_in_base_frame = np.array(list(itertools.product((1, -1), repeat=3))) * (extent_in_bbox_frame / 2)
 
                 # Add the points to our collection of points.
-                points.extend(trimesh.transformations.transform_points(vertices_in_base_com, bbox_center_in_base_com))
+                points.extend(trimesh.transformations.transform_points(vertices_in_base_frame, bbox_center_in_base_frame))
             elif fallback_to_aabb:
                 # If no BB annotation is available, get the AABB for this link.
                 aabb_center, aabb_extent = BoundingBoxAPI.compute_center_extent(prim_path=link.prim_path)
                 aabb_vertices_in_world = aabb_center + np.array(list(itertools.product((1, -1), repeat=3))) * (
                         aabb_extent / 2
                 )
-                aabb_vertices_in_base_com = trimesh.transformations.transform_points(
-                    aabb_vertices_in_world, world_to_base_com
+                aabb_vertices_in_base_frame = trimesh.transformations.transform_points(
+                    aabb_vertices_in_world, world_to_base_frame
                 )
-                points.extend(aabb_vertices_in_base_com)
+                points.extend(aabb_vertices_in_base_frame)
             else:
                 raise ValueError(
                     "Bounding box annotation missing for link: %s. Use fallback_to_aabb=True if you're okay with using "
@@ -755,11 +757,11 @@ class DatasetObject(USDObject):
         if xy_aligned:
             # If the user requested an XY-plane aligned bbox, convert everything to that frame.
             # The desired frame is same as the base_com frame with its X/Y rotations removed.
-            translate = trimesh.transformations.translation_from_matrix(base_com_to_world)
+            translate = trimesh.transformations.translation_from_matrix(base_frame_to_world)
 
             # To find the rotation that this transform does around the Z axis, we rotate the [1, 0, 0] vector by it
             # and then take the arctangent of its projection onto the XY plane.
-            rotated_X_axis = base_com_to_world[:3, 0]
+            rotated_X_axis = base_frame_to_world[:3, 0]
             rotation_around_Z_axis = np.arctan2(rotated_X_axis[1], rotated_X_axis[0])
             xy_aligned_base_com_to_world = trimesh.transformations.compose_matrix(
                 translate=translate, angles=[0, 0, rotation_around_Z_axis]
@@ -767,14 +769,14 @@ class DatasetObject(USDObject):
 
             # We want to move our points to this frame as well.
             world_to_xy_aligned_base_com = trimesh.transformations.inverse_matrix(xy_aligned_base_com_to_world)
-            base_com_to_xy_aligned_base_com = np.dot(world_to_xy_aligned_base_com, base_com_to_world)
+            base_com_to_xy_aligned_base_com = np.dot(world_to_xy_aligned_base_com, base_frame_to_world)
             points = trimesh.transformations.transform_points(points, base_com_to_xy_aligned_base_com)
 
             # Finally update our desired frame.
             desired_frame_to_world = xy_aligned_base_com_to_world
         else:
             # Default desired frame is base CoM frame.
-            desired_frame_to_world = base_com_to_world
+            desired_frame_to_world = base_frame_to_world
 
         # TODO: Implement logic to allow tight bounding boxes that don't necessarily have to match the base frame.
         # All points are now in the desired frame: either the base CoM or the xy-plane-aligned base CoM.
