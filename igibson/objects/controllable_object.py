@@ -239,6 +239,11 @@ class ControllableObject(BaseObject):
         if self._action_type == "discrete":
             action = np.array(self.discrete_action_list[action])
 
+        # Check if the input action's length matches the action dimension
+        assert len(action) == self.action_dim, "Action must be dimension {}, got dim {} instead.".format(
+            self.action_dim, len(action)
+        )
+
         # Run convert actions to controls
         control, control_type = self._actions_to_control(action=action)
 
@@ -430,7 +435,7 @@ class ControllableObject(BaseObject):
         # Add in controller states
         controller_states = OrderedDict()
         for controller_name, controller in self._controllers.items():
-            controller_states[controller_name] = controller.dump_state(serialized=False)
+            controller_states[controller_name] = controller.dump_state()
 
         state["controllers"] = controller_states
 
