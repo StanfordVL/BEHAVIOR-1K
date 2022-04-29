@@ -486,12 +486,5 @@ def import_building_metadata(obj_category, obj_model, name, import_render_channe
     del stage
 
 if __name__ == "__main__":
-    # import_models_metadata_from_scene(urdf=URDF, import_render_channels=False)
-    #import_obj_metadata("stove", "101908", "stove")
-    import_obj_metadata("bottom_cabinet", "46380", "cabinet")
+    import_models_metadata_from_scene(urdf=URDF, import_render_channels=False)
     app.close()
-
-## For test_states.py
-
-#import_obj_metadata("microwave", "7128", "microwave")
-#import_obj_metadata("fridge", "12252", "fridge")
