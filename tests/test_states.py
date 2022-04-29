@@ -215,10 +215,23 @@ def test_toggle():
             abilities={"toggleable": {}},
         )
 
-        sim.import_object(sink, auto_initialize=False)
-        sink.states[object_states.ToggledOn].set_value(True)
-        #sink.set_position([1, 1, 0.8])
+        sim.import_object(sink, auto_initialize=True)
+        sink.set_position(np.array([1, 1, 0.8]))
+
         assert object_states.ToggledOn in sink.states
+
+        sim.step(force_playing=True)
+
+        for i in range(1000000):
+            sim.step()
+            # Every other second, toggle on/off
+            if i % 1000 == 0:
+                if (i // 1000) % 2 == 1:
+                    sink.states[object_states.ToggledOn].set_value(True)
+                    print("On!")
+                else:
+                    sink.states[object_states.ToggledOn].set_value(False)
+                    print("Off!")
 
     finally:
         app.close()
@@ -281,7 +294,7 @@ def test_water_source():
 
         sim.import_object(sink, auto_initialize=False)
         sink.states[object_states.ToggledOn].set_value(True)
-        #sink.set_position([1, 1, 0.8])
+        sink.set_position(np.array([1, 1, 0.8]))
         assert object_states.WaterSource in sink.states
 
         for i in range(10):
@@ -897,9 +910,9 @@ def test_demo():
 #test_temperature()
 #test_touching()
 #test_open()
+test_toggle()
 
-test_demo()
+# test_demo()
 
 ## BROKEN
-#test_toggle()
 #test_water_source()

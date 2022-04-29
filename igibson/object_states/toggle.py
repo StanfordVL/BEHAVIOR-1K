@@ -9,8 +9,7 @@ from igibson.utils.utils import brighten_texture
 
 _TOGGLE_DISTANCE_THRESHOLD = 0.1
 _TOGGLE_LINK_NAME = "toggle_button"
-_TOGGLE_BUTTON_SCALE = [0.05, 0.05, 0.05]
-_TOGGLE_MARKER_OFF_POSITION = np.array([0, 0, -100])
+_TOGGLE_BUTTON_SCALE = 0.05
 _CAN_TOGGLE_STEPS = 5
 
 
@@ -59,9 +58,9 @@ class ToggledOn(AbsoluteObjectState, BooleanState, TextureChangeStateMixin, Link
                 rgba=[1, 0, 0, 0.5],
             )
             self.simulator.import_object(self.visual_marker_on)
-            self.visual_marker_on.set_position(_TOGGLE_MARKER_OFF_POSITION)
+            self.visual_marker_on.visible = False
             self.simulator.import_object(self.visual_marker_off)
-            self.visual_marker_off.set_position(_TOGGLE_MARKER_OFF_POSITION)
+            self.visual_marker_off.visible = False
 
     def _update(self):
         button_position_on_object = self.get_link_position()
@@ -83,33 +82,15 @@ class ToggledOn(AbsoluteObjectState, BooleanState, TextureChangeStateMixin, Link
         if self.robot_can_toggle_steps == _CAN_TOGGLE_STEPS:
             self.value = not self.value
 
-        # swap two types of markers when toggled
-        # when hud overlay is on, we show the toggle buttons, otherwise the buttons are hidden
-        # if self.simulator.mode == SimulatorMode.VR:
-        #     hud_overlay_show_state = self.simulator.get_hud_show_state()
-        # else:
-        #     hud_overlay_show_state = False
-
-
         # Choose which marker to put on object vs which to put away
         show_marker = self.visual_marker_on if self.get_value() else self.visual_marker_off
         hidden_marker = self.visual_marker_off if self.get_value() else self.visual_marker_on
 
         # update toggle button position
-        show_marker.set_position(button_position_on_object)
-        hidden_marker.set_position(button_position_on_object)
+        show_marker.visible = True
+        hidden_marker.visible = False
 
-        # if hud_overlay_show_state:
-        #     for instance in show_marker.renderer_instances:
-        #         instance.hidden = False
-        # else:
-        #     for instance in show_marker.renderer_instances:
-        #         instance.hidden = True
-
-        # for instance in hidden_marker.renderer_instances:
-        #     instance.hidden = True
-
-        # self.update_texture()
+        self.update_texture()
 
     @staticmethod
     def create_transformed_texture(diffuse_tex_filename, diffuse_tex_filename_transformed):
