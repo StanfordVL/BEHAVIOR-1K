@@ -4,7 +4,19 @@ from omni.kit.settings import SettingType
 from igibson.renderer_settings.settings_base import SettingItem, SettingsBase, SubSettingsBase
 
 
-class CommonSettings(SettingsBase):
+class PathTracingSettings(SettingsBase):
+    """
+    Path-Tracing setting group that handles a variety of sub-settings, including:
+        - Anti-Aliasing
+        - Firefly Filter
+        - Path-Tracing
+        - Sampling & Caching
+        - Denoising
+        - Path-Traced Fog
+        - Heterogeneous Volumes (Path Traced Volume)
+        - Multi GPU (if multiple GPUs available)
+    """
+
     def __init__(self):
         self.anti_aliasing_settings = AntiAliasingSettings()
         self.firefly_filter_settings = FireflyFilterSettings()

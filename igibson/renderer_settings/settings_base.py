@@ -1,4 +1,4 @@
-from abc import ABCMeta, abstractmethod
+from abc import ABCMeta
 
 import carb
 import numpy as np
@@ -9,7 +9,7 @@ class SettingsBase(metaclass=ABCMeta):
     """
     Base class for all renderer settings classes.
 
-    Settings classes include Common, Ray-Tracing, Path-Tracing and Post Processing.
+    Settings classes include Common, Real-Time (Ray-Tracing), Path-Tracing and Post Processing.
     """
 
 
@@ -23,21 +23,42 @@ class SubSettingsBase(metaclass=ABCMeta):
 
     @property
     def enabled_setting_path(self):
-        """ Subclass with "enabled" mode needs to overwrite this method. """
+        """
+        The path of "enabled" setting for this sub-settings class.
+
+        Subclass with "enabled" mode needs to overwrite this method. 
+        
+        Returns:
+            str or None: The path of "enabled" mode for this sub-setting class.
+                Defaults to None, which means this sub-setting group cannot be enabled/disabled.
+        """
         return None
 
     def is_enabled(self):
+        """
+        Get the enabled status for this sub-setting class.
+        
+        Returns:
+            bool: Whether this sub-setting group is enabled.
+                Returns true if this sub-setting group has no "enabled" mode.
+        """
         if not self.enabled_setting_path:
             return True
         return self._carb_settings.get(self.enabled_setting_path)
 
     def enable(self):
+        """
+        Enable this sub-setting class.
+        """
         if not self.enabled_setting_path:
             print(f"{self.__class__.__name__} has no enabled mode.")
             return
         self._carb_settings.set_bool(self.enabled_setting_path, True)
 
     def disable(self):
+        """
+        Disable this sub-setting class.
+        """
         if not self.enabled_setting_path:
             print(f"{self.__class__.__name__} has no enabled mode.")
             return
@@ -47,6 +68,16 @@ class SubSettingsBase(metaclass=ABCMeta):
 class SettingItem:
     """
     A wrapper of an individual setting item.
+
+    Args:
+        owner (:class:`SubSettingsBase`): The SubSettingsBase object owning this setting.
+        setting_type (:class:`SettingType`): Setting type (e.g. float, int).
+        name (str): Description of this setting.
+        path (str): Path of this setting.
+        range_from (float): The lower bound of the values for this setting. Defaults to -inf.
+        range_to (float): The upper bound of the values for this settin. Defaults to inf.
+        range_list (list): Possible values for this setting. Defaults to None.
+        range_dict (dict): Possible values for this setting. Defaults to None.
     """
 
     def __init__(
@@ -73,13 +104,36 @@ class SettingItem:
 
     @property
     def value(self):
-        """Get the current setting."""
+        """
+        Get the current setting value.
+        
+        Returns:
+            any: The current setting value.
+        """
         return self._carb_settings.get(self.path)
 
+    def get(self):
+        """
+        Get the current setting value.
+        
+        Returns:
+            any: The current setting value.
+        """
+        return self.value
+
     def reset(self):
+        """
+        Reset the current setting value to default.
+        """
         self.set(self.initial_value)
 
     def set(self, value):
+        """
+        Set the current setting to @value.
+        
+        Args:
+            value (any): Value to set for the current setting value.
+        """
         print(f"Set setting {self.path} ({self.name}) to {value}.")  # carb.log_info
         if not self.owner.is_enabled():
             print(f"Note: {self.owner.enabled_setting_path} is not enabled.")

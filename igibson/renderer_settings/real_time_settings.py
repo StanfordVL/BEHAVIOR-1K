@@ -5,6 +5,19 @@ from igibson.renderer_settings.settings_base import SettingItem, SettingsBase, S
 
 
 class RealTimeSettings(SettingsBase):
+    """
+    Real-Time setting group that handles a variety of sub-settings, including:
+        - Eco Mode
+        - Anti Aliasing
+        - Direct Lighting
+        - Reflections
+        - Translucency
+        - Global Volumetric Effects
+        - Caustics
+        - Indirect Diffuse Lighting
+        - RTMulti GPU (if multiple GPUs available)
+    """
+
     def __init__(self):
         self.eco_mode_settings = EcoModeSettings()
         self.anti_aliasing_settings = AntiAliasingSettings()
@@ -425,41 +438,201 @@ class TranslucencySettings(SettingsBase):
         return "/rtx/translucency/enabled"
 
 
-class RTMultiGPUSettings(SubSettingsBase):
+class GlobalVolumetricEffectsSettings(SubSettingsBase):
     def __init__(self):
         self._carb_settings = carb.settings.get_settings()
 
-        currentGpuCount = self._carb_settings.get("/renderer/multiGpu/currentGpuCount")
-        self.tile_count = SettingItem(
-            self, SettingType.INT, "Tile Count", "/rtx/realtime/mgpu/tileCount", range_from=2, range_to=currentGpuCount
+        self.max_accumulation_frames = SettingItem(
+            self,
+            SettingType.INT,
+            "Accumulation Frames",
+            "/rtx/raytracing/inscattering/maxAccumulationFrames",
+            range_from=1,
+            range_to=255,
         )
-        self.master_post_processOnly = SettingItem(
-            self, SettingType.BOOL, "GPU 0 Post Process Only", "/rtx/realtime/mgpu/masterPostProcessOnly"
+        self.depth_slices = SettingItem(
+            self,
+            SettingType.INT,
+            "# Depth Slices",
+            "/rtx/raytracing/inscattering/depthSlices",
+            range_from=16,
+            range_to=1024,
         )
-        self.tile_overlap = SettingItem(
-            self, SettingType.INT, "Tile Overlap (Pixels)", "/rtx/realtime/mgpu/tileOverlap", range_from=0, range_to=256
+        self.pixel_ratio = SettingItem(
+            self, SettingType.INT, "Pixel Density", "/rtx/raytracing/inscattering/pixelRatio", range_from=4, range_to=64
         )
-        self.tile_overlap_blend_fraction = SettingItem(
+        self.max_distance = SettingItem(
             self,
             SettingType.FLOAT,
-            "Fraction of Overlap Pixels to Blend",
-            "/rtx/realtime/mgpu/tileOverlapBlendFraction",
+            "Max inscattering Distance",
+            "/rtx/raytracing/inscattering/maxDistance",
+            range_from=10,
+            range_to=100000,
+        )
+        self.atmosphere_height = SettingItem(
+            self,
+            SettingType.FLOAT,
+            "Atmosphere Height",
+            "/rtx/raytracing/inscattering/atmosphereHeight",
+            range_from=-100000,
+            range_to=100000,
+        )
+        self.transmittance_color = SettingItem(
+            self, SettingType.COLOR3, "Transmittance Color", "/rtx/raytracing/inscattering/transmittanceColor"
+        )
+        self.transmittance_measurement_distance = SettingItem(
+            self,
+            SettingType.FLOAT,
+            "Transmittance Measurment Distance",
+            "/rtx/raytracing/inscattering/transmittanceMeasurementDistance",
+            range_from=0.0001,
+            range_to=1000000,
+        )
+        self.single_scattering_albedo = SettingItem(
+            self, SettingType.COLOR3, "Single Scattering Albedo", "/rtx/raytracing/inscattering/singleScatteringAlbedo",
+        )
+        self.anisotropy_factor = SettingItem(
+            self,
+            SettingType.FLOAT,
+            "Anisotropy Factor",
+            "/rtx/raytracing/inscattering/anisotropyFactor",
+            range_from=-0.999,
+            range_to=0.999,
+        )
+        self.slice_distribution_exponent = SettingItem(
+            self,
+            SettingType.FLOAT,
+            "Slice Distribution Exponent",
+            "/rtx/raytracing/inscattering/sliceDistributionExponent",
+            range_from=1,
+            range_to=16,
+        )
+        self.blur_sigma = SettingItem(
+            self,
+            SettingType.FLOAT,
+            "Inscatter Blur Sigma",
+            "/rtx/raytracing/inscattering/blurSigma",
+            0.0,
+            range_to=10.0,
+        )
+        self.dithering_scale = SettingItem(
+            self,
+            SettingType.FLOAT,
+            "Inscatter Dithering Scale",
+            "/rtx/raytracing/inscattering/ditheringScale",
+            range_from=0,
+            range_to=100,
+        )
+        self.spatial_jitter_scale = SettingItem(
+            self,
+            SettingType.FLOAT,
+            "Spatial Sample Jittering Scale",
+            "/rtx/raytracing/inscattering/spatialJitterScale",
             range_from=0.0,
+            range_to=1,
+        )
+        self.temporal_jitter_scale = SettingItem(
+            self,
+            SettingType.FLOAT,
+            "Temporal Reprojection Jittering Scale",
+            "/rtx/raytracing/inscattering/temporalJitterScale",
+            range_from=0.0,
+            range_to=1,
+        )
+        self.use_detail_noise = SettingItem(
+            self, SettingType.BOOL, "Apply Density Noise", "/rtx/raytracing/inscattering/useDetailNoise"
+        )
+        self.detail_noise_scale = SettingItem(
+            self,
+            SettingType.FLOAT,
+            "Density Noise World Scale",
+            "/rtx/raytracing/inscattering/detailNoiseScale",
+            range_from=0.0,
+            range_to=1,
+        )
+        self.noise_animation_speed_x = SettingItem(
+            self,
+            SettingType.FLOAT,
+            "Density Noise Animation Speed X",
+            "/rtx/raytracing/inscattering/noiseAnimationSpeedX",
+            range_from=-1.0,
             range_to=1.0,
+        )
+        self.noise_animation_speed_y = SettingItem(
+            self,
+            SettingType.FLOAT,
+            "Density Noise Animation Speed Y",
+            "/rtx/raytracing/inscattering/noiseAnimationSpeedY",
+            range_from=-1.0,
+            range_to=1.0,
+        )
+        self.noise_animation_speed_z = SettingItem(
+            self,
+            SettingType.FLOAT,
+            "Density Noise Animation Speed Z",
+            "/rtx/raytracing/inscattering/noiseAnimationSpeedZ",
+            range_from=-1.0,
+            range_to=1.0,
+        )
+        self.noise_scale_range_min = SettingItem(
+            self,
+            SettingType.FLOAT,
+            "Density Noise Scale Min",
+            "/rtx/raytracing/inscattering/noiseScaleRangeMin",
+            range_from=-1.0,
+            range_to=5.0,
+        )
+        self.noise_scale_range_max = SettingItem(
+            self,
+            SettingType.FLOAT,
+            "Density Noise Scale Max",
+            "/rtx/raytracing/inscattering/noiseScaleRangeMax",
+            range_from=-1.0,
+            range_to=5.0,
+        )
+        self.noise_num_octaves = SettingItem(
+            self,
+            SettingType.INT,
+            "Density Noise Octave Count",
+            "/rtx/raytracing/inscattering/noiseNumOctaves",
+            range_from=1,
+            range_to=8,
+        )
+        self.use_32bit_precision = SettingItem(
+            self, SettingType.BOOL, "Use 32-bit Precision", "/rtx/raytracing/inscattering/use32bitPrecision"
         )
 
     @property
     def settings(self):
         return {
-            "/rtx/realtime/mgpu/tileCount": self.tile_count,
-            "/rtx/realtime/mgpu/masterPostProcessOnly": self.master_post_processOnly,
-            "/rtx/realtime/mgpu/tileOverlap": self.tile_overlap,
-            "/rtx/realtime/mgpu/tileOverlapBlendFraction": self.tile_overlap_blend_fraction,
+            "/rtx/raytracing/inscattering/maxAccumulationFrames": self.max_accumulation_frames,
+            "/rtx/raytracing/inscattering/depthSlices": self.depth_slices,
+            "/rtx/raytracing/inscattering/pixelRatio": self.pixel_ratio,
+            "/rtx/raytracing/inscattering/maxDistance": self.max_distance,
+            "/rtx/raytracing/inscattering/atmosphereHeight": self.atmosphere_height,
+            "/rtx/raytracing/inscattering/transmittanceColor": self.transmittance_color,
+            "/rtx/raytracing/inscattering/transmittanceMeasurementDistance": self.transmittance_measurement_distance,
+            "/rtx/raytracing/inscattering/singleScatteringAlbedo": self.single_scattering_albedo,
+            "/rtx/raytracing/inscattering/anisotropyFactor": self.anisotropy_factor,
+            "/rtx/raytracing/inscattering/sliceDistributionExponent": self.slice_distribution_exponent,
+            "/rtx/raytracing/inscattering/blurSigma": self.blur_sigma,
+            "/rtx/raytracing/inscattering/ditheringScale": self.dithering_scale,
+            "/rtx/raytracing/inscattering/spatialJitterScale": self.spatial_jitter_scale,
+            "/rtx/raytracing/inscattering/temporalJitterScale": self.temporal_jitter_scale,
+            "/rtx/raytracing/inscattering/useDetailNoise": self.use_detail_noise,
+            "/rtx/raytracing/inscattering/detailNoiseScale": self.detail_noise_scale,
+            "/rtx/raytracing/inscattering/noiseAnimationSpeedX": self.noise_animation_speed_x,
+            "/rtx/raytracing/inscattering/noiseAnimationSpeedY": self.noise_animation_speed_y,
+            "/rtx/raytracing/inscattering/noiseAnimationSpeedZ": self.noise_animation_speed_z,
+            "/rtx/raytracing/inscattering/noiseScaleRangeMin": self.noise_scale_range_min,
+            "/rtx/raytracing/inscattering/noiseScaleRangeMax": self.noise_scale_range_max,
+            "/rtx/raytracing/inscattering/noiseNumOctaves": self.noise_num_octaves,
+            "/rtx/raytracing/inscattering/use32bitPrecision": self.use_32bit_precision,
         }
 
     @property
     def enabled_setting_path(self):
-        return "/rtx/realtime/mgpu/enabled"
+        return "/rtx/raytracing/globalVolumetricEffects/enabled"
 
 
 class CausticsSettings(SettingsBase):
@@ -692,198 +865,38 @@ class IndirectDiffuseLightingSettings(SettingsBase):
         return settings
 
 
-class GlobalVolumetricEffectsSettings(SubSettingsBase):
+class RTMultiGPUSettings(SubSettingsBase):
     def __init__(self):
         self._carb_settings = carb.settings.get_settings()
 
-        self.max_accumulation_frames = SettingItem(
-            self,
-            SettingType.INT,
-            "Accumulation Frames",
-            "/rtx/raytracing/inscattering/maxAccumulationFrames",
-            range_from=1,
-            range_to=255,
+        currentGpuCount = self._carb_settings.get("/renderer/multiGpu/currentGpuCount")
+        self.tile_count = SettingItem(
+            self, SettingType.INT, "Tile Count", "/rtx/realtime/mgpu/tileCount", range_from=2, range_to=currentGpuCount
         )
-        self.depth_slices = SettingItem(
-            self,
-            SettingType.INT,
-            "# Depth Slices",
-            "/rtx/raytracing/inscattering/depthSlices",
-            range_from=16,
-            range_to=1024,
+        self.master_post_processOnly = SettingItem(
+            self, SettingType.BOOL, "GPU 0 Post Process Only", "/rtx/realtime/mgpu/masterPostProcessOnly"
         )
-        self.pixel_ratio = SettingItem(
-            self, SettingType.INT, "Pixel Density", "/rtx/raytracing/inscattering/pixelRatio", range_from=4, range_to=64
+        self.tile_overlap = SettingItem(
+            self, SettingType.INT, "Tile Overlap (Pixels)", "/rtx/realtime/mgpu/tileOverlap", range_from=0, range_to=256
         )
-        self.max_distance = SettingItem(
+        self.tile_overlap_blend_fraction = SettingItem(
             self,
             SettingType.FLOAT,
-            "Max inscattering Distance",
-            "/rtx/raytracing/inscattering/maxDistance",
-            range_from=10,
-            range_to=100000,
-        )
-        self.atmosphere_height = SettingItem(
-            self,
-            SettingType.FLOAT,
-            "Atmosphere Height",
-            "/rtx/raytracing/inscattering/atmosphereHeight",
-            range_from=-100000,
-            range_to=100000,
-        )
-        self.transmittance_color = SettingItem(
-            self, SettingType.COLOR3, "Transmittance Color", "/rtx/raytracing/inscattering/transmittanceColor"
-        )
-        self.transmittance_measurement_distance = SettingItem(
-            self,
-            SettingType.FLOAT,
-            "Transmittance Measurment Distance",
-            "/rtx/raytracing/inscattering/transmittanceMeasurementDistance",
-            range_from=0.0001,
-            range_to=1000000,
-        )
-        self.single_scattering_albedo = SettingItem(
-            self, SettingType.COLOR3, "Single Scattering Albedo", "/rtx/raytracing/inscattering/singleScatteringAlbedo",
-        )
-        self.anisotropy_factor = SettingItem(
-            self,
-            SettingType.FLOAT,
-            "Anisotropy Factor",
-            "/rtx/raytracing/inscattering/anisotropyFactor",
-            range_from=-0.999,
-            range_to=0.999,
-        )
-        self.slice_distribution_exponent = SettingItem(
-            self,
-            SettingType.FLOAT,
-            "Slice Distribution Exponent",
-            "/rtx/raytracing/inscattering/sliceDistributionExponent",
-            range_from=1,
-            range_to=16,
-        )
-        self.blur_sigma = SettingItem(
-            self,
-            SettingType.FLOAT,
-            "Inscatter Blur Sigma",
-            "/rtx/raytracing/inscattering/blurSigma",
-            0.0,
-            range_to=10.0,
-        )
-        self.dithering_scale = SettingItem(
-            self,
-            SettingType.FLOAT,
-            "Inscatter Dithering Scale",
-            "/rtx/raytracing/inscattering/ditheringScale",
-            range_from=0,
-            range_to=100,
-        )
-        self.spatial_jitter_scale = SettingItem(
-            self,
-            SettingType.FLOAT,
-            "Spatial Sample Jittering Scale",
-            "/rtx/raytracing/inscattering/spatialJitterScale",
+            "Fraction of Overlap Pixels to Blend",
+            "/rtx/realtime/mgpu/tileOverlapBlendFraction",
             range_from=0.0,
-            range_to=1,
-        )
-        self.temporal_jitter_scale = SettingItem(
-            self,
-            SettingType.FLOAT,
-            "Temporal Reprojection Jittering Scale",
-            "/rtx/raytracing/inscattering/temporalJitterScale",
-            range_from=0.0,
-            range_to=1,
-        )
-        self.use_detail_noise = SettingItem(
-            self, SettingType.BOOL, "Apply Density Noise", "/rtx/raytracing/inscattering/useDetailNoise"
-        )
-        self.detail_noise_scale = SettingItem(
-            self,
-            SettingType.FLOAT,
-            "Density Noise World Scale",
-            "/rtx/raytracing/inscattering/detailNoiseScale",
-            range_from=0.0,
-            range_to=1,
-        )
-        self.noise_animation_speed_x = SettingItem(
-            self,
-            SettingType.FLOAT,
-            "Density Noise Animation Speed X",
-            "/rtx/raytracing/inscattering/noiseAnimationSpeedX",
-            range_from=-1.0,
             range_to=1.0,
-        )
-        self.noise_animation_speed_y = SettingItem(
-            self,
-            SettingType.FLOAT,
-            "Density Noise Animation Speed Y",
-            "/rtx/raytracing/inscattering/noiseAnimationSpeedY",
-            range_from=-1.0,
-            range_to=1.0,
-        )
-        self.noise_animation_speed_z = SettingItem(
-            self,
-            SettingType.FLOAT,
-            "Density Noise Animation Speed Z",
-            "/rtx/raytracing/inscattering/noiseAnimationSpeedZ",
-            range_from=-1.0,
-            range_to=1.0,
-        )
-        self.noise_scale_range_min = SettingItem(
-            self,
-            SettingType.FLOAT,
-            "Density Noise Scale Min",
-            "/rtx/raytracing/inscattering/noiseScaleRangeMin",
-            range_from=-1.0,
-            range_to=5.0,
-        )
-        self.noise_scale_range_max = SettingItem(
-            self,
-            SettingType.FLOAT,
-            "Density Noise Scale Max",
-            "/rtx/raytracing/inscattering/noiseScaleRangeMax",
-            range_from=-1.0,
-            range_to=5.0,
-        )
-        self.noise_num_octaves = SettingItem(
-            self,
-            SettingType.INT,
-            "Density Noise Octave Count",
-            "/rtx/raytracing/inscattering/noiseNumOctaves",
-            range_from=1,
-            range_to=8,
-        )
-        self.use_32bit_precision = SettingItem(
-            self, SettingType.BOOL, "Use 32-bit Precision", "/rtx/raytracing/inscattering/use32bitPrecision"
         )
 
     @property
     def settings(self):
         return {
-            "/rtx/raytracing/inscattering/maxAccumulationFrames": self.max_accumulation_frames,
-            "/rtx/raytracing/inscattering/depthSlices": self.depth_slices,
-            "/rtx/raytracing/inscattering/pixelRatio": self.pixel_ratio,
-            "/rtx/raytracing/inscattering/maxDistance": self.max_distance,
-            "/rtx/raytracing/inscattering/atmosphereHeight": self.atmosphere_height,
-            "/rtx/raytracing/inscattering/transmittanceColor": self.transmittance_color,
-            "/rtx/raytracing/inscattering/transmittanceMeasurementDistance": self.transmittance_measurement_distance,
-            "/rtx/raytracing/inscattering/singleScatteringAlbedo": self.single_scattering_albedo,
-            "/rtx/raytracing/inscattering/anisotropyFactor": self.anisotropy_factor,
-            "/rtx/raytracing/inscattering/sliceDistributionExponent": self.slice_distribution_exponent,
-            "/rtx/raytracing/inscattering/blurSigma": self.blur_sigma,
-            "/rtx/raytracing/inscattering/ditheringScale": self.dithering_scale,
-            "/rtx/raytracing/inscattering/spatialJitterScale": self.spatial_jitter_scale,
-            "/rtx/raytracing/inscattering/temporalJitterScale": self.temporal_jitter_scale,
-            "/rtx/raytracing/inscattering/useDetailNoise": self.use_detail_noise,
-            "/rtx/raytracing/inscattering/detailNoiseScale": self.detail_noise_scale,
-            "/rtx/raytracing/inscattering/noiseAnimationSpeedX": self.noise_animation_speed_x,
-            "/rtx/raytracing/inscattering/noiseAnimationSpeedY": self.noise_animation_speed_y,
-            "/rtx/raytracing/inscattering/noiseAnimationSpeedZ": self.noise_animation_speed_z,
-            "/rtx/raytracing/inscattering/noiseScaleRangeMin": self.noise_scale_range_min,
-            "/rtx/raytracing/inscattering/noiseScaleRangeMax": self.noise_scale_range_max,
-            "/rtx/raytracing/inscattering/noiseNumOctaves": self.noise_num_octaves,
-            "/rtx/raytracing/inscattering/use32bitPrecision": self.use_32bit_precision,
+            "/rtx/realtime/mgpu/tileCount": self.tile_count,
+            "/rtx/realtime/mgpu/masterPostProcessOnly": self.master_post_processOnly,
+            "/rtx/realtime/mgpu/tileOverlap": self.tile_overlap,
+            "/rtx/realtime/mgpu/tileOverlapBlendFraction": self.tile_overlap_blend_fraction,
         }
 
     @property
     def enabled_setting_path(self):
-        return "/rtx/raytracing/globalVolumetricEffects/enabled"
+        return "/rtx/realtime/mgpu/enabled"

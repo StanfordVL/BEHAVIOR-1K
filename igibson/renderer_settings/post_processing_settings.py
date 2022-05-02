@@ -5,6 +5,21 @@ from igibson.renderer_settings.settings_base import SettingItem, SettingsBase, S
 
 
 class PostProcessingSettings(SettingsBase):
+    """
+    Post-Processing setting group that handles a variety of sub-settings, including:
+        - Tone Mapping
+        - Auto Exposure
+        - Color Correction
+        - Color Grading
+        - XR Compositing
+        - Chromatic Aberration
+        - Depth Of Field Camera Overrides
+        - Motion Blur
+        - FTT Bloom
+        - TV Noise & Film Grain
+        - Reshade
+    """
+
     def __init__(self):
         self.tone_mapping_settings = ToneMappingSettings()
         self.auto_exposure_settings = AutoExposureSettings()
@@ -502,7 +517,7 @@ class FTTBloomSettings(SubSettingsBase):
             self, SettingType.BOOL, "Physical Settings", "/rtx/post/lensFlares/physicalSettings"
         )
 
-        # fftbloom_use_physical_settings = self._settings.get("/rtx/post/lensFlares/physicalSettings")
+        # fftbloom_use_physical_settings = self._carb_settings.get("/rtx/post/lensFlares/physicalSettings")
         # Physical settings
         self.blades = SettingItem(
             self, SettingType.INT, "Blades", "/rtx/post/lensFlares/blades", range_from=0, range_to=10
@@ -598,7 +613,7 @@ class FTTBloomSettings(SubSettingsBase):
             "/rtx/post/lensFlares/energyConstrainingBlend": self.energy_constraining_blend,
             "/rtx/post/lensFlares/physicalSettings": self.physical_settings,
         }
-        fftbloom_use_physical_settings = self._settings.get("/rtx/post/lensFlares/physicalSettings")
+        fftbloom_use_physical_settings = self._carb_settings.get("/rtx/post/lensFlares/physicalSettings")
         if fftbloom_use_physical_settings:
             settings.update(
                 {

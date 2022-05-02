@@ -1,9 +1,21 @@
+import carb
 from omni.kit.settings import SettingType
 
 from igibson.renderer_settings.settings_base import SettingItem, SettingsBase, SubSettingsBase
 
 
 class CommonSettings(SettingsBase):
+    """
+    Common setting group that handles a variety of sub-settings, including:
+        - Rendering
+        - Geometry
+        - Materials
+        - Lighting
+        - Simple Fog
+        - Flow
+        - Debug View
+    """
+
     def __init__(self):
         self.render_settings = RenderSettings()
         self.geometry_settings = GeometrySettings()
@@ -242,6 +254,8 @@ class LightingSettings(SubSettingsBase):
 
 class SimpleFogSettings(SubSettingsBase):
     def __init__(self):
+        self._carb_settings = carb.settings.get_settings()
+
         self.fog_color = SettingItem(self, SettingType.COLOR3, "Color", "/rtx/fog/fogColor")
         self.fog_color_intensity = SettingItem(
             self, SettingType.FLOAT, "Intensity", "/rtx/fog/fogColorIntensity", range_from=1, range_to=1000000
@@ -287,9 +301,15 @@ class SimpleFogSettings(SubSettingsBase):
             "/rtx/fog/fogEndDist": self.fog_end_dist,
         }
 
+    @property
+    def enabled_setting_path(self):
+        return "/rtx/fog/enabled"
+
 
 class FlowSettings(SubSettingsBase):
     def __init__(self):
+        self._carb_settings = carb.settings.get_settings()
+
         self.ray_traced_shadows_enabled = SettingItem(
             self, SettingType.BOOL, "Flow in Real-Time Ray Traced Shadows", "/rtx/flow/rayTracedShadowsEnabled"
         )
@@ -321,6 +341,10 @@ class FlowSettings(SubSettingsBase):
             "/rtx/flow/useFlowLibrarySelfShadow": self.use_flow_library_self_shadow,
             "/rtx/flow/maxBlocks": self.max_blocks,
         }
+
+    @property
+    def enabled_setting_path(self):
+        return "/rtx/flow/enabled"
 
 
 class DebugViewSettings(SubSettingsBase):
