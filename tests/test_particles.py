@@ -22,9 +22,9 @@ from igibson.systems.particle_system import DustSystem, StainSystem
 
 
 # Macros
-obj_category = "bottom_cabinet"
-obj_model = "46380"
-name = "cabinet"
+obj_category = "milk"
+obj_model = "milk_000"
+name = "milk"
 system = None
 
 # Create simulator and empty scene
@@ -49,7 +49,7 @@ cab = DatasetObject(
 sim.import_object(obj=cab)
 
 # Move this object a bit upwards and disable gravity
-cab.set_position_orientation(position=np.array([1.0, 1.0, 0.5]))
+cab.set_position_orientation(position=np.array([1.0, 1.0, 0.5]), orientation=np.array([0.0, 0.0, 0.707, 0.707]))
 
 # Initialize dust system
 system = StainSystem
@@ -61,7 +61,7 @@ sim.play()
 # Generate particles on the cabinet
 # system.generate_particles_on_object(obj=cab)
 attachment_group = system.create_attachment_group(obj=cab)
-system.generate_group_particles(group=attachment_group)
+system.generate_group_particles(group=attachment_group, n_particles=100)
 # dust_copy = system._attachment_groups[name]["dust_template_copy1"]
 
 # start the sim so everything is initialized correctly
