@@ -372,7 +372,7 @@ class XFormPrim(BasePrim):
         """
         xform_translate_op = self.get_attribute("xformOp:translate")
         xform_orient_op = self.get_attribute("xformOp:orient")
-        return np.array(xform_translate_op.Get()), gf_quat_to_np_array(xform_orient_op.Get())[[1, 2, 3, 0]]
+        return np.array(xform_translate_op), gf_quat_to_np_array(xform_orient_op)[[1, 2, 3, 0]]
 
     def set_local_pose(self, translation=None, orientation=None):
         """Sets prim's pose with respect to the local frame (the prim's parent frame).
