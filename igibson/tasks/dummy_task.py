@@ -28,8 +28,10 @@ class DummyTask(BaseTask):
         pass
 
     def _reset_agent(self, env):
-        # Do nothing
-        pass
+        # Place agent(s) at origin by default
+        for robot in env.robots:
+            robot.reset()
+            env.land(robot, np.zeros(3), np.zeros(3))
 
     def _get_obs(self, env):
         # No task-specific obs of any kind
