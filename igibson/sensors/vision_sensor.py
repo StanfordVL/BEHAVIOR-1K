@@ -139,7 +139,10 @@ class VisionSensor(BaseSensor):
         self._viewport.set_active_camera(self._prim_path)
 
         # Set the viewer size
-        self._viewport.set_texture_resolution(self._load_config["image_height"], self._load_config["image_width"])
+        self._viewport.set_texture_resolution(self._load_config["image_width"], self._load_config["image_height"])
+        # Requires 3 updates to propagate changes
+        for i in range(3):
+            app.update()
 
         # Initialize sensors
         self._initialize_sensors(names=self._modalities)
@@ -227,7 +230,7 @@ class VisionSensor(BaseSensor):
         Returns:
             int: Image height of this sensor, in pixels
         """
-        return self._viewport.get_texture_resolution()[0]
+        return self._viewport.get_texture_resolution()[1]
 
     @image_height.setter
     def image_height(self, height):
@@ -237,8 +240,11 @@ class VisionSensor(BaseSensor):
         Args:
             height (int): Image height of this sensor, in pixels
         """
-        _, width = self._viewport.get_texture_resolution()
-        self._viewport.set_texture_resolution(height, width)
+        width, _ = self._viewport.get_texture_resolution()
+        self._viewport.set_texture_resolution(width, height)
+        # Requires 3 updates to propagate changes
+        for i in range(3):
+            app.update()
 
     @property
     def image_width(self):
@@ -246,7 +252,7 @@ class VisionSensor(BaseSensor):
         Returns:
             int: Image width of this sensor, in pixels
         """
-        return self._viewport.get_texture_resolution()[1]
+        return self._viewport.get_texture_resolution()[0]
 
     @image_width.setter
     def image_width(self, width):
@@ -256,8 +262,11 @@ class VisionSensor(BaseSensor):
         Args:
             width (int): Image width of this sensor, in pixels
         """
-        height, _ = self._viewport.get_texture_resolution()
-        self._viewport.set_texture_resolution(height, width)
+        _, height = self._viewport.get_texture_resolution()
+        self._viewport.set_texture_resolution(width, height)
+        # Requires 3 updates to propagate changes
+        for i in range(3):
+            app.update()
 
     @property
     def _obs_space_mapping(self):
