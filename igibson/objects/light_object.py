@@ -122,7 +122,7 @@ class LightObject(StatefulObject):
         base_link = stage.DefinePrim(f"{self._prim_path}/base_link", "Xform")
 
         # Define the actual light link
-        light_prim = UsdLux.__dict__[f"{self.light_type}Light"].Define(stage, f"{self._prim_path}/light").GetPrim()
+        light_prim = UsdLux.__dict__[f"{self.light_type}Light"].Define(stage, f"{self._prim_path}/base_link/light").GetPrim()
 
         return prim
 
@@ -131,11 +131,15 @@ class LightObject(StatefulObject):
         super()._post_load(simulator=simulator)
 
         # Grab reference to light link
-        self._light_link = XFormPrim(prim_path=f"{self._prim_path}/light", name=f"{self.name}:light_link")
+        self._light_link = XFormPrim(prim_path=f"{self._prim_path}/base_link/light", name=f"{self.name}:light_link")
 
         # Optionally set the intensity
         if self._load_config.get("intensity", None) is not None:
             self.intensity = self._load_config["intensity"]
+
+        # Optionally set the radius
+        if self._load_config.get("radius", None) is not None:
+            self.radius = self._load_config["radius"]
 
     def _initialize(self):
         # Run super
