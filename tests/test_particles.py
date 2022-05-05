@@ -38,18 +38,18 @@ def steps(n_steps):
         sim.step()
         system.update()
 
-# Add cabinet object
-cab = DatasetObject(
+# Add milk carton object
+milk = DatasetObject(
     prim_path=f"/World/{name}",
     usd_path=f"{ig_dataset_path}/objects/{obj_category}/{obj_model}/usd/{obj_model}.usd",
     name=name,
 )
 
 # Import this object
-sim.import_object(obj=cab)
+sim.import_object(obj=milk)
 
 # Move this object a bit upwards and disable gravity
-cab.set_position_orientation(position=np.array([1.0, 1.0, 0.5]), orientation=np.array([0.0, 0.0, 0.707, 0.707]))
+milk.set_position_orientation(position=np.array([1.0, 1.0, 0.5]), orientation=np.array([0.0, 0.0, 0.707, 0.707]))
 
 # Initialize dust system
 system = StainSystem
@@ -59,21 +59,16 @@ dust = system.particle_object
 sim.play()
 
 # Generate particles on the cabinet
-# system.generate_particles_on_object(obj=cab)
-attachment_group = system.create_attachment_group(obj=cab)
-system.generate_group_particles(group=attachment_group, n_particles=100)
-# dust_copy = system._attachment_groups[name]["dust_template_copy1"]
+attachment_group = system.create_attachment_group(obj=milk)
+system.generate_group_particles(group=attachment_group)
 
 # start the sim so everything is initialized correctly
 sim.step()
 system.update()
 
-cab.disable_gravity()
+milk.disable_gravity()
 
 dc = _dynamic_control.acquire_dynamic_control_interface()
-
-
-
 
 
 for i in range(1000000):
