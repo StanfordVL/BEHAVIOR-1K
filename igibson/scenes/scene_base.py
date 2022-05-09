@@ -318,6 +318,8 @@ class Scene(Serializable, Registerable, metaclass=ABCMeta):
     def remove_object(self, obj):
         # Remove from this registry
         self.object_registry.remove(obj)
+        # Remove from omni stage
+        obj.remove(self)
 
     # TODO: Integrate good features of this
     #

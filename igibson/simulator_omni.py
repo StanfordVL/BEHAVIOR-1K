@@ -265,6 +265,15 @@ class Simulator(SimulationContext):
         if auto_initialize:
             print("GOT HERE AUTO INITIALIZE")
             self.initialize_object_on_next_sim_step(obj=obj)
+    
+    def remove_object(self, obj):
+        """
+        Remove a non-robot object from the simulator.
+
+        Args:
+            obj (BaseObject): a non-robot object to load
+        """
+        self._scene.remove_object(obj)
 
     def _non_physics_step(self):
         """
