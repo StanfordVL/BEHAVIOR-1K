@@ -68,7 +68,7 @@ class Sliced(AbsoluteObjectState, BooleanState):
                                               orientation=np.array(part_orn))
 
         # delete original object from stage
-        self.simulator.stage.RemovePrim(self.obj.prim_path)
+        self.simulator.remove_object(self.obj)
 
         return True
 

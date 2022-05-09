@@ -131,6 +131,23 @@ class BasePrim(Serializable, UniquelyNamed, metaclass=ABCMeta):
         """
         pass
 
+    def remove(self, simulator=None):
+        """
+        Removes this prim from omniverse stage
+
+        Args:
+            simulator (None or SimulationContext): If specified, should be simulator into which this prim will be
+                removed. Otherwise, it will be removed from the default stage
+        """
+        if not self._loaded:
+            raise ValueError("Cannot remove a prim that was never loaded.")
+
+        # Remove prim
+        if simulator:
+            simulator.stage.RemovePrim(self.prim_path)
+        else:
+            get_current_stage.RemovePrim(self.prim_path)
+
     @abstractmethod
     def _load(self, simulator=None):
         pass
