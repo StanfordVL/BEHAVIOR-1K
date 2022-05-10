@@ -127,7 +127,7 @@ class Scene(Serializable, Registerable, metaclass=ABCMeta):
                 prims that we can use as unique IDs to reference prims, e.g., prim.prim_path, prim.name, prim.handle, etc.
         """
         # Only use name by default, the most general
-        return ["name"]
+        return ["name", "prim_path"]
 
     @property
     def object_registry_group_keys(self):

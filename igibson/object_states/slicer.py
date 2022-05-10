@@ -2,6 +2,7 @@ import numpy as np
 from igibson.object_states import ContactBodies, Sliced
 from igibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from igibson.object_states.object_state_base import AbsoluteObjectState, NONE
+from omni.isaac.utils._isaac_utils import math as math_utils
 
 _SLICER_LINK_NAME = "slicer"
 
@@ -21,17 +22,32 @@ class Slicer(AbsoluteObjectState, LinkBasedStateMixin):
         slicer_position = self.get_link_position()
         if slicer_position is None:
             return
-        contact_points = self.obj.states[ContactBodies].get_value()
-        for item in contact_points:
-            if item.linkIndexA != self.link_id:
+        contact_list = self.obj.states[ContactBodies].get_value()
+        # exclude links from our own object
+        link_paths = {link.prim_path for link in self.obj.links.values()}
+        to_cut = set()
+        for c in contact_list:
+            # extract the prim path of the other body
+            if c.body0 in link_paths and c.body1 in link_paths:
                 continue
-            contact_obj = self.simulator.scene.objects_by_id[item.bodyUniqueIdB]
+            path = c.body0 if c.body0 not in link_paths else c.body1
+            path = path.replace("/base_link", "")
+            contact_obj = self.simulator.scene.object_registry("prim_path", path)
+            if contact_obj is None:
+                continue
+            # calculate the normal force applied to the contact object
+            normal_force = math_utils.dot(c.impulse, c.normal) / c.dt
             if Sliced in contact_obj.states:
                 if (
                     not contact_obj.states[Sliced].get_value()
-                    and item.normalForce > contact_obj.states[Sliced].slice_force
+                    and normal_force > contact_obj.states[Sliced].slice_force
                 ):
-                    contact_obj.states[Sliced].set_value(True)
+                    # slicer may contact the same body in multiple points, so only cut once
+                    # since removing the object from the simulator
+                    to_cut.add(contact_obj)
+        for whole_obj in to_cut:
+            whole_obj.states[Sliced].set_value(True)
+                    
 
     def _set_value(self, new_value):
         raise ValueError("set_value not supported for valueless states like Slicer.")

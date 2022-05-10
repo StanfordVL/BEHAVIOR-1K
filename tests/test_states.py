@@ -956,6 +956,63 @@ def test_sliced():
     finally:
         app.close()
 
+def test_slicer():
+    try:
+        obj_category = "apple"
+        obj_model = "00_0"
+        name = "apple"
+
+        sim = Simulator()
+        scene = EmptyScene()
+        sim.import_scene(scene)
+
+        model_root_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}"
+        usd_path = f"{model_root_path}/usd/{obj_model}.usd"
+
+        # Create an dataset object of an apple, but doesn't load it in the simulator
+        whole_obj = DatasetObject(
+            prim_path=f"/World/{name}",
+            usd_path=usd_path,
+            category=obj_category,
+            name=f"{name}",
+            scale=np.array([10.0, 10.0, 10.0]),
+            abilities={"sliceable":{}},
+        )
+
+        obj_category = "table_knife"
+        obj_model = "1"
+        name = "knife"
+
+        model_root_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}"
+        usd_path = f"{model_root_path}/usd/{obj_model}.usd"
+
+        # Create an dataset object of an apple, but doesn't load it in the simulator
+        knife = DatasetObject(
+            prim_path=f"/World/{name}",
+            usd_path=usd_path,
+            category=obj_category,
+            name=f"{name}",
+            scale=np.array([15.0, 15.0, 15.0]),
+            abilities={"slicer":{}},
+        )
+
+        sim.import_object(whole_obj, auto_initialize=True)
+        whole_obj.set_position_orientation(position=np.array([0, 0, 0]))
+
+        sim.import_object(knife, auto_initialize=True)
+        knife.set_position_orientation(position=np.array([0, 1, 0]))
+
+        # needs 1 physics step to activate collision meshes for raycasting
+        sim.step(force_playing=True)
+        
+        assert not whole_obj.states[object_states.Sliced].get_value()
+        
+        for i in range(1000000):
+            sim.step()
+
+    finally:
+        app.close()
+
 ## WORKS
 #test_state_graph()
 #test_dirty()
@@ -970,8 +1027,9 @@ def test_sliced():
 #test_touching()
 #test_open()
 #test_toggle()
+#test_sliced()
 
-test_sliced()
+test_slicer()
 
 # test_demo()
 
