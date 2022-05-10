@@ -473,8 +473,10 @@ class Scene(Serializable, Registerable, metaclass=ABCMeta):
 
     def _deserialize(self, state):
         # Default state for the scene is from the registry alone
-        end_idx = self._registry.state_size
-        return self._registry.deserialize(state=state[:end_idx]), end_idx
+        # We split this into two explicit steps, because the actual registry state size might dynamically change
+        # as we're deserializing
+        state_dict = self._registry.deserialize(state=state)
+        return state_dict, self._registry.state_size
 
     @classproperty
     def _do_not_register_classes(cls):

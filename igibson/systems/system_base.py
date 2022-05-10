@@ -16,7 +16,7 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
         global SYSTEMS_REGISTRY
         # Register this system if requested
         if cls._register_system:
-            print(f"class name: {cls.name}")
+            print(f"registering system: {cls.name}")
             SYSTEMS_REGISTRY.add(obj=cls)
 
     # Simulator reference

@@ -197,7 +197,7 @@ class Registry(UniquelyNamed):
         Returns:
             OrderedDict: Mapping from identifiers to object(s) based on @key
         """
-        return self.__getattribute__(f"_objects_by_{key}")
+        return getattr(self, f"_objects_by_{key}")
 
     def get_ids(self, key):
         """
@@ -223,13 +223,15 @@ class Registry(UniquelyNamed):
         Return:
             any: Attribute @k of @obj
         """
-        # Make sure the attribute exists, otherwise we return the default value
-        if attr not in dir(obj):
+        # We try to grab the object's attribute, and if it fails we fallback to the default value
+        try:
+            val = getattr(obj, attr)
+
+        except:
             print(f"dir: {dir(obj)}")
-            return self.default_value
-        else:
-            # Check if the object is a class or an instance of a class, and use the correct logic to grab the attribute
-            return obj.__getattribute__(obj, attr) if isclass(obj) else obj.__getattribute__(attr)
+            val = self.default_value
+
+        return val
 
     @property
     def objects(self):
@@ -313,7 +315,8 @@ class SerializableRegistry(Registry, Serializable):
 
     def _serialize(self, state):
         # Iterate over the entire dict and flatten
-        return np.concatenate([obj.serialize(state[obj.name]) for obj in self.objects])
+        return np.concatenate([obj.serialize(state[obj.name]) for obj in self.objects]) if \
+            len(self.objects) > 0 else np.array([])
 
     def _deserialize(self, state):
         state_dict = OrderedDict()
@@ -321,8 +324,10 @@ class SerializableRegistry(Registry, Serializable):
         # along the way
         idx = 0
         for obj in self.objects:
-            print(f"obj: {obj.name}, state size: {obj.state_size}")
-            state_dict[obj.name] = obj.deserialize(state[idx:idx+obj.state_size])
+            print(f"obj: {obj.name}, state size: {obj.state_size}, passing in state length: {len(state[idx:])}")
+            # We pass in the entire remaining state vector, assuming the object only parses the relevant states
+            # at the beginning
+            state_dict[obj.name] = obj.deserialize(state[idx:])
             idx += obj.state_size
         return state_dict, idx
 
