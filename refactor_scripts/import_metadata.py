@@ -2,7 +2,7 @@ from igibson import app, ig_dataset_path
 import igibson.utils.transform_utils as T
 import pxr.Vt
 from pxr import Usd
-from pxr import Gf, UsdShade
+from pxr import Gf, UsdShade, UsdLux
 from pxr.Sdf import ValueTypeNames as VT
 import numpy as np
 import xml.etree.ElementTree as ET
@@ -16,10 +16,18 @@ import shutil
 import omni
 from copy import deepcopy
 from omni.isaac.core.utils.stage import open_stage, get_current_stage, close_stage
+from omni.isaac.core.prims.xform_prim import XFormPrim
 
 ##### SET THIS ######
 URDF = f"{ig_dataset_path}/scenes/Rs_int/urdf/Rs_int_best.urdf"
 #### YOU DONT NEED TO TOUCH ANYTHING BELOW HERE IDEALLY :) #####
+
+
+LIGHT_MAPPING = {
+    0: "Rect",
+    2: "Sphere",
+    4: "Disk",
+}
 
 
 def set_mtl_albedo(mtl_prim, texture):
@@ -250,7 +258,7 @@ def import_obj_metadata(obj_category, obj_model, name, import_render_channels=Fa
             with open(data_path, "r") as f:
                 data[data_group] = json.load(f)
 
-    # Pop bb and base link offset info
+    # Pop bb and base link offset and meta links info
     base_link_offset = data["metadata"].pop("base_link_offset")
     default_bb = data["metadata"].pop("bbox_size")
 
@@ -264,6 +272,34 @@ def import_obj_metadata(obj_category, obj_model, name, import_render_channels=Fa
     # Manually modify metadata
     if "openable_joint_ids" in data["metadata"]:
         data["metadata"]["openable_joint_ids"] = {str(pair[0]): pair[1] for pair in data["metadata"]["openable_joint_ids"]}
+
+    # Grab light info if any
+    lights = data["metadata"].get("meta_links", dict()).get("lights", None)
+    if lights is not None:
+        for link_name, light_infos in lights.items():
+            for i, light_info in enumerate(light_infos):
+                # Create the light in the scene
+                light_type = LIGHT_MAPPING[light_info["type"]]
+                light_prim_path = f"/{obj_model}/{link_name}/light{i}"
+                light_prim = UsdLux.__dict__[f"{light_type}Light"].Define(stage, light_prim_path).GetPrim()
+                # Make sure light_prim has XForm properties
+                light = XFormPrim(prim_path=light_prim_path)
+                # Set the values accordingly
+                light.set_local_pose(
+                    translation=np.array(light_info["position"]),
+                    orientation=T.convert_quat(np.array(light_info["orientation"]), to="wxyz")
+                )
+                light.prim.GetAttribute("color").Set(Gf.Vec3f(*np.array(light_info["color"]) / 255.0))
+                light.prim.GetAttribute("intensity").Set(light_info["intensity"])
+                if light_type == "Rect":
+                    light.prim.GetAttribute("height").Set(light_info["length"])
+                    light.prim.GetAttribute("width").Set(light_info["width"])
+                elif light_type == "Disk":
+                    light.prim.GetAttribute("radius").Set(light_info["length"])
+                elif light_type == "Sphere":
+                    light.prim.GetAttribute("radius").Set(light_info["length"])
+                else:
+                    raise ValueError(f"Invalid light type: {light_type}")
 
     # Iterate over dict and replace any lists of dicts as dicts of dicts (with each dict being indexed by an integer)
     data = recursively_replace_list_of_dict(data)
@@ -321,7 +357,10 @@ def recursively_replace_list_of_dict(dic):
             # Replace None
             dic[k] = Tokens.none
         elif isinstance(v, list) or isinstance(v, tuple):
-            if isinstance(v[0], dict):
+            if len(v) == 0:
+                # Empty array
+                dic[k] = pxr.Vt.FloatArray()
+            elif isinstance(v[0], dict):
                 # Replace with dict in place
                 v = {str(i): vv for i, vv in enumerate(v)}
                 dic[k] = v
