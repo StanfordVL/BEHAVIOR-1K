@@ -2,7 +2,7 @@ from igibson.settings import settings
 from igibson.object_states import AABB
 from igibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
 from igibson.utils.constants import SemanticClass
-from igibson.systems.particle_system import DustSystem, StainSystem
+from igibson.systems.macro_particle_system import DustSystem, StainSystem
 import numpy as np
 
 s = settings.object_states.dirty

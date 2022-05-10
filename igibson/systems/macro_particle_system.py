@@ -1,7 +1,7 @@
 import os
 from igibson import assets_path
 from igibson.utils.usd_utils import create_joint
-from igibson.systems.system_base import BaseSystem
+from igibson.systems.particle_system_base import BaseParticleSystem
 from igibson.utils.constants import SemanticClass
 from igibson.utils.python_utils import classproperty
 from igibson.utils.sampling_utils import sample_cuboid_on_object
@@ -11,9 +11,9 @@ from pxr import Gf
 import logging
 
 
-class ParticleSystem(BaseSystem):
+class MacroParticleSystem(BaseParticleSystem):
     """
-    Global system for modeling particles, e.g.: dirt, dust, etc.
+    Global system for modeling "macro" level particles, e.g.: dirt, dust, etc.
     """
     # Template object to use -- this should be some instance of BasePrim. This will be the
     # object that symbolizes a single particle, and will be duplicated to generate the particle system.
@@ -46,8 +46,8 @@ class ParticleSystem(BaseSystem):
     def _dump_state(cls):
         return OrderedDict(
             n_particles=cls.n_particles,
-            poses=(particle.get_position_orientation() for particle in cls.particles),
-            scales=(particle.scale for particle in cls.particles),
+            poses=[particle.get_position_orientation() for particle in cls.particles.values()],
+            scales=[particle.scale for particle in cls.particles.values()],
             template_pose=cls.particle_object.get_position_orientation() if cls.particle_object is not None else None,
             template_scale=cls.particle_object.scale if cls.particle_object is not None else None,
         )
@@ -114,8 +114,8 @@ class ParticleSystem(BaseSystem):
         idx = 1 + n_particles * 10
 
         template_pose, template_scale = None, None
-        # If we still have more in the array, this corresponds to the template info
-        if len(state) > idx:
+        # If our state size is larger than the current index we're at, this corresponds to the template info
+        if cls.state_size > idx:
             template_pose = [
                 state[idx : idx + 3],
                 state[idx + 3 : idx + 7],
@@ -210,7 +210,7 @@ class ParticleSystem(BaseSystem):
         # cls.simulator.stage.RemovePrim(particle.prim_path)
 
 
-class AttachedParticleSystem(ParticleSystem):
+class VisualParticleSystem(MacroParticleSystem):
     """
     Particle system class that additionally includes sampling utilities for placing particles on specific objects
     """
@@ -475,7 +475,7 @@ class AttachedParticleSystem(ParticleSystem):
             raise ValueError(f"Particle attachment group {group} does not exist!")
 
 
-class DustSystem(AttachedParticleSystem):
+class DustSystem(VisualParticleSystem):
     """
     Particle system class to symbolize dust attached to objects
     """
@@ -489,7 +489,7 @@ class DustSystem(AttachedParticleSystem):
         # Run super first
         super().initialize(simulator=simulator)
 
-        # Particle object will be overridden to by default be a small cuboid
+        # Particle object will be overridden by default to be a small cuboid
         # We import now at runtime so prevent circular imports
         from igibson.objects.primitive_object import PrimitiveObject
         cls.particle_object = PrimitiveObject(
@@ -507,7 +507,7 @@ class DustSystem(AttachedParticleSystem):
         cls.particle_object.load(simulator=simulator)
 
 
-class StainSystem(AttachedParticleSystem):
+class StainSystem(VisualParticleSystem):
     """
     Particle system class to symbolize stains attached to objects
     """

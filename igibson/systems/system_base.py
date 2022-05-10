@@ -22,12 +22,6 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
     # Simulator reference
     simulator = None
 
-    def __getattribute__(self, item):
-        # We have to manually override this method so that these class properties decorated with @classproperty
-        # are evaluated correctly
-        attr = super().__getattribute__(self, item)
-        return attr.__get__(self, self) if type(attr) == classproperty else attr
-
     @classproperty
     def name(cls):
         # Class name is the unique name assigned

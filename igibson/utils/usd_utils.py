@@ -1,5 +1,6 @@
 import math
 import numpy as np
+from collections import Iterable
 
 import omni.usd
 from omni.isaac.core.utils.prims import get_prim_at_path, get_prim_path, is_prim_path_valid, get_prim_children
@@ -7,9 +8,53 @@ from omni.isaac.core.utils.carb import set_carb_setting
 from omni.isaac.core.utils.stage import get_current_stage, get_stage_units, traverse_stage
 from omni.isaac.core.utils.bounds import compute_aabb, create_bbox_cache
 from omni.syntheticdata import helpers
-from pxr import Gf, Usd, Sdf, UsdGeom, UsdShade, UsdPhysics, PhysxSchema
+from pxr import Gf, Vt, Usd, Sdf, UsdGeom, UsdShade, UsdPhysics, PhysxSchema
 
 from igibson.utils.constants import JointType
+from igibson.utils.python_utils import assert_valid_key
+
+GF_TO_VT_MAPPING = {
+    Gf.Vec3d: Vt.Vec3dArray,
+    Gf.Vec3f: Vt.Vec3fArray,
+    Gf.Vec3h: Vt.Vec3hArray,
+    Gf.Quatd: Vt.QuatdArray,
+    Gf.Quatf: Vt.QuatfArray,
+    Gf.Quath: Vt.QuathArray,
+    int: Vt.IntArray,
+    float: Vt.FloatArray,
+    bool: Vt.BoolArray,
+    str: Vt.StringArray,
+    chr: Vt.CharArray,
+}
+
+
+def array_to_vtarray(arr, element_type):
+    """
+    Converts array @arr into a Vt-typed array, where each individual element of type @element_type.
+
+    Args:
+        arr (n-array): An array of values. Can be, e.g., a list, or numpy array
+        element_type (type): Per-element type to convert the elements from @arr into.
+            Valid options are keys of GF_TO_VT_MAPPING
+
+    Returns:
+        Vt.Array: Vt-typed array, of specified type corresponding to @element_type
+    """
+    # Make sure array type is valid
+    assert_valid_key(key=element_type, valid_keys=GF_TO_VT_MAPPING, name="array element type")
+
+    # Construct list of values
+    arr_list = []
+
+    # Check first to see if elements are vectors or not. If this is an iterable value that is not a string,
+    # then this is a vector and we have to map it to the correct type via *
+    is_vec_element = (isinstance(arr[0], Iterable)) and (not isinstance(arr[0], str))
+
+    # Loop over array and set values
+    for ele in arr:
+        arr_list.append(element_type(*ele) if is_vec_element else ele)
+
+    return GF_TO_VT_MAPPING[element_type](arr_list)
 
 
 def get_prim_nested_children(prim):
