@@ -219,7 +219,7 @@ class RigidPrim(XFormPrim):
             np.ndarray: current linear velocity of the the rigid prim. Shape (3,).
         """
         if self._handle is not None and self._dc.is_simulating():
-            lin_vel = self._dc.get_rigid_body_linear_velocity(self._handle)
+            lin_vel = np.array(self._dc.get_rigid_body_linear_velocity(self._handle))
         else:
             lin_vel = self._rigid_api.GetVelocityAttr().Get()
         return np.array(lin_vel)
@@ -230,7 +230,6 @@ class RigidPrim(XFormPrim):
         Args:
             velocity (np.ndarray): angular velocity to set the rigid prim to. Shape (3,).
         """
-        print(f"ang vel: {velocity}")
         if self._handle is not None and self._dc.is_simulating():
             self._dc.set_rigid_body_angular_velocity(self._handle, velocity)
         else:
@@ -243,7 +242,7 @@ class RigidPrim(XFormPrim):
             np.ndarray: current angular velocity of the the rigid prim. Shape (3,).
         """
         if self._handle is not None and self._dc.is_simulating():
-            return self._dc.get_rigid_body_angular_velocity(self._handle)
+            return np.array(self._dc.get_rigid_body_angular_velocity(self._handle))
         else:
             return np.array(self._rigid_api.GetAngularVelocityAttr().Get())
 
@@ -286,7 +285,7 @@ class RigidPrim(XFormPrim):
             # Call super method by default
             pos, ori = super().get_position_orientation()
 
-        return pos, ori
+        return np.array(pos), np.array(ori)
 
     def set_local_pose(self, translation=None, orientation=None):
         """
@@ -347,7 +346,7 @@ class RigidPrim(XFormPrim):
             # Call super method by default
             pos, ori = super().get_local_pose()
 
-        return pos, ori
+        return np.array(pos), np.array(ori)
 
     @property
     def handle(self):
