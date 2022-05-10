@@ -1205,7 +1205,7 @@ class InteractiveTraversableScene(TraversableScene):
     @property
     def object_registry_unique_keys(self):
         # Grab from super and add handle for objects
-        return super().object_registry_unique_keys + ["handle"]
+        return super().object_registry_unique_keys
 
     @property
     def object_registry_group_keys(self):
