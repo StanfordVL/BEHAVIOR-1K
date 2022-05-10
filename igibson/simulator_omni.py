@@ -121,6 +121,7 @@ class Simulator(SimulationContext):
 
         # Initialize viewer
         self._set_physics_engine_settings()
+        # TODO: Make this toggleable so we don't always have a viewer if we don't want to
         self._set_viewer_settings()
 
         # List of objects that need to be initialized during whenever the next sim step occurs
@@ -134,8 +135,14 @@ class Simulator(SimulationContext):
         # self.assist_grasp_category_allow_list = self.gen_assisted_grasping_categories()
         # self.assist_grasp_mass_thresh = 10.0
 
+        # Toggle simulator state once so that downstream omni features can be used without bugs
+        # e.g.: particle sampling, which for some reason requires sim.play() to be called at least once
+        self.play()
+        self.stop()
+
     def __new__(
         cls,
+        gravity=9.81,
         physics_dt: float = 1.0 / 60.0,
         rendering_dt: float = 1.0 / 60.0,
         stage_units_in_meters: float = 0.01,
@@ -269,8 +276,8 @@ class Simulator(SimulationContext):
         """
         Complete any non-physics steps such as state updates.
         """
-        # Check to see if any objects should be initialized
-        if len(self._objects_to_initialize) > 0:
+        # Check to see if any objects should be initialized (only done IF we're playing)
+        if len(self._objects_to_initialize) > 0 and self.is_playing():
             for obj in self._objects_to_initialize:
                 obj.initialize()
             self._objects_to_initialize = []
