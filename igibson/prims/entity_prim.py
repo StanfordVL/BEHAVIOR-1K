@@ -234,6 +234,18 @@ class EntityPrim(XFormPrim):
         return self._handle
 
     @property
+    def root_handle(self):
+        """
+        Handle used by Isaac Sim's dynamic control module to reference the root body in this object.
+        Note: while self.handle may be 0 (i.e.: invalid articulation, i.e.: object with no joints), root_handle should
+            always be non-zero (i.e.: valid) if this object is initialized!
+
+        Returns:
+            int: [description]
+        """
+        return self._root_handle
+
+    @property
     def n_dof(self):
         """[summary]
 

@@ -899,7 +899,7 @@ class InteractiveTraversableScene(TraversableScene):
             obj.keep_still()
 
         # Re-initialize our scene object registry by handle since now handles are populated
-        self.object_registry.update(keys="handle")
+        self.object_registry.update(keys="root_handle")
 
         # # TODO: Additional restoring from USD state? Is this even necessary?
         # if self.pybullet_filename is not None:

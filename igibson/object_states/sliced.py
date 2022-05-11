@@ -30,11 +30,6 @@ class Sliced(AbsoluteObjectState, BooleanState):
 
         # Object parts offset annotation are w.r.t the base link of the whole object
         pos, orn = self.obj.get_position_orientation()
-        body_ids = self.obj.get_body_ids()
-        # assert len(body_ids) == 1, "Sliceable is expected to be single-body."
-        inertial_pos, inertial_orn = self.obj.get_local_pose()
-        # takes care of inversion of inertial pos/orn
-        pos, orn = T.relative_pose_transform(pos, orn, inertial_pos, inertial_orn)
 
         # load object parts
         for _, part_idx in enumerate(self.obj.metadata["object_parts"]):
@@ -48,6 +43,10 @@ class Sliced(AbsoluteObjectState, BooleanState):
             part_obj_name = f"{self.obj.name}_part_{part_idx}"
             model_root_path = f"{ig_dataset_path}/objects/{part_category}/{part_model}"
             usd_path = f"{model_root_path}/usd/{part_model}.usd"
+
+            # calculate global part pose
+            part_pos = np.array(part_pos) + pos
+            part_orn = T.quat_multiply(np.array(part_orn), orn)
 
             # circular import
             from igibson.objects.dataset_object import DatasetObject

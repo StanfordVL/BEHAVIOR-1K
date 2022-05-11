@@ -302,7 +302,9 @@ class Simulator(SimulationContext):
         # Step the object states in global topological order.
         for state_type in self.object_state_types:
             for obj in self.scene.get_objects_with_state(state_type):
-                obj.states[state_type].update()
+                # Only update objects that have been initialized so far
+                if obj.initialized:
+                    obj.states[state_type].update()
 
         # TODO
         # # Step the object procedural materials based on the updated object states.
@@ -332,6 +334,9 @@ class Simulator(SimulationContext):
             for obj in self._objects_to_initialize:
                 obj.initialize()
             self._objects_to_initialize = []
+            # Also update the scene registry
+            # TODO: A better place to put this perhaps?
+            self._scene.object_registry.update(keys="root_handle")
 
     def step(self, render=True, force_playing=False):
         """
