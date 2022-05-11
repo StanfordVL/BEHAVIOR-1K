@@ -9,7 +9,7 @@ from igibson.controllers.controller_base import (
     GripperController,
 )
 from igibson.controllers.dd_controller import DifferentialDriveController
-from igibson.controllers.ik_controller import InverseKinematicsController
+# from igibson.controllers.ik_controller import InverseKinematicsController
 from igibson.controllers.joint_controller import JointController
 from igibson.controllers.multi_finger_gripper_controller import MultiFingerGripperController
 from igibson.controllers.null_gripper_controller import NullGripperController
