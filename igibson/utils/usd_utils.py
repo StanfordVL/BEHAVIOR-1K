@@ -264,7 +264,7 @@ class BoundingBoxAPI:
         Clears the internal state of this BoundingBoxAPI
         """
         cls.CACHE = None
-    
+
     @classmethod
     def union(cls, prim_paths):
         """
