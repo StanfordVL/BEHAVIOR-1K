@@ -6,6 +6,7 @@ import numpy as np
 from igibson.scenes.scene_base import Scene
 from igibson.utils.constants import SemanticClass
 from igibson.utils.utils import l2_distance
+from igibson.utils.python_utils import save_init_info
 
 
 class EmptyScene(Scene):
@@ -13,6 +14,7 @@ class EmptyScene(Scene):
     An empty scene for debugging.
     """
 
+    @save_init_info
     def __init__(
             self,
             floor_plane_visible=False,

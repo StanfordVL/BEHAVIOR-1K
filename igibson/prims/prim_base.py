@@ -51,6 +51,7 @@ class BasePrim(Serializable, UniquelyNamed, metaclass=ABCMeta):
         prim_path,
         name,
         load_config=None,
+        **kwargs,
     ):
         self._prim_path = prim_path
         self._name = name
@@ -70,9 +71,13 @@ class BasePrim(Serializable, UniquelyNamed, metaclass=ABCMeta):
             print(f"prim {name} already exists")
             self._prim = get_prim_at_path(prim_path=self._prim_path)
             self._loaded = True
-            # Run post load
+            # Run post load.
+            # skip_init_post_load is a hacky way to prevent subclass (e.g. controllable_object)
+            # from running into errors because simulator is not defined. Need to run _post_load
+            # with the simulator object explictly.
             # TODO: This requires simulator! change?
-            self._post_load()
+            if not "skip_init_post_load" in kwargs or not kwargs["skip_init_post_load"]:
+                self._post_load()
 
         # Run super init
         super().__init__()

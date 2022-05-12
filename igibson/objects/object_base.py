@@ -106,6 +106,7 @@ class BaseObject(EntityPrim, metaclass=ABCMeta):
             prim_path=prim_path,
             name=name,
             load_config=load_config,
+            **kwargs,
         )
 
     def load(self, simulator=None):

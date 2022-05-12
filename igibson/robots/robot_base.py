@@ -15,7 +15,7 @@ from igibson.sensors import create_sensor, SENSOR_PRIMS_TO_SENSOR_CLS, ALL_SENSO
 from igibson.objects.usd_object import USDObject
 from igibson.objects.controllable_object import ControllableObject
 from igibson.utils.gym_utils import GymObservable
-from igibson.utils.python_utils import classproperty, assert_valid_key, merge_nested_dicts, Registerable
+from igibson.utils.python_utils import classproperty, save_init_info, Registerable
 from igibson.utils.utils import rotate_vector_3d
 
 from pxr import UsdPhysics
@@ -34,7 +34,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable, Registerable):
     This class handles object loading, and provides method interfaces that should be
     implemented by subclassed robots.
     """
-
+    @save_init_info
     def __init__(
         self,
         # Shared kwargs in hierarchy

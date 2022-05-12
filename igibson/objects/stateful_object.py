@@ -60,6 +60,21 @@ class StatefulObject(BaseObject):
         # Values that will be filled later
         self._states = None
 
+        # Load abilities from taxonomy if needed & possible
+        if abilities is None:
+            if OBJECT_TAXONOMY is not None:
+                taxonomy_class = OBJECT_TAXONOMY.get_class_name_from_igibson_category(self.category)
+                if taxonomy_class is not None:
+                    abilities = OBJECT_TAXONOMY.get_abilities(taxonomy_class)
+                else:
+                    abilities = {}
+            else:
+                abilities = {}
+        assert isinstance(abilities, dict), "Object abilities must be in dictionary form."
+
+        self._abilities = abilities
+        self.prepare_object_states(abilities=abilities)
+
         # Run super init
         super().__init__(
             prim_path=prim_path,
@@ -75,21 +90,6 @@ class StatefulObject(BaseObject):
             load_config=load_config,
             **kwargs,
         )
-
-        # Load abilities from taxonomy if needed & possible
-        if abilities is None:
-            if OBJECT_TAXONOMY is not None:
-                taxonomy_class = OBJECT_TAXONOMY.get_class_name_from_igibson_category(self.category)
-                if taxonomy_class is not None:
-                    abilities = OBJECT_TAXONOMY.get_abilities(taxonomy_class)
-                else:
-                    abilities = {}
-            else:
-                abilities = {}
-        assert isinstance(abilities, dict), "Object abilities must be in dictionary form."
-
-        self._abilities = abilities
-        self.prepare_object_states(abilities=abilities)
 
     def _post_load(self, simulator=None):
         # Run super method first
@@ -213,6 +213,8 @@ class StatefulObject(BaseObject):
         return state_dic, idx
 
     def clear_cached_states(self):
+        if not self._states:
+            return
         for _, obj_state in self._states.items():
             if isinstance(obj_state, CachingEnabledObjectState):
                 obj_state.clear_cached_value()

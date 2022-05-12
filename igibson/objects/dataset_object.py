@@ -34,6 +34,7 @@ from igibson.utils.urdf_utils import add_fixed_link, get_base_link_name, round_u
 from igibson.utils.utils import mat_to_quat_pos, rotate_vector_3d
 from igibson.utils.constants import AVERAGE_OBJ_DENSITY, AVERAGE_CATEGORY_SPECS, SPECIAL_JOINT_FRICTIONS, DEFAULT_JOINT_FRICTION, JointType
 from igibson.utils.usd_utils import BoundingBoxAPI
+from igibson.utils.python_utils import save_init_info
 
 from omni.isaac.core.utils.stage import add_reference_to_stage
 from omni.isaac.core.utils.prims import get_prim_at_path
@@ -49,6 +50,7 @@ class DatasetObject(USDObject):
     object's category, e.g., avg dims, bounding boxes, masses, etc.
     """
 
+    @save_init_info
     def __init__(
         self,
         prim_path,
@@ -66,6 +68,8 @@ class DatasetObject(USDObject):
         abilities=None,
 
         bounding_box=None,
+        initial_bbox_center_pos=None,
+        initial_bbox_center_ori=None,
         fit_avg_dim_volume=False,
         in_rooms=None,
         texture_randomization=False,
@@ -154,6 +158,9 @@ class DatasetObject(USDObject):
         # Make sure only one of bounding_box and scale are specified
         if bounding_box is not None and scale is not None:
             raise Exception("You cannot define both scale and bounding box size for an DatasetObject")
+
+        self.initial_bbox_center_pos = initial_bbox_center_pos
+        self.initial_bbox_center_ori = initial_bbox_center_ori
 
         # Add info to load config
         load_config = dict() if load_config is None else load_config

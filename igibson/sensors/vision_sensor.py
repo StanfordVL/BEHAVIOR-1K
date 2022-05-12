@@ -5,12 +5,6 @@ import math
 import numpy as np
 import time
 
-import carb
-from pxr import Gf, Usd, UsdGeom
-import omni.usd
-from omni.isaac.core.utils.stage import get_current_stage
-from omni.kit.viewport import get_viewport_interface
-
 from igibson import app
 from igibson.sensors.sensor_base import BaseSensor
 from igibson.utils.constants import MAX_CLASS_COUNT, MAX_INSTANCE_COUNT
@@ -18,6 +12,11 @@ from igibson.utils.python_utils import assert_valid_key, classproperty
 from igibson.utils.usd_utils import get_camera_params, get_semantic_objects_pose
 from igibson.utils.vision_utils import get_rgb_filled
 from igibson.utils.transform_utils import euler2quat, quat2euler
+
+import carb
+from omni.isaac.core.utils.stage import get_current_stage
+from omni.kit.viewport import get_viewport_interface
+from pxr import Gf, UsdGeom
 
 # Make sure synthetic data extension is enabled
 ext_manager = app.app.get_extension_manager()
@@ -123,7 +122,7 @@ class VisionSensor(BaseSensor):
         # Define a new camera prim at the current stage
         stage = get_current_stage()
         prim = UsdGeom.Camera.Define(stage, self._prim_path).GetPrim()
-
+        print("HEY LOAD!")
         return prim
 
     def _post_load(self, simulator=None):
@@ -140,12 +139,14 @@ class VisionSensor(BaseSensor):
 
         # Set the viewer size
         self._viewport.set_texture_resolution(self._load_config["image_width"], self._load_config["image_height"])
+        self._viewport.set_window_size(self._load_config["image_height"], self._load_config["image_width"])
         # Requires 3 updates to propagate changes
         for i in range(3):
             app.update()
 
         # Initialize sensors
         self._initialize_sensors(names=self._modalities)
+        print("HEY POST LOAD!")
 
     def _initialize_sensors(self, names, timeout=10.0):
         """Initializes a raw sensor in the simulation.
@@ -155,6 +156,7 @@ class VisionSensor(BaseSensor):
                 If they are not part of self._RAW_SENSOR_TYPES' keys, we will simply pass over them
             timeout (int): Maximum time in seconds to attempt to initialize sensors.
         """
+        print("HEY _initialize_sensors!")
         # Standardize the input and grab the intersection with all possible raw sensors
         names = set([names]) if isinstance(names, str) else set(names)
         names = names.intersection(set(self._RAW_SENSOR_TYPES.keys()))
@@ -206,7 +208,7 @@ class VisionSensor(BaseSensor):
         # We have to overwrite this because camera prims can't set their quat for some reason ):
         xform_translate_op = self.get_attribute("xformOp:translate")
         xform_orient_op = self.get_attribute("xformOp:rotateXYZ")
-        return np.array(xform_translate_op.Get()), euler2quat(np.array(xform_orient_op.Get()))
+        return np.array(xform_translate_op), euler2quat(np.array(xform_orient_op))
 
     def set_local_pose(self, translation=None, orientation=None):
         # We have to overwrite this because camera prims can't set their quat for some reason ):
@@ -223,6 +225,44 @@ class VisionSensor(BaseSensor):
             # Convert to euler and set
             rot_euler = quat2euler(quat=orientation)
             xform_op.Set(Gf.Vec3f(*rot_euler.tolist()))
+
+    def set_window_position(self, x, y):
+        """Set the position of the viewport window.
+
+        :param x: x position of the viewport window
+        :param y: y position of the viewport window
+        """
+        self._viewport.set_window_pos(x ,y)
+
+    def set_window_size(self, width, height):
+        """Set the size of the viewport window.
+        
+        :param width: width of the viewport window
+        :param height: height of the viewport window
+        """
+        self._viewport.set_window_size(width, height)
+
+    def set_camera_position(self, x, y, z, rotate=True):
+        """Set the position of the active camera.
+
+        :param x: x coordinate of the camera
+        :param y: y coordinate of the camera
+        :param z: z coordinate of the camera
+        :param rotate: set rotate=True to move the camera, but rotate to keep its focus;
+            set rotate=False to move the camera and look at a new point
+        """
+        self._viewport.set_camera_position(self._prim_path, x, y, z, rotate)
+
+    def set_camera_target(self, x, y, z, rotate=True):
+        """Set the target of the active camera.
+
+        :param x: x coordinate of the camera
+        :param y: y coordinate of the camera
+        :param z: z coordinate of the camera
+        :param rotate: rotate=True to rotate the camera to look at the target;
+            set rotate=False to move the camera to look at the target
+        """
+        self._viewport.set_camera_target(self._prim_path, x, y, z, rotate)
 
     @property
     def image_height(self):

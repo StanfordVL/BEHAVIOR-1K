@@ -48,6 +48,7 @@ class EntityPrim(XFormPrim):
         prim_path,
         name,
         load_config=None,
+        **kwargs,
     ):
         # Other values that will be filled in at runtime
         self._dc = None                         # Dynamics control interface
@@ -66,6 +67,7 @@ class EntityPrim(XFormPrim):
             prim_path=prim_path,
             name=name,
             load_config=load_config,
+            **kwargs,
         )
 
     def _initialize(self):

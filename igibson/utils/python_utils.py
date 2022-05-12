@@ -2,11 +2,12 @@
 A set of utility functions for general python usage
 """
 from abc import ABCMeta
-import inspect
 from copy import deepcopy
-import numpy as np
 from collections import OrderedDict, Iterable
-
+from importlib import import_module
+import inspect
+import logging
+import numpy as np
 
 # Global dictionary storing all unique names
 NAMES = set()
@@ -20,6 +21,71 @@ class classproperty:
 
     def __get__(self, owner_self, owner_cls):
         return self.fget(owner_cls)
+
+
+def save_init_info(func):
+    """
+    Decorator to save the init info of an object to object._init_info.
+
+    _init_info contains class name and class constructor's input args.
+    """
+    def return_func(*args, **kwargs):
+        # Get __init__ arguments.
+        arg_spec = inspect.getargspec(func)
+        arg_names = arg_spec[0][1:]
+        defaults = arg_spec[3]
+
+        # Initialize class's self._init_info.
+        self_var = args[0]
+        self_var._init_info = {}
+        self_var._init_info["class_name"] = self_var.__class__.__name__
+        self_var._init_info["args"] = {}
+
+        # Set default parameters.
+        if defaults is not None:
+            default_arg_dict = dict(zip(reversed(arg_names), reversed(defaults)))
+            self_var._init_info["args"].update(default_arg_dict)
+
+        # Set args.
+        arg_dict = dict(zip(arg_names, args[1:]))
+        self_var._init_info["args"].update(arg_dict)
+
+        # Set kwargs.
+        valid_keywords = set(kwargs) & set(arg_names)
+        kwarg_dict = {k: kwargs[k] for k in valid_keywords}
+        self_var._init_info["args"].update(kwarg_dict)
+    
+        func(*args, **kwargs)
+
+    return return_func
+
+
+def create_object_from_init_info(init_info):
+    """
+    Create a new object based on an given init info.
+
+    Args:
+        init_info (dict): Nested dictionary that contains an object's init information.
+    Returns:
+        any: Newly created object.
+    """
+    # Key is a class name and value is the module path defining the class.
+    # This list is exhaustive - all classes can be recreated need to be defined here.
+    module_map = {
+        "InteractiveTraversableScene": "igibson.scenes.interactive_traversable_scene",
+        "DatasetObject": "igibson.objects.dataset_object",
+        "Turtlebot": "igibson.robots.turtlebot",
+    }
+
+    class_name = init_info["class_name"]
+    if class_name not in module_map:
+        logging.error(f"Recreating {class_name} from init_info is not supported.")
+        return
+
+    module_path = module_map[class_name]
+    module = import_module(module_path)
+    cls = getattr(module, class_name)
+    return cls(**init_info["args"], **init_info.get("kwargs", {}))
 
 
 def merge_nested_dicts(base_dict, extra_dict, inplace=False, verbose=False):
