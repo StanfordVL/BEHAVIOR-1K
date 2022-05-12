@@ -1,0 +1,1 @@
+from igibson.renderer_settings.renderer_settings import RendererSettings
