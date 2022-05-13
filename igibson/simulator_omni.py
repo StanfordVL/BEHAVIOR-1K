@@ -6,6 +6,8 @@
 # distribution of this software and related documentation without an express
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 #
+import collections
+import itertools
 import logging
 
 import omni
@@ -25,13 +27,12 @@ from omni.isaac.core.loggers import DataLogger
 from typing import Optional, List
 
 from igibson import assets_path
-from igibson.utils.python_utils import clear as clear_pu
-from igibson.utils.usd_utils import clear as clear_uu
-from igibson.scenes import Scene
+from igibson.transition_machine import DEFAULT_RULES
 from igibson.objects.object_base import BaseObject
 from igibson.object_states.factory import get_states_by_dependency_order
-
-import numpy as np
+from igibson.scenes import Scene
+from igibson.utils.python_utils import clear as clear_pu
+from igibson.utils.usd_utils import clear as clear_uu
 
 
 class Simulator(SimulationContext):
@@ -135,6 +136,11 @@ class Simulator(SimulationContext):
         # TODO: Once objects are in place, uncomment and test this
         # self.assist_grasp_category_allow_list = self.gen_assisted_grasping_categories()
         # self.assist_grasp_mass_thresh = 10.0
+
+        # Set of all non-Omniverse transition rules to apply.
+        self._transition_rules = DEFAULT_RULES
+        self._all_transition_categories = set(
+            category for rule in self._transition_rules for category in rule.categories)
 
         # Toggle simulator state once so that downstream omni features can be used without bugs
         # e.g.: particle sampling, which for some reason requires sim.play() to be called at least once
@@ -312,6 +318,24 @@ class Simulator(SimulationContext):
         #     if hasattr(obj, "procedural_material") and obj.procedural_material is not None:
         #         obj.procedural_material.update()
 
+    def _non_ov_transition_step(self):
+        """Applies all internal non-Omniverse transition rules."""
+        # Create a dict from category to object for all objects we care about.
+        obj_dict = collections.defaultdict(list)
+        for obj in self.scene.objects:
+            if obj.category in self._all_transition_categories:
+                obj_dict[obj.category].append(obj)
+
+        # For each rule, create a subset of the dict and apply it if applicable.
+        for rule in self._transition_rules:
+            obj_subset = list(obj_dict[c] for c in rule.categories if c in obj_dict)
+            if len(obj_subset) != len(rule.categories):
+                continue
+            # TODO: Consider optimizing itertools.product.
+            for obj_tuple in itertools.product(*obj_subset):
+                if rule.condition(self, obj_tuple):
+                    rule.transition(self, obj_tuple)
+
     def stop(self):
         super().stop()
 
@@ -338,7 +362,7 @@ class Simulator(SimulationContext):
             # TODO: A better place to put this perhaps?
             self._scene.object_registry.update(keys="root_handle")
 
-    def step(self, render=True, force_playing=False):
+    def step(self, render=True, force_playing=False, apply_transitions=False):
         """
         Step the simulation at self.render_timestep
 
@@ -346,7 +370,12 @@ class Simulator(SimulationContext):
             render (bool): Whether rendering should occur or not
             force_playing (bool): If True, will force physics to propagate (i.e.: set simulation, if paused / stopped,
                 to "play" mode)
+            apply_transitions (bool): If True, apply the internal transition
+                logic before physics, render steps.
         """
+        if apply_transitions:
+            self._non_ov_transition_step()
+
         # Possibly force playing
         if force_playing and not self.is_playing():
             self.play()
