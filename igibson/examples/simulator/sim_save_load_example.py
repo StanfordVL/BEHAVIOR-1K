@@ -9,7 +9,7 @@ from igibson.simulator_omni import Simulator
 
 SCENE_ID = "Rs_int"
 USD_TEMPLATE_FILE = f"{ig_dataset_path}/scenes/{SCENE_ID}/urdf/{SCENE_ID}_best_template.usd"
-TEST_OUT_PATH = "/home/alanlou/svl/iGibson3/igibson/out"  # Define output directory here.
+TEST_OUT_PATH = ""  # Define output directory here.
 
 #### SAVE SIMULATION ENV #####
 sim = Simulator()
