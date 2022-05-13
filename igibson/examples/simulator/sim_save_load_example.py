@@ -99,7 +99,6 @@ print([o.name for o in sim.scene.robot_registry.objects])
 # Check object positions.
 o = sim.scene.object_registry('name', 'bottom_cabinet_13')
 print(f"{o.name} position: {o.get_position()}")
-# o._dc.get_articulation(o.prim_path)
 
 o = sim.scene.object_registry('name', 'bottom_cabinet_41')
 print(f"{o.name} position: {o.get_position()}")
@@ -116,6 +115,10 @@ for reg in sim.scene.registry.objects:
     print(reg.name)
     for obj in reg.objects:
         print(f"Registry: {reg.name}, obj: {obj.name}")
+
+# Take a step.
+sim.play()
+sim.step()
 
 # Take a look at the scene.
 for _ in range(2000):

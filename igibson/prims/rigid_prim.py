@@ -522,8 +522,8 @@ class RigidPrim(XFormPrim):
         super()._load_state(state=state)
 
         # Set velocities
-        self.set_linear_velocity(state["lin_vel"])
-        self.set_angular_velocity(state["ang_vel"])
+        self.set_linear_velocity(np.array(state["lin_vel"]))
+        self.set_angular_velocity(np.array(state["ang_vel"]))
 
     def _deserialize(self, state):
         # Call supermethod first

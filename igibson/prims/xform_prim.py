@@ -461,7 +461,7 @@ class XFormPrim(BasePrim):
         return OrderedDict(pos=pos, ori=ori)
 
     def _load_state(self, state):
-        self.set_position_orientation(state["pos"], state["ori"])
+        self.set_position_orientation(np.array(state["pos"]), np.array(state["ori"]))
 
     def _serialize(self, state):
         # We serialize by iterating over the keys and adding them to a list that's concatenated at the end

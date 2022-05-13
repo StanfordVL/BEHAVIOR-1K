@@ -31,7 +31,7 @@ def save_init_info(func):
     """
     def return_func(*args, **kwargs):
         # Get __init__ arguments.
-        arg_spec = inspect.getargspec(func)
+        arg_spec = inspect.getfullargspec(func)
         arg_names = arg_spec[0][1:]
         defaults = arg_spec[3]
 
@@ -72,6 +72,7 @@ def create_object_from_init_info(init_info):
     # Key is a class name and value is the module path defining the class.
     # This list is exhaustive - all classes can be recreated need to be defined here.
     module_map = {
+        "EmptyScene": "igibson.scenes.empty_scene",
         "InteractiveTraversableScene": "igibson.scenes.interactive_traversable_scene",
         "DatasetObject": "igibson.objects.dataset_object",
         "Turtlebot": "igibson.robots.turtlebot",

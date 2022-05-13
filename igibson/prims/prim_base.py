@@ -67,17 +67,16 @@ class BasePrim(Serializable, UniquelyNamed, metaclass=ABCMeta):
         self._n_duplicates = 0                              # Simple counter for keeping track of duplicates for unique name indexing
 
         # Run some post-loading steps if this prim has already been loaded
-        if is_prim_path_valid(prim_path=self._prim_path):
+        # skip_init_load is a hacky way to prevent subclass (e.g. controllable_object)
+        # from running into errors because simulator is not defined. Need to run obj.load
+        # with the simulator object explictly.
+        if (not "skip_init_load" in kwargs or not kwargs["skip_init_load"]) and is_prim_path_valid(prim_path=self._prim_path):
             print(f"prim {name} already exists")
             self._prim = get_prim_at_path(prim_path=self._prim_path)
             self._loaded = True
             # Run post load.
-            # skip_init_post_load is a hacky way to prevent subclass (e.g. controllable_object)
-            # from running into errors because simulator is not defined. Need to run _post_load
-            # with the simulator object explictly.
             # TODO: This requires simulator! change?
-            if not "skip_init_post_load" in kwargs or not kwargs["skip_init_post_load"]:
-                self._post_load()
+            self._post_load()
 
         # Run super init
         super().__init__()

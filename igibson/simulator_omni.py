@@ -575,7 +575,7 @@ class Simulator(SimulationContext):
         clear_pu()
         self.scene._registry = self.scene._create_registry()
         self.scene._initialized = False
-
+        
         # Iterate over all the children in the loaded stage.
         for prim in self.world_prim.GetChildren():
             # Only process prims that are an Xform.
@@ -595,9 +595,9 @@ class Simulator(SimulationContext):
                 # Since prim is already loaded, use a hacky way to make post_load work.
                 obj_init_info = init_info[name]
                 obj_init_info["kwargs"] = {}
-                obj_init_info["kwargs"]["skip_init_post_load"] = True
+                obj_init_info["kwargs"]["skip_init_load"] = True
                 obj = create_object_from_init_info(obj_init_info)
-                obj._post_load(self)
+                obj.load(self)
 
                 # Add created object to registry.
                 if isinstance(obj, BaseRobot):
@@ -605,12 +605,19 @@ class Simulator(SimulationContext):
                 else:
                     self.scene.object_registry.add(obj)
 
+                # Run any additional scene-specific logic with the created object.
+                self.scene._add_object(obj)
+
         # Make sure simulator is not running, then start it, then pause it so we can initialize the scene.
         self.stop()
         self.play()
         self.pause()
 
+        # Initialize scene.
         self._scene.initialize()
+
+        # Restore the state of all objects.
+        self.scene.load_state(scene_state)
 
         logging.info("The saved simualtion environment loaded.")
     
