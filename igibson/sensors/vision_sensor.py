@@ -1,30 +1,30 @@
 import os
+import time
 from collections import OrderedDict
 
-import math
+import carb
 import numpy as np
-import time
+from omni.isaac.core.utils.stage import get_current_stage
+from omni.kit.viewport import get_viewport_interface
+from pxr import Gf, UsdGeom
 
 from igibson import app
 from igibson.sensors.sensor_base import BaseSensor
 from igibson.utils.constants import MAX_CLASS_COUNT, MAX_INSTANCE_COUNT
 from igibson.utils.python_utils import assert_valid_key, classproperty
+from igibson.utils.transform_utils import euler2quat, quat2euler
 from igibson.utils.usd_utils import get_camera_params, get_semantic_objects_pose
 from igibson.utils.vision_utils import get_rgb_filled
-from igibson.utils.transform_utils import euler2quat, quat2euler
-
-import carb
-from omni.isaac.core.utils.stage import get_current_stage
-from omni.kit.viewport import get_viewport_interface
-from pxr import Gf, UsdGeom
 
 # Make sure synthetic data extension is enabled
 ext_manager = app.app.get_extension_manager()
 ext_manager.set_extension_enabled("omni.syntheticdata", True)
 
+import omni.syntheticdata._syntheticdata as sd
+
 # Continue with omni synethic data imports afterwards
 from omni.syntheticdata import sensors as sensors_util
-import omni.syntheticdata._syntheticdata as sd
+
 sensor_types = sd.SensorType
 
 
@@ -58,6 +58,7 @@ class VisionSensor(BaseSensor):
         image_width (int): Width of generated images, in pixels
 
     """
+
     _SENSOR_HELPERS = OrderedDict(
         rgb=sensors_util.get_rgb,
         rgb_filled=get_rgb_filled,
@@ -105,8 +106,8 @@ class VisionSensor(BaseSensor):
         load_config["image_width"] = image_width
 
         # Create variables that will be filled in later at runtime
-        self._sd = None             # synthetic data interface
-        self._viewport = None       # Viewport from which to grab data
+        self._sd = None  # synthetic data interface
+        self._viewport = None  # Viewport from which to grab data
 
         # Run super method
         super().__init__(
@@ -122,7 +123,6 @@ class VisionSensor(BaseSensor):
         # Define a new camera prim at the current stage
         stage = get_current_stage()
         prim = UsdGeom.Camera.Define(stage, self._prim_path).GetPrim()
-        print("HEY LOAD!")
         return prim
 
     def _post_load(self, simulator=None):
@@ -146,7 +146,6 @@ class VisionSensor(BaseSensor):
 
         # Initialize sensors
         self._initialize_sensors(names=self._modalities)
-        print("HEY POST LOAD!")
 
     def _initialize_sensors(self, names, timeout=10.0):
         """Initializes a raw sensor in the simulation.
@@ -156,7 +155,6 @@ class VisionSensor(BaseSensor):
                 If they are not part of self._RAW_SENSOR_TYPES' keys, we will simply pass over them
             timeout (int): Maximum time in seconds to attempt to initialize sensors.
         """
-        print("HEY _initialize_sensors!")
         # Standardize the input and grab the intersection with all possible raw sensors
         names = set([names]) if isinstance(names, str) else set(names)
         names = names.intersection(set(self._RAW_SENSOR_TYPES.keys()))
@@ -232,7 +230,7 @@ class VisionSensor(BaseSensor):
         :param x: x position of the viewport window
         :param y: y position of the viewport window
         """
-        self._viewport.set_window_pos(x ,y)
+        self._viewport.set_window_pos(x, y)
 
     def set_window_size(self, width, height):
         """Set the size of the viewport window.
@@ -312,9 +310,10 @@ class VisionSensor(BaseSensor):
     def _obs_space_mapping(self):
         # Make sure bbox obs aren't being used, since they are variable in size!
         for modality in {"bbox_2d_tight", "bbox_2d_loose", "bbox_3d", "camera", "pose"}:
-            assert modality not in self._modalities, \
-                f"Cannot use bounding box, camera, or pose modalities for observation space " \
+            assert modality not in self._modalities, (
+                f"Cannot use bounding box, camera, or pose modalities for observation space "
                 f"because it is variable in size!"
+            )
 
         # Set the remaining modalities' values
         # (shape, low, high)
