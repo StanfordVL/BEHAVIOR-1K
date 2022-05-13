@@ -1,24 +1,14 @@
-import inspect
-import logging
 from abc import ABCMeta, abstractmethod
 from collections import OrderedDict
-from copy import deepcopy
 
-import gym
 import numpy as np
 
-from future.utils import with_metaclass
-
-from igibson.controllers import ControlType, create_controller
-# # from igibson.external.pybullet_tools.utils import get_joint_info
-from igibson.sensors import create_sensor, SENSOR_PRIMS_TO_SENSOR_CLS, ALL_SENSOR_MODALITIES
-from igibson.objects.usd_object import USDObject
 from igibson.objects.controllable_object import ControllableObject
+from igibson.objects.usd_object import USDObject
+from igibson.sensors import ALL_SENSOR_MODALITIES, SENSOR_PRIMS_TO_SENSOR_CLS, create_sensor
 from igibson.utils.gym_utils import GymObservable
-from igibson.utils.python_utils import classproperty, save_init_info, Registerable
+from igibson.utils.python_utils import Registerable, classproperty, save_init_info
 from igibson.utils.utils import rotate_vector_3d
-
-from pxr import UsdPhysics
 
 # Global dicts that will contain mappings
 REGISTERED_ROBOTS = OrderedDict()
@@ -34,6 +24,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable, Registerable):
     This class handles object loading, and provides method interfaces that should be
     implemented by subclassed robots.
     """
+
     @save_init_info
     def __init__(
         self,
@@ -49,21 +40,17 @@ class BaseRobot(USDObject, ControllableObject, GymObservable, Registerable):
         visual_only=False,
         self_collisions=False,
         load_config=None,
-
         # Unique to USDObject hierarchy
         abilities=None,
-
         # Unique to ControllableObject hierarchy
         control_freq=None,
         controller_config=None,
         action_type="continuous",
         action_normalize=True,
         reset_joint_pos=None,
-
         # Unique to this class
         obs_modalities="all",
         proprio_obs="default",
-
         **kwargs,
     ):
         """
@@ -102,8 +89,13 @@ class BaseRobot(USDObject, ControllableObject, GymObservable, Registerable):
             for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
         """
         # Store inputs
-        self._obs_modalities = obs_modalities if obs_modalities == "all" else \
-            {obs_modalities} if isinstance(obs_modalities, str) else set(obs_modalities)              # this will get updated later when we fill in our sensors
+        self._obs_modalities = (
+            obs_modalities
+            if obs_modalities == "all"
+            else {obs_modalities}
+            if isinstance(obs_modalities, str)
+            else set(obs_modalities)
+        )  # this will get updated later when we fill in our sensors
         self._proprio_obs = self.default_proprio_obs if proprio_obs == "default" else list(proprio_obs)
 
         # Process abilities
@@ -111,8 +103,8 @@ class BaseRobot(USDObject, ControllableObject, GymObservable, Registerable):
         abilities = robot_abilities if abilities is None else robot_abilities.update(abilities)
 
         # Initialize internal attributes that will be loaded later
-        self._sensors = None                     # e.g.: scan sensor, vision sensor
-        self._simulator = None                   # Required for AG by ManipulationRobot
+        self._sensors = None  # e.g.: scan sensor, vision sensor
+        self._simulator = None  # Required for AG by ManipulationRobot
 
         # Run super init
         super().__init__(
@@ -151,8 +143,11 @@ class BaseRobot(USDObject, ControllableObject, GymObservable, Registerable):
                 if prim_type in SENSOR_PRIMS_TO_SENSOR_CLS:
                     # Infer what obs modalities to use for this sensor
                     sensor_cls = SENSOR_PRIMS_TO_SENSOR_CLS[prim_type]
-                    modalities = sensor_cls.all_modalities if self._obs_modalities == "all" else \
-                        sensor_cls.all_modalities.intersection(self._obs_modalities)
+                    modalities = (
+                        sensor_cls.all_modalities
+                        if self._obs_modalities == "all"
+                        else sensor_cls.all_modalities.intersection(self._obs_modalities)
+                    )
                     obs_modalities = obs_modalities.union(modalities)
                     # Create the sensor and store it internally
                     sensor = create_sensor(

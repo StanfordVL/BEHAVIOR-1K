@@ -1,41 +1,32 @@
-from abc import ABCMeta, abstractmethod
-from collections import Iterable, OrderedDict
 import logging
+from abc import ABCMeta
+from collections import OrderedDict
 
-import numpy as np
+from pxr import PhysxSchema, UsdPhysics
 
-from future.utils import with_metaclass
-
-from igibson.utils.constants import (
-    ALL_COLLISION_GROUPS_MASK,
-    DEFAULT_COLLISION_GROUP,
-    SPECIAL_COLLISION_GROUPS,
-    SemanticClass,
-)
-from pxr import UsdPhysics, PhysxSchema
-from igibson.utils.semantics_utils import CLASS_NAME_TO_CLASS_ID
-from igibson.utils.usd_utils import get_prim_nested_children, create_joint, CollisionAPI, BoundingBoxAPI
 from igibson.prims.entity_prim import EntityPrim
-from igibson.prims.xform_prim import XFormPrim
+from igibson.utils.constants import DEFAULT_COLLISION_GROUP, SPECIAL_COLLISION_GROUPS, SemanticClass
+from igibson.utils.semantics_utils import CLASS_NAME_TO_CLASS_ID
+from igibson.utils.usd_utils import BoundingBoxAPI, CollisionAPI, create_joint
 
 
 class BaseObject(EntityPrim, metaclass=ABCMeta):
     """This is the interface that all iGibson objects must implement."""
 
     def __init__(
-            self,
-            prim_path,
-            name=None,
-            category="object",
-            class_id=None,
-            scale=1.0,
-            rendering_params=None,
-            visible=True,
-            fixed_base=False,
-            visual_only=False,
-            self_collisions=False,
-            load_config=None,
-            **kwargs,
+        self,
+        prim_path,
+        name=None,
+        category="object",
+        class_id=None,
+        scale=1.0,
+        rendering_params=None,
+        visible=True,
+        fixed_base=False,
+        visual_only=False,
+        self_collisions=False,
+        load_config=None,
+        **kwargs,
     ):
         """
         Create an object instance with the minimum information of class ID and rendering parameters.
@@ -103,10 +94,7 @@ class BaseObject(EntityPrim, metaclass=ABCMeta):
 
         # Run super init
         super().__init__(
-            prim_path=prim_path,
-            name=name,
-            load_config=load_config,
-            **kwargs,
+            prim_path=prim_path, name=name, load_config=load_config, **kwargs,
         )
 
     def load(self, simulator=None):
@@ -129,9 +117,7 @@ class BaseObject(EntityPrim, metaclass=ABCMeta):
         if self.fixed_base:
             # Create fixed joint, and set Body0 to be this object's root prim
             create_joint(
-                prim_path=f"{self._prim_path}/rootJoint",
-                joint_type="FixedJoint",
-                body1=f"{self._prim_path}/base_link",
+                prim_path=f"{self._prim_path}/rootJoint", joint_type="FixedJoint", body1=f"{self._prim_path}/base_link",
             )
         else:
             if self._prim.HasAPI(UsdPhysics.ArticulationRootAPI):
@@ -158,9 +144,7 @@ class BaseObject(EntityPrim, metaclass=ABCMeta):
         # TODO: Do we need to explicitly add all links? or is adding articulation root itself sufficient?
         # Set the collision group
         CollisionAPI.add_to_collision_group(
-            col_group=self.collision_group,
-            prim_path=self.prim_path,
-            create_if_not_exist=True,
+            col_group=self.collision_group, prim_path=self.prim_path, create_if_not_exist=True,
         )
 
     @property
@@ -171,8 +155,11 @@ class BaseObject(EntityPrim, metaclass=ABCMeta):
         # actual base link of the robot instead.
         # See https://forums.developer.nvidia.com/t/inconsistent-values-from-isaacsims-dc-get-joint-parent-child-body/201452/2
         # for more info
-        return f"{self._prim_path}/base_link" if \
-            (not self.fixed_base) and (self.n_links > 1) else super().articulation_root_path
+        return (
+            f"{self._prim_path}/base_link"
+            if (not self.fixed_base) and (self.n_links > 1)
+            else super().articulation_root_path
+        )
 
     @property
     def bbox(self):
@@ -267,4 +254,3 @@ class BaseObject(EntityPrim, metaclass=ABCMeta):
         Runs any relevant updates for this object. This should occur once per simulation step.
         """
         pass
-

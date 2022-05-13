@@ -2,7 +2,12 @@ import sys
 import logging
 import numpy as np
 from collections import OrderedDict
-from igibson.object_states.factory import get_state_name, get_default_states, get_states_for_ability, get_object_state_instance
+from igibson.object_states.factory import (
+    get_state_name,
+    get_default_states,
+    get_states_for_ability,
+    get_object_state_instance,
+)
 from igibson.object_states.object_state_base import CachingEnabledObjectState, REGISTERED_OBJECT_STATES
 from igibson.objects.object_base import BaseObject
 
@@ -20,20 +25,20 @@ class StatefulObject(BaseObject):
     """Objects that support object states."""
 
     def __init__(
-            self,
-            prim_path,
-            name=None,
-            category="object",
-            class_id=None,
-            scale=None,
-            rendering_params=None,
-            visible=True,
-            fixed_base=False,
-            visual_only=False,
-            self_collisions=False,
-            load_config=None,
-            abilities=None,
-            **kwargs,
+        self,
+        prim_path,
+        name=None,
+        category="object",
+        class_id=None,
+        scale=None,
+        rendering_params=None,
+        visible=True,
+        fixed_base=False,
+        visual_only=False,
+        self_collisions=False,
+        load_config=None,
+        abilities=None,
+        **kwargs,
     ):
         """
         @param prim_path: str, global path in the stage to this object
@@ -188,10 +193,16 @@ class StatefulObject(BaseObject):
         state_flat = super()._serialize(state=state)
 
         # Iterate over all states and serialize them individually
-        non_kin_state_flat = np.concatenate([
-            self._states[REGISTERED_OBJECT_STATES[state_name]].serialize(state_dict)
-            for state_name, state_dict in state["non_kin"].items()
-        ]) if len(state["non_kin"]) > 0 else np.array([])
+        non_kin_state_flat = (
+            np.concatenate(
+                [
+                    self._states[REGISTERED_OBJECT_STATES[state_name]].serialize(state_dict)
+                    for state_name, state_dict in state["non_kin"].items()
+                ]
+            )
+            if len(state["non_kin"]) > 0
+            else np.array([])
+        )
 
         # Combine these two arrays
         return np.concatenate([state_flat, non_kin_state_flat])
@@ -206,7 +217,7 @@ class StatefulObject(BaseObject):
         for state_type, state_instance in self._states.items():
             state_name = get_state_name(state_type)
             if state_instance.settable:
-                non_kin_state_dic[state_name] = state_instance.deserialize(state[idx:idx+state_instance.state_size])
+                non_kin_state_dic[state_name] = state_instance.deserialize(state[idx : idx + state_instance.state_size])
                 idx += state_instance.state_size
         state_dic["non_kin"] = non_kin_state_dic
 

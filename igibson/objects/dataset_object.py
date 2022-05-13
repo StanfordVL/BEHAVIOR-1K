@@ -1,47 +1,24 @@
 import itertools
-import json
 import logging
 import math
 import os
-import random
-import time
 import xml.etree.ElementTree as ET
 
 import cv2
 import networkx as nx
 import numpy as np
-
 import trimesh
 from scipy.spatial.transform import Rotation
 
-import igibson
-from igibson.objects.usd_object import USDObject
-# from igibson.external.pybullet_tools.utils import (
-#     get_all_links,
-#     get_center_extent,
-#     get_link_name,
-#     get_link_state,
-#     link_from_name,
-#     matrix_from_quat,
-#     quat_from_matrix,
-# )
-from igibson.object_states.texture_change_state_mixin import TextureChangeStateMixin
-from igibson.objects.stateful_object import StatefulObject
-# from igibson.render.mesh_renderer.materials import ProceduralMaterial, RandomizedMaterial
-from igibson.utils import utils
 import igibson.utils.transform_utils as T
-from igibson.utils.urdf_utils import add_fixed_link, get_base_link_name, round_up, save_urdfs_without_floating_joints
-from igibson.utils.utils import mat_to_quat_pos, rotate_vector_3d
-from igibson.utils.constants import AVERAGE_OBJ_DENSITY, AVERAGE_CATEGORY_SPECS, SPECIAL_JOINT_FRICTIONS, DEFAULT_JOINT_FRICTION, JointType
-from igibson.utils.usd_utils import BoundingBoxAPI
+from igibson.objects.usd_object import USDObject
+from igibson.utils.constants import AVERAGE_CATEGORY_SPECS, DEFAULT_JOINT_FRICTION, SPECIAL_JOINT_FRICTIONS, JointType
 from igibson.utils.python_utils import save_init_info
-
-from omni.isaac.core.utils.stage import add_reference_to_stage
-from omni.isaac.core.utils.prims import get_prim_at_path
-
-
+from igibson.utils.usd_utils import BoundingBoxAPI
+from igibson.utils.utils import rotate_vector_3d
 
 # TODO: Reset sub-bodies that are floating wrt the root prim (e.g.: pillows from bed)
+
 
 class DatasetObject(USDObject):
     """
@@ -66,7 +43,6 @@ class DatasetObject(USDObject):
         self_collisions=False,
         load_config=None,
         abilities=None,
-
         bounding_box=None,
         initial_bbox_center_pos=None,
         initial_bbox_center_ori=None,
@@ -153,7 +129,7 @@ class DatasetObject(USDObject):
 
         # Info that will be filled in at runtime
         self.room_floor = None
-        self.supporting_surfaces = None             # Dictionary mapping link names to surfaces represented by links
+        self.supporting_surfaces = None  # Dictionary mapping link names to surfaces represented by links
 
         # Make sure only one of bounding_box and scale are specified
         if bounding_box is not None and scale is not None:
@@ -578,8 +554,9 @@ class DatasetObject(USDObject):
     def native_bbox(self):
         # Native bbox must be specified for dataset objects!
         native_bbox = super().native_bbox
-        assert native_bbox is not None, f"This dataset object '{self.name}' is expected to have native_bbox specified," \
-                                        f" but found none!"
+        assert native_bbox is not None, (
+            f"This dataset object '{self.name}' is expected to have native_bbox specified," f" but found none!"
+        )
         return native_bbox
 
     @property
@@ -741,15 +718,19 @@ class DatasetObject(USDObject):
                 # Compute the bounding box vertices in the base frame.
                 # bbox_to_link_com = np.dot(link_origin_to_link_com, bbox_to_scaled_link_origin)
                 bbox_center_in_base_frame = np.dot(link_frame_to_base_frame, bbox_to_scaled_link_origin)
-                vertices_in_base_frame = np.array(list(itertools.product((1, -1), repeat=3))) * (extent_in_bbox_frame / 2)
+                vertices_in_base_frame = np.array(list(itertools.product((1, -1), repeat=3))) * (
+                    extent_in_bbox_frame / 2
+                )
 
                 # Add the points to our collection of points.
-                points.extend(trimesh.transformations.transform_points(vertices_in_base_frame, bbox_center_in_base_frame))
+                points.extend(
+                    trimesh.transformations.transform_points(vertices_in_base_frame, bbox_center_in_base_frame)
+                )
             elif fallback_to_aabb:
                 # If no BB annotation is available, get the AABB for this link.
                 aabb_center, aabb_extent = BoundingBoxAPI.compute_center_extent(prim_path=link.prim_path)
                 aabb_vertices_in_world = aabb_center + np.array(list(itertools.product((1, -1), repeat=3))) * (
-                        aabb_extent / 2
+                    aabb_extent / 2
                 )
                 aabb_vertices_in_base_frame = trimesh.transformations.transform_points(
                     aabb_vertices_in_world, world_to_base_frame

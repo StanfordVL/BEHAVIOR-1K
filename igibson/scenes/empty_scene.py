@@ -1,12 +1,10 @@
 import logging
-import os
 
 import numpy as np
 
 from igibson.scenes.scene_base import Scene
-from igibson.utils.constants import SemanticClass
-from igibson.utils.utils import l2_distance
 from igibson.utils.python_utils import save_init_info
+from igibson.utils.utils import l2_distance
 
 
 class EmptyScene(Scene):
@@ -16,9 +14,7 @@ class EmptyScene(Scene):
 
     @save_init_info
     def __init__(
-            self,
-            floor_plane_visible=False,
-            floor_plane_color=(1.0, 1.0, 1.0),
+        self, floor_plane_visible=False, floor_plane_color=(1.0, 1.0, 1.0),
     ):
         super(EmptyScene, self).__init__()
         self.floor_plane_visible = floor_plane_visible
@@ -32,13 +28,7 @@ class EmptyScene(Scene):
         """
         Get a random point in the region of [-5, 5] x [-5, 5].
         """
-        return floor, np.array(
-            [
-                np.random.uniform(-5, 5),
-                np.random.uniform(-5, 5),
-                0.0,
-            ]
-        )
+        return floor, np.array([np.random.uniform(-5, 5), np.random.uniform(-5, 5), 0.0,])
 
     def get_shortest_path(self, floor, source_world, target_world, entire_path=False):
         """

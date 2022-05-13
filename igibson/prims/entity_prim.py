@@ -6,22 +6,29 @@
 # distribution of this software and related documentation without an express
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 #
-from typing import Optional, Tuple, Union, List
+from collections import Iterable, OrderedDict
 from copy import deepcopy
-import numpy as np
-from collections import OrderedDict, Iterable
-from omni.isaac.dynamic_control import _dynamic_control
-from omni.isaac.core.utils.types import DOFInfo
-from omni.isaac.core.utils.transformations import tf_matrix_from_pose
-from omni.isaac.core.utils.rotations import gf_quat_to_np_array
-from pxr import Gf, Usd, UsdGeom, UsdPhysics
-from omni.isaac.core.controllers.articulation_controller import ArticulationController
+from typing import List, Optional, Tuple, Union
+
 import carb
-from omni.isaac.core.utils.prims import is_prim_path_valid, get_prim_property, set_prim_property, \
-    get_prim_parent, get_prim_at_path
-from igibson.prims.xform_prim import XFormPrim
-from igibson.prims.rigid_prim import RigidPrim
+import numpy as np
+from omni.isaac.core.controllers.articulation_controller import ArticulationController
+from omni.isaac.core.utils.prims import (
+    get_prim_at_path,
+    get_prim_parent,
+    get_prim_property,
+    is_prim_path_valid,
+    set_prim_property,
+)
+from omni.isaac.core.utils.rotations import gf_quat_to_np_array
+from omni.isaac.core.utils.transformations import tf_matrix_from_pose
+from omni.isaac.core.utils.types import DOFInfo
+from omni.isaac.dynamic_control import _dynamic_control
+from pxr import Gf, Usd, UsdGeom, UsdPhysics
+
 from igibson.prims.joint_prim import JointPrim
+from igibson.prims.rigid_prim import RigidPrim
+from igibson.prims.xform_prim import XFormPrim
 from igibson.utils.types import JointsState
 
 
@@ -44,16 +51,12 @@ class EntityPrim(XFormPrim):
         """
 
     def __init__(
-        self,
-        prim_path,
-        name,
-        load_config=None,
-        **kwargs,
+        self, prim_path, name, load_config=None, **kwargs,
     ):
         # Other values that will be filled in at runtime
-        self._dc = None                         # Dynamics control interface
-        self._handle = None                     # Handle to this articulation
-        self._root_handle = None                # Handle to the root rigid body of this articulation
+        self._dc = None  # Dynamics control interface
+        self._handle = None  # Handle to this articulation
+        self._root_handle = None  # Handle to the root rigid body of this articulation
         self._dofs_infos = None
         self._n_dof = None
         self._default_joints_state = None
@@ -64,10 +67,7 @@ class EntityPrim(XFormPrim):
 
         # Run super init
         super().__init__(
-            prim_path=prim_path,
-            name=name,
-            load_config=load_config,
-            **kwargs,
+            prim_path=prim_path, name=name, load_config=load_config, **kwargs,
         )
 
     def _initialize(self):
@@ -98,7 +98,9 @@ class EntityPrim(XFormPrim):
                     dof_name = self._dc.get_dof_name(dof_handle)
                     # add dof to list
                     prim_path = self._dc.get_dof_path(dof_handle)
-                    self._dofs_infos[dof_name] = DOFInfo(prim_path=prim_path, handle=dof_handle, prim=self.prim, index=index)
+                    self._dofs_infos[dof_name] = DOFInfo(
+                        prim_path=prim_path, handle=dof_handle, prim=self.prim, index=index
+                    )
 
                 for i in range(self._dc.get_articulation_joint_count(self._handle)):
                     joint_handle = self._dc.get_articulation_joint(self._handle, i)
@@ -108,9 +110,7 @@ class EntityPrim(XFormPrim):
                     # Only add the joint if it's not fixed (i.e.: it has DOFs > 0)
                     if self._dc.get_joint_dof_count(joint_handle) > 0:
                         joint = JointPrim(
-                            prim_path=joint_path,
-                            name=f"{self._name}:joint_{joint_name}",
-                            articulation=self._handle,
+                            prim_path=joint_path, name=f"{self._name}:joint_{joint_name}", articulation=self._handle,
                         )
                         joint.initialize()
                         self._joints[joint_name] = joint
@@ -126,9 +126,10 @@ class EntityPrim(XFormPrim):
             n_dof = 0
 
         # Make sure root prim stored is the same as the one found during initialization
-        assert self.root_prim == root_prim, \
-            f"Mismatch in root prims! Original was {self.root_prim.GetPrimPath()}, " \
+        assert self.root_prim == root_prim, (
+            f"Mismatch in root prims! Original was {self.root_prim.GetPrimPath()}, "
             f"initialized is {root_prim.GetPrimPath()}!"
+        )
 
         # Store values internally
         self._root_handle = root_handle
@@ -142,8 +143,11 @@ class EntityPrim(XFormPrim):
 
     def _post_load(self, simulator=None):
         # Set visual only flag
-        self._visual_only = self._load_config["visual_only"] if \
-            "visual_only" in self._load_config and self._load_config["visual_only"] is not None else False
+        self._visual_only = (
+            self._load_config["visual_only"]
+            if "visual_only" in self._load_config and self._load_config["visual_only"] is not None
+            else False
+        )
 
         # Setup links info FIRST before running any other post loading behavior
         # We iterate over all children of this object's prim,
@@ -321,8 +325,9 @@ class EntityPrim(XFormPrim):
             bool: Whether this object is in contact with the specified object(s) and / or link(s)
         """
         # Make sure at least one of objects or links are specified
-        assert objects is not None or links is not None, "At least one of objects or links must be specified to check" \
-                                                         "for contact!"
+        assert objects is not None or links is not None, (
+            "At least one of objects or links must be specified to check" "for contact!"
+        )
 
         # Standardize inputs
         objects = [] if objects is None else (objects if isinstance(objects, Iterable) else [objects])
@@ -554,8 +559,11 @@ class EntityPrim(XFormPrim):
         Returns:
             n- or k-array: normalized velocities in range [-1, 1] for the specified DOFs
         """
-        return velocities / self.max_joint_velocities if indices is None else \
-            velocities / self.max_joint_velocities[indices]
+        return (
+            velocities / self.max_joint_velocities
+            if indices is None
+            else velocities / self.max_joint_velocities[indices]
+        )
 
     def _denormalize_velocities(self, velocities, indices=None):
         """
@@ -571,8 +579,11 @@ class EntityPrim(XFormPrim):
         Returns:
             n- or k-array: de-normalized velocities for the specified DOFs
         """
-        return velocities * self.max_joint_velocities if indices is None else \
-            velocities * self.max_joint_velocities[indices]
+        return (
+            velocities * self.max_joint_velocities
+            if indices is None
+            else velocities * self.max_joint_velocities[indices]
+        )
 
     def _normalize_efforts(self, efforts, indices=None):
         """
@@ -791,7 +802,9 @@ class EntityPrim(XFormPrim):
         """
         return self.root_link.get_angular_velocity()
 
-    def set_position_orientation(self, position: Optional[np.ndarray] = None, orientation: Optional[np.ndarray] = None) -> None:
+    def set_position_orientation(
+        self, position: Optional[np.ndarray] = None, orientation: Optional[np.ndarray] = None
+    ) -> None:
         """Sets prim's pose with respect to the world's frame.
 
         Args:
@@ -877,7 +890,9 @@ class EntityPrim(XFormPrim):
                 Usd.TimeCode.Default()
             )
             world_position, world_orientation = self.get_position_orientation()
-            my_world_transform = tf_matrix_from_pose(translation=world_position, orientation=world_orientation[[3, 0, 1, 2]])
+            my_world_transform = tf_matrix_from_pose(
+                translation=world_position, orientation=world_orientation[[3, 0, 1, 2]]
+            )
             local_transform = np.matmul(np.linalg.inv(np.transpose(parent_world_tf)), my_world_transform)
             transform = Gf.Transform()
             transform.SetMatrix(Gf.Matrix4d(np.transpose(local_transform)))
@@ -1158,7 +1173,7 @@ class EntityPrim(XFormPrim):
         state_dict = OrderedDict(root_link=self.root_link.deserialize(state=state[:idx]))
         joint_state_dict = OrderedDict()
         for prim_name, prim in self._joints.items():
-            joint_state_dict[prim_name] = prim.deserialize(state=state[idx:idx+prim.state_size])
+            joint_state_dict[prim_name] = prim.deserialize(state=state[idx : idx + prim.state_size])
             idx += prim.state_size
         state_dict["joints"] = joint_state_dict
 
@@ -1166,5 +1181,7 @@ class EntityPrim(XFormPrim):
 
     def _create_prim_with_same_kwargs(self, prim_path, name, load_config):
         # Subclass must implement this method for duplication functionality
-        raise NotImplementedError("Subclass must implement _create_prim_with_same_kwargs() to enable duplication "
-                                  "functionality for EntityPrim!")
+        raise NotImplementedError(
+            "Subclass must implement _create_prim_with_same_kwargs() to enable duplication "
+            "functionality for EntityPrim!"
+        )

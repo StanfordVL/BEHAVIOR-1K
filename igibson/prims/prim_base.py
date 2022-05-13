@@ -7,24 +7,10 @@
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 #
 from abc import ABCMeta, abstractmethod
-from typing import Optional, Tuple
-from pxr import Gf, Usd, UsdGeom, UsdShade
-from omni.isaac.core.utils.types import XFormPrimState
-from omni.isaac.core.materials import PreviewSurface, OmniGlass, OmniPBR, VisualMaterial
-from omni.isaac.core.utils.rotations import gf_quat_to_np_array
-from omni.isaac.core.utils.transformations import tf_matrix_from_pose
-from omni.isaac.core.utils.prims import (
-    get_prim_at_path,
-    move_prim,
-    query_parent_path,
-    is_prim_path_valid,
-    define_prim,
-    get_prim_parent,
-    get_prim_object_type,
-)
-import numpy as np
-import carb
-from omni.isaac.core.utils.stage import get_current_stage
+
+from omni.isaac.core.utils.prims import get_prim_at_path, is_prim_path_valid, move_prim
+from pxr import Usd, UsdGeom
+
 from igibson.utils.python_utils import Serializable, UniquelyNamed
 
 
@@ -47,11 +33,7 @@ class BasePrim(Serializable, UniquelyNamed, metaclass=ABCMeta):
     """
 
     def __init__(
-        self,
-        prim_path,
-        name,
-        load_config=None,
-        **kwargs,
+        self, prim_path, name, load_config=None, **kwargs,
     ):
         self._prim_path = prim_path
         self._name = name
@@ -60,17 +42,19 @@ class BasePrim(Serializable, UniquelyNamed, metaclass=ABCMeta):
         # Other values that will be filled in at runtime
         self._applied_visual_material = None
         self._binding_api = None
-        self._loaded = False                                # Whether this prim exists in the stage or not
-        self._initialized = False                           # Whether this prim has its internal handles / info initialized or not (occurs AFTER and INDEPENDENTLY from loading!)
+        self._loaded = False  # Whether this prim exists in the stage or not
+        self._initialized = False  # Whether this prim has its internal handles / info initialized or not (occurs AFTER and INDEPENDENTLY from loading!)
         self._prim = None
         self._state_size = None
-        self._n_duplicates = 0                              # Simple counter for keeping track of duplicates for unique name indexing
+        self._n_duplicates = 0  # Simple counter for keeping track of duplicates for unique name indexing
 
         # Run some post-loading steps if this prim has already been loaded
         # skip_init_load is a hacky way to prevent subclass (e.g. controllable_object)
         # from running into errors because simulator is not defined. Need to run obj.load
         # with the simulator object explictly.
-        if (not "skip_init_load" in kwargs or not kwargs["skip_init_load"]) and is_prim_path_valid(prim_path=self._prim_path):
+        if (not "skip_init_load" in kwargs or not kwargs["skip_init_load"]) and is_prim_path_valid(
+            prim_path=self._prim_path
+        ):
             print(f"prim {name} already exists")
             self._prim = get_prim_at_path(prim_path=self._prim_path)
             self._loaded = True
@@ -292,11 +276,7 @@ class BasePrim(Serializable, UniquelyNamed, metaclass=ABCMeta):
         Returns:
             BasePrim: Generated prim object (not loaded, and not initialized!)
         """
-        return self.__class__(
-            prim_path=prim_path,
-            name=name,
-            load_config=load_config,
-        )
+        return self.__class__(prim_path=prim_path, name=name, load_config=load_config,)
 
     def duplicate(self, simulator, prim_path):
         """
@@ -312,9 +292,7 @@ class BasePrim(Serializable, UniquelyNamed, metaclass=ABCMeta):
             BasePrim: Generated prim object
         """
         new_prim = self._create_prim_with_same_kwargs(
-            prim_path=prim_path,
-            name=f"{self.name}_copy{self._n_duplicates}",
-            load_config=self._load_config,
+            prim_path=prim_path, name=f"{self.name}_copy{self._n_duplicates}", load_config=self._load_config,
         )
         new_prim.load(simulator=simulator)
 
