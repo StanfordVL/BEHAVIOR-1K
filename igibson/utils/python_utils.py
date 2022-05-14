@@ -3,6 +3,7 @@ A set of utility functions for general python usage
 """
 import inspect
 import logging
+from abc import ABCMeta
 from copy import deepcopy
 from importlib import import_module
 
@@ -57,6 +58,36 @@ def save_init_info(func):
         func(*args, **kwargs)
 
     return return_func
+
+
+class RecreatableMeta(type):
+    """
+    Simple metaclass that automatically saves __init__ args of the instances it creates.
+    """
+
+    def __new__(cls, clsname, bases, clsdict):
+        if "__init__" in clsdict:
+            clsdict["__init__"] = save_init_info(clsdict["__init__"])
+        return super().__new__(cls, clsname, bases, clsdict)
+
+
+class RecreatableAbcMeta(RecreatableMeta, ABCMeta):
+    """
+    A composite metaclass of both RecreatableMeta and ABCMeta.
+
+    Adding in ABCMeta to resolve metadata conflicts.
+    """
+
+    pass
+
+
+class Recreatable(metaclass=RecreatableAbcMeta):
+    """
+    Simple class that provides an abstract interface that automatically saves __init__ args of the instances inheriting it.
+    """
+
+    def __init__(self):
+        pass
 
 
 def create_object_from_init_info(init_info):

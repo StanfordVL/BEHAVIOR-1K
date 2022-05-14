@@ -3,16 +3,15 @@ import logging
 import numpy as np
 
 from igibson.scenes.scene_base import Scene
-from igibson.utils.python_utils import save_init_info
+from igibson.utils.python_utils import Recreatable
 from igibson.utils.utils import l2_distance
 
 
-class EmptyScene(Scene):
+class EmptyScene(Scene, Recreatable):
     """
     An empty scene for debugging.
     """
 
-    @save_init_info
     def __init__(
         self, floor_plane_visible=False, floor_plane_color=(1.0, 1.0, 1.0),
     ):

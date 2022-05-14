@@ -32,8 +32,7 @@ from igibson.utils.assets_utils import (
     get_ig_scene_path,
 )
 from igibson.utils.constants import JointType
-from igibson.utils.python_utils import save_init_info
-from igibson.utils.registry_utils import SerializableRegistry
+from igibson.utils.python_utils import Recreatable
 from igibson.utils.utils import NumpyEncoder, rotate_vector_3d
 
 SCENE_SOURCE_PATHS = {
@@ -43,7 +42,7 @@ SCENE_SOURCE_PATHS = {
 }
 
 
-class InteractiveTraversableScene(TraversableScene):
+class InteractiveTraversableScene(TraversableScene, Recreatable):
     """
     Create an interactive scene defined with iGibson Scene Description Format (iGSDF).
     iGSDF is an extension of URDF that we use to define an interactive scene.
@@ -52,7 +51,6 @@ class InteractiveTraversableScene(TraversableScene):
     navigation functionalities.
     """
 
-    @save_init_info
     def __init__(
         self,
         scene_model,

@@ -13,21 +13,28 @@ from scipy.spatial.transform import Rotation
 import igibson.utils.transform_utils as T
 from igibson.objects.usd_object import USDObject
 from igibson.utils.constants import AVERAGE_CATEGORY_SPECS, DEFAULT_JOINT_FRICTION, SPECIAL_JOINT_FRICTIONS, JointType
-from igibson.utils.python_utils import save_init_info
+from igibson.utils.python_utils import Recreatable
 from igibson.utils.usd_utils import BoundingBoxAPI
 from igibson.utils.utils import rotate_vector_3d
 
 # TODO: Reset sub-bodies that are floating wrt the root prim (e.g.: pillows from bed)
 
 
-class DatasetObject(USDObject):
+def metaclass_resolver(*classes):
+    metaclass = tuple(set(type(cls) for cls in classes))
+    metaclass = (
+        metaclass[0] if len(metaclass) == 1 else type("_".join(mcls.__name__ for mcls in metaclass), metaclass, {})
+    )  # class M_C
+    return metaclass("_".join(cls.__name__ for cls in classes), classes, {})  # class C
+
+
+class DatasetObject(USDObject, Recreatable):
     """
     DatasetObjects are instantiated from a USD file. It is an object that is assumed to come from an iG-supported
     dataset. These objects should contain additional metadata, including aggregate statistics across the
     object's category, e.g., avg dims, bounding boxes, masses, etc.
     """
 
-    @save_init_info
     def __init__(
         self,
         prim_path,

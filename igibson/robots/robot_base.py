@@ -7,7 +7,7 @@ from igibson.objects.controllable_object import ControllableObject
 from igibson.objects.usd_object import USDObject
 from igibson.sensors import ALL_SENSOR_MODALITIES, SENSOR_PRIMS_TO_SENSOR_CLS, create_sensor
 from igibson.utils.gym_utils import GymObservable
-from igibson.utils.python_utils import Registerable, classproperty, save_init_info
+from igibson.utils.python_utils import Recreatable, Registerable, classproperty
 from igibson.utils.utils import rotate_vector_3d
 
 # Global dicts that will contain mappings
@@ -17,7 +17,7 @@ REGISTERED_ROBOTS = OrderedDict()
 ALL_SENSOR_MODALITIES.add("proprio")
 
 
-class BaseRobot(USDObject, ControllableObject, GymObservable, Registerable):
+class BaseRobot(USDObject, ControllableObject, GymObservable, Registerable, Recreatable):
     """
     Base class for USD-based robot agents.
 
@@ -25,7 +25,6 @@ class BaseRobot(USDObject, ControllableObject, GymObservable, Registerable):
     implemented by subclassed robots.
     """
 
-    @save_init_info
     def __init__(
         self,
         # Shared kwargs in hierarchy
