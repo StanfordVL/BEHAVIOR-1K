@@ -97,9 +97,6 @@ class StatefulObject(BaseObject):
         )
 
     def load(self, simulator=None):
-        # Run super first
-        prim = super().load(simulator=simulator)
-
         # Make sure the simulator is not None
         assert simulator is not None, "Simulator must be specified when loading StatefulObject!"
 
@@ -108,7 +105,7 @@ class StatefulObject(BaseObject):
         # be referenced like a normal variable
         setattr(self, "_tmp_sim", simulator)
 
-        return prim
+        return super().load(simulator=simulator)
 
     def _post_load(self):
         # Run super method first
