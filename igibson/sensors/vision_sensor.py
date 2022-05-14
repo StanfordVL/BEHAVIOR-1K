@@ -125,7 +125,10 @@ class VisionSensor(BaseSensor):
         prim = UsdGeom.Camera.Define(stage, self._prim_path).GetPrim()
         return prim
 
-    def _post_load(self, simulator=None):
+    def _post_load(self):
+        # run super first
+        super()._post_load()
+
         # Get synthetic data interface
         self._sd = sd.acquire_syntheticdata_interface()
 

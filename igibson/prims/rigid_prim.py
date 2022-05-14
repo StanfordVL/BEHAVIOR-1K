@@ -76,9 +76,9 @@ class RigidPrim(XFormPrim):
 
         return prim
 
-    def _post_load(self, simulator=None):
+    def _post_load(self):
         # run super first
-        super()._post_load(simulator=simulator)
+        super()._post_load()
 
         # Set visual only flag
         self._visual_only = (

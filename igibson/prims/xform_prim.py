@@ -62,9 +62,9 @@ class XFormPrim(BasePrim):
 
         return prim
 
-    def _post_load(self, simulator=None):
+    def _post_load(self):
         # run super first
-        super()._post_load(simulator=simulator)
+        super()._post_load()
 
         # Make sure all xforms have pose and scaling info
         self._set_xform_properties()

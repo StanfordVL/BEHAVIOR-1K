@@ -104,9 +104,9 @@ class BaseObject(EntityPrim, metaclass=ABCMeta):
         # Run super method
         return super().load(simulator=simulator)
 
-    def _post_load(self, simulator=None):
+    def _post_load(self):
         # Run super first
-        super()._post_load(simulator=simulator)
+        super()._post_load()
 
         # Set visibility
         if "visible" in self._load_config and self._load_config["visible"] is not None:

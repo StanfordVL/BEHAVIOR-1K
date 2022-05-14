@@ -96,13 +96,31 @@ class StatefulObject(BaseObject):
             **kwargs,
         )
 
-    def _post_load(self, simulator=None):
+    def load(self, simulator=None):
+        # Run super first
+        prim = super().load(simulator=simulator)
+
+        # Make sure the simulator is not None
+        assert simulator is not None, "Simulator must be specified when loading StatefulObject!"
+
+        # Store temporary simulator reference just so we can load states later
+        # We use this very opaque method to generate the attribute to denote that this should NOT
+        # be referenced like a normal variable
+        setattr(self, "_tmp_sim", simulator)
+
+        return prim
+
+    def _post_load(self):
         # Run super method first
-        super()._post_load(simulator=simulator)
+        super()._post_load()
 
         # Initialize any states created
+        tmp_sim = getattr(self, "_tmp_sim")
         for state in self._states.values():
-            state.initialize(simulator)
+            state.initialize(tmp_sim)
+
+        # Delete the temporary simulator reference
+        delattr(self, "_tmp_sim")
 
     def initialize_states(self):
         """

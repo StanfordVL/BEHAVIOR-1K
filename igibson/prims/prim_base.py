@@ -107,11 +107,11 @@ class BasePrim(Serializable, UniquelyNamed, metaclass=ABCMeta):
         self._loaded = True
 
         # Run any post-loading logic
-        self._post_load(simulator=simulator)
+        self._post_load()
 
         return self._prim
 
-    def _post_load(self, simulator=None):
+    def _post_load(self):
         """
         Any actions that should be taken (e.g.: modifying the object's properties such as scale, visibility, additional
         joints, etc.) that should be taken after loading the raw object into omniverse but BEFORE we initialize the

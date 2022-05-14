@@ -142,9 +142,9 @@ class ControllableObject(BaseObject):
         self.reset()
         self.keep_still()
 
-    def _post_load(self, simulator=None):
-        # Run super post load first
-        super()._post_load(simulator=simulator)
+    def load(self, simulator=None):
+        # Run super first
+        prim = super().load(simulator=simulator)
 
         # Set the control frequency if one was not provided.
         expected_control_freq = 1.0 / simulator.get_rendering_dt()
@@ -157,6 +157,8 @@ class ControllableObject(BaseObject):
             assert np.isclose(
                 expected_control_freq, self._control_freq
             ), "Stored control frequency does not match environment's render timestep."
+
+        return prim
 
     def _load_controllers(self):
         """
