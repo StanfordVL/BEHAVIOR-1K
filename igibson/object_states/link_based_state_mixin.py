@@ -1,4 +1,5 @@
 import numpy as np
+import logging
 
 class LinkBasedStateMixin(object):
     def __init__(self):
@@ -15,7 +16,10 @@ class LinkBasedStateMixin(object):
 
         try:
             self.link = self.obj.links[self.get_state_link_name()]
-        except ValueError:
+        except KeyError:
+            # Metalink not found, so we failed to initialize, so we assume this is a "dead" linkbasedstatemixin
+            logging.warning(f"Warning: failed to initialize LinkBasedStateMixin {self.__class__.__name__}, no metalink"
+                            f"with name {self.get_state_link_name()} found!")
             return False
 
         return True

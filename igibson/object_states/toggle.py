@@ -38,7 +38,7 @@ class ToggledOn(AbsoluteObjectState, BooleanState, TextureChangeStateMixin, Link
             self.visual_marker_on = PrimitiveObject(
                 prim_path=f"{self.obj.prim_path}/visual_marker_on",
                 primitive_type="Sphere",
-                name="visual_marker_on",
+                name=f"{self.obj.name}_visual_marker_on",
                 class_id=SemanticClass.TOGGLE_MARKER,
                 scale=_TOGGLE_BUTTON_SCALE,
                 visible=True,
@@ -49,7 +49,7 @@ class ToggledOn(AbsoluteObjectState, BooleanState, TextureChangeStateMixin, Link
             self.visual_marker_off = PrimitiveObject(
                 prim_path=f"{self.obj.prim_path}/visual_marker_off",
                 primitive_type="Sphere",
-                name="visual_marker_off",
+                name=f"{self.obj.name}_visual_marker_off",
                 class_id=SemanticClass.TOGGLE_MARKER,
                 scale=_TOGGLE_BUTTON_SCALE,
                 visible=True,

@@ -131,7 +131,7 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin):
         self.marker = USDObject(
             prim_path=f"{self.obj.prim_path}/heat_source_marker",
             usd_path=_HEATING_ELEMENT_MARKER_FILENAME,
-            name="heat_source_marker",
+            name=f"{self.obj.name}_heat_source_marker",
             class_id=SemanticClass.HEAT_SOURCE_MARKER,
             scale=_HEATING_ELEMENT_MARKER_SCALE,
             visible=True,
