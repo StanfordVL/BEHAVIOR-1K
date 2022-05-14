@@ -83,7 +83,8 @@ class RecreatableAbcMeta(RecreatableMeta, ABCMeta):
 
 class Recreatable(metaclass=RecreatableAbcMeta):
     """
-    Simple class that provides an abstract interface that automatically saves __init__ args of the instances inheriting it.
+    Simple class that provides an abstract interface automatically saving __init__ args of
+    the classes inheriting it.
     """
 
     def __init__(self):
