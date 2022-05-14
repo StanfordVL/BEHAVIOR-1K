@@ -20,14 +20,6 @@ from igibson.utils.utils import rotate_vector_3d
 # TODO: Reset sub-bodies that are floating wrt the root prim (e.g.: pillows from bed)
 
 
-def metaclass_resolver(*classes):
-    metaclass = tuple(set(type(cls) for cls in classes))
-    metaclass = (
-        metaclass[0] if len(metaclass) == 1 else type("_".join(mcls.__name__ for mcls in metaclass), metaclass, {})
-    )  # class M_C
-    return metaclass("_".join(cls.__name__ for cls in classes), classes, {})  # class C
-
-
 class DatasetObject(USDObject, Recreatable):
     """
     DatasetObjects are instantiated from a USD file. It is an object that is assumed to come from an iG-supported
