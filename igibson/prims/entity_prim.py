@@ -170,7 +170,7 @@ class EntityPrim(XFormPrim):
             self.disable_gravity()
 
         # Run super
-        super()._post_load(simulator=simulator)
+        super()._post_load()
 
     @property
     def articulated(self):

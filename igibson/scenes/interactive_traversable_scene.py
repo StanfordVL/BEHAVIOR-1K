@@ -551,10 +551,13 @@ class InteractiveTraversableScene(TraversableScene):
             None or DatasetObject: Created iGibson object if a valid objet is found at @prim
         """
         obj = None
+        info = {}
 
         # Extract relevant info from template
         name, prim_path = prim.GetName(), prim.GetPrimPath().__str__()
         category, model, bbox, bbox_center_pos, bbox_center_ori, fixed, in_rooms, random_group, scale, bddl_obj_scope = self._extract_obj_info_from_template_xform(prim=prim)
+        info["bbox_center_pos"] = bbox_center_pos
+        info["bbox_center_ori"] = bbox_center_ori
 
         # Delete the template prim
         simulator.stage.RemovePrim(prim_path)
@@ -704,7 +707,7 @@ class InteractiveTraversableScene(TraversableScene):
             # else:
             #     self.add_object(obj, simulator=None)
 
-        return obj, (bbox_center_pos, bbox_center_ori)
+        return obj, info
 
     def _extract_obj_info_from_template_xform(self, prim):
         """
@@ -781,7 +784,7 @@ class InteractiveTraversableScene(TraversableScene):
                 # add a reference internally
                 if is_template:
                     # Create the object and load it into the simulator
-                    obj, initial_pos_ori = self._create_obj_from_template_xform(simulator=simulator, prim=prim)
+                    obj, info = self._create_obj_from_template_xform(simulator=simulator, prim=prim)
 
                     # Only import the object if we received a valid object
                     if obj is not None:
@@ -790,8 +793,8 @@ class InteractiveTraversableScene(TraversableScene):
                         simulator.import_object(obj, auto_initialize=False)
                         # We also directly set it's bounding box position since this is a known quantity
                         # This is also the only time we'll be able to set fixed object poses
-                        pos = initial_pos_ori[0]
-                        ori = initial_pos_ori[1]
+                        pos = info["bbox_center_pos"]
+                        ori = info["bbox_center_ori"]
                         obj.set_bbox_center_position_orientation(pos, ori)
 
         # disable collision between the fixed links of the fixed objects
