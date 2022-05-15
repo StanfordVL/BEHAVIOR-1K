@@ -136,9 +136,18 @@ class BaseRobot(USDObject, ControllableObject, GymObservable, Registerable):
             **kwargs,
         )
 
-    def _post_load(self, simulator=None):
+    def _load(self, simulator=None):
+        # Run super first
+        prim = super()._load(simulator=simulator)
+
+        # A persistent reference to simulator is needed for AG in ManipulationRobot
+        self._simulator = simulator
+
+        return prim
+
+    def _post_load(self):
         # Run super post load first
-        super()._post_load(simulator=simulator)
+        super()._post_load()
 
         # Search for any sensors this robot might have attached to any of its links
         self._sensors = OrderedDict()
@@ -168,9 +177,6 @@ class BaseRobot(USDObject, ControllableObject, GymObservable, Registerable):
 
         # Update our overall obs modalities
         self._obs_modalities = obs_modalities
-
-        # A persistent reference to simulator is needed for AG in ManipulationRobot
-        self._simulator = simulator
 
     def _initialize(self):
         # Run super first

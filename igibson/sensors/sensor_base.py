@@ -58,9 +58,9 @@ class BaseSensor(XFormPrim, GymObservable, Registerable, metaclass=ABCMeta):
         # Sub-sensors must implement this class directly! Cannot use parent XForm class by default
         raise NotImplementedError("Sensor class must implement _load!")
 
-    def _post_load(self, simulator=None):
+    def _post_load(self):
         # Run super first
-        super()._post_load(simulator=simulator)
+        super()._post_load()
 
         # Set the enabled property based on the internal value
         # This is done so that any subclassed sensors which require simulator specific enabling can handle this now

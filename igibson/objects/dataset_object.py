@@ -434,7 +434,7 @@ class DatasetObject(USDObject):
             if joint.joint_type != JointType.JOINT_FIXED:
                 joint.friction = friction
 
-    def _post_load(self, simulator=None):
+    def _post_load(self):
         # We run this post loading first before any others because we're modifying the load config that will be used
         # downstream
         # Set the scale of this prim according to its bounding box
@@ -494,7 +494,7 @@ class DatasetObject(USDObject):
         # self.load_supporting_surfaces()
 
         # Run super last
-        super()._post_load(simulator=simulator)
+        super()._post_load()
 
     def set_bbox_center_position_orientation(self, pos, orn):
         # TODO - check to make sure works

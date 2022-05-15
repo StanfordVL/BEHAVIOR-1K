@@ -118,9 +118,9 @@ class JointPrim(BasePrim):
 
         return prim
 
-    def _post_load(self, simulator=None):
+    def _post_load(self):
         # run super first
-        super()._post_load(simulator=simulator)
+        super()._post_load()
 
         # Possibly set the bodies
         if "body0" in self._load_config and self._load_config["body0"] is not None:

@@ -116,9 +116,9 @@ class ScanSensor(BaseSensor):
 
         return lidar.GetPrim()
 
-    def _post_load(self, simulator=None):
+    def _post_load(self):
         # run super first
-        super()._post_load(simulator=simulator)
+        super()._post_load()
 
         # Set all the lidar kwargs
         self.min_range = self._load_config["min_range"]

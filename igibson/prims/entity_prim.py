@@ -140,7 +140,7 @@ class EntityPrim(XFormPrim):
         # By default, this prim cannot be instantiated from scratch!
         raise NotImplementedError("By default, an entity prim cannot be created from scratch.")
 
-    def _post_load(self, simulator=None):
+    def _post_load(self):
         # Set visual only flag
         self._visual_only = self._load_config["visual_only"] if \
             "visual_only" in self._load_config and self._load_config["visual_only"] is not None else False
