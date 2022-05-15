@@ -34,7 +34,6 @@ from igibson.utils.assets_utils import (
 from igibson.utils.utils import NumpyEncoder, rotate_vector_3d
 from igibson.utils.registry_utils import SerializableRegistry
 from igibson.utils.constants import JointType
-from igibson.utils.python_utils import Recreatable
 from igibson.utils.utils import NumpyEncoder, rotate_vector_3d
 
 SCENE_SOURCE_PATHS = {
@@ -44,7 +43,7 @@ SCENE_SOURCE_PATHS = {
 }
 
 
-class InteractiveTraversableScene(TraversableScene, Recreatable):
+class InteractiveTraversableScene(TraversableScene):
     """
     Create an interactive scene defined with iGibson Scene Description Format (iGSDF).
     iGSDF is an extension of URDF that we use to define an interactive scene.
@@ -640,8 +639,6 @@ class InteractiveTraversableScene(TraversableScene, Recreatable):
                     rendering_params=self.rendering_params,
                     fixed_base=fixed,
                     bounding_box=bbox,
-                    initial_bbox_center_pos=bbox_center_pos,
-                    initial_bbox_center_ori=bbox_center_ori,
                     in_rooms=in_rooms,
                     texture_randomization=self.texture_randomization,
                     bddl_object_scope=bddl_obj_scope,
@@ -707,7 +704,7 @@ class InteractiveTraversableScene(TraversableScene, Recreatable):
             # else:
             #     self.add_object(obj, simulator=None)
 
-        return obj
+        return obj, (bbox_center_pos, bbox_center_ori)
 
     def _extract_obj_info_from_template_xform(self, prim):
         """
@@ -784,7 +781,7 @@ class InteractiveTraversableScene(TraversableScene, Recreatable):
                 # add a reference internally
                 if is_template:
                     # Create the object and load it into the simulator
-                    obj = self._create_obj_from_template_xform(simulator=simulator, prim=prim)
+                    obj, initial_pos_ori = self._create_obj_from_template_xform(simulator=simulator, prim=prim)
 
                     # Only import the object if we received a valid object
                     if obj is not None:
@@ -793,8 +790,8 @@ class InteractiveTraversableScene(TraversableScene, Recreatable):
                         simulator.import_object(obj, auto_initialize=False)
                         # We also directly set it's bounding box position since this is a known quantity
                         # This is also the only time we'll be able to set fixed object poses
-                        pos = self.object_registry('name', obj.name).initial_bbox_center_pos
-                        ori = self.object_registry('name', obj.name).initial_bbox_center_ori
+                        pos = initial_pos_ori[0]
+                        ori = initial_pos_ori[1]
                         obj.set_bbox_center_position_orientation(pos, ori)
 
         # disable collision between the fixed links of the fixed objects
@@ -815,6 +812,7 @@ class InteractiveTraversableScene(TraversableScene, Recreatable):
         # First, we initialize all of our objects and add the object
         for obj in self.objects:
             obj.initialize()
+            obj.keep_still()
         for robot in self.robots:
             robot.initialize()
 
@@ -839,6 +837,10 @@ class InteractiveTraversableScene(TraversableScene, Recreatable):
             obj.wake()
 
     def reset(self):
+        # Reset the pose and joint configuration of all scene objects.
+        if self._initial_object_states:
+            self.load_state(self._initial_object_states)
+
         # Also open all doors if self.should_open_all_doors is True
         if self.should_open_all_doors:
             self.wake_scene_objects()

@@ -1,7 +1,7 @@
-from abc import ABCMeta, abstractmethod
+from abc import ABC, abstractmethod
 from collections import OrderedDict
 import numpy as np
-from igibson.utils.python_utils import classproperty, Serializable, Registerable
+from igibson.utils.python_utils import classproperty, Serializable, Registerable, Recreatable
 
 
 # Hacky method to serialize "None" values as a number -- we choose magic number 400 since:
@@ -12,7 +12,7 @@ NONE = 400.0
 REGISTERED_OBJECT_STATES = OrderedDict()
 
 
-class BaseObjectState(Serializable, Registerable, metaclass=ABCMeta):
+class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
     """
     Base ObjectState class. Do NOT inherit from this class directly - use either AbsoluteObjectState or
     RelativeObjectState.

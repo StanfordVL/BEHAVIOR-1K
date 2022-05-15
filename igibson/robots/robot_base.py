@@ -15,7 +15,7 @@ from igibson.sensors import create_sensor, SENSOR_PRIMS_TO_SENSOR_CLS, ALL_SENSO
 from igibson.objects.usd_object import USDObject
 from igibson.objects.controllable_object import ControllableObject
 from igibson.utils.gym_utils import GymObservable
-from igibson.utils.python_utils import Recreatable, Registerable, classproperty
+from igibson.utils.python_utils import Registerable, classproperty
 from igibson.utils.utils import rotate_vector_3d
 
 from pxr import UsdPhysics
@@ -27,18 +27,13 @@ REGISTERED_ROBOTS = OrderedDict()
 ALL_SENSOR_MODALITIES.add("proprio")
 
 
-class BaseRobot(USDObject, ControllableObject, GymObservable, Registerable, Recreatable):
+class BaseRobot(USDObject, ControllableObject, GymObservable, Registerable):
     """
     Base class for USD-based robot agents.
 
     This class handles object loading, and provides method interfaces that should be
     implemented by subclassed robots.
     """
-<<<<<<< HEAD
-
-=======
-    @save_init_info
->>>>>>> parent of a5dbc4a1... fix formats and imports
     def __init__(
         self,
         # Shared kwargs in hierarchy

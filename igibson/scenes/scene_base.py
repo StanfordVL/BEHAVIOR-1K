@@ -1,4 +1,4 @@
-from abc import ABCMeta, abstractmethod
+from abc import ABC, abstractmethod
 from collections import OrderedDict
 from future.utils import with_metaclass
 
@@ -20,7 +20,7 @@ from omni.isaac.core.utils.nucleus import find_nucleus_server
 from omni.isaac.core.utils.stage import add_reference_to_stage
 from typing import Optional, Tuple
 import gc
-from igibson.utils.python_utils import classproperty, Serializable, Registerable
+from igibson.utils.python_utils import classproperty, Serializable, Registerable, Recreatable
 from igibson.utils.registry_utils import SerializableRegistry
 from igibson.objects.object_base import BaseObject
 from igibson.objects.dataset_object import DatasetObject
@@ -34,7 +34,7 @@ from igibson.robots.robot_base import BaseRobot
 REGISTERED_SCENES = OrderedDict()
 
 
-class Scene(Serializable, Registerable, metaclass=ABCMeta):
+class Scene(Serializable, Registerable, Recreatable, ABC):
     """
     Base class for all Scene objects.
     Contains the base functionalities and the functions that all derived classes need to implement.
@@ -46,6 +46,7 @@ class Scene(Serializable, Registerable, metaclass=ABCMeta):
         self._initialized = False               # Whether this scene has its internal handles / info initialized or not (occurs AFTER and INDEPENDENTLY from loading!)
         self._registry = None
         self.floor_body_ids = []  # List of ids of the floor_heights
+        self._initial_object_states = {}
 
     @property
     def stage(self) -> Usd.Stage:
@@ -201,6 +202,9 @@ class Scene(Serializable, Registerable, metaclass=ABCMeta):
         self._initialize()
         self._initialized = True
 
+        # Store object states.
+        self._initial_object_states = self.dump_state()
+
     def _create_registry(self):
         """
         Creates the internal registry used for tracking all objects
@@ -355,6 +359,20 @@ class Scene(Serializable, Registerable, metaclass=ABCMeta):
         Resets this scene. Default is no-op
         """
         pass
+
+    def update_initial_object_states(self, obj):
+        """
+        Update an object's information in the scene's _initial_object_states.
+
+        Args:
+            obj: the object to update information about.
+        """
+        if not self._initial_object_states:
+            return
+        if isinstance(obj, BaseRobot):
+            self._initial_object_states["robot_registry"][obj.name] = obj.dump_state()
+        else:
+            self._initial_object_states["object_registry"][obj.name] = obj.dump_state()
 
     @property
     def has_connectivity_graph(self):

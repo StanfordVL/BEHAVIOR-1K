@@ -213,6 +213,7 @@ class StatefulObject(BaseObject):
         return state_dic, idx
 
     def clear_cached_states(self):
+        # Check self._states just in case states have not been initialized yet.
         if not self._states:
             return
         for _, obj_state in self._states.items():

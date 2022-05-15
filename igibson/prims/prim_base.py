@@ -6,11 +6,8 @@
 # distribution of this software and related documentation without an express
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 #
-from abc import ABCMeta, abstractmethod
-from typing import Optional, Tuple
+from abc import ABC, abstractmethod
 from pxr import Gf, Usd, UsdGeom, UsdShade
-from omni.isaac.core.utils.types import XFormPrimState
-from omni.isaac.core.materials import PreviewSurface, OmniGlass, OmniPBR, VisualMaterial
 from omni.isaac.core.utils.rotations import gf_quat_to_np_array
 from omni.isaac.core.utils.transformations import tf_matrix_from_pose
 from omni.isaac.core.utils.prims import (
@@ -22,13 +19,10 @@ from omni.isaac.core.utils.prims import (
     get_prim_parent,
     get_prim_object_type,
 )
-import numpy as np
-import carb
-from omni.isaac.core.utils.stage import get_current_stage
-from igibson.utils.python_utils import Serializable, UniquelyNamed
+from igibson.utils.python_utils import Serializable, UniquelyNamed, Recreatable
 
 
-class BasePrim(Serializable, UniquelyNamed, metaclass=ABCMeta):
+class BasePrim(Serializable, UniquelyNamed, Recreatable, ABC):
     """
     Provides high level functions to deal with a basic prim and its attributes/ properties.
         If there is an Xform prim present at the path, it will use it. Otherwise, a new XForm prim at

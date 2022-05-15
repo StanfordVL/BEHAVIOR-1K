@@ -76,9 +76,8 @@ print([o.name for o in sim.scene.object_registry.objects])
 print([o.name for o in sim.scene.robot_registry.objects])
 
 # Save the simulation environment.
-json_path = os.path.join(TEST_OUT_PATH, "saved_scene.json")
 usd_path = os.path.join(TEST_OUT_PATH, "saved_stage.usd")
-sim.save(json_path, usd_path)
+sim.save(usd_path)
 
 #### LOAD SIMULATION ENV #####
 ## Optional: restart a session and skip the "SAVE SIMULATION ENV" section
@@ -87,9 +86,17 @@ sim.save(json_path, usd_path)
 sim = Simulator()
 
 # Restore the saved sim environment.
-json_path = os.path.join(TEST_OUT_PATH, "saved_scene.json")
 usd_path = os.path.join(TEST_OUT_PATH, "saved_stage.usd")
-sim.restore(json_path, usd_path)
+sim.restore(usd_path)
+
+# Report loaded prims in the world.
+world_prim = sim.world_prim
+for prim in world_prim.GetChildren():
+    name = prim.GetName()
+    # Only process prims that are an Xform.
+    if prim.GetPrimTypeInfo().GetTypeName() == "Xform":
+        name = prim.GetName()
+        print(name)
 
 # Take a look at the registries.
 print([o.name for o in sim.scene.object_registry.objects])
@@ -107,13 +114,6 @@ robot = sim.scene.robot_registry("name", "robot")
 print(f"{robot.name} position: {robot.get_position()}")
 print(f"{robot.name} linear_velocity: {robot.get_linear_velocity()}")
 print(f"{robot.name} angular_velocity: {robot.get_angular_velocity()}")
-
-# Report objects loaded.
-for reg in sim.scene.registry.objects:
-    print("=====")
-    print(reg.name)
-    for obj in reg.objects:
-        print(f"Registry: {reg.name}, obj: {obj.name}")
 
 # Take a step.
 sim.play()

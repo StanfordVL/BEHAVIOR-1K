@@ -4,12 +4,10 @@ import os
 import numpy as np
 
 from igibson.scenes.scene_base import Scene
-from igibson.utils.python_utils import Recreatable
 from igibson.utils.utils import l2_distance
-from igibson.utils.python_utils import save_init_info
 
 
-class EmptyScene(Scene, Recreatable):
+class EmptyScene(Scene):
     """
     An empty scene for debugging.
     """

@@ -248,10 +248,10 @@ class Simulator(SimulationContext):
 
     def import_object(self, obj, auto_initialize=True):
         """
-        Import a non-robot object into the simulator.
+        Import an object into the simulator.
 
         Args:
-            obj (BaseObject): a non-robot object to load
+            obj (BaseObject): an object to load
             auto_initialize (bool): If True, will auto-initialize the requested object on the next simulation step.
                 Otherwise, we assume that the object will call initialize() on its own!
         """
@@ -282,6 +282,7 @@ class Simulator(SimulationContext):
         if len(self._objects_to_initialize) > 0 and self.is_playing():
             for obj in self._objects_to_initialize:
                 obj.initialize()
+                self._scene.update_initial_object_states(obj)
             self._objects_to_initialize = []
             # Also update the scene registry
             # TODO: A better place to put this perhaps?
@@ -323,6 +324,7 @@ class Simulator(SimulationContext):
         if len(self._objects_to_initialize) > 0:
             for obj in self._objects_to_initialize:
                 obj.initialize()
+                self._scene.update_initial_object_states(obj)
             self._objects_to_initialize = []
 
     def step(self, render=True, force_playing=False):
@@ -444,8 +446,8 @@ class Simulator(SimulationContext):
         return
 
     def clear_and_remove_scene(self) -> None:
-        self.clear()
         self._scene = None
+        self.clear()
 
     def clear(self) -> None:
         """Clears the stage leaving the PhysicsScene only if under /World.
@@ -541,20 +543,28 @@ class Simulator(SimulationContext):
             task.post_reset()
         return
 
-    def restore(self, json_path, usd_path):
+    def restore(self, usd_path):
         """
-        Restore a simulation environment from @json_path (scene info) and @usd_path (stage info).
+        Restore a simulation environment from @usd_path.
 
         Args:
-            json_path (str): Full path of JSON file to load, which contains information
+            usd_path (str): Full path of USD file to load, which contains information
                 to recreate a scene.
-            usd_path (str): Full path of USD file to load, which contains the saved stage.
         """
+        if not usd_path.endswith(".usd"):
+            logging.error("You have to define the full usd_path to load from.")
+            return
+
+        # Load saved stage to get saved_info.
+        self.load_stage(usd_path)
+
         # Load saved info.
-        with open(json_path, 'r') as f:
-            saved_info = json.load(f)
+        world_prim = get_prim_at_path("/World")
+        saved_info_str = world_prim.GetCustomDataByKey("saved_info")
+        saved_info = json.loads(saved_info_str)
         init_info = saved_info["init_info"] 
         scene_state = saved_info["state"]
+        initial_object_states = saved_info["initial_object_states"]
 
         # Clear the current environment and delete any currently loaded scene.
         self.clear_and_remove_scene()
@@ -563,6 +573,9 @@ class Simulator(SimulationContext):
         # Note that the imported scene only have the default objects loaded.
         recreated_scene = create_object_from_init_info(init_info["scene"])
         self.import_scene(scene=recreated_scene)
+
+        # Clear the current environment again (but self.scene is not deleted).
+        self.scene._stage = self.stage
 
         # Clear the current environment again (but self.scene is not deleted).
         self.clear()
@@ -619,24 +632,26 @@ class Simulator(SimulationContext):
         # Restore the state of all objects.
         self.scene.load_state(scene_state)
 
+        # Restore scene's _initial_object_states.
+        self.scene._initial_object_states = initial_object_states
+
         logging.info("The saved simualtion environment loaded.")
     
         return
 
-    def save(self, json_path, usd_path):
+    def save(self, usd_path):
         """
-        Saves the current simulation environment to @json_path (scene info) and @usd_path (stage info).
+        Saves the current simulation environment to @usd_path.
 
         Args:
-            json_path (str): Full path of JSON file to save, which contains information
+            usd_path (str): Full path of USD file to load, which contains information
                 to recreate the current scene.
-            usd_path (str): Full path of USD file to load, which contains the saved stage.
         """
         if not self.scene:
             logging.warning("Scene has not been loaded. Nothing to save.")
             return
-        if not json_path.endswith(".json") or not usd_path.endswith(".usd"):
-            logging.error("You have to define the full json_path and the full usd_path to save the scene to.")
+        if not usd_path.endswith(".usd"):
+            logging.error("You have to define the full usd_path to save the scene to.")
             return
 
         # Get scene init info.
@@ -657,9 +672,13 @@ class Simulator(SimulationContext):
         for obj in self.scene.robot_registry.objects:
             saved_info["init_info"][obj.name] = obj._init_info
 
+        # Save scene's initial object states.
+        saved_info["initial_object_states"] = self.scene._initial_object_states
+
         # Dump saved info.
-        with open(json_path, 'w') as f:
-            json.dump(saved_info, f, cls=NumpyEncoder)
+        world_prim = get_prim_at_path("/World")
+        saved_info_str = json.dumps(saved_info, cls=NumpyEncoder)
+        world_prim.SetCustomDataByKey("saved_info", saved_info_str)
 
         # Save stage. This needs to happen at the end since some objects may get reset after sim.stop().
         self.stop()

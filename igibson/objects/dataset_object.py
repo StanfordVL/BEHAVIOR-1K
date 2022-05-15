@@ -17,11 +17,11 @@ from scipy.spatial.transform import Rotation
 import igibson
 from igibson.objects.usd_object import USDObject
 from igibson.utils.constants import AVERAGE_CATEGORY_SPECS, DEFAULT_JOINT_FRICTION, SPECIAL_JOINT_FRICTIONS, JointType
-from igibson.utils.python_utils import Recreatable
+import igibson.utils.transform_utils as T
 from igibson.utils.usd_utils import BoundingBoxAPI
 
 
-class DatasetObject(USDObject, Recreatable):
+class DatasetObject(USDObject):
     """
     DatasetObjects are instantiated from a USD file. It is an object that is assumed to come from an iG-supported
     dataset. These objects should contain additional metadata, including aggregate statistics across the
@@ -45,8 +45,6 @@ class DatasetObject(USDObject, Recreatable):
         abilities=None,
 
         bounding_box=None,
-        initial_bbox_center_pos=None,
-        initial_bbox_center_ori=None,
         fit_avg_dim_volume=False,
         in_rooms=None,
         texture_randomization=False,
@@ -135,9 +133,6 @@ class DatasetObject(USDObject, Recreatable):
         # Make sure only one of bounding_box and scale are specified
         if bounding_box is not None and scale is not None:
             raise Exception("You cannot define both scale and bounding box size for an DatasetObject")
-
-        self.initial_bbox_center_pos = initial_bbox_center_pos
-        self.initial_bbox_center_ori = initial_bbox_center_ori
 
         # Add info to load config
         load_config = dict() if load_config is None else load_config

@@ -122,7 +122,6 @@ class VisionSensor(BaseSensor):
         # Define a new camera prim at the current stage
         stage = get_current_stage()
         prim = UsdGeom.Camera.Define(stage, self._prim_path).GetPrim()
-        print("HEY LOAD!")
         return prim
 
     def _post_load(self, simulator=None):
@@ -146,7 +145,6 @@ class VisionSensor(BaseSensor):
 
         # Initialize sensors
         self._initialize_sensors(names=self._modalities)
-        print("HEY POST LOAD!")
 
     def _initialize_sensors(self, names, timeout=10.0):
         """Initializes a raw sensor in the simulation.
@@ -156,7 +154,6 @@ class VisionSensor(BaseSensor):
                 If they are not part of self._RAW_SENSOR_TYPES' keys, we will simply pass over them
             timeout (int): Maximum time in seconds to attempt to initialize sensors.
         """
-        print("HEY _initialize_sensors!")
         # Standardize the input and grab the intersection with all possible raw sensors
         names = set([names]) if isinstance(names, str) else set(names)
         names = names.intersection(set(self._RAW_SENSOR_TYPES.keys()))

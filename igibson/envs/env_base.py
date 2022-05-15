@@ -9,10 +9,10 @@ from igibson.simulator_omni import Simulator
 # from igibson.simulator_vr import SimulatorVR
 from igibson.utils.gym_utils import GymObservable
 from igibson.utils.utils import parse_config
-from igibson.utils.python_utils import merge_nested_dicts, create_class_from_registry_and_config, Serializable
+from igibson.utils.python_utils import merge_nested_dicts, create_class_from_registry_and_config, Serializable, Recreatable
 
 
-class BaseEnv(gym.Env, GymObservable, Serializable):
+class BaseEnv(gym.Env, GymObservable, Serializable, Recreatable):
     """
     Base Env class that handles loading scene and robot, following OpenAI Gym interface.
     Functions like reset and step are not implemented.
