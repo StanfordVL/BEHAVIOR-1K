@@ -3,26 +3,26 @@ import logging
 import os
 import random
 import xml.etree.ElementTree as ET
-from collections import OrderedDict, defaultdict
-from itertools import combinations
+from collections import defaultdict
 from xml.dom import minidom
+from itertools import combinations
+from collections import OrderedDict
 
 import numpy as np
-from omni.isaac.core.utils.rotations import gf_quat_to_np_array
-from pxr.Sdf import ValueTypeNames as VT
 
-from igibson.maps.segmentation_map import SegmentationMap
+from pxr.Sdf import ValueTypeNames as VT
+from omni.isaac.core.utils.rotations import gf_quat_to_np_array
 
 # from igibson.registries.object_states_registry import ObjectStatesRegistry
 # from igibson.object_states.factory import get_state_from_name, get_state_name
 # from igibson.object_states.object_state_base import AbsoluteObjectState
 from igibson.objects.dataset_object import DatasetObject
-
 # from igibson.objects.multi_object_wrappers import ObjectGrouper, ObjectMultiplexer
 # from igibson.robots import REGISTERED_ROBOTS
 # from igibson.robots.behavior_robot import BehaviorRobot
 # from igibson.robots.robot_base import BaseRobot
 from igibson.scenes.traversable_scene import TraversableScene
+from igibson.maps.segmentation_map import SegmentationMap
 from igibson.utils.assets_utils import (
     get_3dfront_scene_path,
     get_cubicasa_scene_path,
@@ -31,6 +31,8 @@ from igibson.utils.assets_utils import (
     get_ig_model_path,
     get_ig_scene_path,
 )
+from igibson.utils.utils import NumpyEncoder, rotate_vector_3d
+from igibson.utils.registry_utils import SerializableRegistry
 from igibson.utils.constants import JointType
 from igibson.utils.python_utils import Recreatable
 from igibson.utils.utils import NumpyEncoder, rotate_vector_3d
@@ -50,7 +52,6 @@ class InteractiveTraversableScene(TraversableScene, Recreatable):
     InteractiveIndoorScene inherits from TraversableScene the functionalities to compute shortest path and other
     navigation functionalities.
     """
-
     def __init__(
         self,
         scene_model,
@@ -167,6 +168,7 @@ class InteractiveTraversableScene(TraversableScene, Recreatable):
         # ObjectGrouper
         self.object_groupers = defaultdict(dict)
 
+
     def get_scene_loading_info(self, usd_file=None, usd_path=None):
         """
         Gets scene loading info to know what single USD file to load, either specified indirectly via @usd_file or
@@ -193,11 +195,8 @@ class InteractiveTraversableScene(TraversableScene, Recreatable):
                 if not self.object_randomization:
                     fname = "{}_best".format(self.scene_model)
                 else:
-                    fname = (
-                        self.scene_model
-                        if self.predefined_object_randomization_idx is None
-                        else "{}_random_{}".format(self.scene_model, self.predefined_object_randomization_idx)
-                    )
+                    fname = self.scene_model if self.predefined_object_randomization_idx is None else \
+                        "{}_random_{}".format(self.scene_model, self.predefined_object_randomization_idx)
             scene_file = os.path.join(self.scene_dir, "usd", "{}.usd".format(fname))
 
         # Store values internally
@@ -219,13 +218,11 @@ class InteractiveTraversableScene(TraversableScene, Recreatable):
         :param load_room_types: only load objects in these room types into the scene (a list of str)
         :param load_room_instances: only load objects in these room instances into the scene (a list of str)
         """
-        self.load_object_categories = (
-            [load_object_categories] if isinstance(load_object_categories, str) else load_object_categories
-        )
+        self.load_object_categories = [load_object_categories] if \
+            isinstance(load_object_categories, str) else load_object_categories
 
-        self.not_load_object_categories = (
-            [not_load_object_categories] if isinstance(not_load_object_categories, str) else not_load_object_categories
-        )
+        self.not_load_object_categories = [not_load_object_categories] if \
+            isinstance(not_load_object_categories, str) else not_load_object_categories
 
         if load_room_instances is not None:
             if isinstance(load_room_instances, str):
@@ -558,18 +555,7 @@ class InteractiveTraversableScene(TraversableScene, Recreatable):
 
         # Extract relevant info from template
         name, prim_path = prim.GetName(), prim.GetPrimPath().__str__()
-        (
-            category,
-            model,
-            bbox,
-            bbox_center_pos,
-            bbox_center_ori,
-            fixed,
-            in_rooms,
-            random_group,
-            scale,
-            bddl_obj_scope,
-        ) = self._extract_obj_info_from_template_xform(prim=prim)
+        category, model, bbox, bbox_center_pos, bbox_center_ori, fixed, in_rooms, random_group, scale, bddl_obj_scope = self._extract_obj_info_from_template_xform(prim=prim)
 
         # Delete the template prim
         simulator.stage.RemovePrim(prim_path)
@@ -638,9 +624,7 @@ class InteractiveTraversableScene(TraversableScene, Recreatable):
                 usd_path = os.path.join(model_path, "usd", model + ".usd")
 
                 # Make sure only a bounding box OR scale is specified
-                assert (
-                    bbox is None or scale is None
-                ), f"Both scale and bounding box size was defined for a USDObject in the template scene!"
+                assert bbox is None or scale is None, f"Both scale and bounding box size was defined for a USDObject in the template scene!"
 
                 # Make sure scale is, at the minimum, specified
                 if bbox is None and scale is None:
@@ -809,8 +793,8 @@ class InteractiveTraversableScene(TraversableScene, Recreatable):
                         simulator.import_object(obj, auto_initialize=False)
                         # We also directly set it's bounding box position since this is a known quantity
                         # This is also the only time we'll be able to set fixed object poses
-                        pos = self.object_registry("name", obj.name).initial_bbox_center_pos
-                        ori = self.object_registry("name", obj.name).initial_bbox_center_ori
+                        pos = self.object_registry('name', obj.name).initial_bbox_center_pos
+                        ori = self.object_registry('name', obj.name).initial_bbox_center_ori
                         obj.set_bbox_center_position_orientation(pos, ori)
 
         # disable collision between the fixed links of the fixed objects
@@ -998,7 +982,7 @@ class InteractiveTraversableScene(TraversableScene, Recreatable):
                 link.attrib["bounding_box"] = bounding_box
 
             if hasattr(obj, "model_name"):
-                link.attrib["model"] = obj.model_name  # TODO: Update
+                link.attrib["model"] = obj.model_name # TODO: Update
             elif hasattr(obj, "model_path"):
                 model = os.path.basename(obj.model_path)
                 link.attrib["model"] = model
@@ -1020,7 +1004,7 @@ class InteractiveTraversableScene(TraversableScene, Recreatable):
 
         # Common logic for objects that are both in the scene & otherwise.
         base_com_pose = (pos, orn)
-        joint_states = obj.get_joint_states()  # TODO: Outdated API. Use get_joints_state() instead
+        joint_states = obj.get_joint_states()       # TODO: Outdated API. Use get_joints_state() instead
         link.attrib["base_com_pose"] = json.dumps(base_com_pose, cls=NumpyEncoder)
         link.attrib["base_velocities"] = json.dumps(obj.get_velocities(), cls=NumpyEncoder)
         link.attrib["joint_states"] = json.dumps(joint_states, cls=NumpyEncoder)

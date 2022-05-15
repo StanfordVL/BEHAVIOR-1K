@@ -7,19 +7,26 @@
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 #
 from collections import Iterable, OrderedDict
-
-import carb
-import numpy as np
-from omni.isaac.core.materials import OmniGlass, OmniPBR, PreviewSurface
-from omni.isaac.core.utils.prims import get_prim_at_path, get_prim_parent, is_prim_path_valid
-from omni.isaac.core.utils.rotations import gf_quat_to_np_array
-from omni.isaac.core.utils.stage import get_current_stage
-from omni.isaac.core.utils.transformations import tf_matrix_from_pose
+from typing import Optional, Tuple
+from pxr import Gf, Usd, UsdGeom, UsdShade, UsdPhysics
 from omni.isaac.core.utils.types import XFormPrimState
-from pxr import Gf, Usd, UsdGeom, UsdPhysics, UsdShade
-
+from omni.isaac.core.materials import PreviewSurface, OmniGlass, OmniPBR, VisualMaterial
+from omni.isaac.core.utils.rotations import gf_quat_to_np_array
+from omni.isaac.core.utils.transformations import tf_matrix_from_pose
+from omni.isaac.core.utils.prims import (
+    get_prim_at_path,
+    move_prim,
+    query_parent_path,
+    is_prim_path_valid,
+    define_prim,
+    get_prim_parent,
+    get_prim_object_type,
+)
+import numpy as np
+import carb
+from omni.isaac.core.utils.stage import get_current_stage
 from igibson.prims.prim_base import BasePrim
-from igibson.utils.transform_utils import mat2euler, quat2mat
+from igibson.utils.transform_utils import quat2mat, mat2euler
 
 
 class XFormPrim(BasePrim):
@@ -42,7 +49,11 @@ class XFormPrim(BasePrim):
     """
 
     def __init__(
-        self, prim_path, name, load_config=None, **kwargs,
+        self,
+        prim_path,
+        name,
+        load_config=None,
+        **kwargs,
     ):
         # Other values that will be filled in at runtime
         self._default_state = None
@@ -52,7 +63,10 @@ class XFormPrim(BasePrim):
 
         # Run super method
         super().__init__(
-            prim_path=prim_path, name=name, load_config=load_config, **kwargs,
+            prim_path=prim_path,
+            name=name,
+            load_config=load_config,
+            **kwargs,
         )
 
     def _load(self, simulator=None):
@@ -77,11 +91,8 @@ class XFormPrim(BasePrim):
         #     self._set_xform_properties()
 
         # Create collision filter API
-        self._collision_filter_api = (
-            UsdPhysics.FilteredPairsAPI(self._prim)
-            if self._prim.HasAPI(UsdPhysics.FilteredPairsAPI)
-            else UsdPhysics.FilteredPairsAPI.Apply(self._prim)
-        )
+        self._collision_filter_api = UsdPhysics.FilteredPairsAPI(self._prim) if \
+            self._prim.HasAPI(UsdPhysics.FilteredPairsAPI) else UsdPhysics.FilteredPairsAPI.Apply(self._prim)
 
         # Optionally set the scale and visibility
         if "scale" in self._load_config and self._load_config["scale"] is not None:
@@ -277,7 +288,7 @@ class XFormPrim(BasePrim):
             position = current_position
         if orientation is None:
             orientation = current_orientation
-        orientation = orientation[[3, 0, 1, 2]]  # Flip from x,y,z,w to w,x,y,z
+        orientation = orientation[[3, 0, 1, 2]]     # Flip from x,y,z,w to w,x,y,z
         my_world_transform = tf_matrix_from_pose(translation=position, orientation=orientation)
         parent_world_tf = UsdGeom.Xformable(get_prim_parent(self._prim)).ComputeLocalToWorldTransform(
             Usd.TimeCode.Default()
@@ -288,8 +299,7 @@ class XFormPrim(BasePrim):
         calculated_translation = transform.GetTranslation()
         calculated_orientation = transform.GetRotation().GetQuat()
         self.set_local_pose(
-            translation=np.array(calculated_translation),
-            orientation=gf_quat_to_np_array(calculated_orientation)[[1, 2, 3, 0]],  # Flip from w,x,y,z to x,y,z,w
+            translation=np.array(calculated_translation), orientation=gf_quat_to_np_array(calculated_orientation)[[1, 2, 3, 0]]     # Flip from w,x,y,z to x,y,z,w
         )
         return
 
@@ -460,4 +470,7 @@ class XFormPrim(BasePrim):
 
     def _deserialize(self, state):
         # We deserialize deterministically by knowing the order of values -- pos, ori
-        return OrderedDict(pos=state[0:3], ori=state[3:7],), 7
+        return OrderedDict(
+            pos=state[0:3],
+            ori=state[3:7],
+        ), 7

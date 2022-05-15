@@ -6,20 +6,21 @@
 # distribution of this software and related documentation without an express
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 #
+from typing import Optional, Tuple
 from collections import OrderedDict
-
-import numpy as np
-from omni.isaac.contact_sensor import _contact_sensor
 from omni.isaac.core.utils.prims import get_prim_at_path, get_prim_parent
-from omni.isaac.core.utils.rotations import gf_quat_to_np_array
 from omni.isaac.core.utils.transformations import tf_matrix_from_pose
+from omni.isaac.core.utils.rotations import gf_quat_to_np_array
+from pxr import Gf, UsdPhysics, Usd, UsdGeom, PhysxSchema
+import numpy as np
 from omni.isaac.dynamic_control import _dynamic_control
-from pxr import Gf, PhysxSchema, Usd, UsdGeom, UsdPhysics
+from omni.isaac.contact_sensor import _contact_sensor
+import carb
 
 import igibson.macros as m
-from igibson.prims.geom_prim import CollisionGeomPrim, VisualGeomPrim
 from igibson.prims.xform_prim import XFormPrim
-from igibson.utils.types import GEOM_TYPES, CsRawData, DynamicState
+from igibson.prims.geom_prim import CollisionGeomPrim, VisualGeomPrim
+from igibson.utils.types import DynamicState, CsRawData, GEOM_TYPES
 
 
 class RigidPrim(XFormPrim):
@@ -48,11 +49,14 @@ class RigidPrim(XFormPrim):
     """
 
     def __init__(
-        self, prim_path, name, load_config=None,
+        self,
+        prim_path,
+        name,
+        load_config=None,
     ):
         # Other values that will be filled in at runtime
-        self._dc = None  # Dynamic control interface
-        self._cs = None  # Contact sensor interface
+        self._dc = None                     # Dynamic control interface
+        self._cs = None                     # Contact sensor interface
         self._handle = None
         self._contact_handle = None
         self._body_name = None
@@ -67,7 +71,9 @@ class RigidPrim(XFormPrim):
 
         # Run super init
         super().__init__(
-            prim_path=prim_path, name=name, load_config=load_config,
+            prim_path=prim_path,
+            name=name,
+            load_config=load_config,
         )
 
     def _load(self, simulator=None):
@@ -81,36 +87,22 @@ class RigidPrim(XFormPrim):
         super()._post_load(simulator=simulator)
 
         # Set visual only flag
-        self._visual_only = (
-            self._load_config["visual_only"]
-            if "visual_only" in self._load_config and self._load_config["visual_only"] is not None
-            else False
-        )
+        self._visual_only = self._load_config["visual_only"] if \
+            "visual_only" in self._load_config and self._load_config["visual_only"] is not None else False
 
         # Apply rigid body and mass APIs
-        self._rigid_api = (
-            UsdPhysics.RigidBodyAPI(self._prim)
-            if self._prim.HasAPI(UsdPhysics.RigidBodyAPI)
-            else UsdPhysics.RigidBodyAPI.Apply(self._prim)
-        )
-        self._physx_rigid_api = (
-            PhysxSchema.PhysxRigidBodyAPI(self._prim)
-            if self._prim.HasAPI(PhysxSchema.PhysxRigidBodyAPI)
-            else PhysxSchema.PhysxRigidBodyAPI.Apply(self._prim)
-        )
-        self._mass_api = (
-            UsdPhysics.MassAPI(self._prim)
-            if self._prim.HasAPI(UsdPhysics.MassAPI)
-            else UsdPhysics.MassAPI.Apply(self._prim)
-        )
+        self._rigid_api = UsdPhysics.RigidBodyAPI(self._prim) if self._prim.HasAPI(UsdPhysics.RigidBodyAPI) else \
+            UsdPhysics.RigidBodyAPI.Apply(self._prim)
+        self._physx_rigid_api = PhysxSchema.PhysxRigidBodyAPI(self._prim) if \
+            self._prim.HasAPI(PhysxSchema.PhysxRigidBodyAPI) else PhysxSchema.PhysxRigidBodyAPI.Apply(self._prim)
+        self._mass_api = UsdPhysics.MassAPI(self._prim) if self._prim.HasAPI(UsdPhysics.MassAPI) else \
+            UsdPhysics.MassAPI.Apply(self._prim)
 
         # Only create contact report api if we're not visual only
         if not self._visual_only and m.ENABLE_CONTACT_REPORTING:
-            self._physx_rigid_api = (
-                PhysxSchema.PhysxContactReportAPI(self._prim)
-                if self._prim.HasAPI(PhysxSchema.PhysxContactReportAPI)
-                else PhysxSchema.PhysxContactReportAPI.Apply(self._prim)
-            )
+            self._physx_rigid_api = PhysxSchema.PhysxContactReportAPI(self._prim) if \
+                self._prim.HasAPI(PhysxSchema.PhysxContactReportAPI) else \
+                PhysxSchema.PhysxContactReportAPI.Apply(self._prim)
 
         # Possibly set the mass / density
         if "mass" in self._load_config and self._load_config["mass"] is not None:
@@ -164,7 +156,10 @@ class RigidPrim(XFormPrim):
         lin_vel = self.get_linear_velocity()
         ang_vel = self.get_angular_velocity()
         self._default_state = DynamicState(
-            position=pos, orientation=ori, linear_velocity=lin_vel, angular_velocity=ang_vel,
+            position=pos,
+            orientation=ori,
+            linear_velocity=lin_vel,
+            angular_velocity=ang_vel,
         )
 
         # Possibly disable gravity
@@ -184,6 +179,8 @@ class RigidPrim(XFormPrim):
     #     # TODO: Uncomment later, but this significantly slows down everything
     #     # Create sensor
     #     self._contact_handle = self._cs.add_sensor_on_body(self._prim_path, props)
+
+
 
     # def _remove_contact_sensor(self):
     #     """
@@ -344,10 +341,7 @@ class RigidPrim(XFormPrim):
             transform.SetMatrix(Gf.Matrix4d(np.transpose(local_transform)))
             calculated_translation = transform.GetTranslation()
             calculated_orientation = transform.GetRotation().GetQuat()
-            pos, ori = (
-                np.array(calculated_translation),
-                gf_quat_to_np_array(calculated_orientation)[[1, 2, 3, 0]],
-            )  # Flip from w,x,y,z to x,y,z,w to
+            pos, ori = np.array(calculated_translation), gf_quat_to_np_array(calculated_orientation)[[1, 2, 3, 0]] # Flip from w,x,y,z to x,y,z,w to
         else:
             # Call super method by default
             pos, ori = super().get_local_pose()
@@ -441,7 +435,11 @@ class RigidPrim(XFormPrim):
         return self._default_state
 
     def set_default_state(
-        self, position=None, orientation=None, linear_velocity=None, angular_velocity=None,
+        self,
+        position=None,
+        orientation=None,
+        linear_velocity=None,
+        angular_velocity=None,
     ):
         """Sets the default state of the prim, that will be used after each reset.
 

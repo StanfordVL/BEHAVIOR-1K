@@ -1,12 +1,12 @@
 """
 A set of utility functions for general python usage
 """
-import inspect
-import logging
 from abc import ABCMeta
 from copy import deepcopy
+from collections import OrderedDict, Iterable
 from importlib import import_module
-
+import inspect
+import logging
 import numpy as np
 
 # Global dictionary storing all unique names
@@ -15,6 +15,7 @@ CLASS_NAMES = set()
 
 
 class classproperty:
+
     def __init__(self, fget):
         self.fget = fget
 
@@ -28,7 +29,6 @@ def save_init_info(func):
 
     _init_info contains class name and class constructor's input args.
     """
-
     def return_func(*args, **kwargs):
         # Get __init__ arguments.
         arg_spec = inspect.getfullargspec(func)
@@ -54,7 +54,7 @@ def save_init_info(func):
         valid_keywords = set(kwargs) & set(arg_names)
         kwarg_dict = {k: kwargs[k] for k in valid_keywords}
         self_var._init_info["args"].update(kwarg_dict)
-
+    
         func(*args, **kwargs)
 
     return return_func
@@ -191,7 +191,11 @@ def extract_class_init_kwargs_from_dict(cls, dic, copy=False):
             corresponding values
     """
     # extract only relevant kwargs for this specific backbone
-    return extract_subset_dict(dic=dic, keys=get_class_init_kwargs(cls), copy=copy,)
+    return extract_subset_dict(
+        dic=dic,
+        keys=get_class_init_kwargs(cls),
+        copy=copy,
+    )
 
 
 def assert_valid_key(key, valid_keys, name=None):
@@ -206,8 +210,7 @@ def assert_valid_key(key, valid_keys, name=None):
     if name is None:
         name = "value"
     assert key in valid_keys, "Invalid {} received! Valid options are: {}, got: {}".format(
-        name, valid_keys.keys() if isinstance(valid_keys, dict) else valid_keys, key
-    )
+        name, valid_keys.keys() if isinstance(valid_keys, dict) else valid_keys, key)
 
 
 def create_class_from_registry_and_config(cls_name, cls_registry, cfg, cls_type_descriptor):
@@ -242,11 +245,11 @@ class UniquelyNamed:
     Simple class that implements a name property, that must be implemented by a subclass. Note that any @Named
     entity must be UNIQUE!
     """
-
     def __init__(self, *args, **kwargs):
         global NAMES
         # Register this object, making sure it's name is unique
-        assert self.name not in NAMES, f"UniquelyNamed object with name {self.name} already exists!"
+        assert self.name not in NAMES, \
+            f"UniquelyNamed object with name {self.name} already exists!"
         NAMES.add(self.name)
 
     def __del__(self):
@@ -271,7 +274,8 @@ class UniquelyNamedNonInstance:
     def __init_subclass__(cls, **kwargs):
         global CLASS_NAMES
         # Register this object, making sure it's name is unique
-        assert cls.name not in CLASS_NAMES, f"UniquelyNamed class with name {cls.name} already exists!"
+        assert cls.name not in CLASS_NAMES, \
+            f"UniquelyNamed class with name {cls.name} already exists!"
         CLASS_NAMES.add(cls.name)
 
     @classproperty
@@ -334,7 +338,6 @@ class Serializable:
     Simple class that provides an abstract interface to dump / load states, optionally with serialized functionality
     as well.
     """
-
     @property
     def state_size(self):
         """
@@ -452,10 +455,8 @@ class Serializable:
         """
         # Sanity check the idx with the expected state size
         state_dict, idx = self._deserialize(state=state)
-        assert idx == self.state_size, (
-            f"Invalid state deserialization occurred! Expected {self.state_size} total "
-            f"values to be deserialized, only {idx} were."
-        )
+        assert idx == self.state_size, f"Invalid state deserialization occurred! Expected {self.state_size} total " \
+                                           f"values to be deserialized, only {idx} were."
 
         return state_dict
 
@@ -464,7 +465,6 @@ class SerializableNonInstance:
     """
     Identical to Serializable, but intended for non-instanceable classes
     """
-
     @classproperty
     def state_size(cls):
         """
@@ -591,10 +591,8 @@ class SerializableNonInstance:
         # Sanity check the idx with the expected state size
         state_dict, idx = cls._deserialize(state=state)
         assert cls.state_size is not None, "State size must be specified by subclass!"
-        assert idx == cls.state_size, (
-            f"Invalid state deserialization occurred! Expected {cls.state_size} total "
-            f"values to be deserialized, only {idx} were."
-        )
+        assert idx == cls.state_size, f"Invalid state deserialization occurred! Expected {cls.state_size} total " \
+                                      f"values to be deserialized, only {idx} were."
 
         return state_dict
 
