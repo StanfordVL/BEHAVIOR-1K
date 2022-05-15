@@ -210,21 +210,21 @@ class VisionSensor(BaseSensor):
         xform_orient_op = self.get_attribute("xformOp:rotateXYZ")
         return np.array(xform_translate_op), euler2quat(np.array(xform_orient_op))
 
-    def set_local_pose(self, translation=None, orientation=None):
-        # We have to overwrite this because camera prims can't set their quat for some reason ):
-        properties = self.prim.GetPropertyNames()
-        if translation is not None:
-            translation = Gf.Vec3d(*translation.tolist())
-            if "xformOp:translate" not in properties:
-                carb.log_error(
-                    "Translate property needs to be set for {} before setting its position".format(self.name)
-                )
-            self.set_attribute("xformOp:translate", translation)
-        if orientation is not None:
-            xform_op = self._prim.GetAttribute("xformOp:rotateXYZ")
-            # Convert to euler and set
-            rot_euler = quat2euler(quat=orientation)
-            xform_op.Set(Gf.Vec3f(*rot_euler.tolist()))
+    # def set_local_pose(self, translation=None, orientation=None):
+    #     # We have to overwrite this because camera prims can't set their quat for some reason ):
+    #     properties = self.prim.GetPropertyNames()
+    #     if translation is not None:
+    #         translation = Gf.Vec3d(*translation.tolist())
+    #         if "xformOp:translate" not in properties:
+    #             carb.log_error(
+    #                 "Translate property needs to be set for {} before setting its position".format(self.name)
+    #             )
+    #         self.set_attribute("xformOp:translate", translation)
+    #     if orientation is not None:
+    #         xform_op = self._prim.GetAttribute("xformOp:rotateXYZ")
+    #         # Convert to euler and set
+    #         rot_euler = quat2euler(quat=orientation)
+    #         xform_op.Set(Gf.Vec3f(*rot_euler.tolist()))
 
     def set_window_position(self, x, y):
         """Set the position of the viewport window.
