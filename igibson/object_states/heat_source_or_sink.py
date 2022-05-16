@@ -140,19 +140,17 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin):
         )
 
         self.marker.load(simulator=self.simulator)
-        self.marker.set_position(np.array([0, 0, -100]))
+        self.marker.visible = False
 
     def _update(self):
         self.status, self.position = self._compute_state_and_position()
 
         # Move the marker.
-        marker_position = np.array([0, 0, -100])
         if self.position is not None:
-            marker_position = self.position
-
-        # Lazy update of marker position
-        if not np.all(np.isclose(marker_position, self.marker.get_position())):
-            self.marker.set_position(marker_position)
+            self.marker.set_position(self.position)
+            self.marker.visible = True
+        else:
+            self.marker.visible = False
 
     def _get_value(self):
         return self.status, self.position

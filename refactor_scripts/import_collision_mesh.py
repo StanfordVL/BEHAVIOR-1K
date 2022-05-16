@@ -75,7 +75,6 @@ def import_obj_collision_mesh(obj_category, obj_model, name):
     # Save stage
     sim.save_stage(usd_path=usd_path)
 
-#import_models_collision_mesh_from_scene(urdf=URDF)
-import_obj_collision_mesh("stove", "101908", "stove")
+import_models_collision_mesh_from_scene(urdf=URDF)
 
 igibson.app.close()

@@ -146,7 +146,7 @@ class BasePrim(Serializable, UniquelyNamed, metaclass=ABCMeta):
         if simulator:
             simulator.stage.RemovePrim(self.prim_path)
         else:
-            get_current_stage.RemovePrim(self.prim_path)
+            get_current_stage().RemovePrim(self.prim_path)
 
     @abstractmethod
     def _load(self, simulator=None):
