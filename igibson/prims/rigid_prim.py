@@ -188,6 +188,28 @@ class RigidPrim(XFormPrim):
     #     """
     #     self._cs.remove_sensor(self._contact_handle)
 
+    def enable_collisions(self):
+        """
+        Enable collisions for this RigidPrim
+        """
+        # Iterate through all owned collision meshes and toggle on their collisions
+        for col_mesh in self._collision_meshes.values():
+            col_mesh.collision_enabled = True
+
+    def disable_collisions(self):
+        """
+        Disable collisions for this RigidPrim
+        """
+        # Iterate through all owned collision meshes and toggle off their collisions
+        for col_mesh in self._collision_meshes.values():
+            col_mesh.collision_enabled = False
+
+    def update_handles(self):
+        """
+        Updates all internal handles for this prim, in case they change since initialization
+        """
+        self._handle = self._dc.get_rigid_body(self._prim_path)
+
     def contact_list(self):
         """
         Get list of all current contacts with this rigid body
