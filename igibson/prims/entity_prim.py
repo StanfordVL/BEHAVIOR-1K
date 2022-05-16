@@ -151,14 +151,11 @@ class EntityPrim(XFormPrim):
             # Only process prims that are an Xform
             if prim.GetPrimTypeInfo().GetTypeName() == "Xform":
                 link_name = prim.GetName()
-                is_metalink = prim.GetAttribute("ig:is_metalink").Get() or False
                 link = RigidPrim(
                     prim_path=prim.GetPrimPath().__str__(),
                     name=f"{self._name}:{link_name}",
-                    load_config={"visual_only": self._visual_only or is_metalink},
+                    load_config={"visual_only": self._visual_only},
                 )
-                if is_metalink:
-                    link.disable_gravity()
                 self._links[link_name] = link
 
         # Disable any requested collision pairs
