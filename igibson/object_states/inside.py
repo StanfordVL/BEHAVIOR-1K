@@ -2,7 +2,6 @@
 from IPython import embed
 
 import igibson
-# # from igibson.external.pybullet_tools.utils import aabb_contains_point
 from igibson.object_states.aabb import AABB
 from igibson.object_states.adjacency import HorizontalAdjacency, VerticalAdjacency, flatten_planes
 from igibson.object_states.kinematics import KinematicsMixin
@@ -10,6 +9,7 @@ from igibson.object_states.memoization import PositionalValidationMemoizedObject
 from igibson.object_states.object_state_base import BooleanState, RelativeObjectState
 from igibson.object_states.pose import Pose
 from igibson.object_states.utils import sample_kinematics
+from igibson.utils.usd_utils import BoundingBoxAPI
 from igibson.utils.utils import restoreState
 
 
@@ -19,7 +19,7 @@ class Inside(PositionalValidationMemoizedObjectStateMixin, KinematicsMixin, Rela
         return KinematicsMixin.get_dependencies() + [AABB, Pose, HorizontalAdjacency, VerticalAdjacency]
 
     def _set_value(self, other, new_value, use_ray_casting_method=False):
-        state_id = p.saveState()
+        state = self.simulator.dump_state(serialized=True)
 
         for _ in range(10):
             sampling_success = sample_kinematics(
@@ -36,9 +36,7 @@ class Inside(PositionalValidationMemoizedObjectStateMixin, KinematicsMixin, Rela
             if sampling_success:
                 break
             else:
-                restoreState(state_id)
-
-        p.removeState(state_id)
+                self.simulator.load_state(state, serialized=True)
 
         return sampling_success
 
@@ -52,7 +50,7 @@ class Inside(PositionalValidationMemoizedObjectStateMixin, KinematicsMixin, Rela
         inner_object_pos, _ = self.obj.states[Pose].get_value()
         outer_object_AABB = other.states[AABB].get_value()
 
-        if not aabb_contains_point(inner_object_pos, outer_object_AABB):
+        if not BoundingBoxAPI.aabb_contains_point(inner_object_pos, outer_object_AABB):
             return False
 
         # Our definition of inside: an object A is inside an object B if there
@@ -65,8 +63,8 @@ class Inside(PositionalValidationMemoizedObjectStateMixin, KinematicsMixin, Rela
         horizontal_adjacency = self.obj.states[HorizontalAdjacency].get_value()
 
         # First, check if the body can be found on both sides in Z
-        body_ids = set(other.get_body_ids())
-        on_both_sides_Z = not body_ids.isdisjoint(vertical_adjacency.negative_neighbors) and not body_ids.isdisjoint(
+        prim_paths = set(other.link_prim_paths)
+        on_both_sides_Z = not prim_paths.isdisjoint(vertical_adjacency.negative_neighbors) and not prim_paths.isdisjoint(
             vertical_adjacency.positive_neighbors
         )
         if on_both_sides_Z:
@@ -74,8 +72,8 @@ class Inside(PositionalValidationMemoizedObjectStateMixin, KinematicsMixin, Rela
             # find another axis where the object is on both sides.
             on_both_sides_in_any_axis = any(
                 (
-                    not body_ids.isdisjoint(adjacency_list.positive_neighbors)
-                    and not body_ids.isdisjoint(adjacency_list.negative_neighbors)
+                    not prim_paths.isdisjoint(adjacency_list.positive_neighbors)
+                    and not prim_paths.isdisjoint(adjacency_list.negative_neighbors)
                 )
                 for adjacency_list in flatten_planes(horizontal_adjacency)
             )
@@ -85,10 +83,10 @@ class Inside(PositionalValidationMemoizedObjectStateMixin, KinematicsMixin, Rela
         # plane and try to find one where the object is on both sides of both
         # axes in that plane.
         on_both_sides_of_both_axes_in_any_plane = any(
-            not body_ids.isdisjoint(adjacency_list_by_axis[0].positive_neighbors)
-            and not body_ids.isdisjoint(adjacency_list_by_axis[0].negative_neighbors)
-            and not body_ids.isdisjoint(adjacency_list_by_axis[1].positive_neighbors)
-            and not body_ids.isdisjoint(adjacency_list_by_axis[1].negative_neighbors)
+            not prim_paths.isdisjoint(adjacency_list_by_axis[0].positive_neighbors)
+            and not prim_paths.isdisjoint(adjacency_list_by_axis[0].negative_neighbors)
+            and not prim_paths.isdisjoint(adjacency_list_by_axis[1].positive_neighbors)
+            and not prim_paths.isdisjoint(adjacency_list_by_axis[1].negative_neighbors)
             for adjacency_list_by_axis in horizontal_adjacency
         )
         return on_both_sides_of_both_axes_in_any_plane

@@ -16,7 +16,7 @@ class OnTop(PositionalValidationMemoizedObjectStateMixin, RelativeObjectState, B
         return RelativeObjectState.get_dependencies() + [Touching, VerticalAdjacency]
 
     def _set_value(self, other, new_value, use_ray_casting_method=False):
-        state_id = p.saveState()
+        state = self.simulator.dump_state(serialized=True)
 
         for _ in range(10):
             sampling_success = sample_kinematics(
@@ -33,24 +33,13 @@ class OnTop(PositionalValidationMemoizedObjectStateMixin, RelativeObjectState, B
             if sampling_success:
                 break
             else:
-                restoreState(state_id)
-
-        p.removeState(state_id)
+                self.simulator.load_state(state, serialized=True)
 
         return sampling_success
 
-    def _get_value(self, other, use_ray_casting_method=False):
-        del use_ray_casting_method
-
-        # Touching is the less costly of our conditions.
-        # Check it first.
-        if not self.obj.states[Touching].get_value(other):
-            return False
-
-        # Then check vertical adjacency - it's the second least
-        # costly.
-        other_bids = set(other.get_body_ids())
+    def _get_value(self, other):
+        other_prim_paths = set(other.link_prim_paths)
         adjacency = self.obj.states[VerticalAdjacency].get_value()
-        return not other_bids.isdisjoint(adjacency.negative_neighbors) and other_bids.isdisjoint(
+        return not other_prim_paths.isdisjoint(adjacency.negative_neighbors) and other_prim_paths.isdisjoint(
             adjacency.positive_neighbors
         )

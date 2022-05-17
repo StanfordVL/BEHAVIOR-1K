@@ -496,6 +496,14 @@ class DatasetObject(USDObject):
         # Run super last
         super()._post_load()
 
+        # Lastly, after post loading (which includes loading / registering the links internally)
+        # check for any metalinks. If there are any, we disable gravity and collisions for them
+        for link in self._links.values():
+            is_metalink = link.prim.GetAttribute("ig:is_metalink").Get() or False
+            if is_metalink:
+                link.disable_collisions()
+                link.disable_gravity()
+
     def set_bbox_center_position_orientation(self, pos, orn):
         # TODO - check to make sure works
         rotated_offset = T.pose_transform([0, 0, 0], orn, self.scaled_bbox_center_in_base_frame, [0, 0, 0, 1])[0]

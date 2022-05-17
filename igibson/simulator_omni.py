@@ -32,6 +32,7 @@ from igibson.utils.python_utils import clear as clear_pu, create_object_from_ini
 from igibson.utils.usd_utils import clear as clear_uu
 from igibson.scenes import Scene
 from igibson.objects.object_base import BaseObject
+from igibson.object_states.factory import get_states_by_dependency_order
 
 import numpy as np
 
@@ -132,7 +133,7 @@ class Simulator(SimulationContext):
 
         # TODO: Fix
         # Set of categories that can be grasped by assisted grasping
-        self.object_state_types = {} #get_states_by_dependency_order()
+        self.object_state_types = get_states_by_dependency_order()
 
         # TODO: Once objects are in place, uncomment and test this
         # self.assist_grasp_category_allow_list = self.gen_assisted_grasping_categories()
@@ -273,6 +274,15 @@ class Simulator(SimulationContext):
         # if requested
         if auto_initialize:
             self.initialize_object_on_next_sim_step(obj=obj)
+    
+    def remove_object(self, obj):
+        """
+        Remove a non-robot object from the simulator.
+
+        Args:
+            obj (BaseObject): a non-robot object to load
+        """
+        self._scene.remove_object(obj)
 
     def _non_physics_step(self):
         """
@@ -294,7 +304,9 @@ class Simulator(SimulationContext):
         # Step the object states in global topological order.
         for state_type in self.object_state_types:
             for obj in self.scene.get_objects_with_state(state_type):
-                obj.states[state_type].update()
+                # Only update objects that have been initialized so far
+                if obj.initialized:
+                    obj.states[state_type].update()
 
         # TODO
         # # Step the object procedural materials based on the updated object states.
@@ -324,6 +336,9 @@ class Simulator(SimulationContext):
             for obj in self._objects_to_initialize:
                 obj.initialize()
             self._objects_to_initialize = []
+            # Also update the scene registry
+            # TODO: A better place to put this perhaps?
+            self._scene.object_registry.update(keys="root_handle")
 
     def step(self, render=True, force_playing=False):
         """

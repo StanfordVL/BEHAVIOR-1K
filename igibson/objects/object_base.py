@@ -201,6 +201,10 @@ class BaseObject(EntityPrim, metaclass=ABCMeta):
     def mass(self, mass):
         # Cannot set mass directly for this object!
         raise NotImplementedError("Cannot set mass directly for an object!")
+    
+    @property
+    def link_prim_paths(self):
+        return [link.prim_path for link in self._links.values()]
 
     def get_velocities(self):
         """Get this object's root body velocity in the format of Tuple[Array[vx, vy, vz], Array[wx, wy, wz]]"""

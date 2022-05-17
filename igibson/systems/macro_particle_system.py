@@ -20,12 +20,22 @@ class MacroParticleSystem(BaseParticleSystem):
     # Note that this object is NOT part of the actual particle system itself!
     particle_object = None
 
-    # Array of particle objects, mapped by their prim names
-    particles = OrderedDict()
+    # OrderedDict, array of particle objects, mapped by their prim names
+    particles = None
 
     # Scaling factor to sample from when generating a new particle
-    min_scale = np.ones(3)              # (x,y,z) scaling
-    max_scale = np.ones(3)              # (x,y,z) scaling
+    min_scale = None              # (x,y,z) scaling
+    max_scale = None              # (x,y,z) scaling
+
+    @classmethod
+    def initialize(cls, simulator):
+        # Run super method first
+        super().initialize(simulator=simulator)
+
+        # Initialize mutable class variables so they don't automatically get overridden by children classes
+        cls.particles = OrderedDict()
+        cls.min_scale = np.ones(3)
+        cls.max_scale = np.ones(3)
 
     @classproperty
     def n_particles(cls):
@@ -216,10 +226,10 @@ class VisualParticleSystem(MacroParticleSystem):
     """
     # Maps group name to the particles associated with it
     # This is an ordered dict of ordered dict (nested ordered dict maps particle names to particle instance)
-    _group_particles = OrderedDict()
+    _group_particles = None
 
     # Maps group name to the parent object (the object with particles attached to it) of the group
-    _group_objects = OrderedDict()
+    _group_objects = None
 
     # Default behavior for this class -- whether to clip generated particles halfway into objects when sampling
     # their locations on the surface of the given object
@@ -230,14 +240,24 @@ class VisualParticleSystem(MacroParticleSystem):
 
     # Default parameters for sampling particle locations
     # See igibson/utils/sampling_utils.py for how they are used.
-    _SAMPLING_AXIS_PROBABILITIES = [0.25, 0.25, 0.5]
+    _SAMPLING_AXIS_PROBABILITIES = (0.25, 0.25, 0.5)
     _SAMPLING_AABB_OFFSET = 0.1
     _SAMPLING_BIMODAL_MEAN_FRACTION = 0.9
     _SAMPLING_BIMODAL_STDEV_FRACTION = 0.2
     _SAMPLING_MAX_ATTEMPTS = 20
 
-    # Keeps track of particles that need to be removed after the next sim step
-    _particles_to_remove = []
+    # List, keeps track of particles that need to be removed after the next sim step
+    _particles_to_remove = None
+
+    @classmethod
+    def initialize(cls, simulator):
+        # Run super method first
+        super().initialize(simulator=simulator)
+
+        # Initialize mutable class variables so they don't automatically get overridden by children classes
+        cls._group_particles = OrderedDict()
+        cls._group_objects = OrderedDict()
+        cls._particles_to_remove = []
 
     @classproperty
     def groups(cls):

@@ -233,6 +233,18 @@ class EntityPrim(XFormPrim):
         return self._handle
 
     @property
+    def root_handle(self):
+        """
+        Handle used by Isaac Sim's dynamic control module to reference the root body in this object.
+        Note: while self.handle may be 0 (i.e.: invalid articulation, i.e.: object with no joints), root_handle should
+            always be non-zero (i.e.: valid) if this object is initialized!
+
+        Returns:
+            int: [description]
+        """
+        return self._root_handle
+
+    @property
     def n_dof(self):
         """[summary]
 
@@ -296,15 +308,15 @@ class EntityPrim(XFormPrim):
 
     def in_contact_links(self):
         """
-        Get set of unique rigid body handles that this object prim is in contact with
+        Get set of unique rigid body prim paths that this object prim is in contact with
 
         Returns:
-            set: Unique rigid body handles that this body is in contact with
+            set: Unique rigid body prim paths that this body is in contact with
         """
         contact_list = self.contact_list()
-        link_handles = {link.handle for link in self._links.values()}
-        body0_contacts = {c.body0 for c in contact_list if c.body0 not in link_handles}
-        body1_contacts = {c.body1 for c in contact_list if c.body1 not in link_handles}
+        link_paths = {link.prim_path for link in self._links.values()}
+        body0_contacts = {c.body0 for c in contact_list if c.body0 not in link_paths}
+        body1_contacts = {c.body1 for c in contact_list if c.body1 not in link_paths}
         return body0_contacts.union(body1_contacts)
 
     def in_contact(self, objects=None, links=None):
@@ -328,13 +340,14 @@ class EntityPrim(XFormPrim):
         objects = [] if objects is None else (objects if isinstance(objects, Iterable) else [objects])
         links = [] if links is None else (links if isinstance(objects, Iterable) else [links])
 
-        # Get list of link handles to check for contact with
-        link_handles = {[link.handle for link in links]}
+        # Get list of link prim paths to check for contact with
+        link_paths = {link.prim_path for link in links}
         for obj in objects:
-            link_handles = link_handles.union({link.handle for link in obj.links.values()})
+            link_paths = link_paths.union({link.prim_path for link in obj.links.values()})
 
         # Grab all contacts for this object prim
-        valid_contacts = link_handles.intersection(self.in_contact_links())
+        in_contact_paths = self.in_contact_links()
+        valid_contacts = link_paths.intersection(in_contact_paths)
 
         # We're in contact if any of our current contacts are the requested contact
         return len(valid_contacts) > 0

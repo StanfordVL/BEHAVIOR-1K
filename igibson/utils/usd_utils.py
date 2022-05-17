@@ -6,9 +6,10 @@ import omni.usd
 from omni.isaac.core.utils.prims import get_prim_at_path, get_prim_path, is_prim_path_valid, get_prim_children
 from omni.isaac.core.utils.carb import set_carb_setting
 from omni.isaac.core.utils.stage import get_current_stage, get_stage_units, traverse_stage
-from omni.isaac.core.utils.bounds import compute_aabb, create_bbox_cache
+from omni.isaac.core.utils.bounds import compute_aabb, create_bbox_cache, compute_combined_aabb
 from omni.syntheticdata import helpers
 from pxr import Gf, Vt, Usd, Sdf, UsdGeom, UsdShade, UsdPhysics, PhysxSchema
+import numpy as np
 
 from igibson.utils.constants import JointType
 from igibson.utils.python_utils import assert_valid_key
@@ -264,6 +265,44 @@ class BoundingBoxAPI:
         """
         cls.CACHE = None
 
+    @classmethod
+    def union(cls, prim_paths):
+        """
+        Computes the union of AABBs (world-frame oriented) for the prims specified at @prim_paths
+
+        Args:
+            prim_paths (str): Paths to the prims to calculate union AABB for
+
+        Returns:
+            tuple:
+                - 3-array: start (x,y,z) corner of world-coordinate frame aligned bounding box
+                - 3-array: end (x,y,z) corner of world-coordinate frame aligned bounding box
+        """
+        # Create cache if it doesn't already exist
+        if cls.CACHE is None:
+            cls.CACHE = create_bbox_cache(use_extents_hint=False)
+
+        # Grab aabb
+        aabb = compute_combined_aabb(bbox_cache=cls.CACHE, prim_paths=prim_paths)
+
+        return aabb[:3], aabb[3:]
+
+    @classmethod
+    def aabb_contains_point(cls, point, container):
+        """
+        Returns true if the point is contained in the container AABB
+
+        Args:
+            point (tuple): (x,y,z) position in world-coordinates
+            container (tuple):
+                - 3-array: start (x,y,z) corner of world-coordinate frame aligned bounding box
+                - 3-array: end (x,y,z) corner of world-coordinate frame aligned bounding box
+
+        Returns:
+            bool
+        """
+        lower, upper = container
+        return np.less_equal(lower, point).all() and np.less_equal(point, upper).all()
 
 def clear():
     """

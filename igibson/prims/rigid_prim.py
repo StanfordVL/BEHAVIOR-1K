@@ -188,6 +188,28 @@ class RigidPrim(XFormPrim):
     #     """
     #     self._cs.remove_sensor(self._contact_handle)
 
+    def enable_collisions(self):
+        """
+        Enable collisions for this RigidPrim
+        """
+        # Iterate through all owned collision meshes and toggle on their collisions
+        for col_mesh in self._collision_meshes.values():
+            col_mesh.collision_enabled = True
+
+    def disable_collisions(self):
+        """
+        Disable collisions for this RigidPrim
+        """
+        # Iterate through all owned collision meshes and toggle off their collisions
+        for col_mesh in self._collision_meshes.values():
+            col_mesh.collision_enabled = False
+
+    def update_handles(self):
+        """
+        Updates all internal handles for this prim, in case they change since initialization
+        """
+        self._handle = self._dc.get_rigid_body(self._prim_path)
+
     def contact_list(self):
         """
         Get list of all current contacts with this rigid body
@@ -198,7 +220,17 @@ class RigidPrim(XFormPrim):
         # # Make sure we have the ability to grab contacts for this object
         # assert self._physx_contact_report_api is not None, \
         #     "Cannot grab contacts for this rigid prim without Physx's contact report API being added!"
-        return [CsRawData(*c) for c in self._cs.get_body_contact_raw_data(self._prim_path)]
+        contacts = []
+        for c in self._cs.get_body_contact_raw_data(self._prim_path):
+            # contact sensor handles and dynamic articulation handles are not comparable
+            # every prim has a cs to convert (cs) handle to prim path (decode_body_name)
+            # but not every prim (e.g. groundPlane) has a dc to convert prim path to (dc) handle (get_rigid_body)
+            # so simpler to convert both handles (int) to prim paths (str) for comparison
+            c = [*c] # CsRawData enforces body0 and body1 types to be ints, but we want strings
+            c[2] = self._cs.decode_body_name(c[2])
+            c[3] = self._cs.decode_body_name(c[3])
+            contacts.append(CsRawData(*c))
+        return contacts
 
     def set_linear_velocity(self, velocity):
         """Sets the linear velocity of the prim in stage.
