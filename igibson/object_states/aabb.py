@@ -7,7 +7,7 @@ from igibson.object_states.object_state_base import CachingEnabledObjectState, N
 
 class AABB(CachingEnabledObjectState):
     def _compute_value(self):
-        aabb_low, aabb_hi = BoundingBoxAPI.union(self.obj.get_body_ids())
+        aabb_low, aabb_hi = BoundingBoxAPI.union(self.obj.link_prim_paths)
 
         if not hasattr(self.obj, "category") or self.obj.category != "floors" or self.obj.room_floor is None:
             return np.array(aabb_low), np.array(aabb_hi)

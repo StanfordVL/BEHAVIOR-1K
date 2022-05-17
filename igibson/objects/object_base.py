@@ -201,7 +201,8 @@ class BaseObject(EntityPrim, metaclass=ABCMeta):
         # Cannot set mass directly for this object!
         raise NotImplementedError("Cannot set mass directly for an object!")
     
-    def get_body_ids(self):
+    @property
+    def link_prim_paths(self):
         return [link.prim_path for link in self._links.values()]
 
     def get_velocities(self):

@@ -63,8 +63,8 @@ class Inside(PositionalValidationMemoizedObjectStateMixin, KinematicsMixin, Rela
         horizontal_adjacency = self.obj.states[HorizontalAdjacency].get_value()
 
         # First, check if the body can be found on both sides in Z
-        body_ids = set(other.get_body_ids())
-        on_both_sides_Z = not body_ids.isdisjoint(vertical_adjacency.negative_neighbors) and not body_ids.isdisjoint(
+        prim_paths = set(other.link_prim_paths)
+        on_both_sides_Z = not prim_paths.isdisjoint(vertical_adjacency.negative_neighbors) and not prim_paths.isdisjoint(
             vertical_adjacency.positive_neighbors
         )
         if on_both_sides_Z:
@@ -72,8 +72,8 @@ class Inside(PositionalValidationMemoizedObjectStateMixin, KinematicsMixin, Rela
             # find another axis where the object is on both sides.
             on_both_sides_in_any_axis = any(
                 (
-                    not body_ids.isdisjoint(adjacency_list.positive_neighbors)
-                    and not body_ids.isdisjoint(adjacency_list.negative_neighbors)
+                    not prim_paths.isdisjoint(adjacency_list.positive_neighbors)
+                    and not prim_paths.isdisjoint(adjacency_list.negative_neighbors)
                 )
                 for adjacency_list in flatten_planes(horizontal_adjacency)
             )
@@ -83,10 +83,10 @@ class Inside(PositionalValidationMemoizedObjectStateMixin, KinematicsMixin, Rela
         # plane and try to find one where the object is on both sides of both
         # axes in that plane.
         on_both_sides_of_both_axes_in_any_plane = any(
-            not body_ids.isdisjoint(adjacency_list_by_axis[0].positive_neighbors)
-            and not body_ids.isdisjoint(adjacency_list_by_axis[0].negative_neighbors)
-            and not body_ids.isdisjoint(adjacency_list_by_axis[1].positive_neighbors)
-            and not body_ids.isdisjoint(adjacency_list_by_axis[1].negative_neighbors)
+            not prim_paths.isdisjoint(adjacency_list_by_axis[0].positive_neighbors)
+            and not prim_paths.isdisjoint(adjacency_list_by_axis[0].negative_neighbors)
+            and not prim_paths.isdisjoint(adjacency_list_by_axis[1].positive_neighbors)
+            and not prim_paths.isdisjoint(adjacency_list_by_axis[1].negative_neighbors)
             for adjacency_list_by_axis in horizontal_adjacency
         )
         return on_both_sides_of_both_axes_in_any_plane

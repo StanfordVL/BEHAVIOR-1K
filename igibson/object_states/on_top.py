@@ -38,8 +38,8 @@ class OnTop(PositionalValidationMemoizedObjectStateMixin, RelativeObjectState, B
         return sampling_success
 
     def _get_value(self, other):
-        other_bids = set(other.get_body_ids())
+        other_prim_paths = set(other.link_prim_paths)
         adjacency = self.obj.states[VerticalAdjacency].get_value()
-        return not other_bids.isdisjoint(adjacency.negative_neighbors) and other_bids.isdisjoint(
+        return not other_prim_paths.isdisjoint(adjacency.negative_neighbors) and other_prim_paths.isdisjoint(
             adjacency.positive_neighbors
         )
