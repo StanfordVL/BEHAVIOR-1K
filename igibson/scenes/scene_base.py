@@ -203,7 +203,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         self._initialized = True
 
         # Store object states.
-        self._initial_object_states = self.dump_state()
+        self._initial_object_states = self.dump_state(serialized=False)
 
     def _create_registry(self):
         """
@@ -359,20 +359,6 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Resets this scene. Default is no-op
         """
         pass
-
-    def update_initial_object_states(self, obj):
-        """
-        Update an object's information in the scene's _initial_object_states.
-
-        Args:
-            obj: the object to update information about.
-        """
-        if not self._initial_object_states:
-            return
-        if isinstance(obj, BaseRobot):
-            self._initial_object_states["robot_registry"][obj.name] = obj.dump_state()
-        else:
-            self._initial_object_states["object_registry"][obj.name] = obj.dump_state()
 
     @property
     def has_connectivity_graph(self):

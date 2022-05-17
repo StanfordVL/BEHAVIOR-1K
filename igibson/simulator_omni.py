@@ -282,7 +282,6 @@ class Simulator(SimulationContext):
         if len(self._objects_to_initialize) > 0 and self.is_playing():
             for obj in self._objects_to_initialize:
                 obj.initialize()
-                self._scene.update_initial_object_states(obj)
             self._objects_to_initialize = []
             # Also update the scene registry
             # TODO: A better place to put this perhaps?
@@ -324,7 +323,6 @@ class Simulator(SimulationContext):
         if len(self._objects_to_initialize) > 0:
             for obj in self._objects_to_initialize:
                 obj.initialize()
-                self._scene.update_initial_object_states(obj)
             self._objects_to_initialize = []
 
     def step(self, render=True, force_playing=False):
@@ -635,7 +633,7 @@ class Simulator(SimulationContext):
         # Restore scene's _initial_object_states.
         self.scene._initial_object_states = initial_object_states
 
-        logging.info("The saved simualtion environment loaded.")
+        logging.info("The saved simulation environment loaded.")
     
         return
 
@@ -684,7 +682,7 @@ class Simulator(SimulationContext):
         self.stop()
         self.stage.Export(usd_path)
 
-        logging.info("The current simualtion environment saved.")
+        logging.info("The current simulation environment saved.")
         
         return
 
