@@ -8,6 +8,7 @@
 #
 import logging
 
+import json
 import omni
 import carb
 from omni.isaac.core.simulation_context import SimulationContext
@@ -25,7 +26,9 @@ from omni.isaac.core.loggers import DataLogger
 from typing import Optional, List
 
 from igibson import assets_path
-from igibson.utils.python_utils import clear as clear_pu
+from igibson.robots.robot_base import BaseRobot
+from igibson.utils.utils import NumpyEncoder
+from igibson.utils.python_utils import clear as clear_pu, create_object_from_init_info
 from igibson.utils.usd_utils import clear as clear_uu
 from igibson.scenes import Scene
 from igibson.objects.object_base import BaseObject
@@ -245,10 +248,10 @@ class Simulator(SimulationContext):
 
     def import_object(self, obj, auto_initialize=True):
         """
-        Import a non-robot object into the simulator.
+        Import an object into the simulator.
 
         Args:
-            obj (BaseObject): a non-robot object to load
+            obj (BaseObject): an object to load
             auto_initialize (bool): If True, will auto-initialize the requested object on the next simulation step.
                 Otherwise, we assume that the object will call initialize() on its own!
         """
@@ -269,7 +272,6 @@ class Simulator(SimulationContext):
         # Lastly, additionally add this object automatically to be initialized as soon as another simulator step occurs
         # if requested
         if auto_initialize:
-            print("GOT HERE AUTO INITIALIZE")
             self.initialize_object_on_next_sim_step(obj=obj)
 
     def _non_physics_step(self):
@@ -441,14 +443,15 @@ class Simulator(SimulationContext):
         self._scene._finalize()
         return
 
+    def clear_and_remove_scene(self) -> None:
+        self._scene = None
+        self.clear()
+
     def clear(self) -> None:
         """Clears the stage leaving the PhysicsScene only if under /World.
         """
         # Stop the physics
         self.stop()
-
-        # TODO: Handle edge-case for when we clear sim without loading new scene in. self._scene should be None
-        # but scene.load(sim) requires scene to be defined!
 
         # Clear uniquely named items and other internal states
         clear_pu()
@@ -537,6 +540,152 @@ class Simulator(SimulationContext):
         for task in self._current_tasks.values():
             task.post_reset()
         return
+
+    def restore(self, usd_path):
+        """
+        Restore a simulation environment from @usd_path.
+
+        Args:
+            usd_path (str): Full path of USD file to load, which contains information
+                to recreate a scene.
+        """
+        if not usd_path.endswith(".usd"):
+            logging.error("You have to define the full usd_path to load from.")
+            return
+
+        # Load saved stage to get saved_info.
+        self.load_stage(usd_path)
+
+        # Load saved info.
+        world_prim = get_prim_at_path("/World")
+        saved_info_str = world_prim.GetCustomDataByKey("saved_info")
+        saved_info = json.loads(saved_info_str)
+        init_info = saved_info["init_info"] 
+        scene_state = saved_info["state"]
+        initial_object_states = saved_info["initial_object_states"]
+
+        # Clear the current environment and delete any currently loaded scene.
+        self.clear_and_remove_scene()
+
+        # Recreate and import the saved scene.
+        # Note that the imported scene only have the default objects loaded.
+        recreated_scene = create_object_from_init_info(init_info["scene"])
+        self.import_scene(scene=recreated_scene)
+
+        # Clear the current environment again (but self.scene is not deleted).
+        self.scene._stage = self.stage
+
+        # Clear the current environment again (but self.scene is not deleted).
+        self.clear()
+
+        # Load saved stage.
+        self.load_stage(usd_path)
+        self.scene._stage = self.stage
+
+        # Reset some scene variables.
+        clear_pu()
+        self.scene._registry = self.scene._create_registry()
+        self.scene._initialized = False
+        
+        # Iterate over all the children in the loaded stage.
+        for prim in self.world_prim.GetChildren():
+            # Only process prims that are an Xform.
+            if prim.GetPrimTypeInfo().GetTypeName() == "Xform":
+                name = prim.GetName()
+                category = prim.GetAttribute("ig:category").Get()
+
+                # Skip over the wall, floor, or ceilings (#TODO: Can we make this more elegant?)
+                if category in {"walls", "floors", "ceilings"}:
+                    continue
+
+                if name not in init_info:
+                    logging.warning(f"Object {name} does not have _init_info saved. Cannot be restored.")
+                    continue
+                
+                # Create object from saved info and tie the object to loaded prim.
+                # Since prim is already loaded, use a hacky way to make post_load work.
+                obj_init_info = init_info[name]
+                obj_init_info["kwargs"] = {}
+                obj_init_info["kwargs"]["skip_init_load"] = True
+                obj = create_object_from_init_info(obj_init_info)
+                obj.load(self)
+
+                # Add created object to registry.
+                if isinstance(obj, BaseRobot):
+                    self.scene.robot_registry.add(obj)
+                else:
+                    self.scene.object_registry.add(obj)
+
+                # Run any additional scene-specific logic with the created object.
+                self.scene._add_object(obj)
+
+        # Make sure simulator is not running, then start it, then pause it so we can initialize the scene.
+        self.stop()
+        self.play()
+        self.pause()
+
+        # Initialize scene.
+        self._scene.initialize()
+
+        # Restore the state of all objects.
+        self.scene.load_state(scene_state)
+
+        # Restore scene's _initial_object_states.
+        self.scene._initial_object_states = initial_object_states
+
+        logging.info("The saved simulation environment loaded.")
+    
+        return
+
+    def save(self, usd_path):
+        """
+        Saves the current simulation environment to @usd_path.
+
+        Args:
+            usd_path (str): Full path of USD file to load, which contains information
+                to recreate the current scene.
+        """
+        if not self.scene:
+            logging.warning("Scene has not been loaded. Nothing to save.")
+            return
+        if not usd_path.endswith(".usd"):
+            logging.error("You have to define the full usd_path to save the scene to.")
+            return
+
+        # Get scene init info.
+        scene_init_info = self.scene._init_info
+
+        # Get scene states info.
+        scene_state = self.scene.dump_state()
+                
+        # Dump useful information to recreate the scene.
+        saved_info = {}
+        saved_info["init_info"] = {}
+        saved_info["init_info"]["scene"] = scene_init_info
+        saved_info["state"] = scene_state
+
+        # Iterate over all objects and save their init info.
+        for obj in self.scene.object_registry.objects:
+            saved_info["init_info"][obj.name] = obj._init_info
+        for obj in self.scene.robot_registry.objects:
+            saved_info["init_info"][obj.name] = obj._init_info
+
+        # Save scene's initial object states.
+        saved_info["initial_object_states"] = self.scene._initial_object_states
+
+        # Dump saved info.
+        world_prim = get_prim_at_path("/World")
+        saved_info_str = json.dumps(saved_info, cls=NumpyEncoder)
+        world_prim.SetCustomDataByKey("saved_info", saved_info_str)
+
+        # Save stage. This needs to happen at the end since some objects may get reset after sim.stop().
+        self.stop()
+        self.stage.Export(usd_path)
+
+        logging.info("The current simulation environment saved.")
+        
+        return
+
 
     def add_task(self, task: BaseTask) -> None:
         """Tasks should have a unique name.

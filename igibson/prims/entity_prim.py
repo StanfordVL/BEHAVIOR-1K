@@ -48,6 +48,7 @@ class EntityPrim(XFormPrim):
         prim_path,
         name,
         load_config=None,
+        **kwargs,
     ):
         # Other values that will be filled in at runtime
         self._dc = None                         # Dynamics control interface
@@ -66,6 +67,7 @@ class EntityPrim(XFormPrim):
             prim_path=prim_path,
             name=name,
             load_config=load_config,
+            **kwargs,
         )
 
     def _initialize(self):
@@ -138,7 +140,7 @@ class EntityPrim(XFormPrim):
         # By default, this prim cannot be instantiated from scratch!
         raise NotImplementedError("By default, an entity prim cannot be created from scratch.")
 
-    def _post_load(self, simulator=None):
+    def _post_load(self):
         # Set visual only flag
         self._visual_only = self._load_config["visual_only"] if \
             "visual_only" in self._load_config and self._load_config["visual_only"] is not None else False
@@ -168,7 +170,7 @@ class EntityPrim(XFormPrim):
             self.disable_gravity()
 
         # Run super
-        super()._post_load(simulator=simulator)
+        super()._post_load()
 
     @property
     def articulated(self):

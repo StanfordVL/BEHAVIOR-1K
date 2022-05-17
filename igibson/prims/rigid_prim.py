@@ -82,9 +82,9 @@ class RigidPrim(XFormPrim):
 
         return prim
 
-    def _post_load(self, simulator=None):
+    def _post_load(self):
         # run super first
-        super()._post_load(simulator=simulator)
+        super()._post_load()
 
         # Set visual only flag
         self._visual_only = self._load_config["visual_only"] if \
@@ -522,8 +522,8 @@ class RigidPrim(XFormPrim):
         super()._load_state(state=state)
 
         # Set velocities
-        self.set_linear_velocity(state["lin_vel"])
-        self.set_angular_velocity(state["ang_vel"])
+        self.set_linear_velocity(np.array(state["lin_vel"]))
+        self.set_angular_velocity(np.array(state["ang_vel"]))
 
     def _deserialize(self, state):
         # Call supermethod first

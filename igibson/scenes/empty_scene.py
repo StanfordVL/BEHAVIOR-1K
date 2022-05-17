@@ -4,7 +4,6 @@ import os
 import numpy as np
 
 from igibson.scenes.scene_base import Scene
-from igibson.utils.constants import SemanticClass
 from igibson.utils.utils import l2_distance
 
 

@@ -16,31 +16,10 @@ from scipy.spatial.transform import Rotation
 
 import igibson
 from igibson.objects.usd_object import USDObject
-# from igibson.external.pybullet_tools.utils import (
-#     get_all_links,
-#     get_center_extent,
-#     get_link_name,
-#     get_link_state,
-#     link_from_name,
-#     matrix_from_quat,
-#     quat_from_matrix,
-# )
-from igibson.object_states.texture_change_state_mixin import TextureChangeStateMixin
-from igibson.objects.stateful_object import StatefulObject
-# from igibson.render.mesh_renderer.materials import ProceduralMaterial, RandomizedMaterial
-from igibson.utils import utils
+from igibson.utils.constants import AVERAGE_CATEGORY_SPECS, DEFAULT_JOINT_FRICTION, SPECIAL_JOINT_FRICTIONS, JointType
 import igibson.utils.transform_utils as T
-from igibson.utils.urdf_utils import add_fixed_link, get_base_link_name, round_up, save_urdfs_without_floating_joints
-from igibson.utils.utils import mat_to_quat_pos, rotate_vector_3d
-from igibson.utils.constants import AVERAGE_OBJ_DENSITY, AVERAGE_CATEGORY_SPECS, SPECIAL_JOINT_FRICTIONS, DEFAULT_JOINT_FRICTION, JointType
 from igibson.utils.usd_utils import BoundingBoxAPI
 
-from omni.isaac.core.utils.stage import add_reference_to_stage
-from omni.isaac.core.utils.prims import get_prim_at_path
-
-
-
-# TODO: Reset sub-bodies that are floating wrt the root prim (e.g.: pillows from bed)
 
 class DatasetObject(USDObject):
     """
@@ -455,7 +434,7 @@ class DatasetObject(USDObject):
             if joint.joint_type != JointType.JOINT_FIXED:
                 joint.friction = friction
 
-    def _post_load(self, simulator=None):
+    def _post_load(self):
         # We run this post loading first before any others because we're modifying the load config that will be used
         # downstream
         # Set the scale of this prim according to its bounding box
@@ -515,7 +494,7 @@ class DatasetObject(USDObject):
         # self.load_supporting_surfaces()
 
         # Run super last
-        super()._post_load(simulator=simulator)
+        super()._post_load()
 
     def set_bbox_center_position_orientation(self, pos, orn):
         # TODO - check to make sure works

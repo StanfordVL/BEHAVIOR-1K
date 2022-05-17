@@ -311,6 +311,9 @@ class SerializableRegistry(Registry, Serializable):
         # Iterate over all objects and load their states
         print(f"registry: {self.name}")
         for obj in self.objects:
+            if obj.name not in state:
+                logging.warning(f"Object '{obj.name}' is not in the state dict to load from. Skip loading its state.")
+                continue
             obj.load_state(state[obj.name], serialized=False)
 
     def _serialize(self, state):

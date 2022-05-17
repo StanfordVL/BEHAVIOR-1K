@@ -13,7 +13,7 @@ import numpy as np
 from pxr.Sdf import ValueTypeNames as VT
 from omni.isaac.core.utils.rotations import gf_quat_to_np_array
 
-from igibson.registries.object_states_registry import ObjectStatesRegistry
+# from igibson.registries.object_states_registry import ObjectStatesRegistry
 # from igibson.object_states.factory import get_state_from_name, get_state_name
 # from igibson.object_states.object_state_base import AbsoluteObjectState
 from igibson.objects.dataset_object import DatasetObject
@@ -31,9 +31,10 @@ from igibson.utils.assets_utils import (
     get_ig_model_path,
     get_ig_scene_path,
 )
-from igibson.utils.utils import NumpyEncoder, restoreState, rotate_vector_3d
+from igibson.utils.utils import NumpyEncoder, rotate_vector_3d
 from igibson.utils.registry_utils import SerializableRegistry
 from igibson.utils.constants import JointType
+from igibson.utils.utils import NumpyEncoder, rotate_vector_3d
 
 SCENE_SOURCE_PATHS = {
     "IG": get_ig_scene_path,
@@ -50,7 +51,6 @@ class InteractiveTraversableScene(TraversableScene):
     InteractiveIndoorScene inherits from TraversableScene the functionalities to compute shortest path and other
     navigation functionalities.
     """
-
     def __init__(
         self,
         scene_model,
@@ -167,8 +167,6 @@ class InteractiveTraversableScene(TraversableScene):
         # ObjectGrouper
         self.object_groupers = defaultdict(dict)
 
-        # Store the original states retrieved from the USD
-        self.object_states = ObjectStatesRegistry()
 
     def get_scene_loading_info(self, usd_file=None, usd_path=None):
         """
@@ -539,77 +537,6 @@ class InteractiveTraversableScene(TraversableScene):
         """
         return self.open_all_objs_by_category("door", mode="max")
 
-    def restore_object_states_single_object(self, obj, obj_state):
-        """
-        Restores object @obj to the state defined by @object_state.
-
-        Args:
-            obj (DatasetObject): Object to restore state
-            object_state (ObjectSceneState): namedtuple with named parameters corresponding to different states of
-                object @obj
-        """
-        print(f"restoring obj: {obj.name} state")
-        # If the object isn't loaded, skip
-        if not obj.loaded:
-            return
-
-        # If the object state is empty (which happens if an object is added after the scene URDF is parsed), skip
-        if not obj_state:
-            return
-
-        # TODO: For velocities, we are now storing each body's com. Should we somehow do the same for positions?
-        if obj_state.base_com_pose is not None:
-            obj.set_position_orientation(*obj_state.base_com_pose)
-        else:
-            # TODO:
-            # if isinstance(obj, BaseRobot):
-            #     # Backward compatibility, existing scene cache saves robot's base link CoM frame as bbox_center_pose
-            #     obj.set_position_orientation(*obj_kin_state["bbox_center_pose"])
-            # else:
-            #     obj.set_bbox_center_position_orientation(*obj_kin_state["bbox_center_pose"])
-            # obj.set_position_orientation(*obj_kin_state.bbox_center_pose)
-            obj.set_bbox_center_position_orientation(*obj_state.bbox_center_pose)
-
-        # TODO: Change how we do this. Use serialized states instead?
-        # if obj_state.base_velocities is not None:
-        #     obj.set_velocities(obj_state.base_velocities)
-        # else:
-        #     obj.set_velocities([np.zeros(3), np.zeros(3)])
-        #
-        # # Only reset joint states if the object has joint states
-        # if obj.articulated:
-        #     if obj_state.joint_states is not None:
-        #         # TODO: This breaks
-        #         obj.set_joint_states(obj_state.joint_states)
-        #     else:
-        #         obj.reset_joint_states()
-        #
-        # if obj_state.non_kinematic_states is not None:
-        #     obj.load_state(obj_state.non_kinematic_states)
-
-    def restore_object_states(self, object_states=None):
-        """
-        Restores all scene objects according to the object_states defined in @object_states. If not specified, will
-        assume the internal default self.object_states will be used.
-
-        Args:
-            object_states (ObjectSceneStatesRegistry): Registry (dict) storing object-specific information. Maps object
-                name to a namedtuple of object states.
-        """
-        object_states = self.object_states if object_states is None else object_states
-        for obj in self.objects:
-            # TODO
-            # if not isinstance(obj, ObjectMultiplexer):
-            #     self.restore_object_states_single_object(obj, object_states[obj_name])
-            # else:
-            #     for sub_obj in obj._multiplexed_objects:
-            #         if isinstance(sub_obj, ObjectGrouper):
-            #             for obj_part in sub_obj.objects:
-            #                 self.restore_object_states_single_object(obj_part, object_states[obj_part.name])
-            #         else:
-            #             self.restore_object_states_single_object(sub_obj, object_states[sub_obj.name])
-            self.restore_object_states_single_object(obj, obj_state=object_states(obj.name))
-
     def _create_obj_from_template_xform(self, simulator, prim):
         """
         Creates the object specified from a template xform @prim, presumed to be in a template USD file,
@@ -624,10 +551,13 @@ class InteractiveTraversableScene(TraversableScene):
             None or DatasetObject: Created iGibson object if a valid objet is found at @prim
         """
         obj = None
+        info = {}
 
         # Extract relevant info from template
         name, prim_path = prim.GetName(), prim.GetPrimPath().__str__()
         category, model, bbox, bbox_center_pos, bbox_center_ori, fixed, in_rooms, random_group, scale, bddl_obj_scope = self._extract_obj_info_from_template_xform(prim=prim)
+        info["bbox_center_pos"] = bbox_center_pos
+        info["bbox_center_ori"] = bbox_center_ori
 
         # Delete the template prim
         simulator.stage.RemovePrim(prim_path)
@@ -745,14 +675,14 @@ class InteractiveTraversableScene(TraversableScene):
             #     non_kinematic_states = None
             print(f"obj: {name}, bbox center pos: {bbox_center_pos}, bbox center ori: {bbox_center_ori}")
 
-            self.object_states.add_object(
-                obj_name=name,
-                bbox_center_pose=(bbox_center_pos, bbox_center_ori),
-                base_com_pose=None,#(np.zeros(3), np.array([0, 0, 0, 1.0])),
-                base_velocities=None,
-                joint_states=None,
-                non_kinematic_states=None,
-            )
+            # self.object_states.add_object(
+            #     obj_name=name,
+            #     bbox_center_pose=(bbox_center_pos, bbox_center_ori),
+            #     base_com_pose=None,#(np.zeros(3), np.array([0, 0, 0, 1.0])),
+            #     base_velocities=None,
+            #     joint_states=None,
+            #     non_kinematic_states=None,
+            # )
 
             # TODO: Handle multiplexing / groupers
             # if "multiplexer" in link.keys() or "grouper" in link.keys():
@@ -777,7 +707,7 @@ class InteractiveTraversableScene(TraversableScene):
             # else:
             #     self.add_object(obj, simulator=None)
 
-        return obj
+        return obj, info
 
     def _extract_obj_info_from_template_xform(self, prim):
         """
@@ -817,7 +747,7 @@ class InteractiveTraversableScene(TraversableScene):
 
     def _load(self, simulator):
         """
-        Load all scene objects into pybullet
+        Load all scene objects into the simulator.
         """
         # Notify user we're loading the scene
         logging.info("Clearing stage and loading scene USD: {}".format(self.scene_file))
@@ -854,7 +784,8 @@ class InteractiveTraversableScene(TraversableScene):
                 # add a reference internally
                 if is_template:
                     # Create the object and load it into the simulator
-                    obj = self._create_obj_from_template_xform(simulator=simulator, prim=prim)
+                    obj, info = self._create_obj_from_template_xform(simulator=simulator, prim=prim)
+
                     # Only import the object if we received a valid object
                     if obj is not None:
                         # Note that we don't auto-initialize because of some very specific state-setting logic that
@@ -862,7 +793,9 @@ class InteractiveTraversableScene(TraversableScene):
                         simulator.import_object(obj, auto_initialize=False)
                         # We also directly set it's bounding box position since this is a known quantity
                         # This is also the only time we'll be able to set fixed object poses
-                        obj.set_bbox_center_position_orientation(*self.object_states(obj.name).bbox_center_pose)
+                        pos = info["bbox_center_pos"]
+                        ori = info["bbox_center_ori"]
+                        obj.set_bbox_center_position_orientation(pos, ori)
 
         # disable collision between the fixed links of the fixed objects
         fixed_objs = self.object_registry("fixed_base", True, default_val=[])
@@ -881,22 +814,10 @@ class InteractiveTraversableScene(TraversableScene):
     def _initialize(self):
         # First, we initialize all of our objects and add the object
         for obj in self.objects:
-
-            # Initialize objects
             obj.initialize()
-
-            # TODO
-            # if not isinstance(obj, ObjectMultiplexer):
-            #     self.restore_object_states_single_object(obj, object_states[obj_name])
-            # else:
-            #     for sub_obj in obj._multiplexed_objects:
-            #         if isinstance(sub_obj, ObjectGrouper):
-            #             for obj_part in sub_obj.objects:
-            #                 self.restore_object_states_single_object(obj_part, object_states[obj_part.name])
-            #         else:
-            #             self.restore_object_states_single_object(sub_obj, object_states[sub_obj.name])
-            self.restore_object_states_single_object(obj, obj_state=self.object_states(obj.name))
             obj.keep_still()
+        for robot in self.robots:
+            robot.initialize()
 
         # Re-initialize our scene object registry by handle since now handles are populated
         self.object_registry.update(keys="handle")
@@ -919,8 +840,9 @@ class InteractiveTraversableScene(TraversableScene):
             obj.wake()
 
     def reset(self):
-        # Reset the pose and joint configuration of all scene objects
-        self.restore_object_states()
+        # Reset the pose and joint configuration of all scene objects.
+        if self._initial_object_states:
+            self.load_state(self._initial_object_states)
 
         # Also open all doors if self.should_open_all_doors is True
         if self.should_open_all_doors:
@@ -1100,99 +1022,6 @@ class InteractiveTraversableScene(TraversableScene):
         if name in additional_attribs_by_name:
             for key in additional_attribs_by_name[name]:
                 link.attrib[key] = additional_attribs_by_name[name][key]
-
-    # TODO
-    def restore(self, urdf_name=None, urdf_path=None, scene_tree=None, pybullet_filename=None, pybullet_state_id=None):
-        """
-        Restore a already-loaded scene with a given URDF file plus pybullet_filename or pybullet_state_id (optional)
-        The non-kinematic states (e.g. temperature, sliced, dirty) will be loaded from the URDF file.
-        The kinematic states (e.g. pose, joint states) will be loaded from the URDF file OR pybullet state / filename (if provided, for better determinism)
-        This function assume the given URDF and pybullet_filename or pybullet_state_id contains the exact same objects as the current scene, and only their states will be restored.
-
-        :param urdf_name: name of urdf file to save (without .urdf), default to ig_dataset/scenes/<scene_model>/urdf/<urdf_name>.urdf
-        :param urdf_path: full path of URDF file to save (with .urdf)
-        :param scene_tree: already-loaded URDF file stored in memory
-        :param pybullet_filename: optional specification of which pybullet file to save to
-        :param pybullet_save_state: whether to save to pybullet state
-        :param additional_attribs_by_name: additional attributes to be added to object link in the scene URDF
-        """
-        if scene_tree is None:
-            assert urdf_name is not None or urdf_path is not None, "need to specify either urdf_name or urdf_path"
-            if urdf_path is None:
-                urdf_path = os.path.join(self.scene_dir, "urdf", urdf_name + ".urdf")
-            scene_tree = ET.parse(urdf_path)
-
-        assert (
-            pybullet_filename is None or pybullet_state_id is None
-        ), "you can only specify either a pybullet filename or a pybullet state id"
-
-        object_states = defaultdict(dict)
-        for link in scene_tree.findall("link"):
-            object_name = link.attrib["name"]
-            if object_name == "world":
-                continue
-            category = link.attrib["category"]
-
-            if category == "multiplexer":
-                self.object_registry("name", object_name).set_selection(int(link.attrib["current_index"]))
-
-            if category in ["grouper", "multiplexer"]:
-                continue
-
-            object_states[object_name]["bbox_center_pose"] = None
-            object_states[object_name]["base_com_pose"] = json.loads(link.attrib["base_com_pose"])
-            object_states[object_name]["base_velocities"] = json.loads(link.attrib["base_velocities"])
-            object_states[object_name]["joint_states"] = json.loads(link.attrib["joint_states"])
-            object_states[object_name]["non_kinematic_states"] = json.loads(link.attrib["states"])
-
-        self.restore_object_states()
-
-        if pybullet_filename is not None:
-            restoreState(fileName=pybullet_filename)
-        elif pybullet_state_id is not None:
-            restoreState(stateId=pybullet_state_id)
-
-    # TODO
-    def save(
-        self,
-        urdf_name=None,
-        urdf_path=None,
-        pybullet_filename=None,
-        pybullet_save_state=False,
-        additional_attribs_by_name={},
-    ):
-        """
-        Saves a modified URDF file in the scene urdf directory having all objects added to the scene.
-
-        :param urdf_name: name of urdf file to save (without .urdf), default to ig_dataset/scenes/<scene_model>/urdf/<urdf_name>.urdf
-        :param urdf_path: full path of URDF file to save (with .urdf), assumes higher priority than urdf_name
-        :param pybullet_filename: optional specification of which pybullet file to save to
-        :param pybullet_save_state: whether to save to pybullet state
-        :param additional_attribs_by_name: additional attributes to be added to object link in the scene URDF
-        """
-        if urdf_path is None and urdf_name is not None:
-            urdf_path = os.path.join(self.scene_dir, "urdf", urdf_name + ".urdf")
-
-        scene_tree = ET.parse(self.scene_file)
-        tree_root = scene_tree.getroot()
-        for obj in self.objects:
-            self.save_obj_or_multiplexer(obj, tree_root, additional_attribs_by_name)
-
-        if urdf_path is not None:
-            xmlstr = minidom.parseString(ET.tostring(tree_root).replace(b"\n", b"").replace(b"\t", b"")).toprettyxml()
-            with open(urdf_path, "w") as f:
-                f.write(xmlstr)
-
-        if pybullet_filename is not None:
-            p.saveBullet(pybullet_filename)
-
-        if pybullet_save_state:
-            snapshot_id = p.saveState()
-
-        if pybullet_save_state:
-            return scene_tree, snapshot_id
-        else:
-            return scene_tree
 
     @property
     def seg_map(self):

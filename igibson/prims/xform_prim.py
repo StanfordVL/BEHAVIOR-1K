@@ -53,6 +53,7 @@ class XFormPrim(BasePrim):
         prim_path,
         name,
         load_config=None,
+        **kwargs,
     ):
         # Other values that will be filled in at runtime
         self._default_state = None
@@ -65,6 +66,7 @@ class XFormPrim(BasePrim):
             prim_path=prim_path,
             name=name,
             load_config=load_config,
+            **kwargs,
         )
 
     def _load(self, simulator=None):
@@ -74,9 +76,9 @@ class XFormPrim(BasePrim):
 
         return prim
 
-    def _post_load(self, simulator=None):
+    def _post_load(self):
         # run super first
-        super()._post_load(simulator=simulator)
+        super()._post_load()
 
         # Make sure all xforms have pose and scaling info
         self._set_xform_properties()
@@ -459,7 +461,7 @@ class XFormPrim(BasePrim):
         return OrderedDict(pos=pos, ori=ori)
 
     def _load_state(self, state):
-        self.set_position_orientation(state["pos"], state["ori"])
+        self.set_position_orientation(np.array(state["pos"]), np.array(state["ori"]))
 
     def _serialize(self, state):
         # We serialize by iterating over the keys and adding them to a list that's concatenated at the end

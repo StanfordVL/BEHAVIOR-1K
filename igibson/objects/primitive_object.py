@@ -118,9 +118,9 @@ class PrimitiveObject(StatefulObject):
 
         return prim
 
-    def _post_load(self, simulator=None):
+    def _post_load(self):
         # Run super first
-        super()._post_load(simulator=simulator)
+        super()._post_load()
 
         # Set color and opacity
         for mesh in self._links["base_link"].visual_meshes.values():

@@ -60,6 +60,21 @@ class StatefulObject(BaseObject):
         # Values that will be filled later
         self._states = None
 
+        # Load abilities from taxonomy if needed & possible
+        if abilities is None:
+            if OBJECT_TAXONOMY is not None:
+                taxonomy_class = OBJECT_TAXONOMY.get_class_name_from_igibson_category(self.category)
+                if taxonomy_class is not None:
+                    abilities = OBJECT_TAXONOMY.get_abilities(taxonomy_class)
+                else:
+                    abilities = {}
+            else:
+                abilities = {}
+        assert isinstance(abilities, dict), "Object abilities must be in dictionary form."
+
+        self._abilities = abilities
+        self.prepare_object_states(abilities=abilities)
+
         # Run super init
         super().__init__(
             prim_path=prim_path,
@@ -76,28 +91,28 @@ class StatefulObject(BaseObject):
             **kwargs,
         )
 
-        # Load abilities from taxonomy if needed & possible
-        if abilities is None:
-            if OBJECT_TAXONOMY is not None:
-                taxonomy_class = OBJECT_TAXONOMY.get_class_name_from_igibson_category(self.category)
-                if taxonomy_class is not None:
-                    abilities = OBJECT_TAXONOMY.get_abilities(taxonomy_class)
-                else:
-                    abilities = {}
-            else:
-                abilities = {}
-        assert isinstance(abilities, dict), "Object abilities must be in dictionary form."
+    def load(self, simulator=None):
+        # Make sure the simulator is not None
+        assert simulator is not None, "Simulator must be specified when loading StatefulObject!"
 
-        self._abilities = abilities
-        self.prepare_object_states(abilities=abilities)
+        # Store temporary simulator reference just so we can load states later
+        # We use this very opaque method to generate the attribute to denote that this should NOT
+        # be referenced like a normal variable
+        setattr(self, "_tmp_sim", simulator)
 
-    def _post_load(self, simulator=None):
+        return super().load(simulator=simulator)
+
+    def _post_load(self):
         # Run super method first
-        super()._post_load(simulator=simulator)
+        super()._post_load()
 
         # Initialize any states created
+        tmp_sim = getattr(self, "_tmp_sim")
         for state in self._states.values():
-            state.initialize(simulator)
+            state.initialize(tmp_sim)
+
+        # Delete the temporary simulator reference
+        delattr(self, "_tmp_sim")
 
     def initialize_states(self):
         """
@@ -213,6 +228,9 @@ class StatefulObject(BaseObject):
         return state_dic, idx
 
     def clear_cached_states(self):
+        # Check self._states just in case states have not been initialized yet.
+        if not self._states:
+            return
         for _, obj_state in self._states.items():
             if isinstance(obj_state, CachingEnabledObjectState):
                 obj_state.clear_cached_value()

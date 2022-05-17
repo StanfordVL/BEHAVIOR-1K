@@ -15,7 +15,7 @@ from igibson.sensors import create_sensor, SENSOR_PRIMS_TO_SENSOR_CLS, ALL_SENSO
 from igibson.objects.usd_object import USDObject
 from igibson.objects.controllable_object import ControllableObject
 from igibson.utils.gym_utils import GymObservable
-from igibson.utils.python_utils import classproperty, assert_valid_key, merge_nested_dicts, Registerable
+from igibson.utils.python_utils import Registerable, classproperty
 from igibson.utils.utils import rotate_vector_3d
 
 from pxr import UsdPhysics
@@ -34,7 +34,6 @@ class BaseRobot(USDObject, ControllableObject, GymObservable, Registerable):
     This class handles object loading, and provides method interfaces that should be
     implemented by subclassed robots.
     """
-
     def __init__(
         self,
         # Shared kwargs in hierarchy
@@ -137,9 +136,18 @@ class BaseRobot(USDObject, ControllableObject, GymObservable, Registerable):
             **kwargs,
         )
 
-    def _post_load(self, simulator=None):
+    def _load(self, simulator=None):
+        # Run super first
+        prim = super()._load(simulator=simulator)
+
+        # A persistent reference to simulator is needed for AG in ManipulationRobot
+        self._simulator = simulator
+
+        return prim
+
+    def _post_load(self):
         # Run super post load first
-        super()._post_load(simulator=simulator)
+        super()._post_load()
 
         # Search for any sensors this robot might have attached to any of its links
         self._sensors = OrderedDict()
@@ -169,9 +177,6 @@ class BaseRobot(USDObject, ControllableObject, GymObservable, Registerable):
 
         # Update our overall obs modalities
         self._obs_modalities = obs_modalities
-
-        # A persistent reference to simulator is needed for AG in ManipulationRobot
-        self._simulator = simulator
 
     def _initialize(self):
         # Run super first

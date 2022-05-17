@@ -100,9 +100,9 @@ class CollisionGeomPrim(GeomPrim):
             load_config=load_config,
         )
 
-    def _post_load(self, simulator=None):
+    def _post_load(self):
         # run super first
-        super()._post_load(simulator=simulator)
+        super()._post_load()
 
         # Create API references
         self._collision_api = UsdPhysics.CollisionAPI(self._prim) if \
