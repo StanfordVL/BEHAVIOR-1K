@@ -6,7 +6,7 @@
 # distribution of this software and related documentation without an express
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 #
-import collections
+from collections import defaultdict
 import itertools
 import logging
 
@@ -27,7 +27,7 @@ from omni.isaac.core.loggers import DataLogger
 from typing import Optional, List
 
 from igibson import assets_path
-from igibson.transition_machine import DEFAULT_RULES
+from igibson.transition_rules import DEFAULT_RULES
 from igibson.objects.object_base import BaseObject
 from igibson.object_states.factory import get_states_by_dependency_order
 from igibson.scenes import Scene
@@ -139,8 +139,6 @@ class Simulator(SimulationContext):
 
         # Set of all non-Omniverse transition rules to apply.
         self._transition_rules = DEFAULT_RULES
-        self._all_transition_categories = set(
-            category for rule in self._transition_rules for category in rule.categories)
 
         # Toggle simulator state once so that downstream omni features can be used without bugs
         # e.g.: particle sampling, which for some reason requires sim.play() to be called at least once
@@ -320,19 +318,23 @@ class Simulator(SimulationContext):
 
     def _non_ov_transition_step(self):
         """Applies all internal non-Omniverse transition rules."""
-        # Create a dict from category to object for all objects we care about.
-        obj_dict = collections.defaultdict(list)
+        # Create a dict from rule to filter to objects we care about.
+        obj_dict = defaultdict(lambda: defaultdict(list))
         for obj in self.scene.objects:
-            if obj.category in self._all_transition_categories:
-                obj_dict[obj.category].append(obj)
+            for rule in self._transition_rules:
+                for f in rule.filters:
+                    if f(obj):
+                        obj_dict[rule][f].append(obj)
 
         # For each rule, create a subset of the dict and apply it if applicable.
         for rule in self._transition_rules:
-            obj_subset = list(obj_dict[c] for c in rule.categories if c in obj_dict)
-            if len(obj_subset) != len(rule.categories):
+            if rule not in obj_dict:
+                continue
+            obj_list_rule = list(obj_dict[rule][f] for f in rule.filters)
+            if any(not obj_list_filter for obj_list_filter in obj_list_rule):
                 continue
             # TODO: Consider optimizing itertools.product.
-            for obj_tuple in itertools.product(*obj_subset):
+            for obj_tuple in itertools.product(*obj_list_rule):
                 if rule.condition(self, obj_tuple):
                     rule.transition(self, obj_tuple)
 
