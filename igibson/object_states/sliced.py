@@ -15,6 +15,7 @@ class Sliced(AbsoluteObjectState, BooleanState):
         super(Sliced, self).__init__(obj)
         self.slice_force = slice_force
         self.value = False
+        self.sliced_parts = None
 
     def _get_value(self):
         return self.value
@@ -32,6 +33,7 @@ class Sliced(AbsoluteObjectState, BooleanState):
         pos, orn = self.obj.get_position_orientation()
 
         # load object parts
+        self.sliced_parts = OrderedDict()
         for _, part_idx in enumerate(self.obj.metadata["object_parts"]):
             # list of dicts gets replaced by {'0':dict, '1':dict, ...}
             part = self.obj.metadata["object_parts"][part_idx]
@@ -45,8 +47,7 @@ class Sliced(AbsoluteObjectState, BooleanState):
             usd_path = f"{model_root_path}/usd/{part_model}.usd"
 
             # calculate global part pose
-            part_pos = np.array(part_pos) + pos
-            part_orn = T.quat_multiply(np.array(part_orn), orn)
+            part_pos, part_orn = T.pose_transform(pos, orn, np.array(part_pos), np.array(part_orn))
 
             # circular import
             from igibson.objects.dataset_object import DatasetObject
@@ -61,10 +62,13 @@ class Sliced(AbsoluteObjectState, BooleanState):
             )
             
             # add to stage
-            self.simulator.import_object(part_obj, auto_initialize=False)
+            self.simulator.import_object(part_obj, auto_initialize=True)
             # inherit parent position and orientation
             part_obj.set_position_orientation(position=np.array(part_pos),
                                               orientation=np.array(part_orn))
+
+            # Save the sliced object
+            self.sliced_parts[part_obj.name] = part_obj
 
         # delete original object from stage
         self.simulator.remove_object(self.obj)
