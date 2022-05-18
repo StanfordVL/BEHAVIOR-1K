@@ -53,7 +53,6 @@ class XFormPrim(BasePrim):
         prim_path,
         name,
         load_config=None,
-        **kwargs,
     ):
         # Other values that will be filled in at runtime
         self._default_state = None
@@ -66,7 +65,6 @@ class XFormPrim(BasePrim):
             prim_path=prim_path,
             name=name,
             load_config=load_config,
-            **kwargs,
         )
 
     def _load(self, simulator=None):
