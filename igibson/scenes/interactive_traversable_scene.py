@@ -746,55 +746,27 @@ class InteractiveTraversableScene(TraversableScene):
         simulator.clear()
         simulator.load_stage(usd_path=self.scene_file)
 
-        # Store stage reference
+        # Store stage reference and refresh world prim reference
         self._stage = simulator.stage
+        self._world_prim = simulator.world_prim
 
         # Check if current stage is a template based on ig:isTemplate value, and set the value to False if it does not exist
         is_template = False
-        scene_info = None
         # TODO: Need to set template to false by default after loading everything
         if "ig:isTemplate" in self._world_prim.GetPropertyNames():
             is_template = self._world_prim.GetAttribute("ig:isTemplate").Get()
-            # If False, we grab some additional metadata info
-            if not is_template:
-                scene_info = self.get_scene_info()
         else:
-            # Create the property and set it to False
+            # Create the property
             self._world_prim.CreateAttribute("ig:isTemplate", VT.Bool)
-            self._world_prim.GetAttribute("ig:isTemplate").Set(False)
 
-        # Iterate over all the children in the stage world
-        for prim in self._world_prim.GetChildren():
-            # Only process prims that are an Xform
-            if prim.GetPrimTypeInfo().GetTypeName() == "Xform":
-                name = prim.GetName()
-                # category = prim.GetAttribute("ig:category").Get()
-                # # Skip over the wall, floor, or ceilings (#TODO: Can we make this more elegant?)
-                # if category in {"walls", "floors", "ceilings"}:
-                #     continue
+        # Set this to be False -- we are no longer a template after we load
+        self._world_prim.GetAttribute("ig:isTemplate").Set(False)
 
-                # Check if we're using a template -- if so, we need to load the object, otherwise, we simply
-                # add a reference internally
-                if is_template:
-                    # Create the object and load it into the simulator
-                    obj, info = self._create_obj_from_template_xform(simulator=simulator, prim=prim)
-
-                else:
-                    # We sync our object class instance to the (already-loaded) object
-                    obj = create_object_from_init_info(scene_info["init_info"][name])
-                    info = None
-
-                # Only import the object if we received a valid object
-                if obj is not None:
-                    # Note that we don't auto-initialize because of some very specific state-setting logic that
-                    # has to occur a certain way at the start of scene creation (sigh, Omniverse ): )
-                    simulator.import_object(obj, auto_initialize=False)
-                    # If we have additional info specified, we also directly set it's bounding box position since this is a known quantity
-                    # This is also the only time we'll be able to set fixed object poses
-                    if info is not None:
-                        pos = info["bbox_center_pos"]
-                        ori = info["bbox_center_ori"]
-                        obj.set_bbox_center_position_orientation(pos, ori)
+        # Load objects using logic based on whether the current USD is a template or not
+        if is_template:
+            self._load_objects_from_template(simulator=simulator)
+        else:
+            self._load_objects_from_scene_info(simulator=simulator)
 
         # disable collision between the fixed links of the fixed objects
         fixed_objs = self.object_registry("fixed_base", True, default_val=[])
@@ -809,6 +781,57 @@ class InteractiveTraversableScene(TraversableScene):
             self._trav_map.load_trav_map(maps_path)
 
         return list(self.objects)
+
+    def _load_objects_from_template(self, simulator):
+        """
+        Loads scene objects based on metadata information found in the current USD stage, assumed to be a template
+        (property ig:isTemplate is True)
+        """
+        # Iterate over all the children in the stage world
+        for prim in self._world_prim.GetChildren():
+            # Only process prims that are an Xform
+            if prim.GetPrimTypeInfo().GetTypeName() == "Xform":
+                name = prim.GetName()
+
+                # category = prim.GetAttribute("ig:category").Get()
+                # # Skip over the wall, floor, or ceilings (#TODO: Can we make this more elegant?)
+                # if category in {"walls", "floors", "ceilings"}:
+                #     continue
+
+                # Create the object and load it into the simulator
+                obj, info = self._create_obj_from_template_xform(simulator=simulator, prim=prim)
+
+                # Only import the object if we received a valid object
+                if obj is not None:
+                    # Note that we don't auto-initialize because of some very specific state-setting logic that
+                    # has to occur a certain way at the start of scene creation (sigh, Omniverse ): )
+                    simulator.import_object(obj, auto_initialize=False)
+                    # If we have additional info specified, we also directly set it's bounding box position since this is a known quantity
+                    # This is also the only time we'll be able to set fixed object poses
+                    pos = info["bbox_center_pos"]
+                    ori = info["bbox_center_ori"]
+                    obj.set_bbox_center_position_orientation(pos, ori)
+
+    def _load_objects_from_scene_info(self, simulator):
+        """
+        Loads scene objects based on metadata information found in the current USD stage's scene info
+        (information stored in the world prim's CustomData)
+        """
+        # Grab scene info
+        scene_info = self.get_scene_info()
+
+        # Iterate over all scene info, and instantiate object classes linked to the objects found on the stage
+        # accordingly
+        for obj_info in scene_info["init_info"].values():
+            obj = create_object_from_init_info(obj_info)
+            # Make sure this object is already loaded -- i.e.: it was linked to a pre-existing prim found on the stage
+            assert obj.loaded, f"Object {obj.name} should have already been loaded when creating a BaseObject class" \
+                               f"instance, but did not find any on the current stage! " \
+                               f"Searched at prim_path: {obj.prim_path}"
+            # Import into the simulator
+            # Note that we don't auto-initialize because of some very specific state-setting logic that
+            # has to occur a certain way at the start of scene creation (sigh, Omniverse ): )
+            simulator.import_object(obj, auto_initialize=False)
 
     def _initialize(self):
         # First, we initialize all of our objects and add the object

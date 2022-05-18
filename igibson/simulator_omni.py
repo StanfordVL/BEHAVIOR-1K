@@ -248,12 +248,13 @@ class Simulator(SimulationContext):
         """
         self._objects_to_initialize.append(obj)
 
-    def import_object(self, obj, auto_initialize=True):
+    def import_object(self, obj, register=True, auto_initialize=True):
         """
         Import an object into the simulator.
 
         Args:
             obj (BaseObject): an object to load
+            register (bool): whether to register this object internally in the scene registry
             auto_initialize (bool): If True, will auto-initialize the requested object on the next simulation step.
                 Otherwise, we assume that the object will call initialize() on its own!
         """
@@ -269,7 +270,7 @@ class Simulator(SimulationContext):
         assert self.scene is not None, "import_object needs to be called after import_scene"
 
         # Load the object in omniverse by adding it to the scene
-        self.scene.add_object(obj, self, _is_call_from_simulator=True)
+        self.scene.add_object(obj, self, register=register, _is_call_from_simulator=True)
 
         # Lastly, additionally add this object automatically to be initialized as soon as another simulator step occurs
         # if requested
@@ -584,8 +585,11 @@ class Simulator(SimulationContext):
         recreated_scene = create_object_from_init_info(scene_init_info)
         self.import_scene(scene=recreated_scene)
 
-        # Restore the dynamic state of the scene
+        # Start the simulation and restore the dynamic state of the scene and then pause again
+        self.play()
         self.scene.load_state(scene_state, serialized=False)
+        self.app.update()
+        self.pause()
 
         logging.info("The saved simulation environment loaded.")
     
@@ -613,7 +617,10 @@ class Simulator(SimulationContext):
         saved_state_str = json.dumps(self.scene.dump_state(serialized=False), cls=NumpyEncoder)
         self.world_prim.SetCustomDataByKey("scene_state", saved_state_str)
         scene_init_info = self.scene.get_init_info()
-        self.world_prim.SetCustomDataByKey("scene_init_info", scene_init_info)
+        # Overwrite the usd with our desired usd file
+        scene_init_info["args"]["usd_path"] = usd_path
+        scene_init_info_str = json.dumps(scene_init_info, cls=NumpyEncoder)
+        self.world_prim.SetCustomDataByKey("scene_init_info", scene_init_info_str)
 
         # Save stage. This needs to happen at the end since some objects may get reset after sim.stop().
         self.stop()

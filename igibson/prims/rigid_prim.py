@@ -312,7 +312,7 @@ class RigidPrim(XFormPrim):
         """
         if self._handle is not None and self._dc.is_simulating():
             pose = self._dc.get_rigid_body_pose(self._handle)
-            pos, ori = pose.p, pose.r
+            pos, ori = np.asarray(pose.p), np.asarray(pose.r)
         else:
             # Call super method by default
             pos, ori = super().get_position_orientation()

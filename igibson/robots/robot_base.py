@@ -111,7 +111,6 @@ class BaseRobot(USDObject, ControllableObject, GymObservable, Registerable):
 
         # Initialize internal attributes that will be loaded later
         self._sensors = None                     # e.g.: scan sensor, vision sensor
-        self._simulator = None                   # Required for AG by ManipulationRobot
 
         # Run super init
         super().__init__(
@@ -135,15 +134,6 @@ class BaseRobot(USDObject, ControllableObject, GymObservable, Registerable):
             reset_joint_pos=reset_joint_pos,
             **kwargs,
         )
-
-    def _load(self, simulator=None):
-        # Run super first
-        prim = super()._load(simulator=simulator)
-
-        # A persistent reference to simulator is needed for AG in ManipulationRobot
-        self._simulator = simulator
-
-        return prim
 
     def _post_load(self):
         # Run super post load first

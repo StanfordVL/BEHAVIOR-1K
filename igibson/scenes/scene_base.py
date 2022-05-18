@@ -288,7 +288,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         """
         pass
 
-    def add_object(self, obj, simulator, _is_call_from_simulator=False):
+    def add_object(self, obj, simulator, register=True, _is_call_from_simulator=False):
         """
         Add an object to the scene, loading it if the scene is already loaded.
 
@@ -297,6 +297,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
         :param obj: the object to load
         :param simulator: the simulator to add the object to
+        :param register: whether to track this object internally in the scene registry
         :param _is_call_from_simulator: whether the caller is the simulator. This should
             **not** be set by any callers that are not the Simulator class
         :return: the prim of the loaded object if the scene was already loaded, or None if the scene is not loaded
@@ -313,14 +314,15 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # let scene._load() load the object when called later on.
         prim = obj.load(simulator)
 
-        # Add this object to our registry based on its type
-        if isinstance(obj, BaseRobot):
-            self.robot_registry.add(obj)
-        else:
-            self.object_registry.add(obj)
+        # Add this object to our registry based on its type, if we want to register it
+        if register:
+            if isinstance(obj, BaseRobot):
+                self.robot_registry.add(obj)
+            else:
+                self.object_registry.add(obj)
 
-        # Run any additional scene-specific logic with the created object
-        self._add_object(obj)
+            # Run any additional scene-specific logic with the created object
+            self._add_object(obj)
 
         return prim
 

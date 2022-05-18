@@ -323,7 +323,7 @@ class BasePrim(Serializable, UniquelyNamed, Recreatable, ABC):
             name=f"{self.name}_copy{self._n_duplicates}",
             load_config=self._load_config,
         )
-        new_prim.load(simulator=simulator)
+        simulator.import_object(new_prim, register=False, auto_initialize=True)
 
         # Increment duplicate count
         self._n_duplicates += 1
