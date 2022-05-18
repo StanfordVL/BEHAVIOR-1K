@@ -335,8 +335,8 @@ class Simulator(SimulationContext):
                 continue
             # TODO: Consider optimizing itertools.product.
             for obj_tuple in itertools.product(*obj_list_rule):
-                if rule.condition(self, obj_tuple):
-                    rule.transition(self, obj_tuple)
+                if rule.condition(self, *obj_tuple):
+                    rule.transition(self, *obj_tuple)
 
     def stop(self):
         super().stop()

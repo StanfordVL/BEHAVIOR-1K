@@ -45,10 +45,10 @@ class AbilityFilter(BaseFilter):
     """Filter for object abilities."""
 
     def __init__(self, ability):
-        self.state_types = get_states_for_ability(ability)
+        self.ability = ability
 
     def __call__(self, obj):
-        return all(state_type in obj.states for state_type in self.state_types)
+        return self.ability in obj._abilities
 
 
 class OrFilter(BaseFilter):
@@ -84,30 +84,14 @@ class BaseTransitionRule(metaclass=ABCMeta):
         self.filters = filters
 
     @abstractmethod
-    def condition(self, simulator, obj_tuple):
+    def condition(self, simulator,  *args):
         """Returns True if the rule applies to the object tuple."""
         pass
 
     @abstractmethod
-    def transition(self, simulator, obj_tuple):
+    def transition(self, simulator,  *args):
         """Rule to apply for each tuples satisfying the condition."""
         pass
-
-
-# TODO: Perhaps the rules should be in a separate file.
-class DemoRule(BaseTransitionRule):
-    """An example transition rule."""
-
-    def __init__(self):
-        c_filter_apple = CategoryFilter("apple")
-        c_filter_knife = CategoryFilter("table_knife")
-        super(DemoRule, self).__init__((c_filter_apple, c_filter_knife))
-
-    def condition(self, simulator, obj_tuple):
-        return True
-
-    def transition(self, simulator, obj_tuple):
-        print(f"Applied {DemoRule.__name__} to {obj_tuple}")
 
 
 class TransitionRule(BaseTransitionRule):
@@ -118,24 +102,22 @@ class TransitionRule(BaseTransitionRule):
         self.condition_fn = condition_fn
         self.transition_fn = transition_fn
 
-    def condition(self, simulator, obj_tuple):
-        return self.condition_fn(*obj_tuple)
+    def condition(self, simulator, *args):
+        return self.condition_fn(*args)
 
-    def transition(self, simulator, obj_tuple):
-        return self.transition_fn(*obj_tuple)
+    def transition(self, simulator, *args):
+        return self.transition_fn(*args)
 
 
 class SlicingRule(BaseTransitionRule):
     """Transition rule to apply to sliced / slicer object pairs."""
 
     def __init__(self):
-        c_filter_apple = CategoryFilter("apple")
-        c_filter_knife = CategoryFilter("table_knife")
-        super(SlicingRule, self).__init__((c_filter_apple, c_filter_knife))
+        a_filter_sliceable = AbilityFilter("sliceable")
+        a_filter_slicer = AbilityFilter("slicer")
+        super(SlicingRule, self).__init__((a_filter_sliceable, a_filter_slicer))
 
-    def condition(self, simulator, obj_tuple):
-        sliced_obj, slicer_obj = obj_tuple
-
+    def condition(self, simulator, sliced_obj, slicer_obj):
         slicer_position = slicer_obj.states[Slicer].get_link_position()
         if slicer_position is None:
             False
@@ -162,9 +144,7 @@ class SlicingRule(BaseTransitionRule):
                 return True
         return False
 
-    def transition(self, simulator, obj_tuple):
-        sliced_obj, _ = obj_tuple
-
+    def transition(self, simulator, sliced_obj, slicer_obj):
         # Object parts offset annotation are w.r.t the base link of the whole object.
         pos, orn = sliced_obj.get_position_orientation()
 
@@ -220,6 +200,5 @@ class SlicingRule(BaseTransitionRule):
   )
 """
 DEFAULT_RULES = [
-    # DemoRule(),
     SlicingRule(),
 ]
