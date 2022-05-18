@@ -146,6 +146,7 @@ class SlicingRule(BaseTransitionRule):
 
     def transition(self, simulator, sliced_obj, slicer_obj):
         # Object parts offset annotation are w.r.t the base link of the whole object.
+        sliced_obj.states[Sliced].set_value(True)
         pos, orn = sliced_obj.get_position_orientation()
 
         # Load object parts.
@@ -185,7 +186,7 @@ class SlicingRule(BaseTransitionRule):
 
         # Delete original object from stage.
         simulator.remove_object(sliced_obj)
-        print(f"Applied {SlicingRule.__name__} to {obj_tuple}")
+        print(f"Applied {SlicingRule.__name__} to {sliced_obj}")
 
 
 """See the following example for writing simple rules.

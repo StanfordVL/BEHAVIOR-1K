@@ -52,20 +52,17 @@ def test_apple_slicing():
         whole_obj.set_position_orientation(position=np.array([0, 0, 0]))
 
         sim.import_object(knife, auto_initialize=True)
-        knife.set_position_orientation(position=np.array([0, 1, 0]))
+        knife.set_position_orientation(position=np.array([0, 0, 0]))
 
-        print(f"Before {knife.states[object_states.ContactBodies].get_value()}")
         # Need 1 physics step to activate collision meshes for raycasting.
         sim.step(force_playing=True)
-        print(f"After {knife.states[object_states.ContactBodies].get_value()}")
 
         assert not whole_obj.states[object_states.Sliced].get_value()
 
-        for i in range(3):
-            sim.step(apply_transitions=False)
-        print(f"After-2 {knife.states[object_states.ContactBodies].get_value()}")
-        sim.step(apply_transitions=True)
-        print(f"After-last {knife.states[object_states.ContactBodies].get_value()}")
+        for i in range(10):
+            sim.step(apply_transitions=True)
+
+        assert sum("apple_part" in obj.name for obj in sim.scene.objects) == 2
     finally:
         app.close()
 
