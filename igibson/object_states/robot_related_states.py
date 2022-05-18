@@ -27,7 +27,7 @@ class InReachOfRobot(CachingEnabledObjectState, BooleanState):
         return CachingEnabledObjectState.get_dependencies() + [Pose]
 
     def _compute_value(self):
-        robot = _get_robot(self.simulator)
+        robot = _get_robot(self._simulator)
         if not robot:
             return False
 
@@ -45,11 +45,11 @@ class InSameRoomAsRobot(CachingEnabledObjectState, BooleanState):
         return CachingEnabledObjectState.get_dependencies() + [Pose, InsideRoomTypes]
 
     def _compute_value(self):
-        robot = _get_robot(self.simulator)
+        robot = _get_robot(self._simulator)
         if not robot:
             return False
 
-        scene = self.simulator.scene
+        scene = self._simulator.scene
         if not scene or not hasattr(scene, "get_room_instance_by_point"):
             return False
 
@@ -65,7 +65,7 @@ class InSameRoomAsRobot(CachingEnabledObjectState, BooleanState):
 
 class InHandOfRobot(CachingEnabledObjectState, BooleanState):
     def _compute_value(self):
-        robot = _get_robot(self.simulator)
+        robot = _get_robot(self._simulator)
         if not robot:
             return False
 
@@ -88,7 +88,7 @@ class InFOVOfRobot(CachingEnabledObjectState, BooleanState):
         return CachingEnabledObjectState.get_optional_dependencies() + [ObjectsInFOVOfRobot]
 
     def _compute_value(self):
-        robot = _get_robot(self.simulator)
+        robot = _get_robot(self._simulator)
         if not robot:
             return False
 
@@ -105,9 +105,9 @@ class ObjectsInFOVOfRobot(CachingEnabledObjectState):
 
     def _compute_value(self):
         # Pass the FOV through the instance-to-body ID mapping.
-        seg = self.simulator.renderer.render_single_robot_camera(self.obj, modes="ins_seg")[0][:, :, 0]
+        seg = self._simulator.renderer.render_single_robot_camera(self.obj, modes="ins_seg")[0][:, :, 0]
         seg = np.round(seg * MAX_INSTANCE_COUNT).astype(int)
-        body_ids = self.simulator.renderer.get_pb_ids_for_instance_ids(seg)
+        body_ids = self._simulator.renderer.get_pb_ids_for_instance_ids(seg)
 
         # Pixels that don't contain an object are marked -1 but we don't want to include that
         # as a body ID.

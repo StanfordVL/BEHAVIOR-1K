@@ -51,16 +51,6 @@ class _Dirty(AbsoluteObjectState, BooleanState):
 
         return new_value
 
-    # TODO!
-    @classmethod
-    def serialize(cls, data):
-        raise NotImplementedError()
-        # return np.array([NONE])
-
-    @classmethod
-    def deserialize(cls, data):
-        raise NotImplementedError()
-
 
 class Dusty(_Dirty):
     DIRT_CLASS = DustSystem

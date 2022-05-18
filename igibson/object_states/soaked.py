@@ -20,7 +20,7 @@ class Soaked(AbsoluteObjectState, BooleanState, TextureChangeStateMixin):
         return True
 
     def _update(self):
-        water_source_objs = self.simulator.scene.get_objects_with_state(WaterSource)
+        water_source_objs = self._simulator.scene.get_objects_with_state(WaterSource)
         for water_source_obj in water_source_objs:
             contacted_water_prim_paths = set(
                 item.bodyUniqueIdB for item in list(self.obj.states[ContactBodies].get_value())

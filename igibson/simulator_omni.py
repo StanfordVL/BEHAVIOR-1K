@@ -297,7 +297,7 @@ class Simulator(SimulationContext):
             self._objects_to_initialize = []
             # Also update the scene registry
             # TODO: A better place to put this perhaps?
-            self._scene.object_registry.update(keys="handle")
+            self._scene.object_registry.update(keys="root_handle")
 
         # Step all of the particle systems.
         for particle_system in self.particle_systems:

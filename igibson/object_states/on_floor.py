@@ -33,7 +33,7 @@ class OnFloor(RelativeObjectState, KinematicsMixin, BooleanState):
         if not isinstance(other, RoomFloor):
             return False
 
-        state = self.simulator.dump_state(serialized=True)
+        state = self._simulator.dump_state(serialized=False)
 
         for _ in range(10):
             sampling_success = sample_kinematics("onFloor", self.obj, other, new_value)
@@ -47,7 +47,7 @@ class OnFloor(RelativeObjectState, KinematicsMixin, BooleanState):
             if sampling_success:
                 break
             else:
-                self.simulator.load_state(state, serialized=True)
+                self._simulator.load_state(state, serialized=False)
 
         return sampling_success
 

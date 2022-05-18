@@ -47,7 +47,7 @@ class WaterSource(AbsoluteObjectState, LinkBasedStateMixin):
         self.water_stream = WaterStream(
             water_source_position, num=_NUM_DROPS, initial_dump=self.initial_dump, class_id=SemanticClass.WATER
         )
-        self.simulator.import_particle_system(self.water_stream)
+        self._simulator.import_particle_system(self.water_stream)
         del self.initial_dump
 
     def _update(self):

@@ -24,46 +24,48 @@ class CleaningTool(AbsoluteObjectState, LinkBasedStateMixin):
         self.initialize_link_mixin()
 
     def _update(self):
-        # Check if this tool interacts with any dirt particles.
-        for particle_system in self.simulator.particle_systems:
-            # We don't check for inheritance, just the leaf types.
-            # Faster and doesn't need access to the private type _Dirt.
-            particle_type = type(particle_system)
-            if particle_type is not Dust and particle_type is not Stain:
-                continue
-
-            # Check if the surface has any particles.
-            if not particle_system.get_num_active():
-                continue
-
-            # We need to be soaked to clean stains.
-            if isinstance(particle_system, Stain):
-                if Soaked not in self.obj.states or not self.obj.states[Soaked].get_value():
-                    continue
-
-            # Check if we're touching the parent of the particle system through our
-            # cleaning link.
-            contact_bodies = self.obj.states[ContactBodies].get_value()
-            touching_body = [
-                cb for cb in contact_bodies if cb.body1 in particle_system.parent_obj.link_prim_paths
-            ]
-            touching_link = any(self.link is None or cb.body0 == self.link.prim_path for cb in touching_body)
-            if not touching_link:
-                continue
-
-            # Time to check for colliding particles in our AABB.
-            if self.link is not None:
-                # If we have a cleaning link, use it.
-                aabb = BoundingBoxAPI.compute_aabb(self.link.prim_path())
-            else:
-                # Otherwise, use the full-object AABB.
-                aabb = self.obj.states[AABB].get_value()
-
-            # Find particles in the AABB.
-            for particle in particle_system.get_active_particles():
-                pos = particle.get_position()
-                if BoundingBoxAPI.aabb_contains_point(pos, aabb):
-                    particle_system.stash_particle(particle)
+        # TODO!
+        return
+        # # Check if this tool interacts with any dirt particles.
+        # for particle_system in self.simulator.particle_systems:
+        #     # We don't check for inheritance, just the leaf types.
+        #     # Faster and doesn't need access to the private type _Dirt.
+        #     particle_type = type(particle_system)
+        #     if particle_type is not Dust and particle_type is not Stain:
+        #         continue
+        #
+        #     # Check if the surface has any particles.
+        #     if not particle_system.get_num_active():
+        #         continue
+        #
+        #     # We need to be soaked to clean stains.
+        #     if isinstance(particle_system, Stain):
+        #         if Soaked not in self.obj.states or not self.obj.states[Soaked].get_value():
+        #             continue
+        #
+        #     # Check if we're touching the parent of the particle system through our
+        #     # cleaning link.
+        #     contact_bodies = self.obj.states[ContactBodies].get_value()
+        #     touching_body = [
+        #         cb for cb in contact_bodies if cb.body1 in particle_system.parent_obj.link_prim_paths
+        #     ]
+        #     touching_link = any(self.link is None or cb.body0 == self.link.prim_path for cb in touching_body)
+        #     if not touching_link:
+        #         continue
+        #
+        #     # Time to check for colliding particles in our AABB.
+        #     if self.link is not None:
+        #         # If we have a cleaning link, use it.
+        #         aabb = BoundingBoxAPI.compute_aabb(self.link.prim_path())
+        #     else:
+        #         # Otherwise, use the full-object AABB.
+        #         aabb = self.obj.states[AABB].get_value()
+        #
+        #     # Find particles in the AABB.
+        #     for particle in particle_system.get_active_particles():
+        #         pos = particle.get_position()
+        #         if BoundingBoxAPI.aabb_contains_point(pos, aabb):
+        #             particle_system.stash_particle(particle)
 
     def _set_value(self, new_value):
         raise ValueError("Cannot set valueless state CleaningTool.")

@@ -57,9 +57,9 @@ class ToggledOn(AbsoluteObjectState, BooleanState, TextureChangeStateMixin, Link
                 visual_only=True,
                 rgba=[1, 0, 0, 0.5],
             )
-            self.simulator.import_object(self.visual_marker_on)
+            self._simulator.import_object(self.visual_marker_on)
             self.visual_marker_on.visible = False
-            self.simulator.import_object(self.visual_marker_off)
+            self._simulator.import_object(self.visual_marker_off)
             self.visual_marker_off.visible = False
 
     def _update(self):
@@ -69,7 +69,7 @@ class ToggledOn(AbsoluteObjectState, BooleanState, TextureChangeStateMixin, Link
 
         robot_can_toggle = False
         # detect marker and hand interaction
-        for robot in self.simulator.scene.robots:
+        for robot in self._simulator.scene.robots:
             robot_can_toggle = robot.can_toggle(button_position_on_object, _TOGGLE_DISTANCE_THRESHOLD)
             if robot_can_toggle:
                 break
