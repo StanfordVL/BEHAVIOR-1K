@@ -533,9 +533,9 @@ class iGibsonEnv(BaseEnv):
         # Do any domain randomization
         self.randomize_domain()
 
-        # Move all robots away from the scene since the task will place the robots anyways
-        for robot in self.robots:
-            robot.set_position(np.array([100.0, 100.0, 100.0]))
+        # # Move all robots away from the scene since the task will place the robots anyways
+        # for robot in self.robots:
+        #     robot.set_position(np.array([100.0, 100.0, 100.0]))
 
         # Reset the task
         self.task.reset(self)
