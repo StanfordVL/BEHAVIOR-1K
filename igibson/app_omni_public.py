@@ -47,13 +47,12 @@ class OmniApp:
 
     Arguments:
         config (dict): A dictionary containing the configuration for the app. (default: None)
-        experience (str): Path to the application config loaded by the launcher (default: "", will load app/omni.isaac.sim.python.kit if left blank)
+        experience (str): Path to the application config loaded by the launcher (default: "", will load configs/apps/default if left blank)
     """
 
     DEFAULT_LAUNCHER_CONFIG = {
         "headless": True,
         "active_gpu": None,
-        "multi_gpu": True,
         "sync_loads": True,
         "width": 1280,
         "height": 720,
@@ -70,7 +69,6 @@ class OmniApp:
         "max_volume_bounces": 4,
         "open_usd": None,
         "livesync_usd": None,
-        "memory_report": False,
     }
     """
     The config variable is a dictionary containing the following entries
@@ -78,24 +76,22 @@ class OmniApp:
     Args:
         headless (bool): Disable UI when running. Defaults to True
         active_gpu (int): Specify the GPU to use when running, set to None to use default value which is usually the first gpu, default is None
-        multi_gpu (bool): Set to true to enable Multi GPU support, Defaults to true
         sync_loads (bool): When enabled, will pause rendering until all assets are loaded. Defaults to True
-        width (int): Width of the viewport and generated images. Defaults to 1280
-        height (int): Height of the viewport and generated images. Defaults to 720
+        width (int): Width of the viewport and generated images. Defaults to 1024
+        height (int): Height of the viewport and generated images. Defaults to 800
         window_width (int): Width of the application window, independent of viewport, defaults to 1440,
         window_height (int): Height of the application window, independent of viewport, defaults to 900,
         display_options (int): used to specify whats visible in the stage by default. Defaults to 3094 so extra objects do not appear in synthetic data. 3286 is another good default, used for the regular isaac-sim editor experience
         subdiv_refinement_level (int): Number of subdivisons to perform on supported geometry. Defaults to 0
-        renderer (str): Rendering mode, can be  `RayTracedLighting` or `PathTracing`. Defaults to `PathTracing`
+        renderer (str): Rendering mode, can be  `RayTracedLighting` or `PathTracing`. Defaults to `RayTracedLighting`
         anti_aliasing (int): Antialiasing mode, 0: Disabled, 1: TAA, 2: FXAA, 3: DLSS, 4:RTXAA
         samples_per_pixel_per_frame (int): The number of samples to render per frame, increase for improved quality, used for `PathTracing` only. Defaults to 64
         denoiser (bool):  Enable this to use AI denoising to improve image quality, used for `PathTracing` only. Defaults to True
         max_bounces (int): Maximum number of bounces, used for `PathTracing` only. Defaults to 4
-        max_specular_transmission_bounces (int): Maximum number of bounces for specular or transmission, used for `PathTracing` only. Defaults to 6
-        max_volume_bounces (int): Maximum number of bounces for volumetric materials, used for `PathTracing` only. Defaults to 4
-        open_usd (str): This is the name of the usd to open when the app starts. It will not be saved over. Default is None and an empty stage is created on startup.
-        livesync_usd (str): This is the location of the usd that you want to do your interactive work in.  The existing file is overwritten. Default is None
-        memory_report (bool): Set to true to print a memory usage report on exit. Default is False
+        max_specular_transmission_bounces(int): Maximum number of bounces for specular or transmission, used for `PathTracing` only. Defaults to 6
+        max_volume_bounces(int): Maximum number of bounces for volumetric materials, used for `PathTracing` only. Defaults to 4
+        open_usd(str): This is the name of the usd to open when the app starts. It will not be saved over. Default is None and an empty stage is created on startup.
+        livesync_usd(str): This is the location of the usd that you want to do your interactive work in.  The exisitng file is overwritten. Default is None
     """
 
     def __init__(self, launch_config: dict = None, experience: str = "", debug: bool = False) -> None:
@@ -127,7 +123,7 @@ class OmniApp:
         # apply render settings specified in config
         self.reset_render_settings()
         set_carb_setting(self._carb_settings, "/persistent/simulation/defaultMetersPerUnit", 1.0)
-        self._app.print_and_log("Simulation App Starting")
+        print("Simulation App Starting")
         self._app.update()
 
         # Possibly open a USD file, otherwise create a new stage
@@ -156,12 +152,8 @@ class OmniApp:
         self._app.update()
         # Dock floating UIs
         self._prepare_ui()
-        if self.config.get("memory_report"):
-            from omni.isaac.core.utils.statistics import get_memory_stats
-
-            self.start_memory_stats = get_memory_stats()
         # Notify toolkit is running
-        self._app.print_and_log("Simulation App Startup Complete")
+        print("Simulation App Startup Complete")
 
     def _load_omni_extensions(self, launch_config=None, experience=""):
         """
@@ -215,7 +207,7 @@ class OmniApp:
         # Override settings from input config
         self.config = self.DEFAULT_LAUNCHER_CONFIG
         if experience == "":
-            experience = f'{igibson.root_path}/configs/apps/omni.isaac.sim.python.kit'
+            experience = f'{igibson.root_path}/configs/apps/public/omni.isaac.sim.python.kit'
         self.config.update({"experience": experience})
         if launch_config is not None:
             self.config.update(launch_config)
@@ -247,12 +239,10 @@ class OmniApp:
 
     def _start_app(self) -> None:
         """Launch the Omniverse application."""
-        exe_path = os.path.abspath(f'{os.environ["CARB_APP_PATH"]}')
         # input arguments to the application
         args = [
             os.path.abspath(__file__),
             f'{self.config["experience"]}',
-            f"--/app/tokens/exe-path={exe_path}",  # this is needed so dlss lib is found
             f'--/persistent/app/viewport/displayOptions={self.config["display_options"]}',  # hide extra stuff in viewport
             # Forces kit to not render until all USD files are loaded
             f'--/rtx/materialDb/syncLoads={self.config["sync_loads"]}',
@@ -262,7 +252,6 @@ class OmniApp:
             f'--/app/renderer/resolution/height={self.config["height"]}',
             f'--/app/window/width={self.config["window_width"]}',
             f'--/app/window/height={self.config["window_height"]}',
-            f'--/renderer/multiGpu/enabled={self.config["multi_gpu"]}',
             "--ext-folder",
             f'{os.path.abspath(os.environ["ISAAC_PATH"])}/exts',  # adding to json doesn't work
         ]
@@ -278,13 +267,6 @@ class OmniApp:
             args.append("--portable")
         if self.config.get("headless") and "--no-window" not in unknown_args:
             args.append("--no-window")
-
-        # get the effective uid of this process, if its root, then we automatically add the allow root flag
-        # if the flag is already in unknown_args, we don't need to add it again.
-        if sys.platform.startswith("linux"):
-            if os.geteuid() == 0 and "--allow-root" not in unknown_args:
-                args.append("--allow-root")
-
         # pass all extra arguments onto the main kit app
         print("Passing the following args to the base kit application: ", unknown_args)
         args.extend(unknown_args)
@@ -361,14 +343,13 @@ class OmniApp:
 
         # If we're in debug mode, we keep all the extension windows and dock them appropriately
         if self.debug:
-            console = dock_window(view, "Console", omni.ui.DockPosition.BOTTOM, 0.3)
+            dock_window(view, "Console", omni.ui.DockPosition.BOTTOM, 0.3)
             dock_window(view, "Main ToolBar", omni.ui.DockPosition.LEFT)
             self._app.update()
             # Acquire the docking window where `Stage` tab is present and add tabs
             render = dock_window(main_dockspace, "Render Settings", omni.ui.DockPosition.RIGHT, 0.3)
             dock_window(render, "Stage", omni.ui.DockPosition.SAME)
             dock_window(render, "Layer", omni.ui.DockPosition.SAME)
-            dock_window(console, "Content", omni.ui.DockPosition.SAME)
             self._app.update()
             dock_window(render, "Property", omni.ui.DockPosition.BOTTOM)
             self._app.update()
@@ -416,21 +397,10 @@ class OmniApp:
 
     def close(self) -> None:
         """Close the running Omniverse Toolkit."""
-        # workaround for exit issues, clean the stage first:
-        omni.usd.get_context().close_stage()
-        omni.kit.app.get_app().update()
         # check if exited already
         if not self._exiting:
             self._exiting = True
-            self._app.print_and_log("Simulation App Shutting Down")
-            if self.config.get("memory_report"):
-                from pprint import pprint
-                from omni.isaac.core.utils.statistics import get_memory_stats, get_memory_delta
-
-                self.end_memory_stats = get_memory_stats()
-                print("Memory usage delta:\n")
-                pprint(get_memory_delta(self.start_memory_stats, self.end_memory_stats))
-
+            print("Simulation App Shutting Down")
             # We are exisitng but something is still loading, wait for it to load to avoid a deadlock
             from omni.isaac.kit.utils import is_stage_loading
 

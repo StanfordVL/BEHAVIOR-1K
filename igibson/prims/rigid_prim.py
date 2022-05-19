@@ -14,13 +14,18 @@ from omni.isaac.core.utils.rotations import gf_quat_to_np_array
 from pxr import Gf, UsdPhysics, Usd, UsdGeom, PhysxSchema
 import numpy as np
 from omni.isaac.dynamic_control import _dynamic_control
-from omni.isaac.contact_sensor import _contact_sensor
 import carb
 
 import igibson.macros as m
 from igibson.prims.xform_prim import XFormPrim
 from igibson.prims.geom_prim import CollisionGeomPrim, VisualGeomPrim
 from igibson.utils.types import DynamicState, CsRawData, GEOM_TYPES
+
+# Import omni sensor based on type
+if m.IS_PUBLIC_ISAACSIM:
+    from omni.isaac.contact_sensor import _contact_sensor as _s
+else:
+    from omni.isaac.isaac_sensor import _isaac_sensor as _s
 
 
 class RigidPrim(XFormPrim):
@@ -128,7 +133,7 @@ class RigidPrim(XFormPrim):
                     self._visual_meshes[mesh_name] = VisualGeomPrim(**mesh_kwargs)
 
         # Create contact sensor
-        self._cs = _contact_sensor.acquire_contact_sensor_interface()
+        self._cs = _s.acquire_contact_sensor_interface()
         # self._create_contact_sensor()
 
     def _initialize(self):
@@ -148,7 +153,8 @@ class RigidPrim(XFormPrim):
 
         # We grab contact info for the first time before setting our internal handle, because this changes the dc handle
         if self.contact_reporting_enabled:
-            self._cs.get_rigid_body_raw_data(self._prim_path)
+            self._cs.get_body_contact_raw_data(self._prim_path) if m.IS_PUBLIC_ISAACSIM else \
+                self._cs.get_rigid_body_raw_data(self._prim_path)
 
         # Grab handle to this rigid body and get name
         self.update_handles()
@@ -226,7 +232,9 @@ class RigidPrim(XFormPrim):
         #     "Cannot grab contacts for this rigid prim without Physx's contact report API being added!"
         contacts = []
         if self.contact_reporting_enabled:
-            for c in self._cs.get_rigid_body_raw_data(self._prim_path):
+            raw_data = self._cs.get_body_contact_raw_data(self._prim_path) if m.IS_PUBLIC_ISAACSIM else \
+                self._cs.get_rigid_body_raw_data(self._prim_path)
+            for c in raw_data:
                 # contact sensor handles and dynamic articulation handles are not comparable
                 # every prim has a cs to convert (cs) handle to prim path (decode_body_name)
                 # but not every prim (e.g. groundPlane) has a dc to convert prim path to (dc) handle (get_rigid_body)
@@ -244,8 +252,7 @@ class RigidPrim(XFormPrim):
             velocity (np.ndarray): linear velocity to set the rigid prim to. Shape (3,).
         """
         if self._handle is not None and self._dc.is_simulating():
-            print(f"setting rigid velocity: {velocity}")
-            print(self._dc.set_rigid_body_linear_velocity(self._handle, velocity))
+            self._dc.set_rigid_body_linear_velocity(self._handle, velocity)
         else:
             self._rigid_api.GetVelocityAttr().Set(Gf.Vec3f(velocity.tolist()))
         return

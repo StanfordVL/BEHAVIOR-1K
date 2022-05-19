@@ -26,3 +26,7 @@ ENABLE_FLATCACHE = False
 # Whether to use continuous collision detection or not (slower simulation, but can prevent
 # objects from tunneling through each other)
 ENABLE_CCD = False
+
+# Whether the public version of IsaacSim is being used
+# TODO: Remove this once we unify omni version being used
+IS_PUBLIC_ISAACSIM = True
