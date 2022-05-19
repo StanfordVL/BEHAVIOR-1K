@@ -46,7 +46,7 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
         super(BaseObjectState, self).__init__()
         self.obj = obj
         self._initialized = False
-        self.simulator = None
+        self._simulator = None
 
     @property
     def settable(self):
@@ -64,13 +64,15 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
         pass
 
     def _initialize(self):
-        """This function will be called once, after the object has been loaded."""
+        """This function will be called once; should be used for any object state-related objects have been loaded."""
         pass
 
     def initialize(self, simulator):
         assert not self._initialized, "State is already initialized."
 
-        self.simulator = simulator
+        # Store simulator reference
+        self._simulator = simulator
+
         self._initialize()
         self._initialized = True
 

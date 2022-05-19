@@ -26,10 +26,12 @@ from omni.isaac.core.loggers import DataLogger
 from typing import Optional, List
 
 from igibson import assets_path
+import igibson.macros as m
 from igibson.robots.robot_base import BaseRobot
 from igibson.utils.utils import NumpyEncoder
 from igibson.utils.python_utils import clear as clear_pu, create_object_from_init_info
 from igibson.utils.usd_utils import clear as clear_uu
+from igibson.utils.assets_utils import get_ig_avg_category_specs
 from igibson.scenes import Scene
 from igibson.objects.object_base import BaseObject
 from igibson.object_states.factory import get_states_by_dependency_order
@@ -124,7 +126,7 @@ class Simulator(SimulationContext):
         self.first_sync = True          # First sync always sync all objects (regardless of their sleeping states)
 
         # Initialize viewer
-        self._set_physics_engine_settings()
+        # self._set_physics_engine_settings()
         # TODO: Make this toggleable so we don't always have a viewer if we don't want to
         self._set_viewer_settings()
 
@@ -143,6 +145,12 @@ class Simulator(SimulationContext):
         # e.g.: particle sampling, which for some reason requires sim.play() to be called at least once
         self.play()
         self.stop()
+
+        # Finally, update the physics settings
+        # This needs to be done now, after an initial step + stop for some reason if we want to use GPU
+        # dynamics, otherwise we get very strange behavior, e.g., PhysX complains about invalid transforms
+        # and crashes
+        self._set_physics_engine_settings()
 
     def __new__(
         cls,
@@ -187,10 +195,24 @@ class Simulator(SimulationContext):
         """
         Set the physics engine with specified settings
         """
+        assert self.is_stopped(), f"Cannot set simulator physics settings while simulation is playing!"
         self._physics_context.set_gravity(value=-self.gravity)
         # Also make sure we invert the collision group filter settings so that different collision groups cannot
         # collide with each other
-        self._physics_context._physx_scene_api.GetInvertCollisionGroupFilterAttr().Set(True)
+        self._physics_context.set_invert_collision_group_filter(True)
+        # self._physics_context._physx_scene_api.GetInvertCollisionGroupFilterAttr().Set(True)
+
+        # Enable GPU dynamics based on whether we need omni particles feature
+        if m.ENABLE_OMNI_PARTICLES:
+            self._physics_context.enable_gpu_dynamics(True)
+            self._physics_context.set_broadphase_type("GPU")
+        else:
+            self._physics_context.enable_gpu_dynamics(False)
+            self._physics_context.set_broadphase_type("MBP")
+
+        # Modify other settings for speed optimization
+        self._physics_context.enable_flatcache(m.ENABLE_FLATCACHE)
+        self._physics_context.enable_ccd(m.ENABLE_CCD)
 
     def _set_viewer_settings(self):
         """
@@ -247,12 +269,13 @@ class Simulator(SimulationContext):
         """
         self._objects_to_initialize.append(obj)
 
-    def import_object(self, obj, auto_initialize=True):
+    def import_object(self, obj, register=True, auto_initialize=True):
         """
         Import an object into the simulator.
 
         Args:
             obj (BaseObject): an object to load
+            register (bool): whether to register this object internally in the scene registry
             auto_initialize (bool): If True, will auto-initialize the requested object on the next simulation step.
                 Otherwise, we assume that the object will call initialize() on its own!
         """
@@ -268,7 +291,7 @@ class Simulator(SimulationContext):
         assert self.scene is not None, "import_object needs to be called after import_scene"
 
         # Load the object in omniverse by adding it to the scene
-        self.scene.add_object(obj, self, _is_call_from_simulator=True)
+        self.scene.add_object(obj, self, register=register, _is_call_from_simulator=True)
 
         # Lastly, additionally add this object automatically to be initialized as soon as another simulator step occurs
         # if requested
@@ -295,7 +318,7 @@ class Simulator(SimulationContext):
             self._objects_to_initialize = []
             # Also update the scene registry
             # TODO: A better place to put this perhaps?
-            self._scene.object_registry.update(keys="handle")
+            self._scene.object_registry.update(keys="root_handle")
 
         # Step all of the particle systems.
         for particle_system in self.particle_systems:
@@ -330,6 +353,18 @@ class Simulator(SimulationContext):
 
     def play(self):
         super().play()
+
+        # Update all object / robot handles
+        if self.scene is not None and self.scene.initialized:
+            for obj in self.scene.objects:
+                # Only need to update handles if object is already initialized as well
+                if obj.initialized:
+                    obj.update_handles()
+
+            for robot in self.scene.robots:
+                # Only need to update handles if robot is already initialized as well
+                if robot.initialized:
+                    robot.update_handles()
 
         # Check to see if any objects should be initialized
         if len(self._objects_to_initialize) > 0:
@@ -437,26 +472,26 @@ class Simulator(SimulationContext):
         """
         return get_prim_at_path(prim_path="/World")
 
-    def get_current_tasks(self) -> List[BaseTask]:
-        """[summary]
+    # def get_current_tasks(self) -> List[BaseTask]:
+    #     """[summary]
+    #
+    #     Returns:
+    #         List[BaseTask]: [description]
+    #     """
+    #     return self._current_tasks
+    #
+    # def get_task(self, name: str) -> BaseTask:
+    #     if name not in self._current_tasks:
+    #         raise Exception("task name {} doesn't exist in the current world tasks.".format(name))
+    #     return self._current_tasks[name]
 
-        Returns:
-            List[BaseTask]: [description]
-        """
-        return self._current_tasks
-
-    def get_task(self, name: str) -> BaseTask:
-        if name not in self._current_tasks:
-            raise Exception("task name {} doesn't exist in the current world tasks.".format(name))
-        return self._current_tasks[name]
-
-    def _finalize_scene(self) -> None:
-        """[summary]
-        """
-        if not builtins.ISAAC_LAUNCHED_FROM_TERMINAL:
-            self.play()
-        self._scene._finalize()
-        return
+    # def _finalize_scene(self) -> None:
+    #     """[summary]
+    #     """
+    #     if not builtins.ISAAC_LAUNCHED_FROM_TERMINAL:
+    #         self.play()
+    #     self._scene._finalize()
+    #     return
 
     def clear_and_remove_scene(self) -> None:
         self._scene = None
@@ -467,6 +502,9 @@ class Simulator(SimulationContext):
         """
         # Stop the physics
         self.stop()
+
+        # TODO: Handle edge-case for when we clear sim without loading new scene in. self._scene should be None
+        # but scene.load(sim) requires scene to be defined!
 
         # Clear uniquely named items and other internal states
         clear_pu()
@@ -497,64 +535,64 @@ class Simulator(SimulationContext):
 
         return
 
-    def reset(self) -> None:
-        """ Resets the stage to its initial state and each object included in the Scene to its default state
-            as specified by .set_default_state and the __init__ funcs.
-
-            Note:
-            - All tasks should be added before the first reset is called unless a .clear() was called.
-            - All articulations should be added before the first reset is called unless a .clear() was called.
-            - This method takes care of initializing articulation handles with the first reset called.
-            - This will do one step internally regardless
-            - calls post_reset on each object in the Scene
-            - calls post_reset on each Task
-
-            things like setting pd gains for instance should happend at a Task reset or a Robot reset since
-            the defaults are restored after .stop() is called.
-        """
-        if not self._scene_finalized:
-            for task in self._current_tasks.values():
-                task.set_up_scene(self.scene)
-            self._finalize_scene()
-            self._scene_finalized = True
-        self.stop()
-        for task in self._current_tasks.values():
-            task.cleanup()
-        self.play()
-        self.scene.post_reset()
-        for task in self._current_tasks.values():
-            task.post_reset()
-        return
-
-    async def reset_async(self) -> None:
-        """Resets the stage to its initial state and each object included in the Scene to its default state
-            as specified by .set_default_state and the __init__ funcs.
-
-            Note:
-            - All tasks should be added before the first reset is called unless a .clear() was called.
-            - All articulations should be added before the first reset is called unless a .clear() was called.
-            - This method takes care of initializing articulation handles with the first reset called.
-            - This will do one step internally regardless
-            - calls post_reset on each object in the Scene
-            - calls post_reset on each Task
-
-            things like setting pd gains for instance should happend at a Task reset or a Robot reset since
-            the defaults are restored after .stop() is called.
-        """
-        if not self._scene_finalized:
-            for task in self._current_tasks.values():
-                task.set_up_scene(self.scene)
-            await self.play_async()
-            self._finalize_scene()
-            self._scene_finalized = True
-        await self.stop_async()
-        for task in self._current_tasks.values():
-            task.cleanup()
-        await self.play_async()
-        self._scene.post_reset()
-        for task in self._current_tasks.values():
-            task.post_reset()
-        return
+    # def reset(self) -> None:
+    #     """ Resets the stage to its initial state and each object included in the Scene to its default state
+    #         as specified by .set_default_state and the __init__ funcs.
+    #
+    #         Note:
+    #         - All tasks should be added before the first reset is called unless a .clear() was called.
+    #         - All articulations should be added before the first reset is called unless a .clear() was called.
+    #         - This method takes care of initializing articulation handles with the first reset called.
+    #         - This will do one step internally regardless
+    #         - calls post_reset on each object in the Scene
+    #         - calls post_reset on each Task
+    #
+    #         things like setting pd gains for instance should happend at a Task reset or a Robot reset since
+    #         the defaults are restored after .stop() is called.
+    #     """
+    #     if not self._scene_finalized:
+    #         for task in self._current_tasks.values():
+    #             task.set_up_scene(self.scene)
+    #         self._finalize_scene()
+    #         self._scene_finalized = True
+    #     self.stop()
+    #     for task in self._current_tasks.values():
+    #         task.cleanup()
+    #     self.play()
+    #     self.scene.post_reset()
+    #     for task in self._current_tasks.values():
+    #         task.post_reset()
+    #     return
+    #
+    # async def reset_async(self) -> None:
+    #     """Resets the stage to its initial state and each object included in the Scene to its default state
+    #         as specified by .set_default_state and the __init__ funcs.
+    #
+    #         Note:
+    #         - All tasks should be added before the first reset is called unless a .clear() was called.
+    #         - All articulations should be added before the first reset is called unless a .clear() was called.
+    #         - This method takes care of initializing articulation handles with the first reset called.
+    #         - This will do one step internally regardless
+    #         - calls post_reset on each object in the Scene
+    #         - calls post_reset on each Task
+    #
+    #         things like setting pd gains for instance should happend at a Task reset or a Robot reset since
+    #         the defaults are restored after .stop() is called.
+    #     """
+    #     if not self._scene_finalized:
+    #         for task in self._current_tasks.values():
+    #             task.set_up_scene(self.scene)
+    #         await self.play_async()
+    #         self._finalize_scene()
+    #         self._scene_finalized = True
+    #     await self.stop_async()
+    #     for task in self._current_tasks.values():
+    #         task.cleanup()
+    #     await self.play_async()
+    #     self._scene.post_reset()
+    #     for task in self._current_tasks.values():
+    #         task.post_reset()
+    #     return
 
     def restore(self, usd_path):
         """
@@ -565,91 +603,32 @@ class Simulator(SimulationContext):
                 to recreate a scene.
         """
         if not usd_path.endswith(".usd"):
-            logging.error("You have to define the full usd_path to load from.")
+            logging.error(f"You have to define the full usd_path to load from. Got: {usd_path}")
             return
 
         # Load saved stage to get saved_info.
         self.load_stage(usd_path)
 
-        # Load saved info.
-        world_prim = get_prim_at_path("/World")
-        saved_info_str = world_prim.GetCustomDataByKey("saved_info")
-        saved_info = json.loads(saved_info_str)
-        init_info = saved_info["init_info"] 
-        scene_state = saved_info["state"]
-        initial_object_states = saved_info["initial_object_states"]
+        # Load saved info
+        scene_state = json.loads(self.world_prim.GetCustomDataByKey("scene_state"))
+        scene_init_info = json.loads(self.world_prim.GetCustomDataByKey("scene_init_info"))
 
         # Clear the current environment and delete any currently loaded scene.
         self.clear_and_remove_scene()
 
         # Recreate and import the saved scene.
         # Note that the imported scene only have the default objects loaded.
-        recreated_scene = create_object_from_init_info(init_info["scene"])
+        recreated_scene = create_object_from_init_info(scene_init_info)
         self.import_scene(scene=recreated_scene)
 
-        # Clear the current environment again (but self.scene is not deleted).
-        self.scene._stage = self.stage
-
-        # Clear the current environment again (but self.scene is not deleted).
-        self.clear()
-
-        # Load saved stage.
-        self.load_stage(usd_path)
-        self.scene._stage = self.stage
-
-        # Reset some scene variables.
-        clear_pu()
-        self.scene._registry = self.scene._create_registry()
-        self.scene._initialized = False
-        
-        # Iterate over all the children in the loaded stage.
-        for prim in self.world_prim.GetChildren():
-            # Only process prims that are an Xform.
-            if prim.GetPrimTypeInfo().GetTypeName() == "Xform":
-                name = prim.GetName()
-                category = prim.GetAttribute("ig:category").Get()
-
-                # Skip over the wall, floor, or ceilings (#TODO: Can we make this more elegant?)
-                if category in {"walls", "floors", "ceilings"}:
-                    continue
-
-                if name not in init_info:
-                    logging.warning(f"Object {name} does not have _init_info saved. Cannot be restored.")
-                    continue
-                
-                # Create object from saved info and tie the object to loaded prim.
-                # Since prim is already loaded, use a hacky way to make post_load work.
-                obj_init_info = init_info[name]
-                obj_init_info["kwargs"] = {}
-                obj_init_info["kwargs"]["skip_init_load"] = True
-                obj = create_object_from_init_info(obj_init_info)
-                obj.load(self)
-
-                # Add created object to registry.
-                if isinstance(obj, BaseRobot):
-                    self.scene.robot_registry.add(obj)
-                else:
-                    self.scene.object_registry.add(obj)
-
-                # Run any additional scene-specific logic with the created object.
-                self.scene._add_object(obj)
-
-        # Make sure simulator is not running, then start it, then pause it so we can initialize the scene.
-        self.stop()
+        # Start the simulation and restore the dynamic state of the scene and then pause again
         self.play()
+        self.scene.load_state(scene_state, serialized=False)
+        self.app.update()
         self.pause()
 
-        # Initialize scene.
-        self._scene.initialize()
-
-        # Restore the state of all objects.
-        self.scene.load_state(scene_state)
-
-        # Restore scene's _initial_object_states.
-        self.scene._initial_object_states = initial_object_states
-
         logging.info("The saved simulation environment loaded.")
-    
+
         return
 
     def save(self, usd_path):
@@ -664,43 +643,28 @@ class Simulator(SimulationContext):
             logging.warning("Scene has not been loaded. Nothing to save.")
             return
         if not usd_path.endswith(".usd"):
-            logging.error("You have to define the full usd_path to save the scene to.")
+            logging.error(f"You have to define the full usd_path to save the scene to. Got: {usd_path}")
             return
 
-        # Get scene init info.
-        scene_init_info = self.scene._init_info
+        # Update scene info
+        self.scene.update_scene_info()
 
-        # Get scene states info.
-        scene_state = self.scene.dump_state()
-                
-        # Dump useful information to recreate the scene.
-        saved_info = {}
-        saved_info["init_info"] = {}
-        saved_info["init_info"]["scene"] = scene_init_info
-        saved_info["state"] = scene_state
-
-        # Iterate over all objects and save their init info.
-        for obj in self.scene.object_registry.objects:
-            saved_info["init_info"][obj.name] = obj._init_info
-        for obj in self.scene.robot_registry.objects:
-            saved_info["init_info"][obj.name] = obj._init_info
-
-        # Save scene's initial object states.
-        saved_info["initial_object_states"] = self.scene._initial_object_states
-
-        # Dump saved info.
-        world_prim = get_prim_at_path("/World")
-        saved_info_str = json.dumps(saved_info, cls=NumpyEncoder)
-        world_prim.SetCustomDataByKey("saved_info", saved_info_str)
+        # Dump saved current state and also scene init info
+        saved_state_str = json.dumps(self.scene.dump_state(serialized=False), cls=NumpyEncoder)
+        self.world_prim.SetCustomDataByKey("scene_state", saved_state_str)
+        scene_init_info = self.scene.get_init_info()
+        # Overwrite the usd with our desired usd file
+        scene_init_info["args"]["usd_path"] = usd_path
+        scene_init_info_str = json.dumps(scene_init_info, cls=NumpyEncoder)
+        self.world_prim.SetCustomDataByKey("scene_init_info", scene_init_info_str)
 
         # Save stage. This needs to happen at the end since some objects may get reset after sim.stop().
         self.stop()
         self.stage.Export(usd_path)
 
         logging.info("The current simulation environment saved.")
-        
-        return
 
+        return
 
     def add_task(self, task: BaseTask) -> None:
         """Tasks should have a unique name.

@@ -12,7 +12,6 @@ import igibson.utils.transform_utils as T
 import json
 from omni.isaac.core.articulations import Articulation
 from omni.isaac.core.utils.prims import create_prim, set_prim_property, get_prim_at_path, get_prim_path, is_prim_path_valid, get_prim_children
-from omni.kit.viewport import get_viewport_interface
 
 
 ##### SET THIS ######

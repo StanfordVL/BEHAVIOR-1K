@@ -63,7 +63,7 @@ class StatefulObject(BaseObject):
         # Load abilities from taxonomy if needed & possible
         if abilities is None:
             if OBJECT_TAXONOMY is not None:
-                taxonomy_class = OBJECT_TAXONOMY.get_class_name_from_igibson_category(self.category)
+                taxonomy_class = OBJECT_TAXONOMY.get_class_name_from_igibson_category(category)
                 if taxonomy_class is not None:
                     abilities = OBJECT_TAXONOMY.get_abilities(taxonomy_class)
                 else:
@@ -91,28 +91,13 @@ class StatefulObject(BaseObject):
             **kwargs,
         )
 
-    def load(self, simulator=None):
-        # Make sure the simulator is not None
-        assert simulator is not None, "Simulator must be specified when loading StatefulObject!"
+    def _initialize(self):
+        # Run super first
+        super()._initialize()
 
-        # Store temporary simulator reference just so we can load states later
-        # We use this very opaque method to generate the attribute to denote that this should NOT
-        # be referenced like a normal variable
-        setattr(self, "_tmp_sim", simulator)
-
-        return super().load(simulator=simulator)
-
-    def _post_load(self):
-        # Run super method first
-        super()._post_load()
-
-        # Initialize any states created
-        tmp_sim = getattr(self, "_tmp_sim")
+        # Initialize all states
         for state in self._states.values():
-            state.initialize(tmp_sim)
-
-        # Delete the temporary simulator reference
-        delattr(self, "_tmp_sim")
+            state.initialize(self._simulator)
 
     def initialize_states(self):
         """
@@ -120,14 +105,17 @@ class StatefulObject(BaseObject):
         """
         self._states = OrderedDict()
 
-    def add_state(self, name, state):
+    def add_state(self, state):
         """
         Adds state @state with name @name to self.states.
 
         Args:
-            name (str): name of the state to add to this object.
-            state (any): state to add
+            state (ObjectStateBase): Object state instance to add to this object
         """
+        assert self._states is not None, "Cannot add state since states have not been initialized yet!"
+        assert state.__class__ not in self._states, f"State {state.__class__.__name__} " \
+                                                    f"has already been added to this object!"
+        self._states[state.__class__] = state
 
     @property
     def states(self):

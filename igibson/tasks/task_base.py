@@ -12,7 +12,7 @@ REGISTERED_TASKS = OrderedDict()
 class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
     """
     Base Task class.
-    Task-specific reset_scene, reset_agent, get_task_obs, step methods are implemented in subclasses
+    Task-specific reset_scene, reset_agent, step methods are implemented in subclasses
 
     Args:
         termination_config (None or dict): Keyword-mapped configuration to use to generate termination conditions. This

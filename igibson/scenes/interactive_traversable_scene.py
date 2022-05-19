@@ -13,14 +13,8 @@ import numpy as np
 from pxr.Sdf import ValueTypeNames as VT
 from omni.isaac.core.utils.rotations import gf_quat_to_np_array
 
-# from igibson.registries.object_states_registry import ObjectStatesRegistry
-# from igibson.object_states.factory import get_state_from_name, get_state_name
-# from igibson.object_states.object_state_base import AbsoluteObjectState
+from igibson import ig_dataset_path
 from igibson.objects.dataset_object import DatasetObject
-# from igibson.objects.multi_object_wrappers import ObjectGrouper, ObjectMultiplexer
-# from igibson.robots import REGISTERED_ROBOTS
-# from igibson.robots.behavior_robot import BehaviorRobot
-# from igibson.robots.robot_base import BaseRobot
 from igibson.scenes.traversable_scene import TraversableScene
 from igibson.maps.segmentation_map import SegmentationMap
 from igibson.utils.assets_utils import (
@@ -31,6 +25,7 @@ from igibson.utils.assets_utils import (
     get_ig_model_path,
     get_ig_scene_path,
 )
+from igibson.utils.python_utils import create_object_from_init_info
 from igibson.utils.utils import NumpyEncoder, rotate_vector_3d
 from igibson.utils.registry_utils import SerializableRegistry
 from igibson.utils.constants import JointType
@@ -81,7 +76,7 @@ class InteractiveTraversableScene(TraversableScene):
         """
         # TODO: Update
         :param scene_model: Scene model, e.g.: Rs_int
-        :param usd_file: name of ursd file to load (without .urdf), default to ig_dataset/scenes/<scene_model>/urdf/<urdf_file>.urdf
+        :param usd_file: name of usd file to load (without .urdf), default to ig_dataset/scenes/<scene_model>/urdf/<urdf_file>.urdf
         :param usd_path: full path of URDF file to load (with .urdf)
         # :param pybullet_filename: optional specification of which pybullet file to restore after initialization
         :param trav_map_resolution: traversability map resolution
@@ -126,7 +121,6 @@ class InteractiveTraversableScene(TraversableScene):
         self.scene_source = scene_source
 
         # Other values that will be loaded at runtime
-        self.fname = None
         self.scene_file = None
         self.scene_dir = None
         self.load_object_categories = None
@@ -167,7 +161,6 @@ class InteractiveTraversableScene(TraversableScene):
         # ObjectGrouper
         self.object_groupers = defaultdict(dict)
 
-
     def get_scene_loading_info(self, usd_file=None, usd_path=None):
         """
         Gets scene loading info to know what single USD file to load, either specified indirectly via @usd_file or
@@ -184,7 +177,6 @@ class InteractiveTraversableScene(TraversableScene):
         assert self.scene_source in SCENE_SOURCE_PATHS, f"Unsupported scene source: {self.scene_source}"
         self.scene_dir = SCENE_SOURCE_PATHS[self.scene_source](self.scene_model)
 
-        fname = None
         scene_file = usd_path
         # Possibly grab the USD directly from a specified fpath
         if usd_path is None:
@@ -199,7 +191,6 @@ class InteractiveTraversableScene(TraversableScene):
             scene_file = os.path.join(self.scene_dir, "usd", "{}.usd".format(fname))
 
         # Store values internally
-        self.fname = fname
         self.scene_file = scene_file
 
     def get_objects_with_state(self, state):
@@ -575,55 +566,68 @@ class InteractiveTraversableScene(TraversableScene):
             # self.object_multiplexers[link.attrib["multiplexer"]]["grouper"] = object_name
             # continue
 
+        # TODO! Handle
         elif category == "agent" and not self.include_robots:
             raise NotImplementedError()
             # continue
 
         # Robot object
+        # TODO! Handle
         elif category == "agent":
-            raise NotImplementedError()
+            pass
+            # raise NotImplementedError()
             # robot_config = json.loads(link.attrib["robot_config"]) if "robot_config" in link.attrib else {}
             # assert model in REGISTERED_ROBOTS, "Got invalid robot to instantiate: {}".format(model)
             # obj = REGISTERED_ROBOTS[model](name=object_name, **robot_config)
 
         # Non-robot object
         else:
-            # Do not load these object categories (can blacklist building structures as well)
-            not_blacklisted = self.not_load_object_categories is None or category not in self.not_load_object_categories
+            usd_path = None
+            # Walls, floors, ceilings
+            if category in {"walls", "floors", "ceilings"}:
+                usd_path = f"{ig_dataset_path}/scenes/{model}/usd/{category}/{model}_{category}.usd"
 
-            # Only load these object categories (no need to white list building structures)
-            whitelisted = self.load_object_categories is None or category in self.load_object_categories
+            # Other objects -- need to sanity check to make sure we want to load them
+            else:
+                # Do not load these object categories (can blacklist building structures as well)
+                not_blacklisted = self.not_load_object_categories is None or category not in self.not_load_object_categories
 
-            # This object is not located in one of the selected rooms, skip
-            valid_room = self.load_room_instances is None or len(set(self.load_room_instances) & set(in_rooms)) >= 0
+                # Only load these object categories (no need to white list building structures)
+                whitelisted = self.load_object_categories is None or category in self.load_object_categories
 
-            # We only load this model if all the above conditions are met
-            if not_blacklisted and whitelisted and valid_room:
+                # This object is not located in one of the selected rooms, skip
+                valid_room = self.load_room_instances is None or len(set(self.load_room_instances) & set(in_rooms)) >= 0
 
-                # Make sure objects exist in the actual requested category
-                category_path = get_ig_category_path(category)
-                assert len(os.listdir(category_path)) != 0, "No models in category folder {}".format(category_path)
+                # We only load this model if all the above conditions are met
+                if not_blacklisted and whitelisted and valid_room:
 
-                # Potentially grab random object
-                if model == "random":
-                    if random_group is None:
-                        model = random.choice(os.listdir(category_path))
-                    else:
-                        # Using random group to assign the same model to a group of objects
-                        # E.g. we want to use the same model for a group of chairs around the same dining table
-                        # random_group is a unique integer within the category
-                        random_group_key = (category, random_group)
+                    # Make sure objects exist in the actual requested category
+                    category_path = get_ig_category_path(category)
+                    assert len(os.listdir(category_path)) != 0, "No models in category folder {}".format(category_path)
 
-                        if random_group_key in self.random_groups:
-                            model = self.random_groups[random_group_key]
-                        else:
-                            # We create a new unique entry for this random group if it doesn't already exist
+                    # Potentially grab random object
+                    if model == "random":
+                        if random_group is None:
                             model = random.choice(os.listdir(category_path))
-                            self.random_groups[random_group_key] = model
+                        else:
+                            # Using random group to assign the same model to a group of objects
+                            # E.g. we want to use the same model for a group of chairs around the same dining table
+                            # random_group is a unique integer within the category
+                            random_group_key = (category, random_group)
 
-                model_path = get_ig_model_path(category, model)
-                # TODO: Remove "usd" in the middle when we simply have the model directory directly contain the USD
-                usd_path = os.path.join(model_path, "usd", model + ".usd")
+                            if random_group_key in self.random_groups:
+                                model = self.random_groups[random_group_key]
+                            else:
+                                # We create a new unique entry for this random group if it doesn't already exist
+                                model = random.choice(os.listdir(category_path))
+                                self.random_groups[random_group_key] = model
+
+                    model_path = get_ig_model_path(category, model)
+                    # TODO: Remove "usd" in the middle when we simply have the model directory directly contain the USD
+                    usd_path = os.path.join(model_path, "usd", model + ".usd")
+
+            # Only create the object if a valid usd_path is specified
+            if usd_path is not None:
 
                 # Make sure only a bounding box OR scale is specified
                 assert bbox is None or scale is None, f"Both scale and bounding box size was defined for a USDObject in the template scene!"
@@ -647,33 +651,33 @@ class InteractiveTraversableScene(TraversableScene):
                     bddl_object_scope=bddl_obj_scope,
                 )
 
-            # TODO: Are all of these necessary now that we can directly save USD snapshots?
-            # bbox_center_pos = np.array([float(val) for val in connecting_joint.find("origin").attrib["xyz"].split(" ")])
-            # if "rpy" in connecting_joint.find("origin").attrib:
-            #     bbx_center_orn = np.array(
-            #         [float(val) for val in connecting_joint.find("origin").attrib["rpy"].split(" ")]
-            #     )
-            # else:
-            #     bbx_center_orn = np.array([0.0, 0.0, 0.0])
-            # bbx_center_orn = p.getQuaternionFromEuler(bbx_center_orn)
-            #
-            # base_com_pose = json.loads(link.attrib["base_com_pose"]) if "base_com_pose" in link.attrib else None
-            # base_velocities = json.loads(link.attrib["base_velocities"]) if "base_velocities" in link.attrib else None
-            # if "joint_states" in link.keys():
-            #     joint_states = json.loads(link.attrib["joint_states"])
-            # elif "joint_positions" in link.keys():
-            #     # Backward compatibility, assuming multi-sub URDF object don't have any joints
-            #     joint_states = {
-            #         key: (position, 0.0) for key, position in json.loads(link.attrib["joint_positions"])[0].items()
-            #     }
-            # else:
-            #     joint_states = None
-            #
-            # if "states" in link.keys():
-            #     non_kinematic_states = json.loads(link.attrib["states"])
-            # else:
-            #     non_kinematic_states = None
-            print(f"obj: {name}, bbox center pos: {bbox_center_pos}, bbox center ori: {bbox_center_ori}")
+                # TODO: Are all of these necessary now that we can directly save USD snapshots?
+                # bbox_center_pos = np.array([float(val) for val in connecting_joint.find("origin").attrib["xyz"].split(" ")])
+                # if "rpy" in connecting_joint.find("origin").attrib:
+                #     bbx_center_orn = np.array(
+                #         [float(val) for val in connecting_joint.find("origin").attrib["rpy"].split(" ")]
+                #     )
+                # else:
+                #     bbx_center_orn = np.array([0.0, 0.0, 0.0])
+                # bbx_center_orn = p.getQuaternionFromEuler(bbx_center_orn)
+                #
+                # base_com_pose = json.loads(link.attrib["base_com_pose"]) if "base_com_pose" in link.attrib else None
+                # base_velocities = json.loads(link.attrib["base_velocities"]) if "base_velocities" in link.attrib else None
+                # if "joint_states" in link.keys():
+                #     joint_states = json.loads(link.attrib["joint_states"])
+                # elif "joint_positions" in link.keys():
+                #     # Backward compatibility, assuming multi-sub URDF object don't have any joints
+                #     joint_states = {
+                #         key: (position, 0.0) for key, position in json.loads(link.attrib["joint_positions"])[0].items()
+                #     }
+                # else:
+                #     joint_states = None
+                #
+                # if "states" in link.keys():
+                #     non_kinematic_states = json.loads(link.attrib["states"])
+                # else:
+                #     non_kinematic_states = None
+                print(f"obj: {name}, bbox center pos: {bbox_center_pos}, bbox center ori: {bbox_center_ori}")
 
             # self.object_states.add_object(
             #     obj_name=name,
@@ -756,46 +760,27 @@ class InteractiveTraversableScene(TraversableScene):
         simulator.clear()
         simulator.load_stage(usd_path=self.scene_file)
 
-        # Store stage reference
+        # Store stage reference and refresh world prim reference
         self._stage = simulator.stage
+        self._world_prim = simulator.world_prim
 
         # Check if current stage is a template based on ig:isTemplate value, and set the value to False if it does not exist
         is_template = False
-        world_prim = simulator.world_prim
         # TODO: Need to set template to false by default after loading everything
-        if "ig:isTemplate" in world_prim.GetPropertyNames():
-            is_template = world_prim.GetAttribute("ig:isTemplate").Get()
+        if "ig:isTemplate" in self._world_prim.GetPropertyNames():
+            is_template = self._world_prim.GetAttribute("ig:isTemplate").Get()
         else:
-            # Create the property and set it to False
-            world_prim.CreateAttribute("ig:isTemplate", VT.Bool)
-            world_prim.GetAttribute("ig:isTemplate").Set(False)
+            # Create the property
+            self._world_prim.CreateAttribute("ig:isTemplate", VT.Bool)
 
-        # Iterate over all the children in the stage world
-        for prim in world_prim.GetChildren():
-            # Only process prims that are an Xform
-            if prim.GetPrimTypeInfo().GetTypeName() == "Xform":
-                name = prim.GetName()
-                category = prim.GetAttribute("ig:category").Get()
-                # Skip over the wall, floor, or ceilings (#TODO: Can we make this more elegant?)
-                if category in {"walls", "floors", "ceilings"}:
-                    continue
+        # Set this to be False -- we are no longer a template after we load
+        self._world_prim.GetAttribute("ig:isTemplate").Set(False)
 
-                # Check if we're using a template -- if so, we need to load the object, otherwise, we simply
-                # add a reference internally
-                if is_template:
-                    # Create the object and load it into the simulator
-                    obj, info = self._create_obj_from_template_xform(simulator=simulator, prim=prim)
-
-                    # Only import the object if we received a valid object
-                    if obj is not None:
-                        # Note that we don't auto-initialize because of some very specific state-setting logic that
-                        # has to occur a certain way at the start of scene creation (sigh, Omniverse ): )
-                        simulator.import_object(obj, auto_initialize=False)
-                        # We also directly set it's bounding box position since this is a known quantity
-                        # This is also the only time we'll be able to set fixed object poses
-                        pos = info["bbox_center_pos"]
-                        ori = info["bbox_center_ori"]
-                        obj.set_bbox_center_position_orientation(pos, ori)
+        # Load objects using logic based on whether the current USD is a template or not
+        if is_template:
+            self._load_objects_from_template(simulator=simulator)
+        else:
+            self._load_objects_from_scene_info(simulator=simulator)
 
         # disable collision between the fixed links of the fixed objects
         fixed_objs = self.object_registry("fixed_base", True, default_val=[])
@@ -810,6 +795,58 @@ class InteractiveTraversableScene(TraversableScene):
             self._trav_map.load_trav_map(maps_path)
 
         return list(self.objects)
+
+    def _load_objects_from_template(self, simulator):
+        """
+        Loads scene objects based on metadata information found in the current USD stage, assumed to be a template
+        (property ig:isTemplate is True)
+        """
+        # Iterate over all the children in the stage world
+        for prim in self._world_prim.GetChildren():
+            # Only process prims that are an Xform
+            if prim.GetPrimTypeInfo().GetTypeName() == "Xform":
+                name = prim.GetName()
+
+                category = prim.GetAttribute("ig:category").Get()
+                # # Skip over the wall, floor, or ceilings (#TODO: Can we make this more elegant?)
+                # if category in {"walls", "floors", "ceilings"}:
+                #     continue
+
+                # Create the object and load it into the simulator
+                obj, info = self._create_obj_from_template_xform(simulator=simulator, prim=prim)
+
+                # Only import the object if we received a valid object
+                if obj is not None:
+                    # Note that we don't auto-initialize because of some very specific state-setting logic that
+                    # has to occur a certain way at the start of scene creation (sigh, Omniverse ): )
+                    simulator.import_object(obj, auto_initialize=False)
+                    # If we have additional info specified, we also directly set it's bounding box position since this is a known quantity
+                    # This is also the only time we'll be able to set fixed object poses
+                    if category not in {"walls", "floors", "ceilings"}:
+                        pos = info["bbox_center_pos"]
+                        ori = info["bbox_center_ori"]
+                        obj.set_bbox_center_position_orientation(pos, ori)
+
+    def _load_objects_from_scene_info(self, simulator):
+        """
+        Loads scene objects based on metadata information found in the current USD stage's scene info
+        (information stored in the world prim's CustomData)
+        """
+        # Grab scene info
+        scene_info = self.get_scene_info()
+
+        # Iterate over all scene info, and instantiate object classes linked to the objects found on the stage
+        # accordingly
+        for obj_info in scene_info["init_info"].values():
+            obj = create_object_from_init_info(obj_info)
+            # Make sure this object is already loaded -- i.e.: it was linked to a pre-existing prim found on the stage
+            assert obj.loaded, f"Object {obj.name} should have already been loaded when creating a BaseObject class" \
+                               f"instance, but did not find any on the current stage! " \
+                               f"Searched at prim_path: {obj.prim_path}"
+            # Import into the simulator
+            # Note that we don't auto-initialize because of some very specific state-setting logic that
+            # has to occur a certain way at the start of scene creation (sigh, Omniverse ): )
+            simulator.import_object(obj, auto_initialize=False)
 
     def _initialize(self):
         # First, we initialize all of our objects and add the object
@@ -829,6 +866,7 @@ class InteractiveTraversableScene(TraversableScene):
         # TODO: Need to check scene quality
         # self.check_scene_quality(simulator=simulator)
 
+        # TODO: Necessary? Currently does nothing since sim is paused at this point
         # force wake up each body once
         self.wake_scene_objects()
 
@@ -864,164 +902,6 @@ class InteractiveTraversableScene(TraversableScene):
         :return: object handles
         """
         return [obj.handle for obj in self.objects]
-
-    # TODO
-    def save_obj_or_multiplexer(self, obj, tree_root, additional_attribs_by_name):
-        if not isinstance(obj, ObjectMultiplexer):
-            self.save_obj(obj, tree_root, additional_attribs_by_name)
-            return
-
-        multiplexer_link = ET.SubElement(tree_root, "link")
-
-        # Store current index
-        multiplexer_link.attrib = {"category": "multiplexer", "name": obj.name, "current_index": str(obj.current_index)}
-
-        for i, sub_obj in enumerate(obj._multiplexed_objects):
-            if isinstance(sub_obj, ObjectGrouper):
-                grouper_link = ET.SubElement(tree_root, "link")
-
-                # Store pose offset
-                grouper_link.attrib = {
-                    "category": "grouper",
-                    "name": obj.name + "_grouper",
-                    "pose_offsets": json.dumps(sub_obj.pose_offsets, cls=NumpyEncoder),
-                    "multiplexer": obj.name,
-                }
-                for group_sub_obj in sub_obj.objects:
-                    # Store reference to grouper
-                    if group_sub_obj.name not in additional_attribs_by_name:
-                        additional_attribs_by_name[group_sub_obj.name] = {}
-                    additional_attribs_by_name[group_sub_obj.name]["grouper"] = obj.name + "_grouper"
-
-                    if i == obj.current_index:
-                        # Assign object_scope to each object of in the grouper
-                        if obj.name in additional_attribs_by_name:
-                            for key in additional_attribs_by_name[obj.name]:
-                                additional_attribs_by_name[group_sub_obj.name][key] = additional_attribs_by_name[
-                                    obj.name
-                                ][key]
-                    self.save_obj(group_sub_obj, tree_root, additional_attribs_by_name)
-            else:
-                # Store reference to multiplexer
-                if sub_obj.name not in additional_attribs_by_name:
-                    additional_attribs_by_name[sub_obj.name] = {}
-                additional_attribs_by_name[sub_obj.name]["multiplexer"] = obj.name
-                if i == obj.current_index:
-                    # Assign object_scope to the whole object
-                    if obj.name in additional_attribs_by_name:
-                        for key in additional_attribs_by_name[obj.name]:
-                            additional_attribs_by_name[sub_obj.name][key] = additional_attribs_by_name[obj.name][key]
-                self.save_obj(sub_obj, tree_root, additional_attribs_by_name)
-
-    # TODO
-    def save_obj(self, obj, tree_root, additional_attribs_by_name):
-        name = obj.name
-        link = tree_root.find('link[@name="{}"]'.format(name))
-
-        # Convert from center of mass to base link position
-        body_ids = obj.get_body_ids()
-        main_body_id = body_ids[0] if len(body_ids) == 1 else body_ids[obj.main_body]
-
-        dynamics_info = p.getDynamicsInfo(main_body_id, -1)
-        inertial_pos = dynamics_info[3]
-        inertial_orn = dynamics_info[4]
-
-        # TODO: replace this with obj.get_position_orientation() once URDFObject no longer works with multiple body ids
-        pos, orn = p.getBasePositionAndOrientation(main_body_id)
-        pos, orn = np.array(pos), np.array(orn)
-        inv_inertial_pos, inv_inertial_orn = p.invertTransform(inertial_pos, inertial_orn)
-        base_link_position, base_link_orientation = p.multiplyTransforms(pos, orn, inv_inertial_pos, inv_inertial_orn)
-
-        # Convert to XYZ position for URDF
-        euler = euler_from_quat(orn)
-        roll, pitch, yaw = euler
-        if hasattr(obj, "scaled_bbxc_in_blf"):
-            offset = rotate_vector_3d(obj.scaled_bbxc_in_blf, roll, pitch, yaw, False)
-        else:
-            offset = np.array([0, 0, 0])
-        bbox_pos = base_link_position - offset
-
-        xyz = " ".join([str(p) for p in bbox_pos])
-        rpy = " ".join([str(e) for e in euler])
-
-        # The object is already in the scene URDF
-        if link is not None:
-            if obj.category == "floors":
-                floor_names = [obj_name for obj_name in additional_attribs_by_name if "room_floor" in obj_name]
-                if len(floor_names) > 0:
-                    floor_name = floor_names[0]
-                    for key in additional_attribs_by_name[floor_name]:
-                        floor_mappings = []
-                        for floor_name in floor_names:
-                            floor_mappings.append(
-                                "{}:{}".format(additional_attribs_by_name[floor_name][key], floor_name)
-                            )
-                        link.attrib[key] = ",".join(floor_mappings)
-            else:
-                # Overwrite the pose in the original URDF with the pose
-                # from the simulator for floating objects (typically
-                # floating objects will fall by a few millimeters due to
-                # gravity).
-                joint = tree_root.find('joint[@name="{}"]'.format("j_{}".format(name)))
-                if joint is not None and joint.attrib["type"] != "fixed":
-                    link.attrib["rpy"] = rpy
-                    link.attrib["xyz"] = xyz
-                    origin = joint.find("origin")
-                    origin.attrib["rpy"] = rpy
-                    origin.attrib["xyz"] = xyz
-        else:
-            # We need to add the object to the scene URDF
-            category = obj.category
-            room = self.get_room_instance_by_point(pos[:2])
-
-            link = ET.SubElement(tree_root, "link")
-            link.attrib = {
-                "category": category,
-                "name": name,
-                "rpy": rpy,
-                "xyz": xyz,
-            }
-
-            if hasattr(obj, "bounding_box"):
-                bounding_box = " ".join([str(b) for b in obj.bounding_box])
-                link.attrib["bounding_box"] = bounding_box
-
-            if hasattr(obj, "model_name"):
-                link.attrib["model"] = obj.model_name # TODO: Update
-            elif hasattr(obj, "model_path"):
-                model = os.path.basename(obj.model_path)
-                link.attrib["model"] = model
-
-            if room is not None:
-                link.attrib["room"] = room
-
-            if isinstance(obj, BaseRobot):
-                link.attrib["robot_config"] = json.dumps(obj.dump_config(), cls=NumpyEncoder)
-
-            new_joint = ET.SubElement(tree_root, "joint")
-            new_joint.attrib = {"name": "j_{}".format(name), "type": "floating"}
-            new_origin = ET.SubElement(new_joint, "origin")
-            new_origin.attrib = {"rpy": rpy, "xyz": xyz}
-            new_child = ET.SubElement(new_joint, "child")
-            new_child.attrib["link"] = name
-            new_parent = ET.SubElement(new_joint, "parent")
-            new_parent.attrib["link"] = "world"
-
-        # Common logic for objects that are both in the scene & otherwise.
-        base_com_pose = (pos, orn)
-        joint_states = obj.get_joint_states()       # TODO: Outdated API. Use get_joints_state() instead
-        link.attrib["base_com_pose"] = json.dumps(base_com_pose, cls=NumpyEncoder)
-        link.attrib["base_velocities"] = json.dumps(obj.get_velocities(), cls=NumpyEncoder)
-        link.attrib["joint_states"] = json.dumps(joint_states, cls=NumpyEncoder)
-
-        # Add states
-        if hasattr(obj, "states"):
-            link.attrib["states"] = json.dumps(obj.dump_state(), cls=NumpyEncoder)
-
-        # Add additional attributes.
-        if name in additional_attribs_by_name:
-            for key in additional_attribs_by_name[name]:
-                link.attrib[key] = additional_attribs_by_name[name][key]
 
     @property
     def seg_map(self):

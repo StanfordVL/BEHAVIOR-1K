@@ -184,6 +184,12 @@ class JointPrim(BasePrim):
     #         self.set_vel(vel=self._default_state.velocities, target=False)
     #         self.set_effort(effort=self._default_state.efforts)
 
+    def update_handles(self):
+        """
+        Updates all internal handles for this prim, in case they change since initialization
+        """
+        self._handle = self._dc.get_joint(self._prim_path)
+
     def get_default_state(self):
         """
         Returns:

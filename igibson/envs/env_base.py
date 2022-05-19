@@ -340,7 +340,7 @@ class BaseEnv(gym.Env, GymObservable, Serializable, Recreatable):
         return {
             # Environment kwargs
             "env": {
-                "online_sampling": True,
+                # none by default
             },
 
             # Rendering kwargs
@@ -363,9 +363,7 @@ class BaseEnv(gym.Env, GymObservable, Serializable, Recreatable):
             },
 
             # Robot kwargs
-            "robots": {
-                # no robots by default
-            },
+            "robots": [], # no robots by default
         }
 
     @property

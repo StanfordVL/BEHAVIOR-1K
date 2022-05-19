@@ -15,7 +15,6 @@ class Sliced(AbsoluteObjectState, BooleanState):
         super(Sliced, self).__init__(obj)
         self.slice_force = slice_force
         self.value = False
-        self.sliced_parts = None
 
     def _get_value(self):
         return self.value
@@ -33,7 +32,6 @@ class Sliced(AbsoluteObjectState, BooleanState):
         pos, orn = self.obj.get_position_orientation()
 
         # load object parts
-        self.sliced_parts = OrderedDict()
         for _, part_idx in enumerate(self.obj.metadata["object_parts"]):
             # list of dicts gets replaced by {'0':dict, '1':dict, ...}
             part = self.obj.metadata["object_parts"][part_idx]
@@ -62,16 +60,13 @@ class Sliced(AbsoluteObjectState, BooleanState):
             )
             
             # add to stage
-            self.simulator.import_object(part_obj, auto_initialize=True)
+            self._simulator.import_object(part_obj, auto_initialize=True)
             # inherit parent position and orientation
             part_obj.set_position_orientation(position=np.array(part_pos),
                                               orientation=np.array(part_orn))
 
-            # Save the sliced object
-            self.sliced_parts[part_obj.name] = part_obj
-
-        # delete original object from stage
-        self.simulator.remove_object(self.obj)
+        # delete original object from simulator
+        self._simulator.remove_object(self.obj)
 
         return True
 

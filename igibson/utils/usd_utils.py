@@ -189,20 +189,22 @@ class CollisionAPI:
             create_if_not_exist (bool): True if @col_group should be created if it does not already exist, otherwise an
                 error will be raised
         """
-        # Check if collision group exists or not
-        if col_group not in cls.ACTIVE_COLLISION_GROUPS:
-            # Raise error if we don't explicitly want to create a new group
-            if not create_if_not_exist:
-                raise ValueError(f"Collision group {col_group} not found in current registry, and create_if_not_exist"
-                                 f"was set to False!")
-            # Otherwise, create the new group
-            col_group_name = f"/World/collisionGroup_{col_group}"
-            group = UsdPhysics.CollisionGroup.Define(get_current_stage(), col_group_name)
-            group.GetFilteredGroupsRel().AddTarget(col_group_name)  # Make sure that we can collide within our own group
-            cls.ACTIVE_COLLISION_GROUPS[col_group] = group
-
-        # Add this prim to the collision group
-        cls.ACTIVE_COLLISION_GROUPS[col_group].GetCollidersCollectionAPI().GetIncludesRel().AddTarget(prim_path)
+        # TODO: This slows things down and / or crashes the sim with large number of objects. Skipping this for now, look into this later
+        pass
+        # # Check if collision group exists or not
+        # if col_group not in cls.ACTIVE_COLLISION_GROUPS:
+        #     # Raise error if we don't explicitly want to create a new group
+        #     if not create_if_not_exist:
+        #         raise ValueError(f"Collision group {col_group} not found in current registry, and create_if_not_exist"
+        #                          f"was set to False!")
+        #     # Otherwise, create the new group
+        #     col_group_name = f"/World/collisionGroup_{col_group}"
+        #     group = UsdPhysics.CollisionGroup.Define(get_current_stage(), col_group_name)
+        #     group.GetFilteredGroupsRel().AddTarget(col_group_name)  # Make sure that we can collide within our own group
+        #     cls.ACTIVE_COLLISION_GROUPS[col_group] = group
+        #
+        # # Add this prim to the collision group
+        # cls.ACTIVE_COLLISION_GROUPS[col_group].GetCollidersCollectionAPI().GetIncludesRel().AddTarget(prim_path)
 
     @classmethod
     def clear(cls):
@@ -310,3 +312,4 @@ def clear():
     """
     CollisionAPI.clear()
     BoundingBoxAPI.clear()
+

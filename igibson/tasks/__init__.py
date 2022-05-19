@@ -5,3 +5,4 @@ from igibson.tasks.point_navigation_obstacle_task import PointNavigationStaticOb
     PointNavigationDynamicObstacleTask
 from igibson.tasks.point_reaching_task import PointReachingTask
 from igibson.tasks.furniture_closing_task import FurnitureClosingTask
+from igibson.tasks.behavior_task import BehaviorTask

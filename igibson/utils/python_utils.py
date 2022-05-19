@@ -96,6 +96,17 @@ class Recreatable(metaclass=RecreatableAbcMeta):
     def __init__(self):
         pass
 
+    def get_init_info(self):
+        """
+        Grabs relevant initialization information for this class instance. Useful for directly
+        reloading an object from this information, using @create_object_from_init_info.
+
+        Returns:
+            dict: Nested dictionary that contains this object's initialization information
+        """
+        # Note: self._init_info is procedurally generated via @save_init_info called in metaclass
+        return self._init_info
+
 
 def create_object_from_init_info(init_info):
     """

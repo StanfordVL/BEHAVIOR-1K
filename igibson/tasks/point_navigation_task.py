@@ -266,6 +266,9 @@ class PointNavigationTask(BaseTask):
 
         Args:
             env (BaseEnv): Environment instance
+
+        Returns:
+            float: Computed potential
         """
         if self._reward_type == "l2":
             reward = self._get_l2_potential(env)

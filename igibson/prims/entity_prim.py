@@ -48,7 +48,6 @@ class EntityPrim(XFormPrim):
         prim_path,
         name,
         load_config=None,
-        **kwargs,
     ):
         # Other values that will be filled in at runtime
         self._dc = None                         # Dynamics control interface
@@ -67,26 +66,29 @@ class EntityPrim(XFormPrim):
             prim_path=prim_path,
             name=name,
             load_config=load_config,
-            **kwargs,
         )
 
     def _initialize(self):
         # Run super method
         super()._initialize()
 
-        # Get dynamic control info
-        self._dc = _dynamic_control.acquire_dynamic_control_interface()
-        self._handle = self._dc.get_articulation(self.articulation_root_path)
-        self._joints = OrderedDict()
-
         # Initialize all the links
+        # This must happen BEFORE the handle is generated for this prim, because things changing in the RigidPrims may
+        # cause the handle to change!
         for link in self._links.values():
             link.initialize()
 
+        # Initialize joints dictionary
+        self._joints = OrderedDict()
+
+        # Get dynamic control info
+        self._dc = _dynamic_control.acquire_dynamic_control_interface()
+        self.update_handles()
+
         # Handle case separately based on whether the handle is valid (i.e.: whether we are actually articulated or not)
         if self._handle != _dynamic_control.INVALID_HANDLE:
-            root_handle = self._dc.get_articulation_root_body(self._handle)
-            root_prim = get_prim_at_path(self._dc.get_rigid_body_path(root_handle))
+            print(f"initializing obj: {self.name}, articulation root path: {self.articulation_root_path}, handle: {self._handle}, new handle: {self._dc.get_articulation(self.articulation_root_path)}, root handle: {self._root_handle}")
+            root_prim = get_prim_at_path(self._dc.get_rigid_body_path(self._root_handle))
             n_dof = self._dc.get_articulation_dof_count(self._handle)
 
             # Additionally grab DOF info if we have non-fixed joints
@@ -121,7 +123,6 @@ class EntityPrim(XFormPrim):
             # TODO: May need to extend to clusters of rigid bodies, that aren't exactly joined
             # We assume this object contains a single rigid body
             body_path = f"{self._prim_path}/base_link"
-            root_handle = self._dc.get_rigid_body(body_path)
             root_prim = get_prim_at_path(body_path)
             n_dof = 0
 
@@ -131,7 +132,6 @@ class EntityPrim(XFormPrim):
             f"initialized is {root_prim.GetPrimPath()}!"
 
         # Store values internally
-        self._root_handle = root_handle
         self._n_dof = n_dof
 
         print(f"root handle: {self._root_handle}, root prim path: {self._dc.get_rigid_body_path(self._root_handle)}")
@@ -618,6 +618,21 @@ class EntityPrim(XFormPrim):
             n- or k-array: de-normalized efforts for the specified DOFs
         """
         return efforts * self.max_joint_efforts if indices is None else efforts * self.max_joint_efforts[indices]
+
+    def update_handles(self):
+        """
+        Updates all internal handles for this prim, in case they change since initialization
+        """
+        self._handle = self._dc.get_articulation(self.articulation_root_path)
+        self._root_handle = self._dc.get_articulation_root_body(self._handle) if \
+            self._handle != _dynamic_control.INVALID_HANDLE else self._dc.get_rigid_body(f"{self._prim_path}/base_link")
+
+        # Update all links and joints as well
+        for link in self._links.values():
+            link.update_handles()
+
+        for joint in self._joints.values():
+            joint.update_handles()
 
     def update_default_state(self):
         # Iterate over all links and joints and update their default states

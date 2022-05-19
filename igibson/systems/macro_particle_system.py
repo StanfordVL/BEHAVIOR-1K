@@ -513,7 +513,7 @@ class DustSystem(VisualParticleSystem):
         # We import now at runtime so prevent circular imports
         from igibson.objects.primitive_object import PrimitiveObject
         cls.particle_object = PrimitiveObject(
-            prim_path="/World/dust_template",
+            prim_path=f"/World/{cls.name}/dust_template",
             primitive_type="Cube",
             name="dust_template",
             class_id=SemanticClass.DIRT,
@@ -524,7 +524,7 @@ class DustSystem(VisualParticleSystem):
         )
 
         # We also must load the particle object
-        cls.particle_object.load(simulator=simulator)
+        simulator.import_object(obj=cls.particle_object, register=False, auto_initialize=True)
 
 
 class StainSystem(VisualParticleSystem):
@@ -557,7 +557,7 @@ class StainSystem(VisualParticleSystem):
         # We import now at runtime so prevent circular imports
         from igibson.objects.usd_object import USDObject
         cls.particle_object = USDObject(
-            prim_path="/World/stain_template",
+            prim_path=f"/World/{cls.name}/stain_template",
             usd_path=os.path.join(assets_path, "models/stain/stain.usd"),
             name="stain_template",
             class_id=SemanticClass.DIRT,
@@ -567,7 +567,7 @@ class StainSystem(VisualParticleSystem):
         )
 
         # We also must load the particle object
-        cls.particle_object.load(simulator=simulator)
+        simulator.import_object(obj=cls.particle_object, register=False, auto_initialize=True)
 
     @classmethod
     def generate_group_particles(cls, group, n_particles=_N_PARTICLES_PER_GROUP, min_particles_for_success=1):

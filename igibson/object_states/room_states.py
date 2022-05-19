@@ -13,11 +13,11 @@ class InsideRoomTypes(CachingEnabledObjectState):
                 return self.obj.in_rooms
 
         # Otherwise we need to calculate using room segmentation function. Check that it exists.
-        if not hasattr(self.simulator.scene, "get_room_type_by_point"):
+        if not hasattr(self._simulator.scene, "get_room_type_by_point"):
             return ["undefined"]
 
         pose = self.obj.get_position()
-        return [self.simulator.scene.get_room_type_by_point(np.array(pose[:2]))]
+        return [self._simulator.scene.get_room_type_by_point(np.array(pose[:2]))]
 
     def _set_value(self, new_value):
         raise NotImplementedError("Room state currently does not support setting.")

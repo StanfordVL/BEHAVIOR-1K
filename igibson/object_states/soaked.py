@@ -20,15 +20,17 @@ class Soaked(AbsoluteObjectState, BooleanState, TextureChangeStateMixin):
         return True
 
     def _update(self):
-        water_source_objs = self.simulator.scene.get_objects_with_state(WaterSource)
-        for water_source_obj in water_source_objs:
-            contacted_water_prim_paths = set(
-                item.bodyUniqueIdB for item in list(self.obj.states[ContactBodies].get_value())
-            )
-            for particle in water_source_obj.states[WaterSource].water_stream.get_active_particles():
-                if not set(particle.link_prim_paths).isdisjoint(contacted_water_prim_paths):
-                    self.value = True
-        self.update_texture()
+        # TODO!
+        return
+        # water_source_objs = self.simulator.scene.get_objects_with_state(WaterSource)
+        # for water_source_obj in water_source_objs:
+        #     contacted_water_prim_paths = set(
+        #         item.bodyUniqueIdB for item in list(self.obj.states[ContactBodies].get_value())
+        #     )
+        #     for particle in water_source_obj.states[WaterSource].water_stream.get_active_particles():
+        #         if not set(particle.link_prim_paths).isdisjoint(contacted_water_prim_paths):
+        #             self.value = Tru
+        # self.update_texture()
 
     @property
     def settable(self):

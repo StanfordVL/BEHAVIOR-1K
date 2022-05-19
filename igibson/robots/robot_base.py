@@ -11,14 +11,14 @@ from future.utils import with_metaclass
 
 from igibson.controllers import ControlType, create_controller
 # # from igibson.external.pybullet_tools.utils import get_joint_info
+import igibson.macros as m
 from igibson.sensors import create_sensor, SENSOR_PRIMS_TO_SENSOR_CLS, ALL_SENSOR_MODALITIES
 from igibson.objects.usd_object import USDObject
 from igibson.objects.controllable_object import ControllableObject
 from igibson.utils.gym_utils import GymObservable
 from igibson.utils.python_utils import Registerable, classproperty
 from igibson.utils.utils import rotate_vector_3d
-
-from pxr import UsdPhysics
+from pxr import PhysxSchema
 
 # Global dicts that will contain mappings
 REGISTERED_ROBOTS = OrderedDict()
@@ -111,7 +111,6 @@ class BaseRobot(USDObject, ControllableObject, GymObservable, Registerable):
 
         # Initialize internal attributes that will be loaded later
         self._sensors = None                     # e.g.: scan sensor, vision sensor
-        self._simulator = None                   # Required for AG by ManipulationRobot
 
         # Run super init
         super().__init__(
@@ -136,18 +135,18 @@ class BaseRobot(USDObject, ControllableObject, GymObservable, Registerable):
             **kwargs,
         )
 
-    def _load(self, simulator=None):
-        # Run super first
-        prim = super()._load(simulator=simulator)
-
-        # A persistent reference to simulator is needed for AG in ManipulationRobot
-        self._simulator = simulator
-
-        return prim
-
     def _post_load(self):
         # Run super post load first
         super()._post_load()
+
+        # Possibly force enabling of contact sensing for this robot if we set the global flag
+        # TODO: Remove this once we have a more optimized solution
+        # Only create contact report api if we're not visual only
+        if (not self._visual_only) and m.ENABLE_ROBOT_CONTACT_REPORTING:
+            for link in self._links.values():
+                PhysxSchema.PhysxContactReportAPI(link.prim) if \
+                    link.prim.HasAPI(PhysxSchema.PhysxContactReportAPI) else \
+                    PhysxSchema.PhysxContactReportAPI.Apply(link.prim)
 
         # Search for any sensors this robot might have attached to any of its links
         self._sensors = OrderedDict()

@@ -18,6 +18,7 @@ import igibson
 from igibson.objects.usd_object import USDObject
 from igibson.utils.constants import AVERAGE_CATEGORY_SPECS, DEFAULT_JOINT_FRICTION, SPECIAL_JOINT_FRICTIONS, JointType
 import igibson.utils.transform_utils as T
+from igibson.utils.utils import rotate_vector_3d
 from igibson.utils.usd_utils import BoundingBoxAPI
 
 
@@ -232,7 +233,7 @@ class DatasetObject(USDObject):
                 [0.0, 0.0, 1.0],
             ]
         )
-        rotated_quat = quat_from_matrix(np.dot(rot_matrix, matrix_from_quat(chosen_orientation)))
+        rotated_quat = T.mat2quat(np.dot(rot_matrix, T.quat2mat(chosen_orientation)))
         return rotated_quat
 
     # def prepare_visual_mesh_to_material(self):

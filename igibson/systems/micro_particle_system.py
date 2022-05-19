@@ -870,7 +870,8 @@ class FluidSystem(MicroParticleSystem):
 
     @classproperty
     def use_isosurface(cls):
-        return True
+        # TODO: Make true once omni bugs are fixed
+        return False
 
 
 class WaterSystem(FluidSystem):

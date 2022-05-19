@@ -94,6 +94,9 @@ class BaseObject(EntityPrim, metaclass=ABCMeta):
         # self._rendering_params = dict(self.DEFAULT_RENDERING_PARAMS)
         # self._rendering_params.update(category_based_rendering_params)
 
+        # Values to be created at runtime
+        self._simulator = None
+
         # Create load config from inputs
         load_config = dict() if load_config is None else load_config
         load_config["scale"] = scale
@@ -106,15 +109,17 @@ class BaseObject(EntityPrim, metaclass=ABCMeta):
             prim_path=prim_path,
             name=name,
             load_config=load_config,
-            **kwargs,
         )
 
     def load(self, simulator=None):
         # Run sanity check, any of these objects REQUIRE a simulator to be specified
         assert simulator is not None, "Simulator must be specified for loading any object subclassed from BaseObject!"
 
-        # Run super method
-        return super().load(simulator=simulator)
+        # Save simulator reference
+        self._simulator = simulator
+
+        # Run super method ONLY if we're not loaded yet
+        return super().load(simulator=simulator) if not self.loaded else self._prim
 
     def _post_load(self):
         # Run super first

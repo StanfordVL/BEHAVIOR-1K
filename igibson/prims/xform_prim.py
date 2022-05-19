@@ -53,7 +53,6 @@ class XFormPrim(BasePrim):
         prim_path,
         name,
         load_config=None,
-        **kwargs,
     ):
         # Other values that will be filled in at runtime
         self._default_state = None
@@ -66,7 +65,6 @@ class XFormPrim(BasePrim):
             prim_path=prim_path,
             name=name,
             load_config=load_config,
-            **kwargs,
         )
 
     def _load(self, simulator=None):
@@ -284,10 +282,8 @@ class XFormPrim(BasePrim):
                                                           Defaults to None, which means left unchanged.
         """
         current_position, current_orientation = self.get_position_orientation()
-        if position is None:
-            position = current_position
-        if orientation is None:
-            orientation = current_orientation
+        position = current_position if position is None else np.array(position)
+        orientation = current_orientation if orientation is None else np.array(orientation)
         orientation = orientation[[3, 0, 1, 2]]     # Flip from x,y,z,w to w,x,y,z
         my_world_transform = tf_matrix_from_pose(translation=position, orientation=orientation)
         parent_world_tf = UsdGeom.Xformable(get_prim_parent(self._prim)).ComputeLocalToWorldTransform(
@@ -396,7 +392,7 @@ class XFormPrim(BasePrim):
                 )
             self.set_attribute("xformOp:translate", translation)
         if orientation is not None:
-            orientation = orientation[[3, 0, 1, 2]]
+            orientation = np.array(orientation)[[3, 0, 1, 2]]
             if "xformOp:orient" not in properties:
                 carb.log_error(
                     "Orient property needs to be set for {} before setting its orientation".format(self.name)
