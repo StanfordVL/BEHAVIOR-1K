@@ -9,6 +9,7 @@ import numpy as np
 
 from transforms3d.euler import euler2quat
 
+import igibson.macros as m
 from igibson import object_states
 from igibson.envs.env_base import BaseEnv
 from igibson.robots.robot_base import BaseRobot
@@ -198,8 +199,12 @@ class iGibsonEnv(BaseEnv):
         # Load the task
         self._load_task()
 
-        # Reset the environment
+        # Start the simulation, then reset the environment
+        self.simulator.play()
         self.reset()
+
+        # Update the initial scene state
+        self.scene.update_initial_state()
 
         # Load the obs / action spaces
         self.load_observation_space()
@@ -242,7 +247,16 @@ class iGibsonEnv(BaseEnv):
             set of 2-tuple: Unique collision pairs occurring in the simulation at the current timestep, represented
                 by their prim_paths
         """
-        collisions = set()
+        # Grab collisions based on the status of our contact reporting macro flag
+        if m.ENABLE_GLOBAL_CONTACT_REPORTING:
+            collisions = {(c.body0, c.body1)
+                          for obj_group in (self.scene.objects, self.robots)
+                          for obj in obj_group
+                          for c in obj.contact_list()}
+        elif m.ENABLE_ROBOT_CONTACT_REPORTING:
+            collisions = {(c.body0, c.body1) for robot in self.robots for c in robot.contact_list()}
+        else:
+            collisions = set()
         self._current_collisions = self._filter_collisions(collisions) if filtered else collisions
         return self._current_collisions
 
@@ -519,9 +533,9 @@ class iGibsonEnv(BaseEnv):
         # Do any domain randomization
         self.randomize_domain()
 
-        # Move all robots away from the scene since the task will place the robots anyways
-        for robot in self.robots:
-            robot.set_position(np.array([100.0, 100.0, 100.0]))
+        # # Move all robots away from the scene since the task will place the robots anyways
+        # for robot in self.robots:
+        #     robot.set_position(np.array([100.0, 100.0, 100.0]))
 
         # Reset the task
         self.task.reset(self)

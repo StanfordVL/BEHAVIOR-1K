@@ -107,8 +107,11 @@ debug_sampling = False
 # whether to ignore visual shape when importing to pybullet
 ignore_visual_shape = True
 
-# Finally, we must create the igibson application
-from igibson.app_omni import OmniApp
+# Finally, we must create the igibson application (choose based on whether we're public version or not)
+if m.IS_PUBLIC_ISAACSIM:
+    from igibson.app_omni_public import OmniApp
+else:
+    from igibson.app_omni import OmniApp
 
 # Create app as a global reference so any submodule can access it
 app = OmniApp(

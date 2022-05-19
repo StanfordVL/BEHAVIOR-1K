@@ -279,10 +279,6 @@ class PointNavigationTask(BaseTask):
 
         return reward
 
-    def _reset_scene(self, env):
-        # Reset the scene normally
-        env.scene.reset()
-
     def _reset_agent(self, env):
         # Reset agent
         env.robots[self._robot_idn].reset()
@@ -326,6 +322,9 @@ class PointNavigationTask(BaseTask):
             self._goal_pos_marker.set_position(self._goal_pos)
 
     def _reset_variables(self, env):
+        # Run super first
+        super()._reset_variables(env=env)
+
         # Reset internal variables
         self._path_length = 0.0
         self._current_robot_pos = self._initial_pos

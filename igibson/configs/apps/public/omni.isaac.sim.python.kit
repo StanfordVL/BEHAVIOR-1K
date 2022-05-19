@@ -1,39 +1,25 @@
 [package]
 title = "Isaac Sim Python + iGibson"
 description = "A minimal app for use with iGibson"
-version = "2022.1.0"
+version = "2021.2.1"
 
 # That makes it browsable in UI with "experience" filter
 keywords = ["experience", "app", "usd"]
 
 [settings]
 app.name = "iGibson"
-app.version = "2022.1.0"
+app.version = "2021.2.1"
 
 [dependencies]
 "omni.kit.uiapp" = {}
-
-"omni.kit.menu.utils" = {}
-"omni.kit.menu.file" = {}
-"omni.kit.menu.edit" = {}
-"omni.kit.menu.create" = {}
-"omni.kit.menu.common" = {}
 
 "omni.kit.window.viewport" = {}
 "omni.kit.window.toolbar" = {}
 "omni.hydra.rtx" = {}
 
-"omni.physx.tensors" = {}
-# "omni.physx.flatcache" = {}
 "omni.physx.bundle" = {}
 "omni.syntheticdata" = {}
-
-# OmniGraph
-"omni.graph" = {}
-# "omni.graph.action" = {}
-# "omni.graph.nodes" = {}
-# "omni.graph.window.action" = {}
-# "omni.graph.bundle.action" = {}
+# "omni.graph.core" = {}
 
 # Status Bar
 "omni.kit.window.status_bar" = {}
@@ -57,12 +43,11 @@ app.version = "2022.1.0"
 [settings]
 # MGPU is always on, you can turn it from the settings, and force this off to save even more resource if you
 # only want to use a single GPU on your MGPU system
-renderer.multiGpu.enabled = true
+renderer.multiGpu.enabled = false
 
 # Improve determinism with physics and camera movement
 app.asyncRendering = false
 app.hydraEngine.waitIdle = true
-app.hydra.aperture.conform = 4 # Don't modify camera prim, stretch the image so it fits
 
 'rtx-transient'.resourcemanager.enableTextureStreaming = false
 
@@ -74,7 +59,6 @@ exts."omni.kit.renderer.core".imgui.enableMips = true
 exts."omni.kit.browser.material".enabled = false
 exts."omni.kit.window.material".load_after_startup = true
 exts."omni.kit.pipapi".installCheckIgnoreVersion = true
-exts."omni.kit.console".autoRunREPL = false
 
 # Setting the port for the embedded http server
 exts."omni.services.transport.server.http".port = 8211
@@ -102,19 +86,14 @@ size = 16
 # Extensions
 ###############################
 [settings.exts."omni.kit.registry.nucleus"]
-# FOR DEVELOPMENT #
 registries = [
-    { name = "kit/default", url = "omniverse://kit-extensions.ov.nvidia.com/exts/kit/default" },
+   { name = "kit/public", url = "https://kit-102-1-public-extensions.s3.amazonaws.com/public"}
 ]
-postToSlack = false
-# # FOR PRODUCTION #
-# registries = [
-#    { name = "kit/public", url = "https://kit-103-0-public-extensions.s3.amazonaws.com/public"}
-# ]
 
 [settings.app.extensions]
 skipPublishVerification = false
 registryEnabled = true # Need this for registry to load
+folders2 = ["${kit}/exts" ]
 
 # Isaac Sim Settings
 ###############################
@@ -143,7 +122,7 @@ physics.updateToUsd = true
 physics.updateVelocitiesToUsd = true
 physics.useFastCache = false
 physics.visualizationDisplayJoints = false
-#physics.overrideGPUSettings = -1 # force CPU physx
+physics.overrideGPUSettings = 0 # force CPU physx
 
 # Misc Settings
 ###############################
@@ -156,42 +135,32 @@ app.file.ignoreUnsavedOnExit = true # prevents save dialog when exiting
 [settings.ngx]
 enabled=true # Enable this for DLSS
 
-[settings]
-# FOR DEVELOPMENT #
-persistent.isaac.nucleus.default = "omniverse://ov-isaac-dev.nvidia.com"
-# # FOR PRODUCTION #
-# persistent.isaac.nucleus.default = "omniverse://localhost"
-
-# Register extension folder from this repo in kit
-[settings.app.exts]
-folders.'++' = ["${app}/../exts" ]
+[settings.isaac]
+nucleus.default = "omniverse://localhost"
 
 # Isaac Sim Extensions
 ###############################
 [dependencies]
-"omni.isaac.core_archive" = {}
-"omni.isaac.ml_archive" = {}
+"omni.isaac.pip_archive" = {}
 "omni.isaac.urdf" = {}
 "omni.isaac.utils" = {}
 #"omni.isaac.surface_gripper" = {}
 "omni.isaac.range_sensor" = {}
-"omni.isaac.isaac_sensor" = {}
-"omni.isaac.debug_draw" = {}
+"omni.isaac.contact_sensor" = {}
+#"omni.isaac.imu_sensor" = {}
+#"omni.isaac.debug_draw" = {}
 "omni.isaac.dynamic_control" = {}
 "omni.isaac.kit" = {}
 "omni.isaac.core" = {}
-"omni.isaac.core_nodes" = {}
+#"omni.isaac.franka" = {}
 #"omni.isaac.jetbot" = {}
-#"omni.isaac.kaya" = {}
-"omni.isaac.synthetic_utils" = {}
-#"omni.isaac.dr" = {}
-"omni.kit.loop-isaac" = {}
-#"omni.physx.flatcache" = {}
-
-[dependencies."filter:platform"."linux-x86_64"]
 #"omni.isaac.universal_robots" = {}
 #"omni.isaac.dofbot" = {}
-#"omni.isaac.franka" = {}
-"omni.isaac.motion_planning" = {}
-"omni.isaac.motion_generation" = {}
-"omni.isaac.occupancy_map" = {}
+#"omni.isaac.kaya" = {}
+#"omni.isaac.motion_planning" = {}
+#"omni.isaac.motion_generation" = {}
+#"omni.isaac.occupancy_map" = {}
+"omni.isaac.synthetic_utils" = {}
+#"omni.isaac.dr" = {}
+"omni.isaac.python_app" = {}
+"omni.kit.loop-isaac" = {}

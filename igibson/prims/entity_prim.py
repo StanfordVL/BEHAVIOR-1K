@@ -122,7 +122,7 @@ class EntityPrim(XFormPrim):
         else:
             # TODO: May need to extend to clusters of rigid bodies, that aren't exactly joined
             # We assume this object contains a single rigid body
-            body_path = f"{self._prim_path}/base_link"
+            body_path = f"{self._prim_path}/{self.root_link_name}"
             root_prim = get_prim_at_path(body_path)
             n_dof = 0
 
@@ -204,7 +204,8 @@ class EntityPrim(XFormPrim):
             str: Name of this entity's root link
         """
         # Default is the first entry in the links array
-        return list(self._links.keys())[0]
+        link_names = list(self._links.keys())
+        return "base_link" if "base_link" in link_names else link_names[0]
 
     @property
     def root_link(self):
@@ -625,7 +626,7 @@ class EntityPrim(XFormPrim):
         """
         self._handle = self._dc.get_articulation(self.articulation_root_path)
         self._root_handle = self._dc.get_articulation_root_body(self._handle) if \
-            self._handle != _dynamic_control.INVALID_HANDLE else self._dc.get_rigid_body(f"{self._prim_path}/base_link")
+            self._handle != _dynamic_control.INVALID_HANDLE else self._dc.get_rigid_body(f"{self._prim_path}/{self.root_link_name}")
 
         # Update all links and joints as well
         for link in self._links.values():

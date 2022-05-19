@@ -20,7 +20,6 @@ from omni.isaac.dynamic_control import _dynamic_control
 import omni.kit.loop._loop as omni_loop
 import builtins
 from pxr import Usd, UsdGeom, Sdf, UsdPhysics, PhysxSchema
-from omni.kit.viewport import get_viewport_interface
 from omni.isaac.core.utils.viewports import set_camera_view
 from omni.isaac.core.loggers import DataLogger
 from typing import Optional, List
@@ -35,6 +34,12 @@ from igibson.utils.assets_utils import get_ig_avg_category_specs
 from igibson.scenes import Scene
 from igibson.objects.object_base import BaseObject
 from igibson.object_states.factory import get_states_by_dependency_order
+
+# Import viewport getter based on isaacsim version
+if m.IS_PUBLIC_ISAACSIM:
+    from omni.kit.viewport import get_viewport_interface as acquire_viewport_interface
+else:
+    from omni.kit.viewport_legacy import acquire_viewport_interface
 
 import numpy as np
 
@@ -198,9 +203,16 @@ class Simulator(SimulationContext):
         assert self.is_stopped(), f"Cannot set simulator physics settings while simulation is playing!"
         self._physics_context.set_gravity(value=-self.gravity)
         # Also make sure we invert the collision group filter settings so that different collision groups cannot
-        # collide with each other
-        self._physics_context.set_invert_collision_group_filter(True)
-        # self._physics_context._physx_scene_api.GetInvertCollisionGroupFilterAttr().Set(True)
+        # collide with each other, and modify settings for speed optimization
+
+        if m.IS_PUBLIC_ISAACSIM:
+            # Only have access to invert collision filter and CCD setting, no flatcache
+            self._physics_context._physx_scene_api.GetInvertCollisionGroupFilterAttr().Set(True)
+            self._physics_context._physx_scene_api.GetEnableCCDAttr().Set(m.ENABLE_CCD)
+        else:
+            self._physics_context.set_invert_collision_group_filter(True)
+            self._physics_context.enable_ccd(m.ENABLE_CCD)
+            self._physics_context.enable_flatcache(m.ENABLE_FLATCACHE)
 
         # Enable GPU dynamics based on whether we need omni particles feature
         if m.ENABLE_OMNI_PARTICLES:
@@ -210,16 +222,12 @@ class Simulator(SimulationContext):
             self._physics_context.enable_gpu_dynamics(False)
             self._physics_context.set_broadphase_type("MBP")
 
-        # Modify other settings for speed optimization
-        self._physics_context.enable_flatcache(m.ENABLE_FLATCACHE)
-        self._physics_context.enable_ccd(m.ENABLE_CCD)
-
     def _set_viewer_settings(self):
         """
         Initializes a reference to the viewer in the App, and sets the frame size
         """
         # Store reference to viewer (see https://docs.omniverse.nvidia.com/app_isaacsim/app_isaacsim/reference_python_snippets.html#get-camera-parameters)
-        viewport = get_viewport_interface()
+        viewport = acquire_viewport_interface()
         viewport_handle = viewport.get_instance("Viewport")
         self._viewer = viewport.get_viewport_window(viewport_handle)
 
@@ -324,12 +332,13 @@ class Simulator(SimulationContext):
         for particle_system in self.particle_systems:
             particle_system.update(self)
 
-        # Step the object states in global topological order.
-        for state_type in self.object_state_types:
-            for obj in self.scene.get_objects_with_state(state_type):
-                # Only update objects that have been initialized so far
-                if obj.initialized:
-                    obj.states[state_type].update()
+        # Step the object states in global topological order (if the scene exists).
+        if self.scene is not None:
+            for state_type in self.object_state_types:
+                for obj in self.scene.get_objects_with_state(state_type):
+                    # Only update objects that have been initialized so far
+                    if obj.initialized:
+                        obj.states[state_type].update()
 
         # TODO
         # # Step the object procedural materials based on the updated object states.
@@ -337,17 +346,10 @@ class Simulator(SimulationContext):
         #     if hasattr(obj, "procedural_material") and obj.procedural_material is not None:
         #         obj.procedural_material.update()
 
-    def stop(self):
-        super().stop()
-
-        # TODO: Fix, hacky
-        if self.scene is not None and self.scene.initialized:
-            self.scene.reset()
-
-    def stop_async(self):
-        super().stop_async()
-
-        # TODO: Fix, hacky
+    def reset_scene(self):
+        """
+        Resets ths scene (if it exists) and its corresponding objects
+        """
         if self.scene is not None and self.scene.initialized:
             self.scene.reset()
 
@@ -826,7 +828,7 @@ class Simulator(SimulationContext):
         self._init_stage(
             physics_dt=self._initial_physics_dt,
             rendering_dt=self._initial_rendering_dt,
-            stage_units_in_meters=self._stage_units_in_meters,
+            stage_units_in_meters=self._stage_units_in_meters if m.IS_PUBLIC_ISAACSIM else self._initial_stage_units_in_meters,
         )
         self._set_physics_engine_settings()
         self._setup_default_callback_fns()

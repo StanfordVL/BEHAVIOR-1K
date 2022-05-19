@@ -5,6 +5,7 @@ import math
 import numpy as np
 import time
 
+import igibson.macros as m
 from igibson import app
 from igibson.sensors.sensor_base import BaseSensor
 from igibson.utils.constants import MAX_CLASS_COUNT, MAX_INSTANCE_COUNT
@@ -15,8 +16,13 @@ from igibson.utils.transform_utils import euler2quat, quat2euler
 
 import carb
 from omni.isaac.core.utils.stage import get_current_stage
-from omni.kit.viewport import get_viewport_interface
 from pxr import Gf, UsdGeom
+
+# Import viewport getter based on isaacsim version
+if m.IS_PUBLIC_ISAACSIM:
+    from omni.kit.viewport import get_viewport_interface as acquire_viewport_interface
+else:
+    from omni.kit.viewport_legacy import acquire_viewport_interface
 
 # Make sure synthetic data extension is enabled
 ext_manager = app.app.get_extension_manager()
@@ -132,7 +138,7 @@ class VisionSensor(BaseSensor):
         self._sd = sd.acquire_syntheticdata_interface()
 
         # Create a new viewport to link to this camera
-        vp = get_viewport_interface()
+        vp = acquire_viewport_interface()
         viewport_handle = vp.create_instance()
         self._viewport = vp.get_viewport_window(viewport_handle)
 
@@ -165,14 +171,22 @@ class VisionSensor(BaseSensor):
         start = time.time()
         is_initialized = False
         sensors = []
-        while not is_initialized and time.time() < (start + timeout):
+
+        # Initialize differently based on what version of Isaac Sim we're using
+        if m.IS_PUBLIC_ISAACSIM:
+            while not is_initialized and time.time() < (start + timeout):
+                for name in names:
+                    sensors.append(sensors_util.create_or_retrieve_sensor(self._viewport, self._RAW_SENSOR_TYPES[name]))
+                app.update()
+                is_initialized = not any([not self._sd.is_sensor_initialized(s) for s in sensors])
+            if not is_initialized:
+                uninitialized = [s for s in sensors if not self._sd.is_sensor_initialized(s)]
+                raise TimeoutError(f"Unable to initialized sensors: [{uninitialized}] within {timeout} seconds.")
+
+        else:
             for name in names:
                 sensors.append(sensors_util.create_or_retrieve_sensor(self._viewport, self._RAW_SENSOR_TYPES[name]))
             app.update()
-            is_initialized = not any([not self._sd.is_sensor_initialized(s) for s in sensors])
-        if not is_initialized:
-            uninitialized = [s for s in sensors if not self._sd.is_sensor_initialized(s)]
-            raise TimeoutError(f"Unable to initialized sensors: [{uninitialized}] within {timeout} seconds.")
 
         app.update()  # Extra frame required to prevent access violation error
 
@@ -236,7 +250,7 @@ class VisionSensor(BaseSensor):
 
     def set_window_size(self, width, height):
         """Set the size of the viewport window.
-        
+
         :param width: width of the viewport window
         :param height: height of the viewport window
         """

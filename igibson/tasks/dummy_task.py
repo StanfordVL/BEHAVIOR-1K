@@ -23,10 +23,6 @@ class DummyTask(BaseTask):
         # Do nothing
         return OrderedDict()
 
-    def _reset_scene(self, env):
-        # Do nothing
-        pass
-
     def _reset_agent(self, env):
         # Place agent(s) at origin by default
         for robot in env.robots:
