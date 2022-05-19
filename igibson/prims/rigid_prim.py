@@ -151,7 +151,7 @@ class RigidPrim(XFormPrim):
             self._cs.get_rigid_body_raw_data(self._prim_path)
 
         # Grab handle to this rigid body and get name
-        self._handle = self._dc.get_rigid_body(self._prim_path)
+        self.update_handles()
         self._body_name = self._dc.get_rigid_body_name(self._handle)
         print(f"handle: {self._handle}, body name: {self._body_name}")
 

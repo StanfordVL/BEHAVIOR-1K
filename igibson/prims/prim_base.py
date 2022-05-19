@@ -83,7 +83,8 @@ class BasePrim(Serializable, UniquelyNamed, Recreatable, ABC):
         Initializes state of this object and sets up any references necessary post-loading. Subclasses should
         implement / extend the _initialize() method.
         """
-        assert not self._initialized, "Prim can only be initialized once! (It is already initialized)"
+        assert not self._initialized, \
+            f"Prim {self.name} at prim_path {self._prim_path} can only be initialized once! (It is already initialized)"
         self._initialize()
 
         # # Update defaults

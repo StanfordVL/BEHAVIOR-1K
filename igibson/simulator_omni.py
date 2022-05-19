@@ -333,6 +333,18 @@ class Simulator(SimulationContext):
     def play(self):
         super().play()
 
+        # Update all object / robot handles
+        if self.scene is not None and self.scene.initialized:
+            for obj in self.scene.objects:
+                # Only need to update handles if object is already initialized as well
+                if obj.initialized:
+                    obj.update_handles()
+
+            for robot in self.scene.robots:
+                # Only need to update handles if robot is already initialized as well
+                if robot.initialized:
+                    robot.update_handles()
+
         # Check to see if any objects should be initialized
         if len(self._objects_to_initialize) > 0:
             for obj in self._objects_to_initialize:
