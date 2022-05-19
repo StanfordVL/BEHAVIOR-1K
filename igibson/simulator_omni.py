@@ -337,17 +337,10 @@ class Simulator(SimulationContext):
         #     if hasattr(obj, "procedural_material") and obj.procedural_material is not None:
         #         obj.procedural_material.update()
 
-    def stop(self):
-        super().stop()
-
-        # TODO: Fix, hacky
-        if self.scene is not None and self.scene.initialized:
-            self.scene.reset()
-
-    def stop_async(self):
-        super().stop_async()
-
-        # TODO: Fix, hacky
+    def reset_scene(self):
+        """
+        Resets ths scene (if it exists) and its corresponding objects
+        """
         if self.scene is not None and self.scene.initialized:
             self.scene.reset()
 

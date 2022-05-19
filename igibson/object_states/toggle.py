@@ -57,9 +57,9 @@ class ToggledOn(AbsoluteObjectState, BooleanState, TextureChangeStateMixin, Link
                 visual_only=True,
                 rgba=[1, 0, 0, 0.5],
             )
-            self._simulator.import_object(self.visual_marker_on)
+            self._simulator.import_object(self.visual_marker_on, register=False, auto_initialize=True)
             self.visual_marker_on.visible = False
-            self._simulator.import_object(self.visual_marker_off)
+            self._simulator.import_object(self.visual_marker_off, register=False, auto_initialize=True)
             self.visual_marker_off.visible = False
 
     def _update(self):

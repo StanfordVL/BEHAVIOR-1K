@@ -124,8 +124,7 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin):
     def _initialize(self):
         # Run super first
         super()._initialize()
-        if not self.requires_inside:
-            self.initialize_link_mixin()
+        self.initialize_link_mixin()
 
         # Load visual markers
 
@@ -142,7 +141,7 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin):
             visual_only=True,
         )
         # Import marker into simulator
-        self._simulator.import_object(self.marker, auto_initialize=True)
+        self._simulator.import_object(self.marker, register=False, auto_initialize=True)
 
     def _update(self):
         self.status, self.position = self._compute_state_and_position()
