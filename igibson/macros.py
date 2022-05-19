@@ -19,3 +19,10 @@ ENABLE_ROBOT_CONTACT_REPORTING = True
 # Whether to use omni's particles feature (e.g. for fluids) or not
 # This also dictates whether we need to use GPU dynamics or not
 ENABLE_OMNI_PARTICLES = False
+
+# Whether to use omni's flatcache feature or not (can speed up simulation)
+ENABLE_FLATCACHE = False
+
+# Whether to use continuous collision detection or not (slower simulation, but can prevent
+# objects from tunneling through each other)
+ENABLE_CCD = False

@@ -203,15 +203,16 @@ class Simulator(SimulationContext):
         # self._physics_context._physx_scene_api.GetInvertCollisionGroupFilterAttr().Set(True)
 
         # Enable GPU dynamics based on whether we need omni particles feature
-        # and modify other settings for speed optimization
         if m.ENABLE_OMNI_PARTICLES:
             self._physics_context.enable_gpu_dynamics(True)
             self._physics_context.set_broadphase_type("GPU")
         else:
             self._physics_context.enable_gpu_dynamics(False)
             self._physics_context.set_broadphase_type("MBP")
-        self._physics_context.enable_flatcache(False)
-        self._physics_context.enable_ccd(False)
+
+        # Modify other settings for speed optimization
+        self._physics_context.enable_flatcache(m.ENABLE_FLATCACHE)
+        self._physics_context.enable_ccd(m.ENABLE_CCD)
 
     def _set_viewer_settings(self):
         """
