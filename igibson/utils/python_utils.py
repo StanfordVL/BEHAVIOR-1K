@@ -1,12 +1,13 @@
 """
 A set of utility functions for general python usage
 """
+import inspect
 from abc import ABCMeta
 from copy import deepcopy
-from importlib import import_module
-import inspect
-import numpy as np
 from functools import wraps
+from importlib import import_module
+
+import numpy as np
 
 # Global dictionary storing all unique names
 NAMES = set()
