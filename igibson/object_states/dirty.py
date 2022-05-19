@@ -32,6 +32,9 @@ class _Dirty(AbsoluteObjectState, BooleanState):
         # Create the dirt group
         self.dirt_group = self.DIRT_CLASS.create_attachment_group(obj=self.obj)
 
+        # Default max particles for clean is 0
+        self._max_particles_for_clean = 0
+
     def _get_value(self):
         return self.DIRT_CLASS.num_group_particles(group=self.dirt_group) > self._max_particles_for_clean
 

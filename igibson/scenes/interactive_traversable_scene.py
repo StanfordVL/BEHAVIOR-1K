@@ -13,6 +13,7 @@ import numpy as np
 from pxr.Sdf import ValueTypeNames as VT
 from omni.isaac.core.utils.rotations import gf_quat_to_np_array
 
+from igibson import ig_dataset_path
 from igibson.objects.dataset_object import DatasetObject
 from igibson.scenes.traversable_scene import TraversableScene
 from igibson.maps.segmentation_map import SegmentationMap
@@ -75,7 +76,7 @@ class InteractiveTraversableScene(TraversableScene):
         """
         # TODO: Update
         :param scene_model: Scene model, e.g.: Rs_int
-        :param usd_file: name of ursd file to load (without .urdf), default to ig_dataset/scenes/<scene_model>/urdf/<urdf_file>.urdf
+        :param usd_file: name of usd file to load (without .urdf), default to ig_dataset/scenes/<scene_model>/urdf/<urdf_file>.urdf
         :param usd_path: full path of URDF file to load (with .urdf)
         # :param pybullet_filename: optional specification of which pybullet file to restore after initialization
         :param trav_map_resolution: traversability map resolution
@@ -565,55 +566,68 @@ class InteractiveTraversableScene(TraversableScene):
             # self.object_multiplexers[link.attrib["multiplexer"]]["grouper"] = object_name
             # continue
 
+        # TODO! Handle
         elif category == "agent" and not self.include_robots:
             raise NotImplementedError()
             # continue
 
         # Robot object
+        # TODO! Handle
         elif category == "agent":
-            raise NotImplementedError()
+            pass
+            # raise NotImplementedError()
             # robot_config = json.loads(link.attrib["robot_config"]) if "robot_config" in link.attrib else {}
             # assert model in REGISTERED_ROBOTS, "Got invalid robot to instantiate: {}".format(model)
             # obj = REGISTERED_ROBOTS[model](name=object_name, **robot_config)
 
         # Non-robot object
         else:
-            # Do not load these object categories (can blacklist building structures as well)
-            not_blacklisted = self.not_load_object_categories is None or category not in self.not_load_object_categories
+            usd_path = None
+            # Walls, floors, ceilings
+            if category in {"walls", "floors", "ceilings"}:
+                usd_path = f"{ig_dataset_path}/scenes/{model}/usd/{category}/{model}_{category}.usd"
 
-            # Only load these object categories (no need to white list building structures)
-            whitelisted = self.load_object_categories is None or category in self.load_object_categories
+            # Other objects -- need to sanity check to make sure we want to load them
+            else:
+                # Do not load these object categories (can blacklist building structures as well)
+                not_blacklisted = self.not_load_object_categories is None or category not in self.not_load_object_categories
 
-            # This object is not located in one of the selected rooms, skip
-            valid_room = self.load_room_instances is None or len(set(self.load_room_instances) & set(in_rooms)) >= 0
+                # Only load these object categories (no need to white list building structures)
+                whitelisted = self.load_object_categories is None or category in self.load_object_categories
 
-            # We only load this model if all the above conditions are met
-            if not_blacklisted and whitelisted and valid_room:
+                # This object is not located in one of the selected rooms, skip
+                valid_room = self.load_room_instances is None or len(set(self.load_room_instances) & set(in_rooms)) >= 0
 
-                # Make sure objects exist in the actual requested category
-                category_path = get_ig_category_path(category)
-                assert len(os.listdir(category_path)) != 0, "No models in category folder {}".format(category_path)
+                # We only load this model if all the above conditions are met
+                if not_blacklisted and whitelisted and valid_room:
 
-                # Potentially grab random object
-                if model == "random":
-                    if random_group is None:
-                        model = random.choice(os.listdir(category_path))
-                    else:
-                        # Using random group to assign the same model to a group of objects
-                        # E.g. we want to use the same model for a group of chairs around the same dining table
-                        # random_group is a unique integer within the category
-                        random_group_key = (category, random_group)
+                    # Make sure objects exist in the actual requested category
+                    category_path = get_ig_category_path(category)
+                    assert len(os.listdir(category_path)) != 0, "No models in category folder {}".format(category_path)
 
-                        if random_group_key in self.random_groups:
-                            model = self.random_groups[random_group_key]
-                        else:
-                            # We create a new unique entry for this random group if it doesn't already exist
+                    # Potentially grab random object
+                    if model == "random":
+                        if random_group is None:
                             model = random.choice(os.listdir(category_path))
-                            self.random_groups[random_group_key] = model
+                        else:
+                            # Using random group to assign the same model to a group of objects
+                            # E.g. we want to use the same model for a group of chairs around the same dining table
+                            # random_group is a unique integer within the category
+                            random_group_key = (category, random_group)
 
-                model_path = get_ig_model_path(category, model)
-                # TODO: Remove "usd" in the middle when we simply have the model directory directly contain the USD
-                usd_path = os.path.join(model_path, "usd", model + ".usd")
+                            if random_group_key in self.random_groups:
+                                model = self.random_groups[random_group_key]
+                            else:
+                                # We create a new unique entry for this random group if it doesn't already exist
+                                model = random.choice(os.listdir(category_path))
+                                self.random_groups[random_group_key] = model
+
+                    model_path = get_ig_model_path(category, model)
+                    # TODO: Remove "usd" in the middle when we simply have the model directory directly contain the USD
+                    usd_path = os.path.join(model_path, "usd", model + ".usd")
+
+            # Only create the object if a valid usd_path is specified
+            if usd_path is not None:
 
                 # Make sure only a bounding box OR scale is specified
                 assert bbox is None or scale is None, f"Both scale and bounding box size was defined for a USDObject in the template scene!"
@@ -637,33 +651,33 @@ class InteractiveTraversableScene(TraversableScene):
                     bddl_object_scope=bddl_obj_scope,
                 )
 
-            # TODO: Are all of these necessary now that we can directly save USD snapshots?
-            # bbox_center_pos = np.array([float(val) for val in connecting_joint.find("origin").attrib["xyz"].split(" ")])
-            # if "rpy" in connecting_joint.find("origin").attrib:
-            #     bbx_center_orn = np.array(
-            #         [float(val) for val in connecting_joint.find("origin").attrib["rpy"].split(" ")]
-            #     )
-            # else:
-            #     bbx_center_orn = np.array([0.0, 0.0, 0.0])
-            # bbx_center_orn = p.getQuaternionFromEuler(bbx_center_orn)
-            #
-            # base_com_pose = json.loads(link.attrib["base_com_pose"]) if "base_com_pose" in link.attrib else None
-            # base_velocities = json.loads(link.attrib["base_velocities"]) if "base_velocities" in link.attrib else None
-            # if "joint_states" in link.keys():
-            #     joint_states = json.loads(link.attrib["joint_states"])
-            # elif "joint_positions" in link.keys():
-            #     # Backward compatibility, assuming multi-sub URDF object don't have any joints
-            #     joint_states = {
-            #         key: (position, 0.0) for key, position in json.loads(link.attrib["joint_positions"])[0].items()
-            #     }
-            # else:
-            #     joint_states = None
-            #
-            # if "states" in link.keys():
-            #     non_kinematic_states = json.loads(link.attrib["states"])
-            # else:
-            #     non_kinematic_states = None
-            print(f"obj: {name}, bbox center pos: {bbox_center_pos}, bbox center ori: {bbox_center_ori}")
+                # TODO: Are all of these necessary now that we can directly save USD snapshots?
+                # bbox_center_pos = np.array([float(val) for val in connecting_joint.find("origin").attrib["xyz"].split(" ")])
+                # if "rpy" in connecting_joint.find("origin").attrib:
+                #     bbx_center_orn = np.array(
+                #         [float(val) for val in connecting_joint.find("origin").attrib["rpy"].split(" ")]
+                #     )
+                # else:
+                #     bbx_center_orn = np.array([0.0, 0.0, 0.0])
+                # bbx_center_orn = p.getQuaternionFromEuler(bbx_center_orn)
+                #
+                # base_com_pose = json.loads(link.attrib["base_com_pose"]) if "base_com_pose" in link.attrib else None
+                # base_velocities = json.loads(link.attrib["base_velocities"]) if "base_velocities" in link.attrib else None
+                # if "joint_states" in link.keys():
+                #     joint_states = json.loads(link.attrib["joint_states"])
+                # elif "joint_positions" in link.keys():
+                #     # Backward compatibility, assuming multi-sub URDF object don't have any joints
+                #     joint_states = {
+                #         key: (position, 0.0) for key, position in json.loads(link.attrib["joint_positions"])[0].items()
+                #     }
+                # else:
+                #     joint_states = None
+                #
+                # if "states" in link.keys():
+                #     non_kinematic_states = json.loads(link.attrib["states"])
+                # else:
+                #     non_kinematic_states = None
+                print(f"obj: {name}, bbox center pos: {bbox_center_pos}, bbox center ori: {bbox_center_ori}")
 
             # self.object_states.add_object(
             #     obj_name=name,
@@ -793,7 +807,7 @@ class InteractiveTraversableScene(TraversableScene):
             if prim.GetPrimTypeInfo().GetTypeName() == "Xform":
                 name = prim.GetName()
 
-                # category = prim.GetAttribute("ig:category").Get()
+                category = prim.GetAttribute("ig:category").Get()
                 # # Skip over the wall, floor, or ceilings (#TODO: Can we make this more elegant?)
                 # if category in {"walls", "floors", "ceilings"}:
                 #     continue
@@ -808,9 +822,10 @@ class InteractiveTraversableScene(TraversableScene):
                     simulator.import_object(obj, auto_initialize=False)
                     # If we have additional info specified, we also directly set it's bounding box position since this is a known quantity
                     # This is also the only time we'll be able to set fixed object poses
-                    pos = info["bbox_center_pos"]
-                    ori = info["bbox_center_ori"]
-                    obj.set_bbox_center_position_orientation(pos, ori)
+                    if category not in {"walls", "floors", "ceilings"}:
+                        pos = info["bbox_center_pos"]
+                        ori = info["bbox_center_ori"]
+                        obj.set_bbox_center_position_orientation(pos, ori)
 
     def _load_objects_from_scene_info(self, simulator):
         """
@@ -851,6 +866,7 @@ class InteractiveTraversableScene(TraversableScene):
         # TODO: Need to check scene quality
         # self.check_scene_quality(simulator=simulator)
 
+        # TODO: Necessary? Currently does nothing since sim is paused at this point
         # force wake up each body once
         self.wake_scene_objects()
 

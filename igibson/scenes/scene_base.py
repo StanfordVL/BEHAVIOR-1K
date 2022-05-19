@@ -187,8 +187,9 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         self._loaded = True
 
         # Initialize registries
-        for registry in self.system_registry.objects:
-            registry.initialize(simulator=simulator)
+        for system in self.systems:
+            print(f"Initializing system: {system.name}")
+            system.initialize(simulator=simulator)
 
         # Always stop the sim if we started it internally
         if not simulator.is_stopped():

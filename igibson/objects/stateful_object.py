@@ -63,7 +63,7 @@ class StatefulObject(BaseObject):
         # Load abilities from taxonomy if needed & possible
         if abilities is None:
             if OBJECT_TAXONOMY is not None:
-                taxonomy_class = OBJECT_TAXONOMY.get_class_name_from_igibson_category(self.category)
+                taxonomy_class = OBJECT_TAXONOMY.get_class_name_from_igibson_category(category)
                 if taxonomy_class is not None:
                     abilities = OBJECT_TAXONOMY.get_abilities(taxonomy_class)
                 else:

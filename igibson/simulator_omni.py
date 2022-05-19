@@ -604,7 +604,7 @@ class Simulator(SimulationContext):
         self.pause()
 
         logging.info("The saved simulation environment loaded.")
-    
+
         return
 
     def save(self, usd_path):
@@ -639,7 +639,7 @@ class Simulator(SimulationContext):
         self.stage.Export(usd_path)
 
         logging.info("The current simulation environment saved.")
-        
+
         return
 
     def add_task(self, task: BaseTask) -> None:

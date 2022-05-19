@@ -290,7 +290,7 @@ class iGibsonEnv(BaseEnv):
                     # Add this collision
                     new_collisions.add(col_pair)
 
-            return new_collisions
+        return new_collisions
 
     def _populate_info(self, info):
         """
@@ -519,7 +519,7 @@ class iGibsonEnv(BaseEnv):
 
         # Move all robots away from the scene since the task will place the robots anyways
         for robot in self.robots:
-            robot.set_position([100.0, 100.0, 100.0])
+            robot.set_position(np.array([100.0, 100.0, 100.0]))
 
         # Reset the task
         self.task.reset(self)
