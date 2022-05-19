@@ -88,9 +88,6 @@ class BehaviorTask(BaseTask):
             online_object_sampling=False,
             debug_object_sampling=None,
             highlight_task_relevant_objects=False,
-            reset_checkpoint_idx=-1,
-            reset_checkpoint_dir=None,
-            episode_save_dir=None,
             termination_config=None,
             reward_config=None,
     ):
@@ -106,7 +103,8 @@ class BehaviorTask(BaseTask):
 
         # Activity info
         self.activity_name = None
-        self.activity_definition_id = None
+        self.activity_definition_id = activity_definition_id
+        self.activity_instance_id = activity_instance_id
         self.activity_conditions = None
         self.activity_initial_conditions = None
         self.activity_goal_conditions = None
@@ -133,34 +131,17 @@ class BehaviorTask(BaseTask):
         self.sampled_objects = None
         self.sampleable_object_conditions = None
 
-
         # Logic-tracking info
-        self.reset_checkpoint_idx = reset_checkpoint_idx
-        self.reset_checkpoint_dir = reset_checkpoint_dir
-        self.state_history = OrderedDict()
         self.currently_viewed_index = None
         self.currently_viewed_instruction = None
-        self.initial_state = None
-        self.log_writer = None
-
-        # Possibly create a directory to save this episode
-        self.episode_save_dir = episode_save_dir
-        if self.episode_save_dir is not None:
-            os.makedirs(self.episode_save_dir, exist_ok=True)
 
         # Load the initial behavior configuration
         self.update_activity(activity_name=activity_name, activity_definition_id=activity_definition_id, predefined_problem=predefined_problem)
 
         # TODO
         # self.task_obs_dim = MAX_TASK_RELEVANT_OBJS * TASK_RELEVANT_OBJS_OBS_DIM + AGENT_POSE_DIM
-
-        # self.initialized, self.feedback = self.initialize(env)
-        # self.state_history = {}
-        # self.initial_state = self.save_scene(env)
         # if self.config.get("should_highlight_task_relevant_objs", True):
         #     self.highlight_task_relevant_objs(env)
-
-        # self.log_writer = None
 
         # Run super init
         super().__init__(termination_config=termination_config, reward_config=reward_config)
@@ -192,9 +173,6 @@ class BehaviorTask(BaseTask):
 
         # Get the name of the scene
         self.scene_model = env.simulator.scene.scene_model
-
-        # Save this initial state
-        self.initial_state = self.save_scene(env)
 
         # Highlight any task relevant objects if requested
         if self.highlight_task_relevant_objs:
@@ -269,67 +247,6 @@ class BehaviorTask(BaseTask):
             len(satisfied_predicates["satisfied"]) + len(satisfied_predicates["unsatisfied"])
         )
         return -success_score
-
-    def save_scene(self, env):
-        # TODO: Refactor once Alan's save functionality is completed
-        # scene_tree, snapshot_id = self.scene.save(pybullet_save_state=True)
-        # self.state_history[snapshot_id] = scene_tree
-        # return snapshot_id
-        return 0
-
-    def _reset_scene(self, env):
-        # Load the checkpoint if specified, otherwise we restore our scene state
-        if self.reset_checkpoint_dir is not None and self.reset_checkpoint_idx != -1:
-            load_checkpoint(env.simulator, self.reset_checkpoint_dir, self.reset_checkpoint_idx)
-        else:
-            # TODO!
-            pass
-            # env.simulator.scene.restore(scene_tree=self.state_history[self.initial_state], pybullet_state_id=self.initial_state)
-
-    def _reset_agent(self, env):
-        # Nothing to do here
-        return
-
-    def _reset_variables(self, env):
-        # Refresh log writer if we have one active
-        if self.log_writer is not None:
-            self.log_writer.end_log_session()
-            del self.log_writer
-            self.log_writer = None
-
-        # We need to update where we are saving information if we are saving this episode
-        if self.episode_save_dir:
-            timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-            vr_log_path = os.path.join(
-                self.episode_save_dir,
-                "{}_{}_{}_{}_{}.hdf5".format(
-                    self.activity_name,
-                    self.activity_definition_id,
-                    self.scene_model,
-                    timestamp,
-                    env.current_episode,
-                ),
-            )
-            self.log_writer = IGLogWriter(
-                env.simulator,
-                frames_before_write=200,
-                log_filepath=vr_log_path,
-                task=self,
-                store_vr=False,
-                vr_robot=env.robots[0],
-                filter_objects=True,
-            )
-            self.log_writer.set_up_data_storage()
-
-    def step(self, env, action):
-        # Run super method first
-        reward, done, info = super().step(env=env, action=action)
-
-        # Step log writer if specified
-        if self.log_writer is not None:
-            self.log_writer.process_frame()
-
-        return reward, done, info
 
     def initialize_activity(self, env):
         accept_scene = True
@@ -1034,6 +951,17 @@ class BehaviorTask(BaseTask):
     def iterate_instruction(self):
         self.currently_viewed_index = (self.currently_viewed_index + 1) % len(self.activity_conditions.parsed_goal_conditions)
         self.currently_viewed_instruction = self.instruction_order[self.currently_viewed_index]
+
+    @property
+    def name(self):
+        """
+        Returns:
+            str: Name of this task. Defaults to class name
+        """
+        name_base = super().name
+
+        # Add activity name, def id, and inst id
+        return f"{name_base}_{self.activity_name}_{self.activity_definition_id}_{self.activity_instance_id}"
 
     @classproperty
     def valid_scene_types(cls):

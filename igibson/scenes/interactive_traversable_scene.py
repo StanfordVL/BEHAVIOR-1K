@@ -878,9 +878,8 @@ class InteractiveTraversableScene(TraversableScene):
             obj.wake()
 
     def reset(self):
-        # Reset the pose and joint configuration of all scene objects.
-        if self._initial_object_states:
-            self.load_state(self._initial_object_states)
+        # Run super first
+        super().reset()
 
         # Also open all doors if self.should_open_all_doors is True
         if self.should_open_all_doors:

@@ -21,6 +21,7 @@ from omni.isaac.core.utils.nucleus import find_nucleus_server
 from omni.isaac.core.utils.stage import add_reference_to_stage
 from typing import Optional, Tuple
 import gc
+from igibson import app
 from igibson.utils.python_utils import classproperty, Serializable, Registerable, Recreatable
 from igibson.utils.registry_utils import SerializableRegistry
 from igibson.utils.utils import NumpyEncoder
@@ -49,7 +50,10 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         self._registry = None
         self._world_prim = None
         self.floor_body_ids = []  # List of ids of the floor_heights
-        self._initial_object_states = {}
+        self._initial_state = None
+
+        # Call super init
+        super().__init__()
 
     @property
     def stage(self) -> Usd.Stage:
@@ -215,7 +219,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
         # Store object states
         scene_info = self.get_scene_info()
-        self._initial_object_states = self.dump_state(serialized=False) if scene_info is None else \
+        self._initial_state = self.dump_state(serialized=False) if scene_info is None else \
             scene_info["init_state"]
 
     def _create_registry(self):
@@ -376,9 +380,12 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
     def reset(self):
         """
-        Resets this scene. Default is no-op
+        Resets this scene
         """
-        pass
+        # Reset the pose and joint configuration of all scene objects.
+        if self._initial_state is not None:
+            self.load_state(self._initial_state)
+            app.update()
 
     @property
     def has_connectivity_graph(self):
@@ -478,6 +485,12 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             restitution=restitution,
         )
 
+    def update_initial_state(self):
+        """
+        Updates the initial state for this scene (which the scene will get reset to upon calling reset())
+        """
+        self._initial_state = self.dump_state(serialized=False)
+
     def update_scene_info(self):
         """
         Updates the scene-relevant information and saves it to the active USD. Useful for reloading a scene directly
@@ -490,7 +503,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                      for obj in registry.objects}
 
         # Save initial object state info
-        init_state_info = self._initial_object_states
+        init_state_info = self._initial_state
 
         # Compose as single dictionary and dump into custom data field in world prim
         scene_info = {"init_info": init_info, "init_state": init_state_info}

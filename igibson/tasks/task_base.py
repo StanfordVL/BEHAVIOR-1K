@@ -124,23 +124,22 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
         """
         raise NotImplementedError()
 
-    @abstractmethod
     def _reset_scene(self, env):
         """
-        Task-specific scene reset
+        Task-specific scene reset. Default is the normal scene reset
 
         :param env: environment instance
         """
-        raise NotImplementedError()
+        env.scene.reset()
 
-    @abstractmethod
     def _reset_agent(self, env):
         """
         Task-specific agent reset
 
         :param env: environment instance
         """
-        raise NotImplementedError()
+        # Default is no-op
+        pass
 
     def _reset_variables(self, env):
         """
@@ -305,6 +304,14 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
         }
 
         return self._reward, self._done, deepcopy(self._info)
+
+    @property
+    def name(self):
+        """
+        Returns:
+            str: Name of this task. Defaults to class name
+        """
+        return self.__class__.__name__
 
     @property
     def reward(self):
