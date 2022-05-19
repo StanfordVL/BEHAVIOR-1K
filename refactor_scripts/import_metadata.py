@@ -170,9 +170,10 @@ def rename_prim(prim, name):
     return get_prim_at_path(path_to)
 
 
-def import_rendering_channels(obj_prim, model_root_path, usd_path):
+def import_rendering_channels(obj_prim, obj_category, model_root_path, usd_path):
     usd_dir = "/".join(usd_path.split("/")[:-1])
-    mat_dir = f"{model_root_path}/material"
+    mat_dir = f"{model_root_path}/material/{obj_category}" if \
+        obj_category in {"ceilings", "walls", "floors"} else f"{model_root_path}/material"
 
     # Compile all material files we have
     mat_files = set(os.listdir(mat_dir))
@@ -220,8 +221,13 @@ def import_rendering_channels(obj_prim, model_root_path, usd_path):
                         shutil.copy(os.path.join(mat_dir, link_mat_file), mat_fpath)
                         # Check if any valid rendering channel
                         mat_type = link_mat_file.split("_")[-1].split(".")[0]
-                        # Apply the material
-                        RENDERING_CHANNEL_MAPPINGS[mat_type](mat, os.path.join(mat_fpath, link_mat_file))
+                        # Apply the material if it exists
+                        render_channel_fcn = RENDERING_CHANNEL_MAPPINGS.get(mat_type, None)
+                        if render_channel_fcn is not None:
+                            render_channel_fcn(mat, os.path.join(mat_fpath, link_mat_file))
+                        else:
+                            # Warn user that we didn't find the correct rendering channel
+                            print(f"Warning: could not find rendering channel function for material: {mat_type}, skipping")
 
                     # Rename material
                     mat = rename_prim(prim=mat, name=f"material_{link_name}")
@@ -234,8 +240,14 @@ def import_rendering_channels(obj_prim, model_root_path, usd_path):
         shutil.copy(os.path.join(mat_dir, mat_file), mat_fpath)
         # Check if any valid rendering channel
         mat_type = mat_file.split("_")[-1].split(".")[0]
-        # Apply the material
-        RENDERING_CHANNEL_MAPPINGS[mat_type](default_mat, os.path.join(mat_fpath, mat_file))
+        # Apply the material if it exists
+        render_channel_fcn = RENDERING_CHANNEL_MAPPINGS.get(mat_type, None)
+        if render_channel_fcn is not None:
+            render_channel_fcn(mat, os.path.join(mat_fpath, link_mat_file))
+        else:
+            # Warn user that we didn't find the correct rendering channel
+            print(f"Warning: could not find rendering channel function for material: {mat_type}")
+
 
 
 # TODO: Handle metalinks
@@ -358,7 +370,7 @@ def import_obj_metadata(obj_category, obj_model, name, import_render_channels=Fa
     # print(f"looks children: {looks_prim.GetChildren()}")
     # print(f"mat prim: {mat_prim}")
     if import_render_channels:
-        import_rendering_channels(obj_prim=prim, model_root_path=model_root_path, usd_path=usd_path)
+        import_rendering_channels(obj_prim=prim, obj_category=obj_category, model_root_path=model_root_path, usd_path=usd_path)
 
     # Save stage
     stage.Save()
@@ -476,8 +488,9 @@ def import_building_metadata(obj_category, obj_model, name, import_render_channe
     # mat_prim_path = f"{str(prim.GetPrimPath())}/Looks/material_material_0"
     # mat_prim = get_prim_at_path(mat_prim_path)
     # print(f"mat prim: {mat_prim}")
-    if import_render_channels:
-        import_rendering_channels(obj_prim=prim, model_root_path=model_root_path, usd_path=usd_path)
+    # TODO : Pass for now -- need to update handling of paths better, since a single link can have multiple visual meshes + materials
+    # if import_render_channels:
+    #     import_rendering_channels(obj_prim=prim, obj_category=obj_category, model_root_path=model_root_path, usd_path=usd_path)
 
     # Save stage
     stage.Save()
