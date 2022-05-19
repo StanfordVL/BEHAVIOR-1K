@@ -3,11 +3,10 @@ A set of utility functions for general python usage
 """
 from abc import ABCMeta
 from copy import deepcopy
-from collections import OrderedDict, Iterable
 from importlib import import_module
 import inspect
-import logging
 import numpy as np
+from functools import wraps
 
 # Global dictionary storing all unique names
 NAMES = set()
@@ -29,41 +28,39 @@ def save_init_info(func):
 
     _init_info contains class name and class constructor's input args.
     """
-    def return_func(*args, **kwargs):
-        # Get __init__ arguments.
-        arg_spec = inspect.getfullargspec(func)
-        arg_names = arg_spec[0][1:]
-        defaults = arg_spec[3]
-        self_var = args[0]
+    sig = inspect.signature(func)
+
+    @wraps(func) # preserve func name, docstring, arguments list, etc.
+    def wrapper(self, *args, **kwargs):
+        values = sig.bind(self, *args, **kwargs)
 
         # Prevent args of super init from being saved.
-        if hasattr(self_var, "_init_info"):
-            func(*args, **kwargs)
+        if hasattr(self, "_init_info"):
+            func(*values.args, **values.kwargs)
             return
 
         # Initialize class's self._init_info.
-        self_var._init_info = {}
-        self_var._init_info["class_module"] = self_var.__class__.__module__
-        self_var._init_info["class_name"] = self_var.__class__.__name__
-        self_var._init_info["args"] = {}
+        self._init_info = {}
+        self._init_info["class_module"] = self.__class__.__module__
+        self._init_info["class_name"] = self.__class__.__name__
+        self._init_info["args"] = {}
 
-        # Set default parameters.
-        if defaults is not None:
-            default_arg_dict = dict(zip(reversed(arg_names), reversed(defaults)))
-            self_var._init_info["args"].update(default_arg_dict)
+        # Populate class's self._init_info.
+        for k, p in sig.parameters.items():
+            if k == 'self':
+                continue
+            if k in values.arguments:
+                val = values.arguments[k]
+                if p.kind in (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY):
+                    self._init_info["args"][k] = val
+                elif p.kind == inspect.Parameter.VAR_KEYWORD:
+                    for kwarg_k, kwarg_val in values.arguments[k].items():
+                        self._init_info["args"][kwarg_k] = kwarg_val
 
-        # Set args.
-        arg_dict = dict(zip(arg_names, args[1:]))
-        self_var._init_info["args"].update(arg_dict)
+        # Call the original function.
+        func(*values.args, **values.kwargs)
 
-        # Set kwargs.
-        valid_keywords = set(kwargs) & set(arg_names)
-        kwarg_dict = {k: kwargs[k] for k in valid_keywords}
-        self_var._init_info["args"].update(kwarg_dict)
-    
-        func(*args, **kwargs)
-
-    return return_func
+    return wrapper
 
 
 class RecreatableMeta(type):
