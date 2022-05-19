@@ -99,7 +99,7 @@ class RigidPrim(XFormPrim):
             UsdPhysics.MassAPI.Apply(self._prim)
 
         # Only create contact report api if we're not visual only
-        if not self._visual_only and m.ENABLE_CONTACT_REPORTING:
+        if (not self._visual_only) and m.ENABLE_GLOBAL_CONTACT_REPORTING:
             self._physx_rigid_api = PhysxSchema.PhysxContactReportAPI(self._prim) if \
                 self._prim.HasAPI(PhysxSchema.PhysxContactReportAPI) else \
                 PhysxSchema.PhysxContactReportAPI.Apply(self._prim)
@@ -145,6 +145,10 @@ class RigidPrim(XFormPrim):
 
         # Add enabled attribute for the rigid body
         self._rigid_api.CreateRigidBodyEnabledAttr(True)
+
+        # We grab contact info for the first time before setting our internal handle, because this changes the dc handle
+        if self.contact_reporting_enabled:
+            self._cs.get_rigid_body_raw_data(self._prim_path)
 
         # Grab handle to this rigid body and get name
         self._handle = self._dc.get_rigid_body(self._prim_path)
@@ -221,15 +225,16 @@ class RigidPrim(XFormPrim):
         # assert self._physx_contact_report_api is not None, \
         #     "Cannot grab contacts for this rigid prim without Physx's contact report API being added!"
         contacts = []
-        for c in self._cs.get_body_contact_raw_data(self._prim_path):
-            # contact sensor handles and dynamic articulation handles are not comparable
-            # every prim has a cs to convert (cs) handle to prim path (decode_body_name)
-            # but not every prim (e.g. groundPlane) has a dc to convert prim path to (dc) handle (get_rigid_body)
-            # so simpler to convert both handles (int) to prim paths (str) for comparison
-            c = [*c] # CsRawData enforces body0 and body1 types to be ints, but we want strings
-            c[2] = self._cs.decode_body_name(c[2])
-            c[3] = self._cs.decode_body_name(c[3])
-            contacts.append(CsRawData(*c))
+        if self.contact_reporting_enabled:
+            for c in self._cs.get_rigid_body_raw_data(self._prim_path):
+                # contact sensor handles and dynamic articulation handles are not comparable
+                # every prim has a cs to convert (cs) handle to prim path (decode_body_name)
+                # but not every prim (e.g. groundPlane) has a dc to convert prim path to (dc) handle (get_rigid_body)
+                # so simpler to convert both handles (int) to prim paths (str) for comparison
+                c = [*c] # CsRawData enforces body0 and body1 types to be ints, but we want strings
+                c[2] = self._cs.decode_body_name(c[2])
+                c[3] = self._cs.decode_body_name(c[3])
+                contacts.append(CsRawData(*c))
         return contacts
 
     def set_linear_velocity(self, velocity):
@@ -446,6 +451,14 @@ class RigidPrim(XFormPrim):
             density (float): density of the rigid body in kg / m^3.
         """
         self._mass_api.GetDensityAttr().Set(density)
+
+    @property
+    def contact_reporting_enabled(self):
+        """
+        Returns:
+            bool: Whether contact reporting is enabled for this rigid prim or not
+        """
+        return self._prim.HasAPI(PhysxSchema.PhysxContactReportAPI)
 
     # def reset(self):
     #     """
