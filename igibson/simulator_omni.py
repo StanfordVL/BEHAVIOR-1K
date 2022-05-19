@@ -26,6 +26,7 @@ from omni.isaac.core.loggers import DataLogger
 from typing import Optional, List
 
 from igibson import assets_path
+import igibson.macros as m
 from igibson.robots.robot_base import BaseRobot
 from igibson.utils.utils import NumpyEncoder
 from igibson.utils.python_utils import clear as clear_pu, create_object_from_init_info
@@ -125,7 +126,7 @@ class Simulator(SimulationContext):
         self.first_sync = True          # First sync always sync all objects (regardless of their sleeping states)
 
         # Initialize viewer
-        self._set_physics_engine_settings()
+        # self._set_physics_engine_settings()
         # TODO: Make this toggleable so we don't always have a viewer if we don't want to
         self._set_viewer_settings()
 
@@ -144,6 +145,12 @@ class Simulator(SimulationContext):
         # e.g.: particle sampling, which for some reason requires sim.play() to be called at least once
         self.play()
         self.stop()
+
+        # Finally, update the physics settings
+        # This needs to be done now, after an initial step + stop for some reason if we want to use GPU
+        # dynamics, otherwise we get very strange behavior, e.g., PhysX complains about invalid transforms
+        # and crashes
+        self._set_physics_engine_settings()
 
     def __new__(
         cls,
@@ -188,10 +195,23 @@ class Simulator(SimulationContext):
         """
         Set the physics engine with specified settings
         """
+        assert self.is_stopped(), f"Cannot set simulator physics settings while simulation is playing!"
         self._physics_context.set_gravity(value=-self.gravity)
         # Also make sure we invert the collision group filter settings so that different collision groups cannot
         # collide with each other
-        self._physics_context._physx_scene_api.GetInvertCollisionGroupFilterAttr().Set(True)
+        self._physics_context.set_invert_collision_group_filter(True)
+        # self._physics_context._physx_scene_api.GetInvertCollisionGroupFilterAttr().Set(True)
+
+        # Enable GPU dynamics based on whether we need omni particles feature
+        # and modify other settings for speed optimization
+        if m.ENABLE_OMNI_PARTICLES:
+            self._physics_context.enable_gpu_dynamics(True)
+            self._physics_context.set_broadphase_type("GPU")
+        else:
+            self._physics_context.enable_gpu_dynamics(False)
+            self._physics_context.set_broadphase_type("MBP")
+        self._physics_context.enable_flatcache(False)
+        self._physics_context.enable_ccd(False)
 
     def _set_viewer_settings(self):
         """
@@ -481,6 +501,9 @@ class Simulator(SimulationContext):
         """
         # Stop the physics
         self.stop()
+
+        # TODO: Handle edge-case for when we clear sim without loading new scene in. self._scene should be None
+        # but scene.load(sim) requires scene to be defined!
 
         # Clear uniquely named items and other internal states
         clear_pu()
