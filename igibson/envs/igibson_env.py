@@ -130,14 +130,15 @@ class iGibsonEnv(BaseEnv):
         scene_type = self.scene_config["type"]
         assert_valid_key(key=scene_type, valid_keys=REGISTERED_SCENES, name="scene type")
 
-        if scene_type == "InteractiveTraversableScene":
+        # If we're using a BehaviorTask, we may load a pre-cached scene configuration
+        if self.task_config["type"] == "BehaviorTask":
             usd_file = self.scene_config["usd_file"]
-            if usd_file is None and not self.env_config["online_sampling"]:
-                usd_file = "{}_task_{}_{}_{}_fixed_furniture".format(
-                    self.scene_config["model"],
-                    self.task_config["type"],
-                    self.task_config["task_id"],
-                    self.task_config["instance_id"],
+            if usd_file is None and not self.task_config["online_object_sampling"]:
+                usd_file = "{}_task_{}_{}_{}_fixed_furniture_template".format(
+                    self.scene_config["scene_model"],
+                    self.task_config["activity_name"],
+                    self.task_config["activity_definition_id"],
+                    self.task_config["activity_instance_id"],
                 )
             # Update the value in the scene config
             self.scene_config["usd_file"] = usd_file
@@ -473,6 +474,7 @@ class iGibsonEnv(BaseEnv):
             land_success = self.check_collision(obj=obj)
             if land_success:
                 # Once we're successful, we can break immediately
+                print(f"Landed robot successfully!")
                 break
 
         # Print out warning in case we failed to land the object successfully
@@ -600,6 +602,10 @@ class iGibsonEnv(BaseEnv):
         # Add task kwargs
         cfg["task"] = {
             "type": "DummyTask",
+
+            # If we're using a BehaviorTask
+            "activity_definition_id": 0,
+            "activity_instance_id": 0,
         }
 
         return cfg
