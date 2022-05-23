@@ -1,6 +1,7 @@
 from igibson.object_states.object_state_base import REGISTERED_OBJECT_STATES
 from igibson.object_states.aabb import AABB
 from igibson.object_states.adjacency import HorizontalAdjacency, VerticalAdjacency
+from igibson.object_states.attachment import Attached, StickyAttachment, MagneticAttachment
 from igibson.object_states.burnt import Burnt
 from igibson.object_states.cleaning_tool import CleaningTool
 from igibson.object_states.contact_bodies import ContactBodies

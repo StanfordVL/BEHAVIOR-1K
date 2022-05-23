@@ -1013,6 +1013,57 @@ def test_slicer():
     finally:
         app.close()
 
+def test_attachment():
+    try:
+        obj_category = "apple"
+        obj_model = "00_0"
+        name = "apple"
+
+        sim = Simulator()
+        scene = EmptyScene()
+        sim.import_scene(scene)
+
+        model_root_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}"
+        usd_path = f"{model_root_path}/usd/{obj_model}.usd"
+
+        apple_1 = DatasetObject(
+            prim_path=f"/World/{name}_1",
+            usd_path=usd_path,
+            category=obj_category,
+            name=f"{name}_1",
+            scale=np.array([10.0, 10.0, 10.0]),
+            abilities={"magnetic" : {}},
+        )
+
+        apple_2 = DatasetObject(
+            prim_path=f"/World/{name}_2",
+            usd_path=usd_path,
+            category=obj_category,
+            name=f"{name}_2",
+            scale=np.array([10.0, 10.0, 10.0]),
+            abilities={"magnetic" : {}},
+        )
+
+        sim.import_object(apple_1, auto_initialize=True)
+        apple_1.set_position_orientation(position=np.array([0, 0, 0]))
+
+        sim.import_object(apple_2, auto_initialize=True)
+        apple_2.set_position_orientation(position=np.array([1.0, 0, 0]))
+
+        # needs 1 physics step to activate collision meshes for raycasting
+        sim.step(force_playing=True)
+        # sim.pause()
+
+        apple_1.states[object_states.MagneticAttachment].set_value(apple_2, True)
+        
+        assert apple_1.states[object_states.MagneticAttachment].get_value(apple_2)
+        
+        for i in range(1000000):
+            sim.step()
+
+    finally:
+        app.close()
+
 ## WORKS
 #test_state_graph()
 #test_dirty()
@@ -1029,8 +1080,9 @@ def test_slicer():
 #test_toggle()
 #test_sliced()
 #test_slicer()
+#test_demo()
 
-test_demo()
+test_attachment()
 
 ## BROKEN
 #test_water_source()
