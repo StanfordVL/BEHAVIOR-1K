@@ -1032,7 +1032,7 @@ def test_attachment():
             category=obj_category,
             name=f"{name}_1",
             scale=np.array([10.0, 10.0, 10.0]),
-            abilities={"magnetic" : {}},
+            abilities={"sticky" : {}},
         )
 
         apple_2 = DatasetObject(
@@ -1041,7 +1041,7 @@ def test_attachment():
             category=obj_category,
             name=f"{name}_2",
             scale=np.array([10.0, 10.0, 10.0]),
-            abilities={"magnetic" : {}},
+            abilities={},
         )
 
         sim.import_object(apple_1, auto_initialize=True)
@@ -1054,9 +1054,9 @@ def test_attachment():
         sim.step(force_playing=True)
         # sim.pause()
 
-        apple_1.states[object_states.MagneticAttachment].set_value(apple_2, True)
+        # apple_1.states[object_states.MagneticAttachment].set_value(apple_2, True)
         
-        assert apple_1.states[object_states.MagneticAttachment].get_value(apple_2)
+        # assert apple_1.states[object_states.MagneticAttachment].get_value(apple_2)
         
         for i in range(1000000):
             sim.step()

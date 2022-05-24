@@ -33,6 +33,7 @@ _ALL_STATES = frozenset(
         Slicer,
         Soaked,
         Stained,
+        StickyAttachment,
         Temperature,
         ToggledOn,
         Touching,

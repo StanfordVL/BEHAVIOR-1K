@@ -1,4 +1,5 @@
 from abc import abstractmethod
+from igibson.object_states.contact_bodies import ContactBodies
 from igibson.object_states.object_state_base import BooleanState, RelativeObjectState
 import igibson.utils.transform_utils as T
 from igibson.utils.usd_utils import create_joint
@@ -13,21 +14,39 @@ class Attached(RelativeObjectState, BooleanState):
     def get_dependencies():
         return RelativeObjectState.get_dependencies()
 
-    def __init__(self, obj, toggled=True):
+    def __init__(self, obj):
         super(Attached, self).__init__(obj)
 
         self.attached_obj = None
         self.attached_joint = None
         self.attached_joint_path = None
 
-
+    def _update(self):
+        contact_list = self.obj.states[ContactBodies].get_value()
+        # exclude links from our own object
+        link_paths = {link.prim_path for link in self.obj.links.values()}
+        for c in contact_list:
+            # extract the prim path of the other body
+            if c.body0 in link_paths and c.body1 in link_paths:
+                continue
+            path = c.body0 if c.body0 not in link_paths else c.body1
+            path = path.replace("/base_link", "")
+            contact_obj = self._simulator.scene.object_registry("prim_path", path)
+            if contact_obj is None:
+                continue
+            self._set_value(contact_obj, True)
+    
     def _set_value(self, other, new_value):
-        if not new_value or self.attached_obj is not None:
+        if not new_value or self.attached_obj not in [None, other]:
             # delete old joint
             self._simulator.stage.RemovePrim(self.attached_joint_path)
             self.attached_obj = None
             self.attached_joint = None
             self.attached_joint_path = None
+        
+        if self.attached_obj is other:
+            # do nothing; already attached
+            return False
         
         if new_value and self._can_attach(other):
             self.attached_obj = other
@@ -49,8 +68,14 @@ class Attached(RelativeObjectState, BooleanState):
             self.attached_joint.GetAttribute("physics:localPos0").Set(Gf.Vec3f(*rel_pos))
             self.attached_joint.GetAttribute("physics:localRot0").Set(Gf.Quatf(*rel_quat))
 
+        return True
+
     def _get_value(self, other):
         return other == self.attached_obj
+    
+    @staticmethod
+    def get_dependencies():
+        return RelativeObjectState.get_dependencies() + [ContactBodies]
 
     @abstractmethod
     def _can_attach(self, other):
@@ -58,12 +83,12 @@ class Attached(RelativeObjectState, BooleanState):
 
 class StickyAttachment(Attached):
     def _can_attach(self, other):
-        return True
+        return StickyAttachment in self.obj.states or StickyAttachment in other.states 
         # if touching and at least one has sticky state
 
-class MagneticAttachment(StickyAttachment):
+class MagneticAttachment(Attached):
     def _can_attach(self, other):
-        return True
+        return MagneticAttachment in self.obj.states and MagneticAttachment in other.states
         # if touching and both have magnetic state
 
 class MaleAttachment(MagneticAttachment):
