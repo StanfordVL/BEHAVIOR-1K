@@ -322,6 +322,10 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         return 0.372
 
     @property
+    def finger_lengths(self):
+        return {self.default_arm: 0.1}
+
+    @property
     def gripper_link_to_grasp_point(self):
         return {self.default_arm: np.array([0.1, 0, 0])}
 
@@ -395,6 +399,18 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
             ["caster_wheel_link", "l_wheel_link"],
             ["caster_wheel_link", "r_wheel_link"],
         ]
+
+    @property
+    def arm_link_names(self):
+        return {self.default_arm: [
+            "shoulder_pan_link",
+            "shoulder_lift_link",
+            "upperarm_roll_link",
+            "elbow_flex_link",
+            "forearm_roll_link",
+            "wrist_flex_link",
+            "wrist_roll_link",
+        ]}
 
     @property
     def eef_link_names(self):

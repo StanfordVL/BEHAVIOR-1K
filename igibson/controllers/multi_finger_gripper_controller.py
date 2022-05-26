@@ -181,7 +181,7 @@ class MultiFingerGripperController(GripperController):
         else:
             assert np.all(
                 self._control == self._control[0]
-            ), "MultiFingerGripperController has different values in the command for non-independent mode"
+            ), f"MultiFingerGripperController has different values in the command for non-independent mode: {self._control}"
 
             assert POS_TOLERANCE > self._limit_tolerance, (
                 "Joint position tolerance for is_grasping heuristics checking is smaller than or equal to the "

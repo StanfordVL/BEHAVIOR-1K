@@ -6,7 +6,8 @@ Wrappers are useful for data collection and logging. Highly recommended.
 
 class BaseWrapper:
     """
-    Base class for all wrappers in robosuite.
+    Base class for all wrappers in iGibson
+
     Args:
         env (iGibsonEnv): The environment to wrap.
     """
@@ -26,7 +27,7 @@ class BaseWrapper:
         """
         env = self.env
         while True:
-            if isinstance(env, Wrapper):
+            if isinstance(env, BaseWrapper):
                 if env.class_name() == self.class_name():
                     raise Exception("Attempted to double wrap with Wrapper: {}".format(self.__class__.__name__))
                 env = env.env

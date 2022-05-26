@@ -2,7 +2,7 @@ import argparse
 import logging
 import os
 import time
-from collections import OrderedDict
+from collections import OrderedDict, Iterable
 
 import gym
 import numpy as np
@@ -111,6 +111,32 @@ class iGibsonEnv(BaseEnv):
         """
         self._ignore_robot_self_collisions[robot_idn].add(link)
 
+    def remove_ignore_robot_object_collision(self, robot_idn, obj):
+        """
+        Remove a robot-object pair to ignore collisions for
+
+        NOTE: This ignores collisions for the purpose of COUNTING collisions, NOT for the purpose of disabling
+            the actual, physical, collision
+
+        Args:
+            robot_idn (int): Which robot to ignore a collision for
+            obj (BaseObject): Which object to no longer ignore a collision for
+        """
+        self._ignore_robot_object_collisions[robot_idn].remove(obj)
+
+    def remove_ignore_robot_self_collision(self, robot_idn, link):
+        """
+        Remove a robot-link self pair to ignore collisions for
+
+        NOTE: This ignores collisions for the purpose of COUNTING collisions, NOT for the purpose of disabling
+            the actual, physical, collision
+
+        Args:
+            robot_idn (int): Which robot to ignore a collision for
+            link (RigidPrim): Which robot link to no longer ignore a collision for
+        """
+        self._ignore_robot_self_collisions[robot_idn].remove(link)
+
     def _load_variables(self):
         # Store additional variables after config has been loaded fully
         self._initial_pos_z_offset = self.env_config["initial_pos_z_offset"]
@@ -118,8 +144,8 @@ class iGibsonEnv(BaseEnv):
         self._object_randomization_freq = self.env_config["object_randomization_freq"]
 
         # Set other values
-        self._ignore_robot_object_collisions = [[] for _ in self.robots_config]
-        self._ignore_robot_self_collisions = [[] for _ in self.robots_config]
+        self._ignore_robot_object_collisions = [set() for _ in self.robots_config]
+        self._ignore_robot_self_collisions = [set() for _ in self.robots_config]
 
         # Reset bookkeeping variables
         self._reset_variables()
@@ -376,29 +402,87 @@ class iGibsonEnv(BaseEnv):
 
         return obs, reward, done, info
 
-    def check_collision(self, obj):
+    def check_collision(self, objsA=None, linksA=None, objsB=None, linksB=None, step_sim=False):
         """
-        Check whether the given object @obj has collision after one simulator step
+        Check whether the given object @objsA or any of @links has collision after one simulator step. If both
+        are specified, will take the union of the two.
+
+        Note: This natively checks for collisions with @objsA and @linksA. If @objsB and @linksB are None, any valid
+            collision will trigger a True
 
         Args:
-            obj (EntityPrim): Object to check for collision
+            objsA (None or EntityPrim or list of EntityPrim): If specified, object(s) to check for collision
+            linksA (None or RigidPrim or list of RigidPrim): If specified, link(s) to check for collision
+            objsB (None or EntityPrim or list of EntityPrim): If specified, object(s) to check for collision with any
+                of @objsA or @linksA
+            linksB (None or RigidPrim or list of RigidPrim): If specified, link(s) to check for collision with any
+                of @objsA or @linksA
+            step_sim (bool): Whether to step the simulation first before checking collisions. Default is False
 
         Returns:
-            bool: Whether the object @obj is in collision or not
+            bool: Whether any of @objsA or @linksA are in collision or not, possibly with @objsB or @linksB if specified
         """
         # Run simulator step and update contacts
-        self._simulator_step()
+        if step_sim:
+            self._simulator_step()
         collisions = self.update_collisions(filtered=True)
 
-        # Grab all link prim paths owned by the object
-        link_paths = {link.prim_path for link in obj.links.values()}
+        # Run sanity checks and standardize inputs
+        assert objsA is not None or linksA is not None, \
+            "Either objsA or linksA must be specified for collision checking!"
 
-        # Loop over all current collisions and check for any matches
+        objsA = [] if objsA is None else [objsA] if not isinstance(objsA, Iterable) else objsA
+        linksA = [] if linksA is None else [linksA] if not isinstance(linksA, Iterable) else linksA
+
+        # Grab all link prim paths owned by the collision set A
+        paths_A = {link.prim_path for obj in objsA for link in obj.links.values()}
+        paths_A = paths_A.union({link.prim_path for link in linksA})
+
+        # Determine whether we're checking any collision from collision set A
+        check_any_collision = objsB is None and linksB is None
+
         in_collision = False
-        for col_pair in collisions:
-            if len(set(col_pair) - link_paths) < 2:
-                in_collision = True
-                break
+        if check_any_collision:
+            # Immediately check collisions
+            for col_pair in collisions:
+                if len(set(col_pair) - paths_A) < 2:
+                    in_collision = True
+                    break
+        else:
+            # Grab all link prim paths owned by the collision set B
+            objsB = [] if objsB is None else [objsB] if not isinstance(objsB, Iterable) else objsB
+            linksB = [] if linksB is None else [linksB] if not isinstance(linksB, Iterable) else linksB
+            paths_B = {link.prim_path for obj in objsB for link in obj.links.values()}
+            paths_B = paths_B.union({link.prim_path for link in linksB})
+            paths_shared = paths_A.intersection(paths_B)
+            paths_disjoint = paths_A.union(paths_B) - paths_shared
+            is_AB_shared = len(paths_shared) > 0
+
+            # Check collisions specifically between groups A and B
+            for col_pair in collisions:
+                col_pair = set(col_pair)
+                # Two cases -- either paths_A and paths_B overlap or they don't. Process collision checking logic
+                # separately for each case
+                if is_AB_shared:
+                    # Two cases for valid collision: there is a shared collision body in this pair or there isn't.
+                    # Process separately in each case
+                    col_pair_no_shared = col_pair - paths_shared
+                    if len(col_pair_no_shared) < 2:
+                        # Make sure this set minus the disjoint set results in empty col_pair remaining -- this means
+                        # a valid pair combo was found
+                        if len(col_pair_no_shared - paths_disjoint) == 0:
+                            in_collision = True
+                            break
+                    else:
+                        # Make sure A and B sets each have an entry in the col pair for a valid collision
+                        if len(col_pair - paths_A) == 1 and len(col_pair - paths_B) == 1:
+                            in_collision = True
+                            break
+                else:
+                    # Make sure A and B sets each have an entry in the col pair for a valid collision
+                    if len(col_pair - paths_A) == 1 and len(col_pair - paths_B) == 1:
+                        in_collision = True
+                        break
 
         # Only going into this if it is for logging --> efficiency
         if logging.root.level <= logging.DEBUG:
@@ -433,6 +517,8 @@ class iGibsonEnv(BaseEnv):
         # change the z-value of position with stable_z + additional offset
         # in case the surface is not perfect smooth (has bumps)
         obj.set_position(np.array([pos[0], pos[1], stable_z + offset]))
+        # Update by taking a sim step
+        self._simulator_step()
 
     def test_valid_position(self, obj, pos, ori=None):
         """
@@ -456,7 +542,7 @@ class iGibsonEnv(BaseEnv):
             obj.keep_still()
 
         # Valid if there are no collisions
-        return not self.check_collision(obj=obj)
+        return not self.check_collision(objsA=obj)
 
     def land(self, obj, pos, ori):
         """
@@ -485,7 +571,7 @@ class iGibsonEnv(BaseEnv):
             # Run a sim step and see if we have any contacts
             self._simulator_step()
             self.update_collisions(filtered=False)
-            land_success = self.check_collision(obj=obj)
+            land_success = self.check_collision(objsA=obj)
             if land_success:
                 # Once we're successful, we can break immediately
                 print(f"Landed robot successfully!")

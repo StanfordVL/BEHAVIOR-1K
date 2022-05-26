@@ -615,7 +615,7 @@ def relative_pose_transform(pos1, quat1, pos0, quat0):
     mat1 = pose2mat((pos1, quat1))
 
     # Invert pose0 and calculate transform
-    return mat2pose(mat1 @ pose_inv(mat0))
+    return mat2pose(pose_inv(mat0) @ mat1)
 
 
 def _skew_symmetric_translation(pos_A_in_B):
@@ -956,3 +956,11 @@ def matrix_inverse(matrix):
         np.array: 2d-array representing the matrix inverse
     """
     return np.linalg.inv(matrix)
+
+
+def deg2rad(deg):
+    return deg * np.pi / 180.
+
+def rad2deg(rad):
+    return rad * 180. / np.pi
+

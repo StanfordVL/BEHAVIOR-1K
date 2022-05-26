@@ -166,6 +166,9 @@ class ControllableObject(BaseObject):
         Stores created controllers as dictionary mapping controller names to specific controller
         instances used by this object.
         """
+        # Store dof idx mapping to dof name
+        dof_names_ordered = [self._dc.get_dof_name(self._dc.get_articulation_dof(self._handle, i))
+                             for i in range(self.n_dof)]
         # Initialize controllers to create
         self._controllers = OrderedDict()
         # Loop over all controllers, in the order corresponding to @action dim
@@ -177,6 +180,15 @@ class ControllableObject(BaseObject):
                 cfg["command_input_limits"] = "default"  # default is normalized (-1, 1)
             # Create the controller
             self._controllers[name] = create_controller(**cfg)
+
+            # Update the control modes of each joint based on the outputted control from the controllers
+            for dof in self._controllers[name].dof_idx:
+                control_type = self._controllers[name].control_type
+                self._joints[dof_names_ordered[dof]].set_control_type(
+                    control_type=control_type,
+                    kp=self.default_kp if control_type == ControlType.POSITION else None,
+                    kd=self.default_kd if control_type == ControlType.VELOCITY else None,
+                )
 
     def reset(self):
         # Run super first
@@ -508,6 +520,14 @@ class ControllableObject(BaseObject):
         raise NotImplementedError()
 
     @property
+    def controllers(self):
+        """
+        Returns:
+            OrderedDict: Controllers owned by this object, mapping controller name to controller object
+        """
+        return self._controllers
+
+    @property
     @abstractmethod
     def controller_order(self):
         """
@@ -533,6 +553,18 @@ class ControllableObject(BaseObject):
         return dic
 
     @property
+    def controller_joint_idx(self):
+        """
+        :return: Dict[str, Array[int]]: Mapping from controller names (e.g.: head, base, arm, etc.) to corresponding
+            indices of the joint state vector controlled by each controller
+        """
+        dic = {}
+        for controller in self.controller_order:
+            dic[controller] = self._controllers[controller].dof_idx
+
+        return dic
+
+    @property
     def control_limits(self):
         """
         :return: Dict[str, Any]: Keyword-mapped limits for this object. Dict contains:
@@ -548,6 +580,24 @@ class ControllableObject(BaseObject):
             "effort": (-self.max_joint_efforts, self.max_joint_efforts),
             "has_limit": self.joint_has_limits,
         }
+
+    @property
+    def default_kp(self):
+        """
+        Returns:
+            float: Default kp gain to apply to any DOF when switching control modes (e.g.: switching from a
+                velocity control mode to a position control mode)
+        """
+        return 4000.0 #400.0
+
+    @property
+    def default_kd(self):
+        """
+        Returns:
+            float: Default kd gain to apply to any DOF when switching control modes (e.g.: switching from a
+                position control mode to a velocity control mode)
+        """
+        return 4000.0
 
     @property
     @abstractmethod

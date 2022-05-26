@@ -142,10 +142,6 @@ class Simulator(SimulationContext):
         # Set of categories that can be grasped by assisted grasping
         self.object_state_types = get_states_by_dependency_order()
 
-        # TODO: Once objects are in place, uncomment and test this
-        # self.assist_grasp_category_allow_list = self.gen_assisted_grasping_categories()
-        # self.assist_grasp_mass_thresh = 10.0
-
         # Toggle simulator state once so that downstream omni features can be used without bugs
         # e.g.: particle sampling, which for some reason requires sim.play() to be called at least once
         self.play()
@@ -420,18 +416,6 @@ class Simulator(SimulationContext):
     def is_paused(self) -> bool:
         """Returns: True if the simulator is paused."""
         return not (self.is_stopped() or self.is_playing())
-
-    def gen_assisted_grasping_categories(self):
-        """
-        Generate a list of categories that can be grasped using assisted grasping,
-        using labels provided in average category specs file.
-        """
-        assisted_grasp_category_allow_list = set()
-        avg_category_spec = get_ig_avg_category_specs()
-        for k, v in avg_category_spec.items():
-            if v["enable_ag"]:
-                assisted_grasp_category_allow_list.add(k)
-        return assisted_grasp_category_allow_list
 
     @classmethod
     def clear_instance(cls):

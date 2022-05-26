@@ -1,6 +1,7 @@
 import logging
 import numpy as np
 from igibson.objects.stateful_object import StatefulObject
+from igibson.utils.python_utils import assert_valid_key
 
 from pxr import Gf, Usd, Sdf, UsdGeom, UsdPhysics, PhysxSchema, UsdShade
 from omni.isaac.core.utils.stage import add_reference_to_stage, get_current_stage
@@ -13,6 +14,10 @@ PRIMITIVE_OBJECTS = {
     "Capsule",
     "Cone",
 }
+
+VALID_RADIUS_OBJECTS = {"Sphere", "Cone", "Capsule", "Cylinder"}
+VALID_HEIGHT_OBJECTS = {"Cone", "Capsule", "Cylinder"}
+VALID_SIZE_OBJECTS = {"Cube"}
 
 
 class PrimitiveObject(StatefulObject):
@@ -36,6 +41,9 @@ class PrimitiveObject(StatefulObject):
         load_config=None,
         abilities=None,
         rgba=(0.5, 0.5, 0.5, 1.0),
+        radius=None,
+        height=None,
+        size=None,
         **kwargs,
     ):
         """
@@ -66,6 +74,12 @@ class PrimitiveObject(StatefulObject):
         @param abilities: dict in the form of {ability: {param: value}} containing
             object abilities and parameters.
         rgba (4-array): (R, G, B, A) values to set for this object
+        radius (None or float): If specified, sets the radius for this object. This value is scaled by @scale
+            Note: Should only be specified if the @primitive_type is one of {Sphere, Cone, Capsule, Cylinder}
+        height (None or float): If specified, sets the height for this object. This value is scaled by @scale
+            Note: Should only be specified if the @primitive_type is one of {Sphere, Cone, Capsule, Cylinder}
+        size (None or float): If specified, sets the size for this object. This value is scaled by @scale
+            Note: Should only be specified if the @primitive_type is one of {Cube}
         kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
             for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
         """
@@ -73,6 +87,17 @@ class PrimitiveObject(StatefulObject):
         load_config = dict() if load_config is None else load_config
         load_config["color"] = np.array(rgba[:3])
         load_config["opacity"] = rgba[3]
+        load_config["radius"] = 1.0 if radius is None else radius
+        load_config["height"] = 1.0 if height is None else height
+        load_config["size"] = 1.0 if size is None else size
+
+        # Initialize other internal variables
+        self._vis_prim = None
+        self._col_prim = None
+
+        # Make sure primitive type is valid
+        assert_valid_key(key=primitive_type, valid_keys=PRIMITIVE_OBJECTS, name="primitive type")
+        self._primitive_type = primitive_type
 
         super().__init__(
             prim_path=prim_path,
@@ -89,10 +114,6 @@ class PrimitiveObject(StatefulObject):
             abilities=abilities,
             **kwargs,
         )
-        # Make sure primitive type is valid
-        assert primitive_type in PRIMITIVE_OBJECTS, f"Invalid primitive object requested! Valid options are: " \
-                                                    f"{PRIMITIVE_OBJECTS}, got: {primitive_type}"
-        self._primitive_type = primitive_type
 
     def _load(self, simulator=None):
         """
@@ -108,13 +129,13 @@ class PrimitiveObject(StatefulObject):
         base_link = stage.DefinePrim(f"{self._prim_path}/base_link", "Xform")
 
         # Define (finally!) nested meshes corresponding to visual / collision mesh
-        vis_prim = UsdGeom.__dict__[self._primitive_type].Define(stage, f"{self._prim_path}/base_link/visual").GetPrim()
-        col_prim = UsdGeom.__dict__[self._primitive_type].Define(stage, f"{self._prim_path}/base_link/collision").GetPrim()
+        self._vis_prim = UsdGeom.__dict__[self._primitive_type].Define(stage, f"{self._prim_path}/base_link/visual").GetPrim()
+        self._col_prim = UsdGeom.__dict__[self._primitive_type].Define(stage, f"{self._prim_path}/base_link/collision").GetPrim()
 
         # Add collision API to collision geom
-        UsdPhysics.CollisionAPI.Apply(col_prim)
-        UsdPhysics.MeshCollisionAPI.Apply(col_prim)
-        PhysxSchema.PhysxCollisionAPI.Apply(col_prim)
+        UsdPhysics.CollisionAPI.Apply(self._col_prim)
+        UsdPhysics.MeshCollisionAPI.Apply(self._col_prim)
+        PhysxSchema.PhysxCollisionAPI.Apply(self._col_prim)
 
         return prim
 
@@ -126,6 +147,101 @@ class PrimitiveObject(StatefulObject):
         for mesh in self._links["base_link"].visual_meshes.values():
             mesh.color = self._load_config["color"]
             mesh.opacity = self._load_config["opacity"]
+
+        # Possibly set scalings
+        if self._primitive_type in VALID_RADIUS_OBJECTS:
+            self.radius = self._load_config["radius"]
+        if self._primitive_type in VALID_HEIGHT_OBJECTS:
+            self.height = self._load_config["height"]
+        if self._primitive_type in VALID_SIZE_OBJECTS:
+            self.size = self._load_config["size"]
+
+    @property
+    def radius(self):
+        """
+        Gets this object's radius, if it exists.
+
+        Note: This value is scaled with respect to this object's scale property
+        Note: Can only be called if the primitive type is one of {Sphere, Cone, Capsule, Cylinder}
+
+        Returns:
+            float: radius for this object
+        """
+        assert_valid_key(key=self._primitive_type, valid_keys=VALID_RADIUS_OBJECTS, name="primitive object with radius")
+        return self._vis_prim.GetAttribute("radius").Get()
+
+    @radius.setter
+    def radius(self, radius):
+        """
+        Sets this object's radius
+
+        Note: This value is scaled with respect to this object's scale property
+        Note: Can only be called if the primitive type is one of {Sphere, Cone, Capsule, Cylinder}
+
+        Args:
+            radius (float): radius to set
+        """
+        assert_valid_key(key=self._primitive_type, valid_keys=VALID_RADIUS_OBJECTS, name="primitive object with radius")
+        self._vis_prim.GetAttribute("radius").Set(radius)
+        self._col_prim.GetAttribute("radius").Set(radius)
+
+    @property
+    def height(self):
+        """
+        Gets this object's height, if it exists.
+
+        Note: This value is scaled with respect to this object's scale property
+        Note: Can only be called if the primitive type is one of {Sphere, Cone, Capsule, Cylinder}
+
+        Returns:
+            float: height for this object
+        """
+        assert_valid_key(key=self._primitive_type, valid_keys=VALID_HEIGHT_OBJECTS, name="primitive object with height")
+        return self._vis_prim.GetAttribute("height").Get()
+
+    @height.setter
+    def height(self, height):
+        """
+        Sets this object's height
+
+        Note: This value is scaled with respect to this object's scale property
+        Note: Can only be called if the primitive type is one of {Sphere, Cone, Capsule, Cylinder}
+
+        Args:
+            height (float): height to set
+        """
+        assert_valid_key(key=self._primitive_type, valid_keys=VALID_HEIGHT_OBJECTS, name="primitive object with height")
+        self._vis_prim.GetAttribute("height").Set(height)
+        self._col_prim.GetAttribute("height").Set(height)
+
+    @property
+    def size(self):
+        """
+        Gets this object's size, if it exists.
+
+        Note: This value is scaled with respect to this object's scale property
+        Note: Can only be called if the primitive type is one of {Cube}
+
+        Returns:
+            float: size for this object
+        """
+        assert_valid_key(key=self._primitive_type, valid_keys=VALID_SIZE_OBJECTS, name="primitive object with size")
+        return self._vis_prim.GetAttribute("size").Get()
+
+    @size.setter
+    def size(self, size):
+        """
+        Sets this object's size
+
+        Note: This value is scaled with respect to this object's scale property
+        Note: Can only be called if the primitive type is one of {Cube}
+
+        Args:
+            size (float): size to set
+        """
+        assert_valid_key(key=self._primitive_type, valid_keys=VALID_SIZE_OBJECTS, name="primitive object with size")
+        self._vis_prim.GetAttribute("size").Set(size)
+        self._col_prim.GetAttribute("size").Set(size)
 
     def _create_prim_with_same_kwargs(self, prim_path, name, load_config):
         # Add additional kwargs (fit_avg_dim_volume and bounding_box are already captured in load_config)

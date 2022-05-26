@@ -30,6 +30,8 @@ from igibson.utils.usd_utils import create_joint
 from igibson.utils.types import JointsState
 from igibson.utils.transform_utils import quat_inverse, quat_multiply
 from igibson.utils.constants import JointType
+from igibson.utils.python_utils import assert_valid_key
+import igibson.utils.transform_utils as T
 from igibson.controllers.controller_base import ControlType
 
 DEFAULT_MAX_POS = 1000.0
@@ -41,6 +43,7 @@ DEFAULT_MAX_EFFORT = 100.0
 
 
 # TODO: Add logic for non Prismatic / Revolute joints (D6, spherical)
+
 
 class JointPrim(BasePrim):
     """
@@ -225,6 +228,43 @@ class JointPrim(BasePrim):
     def update_default_state(self):
         self.set_default_state(*self.get_state())
 
+    def set_control_type(self, control_type, kp=None, kd=None):
+        """
+        Sets the control type for this joint.
+
+        Args:
+            control_type (ControlType): What type of control to use for this joint.
+                Valid options are: {ControlType.POSITION, ControlType.VELOCITY, ControlType.EFFORT}
+            kp (None or float): If specified, sets the kp gain value for this joint. Should only be set if
+                setting ControlType.POSITION
+            kd (None or float): If specified, sets the kd gain value for this joint. Should only be set if
+                setting ControlType.VELOCITY
+        """
+        # Sanity check inputs
+        assert_valid_key(key=control_type, valid_keys=ControlType.VALID_TYPES, name="control type")
+        if control_type == ControlType.POSITION:
+            assert kp is not None, "kp gain must be specified for setting POSITION control!"
+            assert kd is None, "kd gain must not be specified for setting POSITION control!"
+            kd = 0.0
+
+        elif control_type == ControlType.VELOCITY:
+            assert kp is None, "kp gain must not be specified for setting VELOCITY control!"
+            assert kd is not None, "kd gain must be specified for setting VELOCITY control!"
+            kp = 0.0
+        else:   # Efforts
+            assert kp is None, "kp gain must not be specified for setting EFFORT control!"
+            assert kd is None, "kd gain must not be specified for setting EFFORT control!"
+            kp, kd = 0.0, 0.0
+
+        # Set values
+        for dof_handle, dof_property in zip(self._dof_handles, self._dof_properties):
+            dof_property.stiffness = kp
+            dof_property.damping = kd
+            self._dc.set_dof_properties(dof_handle, dof_property)
+
+        # Update control type
+        self._control_type = control_type
+
     @property
     def body0(self):
         """
@@ -354,8 +394,10 @@ class JointPrim(BasePrim):
         Returns:
             float: maximum velocity for this joint
         """
+        # Only support revolute and prismatic joints for now
+        assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
         # We either return the raw value or a default value if there is no max specified
-        raw_vel = self.get_attribute("physxJoint:maxJointVelocity")
+        raw_vel = self._dof_properties[0].max_velocity
         default_max_vel = DEFAULT_MAX_REVOLUTE_VEL if self.joint_type == "RevoluteJoint" else DEFAULT_MAX_PRISMATIC_VEL
         return default_max_vel if raw_vel in {None, np.inf} else raw_vel
 
@@ -367,7 +409,10 @@ class JointPrim(BasePrim):
         Args:
             vel (float): Velocity to set
         """
-        self.set_attribute("physxJoint:maxJointVelocity", vel)
+        # Only support revolute and prismatic joints for now
+        assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
+        self._dof_properties[0].max_velocity = vel
+        self._dc.set_dof_properties(self._dof_handles[0], self._dof_properties[0])
 
     @property
     def max_force(self):
@@ -377,8 +422,10 @@ class JointPrim(BasePrim):
         Returns:
             float: maximum force for this joint
         """
+        # Only support revolute and prismatic joints for now
+        assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
         # We either return the raw value or a default value if there is no max specified
-        raw_force = self.get_attribute("physxJoint:maxForce")
+        raw_force = self._dof_properties[0].max_effort
         return DEFAULT_MAX_EFFORT if raw_force in {None, np.inf} else raw_force
 
     @max_force.setter
@@ -389,7 +436,10 @@ class JointPrim(BasePrim):
         Args:
             force (float): Force to set
         """
-        self.set_attribute("physxJoint:maxForce", force)
+        # Only support revolute and prismatic joints for now
+        assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
+        self._dof_properties[0].max_effort = force
+        self._dc.set_dof_properties(self._dof_handles[0], self._dof_properties[0])
 
     @property
     def stiffness(self):
@@ -399,7 +449,9 @@ class JointPrim(BasePrim):
         Returns:
             float: stiffness for this joint
         """
-        return self.get_attribute("physxJoint:stiffness")
+        # Only support revolute and prismatic joints for now
+        assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
+        return self._dof_properties[0].stiffness
 
     @stiffness.setter
     def stiffness(self, stiffness):
@@ -409,7 +461,10 @@ class JointPrim(BasePrim):
         Args:
             stiffness (float): stiffness to set
         """
-        self.set_attribute("physxJoint:stiffness", stiffness)
+        # Only support revolute and prismatic joints for now
+        assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
+        self._dof_properties[0].stiffness = stiffness
+        self._dc.set_dof_properties(self._dof_handles[0], self._dof_properties[0])
 
     @property
     def damping(self):
@@ -419,7 +474,9 @@ class JointPrim(BasePrim):
         Returns:
             float: damping for this joint
         """
-        return self.get_attribute("physxJoint:damping")
+        # Only support revolute and prismatic joints for now
+        assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
+        return self._dof_properties[0].damping
 
     @damping.setter
     def damping(self, damping):
@@ -429,7 +486,10 @@ class JointPrim(BasePrim):
         Args:
             damping (float): damping to set
         """
-        self.set_attribute("physxJoint:damping", damping)
+        # Only support revolute and prismatic joints for now
+        assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
+        self._dof_properties[0].stiffness = damping
+        self._dc.set_dof_properties(self._dof_handles[0], self._dof_properties[0])
 
     @property
     def friction(self):
@@ -460,8 +520,10 @@ class JointPrim(BasePrim):
             float: lower_limit for this joint
         """
         # TODO: Add logic for non Prismatic / Revolute joints (D6, spherical)
+        # Only support revolute and prismatic joints for now
+        assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
         # We either return the raw value or a default value if there is no max specified
-        raw_pos = self.get_attribute("physics:lowerLimit")
+        raw_pos = self._dof_properties[0].lower
         return -DEFAULT_MAX_POS if raw_pos in {None, -np.inf} else raw_pos
 
     @lower_limit.setter
@@ -472,6 +534,8 @@ class JointPrim(BasePrim):
         Args:
             lower_limit (float): lower_limit to set
         """
+        # Can't use DC because it's read only property
+        lower_limit = T.rad2deg(lower_limit) if self.is_revolute else lower_limit
         self.set_attribute("physics:lowerLimit", lower_limit)
 
     @property
@@ -482,8 +546,10 @@ class JointPrim(BasePrim):
         Returns:
             float: upper_limit for this joint
         """
+        # Only support revolute and prismatic joints for now
+        assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
         # We either return the raw value or a default value if there is no max specified
-        raw_pos = self.get_attribute("physics:upperLimit")
+        raw_pos = self._dof_properties[0].upper
         return DEFAULT_MAX_POS if raw_pos in {None, np.inf} else raw_pos
 
     @upper_limit.setter
@@ -494,6 +560,8 @@ class JointPrim(BasePrim):
         Args:
             upper_limit (float): upper_limit to set
         """
+        # Can't use DC because it's read only property
+        upper_limit = T.rad2deg(upper_limit) if self.is_revolute else upper_limit
         self.set_attribute("physics:upperLimit", upper_limit)
 
     @property
@@ -502,7 +570,10 @@ class JointPrim(BasePrim):
         Returns:
             bool: True if this joint has a limit, else False
         """
-        return self.lower_limit < self.upper_limit
+        # Only support revolute and prismatic joints for now
+        assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
+        # We either return the raw value or a default value if there is no max specified
+        return self._dof_properties[0].has_limits
 
     @property
     def n_dof(self):
@@ -519,6 +590,22 @@ class JointPrim(BasePrim):
              bool: Whether this joint is articulated or not
         """
         return self._art is not None
+
+    @property
+    def is_revolute(self):
+        """
+        Returns:
+            bool: Whether this joint is revolute or  not
+        """
+        return self._joint_type == "RevoluteJoint"
+
+    @property
+    def is_single_dof(self):
+        """
+        Returns:
+            bool: Whether this joint has a single DOF or not
+        """
+        return self._joint_type in {"RevoluteJoint", "PrismaticJoint"}
 
     def assert_articulated(self):
         """
@@ -670,7 +757,7 @@ class JointPrim(BasePrim):
             if not target:
                 self._dc.set_dof_position(dof_handle, p)
             # We set the position in either case
-            self._dc.set_dof_position(dof_handle, p)
+            self._dc.set_dof_position_target(dof_handle, p)
 
     def set_vel(self, vel, normalized=False, target=False):
         """
@@ -688,7 +775,7 @@ class JointPrim(BasePrim):
         self.assert_articulated()
         if target:
             assert self._control_type == ControlType.VELOCITY, \
-                "Trying to set joint velocity target, but control type is not velocity!"
+                f"Trying to set joint velocity target for joint {self.name}, but control type is not velocity!"
 
         # Standardize input
         vel = np.array([vel]) if self._n_dof == 1 and not isinstance(vel, Iterable) else np.array(vel)
@@ -745,8 +832,8 @@ class JointPrim(BasePrim):
 
     def _load_state(self, state):
         if self.articulated:
-            self.set_pos(state["pos"])
-            self.set_vel(state["vel"])
+            self.set_pos(state["pos"], target=False)
+            self.set_vel(state["vel"], target=False)
             self.set_effort(state["effort"])
 
     def _serialize(self, state):

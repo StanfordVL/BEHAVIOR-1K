@@ -383,8 +383,8 @@ class BaseEnv(gym.Env, GymObservable, Serializable, Recreatable):
         # Run super first
         super().load_state(state=state, serialized=serialized)
 
-        # We also need to manually update the simulator app
-        self._simulator.app.update()
+        # # We also need to manually update the simulator app
+        # self._simulator.app.update()
 
     def _serialize(self, state):
         # Default state is from the scene

@@ -44,6 +44,19 @@ def get_ig_avg_category_specs():
         return dict()
 
 
+def get_assisted_grasping_categories():
+    """
+    Generate a list of categories that can be grasped using assisted grasping,
+    using labels provided in average category specs file.
+    """
+    assisted_grasp_category_allow_list = set()
+    avg_category_spec = get_ig_avg_category_specs()
+    for k, v in avg_category_spec.items():
+        if v["enable_ag"]:
+            assisted_grasp_category_allow_list.add(k)
+    return assisted_grasp_category_allow_list
+
+
 def get_ig_category_ids():
     """
     Get iGibson object categories

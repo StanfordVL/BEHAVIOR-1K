@@ -10,4 +10,5 @@ from igibson.robots.locomotion_robot import LocomotionRobot
 from igibson.robots.robot_base import REGISTERED_ROBOTS, BaseRobot
 from igibson.robots.turtlebot import Turtlebot
 from igibson.robots.fetch import Fetch
+from igibson.robots.tiago import Tiago
 from igibson.robots.two_wheel_robot import TwoWheelRobot
