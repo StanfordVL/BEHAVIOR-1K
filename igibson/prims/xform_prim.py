@@ -452,6 +452,17 @@ class XFormPrim(BasePrim):
         self._collision_filter_api.GetFilteredPairsRel().AddTarget(prim.prim_path)
         prim._collision_filter_api.GetFilteredPairsRel().AddTarget(self._prim_path)
 
+    def remove_filtered_collision_pair(self, prim):
+        """
+        Removes a collision filter pair with another prim
+
+        Args:
+            prim (XFormPrim): Another prim to remove filter collisions with
+        """
+        # Add to both this prim's and the other prim's filtered pair
+        self._collision_filter_api.GetFilteredPairsRel().RemoveTarget(prim.prim_path)
+        prim._collision_filter_api.GetFilteredPairsRel().RemoveTarget(self._prim_path)
+
     def _dump_state(self):
         pos, ori = self.get_position_orientation()
         return OrderedDict(pos=pos, ori=ori)

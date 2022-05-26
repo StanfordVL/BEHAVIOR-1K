@@ -159,7 +159,7 @@ class LightObject(StatefulObject):
     @property
     def radius(self):
         """
-        Gets this joint's radius
+        Gets this light's radius
 
         Returns:
             float: radius for this light
@@ -169,7 +169,7 @@ class LightObject(StatefulObject):
     @radius.setter
     def radius(self, radius):
         """
-        Sets this joint's radius
+        Sets this light's radius
 
         Args:
             radius (float): radius to set
