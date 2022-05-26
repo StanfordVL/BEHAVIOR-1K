@@ -130,6 +130,14 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         return IsGraspingState.UNKNOWN
 
     @property
+    def use_delta_commands(self):
+        """
+        Returns:
+            bool: Whether this controller is using delta commands or not
+        """
+        return self._use_delta_commands
+
+    @property
     def control_type(self):
         return ControlType.get_type(type_str=self._motor_type)
 
