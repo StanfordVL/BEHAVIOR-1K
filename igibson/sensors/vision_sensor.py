@@ -62,6 +62,8 @@ class VisionSensor(BaseSensor):
             loading this sensor's prim at runtime.
         image_height (int): Height of generated images, in pixels
         image_width (int): Width of generated images, in pixels
+        viewport_name (None or str): If specified, will link this camera to the specified viewport, overriding its
+            current camera. Otherwise, creates a new viewport
 
     """
     _SENSOR_HELPERS = OrderedDict(
@@ -104,11 +106,13 @@ class VisionSensor(BaseSensor):
         load_config=None,
         image_height=128,
         image_width=128,
+        viewport_name=None,
     ):
         # Create load config from inputs
         load_config = dict() if load_config is None else load_config
         load_config["image_height"] = image_height
         load_config["image_width"] = image_width
+        load_config["viewport_name"] = viewport_name
 
         # Create variables that will be filled in later at runtime
         self._sd = None             # synthetic data interface
@@ -137,9 +141,15 @@ class VisionSensor(BaseSensor):
         # Get synthetic data interface
         self._sd = sd.acquire_syntheticdata_interface()
 
-        # Create a new viewport to link to this camera
+        # Create a new viewport to link to this camera or link to a pre-existing one
         vp = acquire_viewport_interface()
-        viewport_handle = vp.create_instance()
+        viewport_name = self._load_config["viewport_name"]
+        if viewport_name is not None:
+            vp_names_to_handles = {vp.get_viewport_window_name(h): h for h in vp.get_instance_list()}
+            assert_valid_key(key=viewport_name, valid_keys=vp_names_to_handles, name="viewport name")
+            viewport_handle = vp_names_to_handles[viewport_name]
+        else:
+            viewport_handle = vp.create_instance()
         self._viewport = vp.get_viewport_window(viewport_handle)
 
         # Link the camera and viewport together
