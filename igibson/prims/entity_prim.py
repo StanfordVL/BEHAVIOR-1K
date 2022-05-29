@@ -62,6 +62,7 @@ class EntityPrim(XFormPrim):
         self._joints = None
         self._mass = None
         self._visual_only = None
+        self._texture_states = []
 
         # Run super init
         super().__init__(
@@ -938,12 +939,32 @@ class EntityPrim(XFormPrim):
                 textures.append(texture_path.path)
         return textures
 
-    def update_textures_to_state(self, state):
+    def update_textures_for_state(self, state, value):
         """Update prim's textures to represent @state.
 
         Args:
             state (BaseObjectState): State to represent
+            value (bool): Whether or not changing to the state
         """
+        # Determine the state to set.
+        TEXTURE_CHANGE_PRIORITY = {
+            "Frozen": 4,
+            "Burnt": 3,
+            "Cooked": 2,
+            "Soaked": 1,
+            "ToggledOn": 0,
+        }
+        if value and state.__name__ not in self._texture_states:
+            self._texture_states.append(state.__name__)
+            self._texture_states.sort(key=lambda s: TEXTURE_CHANGE_PRIORITY[s])
+        if not value and state.__name__ in self._texture_states:
+            self._texture_states.remove(state.__name__)
+        
+        state_to_set = self._texture_states[-1] if self._texture_states else None
+        print("update_textures_for_state!")
+        print(self._texture_states, state_to_set)
+
+        # Find the material prims to update.
         looks_prim_path = f"{str(self._prim_path)}/Looks"
         looks_prim = get_prim_at_path(looks_prim_path)
         if not looks_prim:
@@ -964,7 +985,7 @@ class EntityPrim(XFormPrim):
             if len(filename_split) > 0 and filename_split[-1] not in ("DIFFUSE", "albedo"):
                 filename_split.pop()
             target_texture_path = f"{filedir}/{'_'.join(filename_split)}"
-            target_texture_path += f"_{state.__name__}.png" if state else ".png"
+            target_texture_path += f"_{state_to_set}.png" if state_to_set else ".png"
             if not os.path.exists(target_texture_path):
                 print(f"Warning: get texture path failed because {target_texture_path} does not exist")
                 continue
