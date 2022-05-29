@@ -2,7 +2,7 @@ from igibson import app, ig_dataset_path
 import igibson.utils.transform_utils as T
 import pxr.Vt
 from pxr import Usd
-from pxr import Gf, UsdShade, UsdLux
+from pxr import Gf, UsdShade, UsdLux, UsdPhysics, PhysxSchema, UsdGeom
 from pxr.Sdf import ValueTypeNames as VT
 import numpy as np
 import xml.etree.ElementTree as ET
@@ -17,6 +17,7 @@ import omni
 from copy import deepcopy
 from omni.isaac.core.utils.stage import open_stage, get_current_stage, close_stage
 from omni.isaac.core.prims.xform_prim import XFormPrim
+import igibson.utils.transform_utils as T
 
 ##### SET THIS ######
 URDF = f"{ig_dataset_path}/scenes/Rs_int/urdf/Rs_int_best.urdf"
@@ -87,6 +88,7 @@ def set_mtl_emission(mtl_prim, texture):
 
 
 RENDERING_CHANNEL_MAPPINGS = {
+    "diffuse": set_mtl_albedo,
     "albedo": set_mtl_albedo,
     "normal": set_mtl_normal,
     "ao": set_mtl_ao,
@@ -220,7 +222,7 @@ def import_rendering_channels(obj_prim, obj_category, model_root_path, usd_path)
                         mat_fpath = os.path.join(usd_dir, "materials")
                         shutil.copy(os.path.join(mat_dir, link_mat_file), mat_fpath)
                         # Check if any valid rendering channel
-                        mat_type = link_mat_file.split("_")[-1].split(".")[0]
+                        mat_type = link_mat_file.split("_")[-1].split(".")[0].lower()
                         # Apply the material if it exists
                         render_channel_fcn = RENDERING_CHANNEL_MAPPINGS.get(mat_type, None)
                         if render_channel_fcn is not None:
@@ -239,15 +241,54 @@ def import_rendering_channels(obj_prim, obj_category, model_root_path, usd_path)
         mat_fpath = os.path.join(usd_dir, "materials")
         shutil.copy(os.path.join(mat_dir, mat_file), mat_fpath)
         # Check if any valid rendering channel
-        mat_type = mat_file.split("_")[-1].split(".")[0]
+        mat_type = mat_file.split("_")[-1].split(".")[0].lower()
         # Apply the material if it exists
         render_channel_fcn = RENDERING_CHANNEL_MAPPINGS.get(mat_type, None)
         if render_channel_fcn is not None:
-            render_channel_fcn(mat, os.path.join(mat_fpath, link_mat_file))
+            render_channel_fcn(default_mat, os.path.join(mat_fpath, mat_file))
         else:
             # Warn user that we didn't find the correct rendering channel
             print(f"Warning: could not find rendering channel function for material: {mat_type}")
 
+
+def add_xform_properties(prim):
+    properties_to_remove = [
+        "xformOp:rotateX",
+        "xformOp:rotateXZY",
+        "xformOp:rotateY",
+        "xformOp:rotateYXZ",
+        "xformOp:rotateYZX",
+        "xformOp:rotateZ",
+        "xformOp:rotateZYX",
+        "xformOp:rotateZXY",
+        "xformOp:rotateXYZ",
+        "xformOp:transform",
+    ]
+    prop_names = prim.GetPropertyNames()
+    xformable = UsdGeom.Xformable(prim)
+    xformable.ClearXformOpOrder()
+    # TODO: wont be able to delete props for non root links on articulated objects
+    for prop_name in prop_names:
+        if prop_name in properties_to_remove:
+            prim.RemoveProperty(prop_name)
+    if "xformOp:scale" not in prop_names:
+        xform_op_scale = xformable.AddXformOp(UsdGeom.XformOp.TypeScale, UsdGeom.XformOp.PrecisionDouble, "")
+        xform_op_scale.Set(Gf.Vec3d([1.0, 1.0, 1.0]))
+    else:
+        xform_op_scale = UsdGeom.XformOp(prim.GetAttribute("xformOp:scale"))
+
+    if "xformOp:translate" not in prop_names:
+        xform_op_translate = xformable.AddXformOp(
+            UsdGeom.XformOp.TypeTranslate, UsdGeom.XformOp.PrecisionDouble, ""
+        )
+    else:
+        xform_op_translate = UsdGeom.XformOp(prim.GetAttribute("xformOp:translate"))
+
+    if "xformOp:orient" not in prop_names:
+        xform_op_rot = xformable.AddXformOp(UsdGeom.XformOp.TypeOrient, UsdGeom.XformOp.PrecisionDouble, "")
+    else:
+        xform_op_rot = UsdGeom.XformOp(prim.GetAttribute("xformOp:orient"))
+    xformable.SetXformOpOrder([xform_op_translate, xform_op_rot, xform_op_scale])
 
 
 # TODO: Handle metalinks
@@ -311,6 +352,7 @@ def import_obj_metadata(obj_category, obj_model, name, import_render_channels=Fa
                 light_type = LIGHT_MAPPING[light_info["type"]]
                 light_prim_path = f"/{obj_model}/{link_name}/light{i}"
                 light_prim = UsdLux.__dict__[f"{light_type}Light"].Define(stage, light_prim_path).GetPrim()
+                add_xform_properties(prim=light_prim)
                 # Make sure light_prim has XForm properties
                 light = XFormPrim(prim_path=light_prim_path)
                 # Set the values accordingly
