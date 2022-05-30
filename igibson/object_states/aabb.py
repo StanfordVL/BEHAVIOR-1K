@@ -6,7 +6,7 @@ from igibson.object_states.object_state_base import AbsoluteObjectState
 
 
 class AABB(AbsoluteObjectState):
-    def _compute_value(self):
+    def _get_value(self):
         aabb_low, aabb_hi = BoundingBoxAPI.union(self.obj.link_prim_paths)
 
         if not hasattr(self.obj, "category") or self.obj.category != "floors" or self.obj.room_floor is None:
