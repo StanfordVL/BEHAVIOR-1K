@@ -2,10 +2,10 @@ import numpy as np
 from collections import OrderedDict
 
 from igibson.utils.usd_utils import BoundingBoxAPI
-from igibson.object_states.object_state_base import CachingEnabledObjectState, NONE
+from igibson.object_states.object_state_base import AbsoluteObjectState
 
 
-class AABB(CachingEnabledObjectState):
+class AABB(AbsoluteObjectState):
     def _compute_value(self):
         aabb_low, aabb_hi = BoundingBoxAPI.union(self.obj.link_prim_paths)
 
