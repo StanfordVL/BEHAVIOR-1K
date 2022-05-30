@@ -2,9 +2,13 @@ import sys
 import logging
 import numpy as np
 from collections import OrderedDict
-from igibson.object_states.factory import get_state_name, get_default_states, get_states_for_ability, get_object_state_instance
+
+import omni
+from igibson.object_states.factory import get_state_name, get_default_states, get_steam_states, get_states_for_ability, get_object_state_instance
 from igibson.object_states.object_state_base import CachingEnabledObjectState, REGISTERED_OBJECT_STATES
 from igibson.objects.object_base import BaseObject
+from igibson.renderer_settings.renderer_settings import RendererSettings
+from pxr.Sdf import ValueTypeNames as VT
 
 # Optionally import bddl for object taxonomy.
 try:
@@ -59,6 +63,8 @@ class StatefulObject(BaseObject):
         """
         # Values that will be filled later
         self._states = None
+        self._has_steam_prims = False
+        self._emitter = None
 
         # Load abilities from taxonomy if needed & possible
         if abilities is None:
@@ -98,6 +104,10 @@ class StatefulObject(BaseObject):
         # Initialize all states
         for state in self._states.values():
             state.initialize(self._simulator)
+            
+        # Create steam prims if this object has states with steam effects.
+        if self._has_steam_prims:
+            self._create_steam_prims()
 
     def initialize_states(self):
         """
@@ -157,7 +167,75 @@ class StatefulObject(BaseObject):
         # Now generate the states in topological order.
         self.initialize_states()
         for state_type, params in reversed(state_types_and_params):
+            if state_type in get_steam_states():
+                self._has_steam_prims = True
             self._states[state_type] = get_object_state_instance(state_type, self, params)
+
+    def _create_steam_prims(self):
+        """
+        Create necessary prims for steam effects.
+        """
+        # Make sure that flow setting is enabled.
+        renderer_setting = RendererSettings()
+        renderer_setting.common_settings.flow_settings.enable()
+
+        # Define prim paths.
+        flowEmitterBox_prim_path = self._prim_path + "/flowEmitterBox"
+        flowSimulate_prim_path = self._prim_path+ "/flowSimulate"
+        flowOffscreen_prim_path = self._prim_path + "/flowOffscreen"
+        flowRender_prim_path = self._prim_path+ "/flowRender"
+
+        # Define prims.
+        stage = omni.usd.get_context().get_stage()
+        emitter = stage.DefinePrim(flowEmitterBox_prim_path, "FlowEmitterBox")
+        simulate = stage.DefinePrim(flowSimulate_prim_path, "FlowSimulate")
+        offscreen = stage.DefinePrim(flowOffscreen_prim_path, "FlowOffscreen")
+        renderer = stage.DefinePrim(flowRender_prim_path, "FlowRender")
+        advection = stage.DefinePrim(flowSimulate_prim_path + "/advection", "FlowAdvectionCombustionParams")
+        vorticity = stage.DefinePrim(flowSimulate_prim_path + "/vorticity", "FlowVorticityParams")
+        rayMarch = stage.DefinePrim(flowRender_prim_path + "/rayMarch", "FlowRayMarchParams")
+
+        self._emitter = emitter
+
+        # Update settings.
+        bbox = self.bbox
+        
+        emitter.CreateAttribute("enabled", VT.Bool, False).Set(False)
+        emitter.CreateAttribute("fuel", VT.Float, False).Set(1.0)
+        emitter.CreateAttribute("coupleRateFuel", VT.Float, False).Set(0.5)
+        emitter.CreateAttribute("coupleRateTemperature", VT.Float, False).Set(1.0)
+        emitter.CreateAttribute("temperature", VT.Float, False).Set(50)
+        emitter.CreateAttribute("halfSize", VT.Float3, False).Set((bbox[0]*0.4, bbox[1]*0.4, bbox[2]*0.15))
+        emitter.CreateAttribute("position", VT.Float3, False).Set((0, 0, bbox[2]*0.6))
+        emitter.CreateAttribute("velocity", VT.Float3, False).Set((0, 0, bbox[2]*5))
+
+        simulate.CreateAttribute("densityCellSize", VT.Float, False).Set(np.min(bbox)/8)
+
+        vorticity.CreateAttribute("constantMask", VT.Float, False).Set(10.0)
+
+        advection.CreateAttribute("buoyancyPerTemp", VT.Float, False).Set(0.03)
+        advection.CreateAttribute("burnPerTemp", VT.Float, False).Set(0.5)
+        advection.CreateAttribute("gravity", VT.Float3, False).Set((0, 0, -50.0))
+
+        rayMarch.CreateAttribute("attenuation", VT.Float, False).Set(1.0)
+
+    def set_emitter_temperature(self, value):
+        """
+        Set the temperature of the emitter prim for steam effect.
+        
+        Args:
+            value (float): Temperature to set
+        """
+        self._emitter.CreateAttribute("temperature", VT.Float, False).Set(value)
+
+    def set_emitter_enabled(self, value):
+        """
+        Enable/disable the emitter prim for steam effect.
+
+        Args:
+            value (bool): Value to set
+        """
+        self._emitter.CreateAttribute("enabled", VT.Bool, False).Set(value)
 
     def _dump_state(self):
         # Grab state from super class
