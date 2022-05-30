@@ -10,5 +10,5 @@ class SteamStateMixin(BaseObjectState):
         # Assume only state evaluated True will need non-default texture.
         if self.get_value() != self.value:
             self.value = self.get_value()
-            self.obj.set_emitter_temperature(self.value)
             self.obj.set_emitter_enabled(self.value)
+            print(f"Steam effects updated to {self.value} for {self.obj.name}")

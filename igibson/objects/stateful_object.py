@@ -203,30 +203,20 @@ class StatefulObject(BaseObject):
         emitter.CreateAttribute("enabled", VT.Bool, False).Set(False)
         emitter.CreateAttribute("fuel", VT.Float, False).Set(1.0)
         emitter.CreateAttribute("coupleRateFuel", VT.Float, False).Set(0.5)
-        emitter.CreateAttribute("coupleRateTemperature", VT.Float, False).Set(1.0)
-        emitter.CreateAttribute("temperature", VT.Float, False).Set(50)
+        emitter.CreateAttribute("coupleRateVelocity", VT.Float, False).Set(2.0)
         emitter.CreateAttribute("halfSize", VT.Float3, False).Set((bbox[0]*0.4, bbox[1]*0.4, bbox[2]*0.15))
-        emitter.CreateAttribute("position", VT.Float3, False).Set((0, 0, bbox[2]*0.6))
-        emitter.CreateAttribute("velocity", VT.Float3, False).Set((0, 0, bbox[2]*5))
+        emitter.CreateAttribute("position", VT.Float3, False).Set((0, 0, bbox[2]*1.0))
+        emitter.CreateAttribute("velocity", VT.Float3, False).Set((0, 0, 0))
 
-        simulate.CreateAttribute("densityCellSize", VT.Float, False).Set(np.min(bbox)/8)
+        simulate.CreateAttribute("densityCellSize", VT.Float, False).Set(bbox[2]*0.1)
 
         vorticity.CreateAttribute("constantMask", VT.Float, False).Set(10.0)
 
-        advection.CreateAttribute("buoyancyPerTemp", VT.Float, False).Set(0.03)
+        advection.CreateAttribute("buoyancyPerTemp", VT.Float, False).Set(0.05)
         advection.CreateAttribute("burnPerTemp", VT.Float, False).Set(0.5)
         advection.CreateAttribute("gravity", VT.Float3, False).Set((0, 0, -50.0))
 
-        rayMarch.CreateAttribute("attenuation", VT.Float, False).Set(1.0)
-
-    def set_emitter_temperature(self, value):
-        """
-        Set the temperature of the emitter prim for steam effect.
-        
-        Args:
-            value (float): Temperature to set
-        """
-        self._emitter.CreateAttribute("temperature", VT.Float, False).Set(value)
+        rayMarch.CreateAttribute("attenuation", VT.Float, False).Set(1.5)
 
     def set_emitter_enabled(self, value):
         """
