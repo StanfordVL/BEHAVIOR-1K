@@ -586,13 +586,11 @@ class InteractiveTraversableScene(TraversableScene):
             # Walls, floors, ceilings
             if category in {"walls", "floors", "ceilings"}:
                 usd_path = f"{ig_dataset_path}/scenes/{model}/usd/{category}/{model}_{category}.usd"
-                if category == "ceilings":
-                    usd_path = None
+
             # Other objects -- need to sanity check to make sure we want to load them
             else:
                 # Do not load these object categories (can blacklist building structures as well)
                 not_blacklisted = self.not_load_object_categories is None or category not in self.not_load_object_categories
-                print(self.not_load_object_categories, category, not_blacklisted)
 
                 # Only load these object categories (no need to white list building structures)
                 whitelisted = self.load_object_categories is None or category in self.load_object_categories

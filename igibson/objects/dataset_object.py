@@ -95,7 +95,6 @@ class DatasetObject(USDObject):
         kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
             for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
         """
-        self._usd_path = usd_path
         self.in_rooms = in_rooms
         self.texture_randomization = texture_randomization
         # self.overwrite_inertial = overwrite_inertial
@@ -167,8 +166,8 @@ class DatasetObject(USDObject):
         # self.prepare_visual_mesh_to_material()
 
         if prim_type == PrimType.CLOTH:
-            # TODO: replace with the "cloth" version of the usd file
-            usd_path = usd_path
+            assert usd_path.endswith(".usd"), f"usd_path [{usd_path}] is invalid."
+            usd_path = usd_path[:-4] + "_cloth.usd"
 
         # Run super init
         super().__init__(

@@ -6,7 +6,6 @@ from igibson.utils.python_utils import assert_valid_key
 from pxr import Gf, Usd, Sdf, UsdGeom, UsdPhysics, PhysxSchema, UsdShade
 from omni.isaac.core.utils.stage import add_reference_to_stage, get_current_stage
 from igibson.utils.constants import PrimType
-from IPython import embed
 import omni
 import carb
 
@@ -55,7 +54,7 @@ class PrimitiveObject(StatefulObject):
         """
         @param prim_path: str, global path in the stage to this object
         @param primitive_type: str, type of primitive object to create. Should be one of:
-            {Cube, Sphere, Cylinder, Capsule, Cone}
+            {"Cone", "Cube", "Cylinder", "Disk", "Plane", "Sphere", "Torus"}
         @param name: Name for the object. Names need to be unique per scene. If no name is set, a name will be generated
             at the time the object is added to the scene, using the object's category.
         @param category: Category for the object. Defaults to "object".
@@ -82,11 +81,11 @@ class PrimitiveObject(StatefulObject):
             object abilities and parameters.
         rgba (4-array): (R, G, B, A) values to set for this object
         radius (None or float): If specified, sets the radius for this object. This value is scaled by @scale
-            Note: Should only be specified if the @primitive_type is one of {Sphere, Cone, Capsule, Cylinder}
+            Note: Should only be specified if the @primitive_type is one of {"Cone", "Cylinder", "Disk", "Sphere"}
         height (None or float): If specified, sets the height for this object. This value is scaled by @scale
-            Note: Should only be specified if the @primitive_type is one of {Sphere, Cone, Capsule, Cylinder}
+            Note: Should only be specified if the @primitive_type is one of {"Cone", "Cylinder"}
         size (None or float): If specified, sets the size for this object. This value is scaled by @scale
-            Note: Should only be specified if the @primitive_type is one of {Cube}
+            Note: Should only be specified if the @primitive_type is one of {"Cube", "Torus"}
         kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
             for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
         """
@@ -141,7 +140,10 @@ class PrimitiveObject(StatefulObject):
         hs_backup = carb.settings.get_settings().get(SETTING_HALF_SCALE)
         carb.settings.get_settings().set(SETTING_U_SCALE, 1)
         carb.settings.get_settings().set(SETTING_V_SCALE, 1)
-        # Default size (half-extent, radius, etc) is 1.
+
+        # Default half_scale (i.e. half-extent, half_height, radius) is 1.
+        # TODO (eric): change it to 0.5 once the mesh generator API accepts floating-number HALF_SCALE
+        #  (currently it only accepts integer-number and floors 0.5 into 0).
         carb.settings.get_settings().set(SETTING_HALF_SCALE, 1)
 
         if self._prim_type == PrimType.RIGID:
@@ -163,10 +165,8 @@ class PrimitiveObject(StatefulObject):
             )
             omni.kit.commands.execute("MovePrim", path_from=collision_mesh_path_from, path_to=collision_mesh_path)
 
-            self._vis_prim_mesh = UsdGeom.Mesh.Define(stage, visual_mesh_path)
-            self._col_prim_mesh = UsdGeom.Mesh.Define(stage, collision_mesh_path)
-            self._vis_prim = self._vis_prim_mesh.GetPrim()
-            self._col_prim = self._col_prim_mesh.GetPrim()
+            self._vis_prim = UsdGeom.Mesh.Define(stage, visual_mesh_path).GetPrim()
+            self._col_prim = UsdGeom.Mesh.Define(stage, collision_mesh_path).GetPrim()
 
             # Add collision API to collision geom
             UsdPhysics.CollisionAPI.Apply(self._col_prim)
@@ -174,13 +174,16 @@ class PrimitiveObject(StatefulObject):
             PhysxSchema.PhysxCollisionAPI.Apply(self._col_prim)
 
         elif self._prim_type == PrimType.CLOTH:
+            # For Cloth, the base link itself is a cloth mesh
             visual_mesh_path_from = Sdf.Path(omni.usd.get_stage_next_free_path(stage, self._primitive_type, True))
             visual_mesh_path = f"{self._prim_path}/base_link"
 
-            # TODO: potentially change u_patches and v_patches
+            # TODO (eric): configure u_patches and v_patches
             omni.kit.commands.execute(
                 "CreateMeshPrimWithDefaultXform",
                 prim_type=self._primitive_type,
+                # u_patches=1,
+                # v_patches=1,
             )
             omni.kit.commands.execute("MovePrim", path_from=visual_mesh_path_from, path_to=visual_mesh_path)
 
@@ -193,7 +196,8 @@ class PrimitiveObject(StatefulObject):
 
         return prim
 
-    def _post_load(self):        # Run super first
+    def _post_load(self):
+        # Run super first
         super()._post_load()
 
         if self._prim_type == PrimType.RIGID:
@@ -217,8 +221,7 @@ class PrimitiveObject(StatefulObject):
         """
         Gets this object's radius, if it exists.
 
-        Note: This value is scaled with respect to this object's scale property
-        Note: Can only be called if the primitive type is one of {Sphere, Cone, Capsule, Cylinder}
+        Note: Can only be called if the primitive type is one of {"Cone", "Cylinder", "Disk", "Sphere"}
 
         Returns:
             float: radius for this object
@@ -231,8 +234,7 @@ class PrimitiveObject(StatefulObject):
         """
         Sets this object's radius
 
-        Note: This value is scaled with respect to this object's scale property
-        Note: Can only be called if the primitive type is one of {Sphere, Cone, Capsule, Cylinder}
+        Note: Can only be called if the primitive type is one of {"Cone", "Cylinder", "Disk", "Sphere"}
 
         Args:
             radius (float): radius to set
@@ -247,13 +249,14 @@ class PrimitiveObject(StatefulObject):
         """
         Gets this object's height, if it exists.
 
-        Note: This value is scaled with respect to this object's scale property
-        Note: Can only be called if the primitive type is one of {Sphere, Cone, Capsule, Cylinder}
+        Note: Can only be called if the primitive type is one of {"Cone", "Cylinder"}
 
         Returns:
             float: height for this object
         """
         assert_valid_key(key=self._primitive_type, valid_keys=VALID_HEIGHT_OBJECTS, name="primitive object with height")
+
+        # TODO (eric): currently scale [1, 1, 1] will have height 2.0
         return self.scale[2] * 2.0
 
     @height.setter
@@ -261,14 +264,15 @@ class PrimitiveObject(StatefulObject):
         """
         Sets this object's height
 
-        Note: This value is scaled with respect to this object's scale property
-        Note: Can only be called if the primitive type is one of {Sphere, Cone, Capsule, Cylinder}
+        Note: Can only be called if the primitive type is one of {"Cone", "Cylinder"}
 
         Args:
             height (float): height to set
         """
         assert_valid_key(key=self._primitive_type, valid_keys=VALID_HEIGHT_OBJECTS, name="primitive object with height")
         original_scale = self.scale
+
+        # TODO (eric): currently scale [1, 1, 1] will have height 2.0
         original_scale[2] = height / 2.0
         self.scale = original_scale
 
@@ -277,13 +281,14 @@ class PrimitiveObject(StatefulObject):
         """
         Gets this object's size, if it exists.
 
-        Note: This value is scaled with respect to this object's scale property
-        Note: Can only be called if the primitive type is one of {Cube}
+        Note: Can only be called if the primitive type is one of {"Cube", "Torus"}
 
         Returns:
             float: size for this object
         """
         assert_valid_key(key=self._primitive_type, valid_keys=VALID_SIZE_OBJECTS, name="primitive object with size")
+
+        # TODO (eric): currently scale [1, 1, 1] will have size 2.0
         return self.scale[0] * 2.0
 
     @size.setter
@@ -291,14 +296,15 @@ class PrimitiveObject(StatefulObject):
         """
         Sets this object's size
 
-        Note: This value is scaled with respect to this object's scale property
-        Note: Can only be called if the primitive type is one of {Cube}
+        Note: Can only be called if the primitive type is one of {"Cube", "Torus"}
 
         Args:
             size (float): size to set
         """
         assert_valid_key(key=self._primitive_type, valid_keys=VALID_SIZE_OBJECTS, name="primitive object with size")
         original_scale = self.scale
+
+        # TODO (eric): currently scale [1, 1, 1] will have size 2.0
         original_scale[:] = size / 2.0
         self.scale = original_scale
 

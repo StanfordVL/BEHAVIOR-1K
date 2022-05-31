@@ -8,15 +8,12 @@ import os
 sim = Simulator()
 scene = EmptyScene(floor_plane_visible=True)
 sim.import_scene(scene=scene)
-sim.step()
 
 cube1 = PrimitiveObject(prim_path="/World/TestCube1", primitive_type="Cube", prim_type=PrimType.RIGID)
 sim.import_object(cube1)
-sim.step()
 
 cube2 = PrimitiveObject(prim_path="/World/TestCube2", primitive_type="Cube", prim_type=PrimType.CLOTH)
 sim.import_object(cube2)
-sim.step()
 
 carpet1 = DatasetObject(
     prim_path="/World/TestCarpet1",
@@ -24,7 +21,6 @@ carpet1 = DatasetObject(
     prim_type=PrimType.RIGID
 )
 sim.import_object(carpet1)
-sim.step()
 
 carpet2 = DatasetObject(
     prim_path="/World/TestCarpet2",
@@ -40,4 +36,6 @@ carpet3 = DatasetObject(
 )
 sim.import_object(carpet3)
 
-sim.step()
+sim.play()
+for _ in range(100000):
+    sim.step()

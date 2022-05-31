@@ -74,8 +74,8 @@ class EntityPrim(XFormPrim):
             load_config=load_config,
         )
 
-        # This needs to be initialized to be used for _load() for PrimitiveObject
-        self._prim_type = self._load_config["prim_type"] if "prim_type" in self._load_config else None
+        # This needs to be initialized to be used for _load() of PrimitiveObject
+        self._prim_type = self._load_config["prim_type"] if "prim_type" in self._load_config else PrimType.RIGID
 
     def _initialize(self):
         # Run super method

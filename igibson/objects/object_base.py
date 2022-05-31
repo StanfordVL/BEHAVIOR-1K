@@ -18,7 +18,6 @@ from igibson.utils.usd_utils import get_prim_nested_children, create_joint, Coll
 from igibson.prims.entity_prim import EntityPrim
 from igibson.prims.xform_prim import XFormPrim
 from igibson.utils.constants import PrimType
-from IPython import embed
 
 
 class BaseObject(EntityPrim, metaclass=ABCMeta):
