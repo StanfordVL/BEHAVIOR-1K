@@ -70,6 +70,7 @@ def import_objects_from_scene_urdf(urdf):
 
 
 def import_nested_objs_from_element(element):
+    obj_infos = set()
     # Check if this element is a link
     for ele in element:
         if ele.tag == "link":
@@ -78,14 +79,17 @@ def import_nested_objs_from_element(element):
             model = ele.get("model")
             name = ele.get("name").replace("-", "_")
             print(f"Link: name: {name}, category: {category}, model: {model}")
+            obj_info = (category, model)
             # Skip world link
             if name == "world":
                 pass
             # Import building components in different way from default objects
-            elif category in {"ceilings", "walls", "floors"}:
+            elif category in {"ceilings", "walls", "floors"} and obj_info not in obj_infos:
                 import_building_urdf(obj_category=category, obj_model=model, skip_if_exist=False)
-            else:
+                obj_infos.add(obj_info)
+            elif obj_info not in obj_infos:
                 import_obj_urdf(obj_category=category, obj_model=model, skip_if_exist=False)
+                obj_infos.add(obj_info)
         # If there's children nodes, we iterate over those
         for child in ele:
             import_nested_objs_from_element(child)

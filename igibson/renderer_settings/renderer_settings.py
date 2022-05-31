@@ -7,6 +7,15 @@ from igibson.renderer_settings.post_processing_settings import PostProcessingSet
 from igibson.renderer_settings.real_time_settings import RealTimeSettings
 
 
+def singleton(cls):
+    instances = {}
+    def getinstance():
+        if cls not in instances:
+            instances[cls] = cls()
+        return instances[cls]
+    return getinstance
+
+@singleton
 class RendererSettings:
     """
     Controller for all renderer settings.

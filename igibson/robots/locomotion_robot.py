@@ -86,6 +86,20 @@ class LocomotionRobot(BaseRobot):
         }
 
     @property
+    def _default_base_null_joint_controller_config(self):
+        """
+        :return: Dict[str, Any] Default null joint controller config
+            to control this robot's base i.e. dummy controller
+        """
+        return {
+            "name": "NullJointController",
+            "control_freq": self._control_freq,
+            "motor_type": "velocity",
+            "control_limits": self.control_limits,
+            "dof_idx": self.base_control_idx,
+        }
+
+    @property
     def _default_controller_config(self):
         # Always run super method first
         cfg = super()._default_controller_config
@@ -93,6 +107,7 @@ class LocomotionRobot(BaseRobot):
         # Add supported base controllers
         cfg["base"] = {
             self._default_base_joint_controller_config["name"]: self._default_base_joint_controller_config,
+            self._default_base_null_joint_controller_config["name"]: self._default_base_null_joint_controller_config,
         }
 
         return cfg

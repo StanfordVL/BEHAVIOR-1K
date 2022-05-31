@@ -4,6 +4,7 @@ import random
 from transforms3d import euler
 
 from igibson.robots.manipulation_robot import IsGraspingState
+from omni.isaac.core.utils.prims import get_prim_at_path
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.ERROR)
@@ -178,16 +179,16 @@ class MotionPlanner:
             elif self.robot.model_name == "Tiago":
                 left_control_idx = np.concatenate([self.robot.trunk_control_idx, self.robot.arm_control_idx["left"]])
                 self.ik_solver["left"] = IKSolver(
-                    robot_description_path=f"{assets_path}/models/tiago/tiago_left_arm_descriptor.yaml",
-                    robot_urdf_path=f"{assets_path}/models/tiago/tiago_dual.urdf",
+                    robot_description_path=f"{assets_path}/models/tiago/tiago_dual_omnidirectional_stanford_left_arm_descriptor.yaml",
+                    robot_urdf_path=f"{assets_path}/models/tiago/tiago_dual_omnidirectional_stanford.urdf",
                     eef_name="gripper_left_grasping_frame",
                     default_joint_pos=self.robot.default_joint_pos[left_control_idx],
                 )
                 self.ik_control_idx["left"] = left_control_idx
                 right_control_idx = self.robot.arm_control_idx["right"]
                 self.ik_solver["right"] = IKSolver(
-                    robot_description_path=f"{assets_path}/models/tiago/tiago_right_arm_fixed_trunk_descriptor.yaml",
-                    robot_urdf_path=f"{assets_path}/models/tiago/tiago_dual.urdf",
+                    robot_description_path=f"{assets_path}/models/tiago/tiago_dual_omnidirectional_stanford_right_arm_fixed_trunk_descriptor.yaml",
+                    robot_urdf_path=f"{assets_path}/models/tiago/tiago_dual_omnidirectional_stanford.urdf",
                     eef_name="gripper_right_grasping_frame",
                     default_joint_pos=self.robot.default_joint_pos[right_control_idx],
                 )
@@ -1451,8 +1452,28 @@ class MotionPlanner:
 
                 # Teleport also the grasped object
                 if grasped_obj is not None:
-                    grasp_pose = (self.robot.get_eef_position(arm=arm), self.robot.get_eef_orientation(arm=arm))
-                    grasped_obj.set_position_orientation(*grasp_pose)
+                    joint_prim_path = f"{self.robot.eef_links[arm].prim_path}/ag_constraint"
+                    joint_prim = get_prim_at_path(joint_prim_path)
+
+                    # Set the local pose of this joint
+                    local_pos_0 = joint_prim.GetAttribute("physics:localPos0").Get()
+                    local_orn_0 = joint_prim.GetAttribute("physics:localRot0").Get()
+                    local_pos_1 = joint_prim.GetAttribute("physics:localPos1").Get()
+                    local_orn_1 = joint_prim.GetAttribute("physics:localRot1").Get()
+
+                    local_pos_0 = np.array(local_pos_0) * self.robot.scale
+                    local_orn_0 = np.array([*local_orn_0.imaginary, local_orn_0.real])
+                    local_pos_1 = np.array(local_pos_1) * grasped_obj.scale
+                    local_orn_1 = np.array([*local_orn_1.imaginary, local_orn_1.real])
+
+                    gripper_pos = self.robot.get_eef_position(arm)
+                    gripper_orn = self.robot.get_eef_orientation(arm)
+                    gripper_pose = T.pose2mat((gripper_pos, gripper_orn))
+                    jnt_local_pose_0 = T.pose2mat((local_pos_0, local_orn_0))
+                    inv_jnt_local_pose_1 = T.pose_inv(T.pose2mat((local_pos_1, local_orn_1)))
+                    grasp_pose = gripper_pose @ jnt_local_pose_0 @ inv_jnt_local_pose_1
+                    grasp_pos, grasp_orn = T.mat2pose(grasp_pose)
+                    grasped_obj.set_position_orientation(grasp_pos, grasp_orn)
 
         else:
             # TODO

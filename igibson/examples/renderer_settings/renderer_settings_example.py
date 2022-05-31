@@ -10,6 +10,10 @@ sim.import_scene(scene)
 # Create renderer settings object.
 renderer_setting = RendererSettings()
 
+# RendererSettings is a singleton.
+renderer_setting2 = RendererSettings()
+assert renderer_setting == renderer_setting2
+
 # Set current renderer.
 renderer_setting.set_current_renderer("Real-Time")
 assert renderer_setting.get_current_renderer() == "Real-Time"

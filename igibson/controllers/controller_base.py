@@ -106,7 +106,7 @@ class BaseController(Serializable, Registerable, Recreatable):
             ]
         assert "has_limit" in control_limits, "Expected has_limit specified in control_limits, but does not exist."
         self._dof_has_limits = control_limits["has_limit"]
-        self._dof_idx = dof_idx
+        self._dof_idx = np.array(dof_idx, dtype=int)
 
         # Initialize some other variables that will be filled in during runtime
         self._control = None

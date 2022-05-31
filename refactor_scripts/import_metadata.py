@@ -2,7 +2,7 @@ from igibson import app, ig_dataset_path
 import igibson.utils.transform_utils as T
 import pxr.Vt
 from pxr import Usd
-from pxr import Gf, UsdShade, UsdLux
+from pxr import Gf, UsdShade, UsdLux, UsdPhysics, PhysxSchema, UsdGeom
 from pxr.Sdf import ValueTypeNames as VT
 import numpy as np
 import xml.etree.ElementTree as ET
@@ -17,6 +17,7 @@ import omni
 from copy import deepcopy
 from omni.isaac.core.utils.stage import open_stage, get_current_stage, close_stage
 from omni.isaac.core.prims.xform_prim import XFormPrim
+import igibson.utils.transform_utils as T
 
 ##### SET THIS ######
 URDF = f"{ig_dataset_path}/scenes/Rs_int/urdf/Rs_int_best.urdf"
@@ -87,6 +88,7 @@ def set_mtl_emission(mtl_prim, texture):
 
 
 RENDERING_CHANNEL_MAPPINGS = {
+    "diffuse": set_mtl_albedo,
     "albedo": set_mtl_albedo,
     "normal": set_mtl_normal,
     "ao": set_mtl_ao,
@@ -117,6 +119,7 @@ def import_models_metadata_from_scene(urdf, import_render_channels=False):
 
 
 def import_nested_models_metadata_from_element(element, model_pose_info, import_render_channels=False):
+    obj_infos = set()
     # First pass through, populate the joint pose info
     for ele in element:
         if ele.tag == "joint":
@@ -134,18 +137,21 @@ def import_nested_models_metadata_from_element(element, model_pose_info, import_
             name = ele.get("name").replace("-", "_")
             category = ele.get("category")
             model = ele.get("model")
+            obj_info = (category, model)
             if name == "world":
                 # Skip this
                 pass
             # Process ceiling, walls, floor separately
-            elif category in {"ceilings", "walls", "floors"}:
+            elif category in {"ceilings", "walls", "floors"} and obj_info not in obj_infos:
                 import_building_metadata(obj_category=category, obj_model=model, name=name, import_render_channels=import_render_channels)
-            else:
+                obj_infos.add(obj_info)
+            elif obj_info not in obj_infos:
                 print(name)
                 bb = string_to_array(ele.get("bounding_box"))
                 pos = model_pose_info[name]["pos"]
                 quat = model_pose_info[name]["quat"]
                 import_obj_metadata(obj_category=category, obj_model=model, name=name, import_render_channels=import_render_channels)
+                obj_infos.add(obj_info)
 
         # If there's children nodes, we iterate over those
         for child in ele:
@@ -174,9 +180,36 @@ def import_rendering_channels(obj_prim, obj_category, model_root_path, usd_path)
     usd_dir = "/".join(usd_path.split("/")[:-1])
     mat_dir = f"{model_root_path}/material/{obj_category}" if \
         obj_category in {"ceilings", "walls", "floors"} else f"{model_root_path}/material"
-
     # Compile all material files we have
     mat_files = set(os.listdir(mat_dir))
+
+    # Remove the material prims as we will create them explictly later.
+    stage = omni.usd.get_context().get_stage()
+    for prim in obj_prim.GetChildren():
+        looks_prim = None
+        if prim.GetName() == "Looks":
+            looks_prim = prim
+        elif prim.GetPrimTypeInfo().GetTypeName() == "Xform":
+            looks_prim_path = f"{str(prim.GetPrimPath())}/Looks"
+            looks_prim = get_prim_at_path(looks_prim_path)
+        if not looks_prim:
+            continue
+        for subprim in looks_prim.GetChildren():
+            if subprim.GetPrimTypeInfo().GetTypeName() != "Material":
+                continue
+            print(f"Removed material prim {subprim.GetPath()}:", stage.RemovePrim(subprim.GetPath()))
+
+    # Create new default material for this object.
+    mtl_created_list = []
+    omni.kit.commands.execute(
+        "CreateAndBindMdlMaterialFromLibrary",
+        mdl_name="OmniPBR.mdl",
+        mtl_name="OmniPBR",
+        mtl_created_list=mtl_created_list,
+    )
+    default_mat = get_prim_at_path(mtl_created_list[0])
+    default_mat = rename_prim(prim=default_mat, name=f"default_material")
+    print("Created default material:", default_mat.GetPath())
 
     # Iterate over all children of the object prim, if /<obj_name>/<link_name>/visual exists, then we
     # know <link_name> is a valid link, and we check explicitly for these material files in our set
@@ -198,20 +231,25 @@ def import_rendering_channels(obj_prim, obj_category, model_root_path, usd_path)
                         link_mat_files.append(mat_file)
                         mat_files.remove(mat_file)
                 # Potentially write material files for this prim if we have any valid materials
-                if len(link_mat_files) > 0:
+                print("link_mat_files:", link_mat_files)
+                if not link_mat_files:
+                    # Bind default material to the visual prim
+                    shade = UsdShade.Material(default_mat)
+                    UsdShade.MaterialBindingAPI(visual_prim).Bind(shade, UsdShade.Tokens.strongerThanDescendants)
+                else:
                     # Create new material for this link
                     mtl_created_list = []
-
                     omni.kit.commands.execute(
                         "CreateAndBindMdlMaterialFromLibrary",
                         mdl_name="OmniPBR.mdl",
                         mtl_name="OmniPBR",
                         mtl_created_list=mtl_created_list,
                     )
+                    print(f"Created material for link {link_name}:", mtl_created_list[0])
                     mat = get_prim_at_path(mtl_created_list[0])
 
                     shade = UsdShade.Material(mat)
-                    # Bind this material to the visual prim
+                    # Bind the created link material to the visual prim
                     UsdShade.MaterialBindingAPI(visual_prim).Bind(shade, UsdShade.Tokens.strongerThanDescendants)
 
                     # Iterate over all material channels and write them to the material
@@ -220,7 +258,7 @@ def import_rendering_channels(obj_prim, obj_category, model_root_path, usd_path)
                         mat_fpath = os.path.join(usd_dir, "materials")
                         shutil.copy(os.path.join(mat_dir, link_mat_file), mat_fpath)
                         # Check if any valid rendering channel
-                        mat_type = link_mat_file.split("_")[-1].split(".")[0]
+                        mat_type = link_mat_file.split("_")[-1].split(".")[0].lower()
                         # Apply the material if it exists
                         render_channel_fcn = RENDERING_CHANNEL_MAPPINGS.get(mat_type, None)
                         if render_channel_fcn is not None:
@@ -233,21 +271,59 @@ def import_rendering_channels(obj_prim, obj_category, model_root_path, usd_path)
                     mat = rename_prim(prim=mat, name=f"material_{link_name}")
 
     # For any remaining materials, we write them to the default material
-    default_mat = get_prim_at_path(f"{obj_prim.GetPrimPath().pathString}/Looks/material_material_0")
     for mat_file in mat_files:
         # Copy this file into the materials folder
         mat_fpath = os.path.join(usd_dir, "materials")
         shutil.copy(os.path.join(mat_dir, mat_file), mat_fpath)
         # Check if any valid rendering channel
-        mat_type = mat_file.split("_")[-1].split(".")[0]
+        mat_type = mat_file.split("_")[-1].split(".")[0].lower()
         # Apply the material if it exists
         render_channel_fcn = RENDERING_CHANNEL_MAPPINGS.get(mat_type, None)
         if render_channel_fcn is not None:
-            render_channel_fcn(mat, os.path.join(mat_fpath, link_mat_file))
+            render_channel_fcn(default_mat, os.path.join(mat_fpath, mat_file))
         else:
             # Warn user that we didn't find the correct rendering channel
             print(f"Warning: could not find rendering channel function for material: {mat_type}")
 
+
+def add_xform_properties(prim):
+    properties_to_remove = [
+        "xformOp:rotateX",
+        "xformOp:rotateXZY",
+        "xformOp:rotateY",
+        "xformOp:rotateYXZ",
+        "xformOp:rotateYZX",
+        "xformOp:rotateZ",
+        "xformOp:rotateZYX",
+        "xformOp:rotateZXY",
+        "xformOp:rotateXYZ",
+        "xformOp:transform",
+    ]
+    prop_names = prim.GetPropertyNames()
+    xformable = UsdGeom.Xformable(prim)
+    xformable.ClearXformOpOrder()
+    # TODO: wont be able to delete props for non root links on articulated objects
+    for prop_name in prop_names:
+        if prop_name in properties_to_remove:
+            prim.RemoveProperty(prop_name)
+    if "xformOp:scale" not in prop_names:
+        xform_op_scale = xformable.AddXformOp(UsdGeom.XformOp.TypeScale, UsdGeom.XformOp.PrecisionDouble, "")
+        xform_op_scale.Set(Gf.Vec3d([1.0, 1.0, 1.0]))
+    else:
+        xform_op_scale = UsdGeom.XformOp(prim.GetAttribute("xformOp:scale"))
+
+    if "xformOp:translate" not in prop_names:
+        xform_op_translate = xformable.AddXformOp(
+            UsdGeom.XformOp.TypeTranslate, UsdGeom.XformOp.PrecisionDouble, ""
+        )
+    else:
+        xform_op_translate = UsdGeom.XformOp(prim.GetAttribute("xformOp:translate"))
+
+    if "xformOp:orient" not in prop_names:
+        xform_op_rot = xformable.AddXformOp(UsdGeom.XformOp.TypeOrient, UsdGeom.XformOp.PrecisionDouble, "")
+    else:
+        xform_op_rot = UsdGeom.XformOp(prim.GetAttribute("xformOp:orient"))
+    xformable.SetXformOpOrder([xform_op_translate, xform_op_rot, xform_op_scale])
 
 
 # TODO: Handle metalinks
@@ -311,6 +387,7 @@ def import_obj_metadata(obj_category, obj_model, name, import_render_channels=Fa
                 light_type = LIGHT_MAPPING[light_info["type"]]
                 light_prim_path = f"/{obj_model}/{link_name}/light{i}"
                 light_prim = UsdLux.__dict__[f"{light_type}Light"].Define(stage, light_prim_path).GetPrim()
+                add_xform_properties(prim=light_prim)
                 # Make sure light_prim has XForm properties
                 light = XFormPrim(prim_path=light_prim_path)
                 # Set the values accordingly

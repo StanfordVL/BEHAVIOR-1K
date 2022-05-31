@@ -331,11 +331,6 @@ class BaseRobot(USDObject, ControllableObject, GymObservable, Registerable):
                 sensor.remove_modality(modality=modality)
 
     @property
-    def root_link_name(self):
-        # Most robots have base_link as the root_link defined. If it exists, we use that, otherwise, we use the default
-        return "base_link" if "base_link" in self._links else super().root_link_name
-
-    @property
     def sensors(self):
         """
         Returns:
