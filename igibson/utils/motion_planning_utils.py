@@ -178,16 +178,16 @@ class MotionPlanner:
             elif self.robot.model_name == "Tiago":
                 left_control_idx = np.concatenate([self.robot.trunk_control_idx, self.robot.arm_control_idx["left"]])
                 self.ik_solver["left"] = IKSolver(
-                    robot_description_path=f"{assets_path}/models/tiago/tiago_left_arm_descriptor.yaml",
-                    robot_urdf_path=f"{assets_path}/models/tiago/tiago_dual.urdf",
+                    robot_description_path=f"{assets_path}/models/tiago/tiago_dual_omnidirectional_stanford_left_arm_descriptor.yaml",
+                    robot_urdf_path=f"{assets_path}/models/tiago/tiago_dual_omnidirectional_stanford.urdf",
                     eef_name="gripper_left_grasping_frame",
                     default_joint_pos=self.robot.default_joint_pos[left_control_idx],
                 )
                 self.ik_control_idx["left"] = left_control_idx
                 right_control_idx = self.robot.arm_control_idx["right"]
                 self.ik_solver["right"] = IKSolver(
-                    robot_description_path=f"{assets_path}/models/tiago/tiago_right_arm_fixed_trunk_descriptor.yaml",
-                    robot_urdf_path=f"{assets_path}/models/tiago/tiago_dual.urdf",
+                    robot_description_path=f"{assets_path}/models/tiago/tiago_dual_omnidirectional_stanford_right_arm_fixed_trunk_descriptor.yaml",
+                    robot_urdf_path=f"{assets_path}/models/tiago/tiago_dual_omnidirectional_stanford.urdf",
                     eef_name="gripper_right_grasping_frame",
                     default_joint_pos=self.robot.default_joint_pos[right_control_idx],
                 )
