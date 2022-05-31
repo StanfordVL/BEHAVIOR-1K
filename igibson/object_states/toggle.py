@@ -5,7 +5,6 @@ from igibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from igibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
 from igibson.object_states.texture_change_state_mixin import TextureChangeStateMixin
 from igibson.utils.constants import SemanticClass, SimulatorMode
-from igibson.utils.utils import brighten_texture
 
 _TOGGLE_DISTANCE_THRESHOLD = 0.1
 _TOGGLE_LINK_NAME = "toggle_button"
@@ -91,11 +90,6 @@ class ToggledOn(AbsoluteObjectState, BooleanState, TextureChangeStateMixin, Link
         hidden_marker.visible = False
 
         self.update_texture()
-
-    @staticmethod
-    def create_transformed_texture(diffuse_tex_filename, diffuse_tex_filename_transformed):
-        # make the texture 1.5x brighter
-        brighten_texture(diffuse_tex_filename, diffuse_tex_filename_transformed, brightness=1.5)
 
     @property
     def settable(self):

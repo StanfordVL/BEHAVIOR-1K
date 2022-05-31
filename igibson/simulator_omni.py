@@ -336,11 +336,6 @@ class Simulator(SimulationContext):
                     if obj.initialized:
                         obj.states[state_type].update()
 
-        # TODO
-        # # Step the object procedural materials based on the updated object states.
-        # for obj in self.scene.get_objects():
-        #     if hasattr(obj, "procedural_material") and obj.procedural_material is not None:
-        #         obj.procedural_material.update()
 
         # Clear the bounding box cache so that it gets updated during the next time it's called
         BoundingBoxAPI.clear()

@@ -4,7 +4,6 @@ from igibson.object_states.contact_bodies import ContactBodies
 from igibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
 from igibson.object_states.texture_change_state_mixin import TextureChangeStateMixin
 from igibson.object_states.water_source import WaterSource
-from igibson.utils.utils import transform_texture
 
 # TODO: Have BooleanState automatically set the dump / load / serialize / deserialize functions
 class Soaked(AbsoluteObjectState, BooleanState, TextureChangeStateMixin):
@@ -51,8 +50,3 @@ class Soaked(AbsoluteObjectState, BooleanState, TextureChangeStateMixin):
     @staticmethod
     def get_optional_dependencies():
         return [WaterSource]
-
-    @staticmethod
-    def create_transformed_texture(diffuse_tex_filename, diffuse_tex_filename_transformed):
-        # 0.5 mixture with blue
-        transform_texture(diffuse_tex_filename, diffuse_tex_filename_transformed, 0.5, (0, 0, 200))

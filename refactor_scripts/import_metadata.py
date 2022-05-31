@@ -176,9 +176,36 @@ def import_rendering_channels(obj_prim, obj_category, model_root_path, usd_path)
     usd_dir = "/".join(usd_path.split("/")[:-1])
     mat_dir = f"{model_root_path}/material/{obj_category}" if \
         obj_category in {"ceilings", "walls", "floors"} else f"{model_root_path}/material"
-
     # Compile all material files we have
     mat_files = set(os.listdir(mat_dir))
+
+    # Remove the material prims as we will create them explictly later.
+    stage = omni.usd.get_context().get_stage()
+    for prim in obj_prim.GetChildren():
+        looks_prim = None
+        if prim.GetName() == "Looks":
+            looks_prim = prim
+        elif prim.GetPrimTypeInfo().GetTypeName() == "Xform":
+            looks_prim_path = f"{str(prim.GetPrimPath())}/Looks"
+            looks_prim = get_prim_at_path(looks_prim_path)
+        if not looks_prim:
+            continue
+        for subprim in looks_prim.GetChildren():
+            if subprim.GetPrimTypeInfo().GetTypeName() != "Material":
+                continue
+            print(f"Removed material prim {subprim.GetPath()}:", stage.RemovePrim(subprim.GetPath()))
+
+    # Create new default material for this object.
+    mtl_created_list = []
+    omni.kit.commands.execute(
+        "CreateAndBindMdlMaterialFromLibrary",
+        mdl_name="OmniPBR.mdl",
+        mtl_name="OmniPBR",
+        mtl_created_list=mtl_created_list,
+    )
+    default_mat = get_prim_at_path(mtl_created_list[0])
+    default_mat = rename_prim(prim=default_mat, name=f"default_material")
+    print("Created default material:", default_mat.GetPath())
 
     # Iterate over all children of the object prim, if /<obj_name>/<link_name>/visual exists, then we
     # know <link_name> is a valid link, and we check explicitly for these material files in our set
@@ -200,20 +227,25 @@ def import_rendering_channels(obj_prim, obj_category, model_root_path, usd_path)
                         link_mat_files.append(mat_file)
                         mat_files.remove(mat_file)
                 # Potentially write material files for this prim if we have any valid materials
-                if len(link_mat_files) > 0:
+                print("link_mat_files:", link_mat_files)
+                if not link_mat_files:
+                    # Bind default material to the visual prim
+                    shade = UsdShade.Material(default_mat)
+                    UsdShade.MaterialBindingAPI(visual_prim).Bind(shade, UsdShade.Tokens.strongerThanDescendants)
+                else:
                     # Create new material for this link
                     mtl_created_list = []
-
                     omni.kit.commands.execute(
                         "CreateAndBindMdlMaterialFromLibrary",
                         mdl_name="OmniPBR.mdl",
                         mtl_name="OmniPBR",
                         mtl_created_list=mtl_created_list,
                     )
+                    print(f"Created material for link {link_name}:", mtl_created_list[0])
                     mat = get_prim_at_path(mtl_created_list[0])
 
                     shade = UsdShade.Material(mat)
-                    # Bind this material to the visual prim
+                    # Bind the created link material to the visual prim
                     UsdShade.MaterialBindingAPI(visual_prim).Bind(shade, UsdShade.Tokens.strongerThanDescendants)
 
                     # Iterate over all material channels and write them to the material
@@ -235,7 +267,6 @@ def import_rendering_channels(obj_prim, obj_category, model_root_path, usd_path)
                     mat = rename_prim(prim=mat, name=f"material_{link_name}")
 
     # For any remaining materials, we write them to the default material
-    default_mat = get_prim_at_path(f"{obj_prim.GetPrimPath().pathString}/Looks/material_material_0")
     for mat_file in mat_files:
         # Copy this file into the materials folder
         mat_fpath = os.path.join(usd_dir, "materials")
