@@ -8,8 +8,8 @@ _DEFAULT_HEAT_TEMPERATURE = 40
 
 # When an object is set as heated, we will sample it between
 # the heat temperature and these offsets.
-_HEATED_SAMPLING_RANGE_MAX = 10.0
-_HEATED_SAMPLING_RANGE_MIN = 20.0
+_HEATED_SAMPLING_RANGE_MIN = 10.0
+_HEATED_SAMPLING_RANGE_MAX = 20.0
 
 
 class Heated(AbsoluteObjectState, BooleanState, SteamStateMixin):
