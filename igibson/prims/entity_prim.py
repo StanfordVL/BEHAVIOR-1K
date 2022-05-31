@@ -6,24 +6,28 @@
 # distribution of this software and related documentation without an express
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 #
-from typing import Optional, Tuple, Union, List
-from copy import deepcopy
-import os
-import numpy as np
-from collections import OrderedDict, Iterable
-from omni.isaac.dynamic_control import _dynamic_control
-from omni.isaac.core.utils.types import DOFInfo
-from omni.isaac.core.utils.transformations import tf_matrix_from_pose
-from omni.isaac.core.utils.rotations import gf_quat_to_np_array
-from pxr import Gf, Usd, UsdGeom, UsdPhysics
-from omni.isaac.core.controllers.articulation_controller import ArticulationController
+from collections import Iterable, OrderedDict
+from typing import Optional, Tuple
+
 import carb
-from omni.isaac.core.utils.prims import is_prim_path_valid, get_prim_property, set_prim_property, \
-    get_prim_parent, get_prim_at_path
-from omni.usd import get_shader_from_material
-from igibson.prims.xform_prim import XFormPrim
-from igibson.prims.rigid_prim import RigidPrim
+import numpy as np
+from omni.isaac.core.controllers.articulation_controller import ArticulationController
+from omni.isaac.core.utils.prims import (
+    get_prim_at_path,
+    get_prim_parent,
+    get_prim_property,
+    is_prim_path_valid,
+    set_prim_property,
+)
+from omni.isaac.core.utils.rotations import gf_quat_to_np_array
+from omni.isaac.core.utils.transformations import tf_matrix_from_pose
+from omni.isaac.core.utils.types import DOFInfo
+from omni.isaac.dynamic_control import _dynamic_control
+from pxr import Gf, Usd, UsdGeom, UsdPhysics
+
 from igibson.prims.joint_prim import JointPrim
+from igibson.prims.rigid_prim import RigidPrim
+from igibson.prims.xform_prim import XFormPrim
 from igibson.utils.types import JointsState
 
 
@@ -63,7 +67,6 @@ class EntityPrim(XFormPrim):
         self._joints = None
         self._mass = None
         self._visual_only = None
-        self._texture_states = []
 
         # Run super init
         super().__init__(
@@ -935,78 +938,6 @@ class EntityPrim(XFormPrim):
             return np.array(calculated_translation), gf_quat_to_np_array(calculated_orientation)[[1, 2, 3, 0]]
         else:
             return super().get_local_pose()
-
-    def get_textures(self):
-        """Gets prim's texture files.
-
-        Returns:
-            list of (str): List of texture file paths
-        """
-        textures = []
-        looks_prim_path = f"{str(self._prim_path)}/Looks"
-        looks_prim = get_prim_at_path(looks_prim_path)
-        if not looks_prim:
-            return
-        for subprim in looks_prim.GetChildren():
-            if subprim.GetPrimTypeInfo().GetTypeName() != "Material":
-                continue
-            shader = get_shader_from_material(subprim)
-            texture_path = shader.GetInput("diffuse_texture").Get()
-            if texture_path:
-                textures.append(texture_path.path)
-        return textures
-
-    def update_textures_for_state(self, state, value):
-        """Update prim's textures to represent @state.
-
-        Args:
-            state (BaseObjectState): State to represent
-            value (bool): Whether or not changing to the state
-        """
-        # Determine the state to set.
-        TEXTURE_CHANGE_PRIORITY = {
-            "Frozen": 4,
-            "Burnt": 3,
-            "Cooked": 2,
-            "Soaked": 1,
-            "ToggledOn": 0,
-        }
-        if value and state.__name__ not in self._texture_states:
-            self._texture_states.append(state.__name__)
-            self._texture_states.sort(key=lambda s: TEXTURE_CHANGE_PRIORITY[s])
-        if not value and state.__name__ in self._texture_states:
-            self._texture_states.remove(state.__name__)
-        
-        state_to_set = self._texture_states[-1] if self._texture_states else None
-        print("update_textures_for_state!")
-        print(self._texture_states, state_to_set)
-
-        # Find the material prims to update.
-        looks_prim_path = f"{str(self._prim_path)}/Looks"
-        looks_prim = get_prim_at_path(looks_prim_path)
-        if not looks_prim:
-            return
-        for subprim in looks_prim.GetChildren():
-            if subprim.GetPrimTypeInfo().GetTypeName() != "Material":
-                continue
-            shader = get_shader_from_material(subprim)
-            texture_path = shader.GetInput("diffuse_texture").Get()
-            if texture_path is None:
-                continue
-            # Get updated texture file path for state.
-            texture_path_split = texture_path.path.split("/")
-            filedir, filename = "/".join(texture_path_split[:-1]), texture_path_split[-1]
-            assert filename[-4:] == ".png", f"Texture file {filename} does not end with .png"
-            filename_split = filename[:-4].split("_")
-            # Check both file names for backward compatibility.
-            if len(filename_split) > 0 and filename_split[-1] not in ("DIFFUSE", "albedo"):
-                filename_split.pop()
-            target_texture_path = f"{filedir}/{'_'.join(filename_split)}"
-            target_texture_path += f"_{state_to_set}.png" if state_to_set else ".png"
-            if not os.path.exists(target_texture_path):
-                print(f"Warning: get texture path failed because {target_texture_path} does not exist")
-                continue
-            shader.GetInput("diffuse_texture").Set(target_texture_path)
 
     # TODO: Is the omni joint damping (used for driving motors) same as dissipative joint damping (what we had in pb)?
     @property

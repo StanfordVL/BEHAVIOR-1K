@@ -17,6 +17,8 @@ IMPORT_RENDER_CHANNELS = True
 if __name__ == "__main__":
     for obj_category, obj_model in zip(OBJECT_CATEGORIES, OBJECT_MODELS):
         import_obj_urdf(obj_category=obj_category, obj_model=obj_model, skip_if_exist=False)
-        import_obj_metadata(obj_category=obj_category, obj_model=obj_model, name=None)
+        import_obj_metadata(
+            obj_category=obj_category, obj_model=obj_model, name=None, import_render_channels=IMPORT_RENDER_CHANNELS
+        )
 
     app.close()
