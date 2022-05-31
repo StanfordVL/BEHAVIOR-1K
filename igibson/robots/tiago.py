@@ -392,7 +392,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         """
         :return Array[int]: Indices in low-level control vector corresponding to [Left, Right] wheel joints.
         """
-        return np.array([])
+        return np.array([], dtype=int)
 
     @property
     def trunk_control_idx(self):
