@@ -5,19 +5,24 @@ from igibson.utils.python_utils import assert_valid_key
 
 from pxr import Gf, Usd, Sdf, UsdGeom, UsdPhysics, PhysxSchema, UsdShade
 from omni.isaac.core.utils.stage import add_reference_to_stage, get_current_stage
-
+from igibson.utils.constants import PrimType
+from IPython import embed
+import omni
+import carb
 
 PRIMITIVE_OBJECTS = {
-    "Cube",
-    "Sphere",
-    "Cylinder",
-    "Capsule",
     "Cone",
+    "Cube",
+    "Cylinder",
+    "Disk",
+    "Plane",
+    "Sphere",
+    "Torus",
 }
 
-VALID_RADIUS_OBJECTS = {"Sphere", "Cone", "Capsule", "Cylinder"}
-VALID_HEIGHT_OBJECTS = {"Cone", "Capsule", "Cylinder"}
-VALID_SIZE_OBJECTS = {"Cube"}
+VALID_RADIUS_OBJECTS = {"Cone", "Cylinder", "Disk", "Sphere"}
+VALID_HEIGHT_OBJECTS = {"Cone", "Cylinder"}
+VALID_SIZE_OBJECTS = {"Cube", "Torus"}
 
 
 class PrimitiveObject(StatefulObject):
@@ -38,6 +43,7 @@ class PrimitiveObject(StatefulObject):
         fixed_base=False,
         visual_only=False,
         self_collisions=False,
+        prim_type=PrimType.RIGID,
         load_config=None,
         abilities=None,
         rgba=(0.5, 0.5, 0.5, 1.0),
@@ -62,6 +68,7 @@ class PrimitiveObject(StatefulObject):
         @param visual_only: whether this object should be a visual-only (i.e.: not affected by collisions / gravity)
             object or not
         self_collisions (bool): Whether to enable self collisions for this object
+        prim_type (PrimType): Which type of prim the object is, Valid options are: {PrimType.RIGID, PrimType.CLOTH}
         load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
             loading this prim at runtime.
 
@@ -110,6 +117,7 @@ class PrimitiveObject(StatefulObject):
             fixed_base=fixed_base,
             visual_only=visual_only,
             self_collisions=self_collisions,
+            prim_type=prim_type,
             load_config=load_config,
             abilities=abilities,
             **kwargs,
@@ -125,28 +133,76 @@ class PrimitiveObject(StatefulObject):
         stage = get_current_stage()
         prim = stage.DefinePrim(self._prim_path, "Xform")
 
-        # Define a nested mesh corresponding to the root link for this prim
-        base_link = stage.DefinePrim(f"{self._prim_path}/base_link", "Xform")
+        SETTING_U_SCALE = f"/persistent/app/mesh_generator/shapes/{self._primitive_type.lower()}/u_scale"
+        SETTING_V_SCALE = f"/persistent/app/mesh_generator/shapes/{self._primitive_type.lower()}/v_scale"
+        SETTING_HALF_SCALE = f"/persistent/app/mesh_generator/shapes/{self._primitive_type.lower()}/object_half_scale"
+        u_backup = carb.settings.get_settings().get(SETTING_U_SCALE)
+        v_backup = carb.settings.get_settings().get(SETTING_V_SCALE)
+        hs_backup = carb.settings.get_settings().get(SETTING_HALF_SCALE)
+        carb.settings.get_settings().set(SETTING_U_SCALE, 1)
+        carb.settings.get_settings().set(SETTING_V_SCALE, 1)
+        # Default size (half-extent, radius, etc) is 1.
+        carb.settings.get_settings().set(SETTING_HALF_SCALE, 1)
 
-        # Define (finally!) nested meshes corresponding to visual / collision mesh
-        self._vis_prim = UsdGeom.__dict__[self._primitive_type].Define(stage, f"{self._prim_path}/base_link/visual").GetPrim()
-        self._col_prim = UsdGeom.__dict__[self._primitive_type].Define(stage, f"{self._prim_path}/base_link/collision").GetPrim()
+        if self._prim_type == PrimType.RIGID:
+            # Define a nested mesh corresponding to the root link for this prim
+            base_link = stage.DefinePrim(f"{self._prim_path}/base_link", "Xform")
+            visual_mesh_path_from = Sdf.Path(omni.usd.get_stage_next_free_path(stage, self._primitive_type, True))
+            visual_mesh_path = f"{self._prim_path}/base_link/visual"
+            omni.kit.commands.execute(
+                "CreateMeshPrimWithDefaultXform",
+                prim_type=self._primitive_type,
+            )
+            omni.kit.commands.execute("MovePrim", path_from=visual_mesh_path_from, path_to=visual_mesh_path)
 
-        # Add collision API to collision geom
-        UsdPhysics.CollisionAPI.Apply(self._col_prim)
-        UsdPhysics.MeshCollisionAPI.Apply(self._col_prim)
-        PhysxSchema.PhysxCollisionAPI.Apply(self._col_prim)
+            collision_mesh_path_from = Sdf.Path(omni.usd.get_stage_next_free_path(stage, self._primitive_type, True))
+            collision_mesh_path = f"{self._prim_path}/base_link/collision"
+            omni.kit.commands.execute(
+                "CreateMeshPrimWithDefaultXform",
+                prim_type=self._primitive_type,
+            )
+            omni.kit.commands.execute("MovePrim", path_from=collision_mesh_path_from, path_to=collision_mesh_path)
+
+            self._vis_prim_mesh = UsdGeom.Mesh.Define(stage, visual_mesh_path)
+            self._col_prim_mesh = UsdGeom.Mesh.Define(stage, collision_mesh_path)
+            self._vis_prim = self._vis_prim_mesh.GetPrim()
+            self._col_prim = self._col_prim_mesh.GetPrim()
+
+            # Add collision API to collision geom
+            UsdPhysics.CollisionAPI.Apply(self._col_prim)
+            UsdPhysics.MeshCollisionAPI.Apply(self._col_prim)
+            PhysxSchema.PhysxCollisionAPI.Apply(self._col_prim)
+
+        elif self._prim_type == PrimType.CLOTH:
+            visual_mesh_path_from = Sdf.Path(omni.usd.get_stage_next_free_path(stage, self._primitive_type, True))
+            visual_mesh_path = f"{self._prim_path}/base_link"
+
+            # TODO: potentially change u_patches and v_patches
+            omni.kit.commands.execute(
+                "CreateMeshPrimWithDefaultXform",
+                prim_type=self._primitive_type,
+            )
+            omni.kit.commands.execute("MovePrim", path_from=visual_mesh_path_from, path_to=visual_mesh_path)
+
+            self._vis_prim = UsdGeom.Mesh.Define(stage, visual_mesh_path)
+            self._col_prim = None
+
+        carb.settings.get_settings().set(SETTING_U_SCALE, u_backup)
+        carb.settings.get_settings().set(SETTING_V_SCALE, v_backup)
+        carb.settings.get_settings().set(SETTING_HALF_SCALE, hs_backup)
 
         return prim
 
-    def _post_load(self):
-        # Run super first
+    def _post_load(self):        # Run super first
         super()._post_load()
 
-        # Set color and opacity
-        for mesh in self._links["base_link"].visual_meshes.values():
-            mesh.color = self._load_config["color"]
-            mesh.opacity = self._load_config["opacity"]
+        if self._prim_type == PrimType.RIGID:
+            visual_geom_prim = list(self.links["base_link"].visual_meshes.values())[0]
+        elif self._prim_type == PrimType.CLOTH:
+            visual_geom_prim = self.links["base_link"]
+
+        visual_geom_prim.color = self._load_config["color"]
+        visual_geom_prim.opacity = self._load_config["opacity"]
 
         # Possibly set scalings
         if self._primitive_type in VALID_RADIUS_OBJECTS:
@@ -168,7 +224,7 @@ class PrimitiveObject(StatefulObject):
             float: radius for this object
         """
         assert_valid_key(key=self._primitive_type, valid_keys=VALID_RADIUS_OBJECTS, name="primitive object with radius")
-        return self._vis_prim.GetAttribute("radius").Get()
+        return self.scale[0]
 
     @radius.setter
     def radius(self, radius):
@@ -182,8 +238,9 @@ class PrimitiveObject(StatefulObject):
             radius (float): radius to set
         """
         assert_valid_key(key=self._primitive_type, valid_keys=VALID_RADIUS_OBJECTS, name="primitive object with radius")
-        self._vis_prim.GetAttribute("radius").Set(radius)
-        self._col_prim.GetAttribute("radius").Set(radius)
+        original_scale = self.scale
+        original_scale[:2] = radius
+        self.scale = original_scale
 
     @property
     def height(self):
@@ -197,7 +254,7 @@ class PrimitiveObject(StatefulObject):
             float: height for this object
         """
         assert_valid_key(key=self._primitive_type, valid_keys=VALID_HEIGHT_OBJECTS, name="primitive object with height")
-        return self._vis_prim.GetAttribute("height").Get()
+        return self.scale[2] * 2.0
 
     @height.setter
     def height(self, height):
@@ -211,8 +268,9 @@ class PrimitiveObject(StatefulObject):
             height (float): height to set
         """
         assert_valid_key(key=self._primitive_type, valid_keys=VALID_HEIGHT_OBJECTS, name="primitive object with height")
-        self._vis_prim.GetAttribute("height").Set(height)
-        self._col_prim.GetAttribute("height").Set(height)
+        original_scale = self.scale
+        original_scale[2] = height / 2.0
+        self.scale = original_scale
 
     @property
     def size(self):
@@ -226,7 +284,7 @@ class PrimitiveObject(StatefulObject):
             float: size for this object
         """
         assert_valid_key(key=self._primitive_type, valid_keys=VALID_SIZE_OBJECTS, name="primitive object with size")
-        return self._vis_prim.GetAttribute("size").Get()
+        return self.scale[0] * 2.0
 
     @size.setter
     def size(self, size):
@@ -240,8 +298,9 @@ class PrimitiveObject(StatefulObject):
             size (float): size to set
         """
         assert_valid_key(key=self._primitive_type, valid_keys=VALID_SIZE_OBJECTS, name="primitive object with size")
-        self._vis_prim.GetAttribute("size").Set(size)
-        self._col_prim.GetAttribute("size").Set(size)
+        original_scale = self.scale
+        original_scale[:] = size / 2.0
+        self.scale = original_scale
 
     def _create_prim_with_same_kwargs(self, prim_path, name, load_config):
         # Add additional kwargs (fit_avg_dim_volume and bounding_box are already captured in load_config)
@@ -255,6 +314,7 @@ class PrimitiveObject(StatefulObject):
             rendering_params=self.rendering_params,
             visible=self.visible,
             fixed_base=self.fixed_base,
+            prim_type=self._prim_type,
             load_config=load_config,
             abilities=self._abilities,
             visual_only=self._visual_only,

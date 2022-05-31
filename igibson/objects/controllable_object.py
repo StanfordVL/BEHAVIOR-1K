@@ -9,6 +9,7 @@ from igibson.controllers import create_controller
 from igibson.controllers.controller_base import ControlType
 from igibson.utils.python_utils import assert_valid_key, merge_nested_dicts
 from igibson.utils.types import JointsState
+from igibson.utils.constants import PrimType
 
 
 class ControllableObject(BaseObject):
@@ -93,6 +94,7 @@ class ControllableObject(BaseObject):
             fixed_base=fixed_base,
             visual_only=visual_only,
             self_collisions=self_collisions,
+            prim_type=PrimType.RIGID,
             load_config=load_config,
             **kwargs,
         )

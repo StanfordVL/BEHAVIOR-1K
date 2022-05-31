@@ -60,6 +60,11 @@ SPECIAL_JOINT_FRICTIONS = {
 }
 
 
+class PrimType(IntEnum):
+    RIGID = 0
+    CLOTH = 1
+
+
 # TODO: Clean up this class to be better enum with sanity checks
 # Joint types
 class JointType:

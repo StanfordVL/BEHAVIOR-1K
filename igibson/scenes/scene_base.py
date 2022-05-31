@@ -187,13 +187,13 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # Store world prim
         self._world_prim = simulator.world_prim
 
-        prims = self._load(simulator)
-        self._loaded = True
-
         # Initialize registries
         for system in self.systems:
             print(f"Initializing system: {system.name}")
             system.initialize(simulator=simulator)
+
+        prims = self._load(simulator)
+        self._loaded = True
 
         # Always stop the sim if we started it internally
         if not simulator.is_stopped():

@@ -28,6 +28,7 @@ sim = Simulator()
 scene = InteractiveTraversableScene(
     scene_model=SCENE_ID,
     usd_path=USD_TEMPLATE_FILE,
+#    load_object_categories=["carpet", "bed"],
 )
 
 # Import scene
@@ -56,7 +57,7 @@ rgb = obs["robot:eyes_Camera_sensor_rgb"]
 
 # toggle = 1
 for i in range(1000000):
-    robot.apply_action(np.array([1.0, 0]))
+    #robot.apply_action(np.array([1.0, 0]))
     sim.step()
     # print(f"collision groups: {CollisionAPI.ACTIVE_COLLISION_GROUPS}")
     # if i % 10 == 0:

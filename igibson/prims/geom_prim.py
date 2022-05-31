@@ -79,6 +79,24 @@ class GeomPrim(BasePrim):
         # Cannot directly duplicate a mesh prim
         raise NotImplementedError("Cannot directly duplicate a geom prim!")
 
+    @property
+    def purpose(self):
+        """
+        Returns:
+            str: the purpose used for this geom, one of {"default", "render", "proxy", "guide"}
+        """
+        return self.get_attribute("purpose")
+
+    @purpose.setter
+    def purpose(self, purpose):
+        """
+        Sets the purpose of this geom
+
+        Args:
+            purpose (str): the purpose used for this geom, one of {"default", "render", "proxy", "guide"}
+        """
+        self.set_attribute("purpose", purpose)
+
 
 class CollisionGeomPrim(GeomPrim):
 
@@ -103,6 +121,9 @@ class CollisionGeomPrim(GeomPrim):
     def _post_load(self):
         # run super first
         super()._post_load()
+
+        # By default, CollisionGeomPrim does not show up in the rendering.
+        self.purpose = "guide"
 
         # Create API references
         self._collision_api = UsdPhysics.CollisionAPI(self._prim) if \

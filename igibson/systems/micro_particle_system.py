@@ -14,6 +14,7 @@ from omni.physx.scripts import particleUtils
 from collections import OrderedDict
 import numpy as np
 from pxr import Gf, Vt, UsdShade, UsdGeom, PhysxSchema
+from omni.isaac.core.utils.stage import get_current_stage
 import logging
 
 
@@ -393,11 +394,11 @@ class MicroParticleSystem(BaseParticleSystem):
         raise NotImplementedError()
 
     @classproperty
-    def is_dynamic(cls):
+    def visual_only(cls):
         """
         Returns:
-            bool: Whether this particle system should be dynamic, i.e.: subject to collisions and physics. If False,
-                then generated particles will not move or collide
+            bool: Whether this particle system should be visual-only, i.e.: not subject to collisions and physics. If True,
+                the generated particles will not move or collide
         """
         raise NotImplementedError()
 
@@ -483,7 +484,7 @@ class MicroParticleSystem(BaseParticleSystem):
             prim_path=f"/World/{cls.name}",
             physics_scene_path=cls.simulator.get_physics_context().get_current_physics_scene_prim().GetPrimPath().pathString,
             particle_contact_offset=cls.particle_contact_offset,
-            visual_only=cls.is_dynamic,
+            visual_only=cls.visual_only,
             smoothing=cls.use_smoothing,
             anisotropy=cls.use_anisotropy,
             isosurface=cls.use_isosurface,
@@ -556,7 +557,7 @@ class MicroParticleSystem(BaseParticleSystem):
             scales=np.random.uniform(cls.min_scale, cls.max_scale, size=(n_particles, 3)) if scales is None else scales,
             prototype_prim_paths=[pp.GetPrimPath().pathString for pp in cls.particle_prototypes],
             prototype_indices=prototype_indices,
-            enabled=cls.is_dynamic,
+            enabled=not cls.visual_only,
         )
 
         # Create the instancer object that wraps the raw prim
@@ -857,8 +858,8 @@ class FluidSystem(MicroParticleSystem):
         return True
 
     @classproperty
-    def is_dynamic(cls):
-        return True
+    def visual_only(cls):
+        return False
 
     @classproperty
     def use_smoothing(cls):
@@ -899,20 +900,135 @@ class WaterSystem(FluidSystem):
         prototype.CreateRadiusAttr().Set(0.99 * 0.6 * cls.particle_contact_offset)
         return [prototype.GetPrim()]
 
+    # @classmethod
+    # def _create_particle_material(cls):
+    #     # Use DeepWater omni present for rendering water
+    #     mtl_created = []
+    #     omni.kit.commands.execute(
+    #         "CreateAndBindMdlMaterialFromLibrary",
+    #         mdl_name="OmniSurfacePresets.mdl",
+    #         mtl_name="OmniSurface_DeepWater",
+    #         mtl_created_list=mtl_created,
+    #     )
+    #     material_path = mtl_created[0]
+    #
+    #     # Also apply physics to this material
+    #     particleUtils.add_pbd_particle_material(cls.simulator.stage, material_path)
+    #
+    #     # Return generated material
+    #     return UsdShade.Material(get_prim_at_path(material_path))
+
+
+class ClothSystem(MicroParticleSystem):
+    """
+    Particle system class to simulate cloth.
+    """
+    @classproperty
+    def _register_system(cls):
+        # We should register this system since it's an "actual" system (not an intermediate class)
+        return True
+
+    @classproperty
+    def particle_contact_offset(cls):
+        return 0.05
+
+    @classproperty
+    def visual_only(cls):
+        return False
+
+    @classproperty
+    def use_smoothing(cls):
+        return False
+
+    @classproperty
+    def use_anisotropy(cls):
+        return False
+
+    @classproperty
+    def use_isosurface(cls):
+        return False
+
     @classmethod
-    def _create_particle_material(cls):
-        # Use DeepWater omni present for rendering water
-        mtl_created = []
-        omni.kit.commands.execute(
-            "CreateAndBindMdlMaterialFromLibrary",
-            mdl_name="OmniSurfacePresets.mdl",
-            mtl_name="OmniSurface_DeepWater",
-            mtl_created_list=mtl_created,
-        )
-        material_path = mtl_created[0]
+    def _create_particle_prototypes(cls):
+        return []
 
-        # Also apply physics to this material
-        particleUtils.add_pbd_particle_material(cls.simulator.stage, material_path)
+    @classmethod
+    def _create_particle_system(cls):
+        """
+        Creates the single, global particle system. This should only be ever called once, and during initialize()
 
-        # Return generated material
-        return UsdShade.Material(get_prim_at_path(material_path))
+        Returns:
+            Usd.Prim: Particle system prim created
+        """
+        radius = 0.01
+        restOffset = radius
+        contactOffset = restOffset * 1.5
+        return particleUtils.add_physx_particle_system(
+            stage=get_current_stage(),
+            particle_system_path=f"/World/{cls.name}",
+            contact_offset=contactOffset,
+            rest_offset=restOffset,
+            particle_contact_offset=contactOffset,
+            solid_rest_offset=restOffset,
+            fluid_rest_offset=0.0,
+            solver_position_iterations=16,
+            simulation_owner=cls.simulator.get_physics_context().get_current_physics_scene_prim().GetPrimPath().pathString,
+        ).GetPrim()
+
+        # return create_physx_particle_system(
+        #     prim_path=f"/World/{cls.name}",
+        #     physics_scene_path=cls.simulator.get_physics_context().get_current_physics_scene_prim().GetPrimPath().pathString,
+        #     particle_contact_offset=cls.particle_contact_offset,
+        #     visual_only=cls.visual_only,
+        #     smoothing=cls.use_smoothing,
+        #     anisotropy=cls.use_anisotropy,
+        #     isosurface=cls.use_isosurface,
+        # ).GetPrim()
+
+    # def _create_particle_system(cls):
+    #     """
+    #     Creates the single, global particle system. This should only be ever called once, and during initialize()
+    #
+    #     Returns:
+    #         Usd.Prim: Particle system prim created
+    #     """
+    #     return create_physx_particle_system(
+    #         prim_path=f"/World/{cls.name}",
+    #         physics_scene_path=cls.simulator.get_physics_context().get_current_physics_scene_prim().GetPrimPath().pathString,
+    #         particle_contact_offset=cls.particle_contact_offset,
+    #         visual_only=cls.visual_only,
+    #         smoothing=cls.use_smoothing,
+    #         anisotropy=cls.use_anisotropy,
+    #         isosurface=cls.use_isosurface,
+    #     ).GetPrim()
+    #
+    #     particleUtils.add_physx_particle_system(
+    #         stage=stage,
+    #         particle_system_path=particle_system_path,
+    #         contact_offset=contactOffset,
+    #         rest_offset=restOffset,
+    #         particle_contact_offset=contactOffset,
+    #         solid_rest_offset=restOffset,
+    #         fluid_rest_offset=0.0,
+    #         solver_position_iterations=16,
+    #         simulation_owner=self._scene.GetPath(),
+    #     )
+
+
+    # @classmethod
+    # def _create_particle_material(cls):
+    #     # Use DeepWater omni present for rendering water
+    #     mtl_created = []
+    #     omni.kit.commands.execute(
+    #         "CreateAndBindMdlMaterialFromLibrary",
+    #         mdl_name="OmniSurfacePresets.mdl",
+    #         mtl_name="OmniSurface_DeepWater",
+    #         mtl_created_list=mtl_created,
+    #     )
+    #     material_path = mtl_created[0]
+    #
+    #     # Also apply physics to this material
+    #     particleUtils.add_pbd_particle_material(cls.simulator.stage, material_path)
+    #
+    #     # Return generated material
+    #     return UsdShade.Material(get_prim_at_path(material_path))

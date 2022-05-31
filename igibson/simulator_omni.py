@@ -239,15 +239,21 @@ class Simulator(SimulationContext):
         """
         assert self.is_stopped(), "Simulator must be stopped while importing a scene!"
         assert isinstance(scene, Scene), "import_scene can only be called with Scene"
+
         self._scene = scene
         scene.load(self)
 
         # Make sure simulator is not running, then start it, then pause it so we can initialize the scene
-        assert self.is_stopped(), "Simulator must be stopped after importing a scene!"
+        # assert self.is_stopped(), "Simulator must be stopped after importing a scene!"
         self.play()
-        self.pause()
+        # self.pause()
+
         # Initialize the scene
         self._scene.initialize()
+        # self._scene._initialized = True
+
+        self.step()
+        self.stop()
 
     # # TODO
     # def import_particle_system(self, particle_system):
@@ -318,6 +324,7 @@ class Simulator(SimulationContext):
         # Check to see if any objects should be initialized (only done IF we're playing)
         if len(self._objects_to_initialize) > 0 and self.is_playing():
             for obj in self._objects_to_initialize:
+                print("---------step initialize--------------", obj.name)
                 obj.initialize()
             self._objects_to_initialize = []
             # Also update the scene registry
@@ -350,26 +357,27 @@ class Simulator(SimulationContext):
     def play(self):
         super().play()
 
-        # Update all object / robot handles
-        if self.scene is not None and self.scene.initialized:
-            for obj in self.scene.objects:
-                # Only need to update handles if object is already initialized as well
-                if obj.initialized:
-                    obj.update_handles()
-
-            for robot in self.scene.robots:
-                # Only need to update handles if robot is already initialized as well
-                if robot.initialized:
-                    robot.update_handles()
-
-        # Check to see if any objects should be initialized
-        if len(self._objects_to_initialize) > 0:
-            for obj in self._objects_to_initialize:
-                obj.initialize()
-            self._objects_to_initialize = []
-            # Also update the scene registry
-            # TODO: A better place to put this perhaps?
-            self._scene.object_registry.update(keys="root_handle")
+        # # Update all object / robot handles
+        # if self.scene is not None and self.scene.initialized:
+        #     for obj in self.scene.objects:
+        #         # Only need to update handles if object is already initialized as well
+        #         if obj.initialized:
+        #             obj.update_handles()
+        #
+        #     for robot in self.scene.robots:
+        #         # Only need to update handles if robot is already initialized as well
+        #         if robot.initialized:
+        #             robot.update_handles()
+        #
+        # # Check to see if any objects should be initialized
+        # if len(self._objects_to_initialize) > 0:
+        #     for obj in self._objects_to_initialize:
+        #         print("---------play initialize--------------", obj.name)
+        #         obj.initialize()
+        #     self._objects_to_initialize = []
+        #     # Also update the scene registry
+        #     # TODO: A better place to put this perhaps?
+        #     self._scene.object_registry.update(keys="root_handle")
 
     def step(self, render=True, force_playing=False):
         """

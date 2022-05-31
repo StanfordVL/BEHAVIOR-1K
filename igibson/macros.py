@@ -18,7 +18,7 @@ ENABLE_ROBOT_CONTACT_REPORTING = True
 
 # Whether to use omni's particles feature (e.g. for fluids) or not
 # This also dictates whether we need to use GPU dynamics or not
-ENABLE_OMNI_PARTICLES = False
+ENABLE_OMNI_PARTICLES = True
 
 # Whether to use omni's flatcache feature or not (can speed up simulation)
 ENABLE_FLATCACHE = False
@@ -29,4 +29,4 @@ ENABLE_CCD = False
 
 # Whether the public version of IsaacSim is being used
 # TODO: Remove this once we unify omni version being used
-IS_PUBLIC_ISAACSIM = True
+IS_PUBLIC_ISAACSIM = False
