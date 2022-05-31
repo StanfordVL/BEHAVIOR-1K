@@ -1,7 +1,8 @@
 import logging
 import os
 
-from igibson.objects.articulated_object import URDFObject
+import igibson
+from igibson.objects.usd_object import URDFObject
 from igibson.render.mesh_renderer.mesh_renderer_settings import MeshRendererSettings
 from igibson.scenes.empty_scene import EmptyScene
 from igibson.simulator import Simulator

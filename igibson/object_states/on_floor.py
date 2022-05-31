@@ -1,11 +1,11 @@
-import pybullet as p
+
 from IPython import embed
 
 import igibson
 from igibson.object_states.kinematics import KinematicsMixin
 from igibson.object_states.object_state_base import BooleanState, RelativeObjectState
 from igibson.object_states.touching import Touching
-from igibson.object_states.utils import clear_cached_states, get_center_extent, sample_kinematics
+from igibson.object_states.utils import get_center_extent, sample_kinematics
 from igibson.utils.utils import restoreState
 
 
@@ -33,11 +33,12 @@ class OnFloor(RelativeObjectState, KinematicsMixin, BooleanState):
         if not isinstance(other, RoomFloor):
             return False
 
-        state_id = p.saveState()
+        state = self._simulator.dump_state(serialized=False)
+
         for _ in range(10):
             sampling_success = sample_kinematics("onFloor", self.obj, other, new_value)
             if sampling_success:
-                clear_cached_states(self.obj)
+                self.obj.clear_cached_states()
                 if self.get_value(other) != new_value:
                     sampling_success = False
                 if igibson.debug_sampling:
@@ -46,9 +47,7 @@ class OnFloor(RelativeObjectState, KinematicsMixin, BooleanState):
             if sampling_success:
                 break
             else:
-                restoreState(state_id)
-
-        p.removeState(state_id)
+                self._simulator.load_state(state, serialized=False)
 
         return sampling_success
 

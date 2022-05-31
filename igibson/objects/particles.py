@@ -2,11 +2,11 @@ import os
 from collections import deque
 
 import numpy as np
-import pybullet as p
+
 
 import igibson
-from igibson.external.pybullet_tools import utils
-from igibson.external.pybullet_tools.utils import get_aabb_extent, get_link_name, link_from_name
+# from igibson.external.pybullet_tools import utils
+# from igibson.external.pybullet_tools.utils import get_aabb_extent, get_link_name, link_from_name
 from igibson.objects.object_base import BaseObject
 from igibson.utils import sampling_utils
 from igibson.utils.constants import PyBulletSleepState

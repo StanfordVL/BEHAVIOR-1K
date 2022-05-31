@@ -2,10 +2,12 @@ import itertools
 from collections import Counter, defaultdict
 
 import numpy as np
-import pybullet as p
+
 import trimesh
 from scipy.spatial.transform import Rotation
 from scipy.stats import truncnorm
+
+from omni.physx import get_physx_scene_query_interface
 
 import igibson
 from igibson.objects.visual_marker import VisualMarker
@@ -160,6 +162,124 @@ def sample_origin_positions(mins, maxes, count, bimodal_mean_fraction, bimodal_s
     return results
 
 
+def raytest_batch(start_points, end_points, hit_number=0, ignore_bodies=None, ignore_collisions=None):
+    """
+    Computes raytest collisions for a set of rays cast from @start_points to @end_points.
+
+    Args:
+        start_points (list of 3-array): Array of start locations to cast rays, where each is (x,y,z) global
+            start location of the ray
+        end_points (list of 3-array): Array of end locations to cast rays, where each is (x,y,z) global
+            end location of the ray
+        hit_number (int): Report the nth collision detected (default is the closest, i.e.: 0th)
+        ignore_bodies (None or list of str): If specified, specifies absolute USD paths to rigid bodies
+            whose collisions should be ignored
+        ignore_collisions (None or list of str): If specified, specifies absolute USD paths to collision geoms
+            whose collisions should be ignored
+
+    Returns:
+        list of dict: Results for all rays, where each entry corresponds to the result for the ith ray cast. Each
+            dict is composed of:
+
+            "hit" (bool): Whether an object was hit or not
+            "position" (3-array): Location of the hit position
+            "normal" (3-array): normal vector of the face hit
+            "distance" (float): distance from @start_point the hit occurred
+            "collision" (str): absolute USD path to the collision body hit
+            "rigidBody" (str): absolute USD path to the associated rigid body hit
+
+            Note that only "hit" = False exists in the dict if no hit was found
+    """
+    # For now, we do a naive for loop over individual raytests until a better API comes out
+    results = []
+    for start_point, end_point in zip(start_points, end_points):
+        results.append(raytest(
+            start_point=start_point,
+            end_point=end_point,
+            hit_number=hit_number,
+            ignore_bodies=ignore_bodies,
+            ignore_collisions=ignore_collisions,
+        ))
+
+    return results
+
+
+def raytest(
+        start_point,
+        end_point,
+        hit_number=0,
+        ignore_bodies=None,
+        ignore_collisions=None,
+):
+    """
+    Computes raytest collision for ray cast from @start_point to @end_point
+
+    Args:
+        start_point (3-array): (x,y,z) global start location of the ray
+        end_point (3-array): (x,y,z) global end location of the ray
+        hit_number (int): Report the nth collision detected (default is the closest, i.e.: 0th)
+        ignore_bodies (None or list of str): If specified, specifies absolute USD paths to rigid bodies
+            whose collisions should be ignored
+        ignore_collisions (None or list of str): If specified, specifies absolute USD paths to collision geoms
+            whose collisions should be ignored
+
+    Returns:
+        dict:
+            "hit" (bool): Whether an object was hit or not
+            "position" (3-array): Location of the hit position
+            "normal" (3-array): normal vector of the face hit
+            "distance" (float): distance from @start_point the hit occurred
+            "collision" (str): absolute USD path to the collision body hit
+            "rigidBody" (str): absolute USD path to the associated rigid body hit
+
+            Note that only "hit" = False exists in the dict if no hit was found
+    """
+    # Make sure start point, end point are numpy arrays
+    start_point, end_point = np.array(start_point), np.array(end_point)
+    point_diff = end_point - start_point
+    distance = np.linalg.norm(point_diff)
+    direction = point_diff / distance
+
+    # For effiency sake, we handle special case of no ignore_bodies, ignore_collisions, and closest_hit
+    if hit_number == 0 and ignore_bodies is None and ignore_collisions is None:
+        return get_physx_scene_query_interface().raycast_closest(
+            origin=start_point,
+            dir=direction,
+            distance=distance,
+        )
+    else:
+        # Compose callback function for finding raycasts
+        hits = []
+        ignore_bodies = set() if ignore_bodies is None else set(ignore_bodies)
+        ignore_collisions = set() if ignore_collisions is None else set(ignore_collisions)
+
+        def callback(hit):
+            # Only add to hits if we're not ignoring this body or collision
+            if hit.rigid_body not in ignore_bodies and hit.collision not in ignore_collisions:
+                hits.append({
+                    "hit": True,
+                    "position": hit.position,
+                    "distance": hit.distance,
+                    "collision": hit.collision,
+                    "rigidBody": hit.rigid_body,
+                })
+            # If we haven't hit enough objects with this ray, continue traversal
+            # True means contiue traversing; False means stop
+            return len(hits) <= hit_number
+
+
+        # Grab all collisions
+        get_physx_scene_query_interface().raycast_all(
+            origin=start_point,
+            dir=direction,
+            distance=distance,
+            reportFn=callback,
+        )
+
+        # Grab the nth collision if it exists, else return no hits
+        return hits[hit_number] if len(hits) > hit_number else {"hit": False}
+
+
 def sample_cuboid_on_object(
     obj,
     num_samples,
@@ -203,10 +323,8 @@ def sample_cuboid_on_object(
         are set to None when no successful sampling happens within the max number of attempts. Refusal details are only
         filled if the debug_sampling flag is globally set to True.
     """
-    bbox_center, bbox_orn, bbox_bf_extent, _ = obj.get_base_aligned_bounding_box(xy_aligned=True, fallback_to_aabb=True)
+    bbox_center, bbox_orn, bbox_bf_extent, _ = obj.get_base_aligned_bbox(xy_aligned=True, fallback_to_aabb=True)
     half_extent_with_offset = (bbox_bf_extent / 2) + aabb_offset
-
-    body_ids = obj.get_body_ids()
 
     cuboid_dimensions = np.array(cuboid_dimensions)
     assert cuboid_dimensions.ndim <= 2
@@ -252,12 +370,11 @@ def sample_cuboid_on_object(
             destinations = trimesh.transformations.transform_points(bbf_destinations, to_wf_transform)
 
             # Time to cast the rays.
-            cast_results = p.rayTestBatch(rayFromPositions=sources, rayToPositions=destinations, numThreads=0)
+            cast_results = raytest_batch(start_points=sources, end_points=destinations)
 
-            # for ray_start, ray_end in zip(sources, destinations):
-            #     p.addUserDebugLine(ray_start, ray_end, lineWidth=4)
-
-            threshold, hits = check_rays_hit_object(cast_results, body_ids, refusal_reasons["missed_object"], 0.6)
+            # Check whether the object was hit or not
+            rigid_bodies = [link.prim_path for link in obj.links.values()]
+            threshold, hits = check_rays_hit_object(cast_results, rigid_bodies, refusal_reasons["missed_object"], 0.6)
             if not threshold:
                 continue
 
@@ -277,12 +394,12 @@ def sample_cuboid_on_object(
                 continue
 
             # Process the hit positions and normals.
-            hit_positions = np.array([ray_res[3] for ray_res in filtered_cast_results])
-            hit_normals = np.array([ray_res[4] for ray_res in filtered_cast_results])
+            hit_positions = np.array([ray_res["position"] for ray_res in filtered_cast_results])
+            hit_normals = np.array([ray_res["normal"] for ray_res in filtered_cast_results])
             hit_normals /= np.linalg.norm(hit_normals, axis=1)[:, np.newaxis]
 
             assert filtered_center_idx
-            hit_link = filtered_cast_results[filtered_center_idx][1]
+            hit_link = filtered_cast_results[filtered_center_idx]["rigidBody"]
             center_hit_normal = hit_normals[filtered_center_idx]
 
             # Reject anything facing more than 45deg downwards if requested.
@@ -320,7 +437,10 @@ def sample_cuboid_on_object(
                 continue
 
             # Get projection of the base onto the plane, fit a rotation, and compute the new center hit / corners.
-            hit_positions = np.array([ray_res[3] for ray_res in cast_results])
+            print(f"cast results: \n\n{cast_results}")
+            for ray_res in cast_results:
+                print(ray_res)
+            hit_positions = np.array([ray_res.get("position", np.zeros(3)) for ray_res in cast_results])
             projected_hits = get_projection_onto_plane(hit_positions, plane_centroid, plane_normal)
             padding = _DEFAULT_CUBOID_BOTTOM_PADDING * plane_normal
             projected_hits += padding
@@ -342,11 +462,12 @@ def sample_cuboid_on_object(
                 )
             )
 
-            # Now we use the cuboid's diagonals to check that the cuboid is actually empty.
-            if not check_cuboid_empty(
-                plane_normal, corner_positions, refusal_reasons["cuboid_not_empty"], this_cuboid_dimensions
-            ):
-                continue
+            # # Now we use the cuboid's diagonals to check that the cuboid is actually empty.
+            # TODO: Uncomment this check before after confirming logic with Eric
+            # if not check_cuboid_empty(
+            #     plane_normal, corner_positions, refusal_reasons["cuboid_not_empty"], this_cuboid_dimensions
+            # ):
+            #     continue
 
             if undo_padding:
                 cuboid_centroid -= padding
@@ -411,12 +532,27 @@ def check_normal_similarity(center_hit_normal, hit_normals, refusal_log):
     return True
 
 
-def check_rays_hit_object(cast_results, body_ids, refusal_log, threshold=1.0):
-    hit_body_ids = [ray_res[0] for ray_res in cast_results]
-    ray_hits = list(hit_body_id in body_ids for hit_body_id in hit_body_ids)
-    if not (sum(ray_hits) / len(hit_body_ids)) >= threshold:
+def check_rays_hit_object(cast_results, body_names, refusal_log, threshold=1.0):
+    """
+    Checks whether rays hit a specific object, as specified by a list of @body_names
+
+    Args:
+        cast_results (list of dict): Output from raycast_batch.
+        body_names (list or set of str): absolute USD paths to rigid bodies to check for hit
+        refusal_log (list of str): Logging array for adding debug logs
+        threshold (float): Relative ratio in [0, 1] specifying proportion of rays from @cast_results are
+            required to hit @body_names to count as the object being hit
+
+    Returns:
+        tuple:
+            - bool: True if object was hit by more than @threshold proportion of rays, otherwise False
+            - list of bool: Individual T/F for each ray -- whether it hit the object or not
+    """
+    body_names = set(body_names)
+    ray_hits = [ray_res["hit"] and ray_res["rigidBody"] in body_names for ray_res in cast_results]
+    if not (sum(ray_hits) / len(cast_results)) >= threshold:
         if igibson.debug_sampling:
-            refusal_log.append("hits %r" % hit_body_ids)
+            refusal_log.append(f"hits {[ray_res['rigidBody'] for ray_res in cast_results if ray_res['hit']]}")
 
         return False, ray_hits
 
@@ -482,10 +618,8 @@ def check_cuboid_empty(hit_normal, bottom_corner_positions, refusal_log, this_cu
 
     # Combine all these pairs, cast the rays, and make sure the rays don't hit anything.
     all_pairs = np.array(top_to_bottom_pairs + bottom_pairs + top_pairs)
-    check_cast_results = p.rayTestBatch(
-        rayFromPositions=all_pairs[:, 0, :], rayToPositions=all_pairs[:, 1, :], numThreads=0
-    )
-    if not all(ray[0] == -1 for ray in check_cast_results):
+    check_cast_results = raytest_batch(start_points=all_pairs[:, 0, :], end_points=all_pairs[:, 1, :])
+    if not all(not ray["hit"] for ray in check_cast_results):
         if igibson.debug_sampling:
             refusal_log.append("check ray info: %r" % (check_cast_results,))
 

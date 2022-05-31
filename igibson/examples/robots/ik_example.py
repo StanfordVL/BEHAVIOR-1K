@@ -4,10 +4,10 @@ import os
 import time
 
 import numpy as np
-import pybullet as p
+
 
 import igibson
-from igibson.external.pybullet_tools.utils import (
+# from igibson.external.pybullet_tools.utils import (
     get_max_limits,
     get_min_limits,
     get_sample_fn,

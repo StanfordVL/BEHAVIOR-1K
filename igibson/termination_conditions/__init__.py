@@ -1,0 +1,2 @@
+from igibson.termination_conditions.termination_condition_base import REGISTERED_TERMINATION_CONDITIONS, \
+    REGISTERED_SUCCESS_CONDITIONS, REGISTERED_FAILURE_CONDITIONS

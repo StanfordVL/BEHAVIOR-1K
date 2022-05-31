@@ -4,6 +4,7 @@ import gym
 import numpy as np
 
 from igibson.robots.locomotion_robot import LocomotionRobot
+from igibson.utils.python_utils import classproperty
 
 
 class TwoWheelRobot(LocomotionRobot):
@@ -37,7 +38,7 @@ class TwoWheelRobot(LocomotionRobot):
         assert max_wheel_joint_vels[0] == max_wheel_joint_vels[1], "Both wheels must have the same max speed!"
         wheel_straight_vel = 0.5 * max_wheel_joint_vels[0]
         wheel_rotate_vel = 0.5
-        if self.controller_config["base"]["name"] == "JointController":
+        if self._controller_config["base"]["name"] == "JointController":
             action_list = [
                 [wheel_straight_vel, wheel_straight_vel],
                 [-wheel_straight_vel, -wheel_straight_vel],
@@ -75,8 +76,8 @@ class TwoWheelRobot(LocomotionRobot):
         ang_vel = (r_vel - l_vel) / self.wheel_axle_length
 
         # Add info
-        dic["dd_base_lin_vel"] = np.array([lin_vel])
-        dic["dd_base_ang_vel"] = np.array([ang_vel])
+        dic["dd_base_lin_vel"] = lin_vel        # lin_vel is already 1D np array of length 1
+        dic["dd_base_ang_vel"] = ang_vel        # lin_vel is already 1D np array of length 1
 
         return dic
 
@@ -103,11 +104,11 @@ class TwoWheelRobot(LocomotionRobot):
         """
         return {
             "name": "DifferentialDriveController",
-            "control_freq": self.control_freq,
+            "control_freq": self._control_freq,
             "wheel_radius": self.wheel_radius,
             "wheel_axle_length": self.wheel_axle_length,
             "control_limits": self.control_limits,
-            "joint_idx": self.base_control_idx,
+            "dof_idx": self.base_control_idx,
         }
 
     @property
@@ -137,3 +138,10 @@ class TwoWheelRobot(LocomotionRobot):
         :return: float, perpendicular distance between the robot's two wheels, in metric units
         """
         raise NotImplementedError
+
+    @classproperty
+    def _do_not_register_classes(cls):
+        # Don't register this class since it's an abstract template
+        classes = super()._do_not_register_classes
+        classes.add("TwoWheelRobot")
+        return classes

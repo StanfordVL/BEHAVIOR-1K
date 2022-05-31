@@ -5,20 +5,20 @@ class CollisionReward(BaseRewardFunction):
     """
     Collision reward
     Penalize robot collision. Typically collision_reward_weight is negative.
+
+    Args:
+        r_collision (float): Penalty value (>0) to penalize collisions
     """
 
-    def __init__(self, config):
-        super(CollisionReward, self).__init__(config)
-        self.collision_reward_weight = self.config.get("collision_reward_weight", -0.1)
+    def __init__(self, r_collision=0.1):
+        # Store internal vars
+        assert r_collision > 0, f"r_collision must be positive, got: {r_collision}!"
+        self._r_collision = r_collision
 
-    def get_reward(self, task, env):
-        """
-        Reward is self.collision_reward_weight if there is collision
-        in the last timestep
+        # Run super
+        super().__init__()
 
-        :param task: task instance
-        :param env: environment instance
-        :return: reward
-        """
-        has_collision = float(len(env.collision_links) > 0)
-        return has_collision * self.collision_reward_weight
+    def _step(self, task, env, action):
+        # Penalty is Reward is -self._r_collision if there were any collisions in the last timestep
+        reward = float(len(env.current_collisions) > 0) * -self._r_collision
+        return reward, {}

@@ -1,18 +1,15 @@
-from collections import Iterable
+from collections import Iterable, OrderedDict
+from enum import IntEnum
 
 import numpy as np
 
-from igibson.utils.python_utils import assert_valid_key
+from igibson.utils.python_utils import classproperty, assert_valid_key, Serializable, Registerable, Recreatable
 
 # Global dicts that will contain mappings
-REGISTERED_CONTROLLERS = {}
-REGISTERED_LOCOMOTION_CONTROLLERS = {}
-REGISTERED_MANIPULATION_CONTROLLERS = {}
-
-
-def register_controller(cls):
-    if cls.__name__ not in REGISTERED_CONTROLLERS:
-        REGISTERED_CONTROLLERS[cls.__name__] = cls
+REGISTERED_CONTROLLERS = OrderedDict()
+REGISTERED_LOCOMOTION_CONTROLLERS = OrderedDict()
+REGISTERED_MANIPULATION_CONTROLLERS = OrderedDict()
+REGISTERED_GRIPPER_CONTROLLERS = OrderedDict()
 
 
 def register_locomotion_controller(cls):
@@ -25,15 +22,26 @@ def register_manipulation_controller(cls):
         REGISTERED_MANIPULATION_CONTROLLERS[cls.__name__] = cls
 
 
+def register_gripper_controller(cls):
+    if cls.__name__ not in REGISTERED_GRIPPER_CONTROLLERS:
+        REGISTERED_GRIPPER_CONTROLLERS[cls.__name__] = cls
+
+
+class IsGraspingState(IntEnum):
+    TRUE = 1
+    UNKNOWN = 0
+    FALSE = -1
+
+
 # Define macros
 class ControlType:
     POSITION = 0
     VELOCITY = 1
-    TORQUE = 2
+    EFFORT = 2
     _MAPPING = {
         "position": POSITION,
         "velocity": VELOCITY,
-        "torque": TORQUE,
+        "effort": EFFORT,
     }
     VALID_TYPES = set(_MAPPING.values())
     VALID_TYPES_STR = set(_MAPPING.keys())
@@ -41,7 +49,7 @@ class ControlType:
     @classmethod
     def get_type(cls, type_str):
         """
-        :param type_str: One of "position", "velocity", or "torque" (any case), and maps it
+        :param type_str: One of "position", "velocity", or "effort" (any case), and maps it
         to the corresponding type
 
         :return ControlType: control type corresponding to the associated string
@@ -50,41 +58,31 @@ class ControlType:
         return cls._MAPPING[type_str.lower()]
 
 
-class BaseController:
+class BaseController(Serializable, Registerable, Recreatable):
     """
     An abstract class with interface for mapping specific types of commands to deployable control signals.
     """
-
-    def __init_subclass__(cls, **kwargs):
-        """
-        Registers all subclasses as part of this registry. This is useful to decouple internal codebase from external
-        user additions. This way, users can add their custom controller by simply extending this Controller class,
-        and it will automatically be registered internally. This allows users to then specify their controller
-        directly in string-from in e.g., their config files, without having to manually set the str-to-class mapping
-        in our code.
-        """
-        register_controller(cls)
 
     def __init__(
         self,
         control_freq,
         control_limits,
-        joint_idx,
+        dof_idx,
         command_input_limits="default",
         command_output_limits="default",
     ):
         """
         :param control_freq: int, controller loop frequency
         :param control_limits: Dict[str, Tuple[Array[float], Array[float]]]: The min/max limits to the outputted
-            control signal. Should specify per-actuator type limits, i.e.:
+            control signal. Should specify per-dof type limits, i.e.:
 
             "position": [[min], [max]]
             "velocity": [[min], [max]]
-            "torque": [[min], [max]]
+            "effort": [[min], [max]]
             "has_limit": [...bool...]
 
             Values outside of this range will be clipped, if the corresponding joint index in has_limit is True.
-        :param joint_idx: Array[int], specific joint indices controlled by this robot. Used for inferring
+        :param dof_idx: Array[int], specific dof indices controlled by this robot. Used for inferring
             controller-relevant values during control computations
         :param command_input_limits: None or "default" or Tuple[float, float] or Tuple[Array[float], Array[float]],
             if set, is the min/max acceptable inputted command. Values outside of this range will be clipped.
@@ -96,22 +94,22 @@ class BaseController:
             to the @control_limits entry corresponding to self.control_type
         """
         # Store arguments
-        self.control_freq = control_freq
-        self.control_limits = {}
-        for motor_type in {"position", "velocity", "torque"}:
+        self._control_freq = control_freq
+        self._control_limits = {}
+        for motor_type in {"position", "velocity", "effort"}:
             if motor_type not in control_limits:
                 continue
 
-            self.control_limits[ControlType.get_type(motor_type)] = [
+            self._control_limits[ControlType.get_type(motor_type)] = [
                 np.array(control_limits[motor_type][0]),
                 np.array(control_limits[motor_type][1]),
             ]
         assert "has_limit" in control_limits, "Expected has_limit specified in control_limits, but does not exist."
-        self.joint_has_limits = control_limits["has_limit"]
-        self._joint_idx = joint_idx
+        self._dof_has_limits = control_limits["has_limit"]
+        self._dof_idx = np.array(dof_idx, dtype=int)
 
         # Initialize some other variables that will be filled in during runtime
-        self.control = None
+        self._control = None
         self._command = None
         self._command_scale_factor = None
         self._command_output_transform = None
@@ -121,13 +119,13 @@ class BaseController:
         command_input_limits = (-1.0, 1.0) if command_input_limits == "default" else command_input_limits
         command_output_limits = (
             (
-                np.array(self.control_limits[self.control_type][0])[self.joint_idx],
-                np.array(self.control_limits[self.control_type][1])[self.joint_idx],
+                np.array(self._control_limits[self.control_type][0])[self.dof_idx],
+                np.array(self._control_limits[self.control_type][1])[self.dof_idx],
             )
             if command_output_limits == "default"
             else command_output_limits
         )
-        self.command_input_limits = (
+        self._command_input_limits = (
             None
             if command_input_limits is None
             else (
@@ -135,7 +133,7 @@ class BaseController:
                 self.nums2array(command_input_limits[1], self.command_dim),
             )
         )
-        self.command_output_limits = (
+        self._command_output_limits = (
             None
             if command_output_limits is None
             else (
@@ -156,19 +154,19 @@ class BaseController:
         # Make sure command is a np.array
         command = np.array([command]) if type(command) in {int, float} else np.array(command)
         # We only clip and / or scale if self.command_input_limits exists
-        if self.command_input_limits is not None:
+        if self._command_input_limits is not None:
             # Clip
-            command = command.clip(*self.command_input_limits)
-            if self.command_output_limits is not None:
+            command = command.clip(*self._command_input_limits)
+            if self._command_output_limits is not None:
                 # If we haven't calculated how to scale the command, do that now (once)
                 if self._command_scale_factor is None:
                     self._command_scale_factor = abs(
-                        self.command_output_limits[1] - self.command_output_limits[0]
-                    ) / abs(self.command_input_limits[1] - self.command_input_limits[0])
+                        self._command_output_limits[1] - self._command_output_limits[0]
+                    ) / abs(self._command_input_limits[1] - self._command_input_limits[0])
                     self._command_output_transform = (
-                        self.command_output_limits[1] + self.command_output_limits[0]
+                        self._command_output_limits[1] + self._command_output_limits[0]
                     ) / 2.0
-                    self._command_input_transform = (self.command_input_limits[1] + self.command_input_limits[0]) / 2.0
+                    self._command_input_transform = (self._command_input_limits[1] + self._command_input_limits[0]) / 2.0
                 # Scale command
                 command = (
                     command - self._command_input_transform
@@ -199,11 +197,11 @@ class BaseController:
         :return Array[float]: Clipped control signal
         """
         clipped_control = control.clip(
-            self.control_limits[self.control_type][0][self.joint_idx],
-            self.control_limits[self.control_type][1][self.joint_idx],
+            self._control_limits[self.control_type][0][self.dof_idx],
+            self._control_limits[self.control_type][1][self.dof_idx],
         )
         idx = (
-            self.joint_has_limits[self.joint_idx]
+            self._dof_has_limits[self.dof_idx]
             if self.control_type == ControlType.POSITION
             else [True] * self.control_dim
         )
@@ -220,8 +218,8 @@ class BaseController:
         :return Array[float]: numpy array of outputted control signals
         """
         control = self._command_to_control(command=self._command, control_dict=control_dict)
-        self.control = self.clip_control(control=control)
-        return self.control
+        self._control = self.clip_control(control=control)
+        return self._control
 
     def reset(self):
         """
@@ -229,19 +227,21 @@ class BaseController:
         """
         raise NotImplementedError
 
-    def dump_state(self):
-        """
-        :return Any: the state of the object other than what's not included in pybullet state.
-        """
-        return None
+    def _dump_state(self):
+        # Default is no state (empty dict)
+        return OrderedDict()
 
-    def load_state(self, dump):
-        """
-        Load the state of the object other than what's not included in pybullet state.
+    def _load_state(self, state):
+        # Default is no state (empty dict), so this is a no-op
+        pass
 
-        :param dump: Any: the dumped state
-        """
-        return
+    def _serialize(self, state):
+        # Default is no state, so do nothing
+        return np.array([])
+
+    def _deserialize(self, state):
+        # Default is no state, so do nothing
+        return OrderedDict(), 0
 
     def _command_to_control(self, command, control_dict):
         """
@@ -263,7 +263,7 @@ class BaseController:
         corresponding dimension size @dim before converting into a numpy array
         Args:
             nums (numeric or Iterable): Either single value or array of numbers
-            dim (int): Size of array to broadcast input to env.sim.data.actuator_force
+            dim (int): Size of array to broadcast input to
         Returns:
             np.array: Array filled with values specified in @nums
         """
@@ -276,11 +276,57 @@ class BaseController:
         return np.array(nums) if isinstance(nums, Iterable) else np.ones(dim) * nums
 
     @property
+    def state_size(self):
+        # Default is no state, so return 0
+        return 0
+
+    @property
+    def control(self):
+        """
+        Returns:
+            n-array: Array of most recent controls deployed by this controller
+        """
+        return self._control
+
+    @property
+    def control_freq(self):
+        """
+        Returns:
+            float: Control frequency (Hz) of this controller
+        """
+        return self._control_freq
+
+    @property
+    def control_dim(self):
+        """
+        :return int: Expected size of outputted controls
+        """
+        return len(self.dof_idx)
+
+    @property
     def control_type(self):
         """
         :return ControlType: Type of control returned by this controller
         """
         raise NotImplementedError
+
+    @property
+    def command_input_limits(self):
+        """
+        Returns:
+            None or 2-tuple: If specified, returns (min, max) command input limits for this controller, where
+                @min and @max are numpy float arrays of length self.command_dim. Otherwise, returns None
+        """
+        return self._command_input_limits
+
+    @property
+    def command_output_limits(self):
+        """
+        Returns:
+            None or 2-tuple: If specified, returns (min, max) command output limits for this controller, where
+                @min and @max are numpy float arrays of length self.command_dim. Otherwise, returns None
+        """
+        return self._command_output_limits
 
     @property
     def command_dim(self):
@@ -290,18 +336,24 @@ class BaseController:
         raise NotImplementedError
 
     @property
-    def control_dim(self):
+    def dof_idx(self):
         """
-        :return int: Expected size of outputted controls
+        :return Array[int]: DOF indices corresponding to the specific DOFs being controlled by this robot
         """
-        return len(self.joint_idx)
+        return np.array(self._dof_idx)
 
-    @property
-    def joint_idx(self):
-        """
-        :return Array[int]: Joint indices corresponding to the specific joints being controlled by this robot
-        """
-        return np.array(self._joint_idx)
+    @classproperty
+    def _do_not_register_classes(cls):
+        # Don't register this class since it's an abstract template
+        classes = super()._do_not_register_classes
+        classes.add("BaseController")
+        return classes
+
+    @classproperty
+    def _cls_registry(cls):
+        # Global registry
+        global REGISTERED_CONTROLLERS
+        return REGISTERED_CONTROLLERS
 
 
 class LocomotionController(BaseController):
@@ -315,6 +367,13 @@ class LocomotionController(BaseController):
         super().__init_subclass__(**kwargs)
         register_locomotion_controller(cls)
 
+    @classproperty
+    def _do_not_register_classes(cls):
+        # Don't register this class since it's an abstract template
+        classes = super()._do_not_register_classes
+        classes.add("LocomotionController")
+        return classes
+
 
 class ManipulationController(BaseController):
     """
@@ -323,6 +382,42 @@ class ManipulationController(BaseController):
     """
 
     def __init_subclass__(cls, **kwargs):
-        # Register as part of locomotion controllers
+        # Register as part of manipulation controllers
         super().__init_subclass__(**kwargs)
         register_manipulation_controller(cls)
+
+    @classproperty
+    def _do_not_register_classes(cls):
+        # Don't register this class since it's an abstract template
+        classes = super()._do_not_register_classes
+        classes.add("ManipulationController")
+        return classes
+
+
+class GripperController(BaseController):
+    """
+    Controller to control a gripper. All implemented controllers that encompass gripper capabilities
+    should extend from this class.
+    """
+
+    def __init_subclass__(cls, **kwargs):
+        # Register as part of gripper controllers
+        super().__init_subclass__(**kwargs)
+        register_gripper_controller(cls)
+
+    def is_grasping(self):
+        """
+        Checks whether the current state of this gripper being controlled is in a grasping state.
+        Should be implemented by subclass.
+
+        Returns:
+            IsGraspingState: Grasping state of gripper
+        """
+        raise NotImplementedError()
+
+    @classproperty
+    def _do_not_register_classes(cls):
+        # Don't register this class since it's an abstract template
+        classes = super()._do_not_register_classes
+        classes.add("GripperController")
+        return classes

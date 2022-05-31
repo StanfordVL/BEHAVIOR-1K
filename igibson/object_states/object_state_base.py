@@ -1,9 +1,18 @@
-from abc import ABCMeta, abstractmethod
+from abc import ABC, abstractmethod
+from collections import OrderedDict
+import numpy as np
+from igibson.utils.python_utils import classproperty, Serializable, Registerable, Recreatable
 
-from future.utils import with_metaclass
+
+# Hacky method to serialize "None" values as a number -- we choose magic number 400 since:
+# sum([ord(c) for c in "None"]) = 400!
+NONE = 400.0
+
+# Global dicts that will contain mappings
+REGISTERED_OBJECT_STATES = OrderedDict()
 
 
-class BaseObjectState(with_metaclass(ABCMeta, object)):
+class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
     """
     Base ObjectState class. Do NOT inherit from this class directly - use either AbsoluteObjectState or
     RelativeObjectState.
@@ -37,20 +46,33 @@ class BaseObjectState(with_metaclass(ABCMeta, object)):
         super(BaseObjectState, self).__init__()
         self.obj = obj
         self._initialized = False
-        self.simulator = None
+        self._simulator = None
+
+    @property
+    def settable(self):
+        """
+        Returns:
+            bool: True if this object has a state that can be directly dumped / loaded via dump_state() and
+                load_state(), otherwise, returns False. Note that any sub object states that are NOT settable do
+                not need to implement any of _dump_state(), _load_state(), _serialize(), or _deserialize()!
+        """
+        # False by default
+        return False
 
     def _update(self):
         """This function will be called once for every simulator step."""
         pass
 
     def _initialize(self):
-        """This function will be called once, after the object has been loaded."""
+        """This function will be called once; should be used for any object state-related objects have been loaded."""
         pass
 
     def initialize(self, simulator):
         assert not self._initialized, "State is already initialized."
 
-        self.simulator = simulator
+        # Store simulator reference
+        self._simulator = simulator
+
         self._initialize()
         self._initialized = True
 
@@ -62,9 +84,33 @@ class BaseObjectState(with_metaclass(ABCMeta, object)):
         assert self._initialized
         return self._get_value(*args, **kwargs)
 
+    def _get_value(self, *args, **kwargs):
+        raise NotImplementedError
+
     def set_value(self, *args, **kwargs):
         assert self._initialized
         return self._set_value(*args, **kwargs)
+
+    def _set_value(self, *args, **kwargs):
+        raise NotImplementedError
+
+    def dump_state(self, serialized=False):
+        assert self._initialized
+        assert self.settable
+        return super().dump_state(serialized=serialized)
+
+    @classproperty
+    def _do_not_register_classes(cls):
+        # Don't register this class since it's an abstract template
+        classes = super()._do_not_register_classes
+        classes.add("BaseObjectState")
+        return classes
+
+    @classproperty
+    def _cls_registry(cls):
+        # Global registry
+        global REGISTERED_OBJECT_STATES
+        return REGISTERED_OBJECT_STATES
 
 
 class AbsoluteObjectState(BaseObjectState):
@@ -81,17 +127,12 @@ class AbsoluteObjectState(BaseObjectState):
     def _set_value(self, new_value):
         raise NotImplementedError()
 
-    @abstractmethod
-    def _dump(self):
-        raise NotImplementedError()
-
-    def dump(self):
-        assert self._initialized
-        return self._dump()
-
-    @abstractmethod
-    def load(self, data):
-        raise NotImplementedError()
+    @classproperty
+    def _do_not_register_classes(cls):
+        # Don't register this class since it's an abstract template
+        classes = super()._do_not_register_classes
+        classes.add("AbsoluteObjectState")
+        return classes
 
 
 class CachingEnabledObjectState(AbsoluteObjectState):
@@ -128,6 +169,13 @@ class CachingEnabledObjectState(AbsoluteObjectState):
         super(CachingEnabledObjectState, self)._update()
         self.clear_cached_value()
 
+    @classproperty
+    def _do_not_register_classes(cls):
+        # Don't register this class since it's an abstract template
+        classes = super()._do_not_register_classes
+        classes.add("CachingEnabledObjectState")
+        return classes
+
 
 class RelativeObjectState(BaseObjectState):
     """
@@ -143,8 +191,15 @@ class RelativeObjectState(BaseObjectState):
     def _set_value(self, other, new_value):
         raise NotImplementedError()
 
+    @classproperty
+    def _do_not_register_classes(cls):
+        # Don't register this class since it's an abstract template
+        classes = super()._do_not_register_classes
+        classes.add("RelativeObjectState")
+        return classes
 
-class BooleanState(object):
+
+class BooleanState:
     """
     This class is a mixin used to indicate that a state has a boolean value.
     """

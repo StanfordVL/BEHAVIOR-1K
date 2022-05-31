@@ -2,10 +2,10 @@ import os
 import time
 
 import numpy as np
-import pybullet as p
+
 
 import igibson
-from igibson.external.pybullet_tools.utils import (
+# from igibson.external.pybullet_tools.utils import (
     CIRCULAR_LIMITS,
     MAX_DISTANCE,
     PI,

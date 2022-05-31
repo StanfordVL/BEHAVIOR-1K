@@ -1,7 +1,9 @@
 from abc import ABCMeta, abstractmethod
+from collections import Iterable, OrderedDict
+import logging
 
 import numpy as np
-import pybullet as p
+
 from future.utils import with_metaclass
 
 from igibson.utils.constants import (
@@ -10,176 +12,242 @@ from igibson.utils.constants import (
     SPECIAL_COLLISION_GROUPS,
     SemanticClass,
 )
+from pxr import UsdPhysics, PhysxSchema
 from igibson.utils.semantics_utils import CLASS_NAME_TO_CLASS_ID
+from igibson.utils.usd_utils import get_prim_nested_children, create_joint, CollisionAPI, BoundingBoxAPI
+from igibson.prims.entity_prim import EntityPrim
+from igibson.prims.xform_prim import XFormPrim
 
 
-class BaseObject(with_metaclass(ABCMeta, object)):
+class BaseObject(EntityPrim, metaclass=ABCMeta):
     """This is the interface that all iGibson objects must implement."""
 
-    DEFAULT_RENDERING_PARAMS = {
-        "use_pbr": True,
-        "use_pbr_mapping": True,
-        "shadow_caster": True,
-    }
-
-    def __init__(self, name=None, category="object", class_id=None, rendering_params=None):
+    def __init__(
+            self,
+            prim_path,
+            name=None,
+            category="object",
+            class_id=None,
+            scale=1.0,
+            rendering_params=None,
+            visible=True,
+            fixed_base=False,
+            visual_only=False,
+            self_collisions=False,
+            load_config=None,
+            **kwargs,
+    ):
         """
         Create an object instance with the minimum information of class ID and rendering parameters.
 
+        @param prim_path: str, global path in the stage to this object
         @param name: Name for the object. Names need to be unique per scene. If no name is set, a name will be generated
             at the time the object is added to the scene, using the object's category.
         @param category: Category for the object. Defaults to "object".
         @param class_id: What class ID the object should be assigned in semantic segmentation rendering mode.
-        @param rendering_params: Any keyword arguments to be passed into simulator.load_object_into_renderer(...).
+        @param scale: float or 3-array, sets the scale for this object. A single number corresponds to uniform scaling
+            along the x,y,z axes, whereas a 3-array specifies per-axis scaling.
+        @param rendering_params: Any relevant rendering settings for this object.
+        @param visible: bool, whether to render this object or not in the stage
+        @param fixed_base: bool, whether to fix the base of this object or not
+        visual_only (bool): Whether this object should be visual only (and not collide with any other objects)
+        self_collisions (bool): Whether to enable self collisions for this object
+        load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
+            loading this prim at runtime.
+        kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
+            for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
+            Note that this base object does NOT pass kwargs down into the Prim-type super() classes, and we assume
+            that kwargs are only shared between all SUBclasses (children), not SUPERclasses (parents).
         """
         # Generate a name if necessary. Note that the generation order & set of these names is not deterministic.
         if name is None:
             address = "%08X" % id(self)
             name = "{}_{}".format(category, address)
 
-        self.name = name
+        # Store values
         self.category = category
+        self.fixed_base = fixed_base
 
+        logging.info(f"Category: {self.category}")
+
+        # TODO
         # This sets the collision group of the object. In igibson, objects are only permitted to be part of a single
-        # collision group, e.g. the collision group bitvector should only have one bit set to 1.
-        self.collision_group = 1 << (
-            SPECIAL_COLLISION_GROUPS[self.category]
-            if self.category in SPECIAL_COLLISION_GROUPS
-            else DEFAULT_COLLISION_GROUP
-        )
+        # collision group, e.g. collisions are only enabled within a single group
+        self.collision_group = SPECIAL_COLLISION_GROUPS.get(self.category, DEFAULT_COLLISION_GROUP)
 
-        category_based_rendering_params = {}
-        if category in ["walls", "floors", "ceilings"]:
-            category_based_rendering_params["use_pbr"] = False
-            category_based_rendering_params["use_pbr_mapping"] = False
-        if category == "ceilings":
-            category_based_rendering_params["shadow_caster"] = False
-
-        if rendering_params:  # Use the input rendering params as an override.
-            category_based_rendering_params.update(rendering_params)
+        # category_based_rendering_params = {}
+        # if category in ["walls", "floors", "ceilings"]:
+        #     category_based_rendering_params["use_pbr"] = False
+        #     category_based_rendering_params["use_pbr_mapping"] = False
+        # if category == "ceilings":
+        #     category_based_rendering_params["shadow_caster"] = False
+        #
+        # if rendering_params:  # Use the input rendering params as an override.
+        #     category_based_rendering_params.update(rendering_params)
 
         if class_id is None:
             class_id = CLASS_NAME_TO_CLASS_ID.get(category, SemanticClass.USER_ADDED_OBJS)
 
         self.class_id = class_id
         self.renderer_instances = []
-        self._rendering_params = dict(self.DEFAULT_RENDERING_PARAMS)
-        self._rendering_params.update(category_based_rendering_params)
+        self.rendering_params = rendering_params
+        # self._rendering_params = dict(self.DEFAULT_RENDERING_PARAMS)
+        # self._rendering_params.update(category_based_rendering_params)
 
-        self._loaded = False
-        self._body_ids = None
+        # Values to be created at runtime
+        self._simulator = None
 
-    def load(self, simulator):
-        """Load object into pybullet and return list of loaded body ids."""
-        if self._loaded:
-            raise ValueError("Cannot load a single object multiple times.")
-        self._loaded = True
-        self._body_ids = self._load(simulator)
+        # Create load config from inputs
+        load_config = dict() if load_config is None else load_config
+        load_config["scale"] = scale
+        load_config["visible"] = visible
+        load_config["visual_only"] = visual_only
+        load_config["self_collisions"] = self_collisions
 
-        # Set the collision groups.
-        for body_id in self._body_ids:
-            for link_id in [-1] + list(range(p.getNumJoints(body_id))):
-                p.setCollisionFilterGroupMask(body_id, link_id, self.collision_group, ALL_COLLISION_GROUPS_MASK)
+        # Run super init
+        super().__init__(
+            prim_path=prim_path,
+            name=name,
+            load_config=load_config,
+        )
 
-        return self._body_ids
+    def load(self, simulator=None):
+        # Run sanity check, any of these objects REQUIRE a simulator to be specified
+        assert simulator is not None, "Simulator must be specified for loading any object subclassed from BaseObject!"
+
+        # Save simulator reference
+        self._simulator = simulator
+
+        # Run super method ONLY if we're not loaded yet
+        return super().load(simulator=simulator) if not self.loaded else self._prim
+
+    def _post_load(self):
+        # Run super first
+        super()._post_load()
+
+        # Set visibility
+        if "visible" in self._load_config and self._load_config["visible"] is not None:
+            self.visible = self._load_config["visible"]
+
+        # Add fixed joint if we're fixing the base
+        print(f"obj {self.name} is fixed base: {self.fixed_base}")
+        if self.fixed_base:
+            # Create fixed joint, and set Body0 to be this object's root prim
+            create_joint(
+                prim_path=f"{self._prim_path}/rootJoint",
+                joint_type="FixedJoint",
+                body1=f"{self._prim_path}/base_link",
+            )
+        else:
+            if self._prim.HasAPI(UsdPhysics.ArticulationRootAPI):
+                # If we only have a link, remove the articulation root API
+                if self.n_links == 1:
+                    self._prim.RemoveAPI(UsdPhysics.ArticulationRootAPI)
+                    self._prim.RemoveAPI(PhysxSchema.PhysxArticulationAPI)
+                else:
+                    # We need to fix (change) the articulation root
+                    # We have to do something very hacky because omniverse is buggy
+                    # Articulation roots mess up the joint order if it's on a non-fixed base robot, e.g. a
+                    # mobile manipulator. So if we have to move it to the actual root link of the robot instead.
+                    # See https://forums.developer.nvidia.com/t/inconsistent-values-from-isaacsims-dc-get-joint-parent-child-body/201452/2
+                    # for more info
+                    self._prim.RemoveAPI(UsdPhysics.ArticulationRootAPI)
+                    self._prim.RemoveAPI(PhysxSchema.PhysxArticulationAPI)
+                    UsdPhysics.ArticulationRootAPI.Apply(self.root_prim)
+                    PhysxSchema.PhysxArticulationAPI.Apply(self.root_prim)
+
+        # Set self collisions if we have articulation API to set
+        if self._prim.HasAPI(UsdPhysics.ArticulationRootAPI) or self.root_prim.HasAPI(UsdPhysics.ArticulationRootAPI):
+            self.self_collisions = self._load_config["self_collisions"]
+
+        # TODO: Do we need to explicitly add all links? or is adding articulation root itself sufficient?
+        # Set the collision group
+        CollisionAPI.add_to_collision_group(
+            col_group=self.collision_group,
+            prim_path=self.prim_path,
+            create_if_not_exist=True,
+        )
 
     @property
-    def loaded(self):
-        return self._loaded
+    def articulation_root_path(self):
+        # We override this because omniverse is buggy ):
+        # For non-fixed base objects (e.g.: mobile manipulators), using the default articulation root breaks the
+        # kinematic chain for some reason. So, the current workaround is to set the articulation root to be the
+        # actual base link of the robot instead.
+        # See https://forums.developer.nvidia.com/t/inconsistent-values-from-isaacsims-dc-get-joint-parent-child-body/201452/2
+        # for more info
+        return f"{self._prim_path}/{self.root_link_name}" if \
+            (not self.fixed_base) and (self.n_links > 1) else super().articulation_root_path
 
-    def get_body_ids(self):
+    @property
+    def bbox(self):
         """
-        Gets the body IDs belonging to this object.
+        Get this object's actual bounding box
+
+        Returns:
+            3-array: (x,y,z) bounding box
         """
-        return self._body_ids
+        min_corner, max_corner = BoundingBoxAPI.compute_aabb(self.prim_path)
+        return max_corner - min_corner
 
-    @abstractmethod
-    def _load(self, simulator):
-        pass
+    @property
+    def mass(self):
+        """
+        Returns:
+             float: Cumulative mass of this potentially articulated object.
+        """
+        mass = 0.0
+        for link in self._links.values():
+            mass += link.mass
 
-    def get_position(self):
-        """Get object position in the format of Array[x, y, z]"""
-        return self.get_position_orientation()[0]
+        return mass
 
-    def get_orientation(self):
-        """Get object orientation as a quaternion in the format of Array[x, y, z, w]"""
-        return self.get_position_orientation()[1]
-
-    def get_position_orientation(self):
-        """Get object position and orientation in the format of Tuple[Array[x, y, z], Array[x, y, z, w]]"""
-        assert len(self.get_body_ids()) == 1, "Base implementation only works with single-body objects."
-        pos, orn = p.getBasePositionAndOrientation(self.get_body_ids()[0])
-        return np.array(pos), np.array(orn)
-
-    def set_position(self, pos):
-        """Set object position in the format of Array[x, y, z]"""
-        old_orn = self.get_orientation()
-        self.set_position_orientation(pos, old_orn)
-
-    def set_orientation(self, orn):
-        """Set object orientation as a quaternion in the format of Array[x, y, z, w]"""
-        old_pos = self.get_position()
-        self.set_position_orientation(old_pos, orn)
-
-    def set_position_orientation(self, pos, orn):
-        """Set object position and orientation in the format of Tuple[Array[x, y, z], Array[x, y, z, w]]"""
-        assert len(self.get_body_ids()) == 1, "Base implementation only works with single-body objects."
-        p.resetBasePositionAndOrientation(self.get_body_ids()[0], pos, orn)
-
-    def set_base_link_position_orientation(self, pos, orn):
-        """Set object base link position and orientation in the format of Tuple[Array[x, y, z], Array[x, y, z, w]]"""
-        dynamics_info = p.getDynamicsInfo(self.get_body_ids()[0], -1)
-        inertial_pos, inertial_orn = dynamics_info[3], dynamics_info[4]
-        pos, orn = p.multiplyTransforms(pos, orn, inertial_pos, inertial_orn)
-        self.set_position_orientation(pos, orn)
+    @mass.setter
+    def mass(self, mass):
+        # Cannot set mass directly for this object!
+        raise NotImplementedError("Cannot set mass directly for an object!")
+    
+    @property
+    def link_prim_paths(self):
+        return [link.prim_path for link in self._links.values()]
 
     def get_velocities(self):
-        """Get object bodies' velocity in the format of List[Tuple[Array[vx, vy, vz], Array[wx, wy, wz]]]"""
-        velocities = []
-        for body_id in self.get_body_ids():
-            lin, ang = p.getBaseVelocity(body_id)
-            velocities.append((np.array(lin), np.array(ang)))
-
-        return velocities
+        """Get this object's root body velocity in the format of Tuple[Array[vx, vy, vz], Array[wx, wy, wz]]"""
+        return self.get_linear_velocity(), self.get_angular_velocity()
 
     def set_velocities(self, velocities):
-        """Set object base velocity in the format of List[Tuple[Array[vx, vy, vz], Array[wx, wy, wz]]]"""
-        assert len(velocities) == len(self.get_body_ids()), "Number of velocities should match number of bodies."
+        """Set this object's root body velocity in the format of Tuple[Array[vx, vy, vz], Array[wx, wy, wz]]"""
+        lin_vel, ang_vel = velocities
 
-        for bid, (linear_velocity, angular_velocity) in zip(self.get_body_ids(), velocities):
-            p.resetBaseVelocity(bid, linear_velocity, angular_velocity)
+        self.set_linear_velocity(velocity=lin_vel)
+        self.set_angular_velocity(velocity=ang_vel)
 
-    def set_joint_states(self, joint_states):
-        """Set object joint states in the format of Dict[String: (q, q_dot)]]"""
-        for body_id in self.get_body_ids():
-            for j in range(p.getNumJoints(body_id)):
-                info = p.getJointInfo(body_id, j)
-                joint_type = info[2]
-                if joint_type in [p.JOINT_REVOLUTE, p.JOINT_PRISMATIC]:
-                    joint_name = info[1].decode("UTF-8")
-                    joint_position, joint_velocity = joint_states[joint_name]
-                    p.resetJointState(body_id, j, joint_position, targetVelocity=joint_velocity)
+    # def set_joint_states(self, joint_states):
+    #     """Set object joint states in the format of Dict[String: (q, q_dot)]]"""
+    #     # Make sure this object is articulated
+    #     assert self._n_dof > 0, "Can only set joint states for objects that have > 0 DOF!"
+    #     pos = np.zeros(self._n_dof)
+    #     vel = np.zeros(self._n_dof)
+    #     for i, joint_name in enumerate(self._dofs_infos.keys()):
+    #         pos[i], vel[i] = joint_states[joint_name]
+    #
+    #     # Set the joint positions and velocities
+    #     self.set_joint_positions(positions=pos)
+    #     self.set_joint_velocities(velocities=vel)
+    #
+    # def get_joint_states(self):
+    #     """Get object joint states in the format of Dict[String: (q, q_dot)]]"""
+    #     # Make sure this object is articulated
+    #     assert self._n_dof > 0, "Can only get joint states for objects that have > 0 DOF!"
+    #     pos = self.get_joint_positions()
+    #     vel = self.get_joint_velocities()
+    #     joint_states = dict()
+    #     for i, joint_name in enumerate(self._dofs_infos.keys()):
+    #         joint_states[joint_name] = (pos[i], vel[i])
+    #
+    #     return joint_states
 
-    def get_joint_states(self):
-        """Get object joint states in the format of Dict[String: (q, q_dot)]]"""
-        joint_states = {}
-        for body_id in self.get_body_ids():
-            for j in range(p.getNumJoints(body_id)):
-                info = p.getJointInfo(body_id, j)
-                joint_type = info[2]
-                if joint_type in [p.JOINT_REVOLUTE, p.JOINT_PRISMATIC]:
-                    joint_name = info[1].decode("UTF-8")
-                    joint_states[joint_name] = p.getJointState(body_id, j)[:2]
-        return joint_states
-
-    def dump_state(self):
-        """Dump the state of the object other than what's not included in pybullet state."""
-        return None
-
-    def load_state(self, dump):
-        """Load the state of the object other than what's not included in pybullet state."""
-        return
-
+    # TODO
     def highlight(self):
         for instance in self.renderer_instances:
             instance.set_highlight(True)
@@ -188,11 +256,24 @@ class BaseObject(with_metaclass(ABCMeta, object)):
         for instance in self.renderer_instances:
             instance.set_highlight(False)
 
-    def force_wakeup(self):
+    def dump_config(self):
         """
-        Force wakeup sleeping objects
+        Dumps relevant configuration for this object.
+
+        Returns:
+            OrderedDict: Object configuration.
         """
-        for body_id in self.get_body_ids():
-            for joint_id in range(p.getNumJoints(body_id)):
-                p.changeDynamics(body_id, joint_id, activationState=p.ACTIVATION_STATE_WAKE_UP)
-            p.changeDynamics(body_id, -1, activationState=p.ACTIVATION_STATE_WAKE_UP)
+        return OrderedDict(
+            category=self.category,
+            class_id=self.class_id,
+            scale=self.scale,
+            self_collisions=self.self_collisions,
+            rendering_params=self.rendering_params,
+        )
+
+    def update(self):
+        """
+        Runs any relevant updates for this object. This should occur once per simulation step.
+        """
+        pass
+

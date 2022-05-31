@@ -1,6 +1,6 @@
 import itertools
 
-import pybullet as p
+
 
 from igibson.object_states.factory import get_state_name
 from igibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
@@ -129,7 +129,7 @@ class ObjectGrouper(BaseObject):
 
         # These attributes are used during object import and should return
         # the concatenation results of all objects in self.objects
-        if item in ["visual_mesh_to_material", "link_name_to_vm", "body_ids", "is_fixed"]:
+        if item in ["visual_mesh_to_material", "link_name_to_vm", "prim_paths", "is_fixed"]:
             return list(itertools.chain.from_iterable(attrs))
 
         # Otherwise, check that it's the same for everyone and then just return the value.
@@ -139,16 +139,17 @@ class ObjectGrouper(BaseObject):
         return attrs[0]
 
     def _load(self, simulator):
-        body_ids = []
+        prim_paths = []
         for obj in self.objects:
-            body_ids += obj.load(simulator)
-        return body_ids
+            prim_paths += obj.load(simulator)
+        return prim_paths
 
-    def get_body_ids(self):
+    @property
+    def link_prim_paths(self):
         ids = []
         for obj in self.objects:
-            if obj.get_body_ids() is not None:
-                ids.extend(obj.get_body_ids())
+            if obj.link_prim_paths is not None:
+                ids.extend(obj.link_prim_paths)
         if len(ids) == 0:
             ids = None
         return ids
@@ -224,13 +225,14 @@ class ObjectMultiplexer(BaseObject):
         return getattr(self.current_selection(), item)
 
     def _load(self, simulator):
-        body_ids = []
+        prim_paths = []
         for obj in self._multiplexed_objects:
-            body_ids += obj.load(simulator)
-        return body_ids
+            prim_paths += obj.load(simulator)
+        return prim_paths
 
-    def get_body_ids(self):
-        return self.current_selection().get_body_ids()
+    @property
+    def link_prim_paths(self):
+        return self.current_selection().link_prim_paths()
 
     def get_position(self):
         return self.current_selection().get_position()

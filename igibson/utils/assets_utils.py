@@ -33,8 +33,28 @@ def get_ig_avg_category_specs():
     Load average object specs (dimension and mass) for objects
     """
     avg_obj_dim_file = os.path.join(igibson.ig_dataset_path, "metadata", "avg_category_specs.json")
-    with open(avg_obj_dim_file) as f:
-        return json.load(f)
+    if os.path.exists(avg_obj_dim_file):
+        with open(avg_obj_dim_file) as f:
+            return json.load(f)
+    else:
+        logging.warning(
+            "Requested average specs of the object categories in the iGibson Dataset of objects, but the "
+            "file cannot be found. Did you download the dataset? Returning an empty dictionary"
+        )
+        return dict()
+
+
+def get_assisted_grasping_categories():
+    """
+    Generate a list of categories that can be grasped using assisted grasping,
+    using labels provided in average category specs file.
+    """
+    assisted_grasp_category_allow_list = set()
+    avg_category_spec = get_ig_avg_category_specs()
+    for k, v in avg_category_spec.items():
+        if v["enable_ag"]:
+            assisted_grasp_category_allow_list.add(k)
+    return assisted_grasp_category_allow_list
 
 
 def get_ig_category_ids():

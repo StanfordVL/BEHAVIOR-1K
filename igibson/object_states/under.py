@@ -1,11 +1,11 @@
-import pybullet as p
+
 from IPython import embed
 
 import igibson
 from igibson.object_states.adjacency import VerticalAdjacency
 from igibson.object_states.memoization import PositionalValidationMemoizedObjectStateMixin
 from igibson.object_states.object_state_base import BooleanState, RelativeObjectState
-from igibson.object_states.utils import clear_cached_states, sample_kinematics
+from igibson.object_states.utils import sample_kinematics
 from igibson.utils.utils import restoreState
 
 
@@ -15,13 +15,13 @@ class Under(PositionalValidationMemoizedObjectStateMixin, RelativeObjectState, B
         return RelativeObjectState.get_dependencies() + [VerticalAdjacency]
 
     def _set_value(self, other, new_value):
-        state_id = p.saveState()
+        state = self._simulator.dump_state(serialized=False)
 
         for _ in range(10):
             sampling_success = sample_kinematics("under", self.obj, other, new_value)
             if sampling_success:
-                clear_cached_states(self.obj)
-                clear_cached_states(other)
+                self.obj.clear_cached_states()
+                other.clear_cached_states()
                 if self.get_value(other) != new_value:
                     sampling_success = False
                 if igibson.debug_sampling:
@@ -30,15 +30,13 @@ class Under(PositionalValidationMemoizedObjectStateMixin, RelativeObjectState, B
             if sampling_success:
                 break
             else:
-                restoreState(state_id)
-
-        p.removeState(state_id)
+                self._simulator.load_state(state, serialized=False)
 
         return sampling_success
 
     def _get_value(self, other):
+        other_prim_paths = set(other.link_prim_paths)
         adjacency = self.obj.states[VerticalAdjacency].get_value()
-        other_ids = set(other.get_body_ids())
-        return not other_ids.isdisjoint(adjacency.positive_neighbors) and other_ids.isdisjoint(
+        return not other_prim_paths.isdisjoint(adjacency.positive_neighbors) and other_prim_paths.isdisjoint(
             adjacency.negative_neighbors
         )

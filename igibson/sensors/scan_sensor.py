@@ -1,45 +1,158 @@
 import cv2
 import numpy as np
-import pybullet as p
+from collections import OrderedDict, Iterable
+
 from transforms3d.quaternions import quat2mat
+
+from omni.kit.commands import execute
+from omni.isaac.core.utils.stage import get_current_stage
+from omni.isaac.range_sensor import _range_sensor
 
 from igibson.sensors.dropout_sensor_noise import DropoutSensorNoise
 from igibson.sensors.sensor_base import BaseSensor
 from igibson.utils.constants import OccupancyGridState
+from igibson.utils.python_utils import classproperty
 
 
 class ScanSensor(BaseSensor):
     """
-    1D LiDAR scanner sensor and occupancy grid sensor
+    General 2D LiDAR range sensor and occupancy grid sensor.
+
+    Args:
+        prim_path (str): prim path of the Prim to encapsulate or create.
+        name (str): Name for the object. Names need to be unique per scene.
+        modalities (str or list of str): Modality(s) supported by this sensor. Default is "all", which corresponds
+            to all modalities being used. Otherwise, valid options should be part of cls.all_modalities.
+            For this scan sensor, this includes any of:
+                {scan, occupancy_grid}
+            Note that in order for "occupancy_grid" to be used, "scan" must also be included.
+        enabled (bool): Whether this sensor should be enabled by default
+        noise (None or BaseSensorNoise): If specified, sensor noise model to apply to this sensor.
+        load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
+            loading this sensor's prim at runtime.
+        min_range (float): Minimum range to sense in meters
+        max_range (float): Maximum range to sense in meters
+        horizontal_fov (float): Field of view of sensor, in degrees
+        vertical_fov (float): Field of view of sensor, in degrees
+        yaw_offset (float): Degrees for offsetting this sensors horizontal FOV.
+            Useful in cases where this sensor's forward direction is different than expected
+        horizontal_resolution (float): Degrees in between each horizontal scan hit
+        vertical_resolution (float): Degrees in between each vertical scan hit
+        rotation_rate (float): How fast the range sensor is rotating, in rotations per sec. Set to 0 for all scans
+            be to hit at once
+        draw_points (bool): Whether to draw the points hit by this sensor
+        draw_lines (bool): Whether to draw the lines representing the scans from this sensor
+        occupancy_grid_resolution (int): How many discretized nodes in the occupancy grid. This will specify the
+            height == width of the map
+        occupancy_grid_range (float): Range of the occupancy grid, in meters
+        occupancy_grid_inner_radius (float): Inner range of the occupancy grid that will assumed to be empty, in meters
+        occupancy_grid_local_link (None or XFormPrim): XForm prim that represents the "origin" of any generated
+            occupancy grid, e.g.: if this scan sensor is attached to a robot, then this should possibly be the base link
+            for that robot. If None is specified, then this will default to this own sensor's frame as the origin.
     """
+    def __init__(
+        self,
+        prim_path,
+        name,
+        modalities="all",
+        enabled=True,
+        noise=None,
+        load_config=None,
 
-    def __init__(self, env, modalities):
-        super(ScanSensor, self).__init__(env)
-        self.modalities = modalities
-        self.scan_noise_rate = self.config.get("scan_noise_rate", 0.0)
-        self.n_horizontal_rays = self.config.get("n_horizontal_rays", 128)
-        self.n_vertical_beams = self.config.get("n_vertical_beams", 1)
-        assert self.n_vertical_beams == 1, "scan can only handle one vertical beam for now"
-        self.laser_linear_range = self.config.get("laser_linear_range", 10.0)
-        self.laser_angular_range = self.config.get("laser_angular_range", 180.0)
-        self.min_laser_dist = self.config.get("min_laser_dist", 0.05)
-        self.laser_link_name = self.config.get("laser_link_name", "scan_link")
-        self.noise_model = DropoutSensorNoise(env)
-        self.noise_model.set_noise_rate(self.scan_noise_rate)
-        self.noise_model.set_noise_value(1.0)
+        # Basic LIDAR kwargs
+        min_range=0.05,
+        max_range=10.0,
+        horizontal_fov=360.0,
+        vertical_fov=1.0,
+        yaw_offset=0.0,
+        horizontal_resolution=1.0,
+        vertical_resolution=1.0,
+        rotation_rate=0.0,
+        draw_points=False,
+        draw_lines=False,
 
-        self.laser_position, self.laser_orientation = (
-            env.robots[0].links[self.laser_link_name].get_position_orientation()
+        # Occupancy Grid kwargs
+        occupancy_grid_resolution=128,
+        occupancy_grid_range=5.0,
+        occupancy_grid_inner_radius=0.5,
+        occupancy_grid_local_link=None,
+    ):
+        # Store settings
+        self.occupancy_grid_resolution = occupancy_grid_resolution
+        self.occupancy_grid_range = occupancy_grid_range
+        self.occupancy_grid_inner_radius = int(occupancy_grid_inner_radius * occupancy_grid_resolution
+                                                / occupancy_grid_range)
+        self.occupancy_grid_local_link = self if occupancy_grid_local_link is None else occupancy_grid_local_link
+
+        # Create variables that will be filled in at runtime
+        self._rs = None                 # Range sensor interface, analagous to others, e.g.: dynamic control interface
+
+        # Create load config from inputs
+        load_config = dict() if load_config is None else load_config
+        load_config["min_range"] = min_range
+        load_config["max_range"] = max_range
+        load_config["horizontal_fov"] = horizontal_fov
+        load_config["vertical_fov"] = vertical_fov
+        load_config["yaw_offset"] = yaw_offset
+        load_config["horizontal_resolution"] = horizontal_resolution
+        load_config["vertical_resolution"] = vertical_resolution
+        load_config["rotation_rate"] = rotation_rate
+        load_config["draw_points"] = draw_points
+        load_config["draw_lines"] = draw_lines
+
+        # Sanity check modalities -- if we're using occupancy_grid without scan modality, raise an error
+        if isinstance(modalities, Iterable) and not isinstance(modalities, str) and "occupancy_grid" in modalities:
+            assert "scan" in modalities, f"'scan' modality must be included in order to get occupancy_grid modality!"
+
+        # Run super method
+        super().__init__(
+            prim_path=prim_path,
+            name=name,
+            modalities=modalities,
+            enabled=enabled,
+            noise=noise,
+            load_config=load_config,
         )
-        self.base_position, self.base_orientation = env.robots[0].base_link.get_position_orientation()
 
-        if "occupancy_grid" in self.modalities:
-            self.grid_resolution = self.config.get("grid_resolution", 128)
-            self.occupancy_range = self.config.get("occupancy_range", 5)  # m
-            self.robot_footprint_radius = self.config.get("robot_footprint_radius", 0.32)
-            self.robot_footprint_radius_in_map = int(
-                self.robot_footprint_radius / self.occupancy_range * self.grid_resolution
-            )
+    def _load(self, simulator=None):
+        # Define a LIDAR prim at the current stage
+        result, lidar = execute("RangeSensorCreateLidar", path=self._prim_path)
+
+        return lidar.GetPrim()
+
+    def _post_load(self):
+        # run super first
+        super()._post_load()
+
+        # Set all the lidar kwargs
+        self.min_range = self._load_config["min_range"]
+        self.max_range = self._load_config["max_range"]
+        self.horizontal_fov = self._load_config["horizontal_fov"]
+        self.vertical_fov = self._load_config["vertical_fov"]
+        self.yaw_offset = self._load_config["yaw_offset"]
+        self.horizontal_resolution = self._load_config["horizontal_resolution"]
+        self.vertical_resolution = self._load_config["vertical_resolution"]
+        self.rotation_rate = self._load_config["rotation_rate"]
+        self.draw_points = self._load_config["draw_points"]
+        self.draw_lines = self._load_config["draw_lines"]
+
+    def _initialize(self):
+        # run super first
+        super()._initialize()
+
+        # Initialize lidar sensor interface
+        self._rs = _range_sensor.acquire_lidar_sensor_interface()
+
+    @property
+    def _obs_space_mapping(self):
+        # Set the remaining modalities' values
+        # (obs modality, shape, low, high)
+        obs_space_mapping = OrderedDict(
+            scan=((self.n_horizontal_rays, self.n_vertical_rays), 0.0, 1.0, np.float32),
+            occupancy_grid=((self.occupancy_grid_resolution, self.occupancy_grid_resolution, 1), 0.0, 1.0, np.float32),
+        )
+
+        return obs_space_mapping
 
     def get_local_occupancy_grid(self, scan):
         """
@@ -48,43 +161,47 @@ class ScanSensor(BaseSensor):
         :param: 1D LiDAR scan
         :return: local occupancy grid
         """
-        laser_linear_range = self.laser_linear_range
-        laser_angular_range = self.laser_angular_range
-        min_laser_dist = self.min_laser_dist
+        # Run sanity checks first
+        assert "occupancy_grid" in self._modalities, "Occupancy grid is not enabled for this range sensor!"
+        assert self.n_vertical_rays == 1, "Occupancy grid is only valid for a 1D range sensor (n_vertical_rays = 1)!"
 
-        laser_angular_half_range = laser_angular_range / 2.0
-
-        angle = np.arange(
-            -np.radians(laser_angular_half_range),
-            np.radians(laser_angular_half_range),
-            np.radians(laser_angular_range) / self.n_horizontal_rays,
+        # Grab vector of corresponding angles for each scan line
+        angles = np.arange(
+            -np.radians(self.horizontal_fov / 2),
+            np.radians(self.horizontal_fov / 2),
+            np.radians(self.horizontal_resolution),
         )
-        unit_vector_laser = np.array([[np.cos(ang), np.sin(ang), 0.0] for ang in angle])
 
-        scan_laser = unit_vector_laser * (scan * (laser_linear_range - min_laser_dist) + min_laser_dist)
+        # Convert into 3D unit vectors for each angle
+        unit_vector_laser = np.array([[np.cos(ang), np.sin(ang), 0.0] for ang in angles])
 
-        laser_translation = self.laser_position
-        laser_rotation = quat2mat(
-            [self.laser_orientation[3], self.laser_orientation[0], self.laser_orientation[1], self.laser_orientation[2]]
-        )
-        scan_world = laser_rotation.dot(scan_laser.T).T + laser_translation
+        # Scale unit vectors by corresponding laser scan distnaces
+        scan_laser = unit_vector_laser * (scan * (self.max_range - self.min_range) + self.min_range)
 
-        base_translation = self.base_position
-        base_rotation = quat2mat(
-            [self.base_orientation[3], self.base_orientation[0], self.base_orientation[1], self.base_orientation[2]]
-        )
-        scan_local = base_rotation.T.dot((scan_world - base_translation).T).T
+        # Convert scans from laser frame to world frame
+        pos, ori = self.get_position_orientation()
+        scan_world = quat2mat(ori).dot(scan_laser.T).T + pos
+
+        # Convert scans from world frame to local base frame
+        base_pos, base_ori = self.occupancy_grid_local_link.get_position_orientation()
+        scan_local = quat2mat(base_ori).T.dot((scan_world - base_pos).T).T
         scan_local = scan_local[:, :2]
         scan_local = np.concatenate([np.array([[0, 0]]), scan_local, np.array([[0, 0]])], axis=0)
 
         # flip y axis
         scan_local[:, 1] *= -1
 
-        occupancy_grid = np.zeros((self.grid_resolution, self.grid_resolution)).astype(np.uint8)
-
+        # Initialize occupancy grid -- default is unknown values
+        occupancy_grid = np.zeros((self.occupancy_grid_resolution, self.occupancy_grid_resolution)).astype(np.uint8)
         occupancy_grid.fill(int(OccupancyGridState.UNKNOWN * 2.0))
-        scan_local_in_map = scan_local / self.occupancy_range * self.grid_resolution + (self.grid_resolution / 2)
+
+        # Convert local scans into the corresponding OG square it should belong to (note now all values are > 0, since
+        # OG ranges from [0, resolution] x [0, resolution])
+        scan_local_in_map = scan_local / self.occupancy_grid_range * self.occupancy_grid_resolution + \
+                            (self.occupancy_grid_resolution / 2)
         scan_local_in_map = scan_local_in_map.reshape((1, -1, 1, 2)).astype(np.int32)
+
+        # For each scan hit,
         for i in range(scan_local_in_map.shape[1]):
             cv2.circle(
                 img=occupancy_grid,
@@ -98,49 +215,265 @@ class ScanSensor(BaseSensor):
         )
         cv2.circle(
             img=occupancy_grid,
-            center=(self.grid_resolution // 2, self.grid_resolution // 2),
-            radius=int(self.robot_footprint_radius_in_map),
+            center=(self.occupancy_grid_resolution // 2, self.occupancy_grid_resolution // 2),
+            radius=self.occupancy_grid_inner_radius,
             color=int(OccupancyGridState.FREESPACE * 2.0),
             thickness=-1,
         )
 
         return occupancy_grid[:, :, None].astype(np.float32) / 2.0
 
-    def get_obs(self, env):
+    def _get_obs(self):
+        # Run super first to grab any upstream obs
+        obs = super()._get_obs()
+
+        # Add scan info (normalized to [0.0, 1.0])
+        if "scan" in self._modalities:
+            obs["scan"] = (self._rs.get_linear_depth_data(self._prim_path) - self.min_range) / \
+                          (self.max_range - self.min_range)
+
+            # Optionally add occupancy grid info
+            if "occupancy_grid" in self._modalities:
+                obs["occupancy_grid"] = self.get_local_occupancy_grid(scan=obs["scan"])
+
+        return obs
+
+    @property
+    def n_horizontal_rays(self):
         """
-        Get current LiDAR sensor reading and occupancy grid (optional)
-
-        :return: LiDAR sensor reading and local occupancy grid, normalized to [0.0, 1.0]
+        Returns:
+            int: Number of horizontal rays for this range sensor
         """
-        laser_angular_half_range = self.laser_angular_range / 2.0
-        if self.laser_link_name not in env.robots[0].links:
-            raise Exception(
-                "Trying to simulate LiDAR sensor, but laser_link_name cannot be found in the robot URDF file. Please add a link named laser_link_name at the intended laser pose. Feel free to check out assets/models/turtlebot/turtlebot.urdf and examples/configs/turtlebot_p2p_nav.yaml for examples."
-            )
-        laser_position, laser_orientation = env.robots[0].links[self.laser_link_name].get_position_orientation()
-        angle = np.arange(
-            -laser_angular_half_range / 180 * np.pi,
-            laser_angular_half_range / 180 * np.pi,
-            self.laser_angular_range / 180.0 * np.pi / self.n_horizontal_rays,
-        )
-        unit_vector_local = np.array([[np.cos(ang), np.sin(ang), 0.0] for ang in angle])
-        transform_matrix = quat2mat(
-            [laser_orientation[3], laser_orientation[0], laser_orientation[1], laser_orientation[2]]
-        )  # [x, y, z, w]
-        unit_vector_world = transform_matrix.dot(unit_vector_local.T).T
+        return int(self.horizontal_fov // self.horizontal_resolution)
 
-        start_pose = np.tile(laser_position, (self.n_horizontal_rays, 1))
-        start_pose += unit_vector_world * self.min_laser_dist
-        end_pose = laser_position + unit_vector_world * self.laser_linear_range
-        results = p.rayTestBatch(start_pose, end_pose, 6)  # numThreads = 6
+    @property
+    def n_vertical_rays(self):
+        """
+        Returns:
+            int: Number of vertical rays for this range sensor
+        """
+        return int(self.vertical_fov // self.vertical_resolution)
 
-        # hit fraction = [0.0, 1.0] of self.laser_linear_range
-        hit_fraction = np.array([item[2] for item in results])
-        hit_fraction = self.noise_model.add_noise(hit_fraction)
-        scan = np.expand_dims(hit_fraction, 1)
+    @property
+    def min_range(self):
+        """
+        Gets this range sensor's min_range (minimum distance in meters which will register a hit)
 
-        state = {}
-        state["scan"] = scan
-        if "occupancy_grid" in self.modalities:
-            state["occupancy_grid"] = self.get_local_occupancy_grid(scan)
-        return state
+        Returns:
+            float: minimum range for this range sensor, in meters
+        """
+        return self.get_attribute("minRange")
+
+    @min_range.setter
+    def min_range(self, val):
+        """
+        Sets this range sensor's min_range (minimum distance in meters which will register a hit)
+
+        Args:
+            val (float): minimum range for this range sensor, in meters
+        """
+        self.set_attribute("minRange", val)
+
+    @property
+    def max_range(self):
+        """
+        Gets this range sensor's max_range (maximum distance in meters which will register a hit)
+
+        Returns:
+            float: maximum range for this range sensor, in meters
+        """
+        return self.get_attribute("maxRange")
+
+    @max_range.setter
+    def max_range(self, val):
+        """
+        Sets this range sensor's max_range (maximum distance in meters which will register a hit)
+
+        Args:
+            val (float): maximum range for this range sensor, in meters
+        """
+        self.set_attribute("maxRange", val)
+
+    @property
+    def draw_lines(self):
+        """
+        Gets whether range lines are drawn for this sensor
+
+        Returns:
+            bool: Whether range lines are drawn for this sensor
+        """
+        return self.get_attribute("drawLines")
+
+    @draw_lines.setter
+    def draw_lines(self, draw):
+        """
+        Sets whether range lines are drawn for this sensor
+
+        Args:
+            draw (float): Whether range lines are drawn for this sensor
+        """
+        self.set_attribute("drawLines", draw)
+
+    @property
+    def draw_points(self):
+        """
+        Gets whether range points are drawn for this sensor
+
+        Returns:
+            bool: Whether range points are drawn for this sensor
+        """
+        return self.get_attribute("drawPoints")
+
+    @draw_points.setter
+    def draw_points(self, draw):
+        """
+        Sets whether range points are drawn for this sensor
+
+        Args:
+            draw (float): Whether range points are drawn for this sensor
+        """
+        self.set_attribute("drawPoints", draw)
+
+    @property
+    def horizontal_fov(self):
+        """
+        Gets this range sensor's horizontal_fov
+
+        Returns:
+            float: horizontal field of view for this range sensor
+        """
+        return self.get_attribute("horizontalFov")
+
+    @horizontal_fov.setter
+    def horizontal_fov(self, fov):
+        """
+        Sets this range sensor's horizontal_fov
+
+        Args:
+            fov (float): horizontal field of view to set
+        """
+        self.set_attribute("horizontalFov", fov)
+
+    @property
+    def horizontal_resolution(self):
+        """
+        Gets this range sensor's horizontal_resolution (degrees in between each horizontal hit)
+
+        Returns:
+            float: horizontal resolution for this range sensor, in degrees
+        """
+        return self.get_attribute("horizontalResolution")
+
+    @horizontal_resolution.setter
+    def horizontal_resolution(self, resolution):
+        """
+        Sets this range sensor's horizontal_resolution (degrees in between each horizontal hit)
+
+        Args:
+            resolution (float): horizontal resolution to set, in degrees
+        """
+        self.set_attribute("horizontalResolution", resolution)
+
+    @property
+    def vertical_fov(self):
+        """
+        Gets this range sensor's vertical_fov
+
+        Returns:
+            float: vertical field of view for this range sensor
+        """
+        return self.get_attribute("verticalFov")
+
+    @vertical_fov.setter
+    def vertical_fov(self, fov):
+        """
+        Sets this range sensor's vertical_fov
+
+        Args:
+            fov (float): vertical field of view to set
+        """
+        self.set_attribute("verticalFov", fov)
+
+    @property
+    def vertical_resolution(self):
+        """
+        Gets this range sensor's vertical_resolution (degrees in between each vertical hit)
+
+        Returns:
+            float: vertical resolution for this range sensor, in degrees
+        """
+        return self.get_attribute("verticalResolution")
+
+    @vertical_resolution.setter
+    def vertical_resolution(self, resolution):
+        """
+        Sets this range sensor's vertical_resolution (degrees in between each vertical hit)
+
+        Args:
+            resolution (float): vertical resolution to set, in degrees
+        """
+        self.set_attribute("verticalResolution", resolution)
+
+    @property
+    def yaw_offset(self):
+        """
+        Gets this range sensor's yaw_offset (used in cases where this sensor's forward direction is different than expected)
+
+        Returns:
+            float: yaw offset for this range sensor in degrees
+        """
+        return self.get_attribute("yawOffset")
+
+    @yaw_offset.setter
+    def yaw_offset(self, offset):
+        """
+        Sets this range sensor's yaw_offset (used in cases where this sensor's forward direction is different than expected)
+
+        Args:
+            offset (float): yaw offset to set in degrees.
+        """
+        self.set_attribute("yawOffset", offset)
+
+    @property
+    def rotation_rate(self):
+        """
+        Gets this range sensor's rotation_rate, in degrees per second. Note that a 0 value corresponds to no rotation,
+        and all range hits are assumed to be received at the exact same time.
+
+        Returns:
+            float: rotation rate for this range sensor in degrees per second
+        """
+        return self.get_attribute("rotationRate")
+
+    @rotation_rate.setter
+    def rotation_rate(self, rate):
+        """
+        Sets this range sensor's rotation_rate, in degrees per second. Note that a 0 value corresponds to no rotation,
+        and all range hits are assumed to be received at the exact same time.
+
+        Args:
+            rate (float): rotation rate for this range sensor in degrees per second
+        """
+        self.set_attribute("rotationRate", rate)
+
+    @classproperty
+    def all_modalities(cls):
+        return {"scan", "occupancy_grid"}
+
+    @classproperty
+    def no_noise_modalities(cls):
+        # Occupancy grid should have no noise
+        return {"occupancy_grid"}
+
+    @property
+    def enabled(self):
+        # Just use super
+        return super().enabled
+
+    @enabled.setter
+    def enabled(self, enabled):
+        # We must use super and additionally directly en/disable the sensor in the simulation
+        # Note: weird syntax below required to "extend" super class's implementation, see:
+        # https://stackoverflow.com/a/37663266
+        super(ScanSensor, self.__class__).enabled.fset(self, enabled)
+        self.set_attribute("enabled", enabled)

@@ -4,7 +4,7 @@ import os
 import xml.etree.ElementTree as ET
 
 import igibson
-from igibson.objects.articulated_object import URDFObject
+from igibson.objects.usd_object import URDFObject
 from igibson.utils.assets_utils import download_assets
 
 download_assets()

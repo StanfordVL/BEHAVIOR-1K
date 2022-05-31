@@ -1,13 +1,13 @@
 import os
 
 import numpy as np
-import pybullet as p
+
 
 import igibson
 from igibson.object_states.aabb import AABB
 from igibson.object_states.inside import Inside
 from igibson.object_states.link_based_state_mixin import LinkBasedStateMixin
-from igibson.object_states.object_state_base import AbsoluteObjectState
+from igibson.object_states.object_state_base import AbsoluteObjectState, NONE
 from igibson.object_states.open import Open
 from igibson.object_states.toggle import ToggledOn
 
@@ -122,30 +122,36 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin):
         return True, (heating_element_position if not self.requires_inside else None)
 
     def _initialize(self):
-        super(HeatSourceOrSink, self)._initialize()
+        # Run super first
+        super()._initialize()
         self.initialize_link_mixin()
-        self.marker = VisualMarker(
-            visual_shape=p.GEOM_MESH,
-            filename=_HEATING_ELEMENT_MARKER_FILENAME,
-            scale=_HEATING_ELEMENT_MARKER_SCALE,
+
+        # Load visual markers
+
+        # Import at runtime to prevent circular imports
+        from igibson.objects.usd_object import USDObject
+        self.marker = USDObject(
+            prim_path=f"{self.obj.prim_path}/heat_source_marker",
+            usd_path=_HEATING_ELEMENT_MARKER_FILENAME,
+            name=f"{self.obj.name}_heat_source_marker",
             class_id=SemanticClass.HEAT_SOURCE_MARKER,
-            rendering_params={"shadow_caster": True},
+            scale=_HEATING_ELEMENT_MARKER_SCALE,
+            visible=False,
+            fixed_base=False,
+            visual_only=True,
         )
-        self.simulator.import_object(self.marker)
-        self.marker.set_position([0, 0, -100])
+        # Import marker into simulator
+        self._simulator.import_object(self.marker, register=False, auto_initialize=True)
 
     def _update(self):
         self.status, self.position = self._compute_state_and_position()
 
         # Move the marker.
-        marker_position = [0, 0, -100]
         if self.position is not None:
-            marker_position = self.position
-
-        # Lazy update of marker position
-        if not np.all(np.isclose(marker_position, self.marker.get_position())):
-            self.marker.set_position(marker_position)
-            self.marker.force_wakeup()
+            self.marker.set_position(self.position)
+            self.marker.visible = True
+        else:
+            self.marker.visible = False
 
     def _get_value(self):
         return self.status, self.position
@@ -155,8 +161,3 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin):
 
     # Nothing needs to be done to save/load HeatSource since it's stateless except for
     # the marker.
-    def _dump(self):
-        return None
-
-    def load(self, data):
-        return

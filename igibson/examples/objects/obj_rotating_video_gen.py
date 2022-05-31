@@ -7,10 +7,10 @@ import numpy as np
 from PIL import Image
 
 import igibson
-from igibson.objects.articulated_object import ArticulatedObject
+from igibson.objects.usd_object import ArticulatedObject
 from igibson.render.mesh_renderer.mesh_renderer_settings import MeshRendererSettings
 from igibson.render.profiler import Profiler
-from igibson.scenes.igibson_indoor_scene import InteractiveIndoorScene
+from igibson.scenes.interactive_traversable_scene import InteractiveIndoorScene
 from igibson.simulator import Simulator
 
 

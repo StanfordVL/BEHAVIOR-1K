@@ -1,9 +1,7 @@
-from abc import ABCMeta, abstractmethod
-
-from future.utils import with_metaclass
+from abc import ABC, abstractmethod
 
 
-class MetricBase(with_metaclass(ABCMeta, object)):
+class MetricBase(ABC):
     def start_callback(self, env, log_reader):
         pass
 

@@ -3,12 +3,12 @@ import json
 import os
 
 import numpy as np
-import pybullet as p
+
 from bddl.object_taxonomy import ObjectTaxonomy
 from pynput import keyboard
 
 import igibson
-from igibson.objects.articulated_object import URDFObject
+from igibson.objects.usd_object import URDFObject
 from igibson.objects.visual_marker import VisualMarker
 from igibson.scenes.empty_scene import EmptyScene
 from igibson.simulator import Simulator

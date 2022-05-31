@@ -1,3 +1,5 @@
+import numpy as np
+from collections import OrderedDict
 from igibson.object_states.heat_source_or_sink import HeatSourceOrSink
 from igibson.object_states.inside import Inside
 from igibson.object_states.object_state_base import AbsoluteObjectState
@@ -39,7 +41,7 @@ class Temperature(AbsoluteObjectState):
 
         # Find all heat source objects.
         affected_by_heat_source = False
-        for obj2 in self.simulator.scene.get_objects_with_state(HeatSourceOrSink):
+        for obj2 in self._simulator.scene.get_objects_with_state(HeatSourceOrSink):
             # Obtain heat source position.
             heat_source = obj2.states[HeatSourceOrSink]
             heat_source_state, heat_source_position = heat_source.get_value()
@@ -61,21 +63,31 @@ class Temperature(AbsoluteObjectState):
                         continue
 
                 new_temperature += (
-                    (heat_source.temperature - self.value) * heat_source.heating_rate * self.simulator.render_timestep
+                    (heat_source.temperature - self.value) * heat_source.heating_rate * self._simulator.get_rendering_dt()
                 )
                 affected_by_heat_source = True
 
         # Apply temperature decay if not affected by any heat source.
         if not affected_by_heat_source:
             new_temperature += (
-                (DEFAULT_TEMPERATURE - self.value) * TEMPERATURE_DECAY_SPEED * self.simulator.render_timestep
+                (DEFAULT_TEMPERATURE - self.value) * TEMPERATURE_DECAY_SPEED * self._simulator.get_rendering_dt()
             )
 
         self.value = new_temperature
 
-    # For this state, we simply store its value.
-    def _dump(self):
-        return self.value
+    @property
+    def settable(self):
+        return True
 
-    def load(self, data):
-        self.value = data
+    # For this state, we simply store its value.
+    def _dump_state(self):
+        return OrderedDict(temperature=self.value)
+
+    def _load_state(self, state):
+        self.value = state["temperature"]
+
+    def _serialize(self, state):
+        return np.array([state["temperature"]])
+
+    def _deserialize(self, state):
+        return OrderedDict(temperature=state[0]), 1

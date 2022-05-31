@@ -6,6 +6,7 @@ from transforms3d.quaternions import qmult, quat2mat
 
 from igibson.controllers import LocomotionController
 from igibson.robots.robot_base import BaseRobot
+from igibson.utils.python_utils import classproperty
 
 
 class LocomotionRobot(BaseRobot):
@@ -38,11 +39,13 @@ class LocomotionRobot(BaseRobot):
     def _get_proprioception_dict(self):
         dic = super()._get_proprioception_dict()
 
+        joints_state = self.get_joints_state(normalized=False)
+
         # Add base info
-        dic["base_qpos"] = self.joint_positions[self.base_control_idx]
-        dic["base_qpos_sin"] = np.sin(self.joint_positions[self.base_control_idx])
-        dic["base_qpos_cos"] = np.cos(self.joint_positions[self.base_control_idx])
-        dic["base_qvel"] = self.joint_velocities[self.base_control_idx]
+        dic["base_qpos"] = joints_state.positions[self.base_control_idx]
+        dic["base_qpos_sin"] = np.sin(joints_state.positions[self.base_control_idx])
+        dic["base_qpos_cos"] = np.cos(joints_state.positions[self.base_control_idx])
+        dic["base_qvel"] = joints_state.velocities[self.base_control_idx]
 
         return dic
 
@@ -74,12 +77,26 @@ class LocomotionRobot(BaseRobot):
         """
         return {
             "name": "JointController",
-            "control_freq": self.control_freq,
+            "control_freq": self._control_freq,
             "motor_type": "velocity",
             "control_limits": self.control_limits,
-            "joint_idx": self.base_control_idx,
+            "dof_idx": self.base_control_idx,
             "command_output_limits": "default",
             "use_delta_commands": False,
+        }
+
+    @property
+    def _default_base_null_joint_controller_config(self):
+        """
+        :return: Dict[str, Any] Default null joint controller config
+            to control this robot's base i.e. dummy controller
+        """
+        return {
+            "name": "NullJointController",
+            "control_freq": self._control_freq,
+            "motor_type": "velocity",
+            "control_limits": self.control_limits,
+            "dof_idx": self.base_control_idx,
         }
 
     @property
@@ -90,6 +107,7 @@ class LocomotionRobot(BaseRobot):
         # Add supported base controllers
         cfg["base"] = {
             self._default_base_joint_controller_config["name"]: self._default_base_joint_controller_config,
+            self._default_base_null_joint_controller_config["name"]: self._default_base_null_joint_controller_config,
         }
 
         return cfg
@@ -101,7 +119,7 @@ class LocomotionRobot(BaseRobot):
         :param delta: Array[float], (x,y,z) cartesian delta base position
         """
         new_pos = np.array(delta) + self.get_position()
-        self.robot_body.reset_position(new_pos)
+        self.set_position(position=new_pos)
 
     def move_forward(self, delta=0.05):
         """
@@ -109,7 +127,7 @@ class LocomotionRobot(BaseRobot):
 
         :param delta: float, delta base position forward
         """
-        self.move_by(quat2mat(self.base_link.get_orientation()).dot(np.array([delta, 0, 0])))
+        self.move_by(quat2mat(self.get_orientation()).dot(np.array([delta, 0, 0])))
 
     def move_backward(self, delta=0.05):
         """
@@ -117,7 +135,7 @@ class LocomotionRobot(BaseRobot):
 
         :param delta: float, delta base position backward
         """
-        self.move_by(quat2mat(self.base_link.get_orientation()).dot(np.array([-delta, 0, 0])))
+        self.move_by(quat2mat(self.get_orientation()).dot(np.array([-delta, 0, 0])))
 
     def move_left(self, delta=0.05):
         """
@@ -125,7 +143,7 @@ class LocomotionRobot(BaseRobot):
 
         :param delta: float, delta base position left
         """
-        self.move_by(quat2mat(self.base_link.get_orientation()).dot(np.array([0, -delta, 0])))
+        self.move_by(quat2mat(self.get_orientation()).dot(np.array([0, -delta, 0])))
 
     def move_right(self, delta=0.05):
         """
@@ -133,7 +151,7 @@ class LocomotionRobot(BaseRobot):
 
         :param delta: float, delta base position right
         """
-        self.move_by(quat2mat(self.base_link.get_orientation()).dot(np.array([0, delta, 0])))
+        self.move_by(quat2mat(self.get_orientation()).dot(np.array([0, delta, 0])))
 
     def turn_left(self, delta=0.03):
         """
@@ -141,9 +159,9 @@ class LocomotionRobot(BaseRobot):
 
         :param delta: float, delta angle to rotate the base left
         """
-        quat = self.base_link.get_orientation()
+        quat = self.get_orientation()
         quat = qmult((euler2quat(-delta, 0, 0)), quat)
-        self.base_link.set_orientation(quat)
+        self.set_orientation(quat)
 
     def turn_right(self, delta=0.03):
         """
@@ -151,9 +169,9 @@ class LocomotionRobot(BaseRobot):
 
         :param delta: delta angle to rotate the base right
         """
-        quat = self.base_link.get_orientation()
+        quat = self.get_orientation()
         quat = qmult((euler2quat(delta, 0, 0)), quat)
-        self.base_link.set_orientation(quat)
+        self.set_orientation(quat)
 
     @property
     @abstractmethod
@@ -162,3 +180,10 @@ class LocomotionRobot(BaseRobot):
         :return Array[int]: Indices in low-level control vector corresponding to base joints.
         """
         raise NotImplementedError
+
+    @classproperty
+    def _do_not_register_classes(cls):
+        # Don't register this class since it's an abstract template
+        classes = super()._do_not_register_classes
+        classes.add("LocomotionRobot")
+        return classes

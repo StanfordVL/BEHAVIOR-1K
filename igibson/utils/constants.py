@@ -3,10 +3,10 @@ Constant Definitions
 """
 
 import os
-from enum import IntEnum
+from enum import IntEnum, Enum
 
 import igibson
-from igibson.render.mesh_renderer.mesh_renderer_settings import MeshRendererSettings
+from igibson.utils.assets_utils import get_ig_avg_category_specs
 
 AVAILABLE_MODALITIES = ("rgb", "normal", "3d", "seg", "optical_flow", "scene_flow", "ins_seg")
 MAX_INSTANCE_COUNT = 1024
@@ -44,11 +44,65 @@ class SemanticClass(IntEnum):
 # Note that we are starting this from bit 6 since bullet seems to be giving special meaning to groups 0-5.
 # Collision groups for objects. For special logic, different categories can be assigned different collision groups.
 ALL_COLLISION_GROUPS_MASK = -1
-DEFAULT_COLLISION_GROUP = 1
+DEFAULT_COLLISION_GROUP = "default"
 SPECIAL_COLLISION_GROUPS = {
-    "floors": 7,
-    "carpet": 8,
+    "floors": "floors",
+    "carpet": "carpet",
 }
+
+
+# Joint friction magic values to assign to objects based on their category
+DEFAULT_JOINT_FRICTION = 10.0
+SPECIAL_JOINT_FRICTIONS = {
+    "oven": 30.0,
+    "dishwasher": 30.0,
+    "toilet": 3.0,
+}
+
+
+# TODO: Clean up this class to be better enum with sanity checks
+# Joint types
+class JointType:
+    JOINT = "Joint"
+    JOINT_FIXED = "FixedJoint"
+    JOINT_PRISMATIC = "PrismaticJoint"
+    JOINT_REVOLUTE = "RevoluteJoint"
+    JOINT_SPHERICAL = "SphericalJoint"
+
+    _STR_TO_TYPE = {
+        "Joint": JOINT,
+        "FixedJoint": JOINT_FIXED,
+        "PrismaticJoint": JOINT_PRISMATIC,
+        "RevoluteJoint": JOINT_REVOLUTE,
+        "SphericalJoint": JOINT_SPHERICAL,
+    }
+
+    _TYPE_TO_STR = {
+        JOINT: "Joint",
+        JOINT_FIXED: "FixedJoint",
+        JOINT_PRISMATIC: "PrismaticJoint",
+        JOINT_REVOLUTE: "RevoluteJoint",
+        JOINT_SPHERICAL: "SphericalJoint",
+    }
+
+    @classmethod
+    def get_type(cls, str_type):
+        assert str_type in cls._STR_TO_TYPE, f"Invalid string joint type name received: {str_type}"
+        return cls._STR_TO_TYPE[str_type]
+
+    @classmethod
+    def get_str(cls, joint_type):
+        assert joint_type in cls._TYPE_TO_STR, f"Invalid joint type name received: {joint_type}"
+        return cls._TYPE_TO_STR[joint_type]
+
+    @classmethod
+    def is_valid(cls, joint_type):
+        return joint_type in cls._TYPE_TO_STR if isinstance(joint_type, cls) else joint_type in cls._STR_TO_TYPE
+
+
+# Object category specs
+AVERAGE_OBJ_DENSITY = 67.0
+AVERAGE_CATEGORY_SPECS = get_ig_avg_category_specs()
 
 
 def get_collision_group_mask(groups_to_exclude=[]):
@@ -125,35 +179,35 @@ light_modulation_map_filename = os.path.join(
 )
 background_texture = os.path.join(igibson.ig_dataset_path, "scenes", "background", "urban_street_01.jpg")
 
-NamedRenderingPresets = {
-    "NO_PBR": MeshRendererSettings(enable_pbr=False, enable_shadow=False),
-    "PBR_NOSHADOW": MeshRendererSettings(enable_pbr=True, enable_shadow=True),
-    "PBR_SHADOW_MSAA": MeshRendererSettings(enable_pbr=True, enable_shadow=True, msaa=True),
-    "NO_PBR_OPT": MeshRendererSettings(enable_pbr=False, enable_shadow=False, optimized=True),
-    "PBR_NOSHADOW_OPT": MeshRendererSettings(enable_pbr=True, enable_shadow=True, optimized=True),
-    "PBR_SHADOW_MSAA_OPT": MeshRendererSettings(enable_pbr=True, enable_shadow=True, msaa=True, optimized=True),
-    "HQ_WITH_BG_OPT": MeshRendererSettings(
-        env_texture_filename=hdr_texture,
-        env_texture_filename2=hdr_texture2,
-        env_texture_filename3=background_texture,
-        light_modulation_map_filename=light_modulation_map_filename,
-        enable_shadow=True,
-        msaa=True,
-        light_dimming_factor=1.0,
-        optimized=True,
-    ),
-    "VISUAL_RL": MeshRendererSettings(enable_pbr=True, enable_shadow=False, msaa=False, optimized=True),
-    "PERCEPTION": MeshRendererSettings(
-        env_texture_filename=hdr_texture,
-        env_texture_filename2=hdr_texture2,
-        env_texture_filename3=background_texture,
-        light_modulation_map_filename=light_modulation_map_filename,
-        enable_shadow=True,
-        msaa=True,
-        light_dimming_factor=1.0,
-        optimized=True,
-    ),
-}
+# NamedRenderingPresets = {
+#     "NO_PBR": MeshRendererSettings(enable_pbr=False, enable_shadow=False),
+#     "PBR_NOSHADOW": MeshRendererSettings(enable_pbr=True, enable_shadow=True),
+#     "PBR_SHADOW_MSAA": MeshRendererSettings(enable_pbr=True, enable_shadow=True, msaa=True),
+#     "NO_PBR_OPT": MeshRendererSettings(enable_pbr=False, enable_shadow=False, optimized=True),
+#     "PBR_NOSHADOW_OPT": MeshRendererSettings(enable_pbr=True, enable_shadow=True, optimized=True),
+#     "PBR_SHADOW_MSAA_OPT": MeshRendererSettings(enable_pbr=True, enable_shadow=True, msaa=True, optimized=True),
+#     "HQ_WITH_BG_OPT": MeshRendererSettings(
+#         env_texture_filename=hdr_texture,
+#         env_texture_filename2=hdr_texture2,
+#         env_texture_filename3=background_texture,
+#         light_modulation_map_filename=light_modulation_map_filename,
+#         enable_shadow=True,
+#         msaa=True,
+#         light_dimming_factor=1.0,
+#         optimized=True,
+#     ),
+#     "VISUAL_RL": MeshRendererSettings(enable_pbr=True, enable_shadow=False, msaa=False, optimized=True),
+#     "PERCEPTION": MeshRendererSettings(
+#         env_texture_filename=hdr_texture,
+#         env_texture_filename2=hdr_texture2,
+#         env_texture_filename3=background_texture,
+#         light_modulation_map_filename=light_modulation_map_filename,
+#         enable_shadow=True,
+#         msaa=True,
+#         light_dimming_factor=1.0,
+#         optimized=True,
+#     ),
+# }
 
 # Encodings
 RAW_ENCODING = 0

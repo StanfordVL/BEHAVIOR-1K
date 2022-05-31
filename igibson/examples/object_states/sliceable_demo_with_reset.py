@@ -2,10 +2,10 @@ import logging
 import os
 
 import numpy as np
-import pybullet as p
+
 
 from igibson import object_states
-from igibson.objects.articulated_object import URDFObject
+from igibson.objects.usd_object import URDFObject
 from igibson.objects.multi_object_wrappers import ObjectGrouper, ObjectMultiplexer
 from igibson.scenes.empty_scene import EmptyScene
 from igibson.simulator import Simulator

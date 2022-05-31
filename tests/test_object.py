@@ -1,9 +1,9 @@
 import os
 
-import pybullet as p
+
 
 import igibson
-from igibson.objects.articulated_object import ArticulatedObject, RBOObject
+from igibson.objects.usd_object import ArticulatedObject, RBOObject
 from igibson.objects.cube import Cube
 from igibson.objects.ycb_object import YCBObject
 from igibson.robots.turtlebot import Turtlebot

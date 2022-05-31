@@ -2,11 +2,8 @@ import logging
 import os
 
 import numpy as np
-import pybullet as p
-import pybullet_data
 
 from igibson.scenes.scene_base import Scene
-from igibson.utils.constants import SemanticClass
 from igibson.utils.utils import l2_distance
 
 
@@ -15,34 +12,18 @@ class EmptyScene(Scene):
     An empty scene for debugging.
     """
 
-    def __init__(self, render_floor_plane=True, floor_plane_rgba=[1.0, 1.0, 1.0, 1.0]):
+    def __init__(
+            self,
+            floor_plane_visible=False,
+            floor_plane_color=(1.0, 1.0, 1.0),
+    ):
         super(EmptyScene, self).__init__()
-        self.objects = []
-        self.render_floor_plane = render_floor_plane
-        self.floor_plane_rgba = floor_plane_rgba
-
-    def get_objects(self):
-        return list(self.objects)
-
-    def _add_object(self, obj):
-        self.objects.append(obj)
+        self.floor_plane_visible = floor_plane_visible
+        self.floor_plane_color = floor_plane_color
 
     def _load(self, simulator):
-        plane_file = os.path.join(pybullet_data.getDataPath(), "mjcf/ground_plane.xml")
-        self.floor_body_ids += [p.loadMJCF(plane_file)[0]]
-        p.changeDynamics(self.floor_body_ids[0], -1, lateralFriction=1)
-        # White floor plane for visualization purpose if needed.
-        p.changeVisualShape(self.floor_body_ids[0], -1, rgbaColor=self.floor_plane_rgba)
-
-        if self.render_floor_plane:
-            for id in self.floor_body_ids:
-                simulator.load_object_in_renderer(
-                    None, id, SemanticClass.SCENE_OBJS, use_pbr=False, use_pbr_mapping=False
-                )
-
-        # Load additional objects & merge body IDs.
-        additional_object_body_ids = [x for obj in self.objects for x in obj.load(simulator)]
-        return self.floor_body_ids + additional_object_body_ids
+        # Load ground plane
+        self.add_ground_plane(color=self.floor_plane_color, visible=self.floor_plane_visible)
 
     def get_random_point(self, floor=None):
         """

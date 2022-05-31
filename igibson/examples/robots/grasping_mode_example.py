@@ -10,9 +10,9 @@ import time
 from collections import OrderedDict
 
 import numpy as np
-import pybullet as p
 
-from igibson.objects.articulated_object import URDFObject
+
+from igibson.objects.usd_object import URDFObject
 from igibson.objects.ycb_object import YCBObject
 from igibson.robots import REGISTERED_ROBOTS
 from igibson.scenes.empty_scene import EmptyScene

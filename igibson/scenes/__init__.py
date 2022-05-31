@@ -1,0 +1,4 @@
+from igibson.scenes.scene_base import Scene, REGISTERED_SCENES
+from igibson.scenes.empty_scene import EmptyScene
+from igibson.scenes.traversable_scene import TraversableScene
+from igibson.scenes.interactive_traversable_scene import InteractiveTraversableScene

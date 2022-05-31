@@ -10,7 +10,7 @@ import signal
 import xml.etree.ElementTree as ET
 
 import numpy as np
-import pybullet as p
+
 import trimesh
 from pyquaternion import Quaternion
 

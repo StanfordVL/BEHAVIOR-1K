@@ -3,7 +3,6 @@ import os
 import platform
 
 import numpy as np
-import pybullet as p
 
 import igibson
 from igibson.object_states.factory import get_states_by_dependency_order
@@ -39,8 +38,8 @@ def load_without_pybullet_vis(load_func):
 
 class Simulator:
     """
-    Simulator class is a wrapper of physics simulator (pybullet) and MeshRenderer, it loads objects into
-    both pybullet and also MeshRenderer and syncs the pose of objects and robot parts.
+    Simulator class is a wrapper of physics simulator (omniverse) and corresponding renderer, it loads objects into
+    omniverse and its renderer and syncs the pose of objects and robot parts.
     """
 
     def __init__(
@@ -55,7 +54,6 @@ class Simulator:
         vertical_fov=90,
         device_idx=0,
         rendering_settings=MeshRendererSettings(),
-        use_pb_gui=False,
     ):
         """
         :param gravity: gravity on z direction.
@@ -88,22 +86,16 @@ class Simulator:
         self.vertical_fov = vertical_fov
         self.device_idx = device_idx
         self.rendering_settings = rendering_settings
-        self.use_pb_gui = use_pb_gui
-
-        plt = platform.system()
-        if plt == "Darwin" and self.mode == SimulatorMode.GUI_INTERACTIVE and use_pb_gui:
-            self.use_pb_gui = False  # for mac os disable pybullet rendering
-            logging.warning(
-                "Simulator mode gui_interactive is not supported when `use_pb_gui` is true on macOS. Default to use_pb_gui = False."
-            )
-        if plt != "Linux" and self.mode == SimulatorMode.HEADLESS_TENSOR:
-            self.mode = SimulatorMode.HEADLESS
-            logging.warning("Simulator mode headless_tensor is only supported on Linux. Default to headless mode.")
 
         self.viewer = None
         self.renderer = None
 
+        # Initialize other variables
+        self.visual_objects = None
+
+        # TODO: Current thing being worked on
         self.initialize_renderer()
+
         self.initialize_physics_engine()
         self.initialize_viewers()
         self.initialize_variables()

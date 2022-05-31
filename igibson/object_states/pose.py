@@ -1,6 +1,6 @@
 import numpy as np
 
-from igibson.object_states.object_state_base import CachingEnabledObjectState
+from igibson.object_states.object_state_base import CachingEnabledObjectState, NONE
 
 
 class Pose(CachingEnabledObjectState):
@@ -13,8 +13,3 @@ class Pose(CachingEnabledObjectState):
         raise NotImplementedError("Pose state currently does not support setting.")
 
     # Nothing needs to be done to save/load Pose since it will happen due to pose caching.
-    def _dump(self):
-        return None
-
-    def load(self, data):
-        return

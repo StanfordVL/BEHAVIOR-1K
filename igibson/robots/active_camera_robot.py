@@ -3,6 +3,7 @@ from abc import abstractmethod
 import numpy as np
 
 from igibson.robots.robot_base import BaseRobot
+from igibson.utils.python_utils import classproperty
 
 
 class ActiveCameraRobot(BaseRobot):
@@ -35,10 +36,11 @@ class ActiveCameraRobot(BaseRobot):
         dic = super()._get_proprioception_dict()
 
         # Add camera pos info
-        dic["camera_qpos"] = self.joint_positions[self.camera_control_idx]
-        dic["camera_qpos_sin"] = np.sin(self.joint_positions[self.camera_control_idx])
-        dic["camera_qpos_cos"] = np.cos(self.joint_positions[self.camera_control_idx])
-        dic["camera_qvel"] = self.joint_velocities[self.camera_control_idx]
+        joints_state = self.get_joints_state(normalized=False)
+        dic["camera_qpos"] = joints_state.positions[self.camera_control_idx]
+        dic["camera_qpos_sin"] = np.sin(joints_state.positions[self.camera_control_idx])
+        dic["camera_qpos_cos"] = np.cos(joints_state.positions[self.camera_control_idx])
+        dic["camera_qvel"] = joints_state.velocities[self.camera_control_idx]
 
         return dic
 
@@ -69,12 +71,26 @@ class ActiveCameraRobot(BaseRobot):
         """
         return {
             "name": "JointController",
-            "control_freq": self.control_freq,
+            "control_freq": self._control_freq,
             "motor_type": "velocity",
             "control_limits": self.control_limits,
-            "joint_idx": self.camera_control_idx,
+            "dof_idx": self.camera_control_idx,
             "command_output_limits": "default",
             "use_delta_commands": False,
+        }
+
+    @property
+    def _default_camera_null_joint_controller_config(self):
+        """
+        :return: Dict[str, Any] Default null joint controller config
+            to control this robot's camera i.e. dummy controller
+        """
+        return {
+            "name": "NullJointController",
+            "control_freq": self._control_freq,
+            "motor_type": "velocity",
+            "control_limits": self.control_limits,
+            "dof_idx": self.camera_control_idx,
         }
 
     @property
@@ -85,6 +101,7 @@ class ActiveCameraRobot(BaseRobot):
         # We additionally add in camera default
         cfg["camera"] = {
             self._default_camera_joint_controller_config["name"]: self._default_camera_joint_controller_config,
+            self._default_camera_null_joint_controller_config["name"]: self._default_camera_null_joint_controller_config,
         }
 
         return cfg
@@ -96,3 +113,10 @@ class ActiveCameraRobot(BaseRobot):
         :return Array[int]: Indices in low-level control vector corresponding to camera joints.
         """
         raise NotImplementedError
+
+    @classproperty
+    def _do_not_register_classes(cls):
+        # Don't register this class since it's an abstract template
+        classes = super()._do_not_register_classes
+        classes.add("ActiveCameraRobot")
+        return classes

@@ -3,7 +3,7 @@ Developed by Caelen Garrett in pybullet-planning repository (https://github.com/
 and adapted by iGibson team.
 """
 import os
-import pybullet as p
+
 import numpy as np
 import time
 from itertools import product

@@ -2,7 +2,7 @@ import logging
 import os
 
 import numpy as np
-import pybullet as p
+
 import pybullet_data
 
 from igibson.scenes.scene_base import Scene
@@ -59,9 +59,3 @@ class StadiumScene(Scene):
         shortest_path = np.stack((source_world, target_world))
         geodesic_distance = l2_distance(source_world, target_world)
         return shortest_path, geodesic_distance
-
-    def get_objects(self):
-        return list(self.objects)
-
-    def _add_object(self, obj):
-        self.objects.append(obj)

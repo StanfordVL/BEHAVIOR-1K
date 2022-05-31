@@ -1,13 +1,14 @@
 import numpy as np
-import pybullet as p
 
-from igibson.controllers import ControlType, LocomotionController, ManipulationController
+from igibson.controllers import IsGraspingState, ControlType, LocomotionController, ManipulationController, \
+    GripperController
 from igibson.utils.python_utils import assert_valid_key
+import igibson.utils.transform_utils as T
 
 
-class JointController(LocomotionController, ManipulationController):
+class JointController(LocomotionController, ManipulationController, GripperController):
     """
-    Controller class for joint control. Because pybullet can handle direct position / velocity / torque
+    Controller class for joint control. Because omniverse can handle direct position / velocity / effort
     control signals, this is merely a pass-through operation from command to control (with clipping / scaling built in).
 
     Each controller step consists of the following:
@@ -21,25 +22,25 @@ class JointController(LocomotionController, ManipulationController):
         control_freq,
         motor_type,
         control_limits,
-        joint_idx,
+        dof_idx,
         command_input_limits="default",
         command_output_limits="default",
         use_delta_commands=False,
-        compute_delta_in_quat_space=[],
+        compute_delta_in_quat_space=None,
     ):
         """
         :param control_freq: int, controller loop frequency
-        :param motor_type: str, type of motor being controlled, one of {position, velocity, torque}
+        :param motor_type: str, type of motor being controlled, one of {position, velocity, effort}
         :param control_limits: Dict[str, Tuple[Array[float], Array[float]]]: The min/max limits to the outputted
             control signal. Should specify per-actuator type limits, i.e.:
 
             "position": [[min], [max]]
             "velocity": [[min], [max]]
-            "torque": [[min], [max]]
+            "effort": [[min], [max]]
             "has_limit": [...bool...]
 
             Values outside of this range will be clipped, if the corresponding joint index in has_limit is True.
-        :param joint_idx: Array[int], specific joint indices controlled by this robot. Used for inferring
+        :param dof_idx: Array[int], specific dof indices controlled by this robot. Used for inferring
             controller-relevant values during control computations
         :param command_input_limits: None or "default" or Tuple[float, float] or Tuple[Array[float], Array[float]],
             if set, is the min/max acceptable inputted command. Values outside of this range will be clipped.
@@ -50,28 +51,28 @@ class JointController(LocomotionController, ManipulationController):
             If either is None, no scaling will be used. If "default", then this range will automatically be set
             to the @control_limits entry corresponding to self.control_type
         :param use_delta_commands: bool, whether inputted commands should be interpreted as delta or absolute values
-        :param compute_delta_in_quat_space: List[(rx_idx, ry_idx, rz_idx), ...], groups of joints that need to be
-            processed in quaternion space to avoid gimbal lock issues normally faced by 3 DOF rotation joints. Each
-            group needs to consist of three idxes corresponding to the indices in the input space. This is only
-            used in the delta_commands mode.
+        :param compute_delta_in_quat_space: None or List[(rx_idx, ry_idx, rz_idx), ...], if specified, groups of
+            joints that need to be processed in quaternion space to avoid gimbal lock issues normally faced by
+            3 DOF rotation joints. Each group needs to consist of three idxes corresponding to the indices in
+            the input space. This is only used in the delta_commands mode.
         """
         # Store arguments
         assert_valid_key(key=motor_type.lower(), valid_keys=ControlType.VALID_TYPES_STR, name="motor_type")
-        self.motor_type = motor_type.lower()
-        self.use_delta_commands = use_delta_commands
-        self.compute_delta_in_quat_space = compute_delta_in_quat_space
+        self._motor_type = motor_type.lower()
+        self._use_delta_commands = use_delta_commands
+        self._compute_delta_in_quat_space = [] if compute_delta_in_quat_space is None else compute_delta_in_quat_space
 
         # When in delta mode, it doesn't make sense to infer output range using the joint limits (since that's an
         # absolute range and our values are relative). So reject the default mode option in that case.
         assert not (
-            self.use_delta_commands and command_output_limits == "default"
+            self._use_delta_commands and command_output_limits == "default"
         ), "Cannot use 'default' command output limits in delta commands mode of JointController. Try None instead."
 
         # Run super init
         super().__init__(
             control_freq=control_freq,
             control_limits=control_limits,
-            joint_idx=joint_idx,
+            dof_idx=dof_idx,
             command_input_limits=command_input_limits,
             command_output_limits=command_output_limits,
         )
@@ -89,20 +90,20 @@ class JointController(LocomotionController, ManipulationController):
             states necessary for controller computation. Must include the following keys:
                 joint_position: Array of current joint positions
                 joint_velocity: Array of current joint velocities
-                joint_torque: Array of current joint torques
+                joint_effort: Array of current joint effort
 
         :return: Array[float], outputted (non-clipped!) control signal to deploy
         """
         # If we're using delta commands, add this value
-        if self.use_delta_commands:
+        if self._use_delta_commands:
             # Compute the base value for the command.
-            base_value = control_dict["joint_{}".format(self.motor_type)][self.joint_idx]
+            base_value = control_dict["joint_{}".format(self._motor_type)][self.dof_idx]
 
             # Apply the command to the base value.
             u = base_value + command
 
             # Correct any gimbal lock issues using the compute_delta_in_quat_space group.
-            for rx_ind, ry_ind, rz_ind in self.compute_delta_in_quat_space:
+            for rx_ind, ry_ind, rz_ind in self._compute_delta_in_quat_space:
                 # Grab the starting rotations of these joints.
                 start_rots = base_value[[rx_ind, ry_ind, rz_ind]]
 
@@ -110,10 +111,9 @@ class JointController(LocomotionController, ManipulationController):
                 delta_rots = command[[rx_ind, ry_ind, rz_ind]]
 
                 # Compute the final rotations in the quaternion space.
-                _, end_quat = p.multiplyTransforms(
-                    [0, 0, 0], p.getQuaternionFromEuler(delta_rots), [0, 0, 0], p.getQuaternionFromEuler(start_rots)
-                )
-                end_rots = p.getEulerFromQuaternion(end_quat)
+                _, end_quat = T.pose_transform(np.zeros(3), T.euler2quat(delta_rots),
+                                               np.zeros(3), T.euler2quat(start_rots))
+                end_rots = T.quat2euler(end_quat)
 
                 # Update the command
                 u[[rx_ind, ry_ind, rz_ind]] = end_rots
@@ -125,10 +125,22 @@ class JointController(LocomotionController, ManipulationController):
         # Return control
         return u
 
+    def is_grasping(self):
+        # No good heuristic to determine grasping, so return UNKNOWN
+        return IsGraspingState.UNKNOWN
+
+    @property
+    def use_delta_commands(self):
+        """
+        Returns:
+            bool: Whether this controller is using delta commands or not
+        """
+        return self._use_delta_commands
+
     @property
     def control_type(self):
-        return ControlType.get_type(type_str=self.motor_type)
+        return ControlType.get_type(type_str=self._motor_type)
 
     @property
     def command_dim(self):
-        return len(self.joint_idx)
+        return len(self.dof_idx)

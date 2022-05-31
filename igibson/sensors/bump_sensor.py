@@ -15,5 +15,5 @@ class BumpSensor(BaseSensor):
 
         :return: Bump sensor reading
         """
-        has_collision = float(len(env.collision_links) > 0)
+        has_collision = float(len(env.current_collisions) > 0)
         return has_collision

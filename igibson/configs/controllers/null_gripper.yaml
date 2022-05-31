@@ -5,5 +5,5 @@
 robot:
   controller_config:
     gripper:
-      name: NullGripperController
+      name: NullJointController
       # no other args to specify (this is a dummy controller)

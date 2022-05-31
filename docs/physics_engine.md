@@ -11,7 +11,7 @@ More info can be found in here: [PyBullet documentation](https://docs.google.com
 In this example, we import a scene, a robot and an object into PyBullet and step through a few seconds of simulation.
 
 ```python
-import pybullet as p
+
 from igibson.utils.assets_utils import get_scene_path, get_texture_file
 import igibson
 

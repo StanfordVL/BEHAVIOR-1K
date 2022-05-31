@@ -1,7 +1,8 @@
 import os
 
 import gym
-import pybullet as p
+import numpy as np
+
 
 from igibson.robots.locomotion_robot import LocomotionRobot
 

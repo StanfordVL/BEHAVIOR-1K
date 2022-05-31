@@ -1,0 +1,200 @@
+[package]
+title = "Isaac Sim Python + iGibson"
+description = "A minimal app for use with iGibson"
+version = "2022.1.0"
+
+# That makes it browsable in UI with "experience" filter
+keywords = ["experience", "app", "usd"]
+
+[settings]
+app.name = "iGibson"
+app.version = "2022.1.0"
+
+[dependencies]
+"omni.kit.uiapp" = {}
+
+"omni.kit.menu.utils" = {}
+"omni.kit.menu.file" = {}
+"omni.kit.menu.edit" = {}
+"omni.kit.menu.create" = {}
+"omni.kit.menu.common" = {}
+
+"omni.kit.window.viewport" = {}
+"omni.kit.window.toolbar" = {}
+"omni.hydra.rtx" = {}
+
+"omni.physx.tensors" = {}
+# "omni.physx.flatcache" = {}
+"omni.physx.bundle" = {}
+"omni.syntheticdata" = {}
+
+# OmniGraph
+"omni.graph" = {}
+# "omni.graph.action" = {}
+# "omni.graph.nodes" = {}
+# "omni.graph.window.action" = {}
+# "omni.graph.bundle.action" = {}
+
+# Status Bar
+"omni.kit.window.status_bar" = {}
+
+# Flow
+"omni.flowusd" = {}
+
+# Extra extensions
+"omni.rtx.settings.core" = {}
+"omni.kit.window.extensions" = {}
+"omni.kit.profiler.window" = {}
+"omni.kit.primitive.mesh" = {}
+"omni.kit.window.content_browser" = {}
+"omni.kit.window.console" = {}
+
+"omni.kit.window.script_editor" = {}
+#Can be disabled to improve load times and perf but useful for debugging scenes
+"omni.kit.widget.live" = {}
+"omni.kit.window.stage" = {}
+"omni.kit.window.property" = {}
+"omni.kit.widget.layers" = {}
+"omni.kit.property.bundle" = {}
+
+[settings]
+# MGPU is always on, you can turn it from the settings, and force this off to save even more resource if you
+# only want to use a single GPU on your MGPU system
+renderer.multiGpu.enabled = true
+
+# Improve determinism with physics and camera movement
+app.asyncRendering = false
+app.hydraEngine.waitIdle = true
+app.hydra.aperture.conform = 4 # Don't modify camera prim, stretch the image so it fits
+
+'rtx-transient'.resourcemanager.enableTextureStreaming = false
+
+exts."omni.kit.window.file".useNewFilePicker = true
+exts."omni.kit.tool.asset_importer".useNewFilePicker = true
+exts."omni.kit.tool.collect".useNewFilePicker = true
+exts."omni.kit.widget.layers".useNewFilePicker = true
+exts."omni.kit.renderer.core".imgui.enableMips = true
+exts."omni.kit.browser.material".enabled = false
+exts."omni.kit.window.material".load_after_startup = true
+exts."omni.kit.pipapi".installCheckIgnoreVersion = true
+exts."omni.kit.console".autoRunREPL = false
+
+# Setting the port for the embedded http server
+exts."omni.services.transport.server.http".port = 8211
+
+# These disable the kit app from also printing out python output, which gets confusing
+app.python.interceptSysStdOutput = false
+app.python.logSysStdOutput = false
+app.file.ignoreUnsavedOnExit = true # prevents save dialog when exiting
+
+[settings.app.settings]
+persistent = false
+dev_build = false
+
+[settings.app.window]
+title = "iGibson"
+# width = 1700
+# height = 900
+# x = -1
+# y = -1
+
+[setting.app.font]
+file = "${fonts}/OpenSans-SemiBold.ttf"
+size = 16
+
+# Extensions
+###############################
+[settings.exts."omni.kit.registry.nucleus"]
+# FOR DEVELOPMENT #
+registries = [
+    { name = "kit/default", url = "omniverse://kit-extensions.ov.nvidia.com/exts/kit/default" },
+]
+postToSlack = false
+# # FOR PRODUCTION #
+# registries = [
+#    { name = "kit/public", url = "https://kit-103-0-public-extensions.s3.amazonaws.com/public"}
+# ]
+
+[settings.app.extensions]
+skipPublishVerification = false
+registryEnabled = true # Need this for registry to load
+
+# Isaac Sim Settings
+###############################
+[settings.app.renderer]
+skipWhileMinimized = false
+sleepMsOnFocus = 0
+sleepMsOutOfFocus = 0
+resolution.width=1280
+resolution.height=720
+
+[settings.rtx]
+raytracing.fractionalCutoutOpacity = false
+hydra.enableSemanticSchema = true
+# Enable this for static scenes, improves visual quality
+# directLighting.sampledLighting.enabled = true
+
+[settings.persistent]
+app.stage.upAxis = "Z"
+app.viewport.displayOptions = 3094 # This hides everything
+app.viewport.pickingMode = "models"
+app.window.uiStyle = "NvidiaDark"
+app.primCreation.DefaultXformOpType = "Scale, Orient, Translate"
+app.primCreation.DefaultXformOpOrder="xformOp:translate, xformOp:orient, xformOp:scale"
+simulation.minFrameRate = 15
+physics.updateToUsd = true
+physics.updateVelocitiesToUsd = true
+physics.useFastCache = false
+physics.visualizationDisplayJoints = false
+#physics.overrideGPUSettings = -1 # force CPU physx
+
+# Misc Settings
+###############################
+app.viewport.snapToSurface = false
+app.stage.movePrimInPlace = false
+app.stage.instanceableOnCreatingReference = false
+app.file.recentFiles = []
+app.file.ignoreUnsavedOnExit = true # prevents save dialog when exiting
+
+[settings.ngx]
+enabled=true # Enable this for DLSS
+
+[settings]
+# FOR DEVELOPMENT #
+persistent.isaac.nucleus.default = "omniverse://ov-isaac-dev.nvidia.com"
+# # FOR PRODUCTION #
+# persistent.isaac.nucleus.default = "omniverse://localhost"
+
+# Register extension folder from this repo in kit
+[settings.app.exts]
+folders.'++' = ["${app}/../exts" ]
+
+# Isaac Sim Extensions
+###############################
+[dependencies]
+"omni.isaac.core_archive" = {}
+"omni.isaac.ml_archive" = {}
+"omni.isaac.urdf" = {}
+"omni.isaac.utils" = {}
+#"omni.isaac.surface_gripper" = {}
+"omni.isaac.range_sensor" = {}
+"omni.isaac.isaac_sensor" = {}
+"omni.isaac.debug_draw" = {}
+"omni.isaac.dynamic_control" = {}
+"omni.isaac.kit" = {}
+"omni.isaac.core" = {}
+"omni.isaac.core_nodes" = {}
+#"omni.isaac.jetbot" = {}
+#"omni.isaac.kaya" = {}
+"omni.isaac.synthetic_utils" = {}
+#"omni.isaac.dr" = {}
+"omni.kit.loop-isaac" = {}
+#"omni.physx.flatcache" = {}
+
+[dependencies."filter:platform"."linux-x86_64"]
+#"omni.isaac.universal_robots" = {}
+#"omni.isaac.dofbot" = {}
+#"omni.isaac.franka" = {}
+"omni.isaac.motion_planning" = {}
+"omni.isaac.motion_generation" = {}
+"omni.isaac.occupancy_map" = {}

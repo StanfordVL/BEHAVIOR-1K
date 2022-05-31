@@ -2,8 +2,33 @@ import logging
 import os
 
 import yaml
+import builtins
 
-__version__ = "2.0.5"
+# TODO: Need to fix somehow -- igibson gets imported first BEFORE we can actually modify the macros
+import igibson.macros as m
+
+builtins.ISAAC_LAUNCHED_FROM_JUPYTER = (
+    os.getenv("ISAAC_JUPYTER_KERNEL") is not None
+)  # We set this in the kernel.json file
+
+if builtins.ISAAC_LAUNCHED_FROM_JUPYTER:
+    import nest_asyncio
+
+    nest_asyncio.apply()
+else:
+    import carb
+
+    # Do a sanity check to see if we are running in an ipython env
+    try:
+        get_ipython()
+        carb.log_warn(
+            "Interactive python shell detected but ISAAC_JUPYTER_KERNEL was not set. Problems with asyncio may occur"
+        )
+    except:
+        # We are probably not in an interactive shell
+        pass
+
+__version__ = "3.0.0"
 
 logging.getLogger().setLevel(logging.INFO)
 
@@ -81,3 +106,24 @@ debug_sampling = False
 
 # whether to ignore visual shape when importing to pybullet
 ignore_visual_shape = True
+
+# Finally, we must create the igibson application (choose based on whether we're public version or not)
+if m.IS_PUBLIC_ISAACSIM:
+    from igibson.app_omni_public import OmniApp
+else:
+    from igibson.app_omni import OmniApp
+
+# Create app as a global reference so any submodule can access it
+app = OmniApp(
+    {
+        "headless": m.HEADLESS,
+    },
+    debug=m.DEBUG,
+)
+
+from igibson.simulator_omni import Simulator
+
+
+# from omni.isaac.kit import SimulationApp
+# app = SimulationApp({"headless": False})
+# from omni.isaac.core import World as Simulator

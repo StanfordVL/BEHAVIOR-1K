@@ -14,13 +14,6 @@ class Turtlebot(TwoWheelRobot):
     """
 
     @property
-    def model_name(self):
-        """
-        :return str: robot model name
-        """
-        return "Turtlebot"
-
-    @property
     def wheel_radius(self):
         return 0.038
 
@@ -41,4 +34,4 @@ class Turtlebot(TwoWheelRobot):
 
     @property
     def model_file(self):
-        return os.path.join(igibson.assets_path, "models/turtlebot/turtlebot.urdf")
+        return os.path.join(igibson.assets_path, "models/turtlebot/turtlebot/turtlebot.usd")

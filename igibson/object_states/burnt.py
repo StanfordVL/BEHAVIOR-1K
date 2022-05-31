@@ -1,7 +1,6 @@
 from igibson.object_states.max_temperature import MaxTemperature
-from igibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
+from igibson.object_states.object_state_base import AbsoluteObjectState, BooleanState, NONE
 from igibson.object_states.texture_change_state_mixin import TextureChangeStateMixin
-from igibson.utils.utils import transform_texture
 
 _DEFAULT_BURN_TEMPERATURE = 200
 
@@ -14,11 +13,6 @@ class Burnt(AbsoluteObjectState, BooleanState, TextureChangeStateMixin):
     @staticmethod
     def get_dependencies():
         return AbsoluteObjectState.get_dependencies() + [MaxTemperature]
-
-    @staticmethod
-    def create_transformed_texture(diffuse_tex_filename, diffuse_tex_filename_transformed):
-        # 0.8 mixture with black
-        transform_texture(diffuse_tex_filename, diffuse_tex_filename_transformed, 0.8, (0, 0, 0))
 
     def _set_value(self, new_value):
         current_max_temp = self.obj.states[MaxTemperature].get_value()
@@ -36,11 +30,3 @@ class Burnt(AbsoluteObjectState, BooleanState, TextureChangeStateMixin):
 
     def _update(self):
         self.update_texture()
-
-    # Nothing needs to be done to save/load Burnt since it will happen due to
-    # MaxTemperature caching.
-    def _dump(self):
-        return None
-
-    def load(self, data):
-        return

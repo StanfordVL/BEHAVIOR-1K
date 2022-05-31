@@ -1,8 +1,7 @@
 import itertools
-from abc import ABCMeta, abstractmethod
+from abc import ABC, abstractmethod
 
 import numpy as np
-from six import with_metaclass
 
 from igibson.object_states.pose import Pose
 from igibson.utils.utils import l2_distance
@@ -10,7 +9,7 @@ from igibson.utils.utils import l2_distance
 POSITIONAL_VALIDATION_EPSILON = 1e-5
 
 
-class MemoizedObjectStateMixin(with_metaclass(ABCMeta, object)):
+class MemoizedObjectStateMixin(ABC):
     def __init__(self, *args, **kwargs):
         super(MemoizedObjectStateMixin, self).__init__(*args, **kwargs)
         self._memo = {}

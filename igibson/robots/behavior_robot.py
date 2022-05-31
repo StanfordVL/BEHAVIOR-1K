@@ -20,14 +20,11 @@ Total size: 28
 import itertools
 import logging
 import os
-from abc import ABCMeta, abstractmethod
+from abc import ABC, abstractmethod
 
 import numpy as np
-import pybullet as p
-from future.utils import with_metaclass
 
 from igibson import assets_path
-from igibson.object_states.utils import clear_cached_states
 from igibson.objects.visual_marker import VisualMarker
 from igibson.robots.active_camera_robot import ActiveCameraRobot
 from igibson.robots.locomotion_robot import LocomotionRobot
@@ -272,7 +269,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         eye_pos, eye_orn = p.multiplyTransforms(pos, orn, eye_loc_pose[0], eye_loc_pose[1])
         self._parts["eye"].set_position_orientation(eye_pos, eye_orn)
 
-        clear_cached_states(self)
+        self.clear_cached_states()
 
     def reset(self):
         # Move the constraint for each part to the default position.
@@ -407,7 +404,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
                 "use_delta_commands": True,
                 "motor_type": "position",
                 "compute_delta_in_quat_space": [(3, 4, 5)],
-                "joint_idx": self.arm_control_idx[arm],
+                "dof_idx": self.arm_control_idx[arm],
                 "command_input_limits": (
                     [-HAND_LINEAR_VELOCITY] * 3 + [-HAND_ANGULAR_VELOCITY] * 3,  # Lower limit
                     [HAND_LINEAR_VELOCITY] * 3 + [HAND_ANGULAR_VELOCITY] * 3,  # Upper limit
@@ -425,7 +422,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
                 "control_freq": self.control_freq,
                 "motor_type": "position",
                 "control_limits": self.control_limits,
-                "joint_idx": self.gripper_control_idx[arm],
+                "dof_idx": self.gripper_control_idx[arm],
                 "command_output_limits": "default",
                 "inverted": True,
                 "mode": "smooth",
@@ -442,7 +439,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             "use_delta_commands": True,
             "motor_type": "position",
             "compute_delta_in_quat_space": [(3, 4, 5)],
-            "joint_idx": self.base_control_idx,
+            "dof_idx": self.base_control_idx,
             "command_input_limits": (
                 [-BODY_LINEAR_VELOCITY] * 3 + [-BODY_ANGULAR_VELOCITY] * 3,  # Lower limit
                 [BODY_LINEAR_VELOCITY] * 3 + [BODY_ANGULAR_VELOCITY] * 3,  # Upper limit
@@ -460,7 +457,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             "use_delta_commands": True,
             "motor_type": "position",
             "compute_delta_in_quat_space": [(3, 4, 5)],
-            "joint_idx": self.camera_control_idx,
+            "dof_idx": self.camera_control_idx,
             "command_input_limits": (
                 [-HEAD_LINEAR_VELOCITY] * 3 + [-HEAD_ANGULAR_VELOCITY] * 3,  # Lower limit
                 [HEAD_LINEAR_VELOCITY] * 3 + [HEAD_ANGULAR_VELOCITY] * 3,  # Upper limit
@@ -479,7 +476,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
                 "control_limits": self.control_limits,
                 "motor_type": "position",
                 "use_delta_commands": False,
-                "joint_idx": self.reset_control_idx[arm],
+                "dof_idx": self.reset_control_idx[arm],
                 "command_input_limits": None,
             }
         return dic
@@ -551,7 +548,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         return {arm: PALM_CENTER_POS * (1 if arm == "right_hand" else -1) for arm in self.arm_names}
 
 
-class BRPart(with_metaclass(ABCMeta, object)):
+class BRPart(ABC):
     """This is the interface that all BehaviorRobot parts must implement."""
 
     DEFAULT_RENDERING_PARAMS = {

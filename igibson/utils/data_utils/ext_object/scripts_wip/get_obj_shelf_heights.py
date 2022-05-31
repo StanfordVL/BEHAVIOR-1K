@@ -5,11 +5,11 @@ Credit: Andrey Kurenkov
 import argparse
 import os
 
-import pybullet as pb
+b
 import trimesh
 import yaml
 
-from igibson.objects.articulated_object import ArticulatedObject
+from igibson.objects.usd_object import ArticulatedObject
 from igibson.scenes.empty_scene import EmptyScene
 from igibson.simulator import Simulator
 
