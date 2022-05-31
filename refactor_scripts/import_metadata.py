@@ -119,6 +119,7 @@ def import_models_metadata_from_scene(urdf, import_render_channels=False):
 
 
 def import_nested_models_metadata_from_element(element, model_pose_info, import_render_channels=False):
+    obj_infos = set()
     # First pass through, populate the joint pose info
     for ele in element:
         if ele.tag == "joint":
@@ -136,18 +137,21 @@ def import_nested_models_metadata_from_element(element, model_pose_info, import_
             name = ele.get("name").replace("-", "_")
             category = ele.get("category")
             model = ele.get("model")
+            obj_info = (category, model)
             if name == "world":
                 # Skip this
                 pass
             # Process ceiling, walls, floor separately
-            elif category in {"ceilings", "walls", "floors"}:
+            elif category in {"ceilings", "walls", "floors"} and obj_info not in obj_infos:
                 import_building_metadata(obj_category=category, obj_model=model, name=name, import_render_channels=import_render_channels)
-            else:
+                obj_infos.add(obj_info)
+            elif obj_info not in obj_infos:
                 print(name)
                 bb = string_to_array(ele.get("bounding_box"))
                 pos = model_pose_info[name]["pos"]
                 quat = model_pose_info[name]["quat"]
                 import_obj_metadata(obj_category=category, obj_model=model, name=name, import_render_channels=import_render_channels)
+                obj_infos.add(obj_info)
 
         # If there's children nodes, we iterate over those
         for child in ele:
