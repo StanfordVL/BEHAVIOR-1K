@@ -28,7 +28,6 @@ sim = Simulator()
 scene = InteractiveTraversableScene(
     scene_model=SCENE_ID,
     usd_path=USD_TEMPLATE_FILE,
-    load_object_categories=["carpet", "bed"],
 )
 
 # Import scene
