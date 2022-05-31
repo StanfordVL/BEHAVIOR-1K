@@ -9,28 +9,28 @@ sim = Simulator()
 scene = EmptyScene(floor_plane_visible=True)
 sim.import_scene(scene=scene)
 
-cube1 = PrimitiveObject(prim_path="/World/TestCube1", primitive_type="Cube", prim_type=PrimType.RIGID)
+cube1 = PrimitiveObject(prim_path="/World/RigidCube", primitive_type="Cube", prim_type=PrimType.RIGID)
 sim.import_object(cube1)
 
-cube2 = PrimitiveObject(prim_path="/World/TestCube2", primitive_type="Cube", prim_type=PrimType.CLOTH)
+cube2 = PrimitiveObject(prim_path="/World/ClothCube", primitive_type="Cube", prim_type=PrimType.CLOTH)
 sim.import_object(cube2)
 
 carpet1 = DatasetObject(
-    prim_path="/World/TestCarpet1",
+    prim_path="/World/RigidCarpet",
     usd_path=os.path.join(ig_dataset_path, "objects", "carpet", "carpet_0", "usd", "carpet_0.usd"),
     prim_type=PrimType.RIGID
 )
 sim.import_object(carpet1)
 
 carpet2 = DatasetObject(
-    prim_path="/World/TestCarpet2",
+    prim_path="/World/ClothCarpet1",
     usd_path=os.path.join(ig_dataset_path, "objects", "carpet", "carpet_0", "usd", "carpet_0.usd"),
     prim_type=PrimType.CLOTH
 )
 sim.import_object(carpet2)
 
 carpet3 = DatasetObject(
-    prim_path="/World/TestCarpet3",
+    prim_path="/World/ClothCarpet2",
     usd_path=os.path.join(ig_dataset_path, "objects", "carpet", "carpet_0", "usd", "carpet_0.usd"),
     prim_type=PrimType.CLOTH
 )
