@@ -109,8 +109,8 @@ class JR2(ManipulationRobot, TwoWheelRobot):
 
         # Make sure we're using a null controller for the gripper
         assert (
-            self.controller_config["gripper_{}".format(self.default_arm)]["name"] == "NullGripperController"
-        ), "JR2 robot has its gripper disabled, so cannot use any controller other than NullGripperController!"
+            self.controller_config["gripper_{}".format(self.default_arm)]["name"] == "NullJointController"
+        ), "JR2 robot has its gripper disabled, so cannot use any controller other than NullJointController!"
 
         # run super
         super()._validate_configuration()
@@ -146,7 +146,7 @@ class JR2(ManipulationRobot, TwoWheelRobot):
         # We use differential drive with joint controller for arm, since arm only has 5DOF
         controllers["base"] = "DifferentialDriveController"
         controllers["arm_{}".format(self.default_arm)] = "JointController"
-        controllers["gripper_{}".format(self.default_arm)] = "NullGripperController"
+        controllers["gripper_{}".format(self.default_arm)] = "NullJointController"
 
         return controllers
 

@@ -7,8 +7,7 @@ import igibson
 from igibson.controllers import ControlType
 from igibson.robots.active_camera_robot import ActiveCameraRobot
 from igibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
-from igibson.robots.two_wheel_robot import TwoWheelRobot
-from igibson.utils.constants import SemanticClass
+from igibson.robots.locomotion_robot import LocomotionRobot
 from igibson.utils.python_utils import assert_valid_key
 from igibson.utils.usd_utils import JointType
 
@@ -26,7 +25,7 @@ RESET_JOINT_OPTIONS = {
 }
 
 
-class Tiago(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
+class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
     """
     Tiago Robot
     Reference: https://pal-robotics.com/robots/tiago/
@@ -173,8 +172,8 @@ class Tiago(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
     def tucked_default_joint_pos(self):
         return np.array(
             [
-                0.0,        # wheels
-                0.0,
+                # 0.0,        # wheels
+                # 0.0,
                 0.0,        # trunk
                 -1.10,
                 -1.10,
@@ -299,7 +298,8 @@ class Tiago(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         controllers = super()._default_controllers
 
         # We use multi finger gripper, differential drive, and IK controllers as default
-        controllers["base"] = "DifferentialDriveController"
+        # TODO: Get omnidirectional base working
+        controllers["base"] = "NullJointController"
         controllers["camera"] = "JointController"
         # TODO: Revert to IK once implemented
         for arm in self.arm_names:
@@ -351,10 +351,12 @@ class Tiago(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
 
     @property
     def wheel_radius(self):
+        # TODO
         return 0.0613
 
     @property
     def wheel_axle_length(self):
+        # TODO
         return 0.372
 
     @property
@@ -390,21 +392,21 @@ class Tiago(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         """
         :return Array[int]: Indices in low-level control vector corresponding to [Left, Right] wheel joints.
         """
-        return np.array([0, 1])
+        return np.array([])
 
     @property
     def trunk_control_idx(self):
         """
         :return Array[int]: Indices in low-level control vector corresponding to trunk joint.
         """
-        return np.array([2])
+        return np.array([0])
 
     @property
     def camera_control_idx(self):
         """
         :return Array[int]: Indices in low-level control vector corresponding to [tilt, pan] camera joints.
         """
-        return np.array([5, 8])
+        return np.array([3, 6])
 
     @property
     def arm_control_idx(self):
@@ -412,7 +414,7 @@ class Tiago(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         :return dict[str, Array[int]]: Dictionary mapping arm appendage name to indices in low-level control
             vector corresponding to arm joints.
         """
-        return {"left": np.array([3, 6, 9, 11, 13, 15, 17]), "right": np.array([4, 7, 10, 12, 14, 16, 18])}
+        return {"left": np.array([1, 4, 7, 9, 11, 13, 15]), "right": np.array([2, 5, 8, 10, 12, 14, 16])}
 
     @property
     def gripper_control_idx(self):
@@ -420,7 +422,7 @@ class Tiago(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         :return dict[str, Array[int]]: Dictionary mapping arm appendage name to indices in low-level control
             vector corresponding to gripper joints.
         """
-        return {"left": np.array([19, 20]), "right": np.array([21, 22])}
+        return {"left": np.array([17, 18]), "right": np.array([19, 20])}
 
     @property
     def finger_lengths(self):
@@ -428,15 +430,7 @@ class Tiago(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
 
     @property
     def disabled_collision_pairs(self):
-        return [
-            # ["torso_lift_link", "shoulder_lift_link"],
-            # ["torso_lift_link", "torso_fixed_link"],
-            # ["caster_wheel_link", "estop_link"],
-            # ["caster_wheel_link", "laser_link"],
-            # ["caster_wheel_link", "torso_fixed_link"],
-            # ["caster_wheel_link", "l_wheel_link"],
-            # ["caster_wheel_link", "r_wheel_link"],
-        ]
+        return []
 
     @property
     def arm_link_names(self):
@@ -458,7 +452,7 @@ class Tiago(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
 
     @property
     def model_file(self):
-        return os.path.join(igibson.assets_path, "models/tiago/tiago_dual/tiago_dual.usd")
+        return os.path.join(igibson.assets_path, "models/tiago/tiago_dual_omnidirectional_stanford/tiago_dual_omnidirectional_stanford.usd")
 
     def dump_config(self):
         cfg = super().dump_config()

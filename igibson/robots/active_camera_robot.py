@@ -80,6 +80,20 @@ class ActiveCameraRobot(BaseRobot):
         }
 
     @property
+    def _default_camera_null_joint_controller_config(self):
+        """
+        :return: Dict[str, Any] Default null joint controller config
+            to control this robot's camera i.e. dummy controller
+        """
+        return {
+            "name": "NullJointController",
+            "control_freq": self._control_freq,
+            "motor_type": "velocity",
+            "control_limits": self.control_limits,
+            "dof_idx": self.camera_control_idx,
+        }
+
+    @property
     def _default_controller_config(self):
         # Always run super method first
         cfg = super()._default_controller_config
@@ -87,6 +101,7 @@ class ActiveCameraRobot(BaseRobot):
         # We additionally add in camera default
         cfg["camera"] = {
             self._default_camera_joint_controller_config["name"]: self._default_camera_joint_controller_config,
+            self._default_camera_null_joint_controller_config["name"]: self._default_camera_null_joint_controller_config,
         }
 
         return cfg

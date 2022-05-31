@@ -13,7 +13,7 @@ from igibson.controllers import (
     ManipulationController,
     GripperController,
     MultiFingerGripperController,
-    NullGripperController,
+    NullJointController,
 )
 # from igibson.external.pybullet_tools.utils import (
 #     ContactResult,
@@ -895,6 +895,23 @@ class ManipulationRobot(BaseRobot):
         return dic
 
     @property
+    def _default_arm_null_joint_controller_configs(self):
+        """
+        :return: Dict[str, Any] Dictionary mapping arm appendage name to default arm null controller config
+            to control this robot's arm i.e. dummy controller
+        """
+        dic = {}
+        for arm in self.arm_names:
+            dic[arm] = {
+                "name": "NullJointController",
+                "control_freq": self._control_freq,
+                "motor_type": "velocity",
+                "control_limits": self.control_limits,
+                "dof_idx": self.arm_control_idx[arm],
+            }
+        return dic
+
+    @property
     def _default_gripper_multi_finger_controller_configs(self):
         """
         :return: Dict[str, Any] Dictionary mapping arm appendage name to default controller config to control
@@ -942,7 +959,7 @@ class ManipulationRobot(BaseRobot):
         dic = {}
         for arm in self.arm_names:
             dic[arm] = {
-                "name": "NullGripperController",
+                "name": "NullJointController",
                 "control_freq": self._control_freq,
                 "control_limits": self.control_limits,
             }
@@ -955,6 +972,7 @@ class ManipulationRobot(BaseRobot):
 
         arm_ik_configs = self._default_arm_ik_controller_configs
         arm_joint_configs = self._default_arm_joint_controller_configs
+        arm_null_joint_configs = self._default_arm_null_joint_controller_configs
         gripper_pj_configs = self._default_gripper_multi_finger_controller_configs
         gripper_joint_configs = self._default_gripper_joint_controller_configs
         gripper_null_configs = self._default_gripper_null_controller_configs
@@ -964,6 +982,7 @@ class ManipulationRobot(BaseRobot):
             cfg["arm_{}".format(arm)] = {
                 arm_ik_configs[arm]["name"]: arm_ik_configs[arm],
                 arm_joint_configs[arm]["name"]: arm_joint_configs[arm],
+                arm_null_joint_configs[arm]["name"]: arm_null_joint_configs[arm],
             }
             cfg["gripper_{}".format(arm)] = {
                 gripper_pj_configs[arm]["name"]: gripper_pj_configs[arm],

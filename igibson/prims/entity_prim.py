@@ -53,6 +53,7 @@ class EntityPrim(XFormPrim):
         self._dc = None                         # Dynamics control interface
         self._handle = None                     # Handle to this articulation
         self._root_handle = None                # Handle to the root rigid body of this articulation
+        self._root_link_name = None             # Name of the root link
         self._dofs_infos = None
         self._n_dof = None
         self._default_joints_state = None
@@ -149,6 +150,7 @@ class EntityPrim(XFormPrim):
         # We iterate over all children of this object's prim,
         # and grab any that are presumed to be rigid bodies (i.e.: other Xforms)
         self._links = OrderedDict()
+        joint_children = set()
         for prim in self._prim.GetChildren():
             # Only process prims that are an Xform
             if prim.GetPrimTypeInfo().GetTypeName() == "Xform":
@@ -159,6 +161,23 @@ class EntityPrim(XFormPrim):
                     load_config={"visual_only": self._visual_only},
                 )
                 self._links[link_name] = link
+
+                # Also iterate through all children to infer joints and determine the children of those joints
+                # We will use this info to infer which link is the base link!
+                for child_prim in prim.GetChildren():
+                    if "joint" in child_prim.GetPrimTypeInfo().GetTypeName().lower():
+                        # Store the child target of this joint
+                        relationships = {r.GetName(): r for r in child_prim.GetRelationships()}
+                        # Only record if this is NOT a fixed link tying us to the world (i.e.: no target for body0)
+                        if len(relationships["physics:body0"].GetTargets()) > 0:
+                            joint_children.add(relationships["physics:body1"].GetTargets()[0].pathString.split("/")[-1])
+
+        # Infer the correct root link name -- this corresponds to whatever link does not have any joint existing
+        # in the children joints
+        valid_root_links = list(set(self._links.keys()) - joint_children)
+        assert len(valid_root_links) == 1, f"Only a single root link should have been found for this entity prim, " \
+                                           f"but found multiple instead: {valid_root_links}"
+        self._root_link_name = valid_root_links[0]
 
         # Disable any requested collision pairs
         for a_name, b_name in self.disabled_collision_pairs:
@@ -203,9 +222,7 @@ class EntityPrim(XFormPrim):
         Returns:
             str: Name of this entity's root link
         """
-        # Default is the first entry in the links array
-        link_names = list(self._links.keys())
-        return "base_link" if "base_link" in link_names else link_names[0]
+        return self._root_link_name
 
     @property
     def root_link(self):

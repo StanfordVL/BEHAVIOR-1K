@@ -176,7 +176,7 @@ class BaseObject(EntityPrim, metaclass=ABCMeta):
         # actual base link of the robot instead.
         # See https://forums.developer.nvidia.com/t/inconsistent-values-from-isaacsims-dc-get-joint-parent-child-body/201452/2
         # for more info
-        return f"{self._prim_path}/base_link" if \
+        return f"{self._prim_path}/{self.root_link_name}" if \
             (not self.fixed_base) and (self.n_links > 1) else super().articulation_root_path
 
     @property
