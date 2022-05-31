@@ -2,7 +2,11 @@ from abc import ABCMeta
 
 import carb
 import numpy as np
-from omni.kit.settings import SettingType
+import igibson.macros as m
+if m.IS_PUBLIC_ISAACSIM:
+    from omni.kit.settings import SettingType
+else:
+    from omni.kit.widget.settings import SettingType
 
 
 class SettingsBase(metaclass=ABCMeta):
