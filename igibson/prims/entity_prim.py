@@ -181,9 +181,11 @@ class EntityPrim(XFormPrim):
         # Infer the correct root link name -- this corresponds to whatever link does not have any joint existing
         # in the children joints
         valid_root_links = list(set(self._links.keys()) - joint_children)
-        assert len(valid_root_links) == 1, f"Only a single root link should have been found for this entity prim, " \
-                                           f"but found multiple instead: {valid_root_links}"
-        self._root_link_name = valid_root_links[0]
+
+        # TODO: Uncomment safety check here after we figure out how to handle legacy multi-bodied assets like bed with pillow
+        # assert len(valid_root_links) == 1, f"Only a single root link should have been found for this entity prim, " \
+        #                                    f"but found multiple instead: {valid_root_links}"
+        self._root_link_name = valid_root_links[0] if len(valid_root_links) == 1 else "base_link"
 
         # Disable any requested collision pairs
         for a_name, b_name in self.disabled_collision_pairs:
