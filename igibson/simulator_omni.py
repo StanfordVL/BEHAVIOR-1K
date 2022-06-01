@@ -243,7 +243,7 @@ class Simulator(SimulationContext):
         self._scene = scene
         scene.load(self)
 
-        # Make sure simulator is not running, then start it, then pause it so we can initialize the scene
+        # Make sure simulator is not running, then start it so that we can initialize the scene
         assert self.is_stopped(), "Simulator must be stopped after importing a scene!"
         self.play()
 

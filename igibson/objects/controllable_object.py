@@ -94,7 +94,6 @@ class ControllableObject(BaseObject):
             fixed_base=fixed_base,
             visual_only=visual_only,
             self_collisions=self_collisions,
-            prim_type=PrimType.RIGID,
             load_config=load_config,
             **kwargs,
         )

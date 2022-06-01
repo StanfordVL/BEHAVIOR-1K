@@ -760,6 +760,8 @@ class InteractiveTraversableScene(TraversableScene):
         simulator.clear()
         simulator.load_stage(usd_path=self.scene_file)
 
+        self.initialize_systems(simulator)
+
         # Store stage reference and refresh world prim reference
         self._stage = simulator.stage
         self._world_prim = simulator.world_prim
