@@ -868,7 +868,7 @@ class EntityPrim(XFormPrim):
                                                           quaternion is scalar-last (x, y, z, w). shape is (4, ).
                                                           Defaults to None, which means left unchanged.
         """
-        if self._root_handle is not None and self._dc.is_simulating():
+        if self._root_handle is not None and self._root_handle != _dynamic_control.INVALID_HANDLE and self._dc.is_simulating():
             current_position, current_orientation = self.get_position_orientation()
             if position is None:
                 position = current_position
@@ -887,7 +887,7 @@ class EntityPrim(XFormPrim):
                                            second index is quaternion orientation in the world frame of the prim.
                                            quaternion is scalar-last (x, y, z, w). shape is (4, ).
         """
-        if self._root_handle is not None and self._dc.is_simulating():
+        if self._root_handle is not None and self._root_handle != _dynamic_control.INVALID_HANDLE and self._dc.is_simulating():
             pose = self._dc.get_rigid_body_pose(self._root_handle)
             return np.asarray(pose.p), np.asarray(pose.r)
         else:
@@ -906,7 +906,7 @@ class EntityPrim(XFormPrim):
                                                           quaternion is scalar-last (x, y, z, w). shape is (4, ).
                                                           Defaults to None, which means left unchanged.
         """
-        if self._root_handle is not None and self._dc.is_simulating():
+        if self._root_handle is not None and self._root_handle != _dynamic_control.INVALID_HANDLE and self._dc.is_simulating():
             current_translation, current_orientation = self.get_local_pose()
             if translation is None:
                 translation = current_translation
@@ -939,7 +939,7 @@ class EntityPrim(XFormPrim):
                                            second index is quaternion orientation in the local frame of the prim.
                                            quaternion is scalar-last (x, y, z, w). shape is (4, ).
         """
-        if self._root_handle is not None and self._dc.is_simulating():
+        if self._root_handle is not None and self._root_handle != _dynamic_control.INVALID_HANDLE and self._dc.is_simulating():
             parent_world_tf = UsdGeom.Xformable(get_prim_parent(self._prim)).ComputeLocalToWorldTransform(
                 Usd.TimeCode.Default()
             )
