@@ -1,12 +1,24 @@
 from abc import ABCMeta, abstractmethod
+from collections import namedtuple
 
 import numpy as np
 from omni.isaac.utils._isaac_utils import math as math_utils
 
 from igibson import ig_dataset_path
+from igibson.objects.dataset_object import DatasetObject
 from igibson.object_states import *
-from igibson.object_states.factory import get_states_for_ability
 import igibson.utils.transform_utils as T
+from igibson.utils.usd_utils import BoundingBoxAPI
+
+
+# Tuple of attributes of objects created in transitions.
+_attrs_fields = ["category", "model", "name", "scale", "obj", "pos", "orn"]
+ObjectAttrs = namedtuple(
+    "ObjectAttrs", _attrs_fields, defaults=(None,) * len(_attrs_fields))
+
+# Tuple of lists of objects to be added or removed returned from transitions.
+TransitionResults = namedtuple(
+    "TransitionResults", ["add", "remove"], defaults=([], []))
 
 
 class BaseFilter(metaclass=ABCMeta):
@@ -84,12 +96,12 @@ class BaseTransitionRule(metaclass=ABCMeta):
         self.filters = filters
 
     @abstractmethod
-    def condition(self, simulator,  *args):
+    def condition(self, simulator, *args):
         """Returns True if the rule applies to the object tuple."""
         pass
 
     @abstractmethod
-    def transition(self, simulator,  *args):
+    def transition(self, simulator, *args):
         """Rule to apply for each tuples satisfying the condition."""
         pass
 
@@ -149,6 +161,8 @@ class SlicingRule(BaseTransitionRule):
         sliced_obj.states[Sliced].set_value(True)
         pos, orn = sliced_obj.get_position_orientation()
 
+        t_results = TransitionResults()
+
         # Load object parts.
         for _, part_idx in enumerate(sliced_obj.metadata["object_parts"]):
             # List of dicts gets replaced by {'0':dict, '1':dict, ...}.
@@ -178,15 +192,175 @@ class SlicingRule(BaseTransitionRule):
                 abilities={}
             )
 
-            # Add to stage.
-            simulator.import_object(part_obj, auto_initialize=False)
-            # Inherit parent position and orientation.
-            part_obj.set_position_orientation(position=np.array(part_pos),
-                                              orientation=np.array(part_orn))
+            # Add the new object to the results.
+            new_obj_attrs = ObjectAttrs(
+                obj=part_obj, pos=np.array(part_pos), orn=np.array(part_orn))
+            t_results.add.append(new_obj_attrs)
 
         # Delete original object from stage.
-        simulator.remove_object(sliced_obj)
+        t_results.remove.append(sliced_obj)
         print(f"Applied {SlicingRule.__name__} to {sliced_obj}")
+        return t_results
+
+
+def _contained_objects(scene, container_obj):
+    """Returns a list of all objects ``inside'' the container object."""
+    bbox = BoundingBoxAPI.compute_aabb(container_obj.prim_path)
+    contained_objs = []
+    for obj in scene.objects:
+        if obj == container_obj:
+            continue
+        if BoundingBoxAPI.aabb_contains_point(obj.get_position(), bbox):
+            contained_objs.append(obj)
+    return contained_objs
+
+
+class ContainerRule(BaseTransitionRule):
+    """Rule to apply to a container and a set of objects that may be inside."""
+
+    def __init__(self, trigger_steps, final_obj_attrs, container_filter, *contained_filters):
+        # Should be in this order to have the container object come first.
+        super(ContainerRule, self).__init__((container_filter, *contained_filters))
+        self.obj_attrs = final_obj_attrs
+        self.trigger_steps = trigger_steps
+        self._current_steps = 1
+        self._counter = 0
+
+    def condition(self, simulator, container_obj, *contained_objs):
+        if (
+            ToggledOn in container_obj.states and
+            not container_obj.states[ToggledOn].get_value()
+        ):
+            return False
+        # Check all objects inside the container against the expected objects.
+        all_contained_objs = _contained_objects(simulator.scene, container_obj)
+        contained_prim_paths = set(obj.prim_path for obj in contained_objs)
+        all_contained_prim_paths = set(obj.prim_path for obj in all_contained_objs)
+        if contained_prim_paths != all_contained_prim_paths:
+            return False
+        # Check if the trigger step has been reached.
+        if self._current_steps < self.trigger_steps:
+            self._current_steps += 1
+            return False
+        self._current_steps = 1
+        return True
+
+    def transition(self, simulator, container_obj, *contained_objs):
+        t_results = TransitionResults()
+
+        # Create a new object to be added.
+        all_pos, all_orn = [], []
+        for contained_obj in contained_objs:
+            pos, orn = contained_obj.get_position_orientation()
+            all_pos.append(pos)
+            all_orn.append(orn)
+
+        category = self.obj_attrs.category
+        model = self.obj_attrs.model
+        name = f"{self.obj_attrs.name}_{self._counter}"
+        self._counter += 1
+        scale = self.obj_attrs.scale
+
+        model_root_path = f"{ig_dataset_path}/objects/{category}/{model}"
+        usd_path = f"{model_root_path}/usd/{model}.usd"
+
+        final_obj = DatasetObject(
+            prim_path=f"/World/{name}",
+            usd_path=usd_path,
+            category=category,
+            name=f"{name}",
+            scale=scale)
+
+        final_obj_attrs = ObjectAttrs(
+            obj=final_obj, pos=np.mean(all_pos, axis=0), orn=np.mean(all_orn, axis=0))
+        t_results.add.append(final_obj_attrs)
+
+        # Delete all objects inside the container.
+        for contained_obj in contained_objs:
+            t_results.remove.append(contained_obj)
+
+        # Turn off the container, otherwise things would turn into garbage.
+        if ToggledOn in container_obj.states:
+            container_obj.states[ToggledOn].set_value(False)
+        print(f"Applied {ContainerRule.__name__} to {container_obj}")
+        return t_results
+
+
+class ContainerGarbageRule(BaseTransitionRule):
+    """Rule to apply to a container to turn what remain inside into garbage.
+
+    This rule is used as a catch-all rule for containers to turn objects inside
+    the container that did not match any other legitimate rules all into a
+    single garbage object.
+    """
+
+    def __init__(self, garbage_obj_attrs, container_filter):
+        """Ctor for ContainerGarbageRule.
+
+        Args:
+            garbage_obj_attrs: (ObjectAttrs) a namedtuple containing the
+                attributes of garbage objects to be created.
+            container_filter: (BaseFilter) a filter for the container.
+        """
+        super(ContainerGarbageRule, self).__init__((container_filter,))
+        self.obj_attrs = garbage_obj_attrs
+        self._cached_contained_objs = None
+        self._counter = 0
+
+    def condition(self, simulator, container_obj):
+        if (
+            ToggledOn in container_obj.states and
+            not container_obj.states[ToggledOn].get_value()
+        ):
+            return False
+        self._cached_contained_objs = _contained_objects(simulator.scene, container_obj)
+        # Skip in case only a garbage object is inside the container.
+        if len(self._cached_contained_objs) == 1:
+            contained_obj = self._cached_contained_objs[0]
+            if (contained_obj.category == self.obj_attrs.category
+                    and contained_obj.name.startswith(self.obj_attrs.name)):
+                return False
+        return bool(self._cached_contained_objs)
+
+    def transition(self, simulator, container_obj):
+        t_results = TransitionResults()
+
+        # Create a single garbage object to be added.
+        all_pos, all_orn = [], []
+        for contained_obj in self._cached_contained_objs:
+            pos, orn = contained_obj.get_position_orientation()
+            all_pos.append(pos)
+            all_orn.append(orn)
+
+        category = self.obj_attrs.category
+        model = self.obj_attrs.model
+        name = f"{self.obj_attrs.name}_{self._counter}"
+        self._counter += 1
+        scale = self.obj_attrs.scale
+
+        model_root_path = f"{ig_dataset_path}/objects/{category}/{model}"
+        usd_path = f"{model_root_path}/usd/{model}.usd"
+
+        garbage_obj = DatasetObject(
+            prim_path=f"/World/{name}",
+            usd_path=usd_path,
+            category=category,
+            name=f"{name}",
+            scale=scale)
+
+        garbage_obj_attrs = ObjectAttrs(
+            obj=garbage_obj, pos=np.mean(all_pos, axis=0), orn=np.mean(all_orn, axis=0))
+        t_results.add.append(garbage_obj_attrs)
+
+        # Remove all contained objects.
+        for contained_obj in self._cached_contained_objs:
+            t_results.remove.append(contained_obj)
+
+        # Turn off the container after the transition and reset things.
+        if ToggledOn in container_obj.states:
+            container_obj.states[ToggledOn].set_value(False)
+        self._cached_contained_objs = None
+        return t_results
 
 
 """See the following example for writing simple rules.

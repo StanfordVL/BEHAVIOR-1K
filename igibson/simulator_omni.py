@@ -25,9 +25,10 @@ from omni.kit.viewport import get_viewport_interface
 from omni.isaac.core.utils.viewports import set_camera_view
 from omni.isaac.core.loggers import DataLogger
 from typing import Optional, List
+from igibson.utils.usd_utils import BoundingBoxAPI
 
 from igibson import assets_path
-from igibson.transition_rules import DEFAULT_RULES
+from igibson.transition_rules import DEFAULT_RULES, TransitionResults
 from igibson.objects.object_base import BaseObject
 from igibson.object_states.factory import get_states_by_dependency_order
 from igibson.scenes import Scene
@@ -316,6 +317,8 @@ class Simulator(SimulationContext):
         #     if hasattr(obj, "procedural_material") and obj.procedural_material is not None:
         #         obj.procedural_material.update()
 
+        BoundingBoxAPI.clear()
+
     def _non_ov_transition_step(self):
         """Applies all internal non-Omniverse transition rules."""
         # Create a dict from rule to filter to objects we care about.
@@ -327,6 +330,8 @@ class Simulator(SimulationContext):
                         obj_dict[rule][f].append(obj)
 
         # For each rule, create a subset of the dict and apply it if applicable.
+        added_obj_attrs = []
+        removed_objs = []
         for rule in self._transition_rules:
             if rule not in obj_dict:
                 continue
@@ -336,7 +341,20 @@ class Simulator(SimulationContext):
             # TODO: Consider optimizing itertools.product.
             for obj_tuple in itertools.product(*obj_list_rule):
                 if rule.condition(self, *obj_tuple):
-                    rule.transition(self, *obj_tuple)
+                    t_results = rule.transition(self, *obj_tuple)
+                    if isinstance(t_results, TransitionResults):
+                        added_obj_attrs.extend(t_results.add)
+                        removed_objs.extend(t_results.remove)
+
+        # Process all transition results.
+        for added_obj_attr in added_obj_attrs:
+            new_obj = added_obj_attr.obj
+            self.import_object(added_obj_attr.obj, auto_initialize=False)
+            pos, orn = added_obj_attr.pos, added_obj_attr.orn
+            new_obj.set_position_orientation(position=pos, orientation=orn)
+        for removed_obj in removed_objs:
+            self.remove_object(removed_obj)
+
 
     def stop(self):
         super().stop()
