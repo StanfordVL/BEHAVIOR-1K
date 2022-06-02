@@ -32,7 +32,7 @@ class Slicer(AbsoluteObjectState, LinkBasedStateMixin):
                 continue
             path = c.body0 if c.body0 not in link_paths else c.body1
             path = path.replace("/base_link", "")
-            contact_obj = self.simulator.scene.object_registry("prim_path", path)
+            contact_obj = self._simulator.scene.object_registry("prim_path", path)
             if contact_obj is None:
                 continue
             # calculate the normal force applied to the contact object

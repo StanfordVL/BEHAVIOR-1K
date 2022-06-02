@@ -6,11 +6,8 @@
 # distribution of this software and related documentation without an express
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 #
-from abc import ABCMeta, abstractmethod
-from typing import Optional, Tuple
+from abc import ABC, abstractmethod
 from pxr import Gf, Usd, UsdGeom, UsdShade
-from omni.isaac.core.utils.types import XFormPrimState
-from omni.isaac.core.materials import PreviewSurface, OmniGlass, OmniPBR, VisualMaterial
 from omni.isaac.core.utils.rotations import gf_quat_to_np_array
 from omni.isaac.core.utils.transformations import tf_matrix_from_pose
 from omni.isaac.core.utils.prims import (
@@ -22,13 +19,11 @@ from omni.isaac.core.utils.prims import (
     get_prim_parent,
     get_prim_object_type,
 )
-import numpy as np
-import carb
 from omni.isaac.core.utils.stage import get_current_stage
-from igibson.utils.python_utils import Serializable, UniquelyNamed
+from igibson.utils.python_utils import Serializable, UniquelyNamed, Recreatable
 
 
-class BasePrim(Serializable, UniquelyNamed, metaclass=ABCMeta):
+class BasePrim(Serializable, UniquelyNamed, Recreatable, ABC):
     """
     Provides high level functions to deal with a basic prim and its attributes/ properties.
         If there is an Xform prim present at the path, it will use it. Otherwise, a new XForm prim at
@@ -70,8 +65,7 @@ class BasePrim(Serializable, UniquelyNamed, metaclass=ABCMeta):
             print(f"prim {name} already exists")
             self._prim = get_prim_at_path(prim_path=self._prim_path)
             self._loaded = True
-            # Run post load
-            # TODO: This requires simulator! change?
+            # Run post load.
             self._post_load()
 
         # Run super init
@@ -89,7 +83,8 @@ class BasePrim(Serializable, UniquelyNamed, metaclass=ABCMeta):
         Initializes state of this object and sets up any references necessary post-loading. Subclasses should
         implement / extend the _initialize() method.
         """
-        assert not self._initialized, "Prim can only be initialized once! (It is already initialized)"
+        assert not self._initialized, \
+            f"Prim {self.name} at prim_path {self._prim_path} can only be initialized once! (It is already initialized)"
         self._initialize()
 
         # # Update defaults
@@ -119,11 +114,11 @@ class BasePrim(Serializable, UniquelyNamed, metaclass=ABCMeta):
         self._loaded = True
 
         # Run any post-loading logic
-        self._post_load(simulator=simulator)
+        self._post_load()
 
         return self._prim
 
-    def _post_load(self, simulator=None):
+    def _post_load(self):
         """
         Any actions that should be taken (e.g.: modifying the object's properties such as scale, visibility, additional
         joints, etc.) that should be taken after loading the raw object into omniverse but BEFORE we initialize the
@@ -146,7 +141,7 @@ class BasePrim(Serializable, UniquelyNamed, metaclass=ABCMeta):
         if simulator:
             simulator.stage.RemovePrim(self.prim_path)
         else:
-            get_current_stage.RemovePrim(self.prim_path)
+            get_current_stage().RemovePrim(self.prim_path)
 
     @abstractmethod
     def _load(self, simulator=None):
@@ -329,7 +324,7 @@ class BasePrim(Serializable, UniquelyNamed, metaclass=ABCMeta):
             name=f"{self.name}_copy{self._n_duplicates}",
             load_config=self._load_config,
         )
-        new_prim.load(simulator=simulator)
+        simulator.import_object(new_prim, register=False, auto_initialize=True)
 
         # Increment duplicate count
         self._n_duplicates += 1

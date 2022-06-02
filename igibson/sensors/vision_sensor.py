@@ -5,12 +5,7 @@ import math
 import numpy as np
 import time
 
-import carb
-from pxr import Gf, Usd, UsdGeom
-import omni.usd
-from omni.isaac.core.utils.stage import get_current_stage
-from omni.kit.viewport import get_viewport_interface
-
+import igibson.macros as m
 from igibson import app
 from igibson.sensors.sensor_base import BaseSensor
 from igibson.utils.constants import MAX_CLASS_COUNT, MAX_INSTANCE_COUNT
@@ -18,6 +13,16 @@ from igibson.utils.python_utils import assert_valid_key, classproperty
 from igibson.utils.usd_utils import get_camera_params, get_semantic_objects_pose
 from igibson.utils.vision_utils import get_rgb_filled
 from igibson.utils.transform_utils import euler2quat, quat2euler
+
+import carb
+from omni.isaac.core.utils.stage import get_current_stage
+from pxr import Gf, UsdGeom
+
+# Import viewport getter based on isaacsim version
+if m.IS_PUBLIC_ISAACSIM:
+    from omni.kit.viewport import get_viewport_interface as acquire_viewport_interface
+else:
+    from omni.kit.viewport_legacy import acquire_viewport_interface
 
 # Make sure synthetic data extension is enabled
 ext_manager = app.app.get_extension_manager()
@@ -123,15 +128,17 @@ class VisionSensor(BaseSensor):
         # Define a new camera prim at the current stage
         stage = get_current_stage()
         prim = UsdGeom.Camera.Define(stage, self._prim_path).GetPrim()
-
         return prim
 
-    def _post_load(self, simulator=None):
+    def _post_load(self):
+        # run super first
+        super()._post_load()
+
         # Get synthetic data interface
         self._sd = sd.acquire_syntheticdata_interface()
 
         # Create a new viewport to link to this camera
-        vp = get_viewport_interface()
+        vp = acquire_viewport_interface()
         viewport_handle = vp.create_instance()
         self._viewport = vp.get_viewport_window(viewport_handle)
 
@@ -140,9 +147,14 @@ class VisionSensor(BaseSensor):
 
         # Set the viewer size
         self._viewport.set_texture_resolution(self._load_config["image_width"], self._load_config["image_height"])
+        self._viewport.set_window_size(self._load_config["image_height"], self._load_config["image_width"])
         # Requires 3 updates to propagate changes
         for i in range(3):
             app.update()
+
+    def _initialize(self):
+        # Run super first
+        super()._initialize()
 
         # Initialize sensors
         self._initialize_sensors(names=self._modalities)
@@ -163,18 +175,29 @@ class VisionSensor(BaseSensor):
         start = time.time()
         is_initialized = False
         sensors = []
-        while not is_initialized and time.time() < (start + timeout):
+
+        # Initialize differently based on what version of Isaac Sim we're using
+        if m.IS_PUBLIC_ISAACSIM:
+            while not is_initialized and time.time() < (start + timeout):
+                for name in names:
+                    sensors.append(sensors_util.create_or_retrieve_sensor(self._viewport, self._RAW_SENSOR_TYPES[name]))
+                app.update()
+                is_initialized = not any([not self._sd.is_sensor_initialized(s) for s in sensors])
+            if not is_initialized:
+                uninitialized = [s for s in sensors if not self._sd.is_sensor_initialized(s)]
+                raise TimeoutError(f"Unable to initialized sensors: [{uninitialized}] within {timeout} seconds.")
+
+        else:
             for name in names:
                 sensors.append(sensors_util.create_or_retrieve_sensor(self._viewport, self._RAW_SENSOR_TYPES[name]))
             app.update()
-            is_initialized = not any([not self._sd.is_sensor_initialized(s) for s in sensors])
-        if not is_initialized:
-            uninitialized = [s for s in sensors if not self._sd.is_sensor_initialized(s)]
-            raise TimeoutError(f"Unable to initialized sensors: [{uninitialized}] within {timeout} seconds.")
 
         app.update()  # Extra frame required to prevent access violation error
 
     def _get_obs(self):
+        # Make sure we're initialized
+        assert self.initialized, "Cannot grab vision observations without first initializing this VisionSensor!"
+
         # Run super first to grab any upstream obs
         obs = super()._get_obs()
 
@@ -206,23 +229,61 @@ class VisionSensor(BaseSensor):
         # We have to overwrite this because camera prims can't set their quat for some reason ):
         xform_translate_op = self.get_attribute("xformOp:translate")
         xform_orient_op = self.get_attribute("xformOp:rotateXYZ")
-        return np.array(xform_translate_op.Get()), euler2quat(np.array(xform_orient_op.Get()))
+        return np.array(xform_translate_op), euler2quat(np.array(xform_orient_op))
 
-    def set_local_pose(self, translation=None, orientation=None):
-        # We have to overwrite this because camera prims can't set their quat for some reason ):
-        properties = self.prim.GetPropertyNames()
-        if translation is not None:
-            translation = Gf.Vec3d(*translation.tolist())
-            if "xformOp:translate" not in properties:
-                carb.log_error(
-                    "Translate property needs to be set for {} before setting its position".format(self.name)
-                )
-            self.set_attribute("xformOp:translate", translation)
-        if orientation is not None:
-            xform_op = self._prim.GetAttribute("xformOp:rotateXYZ")
-            # Convert to euler and set
-            rot_euler = quat2euler(quat=orientation)
-            xform_op.Set(Gf.Vec3f(*rot_euler.tolist()))
+    # def set_local_pose(self, translation=None, orientation=None):
+    #     # We have to overwrite this because camera prims can't set their quat for some reason ):
+    #     properties = self.prim.GetPropertyNames()
+    #     if translation is not None:
+    #         translation = Gf.Vec3d(*translation.tolist())
+    #         if "xformOp:translate" not in properties:
+    #             carb.log_error(
+    #                 "Translate property needs to be set for {} before setting its position".format(self.name)
+    #             )
+    #         self.set_attribute("xformOp:translate", translation)
+    #     if orientation is not None:
+    #         xform_op = self._prim.GetAttribute("xformOp:rotateXYZ")
+    #         # Convert to euler and set
+    #         rot_euler = quat2euler(quat=orientation)
+    #         xform_op.Set(Gf.Vec3f(*rot_euler.tolist()))
+
+    def set_window_position(self, x, y):
+        """Set the position of the viewport window.
+
+        :param x: x position of the viewport window
+        :param y: y position of the viewport window
+        """
+        self._viewport.set_window_pos(x ,y)
+
+    def set_window_size(self, width, height):
+        """Set the size of the viewport window.
+
+        :param width: width of the viewport window
+        :param height: height of the viewport window
+        """
+        self._viewport.set_window_size(width, height)
+
+    def set_camera_position(self, x, y, z, rotate=True):
+        """Set the position of the active camera.
+
+        :param x: x coordinate of the camera
+        :param y: y coordinate of the camera
+        :param z: z coordinate of the camera
+        :param rotate: set rotate=True to move the camera, but rotate to keep its focus;
+            set rotate=False to move the camera and look at a new point
+        """
+        self._viewport.set_camera_position(self._prim_path, x, y, z, rotate)
+
+    def set_camera_target(self, x, y, z, rotate=True):
+        """Set the target of the active camera.
+
+        :param x: x coordinate of the camera
+        :param y: y coordinate of the camera
+        :param z: z coordinate of the camera
+        :param rotate: rotate=True to rotate the camera to look at the target;
+            set rotate=False to move the camera to look at the target
+        """
+        self._viewport.set_camera_target(self._prim_path, x, y, z, rotate)
 
     @property
     def image_height(self):

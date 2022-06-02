@@ -10,6 +10,7 @@ from collections import defaultdict
 import itertools
 import logging
 
+import json
 import omni
 import carb
 from omni.isaac.core.simulation_context import SimulationContext
@@ -21,19 +22,38 @@ from omni.isaac.dynamic_control import _dynamic_control
 import omni.kit.loop._loop as omni_loop
 import builtins
 from pxr import Usd, UsdGeom, Sdf, UsdPhysics, PhysxSchema
-from omni.kit.viewport import get_viewport_interface
 from omni.isaac.core.utils.viewports import set_camera_view
 from omni.isaac.core.loggers import DataLogger
 from typing import Optional, List
 from igibson.utils.usd_utils import BoundingBoxAPI
 
 from igibson import assets_path
+<<<<<<< HEAD
 from igibson.transition_rules import DEFAULT_RULES, TransitionResults
 from igibson.objects.object_base import BaseObject
 from igibson.object_states.factory import get_states_by_dependency_order
 from igibson.scenes import Scene
 from igibson.utils.python_utils import clear as clear_pu
 from igibson.utils.usd_utils import clear as clear_uu
+=======
+import igibson.macros as m
+from igibson.robots.robot_base import BaseRobot
+from igibson.utils.utils import NumpyEncoder
+from igibson.utils.python_utils import clear as clear_pu, create_object_from_init_info
+from igibson.utils.usd_utils import clear as clear_uu, BoundingBoxAPI
+from igibson.utils.assets_utils import get_ig_avg_category_specs
+from igibson.scenes import Scene
+from igibson.objects.object_base import BaseObject
+from igibson.object_states.factory import get_states_by_dependency_order
+
+# Import viewport getter based on isaacsim version
+if m.IS_PUBLIC_ISAACSIM:
+    from omni.kit.viewport import get_viewport_interface as acquire_viewport_interface
+else:
+    from omni.kit.viewport_legacy import acquire_viewport_interface
+
+import numpy as np
+>>>>>>> ig-develop
 
 
 class Simulator(SimulationContext):
@@ -123,7 +143,7 @@ class Simulator(SimulationContext):
         self.first_sync = True          # First sync always sync all objects (regardless of their sleeping states)
 
         # Initialize viewer
-        self._set_physics_engine_settings()
+        # self._set_physics_engine_settings()
         # TODO: Make this toggleable so we don't always have a viewer if we don't want to
         self._set_viewer_settings()
 
@@ -134,10 +154,6 @@ class Simulator(SimulationContext):
         # Set of categories that can be grasped by assisted grasping
         self.object_state_types = get_states_by_dependency_order()
 
-        # TODO: Once objects are in place, uncomment and test this
-        # self.assist_grasp_category_allow_list = self.gen_assisted_grasping_categories()
-        # self.assist_grasp_mass_thresh = 10.0
-
         # Set of all non-Omniverse transition rules to apply.
         self._transition_rules = DEFAULT_RULES
 
@@ -145,6 +161,12 @@ class Simulator(SimulationContext):
         # e.g.: particle sampling, which for some reason requires sim.play() to be called at least once
         self.play()
         self.stop()
+
+        # Finally, update the physics settings
+        # This needs to be done now, after an initial step + stop for some reason if we want to use GPU
+        # dynamics, otherwise we get very strange behavior, e.g., PhysX complains about invalid transforms
+        # and crashes
+        self._set_physics_engine_settings()
 
     def __new__(
         cls,
@@ -189,17 +211,34 @@ class Simulator(SimulationContext):
         """
         Set the physics engine with specified settings
         """
+        assert self.is_stopped(), f"Cannot set simulator physics settings while simulation is playing!"
         self._physics_context.set_gravity(value=-self.gravity)
         # Also make sure we invert the collision group filter settings so that different collision groups cannot
-        # collide with each other
-        self._physics_context._physx_scene_api.GetInvertCollisionGroupFilterAttr().Set(True)
+        # collide with each other, and modify settings for speed optimization
+
+        if m.IS_PUBLIC_ISAACSIM:
+            # Only have access to invert collision filter and CCD setting, no flatcache
+            self._physics_context._physx_scene_api.GetInvertCollisionGroupFilterAttr().Set(True)
+            self._physics_context._physx_scene_api.GetEnableCCDAttr().Set(m.ENABLE_CCD)
+        else:
+            self._physics_context.set_invert_collision_group_filter(True)
+            self._physics_context.enable_ccd(m.ENABLE_CCD)
+            self._physics_context.enable_flatcache(m.ENABLE_FLATCACHE)
+
+        # Enable GPU dynamics based on whether we need omni particles feature
+        if m.ENABLE_OMNI_PARTICLES:
+            self._physics_context.enable_gpu_dynamics(True)
+            self._physics_context.set_broadphase_type("GPU")
+        else:
+            self._physics_context.enable_gpu_dynamics(False)
+            self._physics_context.set_broadphase_type("MBP")
 
     def _set_viewer_settings(self):
         """
         Initializes a reference to the viewer in the App, and sets the frame size
         """
         # Store reference to viewer (see https://docs.omniverse.nvidia.com/app_isaacsim/app_isaacsim/reference_python_snippets.html#get-camera-parameters)
-        viewport = get_viewport_interface()
+        viewport = acquire_viewport_interface()
         viewport_handle = viewport.get_instance("Viewport")
         self._viewer = viewport.get_viewport_window(viewport_handle)
 
@@ -249,12 +288,13 @@ class Simulator(SimulationContext):
         """
         self._objects_to_initialize.append(obj)
 
-    def import_object(self, obj, auto_initialize=True):
+    def import_object(self, obj, register=True, auto_initialize=True):
         """
-        Import a non-robot object into the simulator.
+        Import an object into the simulator.
 
         Args:
-            obj (BaseObject): a non-robot object to load
+            obj (BaseObject): an object to load
+            register (bool): whether to register this object internally in the scene registry
             auto_initialize (bool): If True, will auto-initialize the requested object on the next simulation step.
                 Otherwise, we assume that the object will call initialize() on its own!
         """
@@ -270,12 +310,11 @@ class Simulator(SimulationContext):
         assert self.scene is not None, "import_object needs to be called after import_scene"
 
         # Load the object in omniverse by adding it to the scene
-        self.scene.add_object(obj, self, _is_call_from_simulator=True)
+        self.scene.add_object(obj, self, register=register, _is_call_from_simulator=True)
 
         # Lastly, additionally add this object automatically to be initialized as soon as another simulator step occurs
         # if requested
         if auto_initialize:
-            print("GOT HERE AUTO INITIALIZE")
             self.initialize_object_on_next_sim_step(obj=obj)
     
     def remove_object(self, obj):
@@ -298,25 +337,22 @@ class Simulator(SimulationContext):
             self._objects_to_initialize = []
             # Also update the scene registry
             # TODO: A better place to put this perhaps?
-            self._scene.object_registry.update(keys="handle")
+            self._scene.object_registry.update(keys="root_handle")
 
         # Step all of the particle systems.
         for particle_system in self.particle_systems:
             particle_system.update(self)
 
-        # Step the object states in global topological order.
-        for state_type in self.object_state_types:
-            for obj in self.scene.get_objects_with_state(state_type):
-                # Only update objects that have been initialized so far
-                if obj.initialized:
-                    obj.states[state_type].update()
+        # Step the object states in global topological order (if the scene exists).
+        if self.scene is not None:
+            for state_type in self.object_state_types:
+                for obj in self.scene.get_objects_with_state(state_type):
+                    # Only update objects that have been initialized so far
+                    if obj.initialized:
+                        obj.states[state_type].update()
 
-        # TODO
-        # # Step the object procedural materials based on the updated object states.
-        # for obj in self.scene.get_objects():
-        #     if hasattr(obj, "procedural_material") and obj.procedural_material is not None:
-        #         obj.procedural_material.update()
 
+        # Clear the bounding box cache so that it gets updated during the next time it's called
         BoundingBoxAPI.clear()
 
     def _non_ov_transition_step(self):
@@ -355,23 +391,27 @@ class Simulator(SimulationContext):
         for removed_obj in removed_objs:
             self.remove_object(removed_obj)
 
-
-    def stop(self):
-        super().stop()
-
-        # TODO: Fix, hacky
-        if self.scene is not None and self.scene.initialized:
-            self.scene.reset()
-
-    def stop_async(self):
-        super().stop_async()
-
-        # TODO: Fix, hacky
+    def reset_scene(self):
+        """
+        Resets ths scene (if it exists) and its corresponding objects
+        """
         if self.scene is not None and self.scene.initialized:
             self.scene.reset()
 
     def play(self):
         super().play()
+
+        # Update all object / robot handles
+        if self.scene is not None and self.scene.initialized:
+            for obj in self.scene.objects:
+                # Only need to update handles if object is already initialized as well
+                if obj.initialized:
+                    obj.update_handles()
+
+            for robot in self.scene.robots:
+                # Only need to update handles if robot is already initialized as well
+                if robot.initialized:
+                    robot.update_handles()
 
         # Check to see if any objects should be initialized
         if len(self._objects_to_initialize) > 0:
@@ -431,18 +471,6 @@ class Simulator(SimulationContext):
         """Returns: True if the simulator is paused."""
         return not (self.is_stopped() or self.is_playing())
 
-    def gen_assisted_grasping_categories(self):
-        """
-        Generate a list of categories that can be grasped using assisted grasping,
-        using labels provided in average category specs file.
-        """
-        assisted_grasp_category_allow_list = set()
-        avg_category_spec = get_ig_avg_category_specs()
-        for k, v in avg_category_spec.items():
-            if v["enable_ag"]:
-                assisted_grasp_category_allow_list.add(k)
-        return assisted_grasp_category_allow_list
-
     @classmethod
     def clear_instance(cls):
         SimulationContext.clear_instance()
@@ -484,26 +512,30 @@ class Simulator(SimulationContext):
         """
         return get_prim_at_path(prim_path="/World")
 
-    def get_current_tasks(self) -> List[BaseTask]:
-        """[summary]
+    # def get_current_tasks(self) -> List[BaseTask]:
+    #     """[summary]
+    #
+    #     Returns:
+    #         List[BaseTask]: [description]
+    #     """
+    #     return self._current_tasks
+    #
+    # def get_task(self, name: str) -> BaseTask:
+    #     if name not in self._current_tasks:
+    #         raise Exception("task name {} doesn't exist in the current world tasks.".format(name))
+    #     return self._current_tasks[name]
 
-        Returns:
-            List[BaseTask]: [description]
-        """
-        return self._current_tasks
+    # def _finalize_scene(self) -> None:
+    #     """[summary]
+    #     """
+    #     if not builtins.ISAAC_LAUNCHED_FROM_TERMINAL:
+    #         self.play()
+    #     self._scene._finalize()
+    #     return
 
-    def get_task(self, name: str) -> BaseTask:
-        if name not in self._current_tasks:
-            raise Exception("task name {} doesn't exist in the current world tasks.".format(name))
-        return self._current_tasks[name]
-
-    def _finalize_scene(self) -> None:
-        """[summary]
-        """
-        if not builtins.ISAAC_LAUNCHED_FROM_TERMINAL:
-            self.play()
-        self._scene._finalize()
-        return
+    def clear_and_remove_scene(self) -> None:
+        self._scene = None
+        self.clear()
 
     def clear(self) -> None:
         """Clears the stage leaving the PhysicsScene only if under /World.
@@ -543,63 +575,135 @@ class Simulator(SimulationContext):
 
         return
 
-    def reset(self) -> None:
-        """ Resets the stage to its initial state and each object included in the Scene to its default state
-            as specified by .set_default_state and the __init__ funcs.
+    # def reset(self) -> None:
+    #     """ Resets the stage to its initial state and each object included in the Scene to its default state
+    #         as specified by .set_default_state and the __init__ funcs.
+    #
+    #         Note:
+    #         - All tasks should be added before the first reset is called unless a .clear() was called.
+    #         - All articulations should be added before the first reset is called unless a .clear() was called.
+    #         - This method takes care of initializing articulation handles with the first reset called.
+    #         - This will do one step internally regardless
+    #         - calls post_reset on each object in the Scene
+    #         - calls post_reset on each Task
+    #
+    #         things like setting pd gains for instance should happend at a Task reset or a Robot reset since
+    #         the defaults are restored after .stop() is called.
+    #     """
+    #     if not self._scene_finalized:
+    #         for task in self._current_tasks.values():
+    #             task.set_up_scene(self.scene)
+    #         self._finalize_scene()
+    #         self._scene_finalized = True
+    #     self.stop()
+    #     for task in self._current_tasks.values():
+    #         task.cleanup()
+    #     self.play()
+    #     self.scene.post_reset()
+    #     for task in self._current_tasks.values():
+    #         task.post_reset()
+    #     return
+    #
+    # async def reset_async(self) -> None:
+    #     """Resets the stage to its initial state and each object included in the Scene to its default state
+    #         as specified by .set_default_state and the __init__ funcs.
+    #
+    #         Note:
+    #         - All tasks should be added before the first reset is called unless a .clear() was called.
+    #         - All articulations should be added before the first reset is called unless a .clear() was called.
+    #         - This method takes care of initializing articulation handles with the first reset called.
+    #         - This will do one step internally regardless
+    #         - calls post_reset on each object in the Scene
+    #         - calls post_reset on each Task
+    #
+    #         things like setting pd gains for instance should happend at a Task reset or a Robot reset since
+    #         the defaults are restored after .stop() is called.
+    #     """
+    #     if not self._scene_finalized:
+    #         for task in self._current_tasks.values():
+    #             task.set_up_scene(self.scene)
+    #         await self.play_async()
+    #         self._finalize_scene()
+    #         self._scene_finalized = True
+    #     await self.stop_async()
+    #     for task in self._current_tasks.values():
+    #         task.cleanup()
+    #     await self.play_async()
+    #     self._scene.post_reset()
+    #     for task in self._current_tasks.values():
+    #         task.post_reset()
+    #     return
 
-            Note:
-            - All tasks should be added before the first reset is called unless a .clear() was called.
-            - All articulations should be added before the first reset is called unless a .clear() was called.
-            - This method takes care of initializing articulation handles with the first reset called.
-            - This will do one step internally regardless
-            - calls post_reset on each object in the Scene
-            - calls post_reset on each Task
-
-            things like setting pd gains for instance should happend at a Task reset or a Robot reset since
-            the defaults are restored after .stop() is called.
+    def restore(self, usd_path):
         """
-        if not self._scene_finalized:
-            for task in self._current_tasks.values():
-                task.set_up_scene(self.scene)
-            self._finalize_scene()
-            self._scene_finalized = True
-        self.stop()
-        for task in self._current_tasks.values():
-            task.cleanup()
+        Restore a simulation environment from @usd_path.
+
+        Args:
+            usd_path (str): Full path of USD file to load, which contains information
+                to recreate a scene.
+        """
+        if not usd_path.endswith(".usd"):
+            logging.error(f"You have to define the full usd_path to load from. Got: {usd_path}")
+            return
+
+        # Load saved stage to get saved_info.
+        self.load_stage(usd_path)
+
+        # Load saved info
+        scene_state = json.loads(self.world_prim.GetCustomDataByKey("scene_state"))
+        scene_init_info = json.loads(self.world_prim.GetCustomDataByKey("scene_init_info"))
+
+        # Clear the current environment and delete any currently loaded scene.
+        self.clear_and_remove_scene()
+
+        # Recreate and import the saved scene.
+        # Note that the imported scene only have the default objects loaded.
+        recreated_scene = create_object_from_init_info(scene_init_info)
+        self.import_scene(scene=recreated_scene)
+
+        # Start the simulation and restore the dynamic state of the scene and then pause again
         self.play()
-        self.scene.post_reset()
-        for task in self._current_tasks.values():
-            task.post_reset()
+        self.scene.load_state(scene_state, serialized=False)
+        self.app.update()
+        self.pause()
+
+        logging.info("The saved simulation environment loaded.")
+
         return
 
-    async def reset_async(self) -> None:
-        """Resets the stage to its initial state and each object included in the Scene to its default state
-            as specified by .set_default_state and the __init__ funcs.
-
-            Note:
-            - All tasks should be added before the first reset is called unless a .clear() was called.
-            - All articulations should be added before the first reset is called unless a .clear() was called.
-            - This method takes care of initializing articulation handles with the first reset called.
-            - This will do one step internally regardless
-            - calls post_reset on each object in the Scene
-            - calls post_reset on each Task
-
-            things like setting pd gains for instance should happend at a Task reset or a Robot reset since
-            the defaults are restored after .stop() is called.
+    def save(self, usd_path):
         """
-        if not self._scene_finalized:
-            for task in self._current_tasks.values():
-                task.set_up_scene(self.scene)
-            await self.play_async()
-            self._finalize_scene()
-            self._scene_finalized = True
-        await self.stop_async()
-        for task in self._current_tasks.values():
-            task.cleanup()
-        await self.play_async()
-        self._scene.post_reset()
-        for task in self._current_tasks.values():
-            task.post_reset()
+        Saves the current simulation environment to @usd_path.
+
+        Args:
+            usd_path (str): Full path of USD file to load, which contains information
+                to recreate the current scene.
+        """
+        if not self.scene:
+            logging.warning("Scene has not been loaded. Nothing to save.")
+            return
+        if not usd_path.endswith(".usd"):
+            logging.error(f"You have to define the full usd_path to save the scene to. Got: {usd_path}")
+            return
+
+        # Update scene info
+        self.scene.update_scene_info()
+
+        # Dump saved current state and also scene init info
+        saved_state_str = json.dumps(self.scene.dump_state(serialized=False), cls=NumpyEncoder)
+        self.world_prim.SetCustomDataByKey("scene_state", saved_state_str)
+        scene_init_info = self.scene.get_init_info()
+        # Overwrite the usd with our desired usd file
+        scene_init_info["args"]["usd_path"] = usd_path
+        scene_init_info_str = json.dumps(scene_init_info, cls=NumpyEncoder)
+        self.world_prim.SetCustomDataByKey("scene_init_info", scene_init_info_str)
+
+        # Save stage. This needs to happen at the end since some objects may get reset after sim.stop().
+        self.stop()
+        self.stage.Export(usd_path)
+
+        logging.info("The current simulation environment saved.")
+
         return
 
     def add_task(self, task: BaseTask) -> None:
@@ -762,7 +866,7 @@ class Simulator(SimulationContext):
         self._init_stage(
             physics_dt=self._initial_physics_dt,
             rendering_dt=self._initial_rendering_dt,
-            stage_units_in_meters=self._stage_units_in_meters,
+            stage_units_in_meters=self._stage_units_in_meters if m.IS_PUBLIC_ISAACSIM else self._initial_stage_units_in_meters,
         )
         self._set_physics_engine_settings()
         self._setup_default_callback_fns()

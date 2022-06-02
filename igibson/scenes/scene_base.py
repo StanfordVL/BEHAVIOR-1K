@@ -1,4 +1,5 @@
-from abc import ABCMeta, abstractmethod
+import json
+from abc import ABC, abstractmethod
 from collections import OrderedDict
 from future.utils import with_metaclass
 
@@ -20,8 +21,10 @@ from omni.isaac.core.utils.nucleus import find_nucleus_server
 from omni.isaac.core.utils.stage import add_reference_to_stage
 from typing import Optional, Tuple
 import gc
-from igibson.utils.python_utils import classproperty, Serializable, Registerable
+from igibson import app
+from igibson.utils.python_utils import classproperty, Serializable, Registerable, Recreatable
 from igibson.utils.registry_utils import SerializableRegistry
+from igibson.utils.utils import NumpyEncoder
 from igibson.objects.object_base import BaseObject
 from igibson.objects.dataset_object import DatasetObject
 from igibson.systems import SYSTEMS_REGISTRY
@@ -34,7 +37,7 @@ from igibson.robots.robot_base import BaseRobot
 REGISTERED_SCENES = OrderedDict()
 
 
-class Scene(Serializable, Registerable, metaclass=ABCMeta):
+class Scene(Serializable, Registerable, Recreatable, ABC):
     """
     Base class for all Scene objects.
     Contains the base functionalities and the functions that all derived classes need to implement.
@@ -45,7 +48,12 @@ class Scene(Serializable, Registerable, metaclass=ABCMeta):
         self._loaded = False                    # Whether this scene exists in the stage or not
         self._initialized = False               # Whether this scene has its internal handles / info initialized or not (occurs AFTER and INDEPENDENTLY from loading!)
         self._registry = None
+        self._world_prim = None
         self.floor_body_ids = []  # List of ids of the floor_heights
+        self._initial_state = None
+
+        # Call super init
+        super().__init__()
 
     @property
     def stage(self) -> Usd.Stage:
@@ -173,11 +181,19 @@ class Scene(Serializable, Registerable, metaclass=ABCMeta):
         if self._loaded:
             raise ValueError("This scene is already loaded.")
 
-        # Creat the registry for tracking all objects in the scene
+        # Create the registry for tracking all objects in the scene
         self._registry = self._create_registry()
+
+        # Store world prim
+        self._world_prim = simulator.world_prim
 
         prims = self._load(simulator)
         self._loaded = True
+
+        # Initialize registries
+        for system in self.systems:
+            print(f"Initializing system: {system.name}")
+            system.initialize(simulator=simulator)
 
         # Always stop the sim if we started it internally
         if not simulator.is_stopped():
@@ -200,6 +216,11 @@ class Scene(Serializable, Registerable, metaclass=ABCMeta):
         assert not self._initialized, "Scene can only be initialized once! (It is already initialized)"
         self._initialize()
         self._initialized = True
+
+        # Store object states
+        scene_info = self.get_scene_info()
+        self._initial_state = self.dump_state(serialized=False) if scene_info is None else \
+            scene_info["init_state"]
 
     def _create_registry(self):
         """
@@ -272,7 +293,7 @@ class Scene(Serializable, Registerable, metaclass=ABCMeta):
         """
         pass
 
-    def add_object(self, obj, simulator, _is_call_from_simulator=False):
+    def add_object(self, obj, simulator, register=True, _is_call_from_simulator=False):
         """
         Add an object to the scene, loading it if the scene is already loaded.
 
@@ -281,6 +302,7 @@ class Scene(Serializable, Registerable, metaclass=ABCMeta):
 
         :param obj: the object to load
         :param simulator: the simulator to add the object to
+        :param register: whether to track this object internally in the scene registry
         :param _is_call_from_simulator: whether the caller is the simulator. This should
             **not** be set by any callers that are not the Simulator class
         :return: the prim of the loaded object if the scene was already loaded, or None if the scene is not loaded
@@ -297,14 +319,15 @@ class Scene(Serializable, Registerable, metaclass=ABCMeta):
         # let scene._load() load the object when called later on.
         prim = obj.load(simulator)
 
-        # Add this object to our registry based on its type
-        if isinstance(obj, BaseRobot):
-            self.robot_registry.add(obj)
-        else:
-            self.object_registry.add(obj)
+        # Add this object to our registry based on its type, if we want to register it
+        if register:
+            if isinstance(obj, BaseRobot):
+                self.robot_registry.add(obj)
+            else:
+                self.object_registry.add(obj)
 
-        # Run any additional scene-specific logic with the created object
-        self._add_object(obj)
+            # Run any additional scene-specific logic with the created object
+            self._add_object(obj)
 
         return prim
 
@@ -316,8 +339,11 @@ class Scene(Serializable, Registerable, metaclass=ABCMeta):
 
 
     def remove_object(self, obj):
-        # Remove from this registry
-        self.object_registry.remove(obj)
+        # Remove from the appropriate registry
+        if isinstance(obj, BaseRobot):
+            self.robot_registry.remove(obj)
+        else:
+            self.object_registry.remove(obj)
         # Remove from omni stage
         obj.remove(self)
 
@@ -354,9 +380,12 @@ class Scene(Serializable, Registerable, metaclass=ABCMeta):
 
     def reset(self):
         """
-        Resets this scene. Default is no-op
+        Resets this scene
         """
-        pass
+        # Reset the pose and joint configuration of all scene objects.
+        if self._initial_state is not None:
+            self.load_state(self._initial_state)
+            app.update()
 
     @property
     def has_connectivity_graph(self):
@@ -455,6 +484,49 @@ class Scene(Serializable, Registerable, metaclass=ABCMeta):
             dynamic_friction=dynamic_friction,
             restitution=restitution,
         )
+
+    def update_initial_state(self):
+        """
+        Updates the initial state for this scene (which the scene will get reset to upon calling reset())
+        """
+        self._initial_state = self.dump_state(serialized=False)
+
+    def update_scene_info(self):
+        """
+        Updates the scene-relevant information and saves it to the active USD. Useful for reloading a scene directly
+        from a saved USD in this format.
+        """
+        # Save relevant information
+
+        # Iterate over all objects and save their init info
+        init_info = {obj.name: obj.get_init_info() for registry in (self.object_registry, self.robot_registry)
+                     for obj in registry.objects}
+
+        # Save initial object state info
+        init_state_info = self._initial_state
+
+        # Compose as single dictionary and dump into custom data field in world prim
+        scene_info = {"init_info": init_info, "init_state": init_state_info}
+        scene_info_str = json.dumps(scene_info, cls=NumpyEncoder)
+        self._world_prim.SetCustomDataByKey("scene_info", scene_info_str)
+
+    def get_scene_info(self):
+        """
+        Stored information, if any, for this scene. Structure is:
+
+            "init_info":
+                "<obj0>": <obj0> init kw/args
+                ...
+                "<robot0>": <robot0> init kw/args
+                ...
+            "init_state":
+                dict: State of the scene upon episode initialization; output from self.dump_state(serialized=False)
+
+        Returns:
+            None or dict: If it exists, nested dictionary of relevant scene information
+        """
+        scene_info_str = self._world_prim.GetCustomDataByKey("scene_info")
+        return None if scene_info_str is None else json.loads(scene_info_str)
 
     @property
     def state_size(self):

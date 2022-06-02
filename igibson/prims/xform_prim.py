@@ -74,9 +74,9 @@ class XFormPrim(BasePrim):
 
         return prim
 
-    def _post_load(self, simulator=None):
+    def _post_load(self):
         # run super first
-        super()._post_load(simulator=simulator)
+        super()._post_load()
 
         # Make sure all xforms have pose and scaling info
         self._set_xform_properties()
@@ -282,10 +282,8 @@ class XFormPrim(BasePrim):
                                                           Defaults to None, which means left unchanged.
         """
         current_position, current_orientation = self.get_position_orientation()
-        if position is None:
-            position = current_position
-        if orientation is None:
-            orientation = current_orientation
+        position = current_position if position is None else np.array(position)
+        orientation = current_orientation if orientation is None else np.array(orientation)
         orientation = orientation[[3, 0, 1, 2]]     # Flip from x,y,z,w to w,x,y,z
         my_world_transform = tf_matrix_from_pose(translation=position, orientation=orientation)
         parent_world_tf = UsdGeom.Xformable(get_prim_parent(self._prim)).ComputeLocalToWorldTransform(
@@ -394,7 +392,7 @@ class XFormPrim(BasePrim):
                 )
             self.set_attribute("xformOp:translate", translation)
         if orientation is not None:
-            orientation = orientation[[3, 0, 1, 2]]
+            orientation = np.array(orientation)[[3, 0, 1, 2]]
             if "xformOp:orient" not in properties:
                 carb.log_error(
                     "Orient property needs to be set for {} before setting its orientation".format(self.name)
@@ -454,12 +452,23 @@ class XFormPrim(BasePrim):
         self._collision_filter_api.GetFilteredPairsRel().AddTarget(prim.prim_path)
         prim._collision_filter_api.GetFilteredPairsRel().AddTarget(self._prim_path)
 
+    def remove_filtered_collision_pair(self, prim):
+        """
+        Removes a collision filter pair with another prim
+
+        Args:
+            prim (XFormPrim): Another prim to remove filter collisions with
+        """
+        # Add to both this prim's and the other prim's filtered pair
+        self._collision_filter_api.GetFilteredPairsRel().RemoveTarget(prim.prim_path)
+        prim._collision_filter_api.GetFilteredPairsRel().RemoveTarget(self._prim_path)
+
     def _dump_state(self):
         pos, ori = self.get_position_orientation()
         return OrderedDict(pos=pos, ori=ori)
 
     def _load_state(self, state):
-        self.set_position_orientation(state["pos"], state["ori"])
+        self.set_position_orientation(np.array(state["pos"]), np.array(state["ori"]))
 
     def _serialize(self, state):
         # We serialize by iterating over the keys and adding them to a list that's concatenated at the end

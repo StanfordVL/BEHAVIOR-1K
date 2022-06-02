@@ -266,6 +266,9 @@ class PointNavigationTask(BaseTask):
 
         Args:
             env (BaseEnv): Environment instance
+
+        Returns:
+            float: Computed potential
         """
         if self._reward_type == "l2":
             reward = self._get_l2_potential(env)
@@ -275,10 +278,6 @@ class PointNavigationTask(BaseTask):
             raise ValueError(f"Invalid reward type! {self._reward_type}")
 
         return reward
-
-    def _reset_scene(self, env):
-        # Reset the scene normally
-        env.scene.reset()
 
     def _reset_agent(self, env):
         # Reset agent
@@ -323,6 +322,9 @@ class PointNavigationTask(BaseTask):
             self._goal_pos_marker.set_position(self._goal_pos)
 
     def _reset_variables(self, env):
+        # Run super first
+        super()._reset_variables(env=env)
+
         # Reset internal variables
         self._path_length = 0.0
         self._current_robot_pos = self._initial_pos

@@ -15,7 +15,7 @@ class Under(PositionalValidationMemoizedObjectStateMixin, RelativeObjectState, B
         return RelativeObjectState.get_dependencies() + [VerticalAdjacency]
 
     def _set_value(self, other, new_value):
-        state = self.simulator.dump_state(serialized=True)
+        state = self._simulator.dump_state(serialized=False)
 
         for _ in range(10):
             sampling_success = sample_kinematics("under", self.obj, other, new_value)
@@ -30,13 +30,13 @@ class Under(PositionalValidationMemoizedObjectStateMixin, RelativeObjectState, B
             if sampling_success:
                 break
             else:
-                self.simulator.load_state(state, serialized=True)
+                self._simulator.load_state(state, serialized=False)
 
         return sampling_success
 
     def _get_value(self, other):
-        other_bids = set(other.get_body_ids())
+        other_prim_paths = set(other.link_prim_paths)
         adjacency = self.obj.states[VerticalAdjacency].get_value()
-        return not other_bids.isdisjoint(adjacency.positive_neighbors) and other_bids.isdisjoint(
+        return not other_prim_paths.isdisjoint(adjacency.positive_neighbors) and other_prim_paths.isdisjoint(
             adjacency.negative_neighbors
         )

@@ -9,10 +9,10 @@ from igibson.simulator_omni import Simulator
 # from igibson.simulator_vr import SimulatorVR
 from igibson.utils.gym_utils import GymObservable
 from igibson.utils.utils import parse_config
-from igibson.utils.python_utils import merge_nested_dicts, create_class_from_registry_and_config, Serializable
+from igibson.utils.python_utils import merge_nested_dicts, create_class_from_registry_and_config, Serializable, Recreatable
 
 
-class BaseEnv(gym.Env, GymObservable, Serializable):
+class BaseEnv(gym.Env, GymObservable, Serializable, Recreatable):
     """
     Base Env class that handles loading scene and robot, following OpenAI Gym interface.
     Functions like reset and step are not implemented.
@@ -340,7 +340,7 @@ class BaseEnv(gym.Env, GymObservable, Serializable):
         return {
             # Environment kwargs
             "env": {
-                "online_sampling": True,
+                # none by default
             },
 
             # Rendering kwargs
@@ -363,9 +363,7 @@ class BaseEnv(gym.Env, GymObservable, Serializable):
             },
 
             # Robot kwargs
-            "robots": {
-                # no robots by default
-            },
+            "robots": [], # no robots by default
         }
 
     @property
@@ -385,8 +383,8 @@ class BaseEnv(gym.Env, GymObservable, Serializable):
         # Run super first
         super().load_state(state=state, serialized=serialized)
 
-        # We also need to manually update the simulator app
-        self._simulator.app.update()
+        # # We also need to manually update the simulator app
+        # self._simulator.app.update()
 
     def _serialize(self, state):
         # Default state is from the scene

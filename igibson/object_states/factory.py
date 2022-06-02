@@ -11,6 +11,7 @@ _ALL_STATES = frozenset(
         ContactBodies,
         Cooked,
         Dusty,
+        Heated,
         Frozen,
         HeatSourceOrSink,
         HorizontalAdjacency,
@@ -48,6 +49,7 @@ _ABILITY_TO_STATE_MAPPING = {
     "cookable": [Cooked],
     "dustyable": [Dusty],
     "freezable": [Frozen],
+    "heatable": [Heated],
     "heatSource": [HeatSourceOrSink],
     "openable": [Open],
     "robot": ROOM_STATES + [ObjectsInFOVOfRobot],
@@ -74,13 +76,15 @@ _DEFAULT_STATE_SET = frozenset(
     ]
 )
 
-TEXTURE_CHANGE_PRIORITY = {
-    Frozen: 4,
-    Burnt: 3,
-    Cooked: 2,
-    Soaked: 1,
-    ToggledOn: 0,
-}
+_STEAM_STATE_SET = frozenset(
+    [
+        Heated,
+    ]
+)
+
+
+def get_steam_states():
+    return _STEAM_STATE_SET
 
 
 def get_default_states():

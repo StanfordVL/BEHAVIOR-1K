@@ -44,12 +44,20 @@ class PhysxParticleInstancer(BasePrim):
         # We raise an error, this should NOT be created from scratch
         raise NotImplementedError("PhysxPointInstancer should NOT be loaded via this class! Should be created before.")
 
-    def _initialize(self):
-        # Run super first
-        super()._initialize()
+    def _post_load(self, simulator=None):
+        # Run super
+        super()._post_load(simulator=simulator)
 
         # Store how many particles we have
         self._n_particles = len(self.particle_positions)
+
+        # Set the invisibleIds to be 0, and all particles to be 1
+        self.set_attribute(attr="ids", val=np.ones(self._n_particles))
+        self.set_attribute(attr="invisibleIds", val=[0])
+
+    def _initialize(self):
+        # Run super first
+        super()._initialize()
 
     def update_default_state(self):
         pass
@@ -206,6 +214,31 @@ class PhysxParticleInstancer(BasePrim):
         """
         self.set_attribute(attr="protoIndices", val=prototype_ids)
 
+    @property
+    def particle_visibilities(self):
+        """
+        Returns:
+            np.array: (N,) numpy array, where each entry is the specific particle's visiblity
+                (1 if visible, 0 otherwise)
+        """
+        # We leverage the ids + invisibleIds prim fields to infer visibility
+        # id = 1 means visible, id = 0 means invisible
+        ids = self.get_attribute("ids")
+        return np.ones(self.n_particles) if ids is None else np.array(ids)
+
+    @particle_visibilities.setter
+    def particle_visibilities(self, visibilities):
+        """
+        Set the particle visibilities for this instancer
+
+        Args:
+            np.array: (N,) numpy array, where each entry is the specific particle's desired visiblity
+                (1 if visible, 0 otherwise)
+        """
+        # We leverage the ids + invisibleIds prim fields to infer visibility
+        # id = 1 means visible, id = 0 means invisible
+        self.set_attribute(attr="ids", val=visibilities)
+
     def _dump_state(self):
         return OrderedDict(
             idn=self._idn,
@@ -286,8 +319,8 @@ class MicroParticleSystem(BaseParticleSystem):
     # Particle prototypes -- will be list of mesh prims to use as particle prototypes for this system
     particle_prototypes = None
 
-    # Particle instancers -- maps name to particle instancer prims
-    particle_instancers = OrderedDict()
+    # Particle instancers -- maps name to particle instancer prims (OrderedDict)
+    particle_instancers = None
 
     # Particle material -- either a UsdShade.Material or None if no material is used for this particle system
     particle_material = None
@@ -316,6 +349,9 @@ class MicroParticleSystem(BaseParticleSystem):
     def initialize(cls, simulator):
         # Run super first
         super().initialize(simulator=simulator)
+
+        # Initialize class variables that are mutable so they don't get overridden by children classes
+        cls.particle_instancers = OrderedDict()
 
         # Set the default scales according to the collision offset
         cls.min_scale = np.ones(3) * cls.particle_contact_offset
@@ -456,9 +492,9 @@ class MicroParticleSystem(BaseParticleSystem):
     @classmethod
     def generate_particle_instancer(
             cls,
-            idn,
-            particle_group,
             n_particles,
+            idn=None,
+            particle_group=0,
             positions=None,
             velocities=None,
             orientations=None,
@@ -470,12 +506,13 @@ class MicroParticleSystem(BaseParticleSystem):
         Generates a new particle instancer with unique identification number @idn, and registers it internally
 
         Args:
-            idn (int): Unique identification number to assign to this particle instancer. This is used to
+            n_particles (int): Number of particles to generate for this instancer
+            idn (None or int): Unique identification number to assign to this particle instancer. This is used to
                 deterministically reproduce individual particle instancer states dynamically, even if we
-                delete / add additional ones at runtime during simulation.
+                delete / add additional ones at runtime during simulation. If None, this system will generate a unique
+                identifier automatically.
             particle_group (int): ID for this particle set. Particles from different groups will automatically collide
                 with each other. Particles in the same group will have collision behavior dictated by @self_collision
-            n_particles (int): Number of particles to generate for this instancer
             positions (None or np.array): (n_particles, 3) shaped array specifying per-particle (x,y,z) positions.
                 If not specified, will be set to the origin by default
             velocities (None or np.array): (n_particles, 3) shaped array specifying per-particle (x,y,z) velocities.
@@ -494,6 +531,11 @@ class MicroParticleSystem(BaseParticleSystem):
         """
         # Run sanity checks
         assert cls.initialized, "Must initialize system before generating particle instancers!"
+
+        # Automatically generate an identification number for this instancer if none is specified
+        if idn is None:
+            max_idn = max([cls.particle_instancer_name_to_idn(name) for name in cls.particle_instancers.values()])
+            idn = max_idn + 1
 
         # Generate standardized prim path for this instancer
         name = cls.particle_instancer_idn_to_name(idn=idn)
@@ -828,7 +870,8 @@ class FluidSystem(MicroParticleSystem):
 
     @classproperty
     def use_isosurface(cls):
-        return True
+        # TODO: Make true once omni bugs are fixed
+        return False
 
 
 class WaterSystem(FluidSystem):

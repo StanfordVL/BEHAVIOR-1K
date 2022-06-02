@@ -126,9 +126,9 @@ class LightObject(StatefulObject):
 
         return prim
 
-    def _post_load(self, simulator=None):
+    def _post_load(self):
         # run super first
-        super()._post_load(simulator=simulator)
+        super()._post_load()
 
         # Grab reference to light link
         self._light_link = XFormPrim(prim_path=f"{self._prim_path}/base_link/light", name=f"{self.name}:light_link")
@@ -159,7 +159,7 @@ class LightObject(StatefulObject):
     @property
     def radius(self):
         """
-        Gets this joint's radius
+        Gets this light's radius
 
         Returns:
             float: radius for this light
@@ -169,7 +169,7 @@ class LightObject(StatefulObject):
     @radius.setter
     def radius(self, radius):
         """
-        Sets this joint's radius
+        Sets this light's radius
 
         Args:
             radius (float): radius to set

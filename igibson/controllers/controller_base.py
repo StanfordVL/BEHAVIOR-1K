@@ -3,7 +3,7 @@ from enum import IntEnum
 
 import numpy as np
 
-from igibson.utils.python_utils import classproperty, assert_valid_key, Serializable, Registerable
+from igibson.utils.python_utils import classproperty, assert_valid_key, Serializable, Registerable, Recreatable
 
 # Global dicts that will contain mappings
 REGISTERED_CONTROLLERS = OrderedDict()
@@ -58,7 +58,7 @@ class ControlType:
         return cls._MAPPING[type_str.lower()]
 
 
-class BaseController(Serializable, Registerable):
+class BaseController(Serializable, Registerable, Recreatable):
     """
     An abstract class with interface for mapping specific types of commands to deployable control signals.
     """
@@ -106,7 +106,7 @@ class BaseController(Serializable, Registerable):
             ]
         assert "has_limit" in control_limits, "Expected has_limit specified in control_limits, but does not exist."
         self._dof_has_limits = control_limits["has_limit"]
-        self._dof_idx = dof_idx
+        self._dof_idx = np.array(dof_idx, dtype=int)
 
         # Initialize some other variables that will be filled in during runtime
         self._control = None

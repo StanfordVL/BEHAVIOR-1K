@@ -6,22 +6,28 @@
 # distribution of this software and related documentation without an express
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 #
-from typing import Optional, Tuple, Union, List
-from copy import deepcopy
-import numpy as np
-from collections import OrderedDict, Iterable
-from omni.isaac.dynamic_control import _dynamic_control
-from omni.isaac.core.utils.types import DOFInfo
-from omni.isaac.core.utils.transformations import tf_matrix_from_pose
-from omni.isaac.core.utils.rotations import gf_quat_to_np_array
-from pxr import Gf, Usd, UsdGeom, UsdPhysics
-from omni.isaac.core.controllers.articulation_controller import ArticulationController
+from collections import Iterable, OrderedDict
+from typing import Optional, Tuple
+
 import carb
-from omni.isaac.core.utils.prims import is_prim_path_valid, get_prim_property, set_prim_property, \
-    get_prim_parent, get_prim_at_path
-from igibson.prims.xform_prim import XFormPrim
-from igibson.prims.rigid_prim import RigidPrim
+import numpy as np
+from omni.isaac.core.controllers.articulation_controller import ArticulationController
+from omni.isaac.core.utils.prims import (
+    get_prim_at_path,
+    get_prim_parent,
+    get_prim_property,
+    is_prim_path_valid,
+    set_prim_property,
+)
+from omni.isaac.core.utils.rotations import gf_quat_to_np_array
+from omni.isaac.core.utils.transformations import tf_matrix_from_pose
+from omni.isaac.core.utils.types import DOFInfo
+from omni.isaac.dynamic_control import _dynamic_control
+from pxr import Gf, Usd, UsdGeom, UsdPhysics
+
 from igibson.prims.joint_prim import JointPrim
+from igibson.prims.rigid_prim import RigidPrim
+from igibson.prims.xform_prim import XFormPrim
 from igibson.utils.types import JointsState
 
 
@@ -53,6 +59,7 @@ class EntityPrim(XFormPrim):
         self._dc = None                         # Dynamics control interface
         self._handle = None                     # Handle to this articulation
         self._root_handle = None                # Handle to the root rigid body of this articulation
+        self._root_link_name = None             # Name of the root link
         self._dofs_infos = None
         self._n_dof = None
         self._default_joints_state = None
@@ -72,19 +79,23 @@ class EntityPrim(XFormPrim):
         # Run super method
         super()._initialize()
 
-        # Get dynamic control info
-        self._dc = _dynamic_control.acquire_dynamic_control_interface()
-        self._handle = self._dc.get_articulation(self.articulation_root_path)
-        self._joints = OrderedDict()
-
         # Initialize all the links
+        # This must happen BEFORE the handle is generated for this prim, because things changing in the RigidPrims may
+        # cause the handle to change!
         for link in self._links.values():
             link.initialize()
 
+        # Initialize joints dictionary
+        self._joints = OrderedDict()
+
+        # Get dynamic control info
+        self._dc = _dynamic_control.acquire_dynamic_control_interface()
+        self.update_handles()
+
         # Handle case separately based on whether the handle is valid (i.e.: whether we are actually articulated or not)
         if self._handle != _dynamic_control.INVALID_HANDLE:
-            root_handle = self._dc.get_articulation_root_body(self._handle)
-            root_prim = get_prim_at_path(self._dc.get_rigid_body_path(root_handle))
+            print(f"initializing obj: {self.name}, articulation root path: {self.articulation_root_path}, handle: {self._handle}, new handle: {self._dc.get_articulation(self.articulation_root_path)}, root handle: {self._root_handle}")
+            root_prim = get_prim_at_path(self._dc.get_rigid_body_path(self._root_handle))
             n_dof = self._dc.get_articulation_dof_count(self._handle)
 
             # Additionally grab DOF info if we have non-fixed joints
@@ -118,8 +129,7 @@ class EntityPrim(XFormPrim):
         else:
             # TODO: May need to extend to clusters of rigid bodies, that aren't exactly joined
             # We assume this object contains a single rigid body
-            body_path = f"{self._prim_path}/base_link"
-            root_handle = self._dc.get_rigid_body(body_path)
+            body_path = f"{self._prim_path}/{self.root_link_name}"
             root_prim = get_prim_at_path(body_path)
             n_dof = 0
 
@@ -129,7 +139,6 @@ class EntityPrim(XFormPrim):
             f"initialized is {root_prim.GetPrimPath()}!"
 
         # Store values internally
-        self._root_handle = root_handle
         self._n_dof = n_dof
 
         print(f"root handle: {self._root_handle}, root prim path: {self._dc.get_rigid_body_path(self._root_handle)}")
@@ -138,7 +147,7 @@ class EntityPrim(XFormPrim):
         # By default, this prim cannot be instantiated from scratch!
         raise NotImplementedError("By default, an entity prim cannot be created from scratch.")
 
-    def _post_load(self, simulator=None):
+    def _post_load(self):
         # Set visual only flag
         self._visual_only = self._load_config["visual_only"] if \
             "visual_only" in self._load_config and self._load_config["visual_only"] is not None else False
@@ -147,19 +156,36 @@ class EntityPrim(XFormPrim):
         # We iterate over all children of this object's prim,
         # and grab any that are presumed to be rigid bodies (i.e.: other Xforms)
         self._links = OrderedDict()
+        joint_children = set()
         for prim in self._prim.GetChildren():
             # Only process prims that are an Xform
             if prim.GetPrimTypeInfo().GetTypeName() == "Xform":
                 link_name = prim.GetName()
-                is_metalink = prim.GetAttribute("ig:is_metalink").Get() or False
                 link = RigidPrim(
                     prim_path=prim.GetPrimPath().__str__(),
                     name=f"{self._name}:{link_name}",
-                    load_config={"visual_only": self._visual_only or is_metalink},
+                    load_config={"visual_only": self._visual_only},
                 )
-                if is_metalink:
-                    link.disable_gravity()
                 self._links[link_name] = link
+
+                # Also iterate through all children to infer joints and determine the children of those joints
+                # We will use this info to infer which link is the base link!
+                for child_prim in prim.GetChildren():
+                    if "joint" in child_prim.GetPrimTypeInfo().GetTypeName().lower():
+                        # Store the child target of this joint
+                        relationships = {r.GetName(): r for r in child_prim.GetRelationships()}
+                        # Only record if this is NOT a fixed link tying us to the world (i.e.: no target for body0)
+                        if len(relationships["physics:body0"].GetTargets()) > 0:
+                            joint_children.add(relationships["physics:body1"].GetTargets()[0].pathString.split("/")[-1])
+
+        # Infer the correct root link name -- this corresponds to whatever link does not have any joint existing
+        # in the children joints
+        valid_root_links = list(set(self._links.keys()) - joint_children)
+
+        # TODO: Uncomment safety check here after we figure out how to handle legacy multi-bodied assets like bed with pillow
+        # assert len(valid_root_links) == 1, f"Only a single root link should have been found for this entity prim, " \
+        #                                    f"but found multiple instead: {valid_root_links}"
+        self._root_link_name = valid_root_links[0] if len(valid_root_links) == 1 else "base_link"
 
         # Disable any requested collision pairs
         for a_name, b_name in self.disabled_collision_pairs:
@@ -171,7 +197,7 @@ class EntityPrim(XFormPrim):
             self.disable_gravity()
 
         # Run super
-        super()._post_load(simulator=simulator)
+        super()._post_load()
 
     @property
     def articulated(self):
@@ -204,8 +230,7 @@ class EntityPrim(XFormPrim):
         Returns:
             str: Name of this entity's root link
         """
-        # Default is the first entry in the links array
-        return list(self._links.keys())[0]
+        return self._root_link_name
 
     @property
     def root_link(self):
@@ -619,6 +644,21 @@ class EntityPrim(XFormPrim):
             n- or k-array: de-normalized efforts for the specified DOFs
         """
         return efforts * self.max_joint_efforts if indices is None else efforts * self.max_joint_efforts[indices]
+
+    def update_handles(self):
+        """
+        Updates all internal handles for this prim, in case they change since initialization
+        """
+        self._handle = self._dc.get_articulation(self.articulation_root_path)
+        self._root_handle = self._dc.get_articulation_root_body(self._handle) if \
+            self._handle != _dynamic_control.INVALID_HANDLE else self._dc.get_rigid_body(f"{self._prim_path}/{self.root_link_name}")
+
+        # Update all links and joints as well
+        for link in self._links.values():
+            link.update_handles()
+
+        for joint in self._joints.values():
+            joint.update_handles()
 
     def update_default_state(self):
         # Iterate over all links and joints and update their default states

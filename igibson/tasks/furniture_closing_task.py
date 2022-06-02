@@ -105,8 +105,9 @@ class FurnitureClosingTask(BaseTask):
         return task_potential
 
     def _reset_scene(self, env):
-        # Reset the scene normally
-        env.scene.reset_scene_objects()
+        # Run super first
+        super().reset(env=env)
+
         # Make sure all objects are awake
         env.scene.wake_scene_objects()
         # Sample opening objects and grab their references

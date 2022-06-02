@@ -9,11 +9,11 @@ from igibson.controllers.controller_base import (
     GripperController,
 )
 from igibson.controllers.dd_controller import DifferentialDriveController
-# from igibson.controllers.ik_controller import InverseKinematicsController
+from igibson.controllers.ik_controller import InverseKinematicsController
 from igibson.controllers.joint_controller import JointController
 from igibson.controllers.multi_finger_gripper_controller import MultiFingerGripperController
-from igibson.controllers.null_gripper_controller import NullGripperController
-from igibson.utils.python_utils import assert_valid_key, extract_class_init_kwargs_from_dict
+from igibson.controllers.null_joint_controller import NullJointController
+from igibson.utils.python_utils import assert_valid_key
 
 
 def create_controller(name, **kwargs):

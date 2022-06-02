@@ -641,7 +641,7 @@ def test_heat_source():
             abilities={"heatSource": {}},
         )
 
-        sim.import_object(stove, auto_initialize=False)
+        sim.import_object(stove, auto_initialize=True)
         stove.set_position_orientation(position=np.array([0, 0, 0.5]))
         
 
@@ -1028,10 +1028,9 @@ def test_slicer():
 #test_open()
 #test_toggle()
 #test_sliced()
+#test_slicer()
 
-test_slicer()
-
-# test_demo()
+test_demo()
 
 ## BROKEN
 #test_water_source()

@@ -71,14 +71,14 @@ def compute_adjacencies(obj, axes, max_distance):
     directions[1::2] = -axes
 
     # For now, we keep our result in the dimensionality of (direction, hit_object_order).
-    finalized = np.zeros(directions.shape[0], dtype=np.bool)
+    finalized = np.zeros(directions.shape[0], dtype=bool)
     bodies_by_direction = [[] for _ in directions]
 
     # Prepare this object's info for ray casting.
     # Use AABB center instead of position because we cannot get valid position
     # for fixed objects if fixed links are merged.
     object_position, _ = obj.states[Pose].get_value()
-    body_ids = obj.get_body_ids()
+    prim_paths = obj.link_prim_paths
 
     # Cast rays repeatedly until the max number of casting is reached
     for i in range(_MAX_ITERATIONS):
@@ -100,15 +100,15 @@ def compute_adjacencies(obj, axes, max_distance):
             ray_starts,
             ray_endpoints,
             hit_number=i,
-            ignore_bodies=body_ids,
-            ignore_collisions=body_ids
+            ignore_bodies=prim_paths,
+            ignore_collisions=prim_paths
         )
 
         # Add the results to the appropriate lists
         for idx, result in enumerate(ray_results):
             axis_idx = unfinished_directions[idx]
             if result["hit"]:
-                if result["rigidBody"] not in body_ids:
+                if result["rigidBody"] not in prim_paths:
                     bodies_by_direction[axis_idx].append(result["rigidBody"])
             else:
                 # Set the finalization status of no-hit directions

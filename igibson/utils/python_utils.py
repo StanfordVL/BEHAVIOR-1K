@@ -1,12 +1,13 @@
 """
 A set of utility functions for general python usage
 """
-from abc import ABCMeta
 import inspect
+from abc import ABCMeta
 from copy import deepcopy
-import numpy as np
-from collections import OrderedDict, Iterable
+from functools import wraps
+from importlib import import_module
 
+import numpy as np
 
 # Global dictionary storing all unique names
 NAMES = set()
@@ -20,6 +21,103 @@ class classproperty:
 
     def __get__(self, owner_self, owner_cls):
         return self.fget(owner_cls)
+
+
+def save_init_info(func):
+    """
+    Decorator to save the init info of an object to object._init_info.
+
+    _init_info contains class name and class constructor's input args.
+    """
+    sig = inspect.signature(func)
+
+    @wraps(func) # preserve func name, docstring, arguments list, etc.
+    def wrapper(self, *args, **kwargs):
+        values = sig.bind(self, *args, **kwargs)
+
+        # Prevent args of super init from being saved.
+        if hasattr(self, "_init_info"):
+            func(*values.args, **values.kwargs)
+            return
+
+        # Initialize class's self._init_info.
+        self._init_info = {}
+        self._init_info["class_module"] = self.__class__.__module__
+        self._init_info["class_name"] = self.__class__.__name__
+        self._init_info["args"] = {}
+
+        # Populate class's self._init_info.
+        for k, p in sig.parameters.items():
+            if k == 'self':
+                continue
+            if k in values.arguments:
+                val = values.arguments[k]
+                if p.kind in (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY):
+                    self._init_info["args"][k] = val
+                elif p.kind == inspect.Parameter.VAR_KEYWORD:
+                    for kwarg_k, kwarg_val in values.arguments[k].items():
+                        self._init_info["args"][kwarg_k] = kwarg_val
+
+        # Call the original function.
+        func(*values.args, **values.kwargs)
+
+    return wrapper
+
+
+class RecreatableMeta(type):
+    """
+    Simple metaclass that automatically saves __init__ args of the instances it creates.
+    """
+
+    def __new__(cls, clsname, bases, clsdict):
+        if "__init__" in clsdict:
+            clsdict["__init__"] = save_init_info(clsdict["__init__"])
+        return super().__new__(cls, clsname, bases, clsdict)
+
+
+class RecreatableAbcMeta(RecreatableMeta, ABCMeta):
+    """
+    A composite metaclass of both RecreatableMeta and ABCMeta.
+
+    Adding in ABCMeta to resolve metadata conflicts.
+    """
+
+    pass
+
+
+class Recreatable(metaclass=RecreatableAbcMeta):
+    """
+    Simple class that provides an abstract interface automatically saving __init__ args of
+    the classes inheriting it.
+    """
+
+    def __init__(self):
+        pass
+
+    def get_init_info(self):
+        """
+        Grabs relevant initialization information for this class instance. Useful for directly
+        reloading an object from this information, using @create_object_from_init_info.
+
+        Returns:
+            dict: Nested dictionary that contains this object's initialization information
+        """
+        # Note: self._init_info is procedurally generated via @save_init_info called in metaclass
+        return self._init_info
+
+
+def create_object_from_init_info(init_info):
+    """
+    Create a new object based on an given init info.
+
+    Args:
+        init_info (dict): Nested dictionary that contains an object's init information.
+    Returns:
+        any: Newly created object.
+    """
+    module = import_module(init_info["class_module"])
+    cls = getattr(module, init_info["class_name"])
+    return cls(**init_info["args"], **init_info.get("kwargs", {}))
 
 
 def merge_nested_dicts(base_dict, extra_dict, inplace=False, verbose=False):

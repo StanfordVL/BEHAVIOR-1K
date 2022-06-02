@@ -122,37 +122,36 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin):
         return True, (heating_element_position if not self.requires_inside else None)
 
     def _initialize(self):
-        super(HeatSourceOrSink, self)._initialize()
-        if not self.requires_inside:
-            self.initialize_link_mixin()
+        # Run super first
+        super()._initialize()
+        self.initialize_link_mixin()
+
+        # Load visual markers
 
         # Import at runtime to prevent circular imports
         from igibson.objects.usd_object import USDObject
         self.marker = USDObject(
             prim_path=f"{self.obj.prim_path}/heat_source_marker",
             usd_path=_HEATING_ELEMENT_MARKER_FILENAME,
-            name="heat_source_marker",
+            name=f"{self.obj.name}_heat_source_marker",
             class_id=SemanticClass.HEAT_SOURCE_MARKER,
             scale=_HEATING_ELEMENT_MARKER_SCALE,
-            visible=True,
+            visible=False,
             fixed_base=False,
             visual_only=True,
         )
-
-        self.marker.load(simulator=self.simulator)
-        self.marker.set_position(np.array([0, 0, -100]))
+        # Import marker into simulator
+        self._simulator.import_object(self.marker, register=False, auto_initialize=True)
 
     def _update(self):
         self.status, self.position = self._compute_state_and_position()
 
         # Move the marker.
-        marker_position = np.array([0, 0, -100])
         if self.position is not None:
-            marker_position = self.position
-
-        # Lazy update of marker position
-        if not np.all(np.isclose(marker_position, self.marker.get_position())):
-            self.marker.set_position(marker_position)
+            self.marker.set_position(self.position)
+            self.marker.visible = True
+        else:
+            self.marker.visible = False
 
     def _get_value(self):
         return self.status, self.position

@@ -1,29 +1,28 @@
 import numpy as np
 
-from igibson.controllers import IsGraspingState, ControlType, GripperController
-
-VALID_MODES = {
-    "binary",
-    "smooth",
-    "independent",
-}
+from igibson.controllers import JointController
 
 
-class NullGripperController(GripperController):
+class NullJointController(JointController):
     """
-    Dummy Controller class for non-prehensile gripper control (i.e.: no control).
-    This class has a zero-size command space, and returns an empty array for control
+    Dummy Controller class for a null-type of joint control (i.e.: no control or constant pass-through control).
+    This class has a zero-size command space, and returns either an empty array for control if dof_idx is None
+    else constant values as specified by @default_command (if not specified, uses zeros)
     """
 
     def __init__(
         self,
         control_freq,
+        motor_type,
         control_limits,
+        dof_idx,
         command_input_limits="default",
         command_output_limits="default",
+        default_command=None,
     ):
         """
         :param control_freq: int, controller loop frequency
+        :param motor_type: str, type of motor being controlled, one of {position, velocity, effort}
         :param control_limits: Dict[str, Tuple[Array[float], Array[float]]]: The min/max limits to the outputted
             control signal. Should specify per-actuator type limits, i.e.:
 
@@ -33,6 +32,8 @@ class NullGripperController(GripperController):
             "has_limit": [...bool...]
 
             Values outside of this range will be clipped, if the corresponding joint index in has_limit is True.
+        :param dof_idx: Array[int], specific dof indices controlled by this robot. Used for inferring
+            controller-relevant values during control computations
         :param command_input_limits: None or "default" or Tuple[float, float] or Tuple[Array[float], Array[float]],
             if set, is the min/max acceptable inputted command. Values outside of this range will be clipped.
             If None, no clipping will be used. If "default", range will be set to (-1, 1)
@@ -41,53 +42,35 @@ class NullGripperController(GripperController):
             then all inputted command values will be scaled from the input range to the output range.
             If either is None, no scaling will be used. If "default", then this range will automatically be set
             to the @control_limits entry corresponding to self.control_type
+        :param default_command: None or n-array, if specified, should be the same length as @dof_idx, specifying
+            the default control for this controller to output
         """
-        # Immediately run super init
+        # Store values
+        self._default_command = np.zeros(len(dof_idx)) if default_command is None else np.array(default_command)
 
         # Run super init
         super().__init__(
             control_freq=control_freq,
+            motor_type=motor_type,
             control_limits=control_limits,
-            dof_idx=np.array([], dtype=np.int),  # no joints controlled
+            dof_idx=dof_idx,
             command_input_limits=command_input_limits,
             command_output_limits=command_output_limits,
         )
 
-    def reset(self):
-        # No-op
-        pass
-
     def _preprocess_command(self, command):
-        # No action
-        return command
+        # Set the command to be internal stored default value
+        return np.array(self._default_command)
 
-    def clip_control(self, control):
-        # No action
-        return control
-
-    def _command_to_control(self, command, control_dict):
+    def update_default_command(self, command):
         """
-        Converts the (already preprocessed) inputted @command into deployable (non-clipped!) gripper
-        joint control signal. Since this is a null controller, command should be an empty numpy array
-        and this function will equivalently return an empty array
+        Updates the internal default command value.
 
-        :param command: Array[float], desired (already preprocessed) command to convert into control signals.
-            This should always be 2D command for each gripper joint (Empty in this case)
-        :param control_dict: Dict[str, Any], dictionary that should include any relevant keyword-mapped
-            states necessary for controller computation.
-
-        :return: Array[float], outputted (non-clipped!) control signal to deploy. This is an empty np.array
+        Args:
+            command (n-array): New default command values to set for this controller.
+                Should be of dimension @command_dim
         """
-        return np.array([])
+        assert len(command) == self.command_dim, \
+            f"Default control must be length: {self.command_dim}, got length: {len(command)}"
 
-    def is_grasping(self):
-        # Null gripper cannot grasp anything
-        return IsGraspingState.FALSE
-
-    @property
-    def control_type(self):
-        return ControlType.POSITION
-
-    @property
-    def command_dim(self):
-        return 0
+        self._default_command = np.array(command)

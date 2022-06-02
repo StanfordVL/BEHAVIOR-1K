@@ -41,7 +41,7 @@ class Temperature(AbsoluteObjectState):
 
         # Find all heat source objects.
         affected_by_heat_source = False
-        for obj2 in self.simulator.scene.get_objects_with_state(HeatSourceOrSink):
+        for obj2 in self._simulator.scene.get_objects_with_state(HeatSourceOrSink):
             # Obtain heat source position.
             heat_source = obj2.states[HeatSourceOrSink]
             heat_source_state, heat_source_position = heat_source.get_value()
@@ -63,14 +63,14 @@ class Temperature(AbsoluteObjectState):
                         continue
 
                 new_temperature += (
-                    (heat_source.temperature - self.value) * heat_source.heating_rate * self.simulator.get_rendering_dt()
+                    (heat_source.temperature - self.value) * heat_source.heating_rate * self._simulator.get_rendering_dt()
                 )
                 affected_by_heat_source = True
 
         # Apply temperature decay if not affected by any heat source.
         if not affected_by_heat_source:
             new_temperature += (
-                (DEFAULT_TEMPERATURE - self.value) * TEMPERATURE_DECAY_SPEED * self.simulator.get_rendering_dt()
+                (DEFAULT_TEMPERATURE - self.value) * TEMPERATURE_DECAY_SPEED * self._simulator.get_rendering_dt()
             )
 
         self.value = new_temperature

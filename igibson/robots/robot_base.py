@@ -11,14 +11,14 @@ from future.utils import with_metaclass
 
 from igibson.controllers import ControlType, create_controller
 # # from igibson.external.pybullet_tools.utils import get_joint_info
+import igibson.macros as m
 from igibson.sensors import create_sensor, SENSOR_PRIMS_TO_SENSOR_CLS, ALL_SENSOR_MODALITIES
 from igibson.objects.usd_object import USDObject
 from igibson.objects.controllable_object import ControllableObject
 from igibson.utils.gym_utils import GymObservable
-from igibson.utils.python_utils import classproperty, assert_valid_key, merge_nested_dicts, Registerable
+from igibson.utils.python_utils import Registerable, classproperty
 from igibson.utils.utils import rotate_vector_3d
-
-from pxr import UsdPhysics
+from pxr import PhysxSchema
 
 # Global dicts that will contain mappings
 REGISTERED_ROBOTS = OrderedDict()
@@ -34,7 +34,6 @@ class BaseRobot(USDObject, ControllableObject, GymObservable, Registerable):
     This class handles object loading, and provides method interfaces that should be
     implemented by subclassed robots.
     """
-
     def __init__(
         self,
         # Shared kwargs in hierarchy
@@ -112,7 +111,6 @@ class BaseRobot(USDObject, ControllableObject, GymObservable, Registerable):
 
         # Initialize internal attributes that will be loaded later
         self._sensors = None                     # e.g.: scan sensor, vision sensor
-        self._simulator = None                   # Required for AG by ManipulationRobot
 
         # Run super init
         super().__init__(
@@ -137,9 +135,18 @@ class BaseRobot(USDObject, ControllableObject, GymObservable, Registerable):
             **kwargs,
         )
 
-    def _post_load(self, simulator=None):
+    def _post_load(self):
         # Run super post load first
-        super()._post_load(simulator=simulator)
+        super()._post_load()
+
+        # Possibly force enabling of contact sensing for this robot if we set the global flag
+        # TODO: Remove this once we have a more optimized solution
+        # Only create contact report api if we're not visual only
+        if (not self._visual_only) and m.ENABLE_ROBOT_CONTACT_REPORTING:
+            for link in self._links.values():
+                PhysxSchema.PhysxContactReportAPI(link.prim) if \
+                    link.prim.HasAPI(PhysxSchema.PhysxContactReportAPI) else \
+                    PhysxSchema.PhysxContactReportAPI.Apply(link.prim)
 
         # Search for any sensors this robot might have attached to any of its links
         self._sensors = OrderedDict()
@@ -169,9 +176,6 @@ class BaseRobot(USDObject, ControllableObject, GymObservable, Registerable):
 
         # Update our overall obs modalities
         self._obs_modalities = obs_modalities
-
-        # A persistent reference to simulator is needed for AG in ManipulationRobot
-        self._simulator = simulator
 
     def _initialize(self):
         # Run super first
@@ -325,11 +329,6 @@ class BaseRobot(USDObject, ControllableObject, GymObservable, Registerable):
         for sensor in self._sensors.values():
             if modality in sensor.all_modalities:
                 sensor.remove_modality(modality=modality)
-
-    @property
-    def root_link_name(self):
-        # Most robots have base_link as the root_link defined. If it exists, we use that, otherwise, we use the default
-        return "base_link" if "base_link" in self._links else super().root_link_name
 
     @property
     def sensors(self):

@@ -16,31 +16,11 @@ from scipy.spatial.transform import Rotation
 
 import igibson
 from igibson.objects.usd_object import USDObject
-# from igibson.external.pybullet_tools.utils import (
-#     get_all_links,
-#     get_center_extent,
-#     get_link_name,
-#     get_link_state,
-#     link_from_name,
-#     matrix_from_quat,
-#     quat_from_matrix,
-# )
-from igibson.object_states.texture_change_state_mixin import TextureChangeStateMixin
-from igibson.objects.stateful_object import StatefulObject
-# from igibson.render.mesh_renderer.materials import ProceduralMaterial, RandomizedMaterial
-from igibson.utils import utils
+from igibson.utils.constants import AVERAGE_CATEGORY_SPECS, DEFAULT_JOINT_FRICTION, SPECIAL_JOINT_FRICTIONS, JointType
 import igibson.utils.transform_utils as T
-from igibson.utils.urdf_utils import add_fixed_link, get_base_link_name, round_up, save_urdfs_without_floating_joints
-from igibson.utils.utils import mat_to_quat_pos, rotate_vector_3d
-from igibson.utils.constants import AVERAGE_OBJ_DENSITY, AVERAGE_CATEGORY_SPECS, SPECIAL_JOINT_FRICTIONS, DEFAULT_JOINT_FRICTION, JointType
+from igibson.utils.utils import rotate_vector_3d
 from igibson.utils.usd_utils import BoundingBoxAPI
 
-from omni.isaac.core.utils.stage import add_reference_to_stage
-from omni.isaac.core.utils.prims import get_prim_at_path
-
-
-
-# TODO: Reset sub-bodies that are floating wrt the root prim (e.g.: pillows from bed)
 
 class DatasetObject(USDObject):
     """
@@ -253,7 +233,7 @@ class DatasetObject(USDObject):
                 [0.0, 0.0, 1.0],
             ]
         )
-        rotated_quat = quat_from_matrix(np.dot(rot_matrix, matrix_from_quat(chosen_orientation)))
+        rotated_quat = T.mat2quat(np.dot(rot_matrix, T.quat2mat(chosen_orientation)))
         return rotated_quat
 
     # def prepare_visual_mesh_to_material(self):
@@ -455,7 +435,7 @@ class DatasetObject(USDObject):
             if joint.joint_type != JointType.JOINT_FIXED:
                 joint.friction = friction
 
-    def _post_load(self, simulator=None):
+    def _post_load(self):
         # We run this post loading first before any others because we're modifying the load config that will be used
         # downstream
         # Set the scale of this prim according to its bounding box
@@ -515,7 +495,15 @@ class DatasetObject(USDObject):
         # self.load_supporting_surfaces()
 
         # Run super last
-        super()._post_load(simulator=simulator)
+        super()._post_load()
+
+        # Lastly, after post loading (which includes loading / registering the links internally)
+        # check for any metalinks. If there are any, we disable gravity and collisions for them
+        for link in self._links.values():
+            is_metalink = link.prim.GetAttribute("ig:is_metalink").Get() or False
+            if is_metalink:
+                link.disable_collisions()
+                link.disable_gravity()
 
     def set_bbox_center_position_orientation(self, pos, orn):
         # TODO - check to make sure works
@@ -561,11 +549,6 @@ class DatasetObject(USDObject):
     def set_room_floor(self, room_floor):
         assert self.category == "floors"
         self.room_floor = room_floor
-
-    @property
-    def root_link_name(self):
-        # Most objects have base_link as the root_link defined. If it exists, we use that, otherwise, we use the default
-        return "base_link" if "base_link" in self._links else super().root_link_name
 
     @property
     def native_bbox(self):

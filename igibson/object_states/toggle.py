@@ -5,7 +5,6 @@ from igibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from igibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
 from igibson.object_states.texture_change_state_mixin import TextureChangeStateMixin
 from igibson.utils.constants import SemanticClass, SimulatorMode
-from igibson.utils.utils import brighten_texture
 
 _TOGGLE_DISTANCE_THRESHOLD = 0.1
 _TOGGLE_LINK_NAME = "toggle_button"
@@ -38,7 +37,7 @@ class ToggledOn(AbsoluteObjectState, BooleanState, TextureChangeStateMixin, Link
             self.visual_marker_on = PrimitiveObject(
                 prim_path=f"{self.obj.prim_path}/visual_marker_on",
                 primitive_type="Sphere",
-                name="visual_marker_on",
+                name=f"{self.obj.name}_visual_marker_on",
                 class_id=SemanticClass.TOGGLE_MARKER,
                 scale=_TOGGLE_BUTTON_SCALE,
                 visible=True,
@@ -49,7 +48,7 @@ class ToggledOn(AbsoluteObjectState, BooleanState, TextureChangeStateMixin, Link
             self.visual_marker_off = PrimitiveObject(
                 prim_path=f"{self.obj.prim_path}/visual_marker_off",
                 primitive_type="Sphere",
-                name="visual_marker_off",
+                name=f"{self.obj.name}_visual_marker_off",
                 class_id=SemanticClass.TOGGLE_MARKER,
                 scale=_TOGGLE_BUTTON_SCALE,
                 visible=True,
@@ -57,9 +56,9 @@ class ToggledOn(AbsoluteObjectState, BooleanState, TextureChangeStateMixin, Link
                 visual_only=True,
                 rgba=[1, 0, 0, 0.5],
             )
-            self.simulator.import_object(self.visual_marker_on)
+            self._simulator.import_object(self.visual_marker_on, register=False, auto_initialize=True)
             self.visual_marker_on.visible = False
-            self.simulator.import_object(self.visual_marker_off)
+            self._simulator.import_object(self.visual_marker_off, register=False, auto_initialize=True)
             self.visual_marker_off.visible = False
 
     def _update(self):
@@ -69,7 +68,7 @@ class ToggledOn(AbsoluteObjectState, BooleanState, TextureChangeStateMixin, Link
 
         robot_can_toggle = False
         # detect marker and hand interaction
-        for robot in self.simulator.scene.robots:
+        for robot in self._simulator.scene.robots:
             robot_can_toggle = robot.can_toggle(button_position_on_object, _TOGGLE_DISTANCE_THRESHOLD)
             if robot_can_toggle:
                 break
@@ -91,11 +90,6 @@ class ToggledOn(AbsoluteObjectState, BooleanState, TextureChangeStateMixin, Link
         hidden_marker.visible = False
 
         self.update_texture()
-
-    @staticmethod
-    def create_transformed_texture(diffuse_tex_filename, diffuse_tex_filename_transformed):
-        # make the texture 1.5x brighter
-        brighten_texture(diffuse_tex_filename, diffuse_tex_filename_transformed, brightness=1.5)
 
     @property
     def settable(self):

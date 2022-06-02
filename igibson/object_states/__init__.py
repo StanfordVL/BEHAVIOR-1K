@@ -8,6 +8,7 @@ from igibson.object_states.cooked import Cooked
 from igibson.object_states.dirty import Dusty, Stained
 from igibson.object_states.frozen import Frozen
 from igibson.object_states.heat_source_or_sink import HeatSourceOrSink
+from igibson.object_states.heated import Heated
 from igibson.object_states.inside import Inside
 from igibson.object_states.max_temperature import MaxTemperature
 from igibson.object_states.next_to import NextTo

@@ -20,10 +20,9 @@ Total size: 28
 import itertools
 import logging
 import os
-from abc import ABCMeta, abstractmethod
+from abc import ABC, abstractmethod
 
 import numpy as np
-from future.utils import with_metaclass
 
 from igibson import assets_path
 from igibson.objects.visual_marker import VisualMarker
@@ -549,7 +548,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         return {arm: PALM_CENTER_POS * (1 if arm == "right_hand" else -1) for arm in self.arm_names}
 
 
-class BRPart(with_metaclass(ABCMeta, object)):
+class BRPart(ABC):
     """This is the interface that all BehaviorRobot parts must implement."""
 
     DEFAULT_RENDERING_PARAMS = {

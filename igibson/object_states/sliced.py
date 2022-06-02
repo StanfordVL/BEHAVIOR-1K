@@ -45,8 +45,7 @@ class Sliced(AbsoluteObjectState, BooleanState):
             usd_path = f"{model_root_path}/usd/{part_model}.usd"
 
             # calculate global part pose
-            part_pos = np.array(part_pos) + pos
-            part_orn = T.quat_multiply(np.array(part_orn), orn)
+            part_pos, part_orn = T.pose_transform(pos, orn, np.array(part_pos), np.array(part_orn))
 
             # circular import
             from igibson.objects.dataset_object import DatasetObject
@@ -61,13 +60,13 @@ class Sliced(AbsoluteObjectState, BooleanState):
             )
             
             # add to stage
-            self.simulator.import_object(part_obj, auto_initialize=False)
+            self._simulator.import_object(part_obj, auto_initialize=True)
             # inherit parent position and orientation
             part_obj.set_position_orientation(position=np.array(part_pos),
                                               orientation=np.array(part_orn))
 
-        # delete original object from stage
-        self.simulator.remove_object(self.obj)
+        # delete original object from simulator
+        self._simulator.remove_object(self.obj)
 
         return True
 

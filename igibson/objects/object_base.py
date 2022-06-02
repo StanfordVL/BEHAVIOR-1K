@@ -94,6 +94,9 @@ class BaseObject(EntityPrim, metaclass=ABCMeta):
         # self._rendering_params = dict(self.DEFAULT_RENDERING_PARAMS)
         # self._rendering_params.update(category_based_rendering_params)
 
+        # Values to be created at runtime
+        self._simulator = None
+
         # Create load config from inputs
         load_config = dict() if load_config is None else load_config
         load_config["scale"] = scale
@@ -112,12 +115,15 @@ class BaseObject(EntityPrim, metaclass=ABCMeta):
         # Run sanity check, any of these objects REQUIRE a simulator to be specified
         assert simulator is not None, "Simulator must be specified for loading any object subclassed from BaseObject!"
 
-        # Run super method
-        return super().load(simulator=simulator)
+        # Save simulator reference
+        self._simulator = simulator
 
-    def _post_load(self, simulator=None):
+        # Run super method ONLY if we're not loaded yet
+        return super().load(simulator=simulator) if not self.loaded else self._prim
+
+    def _post_load(self):
         # Run super first
-        super()._post_load(simulator=simulator)
+        super()._post_load()
 
         # Set visibility
         if "visible" in self._load_config and self._load_config["visible"] is not None:
@@ -170,7 +176,7 @@ class BaseObject(EntityPrim, metaclass=ABCMeta):
         # actual base link of the robot instead.
         # See https://forums.developer.nvidia.com/t/inconsistent-values-from-isaacsims-dc-get-joint-parent-child-body/201452/2
         # for more info
-        return f"{self._prim_path}/base_link" if \
+        return f"{self._prim_path}/{self.root_link_name}" if \
             (not self.fixed_base) and (self.n_links > 1) else super().articulation_root_path
 
     @property
@@ -201,7 +207,8 @@ class BaseObject(EntityPrim, metaclass=ABCMeta):
         # Cannot set mass directly for this object!
         raise NotImplementedError("Cannot set mass directly for an object!")
     
-    def get_body_ids(self):
+    @property
+    def link_prim_paths(self):
         return [link.prim_path for link in self._links.values()]
 
     def get_velocities(self):

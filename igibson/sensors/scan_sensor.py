@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from collections import OrderedDict
+from collections import OrderedDict, Iterable
 
 from transforms3d.quaternions import quat2mat
 
@@ -78,11 +78,11 @@ class ScanSensor(BaseSensor):
         occupancy_grid_local_link=None,
     ):
         # Store settings
-        self._occupancy_grid_resolution = occupancy_grid_resolution
-        self._occupancy_grid_range = occupancy_grid_range
-        self._occupancy_grid_inner_radius = int(occupancy_grid_inner_radius * occupancy_grid_resolution
+        self.occupancy_grid_resolution = occupancy_grid_resolution
+        self.occupancy_grid_range = occupancy_grid_range
+        self.occupancy_grid_inner_radius = int(occupancy_grid_inner_radius * occupancy_grid_resolution
                                                 / occupancy_grid_range)
-        self._occupancy_grid_local_link = self if occupancy_grid_local_link is None else occupancy_grid_local_link
+        self.occupancy_grid_local_link = self if occupancy_grid_local_link is None else occupancy_grid_local_link
 
         # Create variables that will be filled in at runtime
         self._rs = None                 # Range sensor interface, analagous to others, e.g.: dynamic control interface
@@ -100,6 +100,10 @@ class ScanSensor(BaseSensor):
         load_config["draw_points"] = draw_points
         load_config["draw_lines"] = draw_lines
 
+        # Sanity check modalities -- if we're using occupancy_grid without scan modality, raise an error
+        if isinstance(modalities, Iterable) and not isinstance(modalities, str) and "occupancy_grid" in modalities:
+            assert "scan" in modalities, f"'scan' modality must be included in order to get occupancy_grid modality!"
+
         # Run super method
         super().__init__(
             prim_path=prim_path,
@@ -116,9 +120,9 @@ class ScanSensor(BaseSensor):
 
         return lidar.GetPrim()
 
-    def _post_load(self, simulator=None):
+    def _post_load(self):
         # run super first
-        super()._post_load(simulator=simulator)
+        super()._post_load()
 
         # Set all the lidar kwargs
         self.min_range = self._load_config["min_range"]
@@ -145,7 +149,7 @@ class ScanSensor(BaseSensor):
         # (obs modality, shape, low, high)
         obs_space_mapping = OrderedDict(
             scan=((self.n_horizontal_rays, self.n_vertical_rays), 0.0, 1.0, np.float32),
-            occupancy_grid=((self._occupancy_grid_resolution, self._occupancy_grid_resolution, 1), 0.0, 1.0, np.float32),
+            occupancy_grid=((self.occupancy_grid_resolution, self.occupancy_grid_resolution, 1), 0.0, 1.0, np.float32),
         )
 
         return obs_space_mapping
@@ -179,7 +183,7 @@ class ScanSensor(BaseSensor):
         scan_world = quat2mat(ori).dot(scan_laser.T).T + pos
 
         # Convert scans from world frame to local base frame
-        base_pos, base_ori = self._occupancy_grid_local_link.get_position_orientation()
+        base_pos, base_ori = self.occupancy_grid_local_link.get_position_orientation()
         scan_local = quat2mat(base_ori).T.dot((scan_world - base_pos).T).T
         scan_local = scan_local[:, :2]
         scan_local = np.concatenate([np.array([[0, 0]]), scan_local, np.array([[0, 0]])], axis=0)
@@ -188,13 +192,13 @@ class ScanSensor(BaseSensor):
         scan_local[:, 1] *= -1
 
         # Initialize occupancy grid -- default is unknown values
-        occupancy_grid = np.zeros((self._occupancy_grid_resolution, self._occupancy_grid_resolution)).astype(np.uint8)
+        occupancy_grid = np.zeros((self.occupancy_grid_resolution, self.occupancy_grid_resolution)).astype(np.uint8)
         occupancy_grid.fill(int(OccupancyGridState.UNKNOWN * 2.0))
 
         # Convert local scans into the corresponding OG square it should belong to (note now all values are > 0, since
         # OG ranges from [0, resolution] x [0, resolution])
-        scan_local_in_map = scan_local / self._occupancy_grid_range * self._occupancy_grid_resolution + \
-                            (self._occupancy_grid_resolution / 2)
+        scan_local_in_map = scan_local / self.occupancy_grid_range * self.occupancy_grid_resolution + \
+                            (self.occupancy_grid_resolution / 2)
         scan_local_in_map = scan_local_in_map.reshape((1, -1, 1, 2)).astype(np.int32)
 
         # For each scan hit,
@@ -211,8 +215,8 @@ class ScanSensor(BaseSensor):
         )
         cv2.circle(
             img=occupancy_grid,
-            center=(self._occupancy_grid_resolution // 2, self._occupancy_grid_resolution // 2),
-            radius=self._occupancy_grid_inner_radius,
+            center=(self.occupancy_grid_resolution // 2, self.occupancy_grid_resolution // 2),
+            radius=self.occupancy_grid_inner_radius,
             color=int(OccupancyGridState.FREESPACE * 2.0),
             thickness=-1,
         )

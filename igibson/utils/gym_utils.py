@@ -15,7 +15,7 @@ class GymObservable(metaclass=ABCMeta):
     """
     def __init__(self, *args, **kwargs):
         # Initialize variables that we will fill in later
-        self._observation_space = None
+        self.observation_space = None
 
         # Call any super methods
         super().__init__(*args, **kwargs)
@@ -68,5 +68,6 @@ class GymObservable(metaclass=ABCMeta):
         """
         # Load the observation space and convert it into a gym-compatible dictionary
         self.observation_space = gym.spaces.Dict(self._load_observation_space())
+        print(f"Loaded obs space dictionary for: {self.__class__.__name__}")
 
         return self.observation_space

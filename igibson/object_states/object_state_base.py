@@ -1,7 +1,7 @@
-from abc import ABCMeta, abstractmethod
+from abc import ABC, abstractmethod
 from collections import OrderedDict
 import numpy as np
-from igibson.utils.python_utils import classproperty, Serializable, Registerable
+from igibson.utils.python_utils import classproperty, Serializable, Registerable, Recreatable
 
 
 # Hacky method to serialize "None" values as a number -- we choose magic number 400 since:
@@ -12,7 +12,7 @@ NONE = 400.0
 REGISTERED_OBJECT_STATES = OrderedDict()
 
 
-class BaseObjectState(Serializable, Registerable, metaclass=ABCMeta):
+class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
     """
     Base ObjectState class. Do NOT inherit from this class directly - use either AbsoluteObjectState or
     RelativeObjectState.
@@ -46,7 +46,7 @@ class BaseObjectState(Serializable, Registerable, metaclass=ABCMeta):
         super(BaseObjectState, self).__init__()
         self.obj = obj
         self._initialized = False
-        self.simulator = None
+        self._simulator = None
 
     @property
     def settable(self):
@@ -64,13 +64,15 @@ class BaseObjectState(Serializable, Registerable, metaclass=ABCMeta):
         pass
 
     def _initialize(self):
-        """This function will be called once, after the object has been loaded."""
+        """This function will be called once; should be used for any object state-related objects have been loaded."""
         pass
 
     def initialize(self, simulator):
         assert not self._initialized, "State is already initialized."
 
-        self.simulator = simulator
+        # Store simulator reference
+        self._simulator = simulator
+
         self._initialize()
         self._initialized = True
 

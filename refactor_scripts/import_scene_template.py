@@ -76,9 +76,9 @@ def import_nested_models_template_from_element(element, model_pose_info):
             if name == "world":
                 # Skip this
                 pass
-            # Process ceiling, walls, floor separately
-            elif category in {"ceilings", "walls", "floors"}:
-                import_building_usd_fixed(obj_category=category, obj_model=model, name=name)
+            # # Process ceiling, walls, floor separately
+            # elif category in {"ceilings", "walls", "floors"}:
+            #     import_building_usd_fixed(obj_category=category, obj_model=model, name=name)
             else:
                 print(name)
                 bb = string_to_array(ele.get("bounding_box")) if "bounding_box" in ele.keys() else None
@@ -146,7 +146,6 @@ def import_obj_template(obj_category, obj_model, name, bb, pos, quat, fixed_jnt,
     # Create new Xform prim that will contain info
     obj = sim.stage.DefinePrim(f"/World/{name.replace('-', '_')}", "Xform")
     obj.CreateAttribute("ig:category", VT.String)
-    obj.CreateAttribute("ig:model", VT.String)
     obj.CreateAttribute("ig:fixedJoint", VT.Bool)
     obj.CreateAttribute("ig:position", VT.Vector3f)
     obj.CreateAttribute("ig:orientation", VT.Quatf)
@@ -154,13 +153,16 @@ def import_obj_template(obj_category, obj_model, name, bb, pos, quat, fixed_jnt,
 
     # Set these values
     obj.GetAttribute("ig:category").Set(obj_category)
-    obj.GetAttribute("ig:model").Set(obj_model)
     obj.GetAttribute("ig:fixedJoint").Set(fixed_jnt)
     obj.GetAttribute("ig:position").Set(Gf.Vec3f(*pos))
     obj.GetAttribute("ig:orientation").Set(Gf.Quatf(*quat.tolist()))
     obj.GetAttribute("ig:rooms").Set(room)
 
     # Potentially create additonal attributes
+    if obj_model is not None:
+        obj.CreateAttribute("ig:model", VT.String)
+        obj.GetAttribute("ig:model").Set(obj_model)
+
     if bb is not None:
         obj.CreateAttribute("ig:boundingBox", VT.Vector3f)
         obj.GetAttribute("ig:boundingBox").Set(Gf.Vec3f(*bb))

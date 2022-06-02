@@ -2,7 +2,7 @@ import logging
 import os
 import pickle
 import sys
-from abc import ABCMeta
+from abc import ABC
 
 import cv2
 import networkx as nx
@@ -15,7 +15,7 @@ from igibson.maps.traversable_map import TraversableMap
 from igibson.utils.python_utils import classproperty
 
 
-class TraversableScene(Scene, metaclass=ABCMeta):
+class TraversableScene(Scene, ABC):
     """
     Traversable scene class.
     Contains the functionalities for navigation such as shortest path computation
