@@ -25,17 +25,8 @@ from pxr import Usd, UsdGeom, Sdf, UsdPhysics, PhysxSchema
 from omni.isaac.core.utils.viewports import set_camera_view
 from omni.isaac.core.loggers import DataLogger
 from typing import Optional, List
-from igibson.utils.usd_utils import BoundingBoxAPI
 
 from igibson import assets_path
-<<<<<<< HEAD
-from igibson.transition_rules import DEFAULT_RULES, TransitionResults
-from igibson.objects.object_base import BaseObject
-from igibson.object_states.factory import get_states_by_dependency_order
-from igibson.scenes import Scene
-from igibson.utils.python_utils import clear as clear_pu
-from igibson.utils.usd_utils import clear as clear_uu
-=======
 import igibson.macros as m
 from igibson.robots.robot_base import BaseRobot
 from igibson.utils.utils import NumpyEncoder
@@ -45,15 +36,13 @@ from igibson.utils.assets_utils import get_ig_avg_category_specs
 from igibson.scenes import Scene
 from igibson.objects.object_base import BaseObject
 from igibson.object_states.factory import get_states_by_dependency_order
+from igibson.transition_rules import DEFAULT_RULES, TransitionResults
 
 # Import viewport getter based on isaacsim version
 if m.IS_PUBLIC_ISAACSIM:
     from omni.kit.viewport import get_viewport_interface as acquire_viewport_interface
 else:
     from omni.kit.viewport_legacy import acquire_viewport_interface
-
-import numpy as np
->>>>>>> ig-develop
 
 
 class Simulator(SimulationContext):
