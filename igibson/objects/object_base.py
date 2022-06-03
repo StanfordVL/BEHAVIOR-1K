@@ -191,6 +191,17 @@ class BaseObject(EntityPrim, metaclass=ABCMeta):
         return max_corner - min_corner
 
     @property
+    def bbox_center(self):
+        """
+        Get this object's actual bounding box
+
+        Returns:
+            3-array: (x,y,z) bounding box
+        """
+        min_corner, max_corner = BoundingBoxAPI.compute_aabb(self.prim_path)
+        return (max_corner + min_corner) / 2.0
+
+    @property
     def mass(self):
         """
         Returns:
