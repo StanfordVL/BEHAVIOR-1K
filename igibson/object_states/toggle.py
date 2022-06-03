@@ -7,7 +7,7 @@ from igibson.object_states.texture_change_state_mixin import TextureChangeStateM
 from igibson.utils.constants import SemanticClass, SimulatorMode
 
 _TOGGLE_DISTANCE_THRESHOLD = 0.1
-_TOGGLE_LINK_NAME = "toggle_button"
+_TOGGLE_LINK_NAME = "toggle_button_link"
 _TOGGLE_BUTTON_SCALE = 0.05
 _CAN_TOGGLE_STEPS = 5
 

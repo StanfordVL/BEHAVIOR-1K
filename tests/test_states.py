@@ -10,9 +10,13 @@ from igibson import object_states, app, ig_dataset_path
 from igibson.object_states.factory import get_state_dependency_graph, get_states_by_dependency_order
 from igibson.objects.dataset_object import DatasetObject
 from igibson.objects.ycb_object import YCBObject
+from igibson.objects.primitive_object import PrimitiveObject
 from igibson.scenes.empty_scene import EmptyScene
+from igibson.sensors.vision_sensor import VisionSensor
 from igibson.simulator_omni import Simulator
 from igibson.utils.assets_utils import download_assets, get_ig_model_path
+from igibson.utils.usd_utils import create_joint
+from pxr import Gf
 
 #download_assets()
 
@@ -265,45 +269,6 @@ def test_dirty():
 
         for i in range(10):
             sim.step()
-
-    finally:
-        app.close()
-
-
-def test_water_source():
-    try:
-        obj_category = "sink"
-        obj_model = "sink_1"
-        name = "sink"
-
-        sim = Simulator()
-        scene = EmptyScene()
-        sim.import_scene(scene)
-
-        model_root_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}"
-        usd_path = f"{model_root_path}/usd/{obj_model}.usd"
-
-        sink = DatasetObject(
-            prim_path=f"/World/{name}",
-            usd_path=usd_path,
-            category=obj_category,
-            name=name,
-            scale=np.array([0.8, 0.8, 0.8]),
-            abilities={"waterSource": {}, "toggleable": {}},
-        )
-
-        sim.import_object(sink, auto_initialize=False)
-        sink.states[object_states.ToggledOn].set_value(True)
-        sink.set_position(np.array([1, 1, 0.8]))
-        assert object_states.WaterSource in sink.states
-
-        for i in range(10):
-            sim.step()
-
-        # Check that we have some loaded particles here.
-        assert (
-            sink.states[object_states.WaterSource].water_stream.get_active_particles()[0].get_body_ids()[0] is not None
-        )
 
     finally:
         app.close()
@@ -1013,6 +978,214 @@ def test_slicer():
     finally:
         app.close()
 
+
+def test_water_source_sink():
+    try:
+        obj_category = "sink"
+        obj_model = "sink_2"
+        name = "sink"
+
+        sim = Simulator()
+        scene = EmptyScene()
+        sim.import_scene(scene)
+
+        # Overwrite physics
+        sim.stop()
+        pc = sim.get_physics_context()
+        pc.enable_gpu_dynamics(True)
+        pc.set_broadphase_type("GPU")
+        sim.play()
+        sim.stop()
+
+        model_root_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}"
+        usd_path = f"{model_root_path}/usd/{obj_model}.usd"
+
+        # Create object
+        obj = DatasetObject(
+            prim_path=f"/World/{name}",
+            usd_path=usd_path,
+            category=obj_category,
+            name=f"{name}",
+            scale=np.array([1.0, 1.0, 1.0]),
+            abilities={
+                "waterSource": {},
+                "waterSink": {},
+                "toggleable": {},
+            },
+        )
+
+
+        sim.import_object(obj)
+        obj.set_position(np.array([0,0,0.35]))
+        sim.play()
+
+        # Create camera to track sick location correctly
+        cam = VisionSensor(
+            prim_path="/World/viewer_camera",
+            name="camera",
+            image_height=720,
+            image_width=1280,
+            modalities="rgb",
+            viewport_name="Viewport",
+        )
+        sim.step()
+        cam.initialize()
+        cam.set_position_orientation(position=np.array([0.00551, -1.5846, 2.39234]), orientation=np.array([0.3657, 0.00318, 0.0081, 0.93069]))
+
+        # Toggle water source on
+        obj.states[object_states.ToggledOn].set_value(True)
+        ws = obj.states[object_states.WaterSource]
+        sim.stop()
+        sim.play()
+        print(f"WaterSource and WaterSink are active!")
+
+        for i in range(1000):
+            sim.step()
+
+            if i % 50 == 0:
+                print(f"Number of water particles active: {ws.n_particles_per_group * len(ws.fluid_groups)}")
+
+    finally:
+        app.close()
+
+
+def test_water_filled():
+    try:
+        obj_category = "cup"
+        obj_model = "cup_000"
+        name = "cup"
+
+        sim = Simulator()
+        scene = EmptyScene(floor_plane_visible=True)
+        sim.import_scene(scene)
+
+        # Overwrite physics
+        sim.stop()
+        pc = sim.get_physics_context()
+        pc.enable_gpu_dynamics(True)
+        pc.set_broadphase_type("GPU")
+        sim.play()
+        sim.stop()
+
+        model_root_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}"
+        usd_path = f"{model_root_path}/usd/{obj_model}.usd"
+
+        # Create water source
+        water_spout = PrimitiveObject(
+            prim_path="/World/water_spout",
+            primitive_type="Sphere",
+            name="water_spout",
+            visual_only=True,
+            visible=False,
+            abilities={
+                "waterSource": {},
+                "toggleable": {},
+            }
+        )
+        sim.import_object(water_spout)
+
+        # Define appropriate metalinks for this spout
+        for metalink_name in ("toggle_button_link", "water_source_link"):
+            metalink_prim_path = f"{water_spout.prim_path}/{metalink_name}"
+            sim.stage.DefinePrim(metalink_prim_path, "Xform")
+            # Add fixed joint between new link and root link
+            create_joint(
+                prim_path=f"{water_spout.prim_path}/{metalink_name}_joint",
+                joint_type="FixedJoint",
+                body0=water_spout.root_link.prim_path,
+                body1=metalink_prim_path,
+                enabled=True,
+                stage=sim.stage,
+            )
+
+        # Update some internal states via post-load again
+        water_spout._post_load()
+
+        # Create cup object
+        obj = DatasetObject(
+            prim_path=f"/World/{name}",
+            usd_path=usd_path,
+            category=obj_category,
+            name=f"{name}",
+            scale=0.3,
+            abilities={
+                "filled": {"fluid": "Water"},
+            },
+        )
+        sim.import_object(obj)
+
+        # Define appropriate container link and mesh for this object
+        container_prim_path = f"{obj.prim_path}/container_link"
+        sim.stage.DefinePrim(container_prim_path, "Xform")
+        # Add fixed joint between new link and root link
+        create_joint(
+            prim_path=f"{obj.prim_path}/container_link_joint",
+            joint_type="FixedJoint",
+            body0=obj.root_link.prim_path,
+            body1=container_prim_path,
+            enabled=True,
+            stage=sim.stage,
+        )
+        # Add mesh to symbolize the actual volume to be filled
+        sim.stage.DefinePrim(f"{container_prim_path}/container_cube", "Cube")
+
+        # Update some internal states via post-load again, and make sure our dummy link has low mass
+        obj._post_load()
+        obj.links["container_link"].mass = 0.0001
+        container_mesh = obj.links["container_link"].visual_meshes["container_cube"]
+
+        container_mesh.set_attribute("xformOp:translate", Gf.Vec3d(0, 0.56657, 0.15427))
+        container_mesh.scale = np.array([0.12, 0.12, 0.15])
+
+        obj.set_position(np.array([0,0,0]))
+        sim.play()
+
+        # Hide visibility of all toggle markers for water spout and container volume for cup
+        for link in water_spout.states[object_states.ToggledOn].visual_marker_on.links.values():
+            link.visible = False
+        for link in water_spout.states[object_states.ToggledOn].visual_marker_off.links.values():
+            link.visible = False
+        obj.links["container_link"].visible = False
+
+        # Create camera to track cup location correctly
+        cam = VisionSensor(
+            prim_path="/World/viewer_camera",
+            name="camera",
+            image_height=720,
+            image_width=1280,
+            modalities="rgb",
+            viewport_name="Viewport",
+        )
+        sim.step()
+        cam.initialize()
+        cam.set_position_orientation(position=np.array([-0.76926,-0.22523,1.29085]), orientation=np.array([0.27383,-0.17394,-0.50717,0.79846]))
+        sim.stop()
+
+        # Move the water source to be above the cup above its center of mass
+        base_link = obj.links["base_link"]
+        water_pos = base_link.get_position() + np.array(base_link.get_attribute("physics:centerOfMass")) * base_link.get_world_scale() + np.array([0, 0, 0.2])
+        water_spout.set_position(water_pos)
+
+        # Toggle water source on
+        water_spout.states[object_states.ToggledOn].set_value(True)
+        ws = water_spout.states[object_states.WaterSource]
+
+        sim.play()
+        print(f"Cup is filled: {obj.states[object_states.Filled].get_value()}")
+
+        for i in range(400):
+            if i == 300:
+                water_spout.states[object_states.ToggledOn].set_value(False)
+            sim.step()
+
+        cup_is_filled = obj.states[object_states.Filled].get_value()
+        print(f"Cup is filled: {cup_is_filled}")
+        assert cup_is_filled
+
+    finally:
+        app.close()
+
+
 ## WORKS
 #test_state_graph()
 #test_dirty()
@@ -1029,8 +1202,8 @@ def test_slicer():
 #test_toggle()
 #test_sliced()
 #test_slicer()
+#test_water_source_sink()
 
-test_demo()
+# test_demo()
 
 ## BROKEN
-#test_water_source()

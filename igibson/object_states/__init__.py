@@ -58,3 +58,5 @@ from igibson.object_states.toggle import ToggledOn
 from igibson.object_states.touching import Touching
 from igibson.object_states.under import Under
 from igibson.object_states.water_source import WaterSource
+from igibson.object_states.water_sink import WaterSink
+from igibson.object_states.filled import Filled
