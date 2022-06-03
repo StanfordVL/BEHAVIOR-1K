@@ -25,10 +25,10 @@ import numpy as np
 import carb
 from omni.isaac.core.utils.stage import get_current_stage
 from omni.isaac.core.materials import PhysicsMaterial
-from igibson.prims.prim_base import BasePrim
+from igibson.prims.xform_prim import XFormPrim
 
 
-class GeomPrim(BasePrim):
+class GeomPrim(XFormPrim):
     """
     Provides high level functions to deal with a geom prim and its attributes / properties.
     If there is an geom prim present at the path, it will use it. By default, a geom prim cannot be directly
