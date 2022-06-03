@@ -17,6 +17,38 @@ from pxr import Gf, Vt, UsdShade, UsdGeom, PhysxSchema
 import logging
 
 
+# physics settins
+from omni.physx.bindings._physx import (
+    SETTING_UPDATE_TO_USD,
+    SETTING_UPDATE_VELOCITIES_TO_USD,
+    SETTING_NUM_THREADS,
+    SETTING_UPDATE_PARTICLES_TO_USD,
+)
+import carb
+
+# Settings for Isosurface
+isregistry = carb.settings.acquire_settings_interface()
+# disable grid and lights
+dOptions = isregistry.get_as_int("persistent/app/viewport/displayOptions")
+dOptions &= ~(1 << 6 | 1 << 8)
+isregistry.set_int("persistent/app/viewport/displayOptions", dOptions)
+isregistry.set_bool(SETTING_UPDATE_TO_USD, True)
+isregistry.set_int(SETTING_NUM_THREADS, 8)
+isregistry.set_bool(SETTING_UPDATE_VELOCITIES_TO_USD, False)
+isregistry.set_bool(SETTING_UPDATE_PARTICLES_TO_USD, False)
+isregistry.set_int("persistent/simulation/minFrameRate", 60)
+isregistry.set_bool("rtx-defaults/pathtracing/lightcache/cached/enabled", False)
+isregistry.set_bool("rtx-defaults/pathtracing/cached/enabled", False)
+isregistry.set_int("rtx-defaults/pathtracing/fireflyFilter/maxIntensityPerSample", 10000)
+isregistry.set_int("rtx-defaults/pathtracing/fireflyFilter/maxIntensityPerSampleDiffuse", 50000)
+isregistry.set_float("rtx-defaults/pathtracing/optixDenoiser/blendFactor", 0.09)
+isregistry.set_int("rtx-defaults/pathtracing/aa/op", 2)
+isregistry.set_int("rtx-defaults/pathtracing/maxBounces", 32)
+isregistry.set_int("rtx-defaults/pathtracing/maxSpecularAndTransmissionBounces", 16)
+isregistry.set_int("rtx-defaults/post/dlss/execMode", 1)
+isregistry.set_int("rtx-defaults/translucency/maxRefractionBounces", 12)
+
+
 class PhysxParticleInstancer(BasePrim):
     """
     Simple class that wraps the raw omniverse point instancer prim and provides convenience functions for
@@ -44,9 +76,9 @@ class PhysxParticleInstancer(BasePrim):
         # We raise an error, this should NOT be created from scratch
         raise NotImplementedError("PhysxPointInstancer should NOT be loaded via this class! Should be created before.")
 
-    def _post_load(self, simulator=None):
+    def _post_load(self):
         # Run super
-        super()._post_load(simulator=simulator)
+        super()._post_load()
 
         # Store how many particles we have
         self._n_particles = len(self.particle_positions)
@@ -353,9 +385,9 @@ class MicroParticleSystem(BaseParticleSystem):
         # Initialize class variables that are mutable so they don't get overridden by children classes
         cls.particle_instancers = OrderedDict()
 
-        # Set the default scales according to the collision offset
-        cls.min_scale = np.ones(3) * cls.particle_contact_offset
-        cls.max_scale = np.ones(3) * cls.particle_contact_offset
+        # Set the default scales
+        cls.min_scale = np.ones(3)
+        cls.max_scale = np.ones(3)
 
         # Create the particle system
         cls.prim = cls._create_particle_system()
@@ -374,8 +406,22 @@ class MicroParticleSystem(BaseParticleSystem):
             particleUtils.add_pbd_particle_material(simulator.stage, mat_path)
             bind_material(prim_path=cls.prim_path, material_path=mat_path)
 
-        # Create the particle prototypes
+        # Create the particle prototypes, and make them all invisible
         cls.particle_prototypes = cls._create_particle_prototypes()
+        for prototype_prim in cls.particle_prototypes:
+            UsdGeom.Imageable(prototype_prim).MakeInvisible()
+
+        # # Create dummy
+        # create_physx_particleset_pointinstancer(
+        #     name="dummy",
+        #     particle_system_path=cls.prim_path,
+        #     particle_group=0,
+        #     positions=np.zeros((1, 3)),
+        #     fluid=cls.is_fluid,
+        #     particle_density=cls.particle_density,
+        #     prototype_prim_paths=[pp.GetPrimPath().pathString for pp in cls.particle_prototypes],
+        #     enabled=cls.is_dynamic,
+        # )
 
     @classproperty
     def state_size(cls):
@@ -483,7 +529,7 @@ class MicroParticleSystem(BaseParticleSystem):
             prim_path=f"/World/{cls.name}",
             physics_scene_path=cls.simulator.get_physics_context().get_current_physics_scene_prim().GetPrimPath().pathString,
             particle_contact_offset=cls.particle_contact_offset,
-            visual_only=cls.is_dynamic,
+            visual_only=not cls.is_dynamic,
             smoothing=cls.use_smoothing,
             anisotropy=cls.use_anisotropy,
             isosurface=cls.use_isosurface,
@@ -534,7 +580,8 @@ class MicroParticleSystem(BaseParticleSystem):
 
         # Automatically generate an identification number for this instancer if none is specified
         if idn is None:
-            max_idn = max([cls.particle_instancer_name_to_idn(name) for name in cls.particle_instancers.values()])
+            idns = [cls.particle_instancer_name_to_idn(name) for name in cls.particle_instancers.keys()]
+            max_idn = max(idns) if len(idns) > 0 else -1
             idn = max_idn + 1
 
         # Generate standardized prim path for this instancer
@@ -849,7 +896,8 @@ class MicroParticleSystem(BaseParticleSystem):
 
 class FluidSystem(MicroParticleSystem):
     """
-    Particle system class simulating fluids, leveraging isosurface feature in omniverse to render nice PBR fluid texture
+    Particle system class simulating fluids, leveraging isosurface feature in omniverse to render nice PBR fluid
+    texture. Individual particles are composed of spheres.
     """
 
     @classproperty
@@ -873,6 +921,22 @@ class FluidSystem(MicroParticleSystem):
         # TODO: Make true once omni bugs are fixed
         return False
 
+    @classproperty
+    def particle_radius(cls):
+        """
+        Returns:
+            float: Radius for the particles to be generated, since all fluids are composed of spheres
+        """
+        # Magic number from omni tutorials
+        return 0.99 * 0.6 * cls.particle_contact_offset
+
+    @classmethod
+    def _create_particle_prototypes(cls):
+        # Simulate particles with simple spheres
+        prototype = UsdGeom.Sphere.Define(cls.simulator.stage, f"{cls.prim_path}/{cls.name}ParticlePrototype")
+        prototype.CreateRadiusAttr().Set(cls.particle_radius)
+        return [prototype.GetPrim()]
+
 
 class WaterSystem(FluidSystem):
     """
@@ -885,19 +949,12 @@ class WaterSystem(FluidSystem):
 
     @classproperty
     def particle_contact_offset(cls):
-        return 0.004
+        return 0.01
 
     @classproperty
     def particle_density(cls):
         # Water is 1000 kg/m^3
         return 1000.0
-
-    @classmethod
-    def _create_particle_prototypes(cls):
-        # Simulate water particles with simple spheres
-        prototype = UsdGeom.Sphere.Define(cls.simulator.stage, f"{cls.prim_path}/waterParticlePrototype")
-        prototype.CreateRadiusAttr().Set(0.99 * 0.6 * cls.particle_contact_offset)
-        return [prototype.GetPrim()]
 
     @classmethod
     def _create_particle_material(cls):

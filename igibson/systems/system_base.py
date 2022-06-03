@@ -52,6 +52,7 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
         """
         Initializes this system. Default behavior is to simply store the @simulator reference internally
         """
+        assert not cls.initialized, f"Already initialized system {cls.name}!"
         cls.simulator = simulator
 
     @classmethod
