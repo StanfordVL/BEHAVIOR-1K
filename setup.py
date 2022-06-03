@@ -23,6 +23,7 @@ setup(
     install_requires=[
         "gym>=0.23",
         "numpy>=1.16.0",
+        "GitPython",
         # "scipy>=1.4",
         # "pybullet-svl>=3.1.6",
         # "transforms3d>=0.3.1",
