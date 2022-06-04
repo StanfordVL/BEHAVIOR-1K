@@ -27,6 +27,7 @@ import carb
 from omni.isaac.core.utils.stage import get_current_stage
 from igibson.prims.prim_base import BasePrim
 from igibson.utils.transform_utils import quat2mat, mat2euler
+from igibson.utils.usd_utils import BoundingBoxAPI
 
 
 class XFormPrim(BasePrim):
@@ -440,6 +441,28 @@ class XFormPrim(BasePrim):
         if "xformOp:scale" not in properties:
             carb.log_error("Scale property needs to be set for {} before setting its scale".format(self.name))
         self.set_attribute("xformOp:scale", scale)
+
+    @property
+    def bbox(self):
+        """
+        Get this xform's actual bounding box
+
+        Returns:
+            3-array: (x,y,z) bounding box
+        """
+        min_corner, max_corner = BoundingBoxAPI.compute_aabb(self.prim_path)
+        return max_corner - min_corner
+
+    @property
+    def bbox_center(self):
+        """
+        Get this xform's actual bounding box center
+
+        Returns:
+            3-array: (x,y,z) bounding box center
+        """
+        min_corner, max_corner = BoundingBoxAPI.compute_aabb(self.prim_path)
+        return (max_corner + min_corner) / 2.0
 
     def add_filtered_collision_pair(self, prim):
         """

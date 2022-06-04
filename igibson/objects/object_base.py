@@ -14,7 +14,7 @@ from igibson.utils.constants import (
 )
 from pxr import UsdPhysics, PhysxSchema
 from igibson.utils.semantics_utils import CLASS_NAME_TO_CLASS_ID
-from igibson.utils.usd_utils import get_prim_nested_children, create_joint, CollisionAPI, BoundingBoxAPI
+from igibson.utils.usd_utils import get_prim_nested_children, create_joint, CollisionAPI
 from igibson.prims.entity_prim import EntityPrim
 from igibson.prims.xform_prim import XFormPrim
 
@@ -178,28 +178,6 @@ class BaseObject(EntityPrim, metaclass=ABCMeta):
         # for more info
         return f"{self._prim_path}/{self.root_link_name}" if \
             (not self.fixed_base) and (self.n_links > 1) else super().articulation_root_path
-
-    @property
-    def bbox(self):
-        """
-        Get this object's actual bounding box
-
-        Returns:
-            3-array: (x,y,z) bounding box
-        """
-        min_corner, max_corner = BoundingBoxAPI.compute_aabb(self.prim_path)
-        return max_corner - min_corner
-
-    @property
-    def bbox_center(self):
-        """
-        Get this object's actual bounding box
-
-        Returns:
-            3-array: (x,y,z) bounding box
-        """
-        min_corner, max_corner = BoundingBoxAPI.compute_aabb(self.prim_path)
-        return (max_corner + min_corner) / 2.0
 
     @property
     def mass(self):
