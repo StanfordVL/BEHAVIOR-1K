@@ -92,8 +92,8 @@ class PrimitiveObject(StatefulObject):
         load_config["size"] = 1.0 if size is None else size
 
         # Initialize other internal variables
-        self._vis_prim = None
-        self._col_prim = None
+        self._vis_geom = None
+        self._col_geom = None
 
         # Make sure primitive type is valid
         assert_valid_key(key=primitive_type, valid_keys=PRIMITIVE_OBJECTS, name="primitive type")
@@ -129,13 +129,13 @@ class PrimitiveObject(StatefulObject):
         base_link = stage.DefinePrim(f"{self._prim_path}/base_link", "Xform")
 
         # Define (finally!) nested meshes corresponding to visual / collision mesh
-        self._vis_prim = UsdGeom.__dict__[self._primitive_type].Define(stage, f"{self._prim_path}/base_link/visual").GetPrim()
-        self._col_prim = UsdGeom.__dict__[self._primitive_type].Define(stage, f"{self._prim_path}/base_link/collision").GetPrim()
+        self._vis_geom = UsdGeom.__dict__[self._primitive_type].Define(stage, f"{self._prim_path}/base_link/visual")
+        self._col_geom = UsdGeom.__dict__[self._primitive_type].Define(stage, f"{self._prim_path}/base_link/collision")
 
         # Add collision API to collision geom
-        UsdPhysics.CollisionAPI.Apply(self._col_prim)
-        UsdPhysics.MeshCollisionAPI.Apply(self._col_prim)
-        PhysxSchema.PhysxCollisionAPI.Apply(self._col_prim)
+        UsdPhysics.CollisionAPI.Apply(self._col_geom.GetPrim())
+        UsdPhysics.MeshCollisionAPI.Apply(self._col_geom.GetPrim())
+        PhysxSchema.PhysxCollisionAPI.Apply(self._col_geom.GetPrim())
 
         return prim
 
@@ -168,7 +168,7 @@ class PrimitiveObject(StatefulObject):
             float: radius for this object
         """
         assert_valid_key(key=self._primitive_type, valid_keys=VALID_RADIUS_OBJECTS, name="primitive object with radius")
-        return self._vis_prim.GetAttribute("radius").Get()
+        return self._vis_geom.GetRadiusAttr().Get()
 
     @radius.setter
     def radius(self, radius):
@@ -182,8 +182,9 @@ class PrimitiveObject(StatefulObject):
             radius (float): radius to set
         """
         assert_valid_key(key=self._primitive_type, valid_keys=VALID_RADIUS_OBJECTS, name="primitive object with radius")
-        self._vis_prim.GetAttribute("radius").Set(radius)
-        self._col_prim.GetAttribute("radius").Set(radius)
+        self._vis_geom.GetRadiusAttr().Set(radius)
+        self._col_geom.GetRadiusAttr().Set(radius)
+        # TODO: Set extent
 
     @property
     def height(self):
@@ -197,7 +198,7 @@ class PrimitiveObject(StatefulObject):
             float: height for this object
         """
         assert_valid_key(key=self._primitive_type, valid_keys=VALID_HEIGHT_OBJECTS, name="primitive object with height")
-        return self._vis_prim.GetAttribute("height").Get()
+        return self._vis_geom.GetHeightAttr().Get()
 
     @height.setter
     def height(self, height):
@@ -211,8 +212,9 @@ class PrimitiveObject(StatefulObject):
             height (float): height to set
         """
         assert_valid_key(key=self._primitive_type, valid_keys=VALID_HEIGHT_OBJECTS, name="primitive object with height")
-        self._vis_prim.GetAttribute("height").Set(height)
-        self._col_prim.GetAttribute("height").Set(height)
+        self._vis_geom.GetHeightAttr().Set(height)
+        self._col_geom.GetHeightAttr().Set(height)
+        # TODO: Set extent
 
     @property
     def size(self):
@@ -226,7 +228,7 @@ class PrimitiveObject(StatefulObject):
             float: size for this object
         """
         assert_valid_key(key=self._primitive_type, valid_keys=VALID_SIZE_OBJECTS, name="primitive object with size")
-        return self._vis_prim.GetAttribute("size").Get()
+        return self._vis_geom.GetSizeAttr().Get()
 
     @size.setter
     def size(self, size):
@@ -240,8 +242,10 @@ class PrimitiveObject(StatefulObject):
             size (float): size to set
         """
         assert_valid_key(key=self._primitive_type, valid_keys=VALID_SIZE_OBJECTS, name="primitive object with size")
-        self._vis_prim.GetAttribute("size").Set(size)
-        self._col_prim.GetAttribute("size").Set(size)
+        self._vis_geom.GetSizeAttr().Set(size)
+        self._vis_geom.GetExtentAttr().Set([-np.ones(3) * size / 2, np.ones(3) * size / 2])
+        self._col_geom.GetSizeAttr().Set(size)
+        self._col_geom.GetExtentAttr().Set([-np.ones(3) * size / 2, np.ones(3) * size / 2])
 
     def _create_prim_with_same_kwargs(self, prim_path, name, load_config):
         # Add additional kwargs (fit_avg_dim_volume and bounding_box are already captured in load_config)
