@@ -1,10 +1,12 @@
 import os
+import omni
 from igibson import assets_path
 from igibson.utils.usd_utils import create_joint
 from igibson.systems.particle_system_base import BaseParticleSystem
 from igibson.utils.constants import SemanticClass
 from igibson.utils.python_utils import classproperty
 from igibson.utils.sampling_utils import sample_cuboid_on_object
+from igibson.prims.geom_prim import VisualGeomPrim
 from collections import OrderedDict
 import numpy as np
 from pxr import Gf
@@ -44,6 +46,15 @@ class MacroParticleSystem(BaseParticleSystem):
             int: Number of active particles in this system
         """
         return len(cls.particles)
+
+    @classproperty
+    def particle_name_prefix(cls):
+        """
+        Returns:
+            str: Naming prefix used for all generated particles. This is coupled with the unique particle ID to generate
+                the full particle name
+        """
+        return f"{cls.name}Particle"
 
     @classproperty
     def state_size(cls):
@@ -181,17 +192,18 @@ class MacroParticleSystem(BaseParticleSystem):
         Adds a particle to this system.
 
         Args:
-            prim_path (str): Absolute path to the newly created particle
+            prim_path (str): Absolute path to the newly created particle, minus the name for this particle
             scale (None or 3-array): Relative (x,y,z) scale of the particle, if any. If not specified, will
                 automatically be sampled based on cls.min_scale and cls.max_scale
             position (None or 3-array): Global (x,y,z) position to set this particle to, if any
             orientation (None or 4-array): Global (x,y,z,w) quaternion orientation to set this particle to, if any
 
         Returns:
-            BasePrim: Newly created particle instance, which is added internally as well
+            XFormPrim: Newly created particle instance, which is added internally as well
         """
-        # Duplicate the prim template
-        new_particle = cls.particle_object.duplicate(simulator=cls.simulator, prim_path=prim_path)
+        # Generate the new particle
+        name = cls.particle_id2name(idn=cls.get_next_particle_unique_idn())
+        new_particle = cls._load_new_particle(prim_path=f"{prim_path}/{name}", name=name)
 
         # Sample the scale and also make sure the particle is visible
         new_particle.scale *= np.random.uniform(cls.min_scale, cls.max_scale) if scale is None else scale
@@ -218,6 +230,57 @@ class MacroParticleSystem(BaseParticleSystem):
         particle = cls.particles.pop(name)
         # TODO: This causes segfaults UNLESS simulator is stopped
         # cls.simulator.stage.RemovePrim(particle.prim_path)
+
+    @classmethod
+    def _load_new_particle(cls, prim_path, name):
+        """
+        Loads a new particle into the current stage, leveraging @cls.particle_object as a template for the new particle
+        to load. This function should be implemented by any subclasses.
+
+        Args:
+            prim_path (str): The absolute stage path at which to create the new particle
+            name (str): The name to assign to this new particle at the path
+
+        Returns:
+            XFormPrim: Loaded particle
+        """
+        raise NotImplementedError()
+
+    @classmethod
+    def particle_name2id(cls, name):
+        """
+        Args:
+            name (str): Particle name to grab its corresponding unique id number for
+
+        Returns:
+            int: Unique ID assigned to the particle based on its name
+        """
+        assert cls.particle_name_prefix in name, \
+            f"Particle name should have '{cls.particle_name_prefix}' in it when checking ID! Got: {name}"
+        return int(name.split(cls.particle_name_prefix)[-1])
+
+    @classmethod
+    def particle_id2name(cls, idn):
+        """
+        Args:
+            idn (int): Unique ID number assigned to the particle to grab the name for
+
+        Returns:
+            str: Particle name corresponding to its unique id number
+        """
+        assert isinstance(idn, int), \
+            f"Particle idn must be an integer when checking name! Got: {idn}. Type: {type(idn)}"
+        return f"{cls.particle_name_prefix}{idn}"
+
+    @classmethod
+    def get_next_particle_unique_idn(cls):
+        """
+        Returns:
+            int: Minimum unique ID number greater than zero that can be assigned to a new particle
+        """
+        # Aggregate all current particle IDs, and grab the unique minimum value
+        current_idns = np.array([cls.particle_name2id(name=name) for name in cls.particles.keys()] + [-1])
+        return int(sorted(set(np.arange(current_idns.max() + 2)) - set(current_idns))[0])
 
 
 class VisualParticleSystem(MacroParticleSystem):
@@ -276,6 +339,25 @@ class VisualParticleSystem(MacroParticleSystem):
         for particle in cls._particles_to_remove:
             cls.remove_particle(name=particle.name)
         cls._particles_to_remove = []
+
+    @classmethod
+    def _load_new_particle(cls, prim_path, name):
+        # We copy the template prim and generate the new object
+        omni.kit.commands.execute(
+            "CopyPrim",
+            path_from=cls.particle_object.prim_path,
+            path_to=prim_path,
+        )
+        return VisualGeomPrim(prim_path=prim_path, name=name)
+
+    @classmethod
+    def set_particle_template_object(cls, obj):
+        # Sanity check to make sure the added object is an instance of VisualGeomPrim
+        assert isinstance(obj, VisualGeomPrim), \
+            f"Particle template object for {cls.name} must be a VisualGeomPrim instance!"
+
+        # Run super method
+        super().set_particle_template_object(obj=obj)
 
     @classmethod
     def remove_all_particles(cls):
@@ -411,17 +493,13 @@ class VisualParticleSystem(MacroParticleSystem):
 
         # Generate requested number of particles
         obj = cls._group_objects[group]
-        bboxes = []
-        for i in range(n_particles):
-            # This already scales the particle to a random size
-            particle = cls.add_particle(prim_path=f"{obj.prim_path}/particle{cls.n_particles}")
-            # Add to group
-            cls._group_particles[group][particle.name] = particle
-            # Grab its bounding box
-            bboxes.append(particle.bbox.tolist())
+
+        # Sample scales of the particles to generate
+        scales = np.random.uniform(cls.min_scale, cls.max_scale, (n_particles, 3))
+        bboxes = [(cls.particle_object.bbox * scale).tolist() for scale in scales]
 
         # Sample locations for all particles
-        # TODO: Does simulation need to play at this point in time?
+        # TODO: Does simulation need to play at this point in time? Answer: yes
         results = sample_cuboid_on_object(
             obj=obj,
             num_samples=n_particles,
@@ -440,14 +518,13 @@ class VisualParticleSystem(MacroParticleSystem):
         # Get total number of sampled points
         n_success = sum(result[0] is not None for result in results)
 
-        # If we aren't successful, then we will remove all particles and terminate early
+        # If we aren't successful, then we terminate early
         if n_success < min_particles_for_success:
-            cls._particles_to_remove += list(cls._group_particles[group].values())
             group = None
 
         else:
             # Use sampled points
-            for result, particle in zip(results, cls._group_particles[group].values()):
+            for result, scale, bbox in zip(results, scales, bboxes):
                 position, normal, quaternion, hit_link, reasons = result
 
                 # For now, we make sure all points were sampled successfully
@@ -460,25 +537,17 @@ class VisualParticleSystem(MacroParticleSystem):
                         # Shift the object halfway down.
                         cuboid_base_to_center = particle.bbox[2] / 2.0
                         surface_point -= normal * cuboid_base_to_center
-                    # Set the pose for this particle
-                    particle.set_position_orientation(position=position, orientation=quaternion)
-                    # Fix to the hit link as well
-                    joint_prim = create_joint(
-                        prim_path=f"{particle.prim_path}/rootJoint",
-                        joint_type="FixedJoint",
-                        body0=hit_link,
-                        body1=f"{particle.prim_path}/base_link",
+
+                    # Create particle
+                    particle = cls.add_particle(
+                        prim_path=hit_link,
+                        position=surface_point,
+                        orientation=quaternion,
+                        scale=scale,
                     )
-                    # Make sure to offset this prim's position and orientation accordingly
-                    # We use the raw local transforms from omni, NOT the inferred physical transforms
-                    raw_relative_pos = particle.get_attribute("xformOp:translate")
-                    raw_relative_quat = Gf.Quatf(particle.get_attribute("xformOp:orient"))
-                    joint_prim.GetAttribute("physics:localPos0").Set(raw_relative_pos)
-                    joint_prim.GetAttribute("physics:localRot0").Set(raw_relative_quat)
-                else:
-                    # Delete this object after we're done
-                    # TODO: Figure out better way to do this
-                    cls._particles_to_remove.append(particle)
+
+                    # Add to group
+                    cls._group_particles[group][particle.name] = particle
 
         return group
 
@@ -512,19 +581,22 @@ class DustSystem(VisualParticleSystem):
         # Particle object will be overridden by default to be a small cuboid
         # We import now at runtime so prevent circular imports
         from igibson.objects.primitive_object import PrimitiveObject
-        cls.particle_object = PrimitiveObject(
+        dust_object = PrimitiveObject(
             prim_path=f"/World/{cls.name}/dust_template",
             primitive_type="Cube",
             name="dust_template",
             class_id=SemanticClass.DIRT,
-            scale=np.array([0.015, 0.015, 0.015]),
+            size=0.030,
             visible=False,
             fixed_base=False,
             visual_only=True,
         )
 
         # We also must load the particle object
-        simulator.import_object(obj=cls.particle_object, register=False, auto_initialize=True)
+        simulator.import_object(obj=dust_object, register=False, auto_initialize=True)
+
+        # Class particle object is the visual mesh
+        cls.particle_object = dust_object.links["base_link"].visual_meshes["visual"]
 
 
 class StainSystem(VisualParticleSystem):
@@ -556,7 +628,7 @@ class StainSystem(VisualParticleSystem):
         # Particle object will be overridden to by default be a specific USD file
         # We import now at runtime so prevent circular imports
         from igibson.objects.usd_object import USDObject
-        cls.particle_object = USDObject(
+        stain_object = USDObject(
             prim_path=f"/World/{cls.name}/stain_template",
             usd_path=os.path.join(assets_path, "models/stain/stain.usd"),
             name="stain_template",
@@ -565,9 +637,11 @@ class StainSystem(VisualParticleSystem):
             fixed_base=False,
             visual_only=True,
         )
-
         # We also must load the particle object
-        simulator.import_object(obj=cls.particle_object, register=False, auto_initialize=True)
+        simulator.import_object(obj=stain_object, register=False, auto_initialize=True)
+
+        # Class particle object is the visual mesh
+        cls.particle_object = stain_object.links["base_link"].visual_meshes["visuals"]
 
     @classmethod
     def generate_group_particles(cls, group, n_particles=_N_PARTICLES_PER_GROUP, min_particles_for_success=1):
