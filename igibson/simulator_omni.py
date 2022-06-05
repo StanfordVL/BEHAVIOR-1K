@@ -360,9 +360,16 @@ class Simulator(SimulationContext):
         for rule in self._transition_rules:
             if rule not in obj_dict:
                 continue
+            # Create lists of objects that this rule potentially cares about.
+            # Skip the rule if any of the object lists is empty.
             obj_list_rule = list(obj_dict[rule][f] for f in rule.filters)
             if any(not obj_list_filter for obj_list_filter in obj_list_rule):
                 continue
+            # For each possible combination of objects, check if the rule is
+            # applicable, and if so, apply the transition defined by the rule.
+            # If objects are to be added / removed, the transition function is
+            # expected to return an instance of TransitionResults containing
+            # information about those objects.
             # TODO: Consider optimizing itertools.product.
             for obj_tuple in itertools.product(*obj_list_rule):
                 if rule.condition(self, *obj_tuple):
@@ -374,7 +381,7 @@ class Simulator(SimulationContext):
         # Process all transition results.
         for added_obj_attr in added_obj_attrs:
             new_obj = added_obj_attr.obj
-            self.import_object(added_obj_attr.obj, auto_initialize=False)
+            self.import_object(added_obj_attr.obj)
             pos, orn = added_obj_attr.pos, added_obj_attr.orn
             new_obj.set_position_orientation(position=pos, orientation=orn)
         for removed_obj in removed_objs:

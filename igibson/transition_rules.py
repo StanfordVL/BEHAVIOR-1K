@@ -106,11 +106,11 @@ class BaseTransitionRule(metaclass=ABCMeta):
         pass
 
 
-class TransitionRule(BaseTransitionRule):
+class GenericTransitionRule(BaseTransitionRule):
     """A generic transition rule template used typically for simple rules."""
 
     def __init__(self, filters, condition_fn, transition_fn):
-        super(TransitionRule, self).__init__(filters)
+        super(GenericTransitionRule, self).__init__(filters)
         self.condition_fn = condition_fn
         self.transition_fn = transition_fn
 
@@ -365,7 +365,7 @@ class ContainerGarbageRule(BaseTransitionRule):
 
 """See the following example for writing simple rules.
 
-  TransitionRule(
+  GenericTransitionRule(
       filters=(
           AndFilter(CategoryFilter("light"), StateFilter(ToggledOn, True)),
           CategoryFilter("key"),
