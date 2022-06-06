@@ -81,6 +81,7 @@ class Simulator(SimulationContext):
             :param viewer_height: height of the camera image
             :param vertical_fov: vertical field of view of the camera image in degrees
             :param device_idx: GPU device index to run rendering on
+            apply_transitions (bool): True to apply the transition rules.
         """
 
     _world_initialized = False
@@ -95,6 +96,7 @@ class Simulator(SimulationContext):
             viewer_height=720,
             vertical_fov=90,
             device_idx=0,
+            apply_transitions=False,
     ) -> None:
         super().__init__(
             physics_dt=physics_dt,
@@ -144,6 +146,7 @@ class Simulator(SimulationContext):
         self.object_state_types = get_states_by_dependency_order()
 
         # Set of all non-Omniverse transition rules to apply.
+        self._apply_transitions = apply_transitions
         self._transition_rules = DEFAULT_RULES
 
         # Toggle simulator state once so that downstream omni features can be used without bugs
@@ -167,6 +170,7 @@ class Simulator(SimulationContext):
         viewer_height=720,
         vertical_fov=90,
         device_idx=0,
+        apply_transitions=False,
     ) -> None:
         # Overwrite since we have different kwargs
         if Simulator._instance is None:
@@ -423,8 +427,7 @@ class Simulator(SimulationContext):
             # TODO: A better place to put this perhaps?
             self._scene.object_registry.update(keys="root_handle")
 
-    # TODO: Potentially make apply_transitions a ctor argument.
-    def step(self, render=True, force_playing=False, apply_transitions=False):
+    def step(self, render=True, force_playing=False):
         """
         Step the simulation at self.render_timestep
 
@@ -432,12 +435,7 @@ class Simulator(SimulationContext):
             render (bool): Whether rendering should occur or not
             force_playing (bool): If True, will force physics to propagate (i.e.: set simulation, if paused / stopped,
                 to "play" mode)
-            apply_transitions (bool): If True, apply the internal transition
-                logic before physics, render steps.
         """
-        if apply_transitions:
-            self._transition_rule_step()
-
         # Possibly force playing
         if force_playing and not self.is_playing():
             self.play()
@@ -450,6 +448,8 @@ class Simulator(SimulationContext):
         super().step(render=render)
 
         self._non_physics_step()
+        if self._apply_transitions:
+            self._transition_rule_step()
         # self.sync()
         self.frame_count += 1
 

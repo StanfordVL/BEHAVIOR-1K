@@ -25,7 +25,7 @@ def create_dataset_object(category, model, name, scale, abilities=dict()):
 
 def test_apple_slicing():
     try:
-        sim = Simulator()
+        sim = Simulator(apply_transitions=True)
         scene = EmptyScene()
         sim.import_scene(scene)
 
@@ -58,7 +58,7 @@ def test_apple_slicing():
 
 def test_container():
     try:
-        sim = Simulator()
+        sim = Simulator(apply_transitions=True)
         scene = EmptyScene()
         sim.import_scene(scene)
 
@@ -100,7 +100,7 @@ def test_container():
 
 def test_container_garbage():
     try:
-        sim = Simulator()
+        sim = Simulator(apply_transitions=True)
         scene = EmptyScene()
         sim.import_scene(scene)
 
@@ -130,10 +130,10 @@ def test_container_garbage():
         for i in range(3000):
             if i % 1000 == 0:
                 print(3 - i // 1000)
-            sim.step(apply_transitions=False)
+            sim.step()
 
         for i in range(10000):
-            sim.step(apply_transitions=True)
+            sim.step()
     finally:
         app.close()
 
