@@ -6,6 +6,8 @@
 # distribution of this software and related documentation without an express
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 #
+from collections import defaultdict
+import itertools
 import logging
 
 import json
@@ -34,14 +36,13 @@ from igibson.utils.assets_utils import get_ig_avg_category_specs
 from igibson.scenes import Scene
 from igibson.objects.object_base import BaseObject
 from igibson.object_states.factory import get_states_by_dependency_order
+from igibson.transition_rules import DEFAULT_RULES, TransitionResults
 
 # Import viewport getter based on isaacsim version
 if m.IS_PUBLIC_ISAACSIM:
     from omni.kit.viewport import get_viewport_interface as acquire_viewport_interface
 else:
     from omni.kit.viewport_legacy import acquire_viewport_interface
-
-import numpy as np
 
 
 class Simulator(SimulationContext):
@@ -80,6 +81,7 @@ class Simulator(SimulationContext):
             :param viewer_height: height of the camera image
             :param vertical_fov: vertical field of view of the camera image in degrees
             :param device_idx: GPU device index to run rendering on
+            apply_transitions (bool): True to apply the transition rules.
         """
 
     _world_initialized = False
@@ -94,6 +96,7 @@ class Simulator(SimulationContext):
             viewer_height=720,
             vertical_fov=90,
             device_idx=0,
+            apply_transitions=False,
     ) -> None:
         super().__init__(
             physics_dt=physics_dt,
@@ -142,6 +145,10 @@ class Simulator(SimulationContext):
         # Set of categories that can be grasped by assisted grasping
         self.object_state_types = get_states_by_dependency_order()
 
+        # Set of all non-Omniverse transition rules to apply.
+        self._apply_transitions = apply_transitions
+        self._transition_rules = DEFAULT_RULES
+
         # Toggle simulator state once so that downstream omni features can be used without bugs
         # e.g.: particle sampling, which for some reason requires sim.play() to be called at least once
         self.play()
@@ -163,6 +170,7 @@ class Simulator(SimulationContext):
         viewer_height=720,
         vertical_fov=90,
         device_idx=0,
+        apply_transitions=False,
     ) -> None:
         # Overwrite since we have different kwargs
         if Simulator._instance is None:
@@ -348,6 +356,54 @@ class Simulator(SimulationContext):
         # Clear the bounding box cache so that it gets updated during the next time it's called
         BoundingBoxAPI.clear()
 
+    def _transition_rule_step(self):
+        """Applies all internal non-Omniverse transition rules."""
+        # Create a dict from rule to filter to objects we care about.
+        obj_dict = defaultdict(lambda: defaultdict(list))
+        for obj in self.scene.objects:
+            for rule in self._transition_rules:
+                for f in rule.filters:
+                    if f(obj):
+                        obj_dict[rule][f].append(obj)
+
+        # For each rule, create a subset of the dict and apply it if applicable.
+        added_obj_attrs = []
+        removed_objs = []
+        for rule in self._transition_rules:
+            if rule not in obj_dict:
+                continue
+            # Create lists of objects that this rule potentially cares about.
+            # Skip the rule if any of the object lists is empty.
+            obj_list_rule = list(obj_dict[rule][f] for f in rule.filters)
+            if any(not obj_list_filter for obj_list_filter in obj_list_rule):
+                continue
+            # For each possible combination of objects, check if the rule is
+            # applicable, and if so, apply the transition defined by the rule.
+            # If objects are to be added / removed, the transition function is
+            # expected to return an instance of TransitionResults containing
+            # information about those objects.
+            # TODO: Consider optimizing itertools.product.
+            # TODO: Track what needs to be added / removed at the Scene object level.
+            # Comments from a PR on possible changes:
+            # - Make the transition function immediately apply the transition.
+            # - Addition / removal tracking on the Scene object.
+            # - Check if the objects are still in the scene in each step.
+            for obj_tuple in itertools.product(*obj_list_rule):
+                if rule.condition(self, *obj_tuple):
+                    t_results = rule.transition(self, *obj_tuple)
+                    if isinstance(t_results, TransitionResults):
+                        added_obj_attrs.extend(t_results.add)
+                        removed_objs.extend(t_results.remove)
+
+        # Process all transition results.
+        for added_obj_attr in added_obj_attrs:
+            new_obj = added_obj_attr.obj
+            self.import_object(added_obj_attr.obj)
+            pos, orn = added_obj_attr.pos, added_obj_attr.orn
+            new_obj.set_position_orientation(position=pos, orientation=orn)
+        for removed_obj in removed_objs:
+            self.remove_object(removed_obj)
+
     def reset_scene(self):
         """
         Resets ths scene (if it exists) and its corresponding objects
@@ -400,6 +456,8 @@ class Simulator(SimulationContext):
         super().step(render=render)
 
         self._non_physics_step()
+        if self._apply_transitions:
+            self._transition_rule_step()
         # self.sync()
         self.frame_count += 1
 
