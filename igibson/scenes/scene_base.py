@@ -172,7 +172,6 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         The elements to load may include: floor, building, objects, etc.
 
         :param simulator: the simulator to load the scene into
-        :return: a list of pybullet ids of elements composing the scene, including floors, buildings and objects
         """
         # Make sure simulator is stopped
         assert simulator.is_stopped(), "Simulator should be stopped when loading this scene!"
@@ -187,7 +186,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # Store world prim
         self._world_prim = simulator.world_prim
 
-        prims = self._load(simulator)
+        self._load(simulator)
         self._loaded = True
 
         # The systems should be initialized internally within self._load
@@ -197,8 +196,6 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # Always stop the sim if we started it internally
         if not simulator.is_stopped():
             simulator.stop()
-
-        return prims
 
     def initialize_systems(self, simulator):
         # Initialize registries

@@ -145,7 +145,13 @@ class BasePrim(Serializable, UniquelyNamed, Recreatable, ABC):
 
     @abstractmethod
     def _load(self, simulator=None):
-        pass
+        """
+        Loads the raw prim into the simulator. Any post-processing should be done in @self._post_load()
+
+        Args:
+            simulator (Simulator): Active simulation context
+        """
+        raise NotImplementedError()
 
     @property
     def loaded(self):

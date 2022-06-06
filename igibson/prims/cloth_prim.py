@@ -12,10 +12,9 @@ from pxr import UsdPhysics
 from omni.isaac.core.utils.stage import get_current_stage
 from omni.physx.scripts import particleUtils
 
-from igibson.prims.xform_prim import XFormPrim
-from igibson.prims.geom_prim import VisualGeomPrim
+from igibson.prims.geom_prim import GeomPrim
 
-class ClothPrim(VisualGeomPrim):
+class ClothPrim(GeomPrim):
     """
     Provides high level functions to deal with a cloth prim and its attributes/ properties.
     If there is an prim present at the path, it will use it. Otherwise, a new XForm prim at
