@@ -756,9 +756,10 @@ class InteractiveTraversableScene(TraversableScene):
         # Notify user we're loading the scene
         logging.info("Clearing stage and loading scene USD: {}".format(self.scene_file))
 
-        # We first load the initial USD file, clearing the stage in the meantime
-        simulator.clear()
+        # We first load the initial USD file
         simulator.load_stage(usd_path=self.scene_file)
+
+        self.initialize_systems(simulator)
 
         # Store stage reference and refresh world prim reference
         self._stage = simulator.stage

@@ -25,10 +25,10 @@ import numpy as np
 import carb
 from omni.isaac.core.utils.stage import get_current_stage
 from omni.isaac.core.materials import PhysicsMaterial
-from igibson.prims.prim_base import BasePrim
+from igibson.prims.xform_prim import XFormPrim
 
 
-class GeomPrim(BasePrim):
+class GeomPrim(XFormPrim):
     """
     Provides high level functions to deal with a geom prim and its attributes / properties.
     If there is an geom prim present at the path, it will use it. By default, a geom prim cannot be directly
@@ -59,6 +59,13 @@ class GeomPrim(BasePrim):
         # This should not be called, because this prim cannot be instantiated from scratch!
         raise NotImplementedError("By default, a geom prim cannot be created from scratch.")
 
+    def _post_load(self):
+        # run super first
+        super()._post_load()
+
+        # By default, GeomPrim shows up in the rendering.
+        self.purpose = "default"
+
     def _dump_state(self):
         # No state to dump
         return OrderedDict()
@@ -78,6 +85,62 @@ class GeomPrim(BasePrim):
     def duplicate(self, simulator, prim_path):
         # Cannot directly duplicate a mesh prim
         raise NotImplementedError("Cannot directly duplicate a geom prim!")
+
+    @property
+    def purpose(self):
+        """
+        Returns:
+            str: the purpose used for this geom, one of {"default", "render", "proxy", "guide"}
+        """
+        return self.get_attribute("purpose")
+
+    @purpose.setter
+    def purpose(self, purpose):
+        """
+        Sets the purpose of this geom
+
+        Args:
+            purpose (str): the purpose used for this geom, one of {"default", "render", "proxy", "guide"}
+        """
+        self.set_attribute("purpose", purpose)
+
+    @property
+    def color(self):
+        """
+        Returns:
+            None or 3-array: If set, the default RGB color used for this visual geom
+        """
+        color = self.get_attribute("primvars:displayColor")
+        return None if color is None else np.array(color)[0]
+
+    @color.setter
+    def color(self, rgb):
+        """
+        Sets the RGB color of this visual mesh
+
+        Args:
+            3-array: The default RGB color used for this visual geom
+        """
+        self.set_attribute("primvars:displayColor", np.array(rgb))
+
+    @property
+    def opacity(self):
+        """
+        Returns:
+            None or float: If set, the default opacity used for this visual geom
+        """
+        opacity = self.get_attribute("primvars:displayOpacity")
+        return None if opacity is None else np.array(opacity)[0]
+
+    @opacity.setter
+    def opacity(self, opacity):
+        """
+        Sets the opacity of this visual mesh
+
+        Args:
+            opacity: The default opacity used for this visual geom
+        """
+        self.set_attribute("primvars:displayOpacity", np.array([opacity]))
 
 
 class CollisionGeomPrim(GeomPrim):
@@ -103,6 +166,9 @@ class CollisionGeomPrim(GeomPrim):
     def _post_load(self):
         # run super first
         super()._post_load()
+
+        # By default, CollisionGeomPrim does not show up in the rendering.
+        self.purpose = "guide"
 
         # Create API references
         self._collision_api = UsdPhysics.CollisionAPI(self._prim) if \
@@ -268,55 +334,4 @@ class CollisionGeomPrim(GeomPrim):
 
 
 class VisualGeomPrim(GeomPrim):
-
-    def __init__(
-            self,
-            prim_path,
-            name,
-            load_config=None,
-    ):
-
-        # Run super method
-        super().__init__(
-            prim_path=prim_path,
-            name=name,
-            load_config=load_config,
-        )
-
-    @property
-    def color(self):
-        """
-        Returns:
-            None or 3-array: If set, the default RGB color used for this visual geom
-        """
-        color = self.get_attribute("primvars:displayColor")
-        return None if color is None else np.array(color)[0]
-
-    @color.setter
-    def color(self, rgb):
-        """
-        Sets the RGB color of this visual mesh
-
-        Args:
-            3-array: The default RGB color used for this visual geom
-        """
-        self.set_attribute("primvars:displayColor", np.array(rgb))
-
-    @property
-    def opacity(self):
-        """
-        Returns:
-            None or float: If set, the default opacity used for this visual geom
-        """
-        opacity = self.get_attribute("primvars:displayOpacity")
-        return None if opacity is None else np.array(opacity)[0]
-
-    @opacity.setter
-    def opacity(self, opacity):
-        """
-        Sets the opacity of this visual mesh
-
-        Args:
-            opacity: The default opacity used for this visual geom
-        """
-        self.set_attribute("primvars:displayOpacity", np.array([opacity]))
+    pass

@@ -17,6 +17,7 @@ from igibson.utils.semantics_utils import CLASS_NAME_TO_CLASS_ID
 from igibson.utils.usd_utils import get_prim_nested_children, create_joint, CollisionAPI, BoundingBoxAPI
 from igibson.prims.entity_prim import EntityPrim
 from igibson.prims.xform_prim import XFormPrim
+from igibson.utils.constants import PrimType
 
 
 class BaseObject(EntityPrim, metaclass=ABCMeta):
@@ -34,6 +35,7 @@ class BaseObject(EntityPrim, metaclass=ABCMeta):
             fixed_base=False,
             visual_only=False,
             self_collisions=False,
+            prim_type=PrimType.RIGID,
             load_config=None,
             **kwargs,
     ):
@@ -52,6 +54,7 @@ class BaseObject(EntityPrim, metaclass=ABCMeta):
         @param fixed_base: bool, whether to fix the base of this object or not
         visual_only (bool): Whether this object should be visual only (and not collide with any other objects)
         self_collisions (bool): Whether to enable self collisions for this object
+        prim_type (PrimType): Which type of prim the object is, Valid options are: {PrimType.RIGID, PrimType.CLOTH}
         load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
             loading this prim at runtime.
         kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
@@ -103,6 +106,7 @@ class BaseObject(EntityPrim, metaclass=ABCMeta):
         load_config["visible"] = visible
         load_config["visual_only"] = visual_only
         load_config["self_collisions"] = self_collisions
+        load_config["prim_type"] = prim_type
 
         # Run super init
         super().__init__(

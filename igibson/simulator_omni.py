@@ -239,15 +239,23 @@ class Simulator(SimulationContext):
         """
         assert self.is_stopped(), "Simulator must be stopped while importing a scene!"
         assert isinstance(scene, Scene), "import_scene can only be called with Scene"
-        self._scene = scene
-        scene.load(self)
 
-        # Make sure simulator is not running, then start it, then pause it so we can initialize the scene
+        # Clear the existing scene if any
+        self.clear()
+
+        self._scene = scene
+        self._scene.load(self)
+
+        # Make sure simulator is not running, then start it so that we can initialize the scene
         assert self.is_stopped(), "Simulator must be stopped after importing a scene!"
         self.play()
-        self.pause()
+
         # Initialize the scene
         self._scene.initialize()
+
+        # Need to one more step for particle systems to work
+        self.step()
+        self.stop()
 
     # # TODO
     # def import_particle_system(self, particle_system):
@@ -477,10 +485,6 @@ class Simulator(SimulationContext):
     #     self._scene._finalize()
     #     return
 
-    def clear_and_remove_scene(self) -> None:
-        self._scene = None
-        self.clear()
-
     def clear(self) -> None:
         """Clears the stage leaving the PhysicsScene only if under /World.
         """
@@ -498,6 +502,7 @@ class Simulator(SimulationContext):
         #     self.scene.clear()
         self._current_tasks = dict()
         self._scene_finalized = False
+        self._scene = None
         self._data_logger = DataLogger()
 
         # def check_deletable_prim(prim_path):
@@ -598,7 +603,7 @@ class Simulator(SimulationContext):
         scene_init_info = json.loads(self.world_prim.GetCustomDataByKey("scene_init_info"))
 
         # Clear the current environment and delete any currently loaded scene.
-        self.clear_and_remove_scene()
+        self.clear()
 
         # Recreate and import the saved scene.
         # Note that the imported scene only have the default objects loaded.

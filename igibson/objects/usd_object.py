@@ -4,6 +4,7 @@ from igibson.objects.stateful_object import StatefulObject
 
 from omni.isaac.core.utils.stage import add_reference_to_stage
 from omni.isaac.core.utils.prims import get_prim_at_path
+from igibson.utils.constants import PrimType
 
 
 class USDObject(StatefulObject):
@@ -25,6 +26,7 @@ class USDObject(StatefulObject):
         fixed_base=False,
         visual_only=False,
         self_collisions=False,
+        prim_type=PrimType.RIGID,
         load_config=None,
         abilities=None,
         **kwargs,
@@ -43,6 +45,7 @@ class USDObject(StatefulObject):
         @param fixed_base: bool, whether to fix the base of this object or not
         visual_only (bool): Whether this object should be visual only (and not collide with any other objects)
         self_collisions (bool): Whether to enable self collisions for this object
+        prim_type (PrimType): Which type of prim the object is, Valid options are: {PrimType.RIGID, PrimType.CLOTH}
         load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
             loading this prim at runtime.
         @param abilities: dict in the form of {ability: {param: value}} containing
@@ -61,6 +64,7 @@ class USDObject(StatefulObject):
             fixed_base=fixed_base,
             visual_only=visual_only,
             self_collisions=self_collisions,
+            prim_type=prim_type,
             load_config=load_config,
             abilities=abilities,
             **kwargs,
@@ -91,6 +95,7 @@ class USDObject(StatefulObject):
             visible=self.visible,
             fixed_base=self.fixed_base,
             visual_only=self._visual_only,
+            prim_type=self._prim_type,
             load_config=load_config,
             abilities=self._abilities,
         )

@@ -29,6 +29,7 @@ from omni.isaac.core.utils.stage import get_current_stage
 from igibson.objects.stateful_object import StatefulObject
 from igibson.prims.xform_prim import XFormPrim
 from igibson.utils.python_utils import assert_valid_key
+from igibson.utils.constants import PrimType
 
 
 class LightObject(StatefulObject):
@@ -106,6 +107,7 @@ class LightObject(StatefulObject):
             fixed_base=False,
             visual_only=True,
             self_collisions=False,
+            prim_type=PrimType.RIGID,
             load_config=load_config,
             abilities=abilities,
             **kwargs,

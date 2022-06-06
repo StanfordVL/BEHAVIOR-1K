@@ -172,7 +172,6 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         The elements to load may include: floor, building, objects, etc.
 
         :param simulator: the simulator to load the scene into
-        :return: a list of pybullet ids of elements composing the scene, including floors, buildings and objects
         """
         # Make sure simulator is stopped
         assert simulator.is_stopped(), "Simulator should be stopped when loading this scene!"
@@ -187,19 +186,24 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # Store world prim
         self._world_prim = simulator.world_prim
 
-        prims = self._load(simulator)
+        self._load(simulator)
         self._loaded = True
 
-        # Initialize registries
+        # TODO (eric): make scene have _post_load() function that calls obj._post_load() for each object in the scene.
+        # Then we should be able to sandwich self.initialize_systems() between self._load() and self._post_load()
+        # The systems should be initialized internally within self._load
         for system in self.systems:
-            print(f"Initializing system: {system.name}")
-            system.initialize(simulator=simulator)
+            assert system.initialized, f"System not initialized: {system.name}"
 
         # Always stop the sim if we started it internally
         if not simulator.is_stopped():
             simulator.stop()
 
-        return prims
+    def initialize_systems(self, simulator):
+        # Initialize registries
+        for system in self.systems:
+            print(f"Initializing system: {system.name}")
+            system.initialize(simulator=simulator)
 
     def _initialize(self):
         """
