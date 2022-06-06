@@ -59,7 +59,7 @@ _ABILITY_TO_STATE_MAPPING = {
     "heatable": [Heated],
     "heatSource": [HeatSourceOrSink],
     "hungFemaleAttachable" : [HungFemaleAttachment],
-    "hungMaleAttachable" : [MaleAttachment],
+    "hungMaleAttachable" : [HungMaleAttachment],
     "magnetic" : [MagneticAttachment],
     "maleAttachable" : [MaleAttachment],
     "openable": [Open],

@@ -19,7 +19,7 @@ def setup_scene_for_abilities(abilities1, abilities2):
 
     objs = [None, None]
     abilities_arr = [abilities1, abilities2]
-    position_arr = [np.array([0, 0, 0]), np.array([2, 0, 0])]
+    position_arr = [np.array([0, 0, 0.04]), np.array([2, 0, 0.8])]
     for idx, (obj_category, obj_model) in enumerate((("apple", "00_0"), ("fridge", "12252"))):
         name = obj_category
         model_root_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}"
@@ -57,8 +57,8 @@ for i in range(200):
     sim.step()
 assert obj1.states[object_states.StickyAttachment].get_value(obj2)
 
-# Obj1 is not able to move since it's attached to heavy obj2.
-obj1.set_linear_velocity(velocity=np.array([-2.0, 0, 2.0]))
+# Apply a large force to obj1 but the two objects cannot move much because obj2 is heavy.
+obj1.set_linear_velocity(velocity=np.array([10.0, 0, 50.0]))
 for i in range(200):
     sim.step()
 
@@ -86,8 +86,8 @@ for i in range(200):
 assert obj1.states[object_states.MagneticAttachment].get_value(obj2)
 assert obj2.states[object_states.MagneticAttachment].get_value(obj1)
 
-# Obj1 is not able to move since it's attached to heavy obj2.
-obj1.set_linear_velocity(velocity=np.array([-2.0, 0, 2.0]))
+# Apply a large force to obj1 but the two objects cannot move much because obj2 is heavy.
+obj1.set_linear_velocity(velocity=np.array([10.0, 0, 50.0]))
 for i in range(200):
     sim.step()
 
@@ -137,8 +137,8 @@ for i in range(200):
 assert obj1.states[object_states.MaleAttachment].get_value(obj2)
 assert obj2.states[object_states.FemaleAttachment].get_value(obj1)
 
-# Obj1 is not able to move since it's attached to heavy obj2.
-obj1.set_linear_velocity(velocity=np.array([-2.0, 0, 2.0]))
+# Apply a large force to obj1 but the two objects cannot move much because obj2 is heavy.
+obj1.set_linear_velocity(velocity=np.array([10.0, 0, 50.0]))
 for i in range(200):
     sim.step()
 
@@ -176,7 +176,7 @@ for i in range(200):
 ######################################################################################
 # HungMaleAttachment / HungFemaleAttachment
 #   can attach if touching, self is male, the other is female,
-#   and hanging object is "below" mounting object (center of bbox).
+#   and the male hanging object is "below" the female mounting object (center of bbox).
 ######################################################################################
 obj1, obj2 = setup_scene_for_abilities(abilities1={"hungMaleAttachable": {}}, abilities2={"hungFemaleAttachable": {}})
 assert object_states.HungMaleAttachment in obj1.states
@@ -189,8 +189,8 @@ for i in range(200):
 assert obj1.states[object_states.HungMaleAttachment].get_value(obj2)
 assert obj2.states[object_states.HungFemaleAttachment].get_value(obj1)
 
-# Obj1 is not able to move since it's attached to heavy obj2.
-obj1.set_linear_velocity(velocity=np.array([-2.0, 0, 2.0]))
+# Apply a large force to obj1 but the two objects cannot move much because obj2 is heavy.
+obj1.set_linear_velocity(velocity=np.array([10.0, 0, 50.0]))
 for i in range(200):
     sim.step()
 
