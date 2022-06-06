@@ -107,7 +107,7 @@ class XFormPrim(BasePrim):
         self._default_state = XFormPrimState(position=default_pos, orientation=default_ori)
 
     def _set_xform_properties(self):
-        current_position, current_orientation = self.get_position_orientation()
+        # current_position, current_orientation = self.get_position_orientation()
         properties_to_remove = [
             "xformOp:rotateX",
             "xformOp:rotateXZY",
@@ -146,7 +146,7 @@ class XFormPrim(BasePrim):
             xform_op_rot = UsdGeom.XformOp(self._prim.GetAttribute("xformOp:orient"))
         xformable.SetXformOpOrder([xform_op_translate, xform_op_rot, xform_op_scale])
         # Possibly set position and orientation
-        self.set_position_orientation(position=current_position, orientation=current_orientation)
+        # self.set_position_orientation(position=current_position, orientation=current_orientation)
         return
 
     # def reset(self):
