@@ -201,6 +201,21 @@ class ControllableObject(BaseObject):
             efforts=np.zeros(self._n_dof),
         ), normalized=False)
 
+        # Store dof idx mapping to dof name
+        dof_names_ordered = [self._dc.get_dof_name(self._dc.get_articulation_dof(self._handle, i))
+                             for i in range(self.n_dof)]
+
+        # Update the control modes of each joint based on the outputted control from the controllers
+        # Omni resets them after every reset
+        for controller in self._controllers.values():
+            for dof in controller.dof_idx:
+                control_type = controller.control_type
+                self._joints[dof_names_ordered[dof]].set_control_type(
+                    control_type=control_type,
+                    kp=self.default_kp if control_type == ControlType.POSITION else None,
+                    kd=self.default_kd if control_type == ControlType.VELOCITY else None,
+                )
+
         # Reset all controllers
         for controller in self._controllers.values():
             controller.reset()
