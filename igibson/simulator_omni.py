@@ -344,7 +344,7 @@ class Simulator(SimulationContext):
         # Clear the bounding box cache so that it gets updated during the next time it's called
         BoundingBoxAPI.clear()
 
-    def _non_ov_transition_step(self):
+    def _transition_rule_step(self):
         """Applies all internal non-Omniverse transition rules."""
         # Create a dict from rule to filter to objects we care about.
         obj_dict = defaultdict(lambda: defaultdict(list))
@@ -371,6 +371,11 @@ class Simulator(SimulationContext):
             # expected to return an instance of TransitionResults containing
             # information about those objects.
             # TODO: Consider optimizing itertools.product.
+            # TODO: Track what needs to be added / removed at the Scene object level.
+            # Comments from a PR on possible changes:
+            # - Make the transition function immediately apply the transition.
+            # - Addition / removal tracking on the Scene object.
+            # - Check if the objects are still in the scene in each step.
             for obj_tuple in itertools.product(*obj_list_rule):
                 if rule.condition(self, *obj_tuple):
                     t_results = rule.transition(self, *obj_tuple)
@@ -418,6 +423,7 @@ class Simulator(SimulationContext):
             # TODO: A better place to put this perhaps?
             self._scene.object_registry.update(keys="root_handle")
 
+    # TODO: Potentially make apply_transitions a ctor argument.
     def step(self, render=True, force_playing=False, apply_transitions=False):
         """
         Step the simulation at self.render_timestep
@@ -430,7 +436,7 @@ class Simulator(SimulationContext):
                 logic before physics, render steps.
         """
         if apply_transitions:
-            self._non_ov_transition_step()
+            self._transition_rule_step()
 
         # Possibly force playing
         if force_playing and not self.is_playing():

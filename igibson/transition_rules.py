@@ -203,6 +203,7 @@ class SlicingRule(BaseTransitionRule):
         return t_results
 
 
+# TODO: Replace with a more standard API when available.
 def _contained_objects(scene, container_obj):
     """Returns a list of all objects ``inside'' the container object."""
     bbox = BoundingBoxAPI.compute_aabb(container_obj.prim_path)
