@@ -9,7 +9,6 @@ from igibson.controllers import create_controller
 from igibson.controllers.controller_base import ControlType
 from igibson.utils.python_utils import assert_valid_key, merge_nested_dicts
 from igibson.utils.types import JointsState
-from igibson.utils.constants import PrimType
 
 
 class ControllableObject(BaseObject):

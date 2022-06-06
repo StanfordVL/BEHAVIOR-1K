@@ -189,6 +189,8 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         self._load(simulator)
         self._loaded = True
 
+        # TODO (eric): make scene have _post_load() function that calls obj._post_load() for each object in the scene.
+        # Then we should be able to sandwich self.initialize_systems() between self._load() and self._post_load()
         # The systems should be initialized internally within self._load
         for system in self.systems:
             assert system.initialized, f"System not initialized: {system.name}"
