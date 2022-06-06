@@ -824,7 +824,7 @@ class ManipulationRobot(BaseRobot):
         """
         arm = self.default_arm if arm == "default" else arm
         self._ag_release_counter[arm] += 1
-        time_since_release = self._ag_release_counter[arm] * self._simulator.render_timestep
+        time_since_release = self._ag_release_counter[arm] * self._simulator.get_rendering_dt()
         if time_since_release >= RELEASE_WINDOW:
             # Remove filtered collision restraints
             for finger_link in self.finger_links[arm]:
