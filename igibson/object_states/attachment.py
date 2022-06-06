@@ -1,9 +1,11 @@
 from abc import abstractmethod
+
+from pxr import Gf
+
+import igibson.utils.transform_utils as T
 from igibson.object_states.contact_bodies import ContactBodies
 from igibson.object_states.object_state_base import BooleanState, RelativeObjectState
-from igibson.utils.usd_utils import create_joint
-import igibson.utils.transform_utils as T
-from pxr import Gf
+from igibson.utils.usd_utils import BoundingBoxAPI, create_joint
 
 # After detachment, an object cannot be attached again within this number of steps.
 _DEFAULT_ATTACH_PROTECTION_COUNTDOWN = 10
@@ -25,21 +27,12 @@ class Attached(RelativeObjectState, BooleanState):
         self.attached_obj = None
         self.attached_joints = [None, None]
         self.attached_joint_paths = [None, None]
-        self.enable_attach_this_step = False
         self.attach_protection_countdown = -1
 
     def _update(self):
         # The object cannot be attached to anything when self.attach_protection_countdown is positive.
         if self.attach_protection_countdown > 0:
             self.attach_protection_countdown -= 1
-            return
-
-        # The objects were attached in the last simulation step.
-        if self.enable_attach_this_step:
-            print(f"{self.obj.name} is attached to {self.attached_obj.name}.")
-            self.attached_joints[0].GetAttribute("physics:jointEnabled").Set(True)
-            self.attached_joints[1].GetAttribute("physics:jointEnabled").Set(True)
-            self.enable_attach_this_step = False
             return
 
         contact_list = self.obj.states[ContactBodies].get_value()
@@ -76,7 +69,6 @@ class Attached(RelativeObjectState, BooleanState):
             self.attached_obj = None
             self.attached_joints = [None, None]
             self.attached_joint_paths = [None, None]
-            self.enable_attach_this_step = False
             # The object should not be able to attach again within some steps after unattaching.
             # Otherwise the object may be attached right away.
             self.attach_protection_countdown = _DEFAULT_ATTACH_PROTECTION_COUNTDOWN
@@ -100,7 +92,6 @@ class Attached(RelativeObjectState, BooleanState):
                     joint_type="FixedJoint",
                     body0=f"{obj1.prim_path}/base_link",
                     body1=f"{obj2.prim_path}/base_link",
-                    enabled=False,
                 )
 
                 # Set the local pose of the attachment joint.
@@ -113,10 +104,6 @@ class Attached(RelativeObjectState, BooleanState):
 
                 self.attached_joints[idx].GetAttribute("physics:localPos0").Set(Gf.Vec3f(*rel_pos))
                 self.attached_joints[idx].GetAttribute("physics:localRot0").Set(Gf.Quatf(*rel_quat))
-
-            # We have to toggle the joint from off to on after a physics step because of an omni quirk
-            # Otherwise the joint transform is very weird.
-            self.enable_attach_this_step = True
 
         return True
 
@@ -194,8 +181,8 @@ class HungMaleAttachment(MaleAttachment):
         Returns true if touching, self is male, the other is female,
         and the male hanging object is "below" the female mounting object (center of bbox).
         """
-        male_center_z = self.obj.get_position()[2]
-        female_center_z = other.get_position()[2]
+        male_center_z = BoundingBoxAPI.compute_center_extent(self.obj.prim_path)[0][2]
+        female_center_z = BoundingBoxAPI.compute_center_extent(other.prim_path)[0][2]
         return male_center_z < female_center_z and HungFemaleAttachment in other.states
 
 
@@ -213,6 +200,6 @@ class HungFemaleAttachment(FemaleAttachment):
         Returns true if touching, the other is male, self is female
         and the male hanging object is "below" the female mounting object (center of bbox).
         """
-        male_center_z = other.get_position()[2]
-        female_center_z = self.obj.get_position()[2]
+        male_center_z = BoundingBoxAPI.compute_center_extent(other.prim_path)[0][2]
+        female_center_z = BoundingBoxAPI.compute_center_extent(self.obj.prim_path)[0][2]
         return male_center_z < female_center_z and HungMaleAttachment in other.states
