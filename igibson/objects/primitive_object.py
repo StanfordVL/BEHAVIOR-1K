@@ -241,7 +241,10 @@ class PrimitiveObject(StatefulObject):
         """
         assert_valid_key(key=self._primitive_type, valid_keys=VALID_RADIUS_OBJECTS, name="primitive object with radius")
         original_scale = self.scale
-        original_scale[:2] = radius
+        if self._primitive_type == "Sphere":
+            original_scale[:] = radius
+        else:
+            original_scale[:2] = radius
         self.scale = original_scale
 
     @property

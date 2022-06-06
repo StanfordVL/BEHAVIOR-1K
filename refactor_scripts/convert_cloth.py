@@ -16,14 +16,12 @@ from omni.isaac.core.utils.prims import get_prim_at_path, is_prim_path_valid
 from omni.kit.commands import execute
 
 
-CLOTH_CATEGORIES = ["dishtowel"]
+CLOTH_CATEGORIES = ["carpet"]
 THRESH = 0.05
 
 for category in CLOTH_CATEGORIES:
     category_dir = os.path.join(ig_dataset_path, "objects", category)
     for model in os.listdir(category_dir):
-        if "(copy)" in model:
-            continue
 
         model_dir = os.path.join(category_dir, model)
         visual_mesh_dir = os.path.join(model_dir, "shape", "visual")
@@ -40,11 +38,14 @@ for category in CLOTH_CATEGORIES:
         while True:
             # face_indices_from_area = np.where(mesh.area_faces > AREA_THRESH)[0]
             edge_indices = np.where(mesh.edges_unique_length > THRESH)[0]
+
+            # Faces that have ALL edges longer than the threshold
             face_indices_from_edge_length = np.where([len(np.intersect1d(face, edge_indices)) == 3 for face in mesh.faces_unique_edges])[0]
             # face_indices = np.union1d(face_indices_from_area, face_indices_from_edge_length)
             face_indices = face_indices_from_edge_length
             if len(face_indices) == 0:
                 break
+
             mesh = mesh.subdivide(face_indices)
 
         print(f"Final face count: {len(mesh.faces)}")
@@ -62,6 +63,7 @@ for category in CLOTH_CATEGORIES:
         tmp_original_obj_file = original_obj_file[:-4] + "_original.obj"
         shutil.move(original_obj_file, tmp_original_obj_file)
 
+        # Create the new visual mesh that uses the original mtl
         with open(original_obj_file, "w+") as dst:
             with open(new_obj_file, "r") as src:
                 for line in src.readlines():
@@ -73,15 +75,19 @@ for category in CLOTH_CATEGORIES:
         rigid_usd_file = os.path.join(category_dir, model, "usd", f"{model}_rigid.usd")
         cloth_usd_file = os.path.join(category_dir, model, "usd", f"{model}_cloth.usd")
 
+        # Rename the original rigid usd if exists
         if os.path.isfile(usd_file):
             shutil.move(usd_file, rigid_usd_file)
 
+        # Use the import_obj_urdf to output to usd_file
         import_obj_urdf(category, model)
+        # Rename it to the cloth version
         shutil.move(usd_file, cloth_usd_file)
 
-        # Rename back model.usd
+        # Rename back model.usd if exists
         if os.path.isfile(rigid_usd_file):
             shutil.move(rigid_usd_file, usd_file)
+
         # Rename back original visual mesh OBJ file
         shutil.move(tmp_original_obj_file, original_obj_file)
         # Remove tmp directory
@@ -93,9 +99,7 @@ for category in CLOTH_CATEGORIES:
         prim = stage.GetDefaultPrim()
 
         links = [child for child in prim.GetChildren() if child.GetTypeName() == "Xform"]
-        if len(links) != 1:
-            print(f"WARNING: [{cloth_usd_file}] has more than one link. Skipped.")
-            continue
+        assert len(links) == 1, f"[{cloth_usd_file}] has more than one link"
         link = links[0]
 
         tmp_base_link_path = prim.GetPrimPath().AppendPath("base_link_backup")
@@ -104,14 +108,12 @@ for category in CLOTH_CATEGORIES:
         link = get_prim_at_path(tmp_base_link_path)
 
         visual_mesh_path = tmp_base_link_path.AppendPath("visuals")
-        if not is_prim_path_valid(visual_mesh_path):
-            print(f"WARNING: visual mesh path [{visual_mesh_path}] does not exist. Skipped.")
-            continue
+        assert is_prim_path_valid(visual_mesh_path), f"WARNING: visual mesh path [{visual_mesh_path}] does not exist"
+
         visual_mesh = get_prim_at_path(visual_mesh_path)
-        if visual_mesh.GetTypeName() != "Mesh":
-            print(f"WARNING: visual mesh path [{visual_mesh_path}] does not have type Mesh "
-                  f"(likely because there are multiple visual meshes). Skipped.")
-            continue
+        assert visual_mesh.GetTypeName() == "Mesh", \
+            f"WARNING: visual mesh path [{visual_mesh_path}] does not have type Mesh " \
+            f"(likely because there are multiple visual meshes)."
 
         execute("MovePrim", path_from=visual_mesh.GetPrimPath(), path_to=prim.GetPrimPath().AppendPath("base_link"))
 
@@ -121,60 +123,3 @@ for category in CLOTH_CATEGORIES:
         print(f"Done: {cloth_usd_file}")
 
 app.close()
-
-        # if os.path.isfile(usd_file):
-        #     assert open_stage(usd_file)
-        #     stage = get_current_stage()
-        #     prim = stage.GetDefaultPrim()
-        #
-        #     links = [child for child in prim.GetChildren() if child.GetTypeName() == "Xform"]
-        #     if len(links) != 1:
-        #         print(f"WARNING: [{usd_file}] has more than one link. Skipped.")
-        #         continue
-        #     link = links[0]
-        #
-        #     tmp_base_link_path = prim.GetPrimPath().AppendPath("base_link_backup")
-        #     execute("MovePrim", path_from=link.GetPrimPath(), path_to=tmp_base_link_path)
-        #
-        #     link = get_prim_at_path(tmp_base_link_path)
-        #
-        #     visual_mesh_path = tmp_base_link_path.AppendPath("visuals")
-        #     if not is_prim_path_valid(visual_mesh_path):
-        #         print(f"WARNING: visual mesh path [{visual_mesh_path}] does not exist. Skipped.")
-        #         continue
-        #     visual_mesh = get_prim_at_path(visual_mesh_path)
-        #     if visual_mesh.GetTypeName() != "Mesh":
-        #         print(f"WARNING: visual mesh path [{visual_mesh_path}] does not have type Mesh "
-        #               f"(likely because there are multiple visual meshes). Skipped.")
-        #         continue
-        #
-        #     execute("MovePrim", path_from=visual_mesh.GetPrimPath(), path_to=prim.GetPrimPath().AppendPath("base_link"))
-        #
-        #     stage.RemovePrim(tmp_base_link_path)
-        #
-        #     embed()
-        #     new_usd_file = usd_file[:-4] + "_cloth_test.usd"
-        #     stage.Export(new_usd_file)
-        #
-        #     print(f"New cloth usd created: {new_usd_file}")
-
-
-# import trimesh
-# import numpy as np
-#
-# THRESH = 0.05
-# # AREA_THRESH = (THRESH * THRESH) / 2.0
-# mesh = trimesh.load("carpet_0_m1_original.obj")
-# for i in range(100):
-#     # face_indices_from_area = np.where(mesh.area_faces > AREA_THRESH)[0]
-#     edge_indices = np.where(mesh.edges_unique_length > THRESH)[0]
-#     face_indices_from_edge_length = \
-#     np.where([len(np.intersect1d(face, edge_indices)) == 3 for face in mesh.faces_unique_edges])[0]
-#     # face_indices = np.union1d(face_indices_from_area, face_indices_from_edge_length)
-#     face_indices = face_indices_from_edge_length
-#     if len(face_indices) == 0:
-#         break
-#     mesh = mesh.subdivide(face_indices)
-#     print(f"iter: {i}, # faces: {len(mesh.faces)}")
-# mesh.export("test.obj", file_type="obj")
-#
