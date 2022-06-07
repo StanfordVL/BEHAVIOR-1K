@@ -222,6 +222,9 @@ def generate_points_in_volume_checker_function(obj, volume_link):
             face_centroids = msh.vertices[msh.faces].mean(axis=1)
             face_normals = msh.face_normals
 
+            # This function assumes that:
+            # 1. @particle_positions are in the local container_link frame
+            # 2. the @check_points_in_[...] function will convert them into the local @mesh frame
             fcn = lambda mesh, particle_positions: check_points_in_convex_hull_mesh(
                 mesh_face_centroids=face_centroids,
                 mesh_face_normals=face_normals,
@@ -295,6 +298,7 @@ def generate_points_in_volume_checker_function(obj, volume_link):
             # Aggregate values across all subvolumes
             # NOTE: Assumes all volumes are strictly disjointed (becuase we sum over all subvolumes to calculate
             # total raw volume)
+            # TODO: Is there a way we can explicitly check if disjointed?
             vols = [calc_fcn(mesh) * np.product(mesh.GetAttribute("xformOp:scale").Get())
                     for calc_fcn, mesh in zip(volume_calc_fcns, container_meshes)]
             # Aggregate over all volumes and scale by the link's global scale
