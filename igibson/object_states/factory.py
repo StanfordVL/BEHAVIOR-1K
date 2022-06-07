@@ -74,7 +74,7 @@ _ABILITY_TO_STATE_MAPPING = {
     "toggleable": [ToggledOn],
     "waterSource": [WaterSource],
     "waterSink": [WaterSink],
-    "filled": [Filled],
+    "fillable": [Filled],
 }
 
 _DEFAULT_STATE_SET = frozenset(

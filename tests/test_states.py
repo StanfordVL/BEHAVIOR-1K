@@ -1109,7 +1109,7 @@ def test_water_filled():
             name=f"{name}",
             scale=0.3,
             abilities={
-                "filled": {"fluid": "Water"},
+                "fillable": {"fluid": "Water"},
             },
         )
         sim.import_object(obj)
