@@ -90,8 +90,9 @@ def check_points_in_cylinder(size, pos, quat, scale, particle_positions):
         scale=scale,
         particle_positions=particle_positions,
     )
-    in_height = (-size[1] / 2.0 < particle_positions[:, -1]) & (particle_positions[:, -1] < size[1] / 2.0)
-    in_radius = np.linalg.norm(particle_positions[:, :-1], axis=-1) < size[0]
+    radius, height = size
+    in_height = (-height / 2.0 < particle_positions[:, -1]) & (particle_positions[:, -1] < height / 2.0)
+    in_radius = np.linalg.norm(particle_positions[:, :-1], axis=-1) < radius
     return in_height & in_radius
 
 
