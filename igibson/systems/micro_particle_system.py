@@ -938,6 +938,7 @@ class FluidSystem(MicroParticleSystem):
             float: Radius for the particles to be generated, since all fluids are composed of spheres
         """
         # Magic number from omni tutorials
+        # See https://docs.omniverse.nvidia.com/prod_extensions/prod_extensions/ext_physics.html#offset-autocomputation
         return 0.99 * 0.6 * cls.particle_contact_offset
 
     @classmethod
