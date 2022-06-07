@@ -450,7 +450,6 @@ class DatasetObject(USDObject):
             scale = np.ones(3)
             if self.avg_obj_dims is not None:
                 # Find the average volume, and scale accordingly relative to the native volume based on the bbox
-                spec_vol = self.avg_obj_dims["size"][0] * self.avg_obj_dims["size"][1] * self.avg_obj_dims["size"][2]
                 volume_ratio = np.product(self.avg_obj_dims["size"]) / np.product(self.native_bbox)
                 size_ratio = np.cbrt(volume_ratio)
                 scale *= size_ratio
@@ -502,6 +501,22 @@ class DatasetObject(USDObject):
 
         # Run super last
         super()._post_load()
+
+        # Assign realistic density and mass based on average object category spec
+        if self.avg_obj_dims is not None:
+            v_ratio = (np.product(self.native_bbox) * np.product(self.scale)) / np.product(self.avg_obj_dims["size"])
+            mass = self.avg_obj_dims["mass"] * v_ratio
+            if self._prim_type == PrimType.RIGID:
+                # Assume each link has the same density
+                density = mass / self.volume
+                for link in self._links.values():
+                    # Overwrite the original, inaccurate mass value
+                    link.mass = 0.0
+                    link.density = density
+
+            elif self._prim_type == PrimType.CLOTH:
+                # Cloth cannot set density. Internally omni evenly distributes the mass to each particle
+                self._links["base_link"].mass = mass
 
         # Lastly, after post loading (which includes loading / registering the links internally)
         # check for any metalinks. If there are any, we disable gravity and collisions for them
@@ -558,11 +573,15 @@ class DatasetObject(USDObject):
 
     @property
     def native_bbox(self):
-        # Native bbox must be specified for dataset objects!
-        native_bbox = super().native_bbox
-        assert native_bbox is not None, f"This dataset object '{self.name}' is expected to have native_bbox specified," \
-                                        f" but found none!"
-        return native_bbox
+        """
+        Get this object's native bounding box
+
+        Returns:
+            None or 3-array: (x,y,z) bounding box
+        """
+        assert "ig:nativeBB" in self.property_names, \
+            f"This dataset object '{self.name}' is expected to have native_bbox specified, but found none!"
+        return np.array(self.get_attribute(attr="ig:nativeBB"))
 
     @property
     def base_link_offset(self):

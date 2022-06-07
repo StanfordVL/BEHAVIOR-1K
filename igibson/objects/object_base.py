@@ -197,9 +197,24 @@ class BaseObject(EntityPrim, metaclass=ABCMeta):
 
     @mass.setter
     def mass(self, mass):
-        # Cannot set mass directly for this object!
         raise NotImplementedError("Cannot set mass directly for an object!")
-    
+
+    @property
+    def volume(self):
+        """
+        Returns:
+             float: Cumulative volume of this potentially articulated object.
+        """
+        volume = 0.0
+        for link in self._links.values():
+            volume += link.volume
+
+        return volume
+
+    @volume.setter
+    def volume(self, volume):
+        raise NotImplementedError("Cannot set volume directly for an object!")
+
     @property
     def link_prim_paths(self):
         return [link.prim_path for link in self._links.values()]

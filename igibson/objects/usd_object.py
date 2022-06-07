@@ -106,18 +106,3 @@ class USDObject(StatefulObject):
             load_config=load_config,
             abilities=self._abilities,
         )
-
-    @property
-    def bbox(self):
-        # Override this function to pull directly from the native_bbox property if it exists
-        return super().bbox if self.native_bbox is not None else self.native_bbox * self.scale
-
-    @property
-    def native_bbox(self):
-        """
-        Get this object's native bounding box
-
-        Returns:
-            None or 3-array: (x,y,z) bounding box if it exists, else None
-        """
-        return np.array(self.get_attribute(attr="ig:nativeBB")) if "ig:nativeBB" in self.property_names else None

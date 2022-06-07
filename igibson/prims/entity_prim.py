@@ -64,7 +64,6 @@ class EntityPrim(XFormPrim):
         self._default_joints_state = None
         self._links = None
         self._joints = None
-        self._mass = None
         self._visual_only = None
 
         # Run super init

@@ -210,8 +210,11 @@ def generate_points_in_volume_checker_function(obj, volume_link):
         mesh_type = sub_container_mesh.GetTypeName()
         if mesh_type == "Mesh":
             # For efficiency, we pre-compute the mesh using trimesh and find its corresponding faces and normals
+            face_vertex_counts = np.array(sub_container_mesh.GetAttribute("faceVertexCounts").Get())
+            if not (np.unique(face_vertex_counts).shape[0] == 1 and np.unique(face_vertex_counts)[0] == 3):
+                raise ValueError(f"Cannot create volume checker function for non-triangular meshes")
             msh = trimesh.Trimesh(
-                    vertices=np.array(sub_container_mesh.GetAttribute("vertices").Get()),
+                    vertices=np.array(sub_container_mesh.GetAttribute("points").Get()),
                     faces=np.array(sub_container_mesh.GetAttribute("faceVertexIndices").Get()).reshape(-1, 3),
                     vertex_normals=np.array(sub_container_mesh.GetAttribute("normals").Get()),
                 )

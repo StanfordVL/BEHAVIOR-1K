@@ -150,7 +150,7 @@ def import_nested_models_metadata_from_element(element, model_pose_info, import_
                 bb = string_to_array(ele.get("bounding_box"))
                 pos = model_pose_info[name]["pos"]
                 quat = model_pose_info[name]["quat"]
-                import_obj_metadata(obj_category=category, obj_model=model, name=name, import_render_channels=import_render_channels)
+                import_obj_metadata(obj_category=category, obj_model=model, import_render_channels=import_render_channels)
                 obj_infos.add(obj_info)
 
         # If there's children nodes, we iterate over those
@@ -331,7 +331,7 @@ def add_xform_properties(prim):
 
 # TODO: Handle metalinks
 # TODO: Import heights per link folder into USD folder
-def import_obj_metadata(obj_category, obj_model, name, import_render_channels=False):
+def import_obj_metadata(obj_category, obj_model, import_render_channels=False):
     # Check if filepath exists
     model_root_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}"
     usd_path = f"{model_root_path}/usd/{obj_model}.usd"
