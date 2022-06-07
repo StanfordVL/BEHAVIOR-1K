@@ -27,27 +27,32 @@ from omni.physx.bindings._physx import (
 )
 import carb
 
-# Settings for Isosurface
-isregistry = carb.settings.acquire_settings_interface()
-# disable grid and lights
-dOptions = isregistry.get_as_int("persistent/app/viewport/displayOptions")
-dOptions &= ~(1 << 6 | 1 << 8)
-isregistry.set_int("persistent/app/viewport/displayOptions", dOptions)
-isregistry.set_bool(SETTING_UPDATE_TO_USD, True)
-isregistry.set_int(SETTING_NUM_THREADS, 8)
-isregistry.set_bool(SETTING_UPDATE_VELOCITIES_TO_USD, False)
-isregistry.set_bool(SETTING_UPDATE_PARTICLES_TO_USD, False)
-isregistry.set_int("persistent/simulation/minFrameRate", 60)
-isregistry.set_bool("rtx-defaults/pathtracing/lightcache/cached/enabled", False)
-isregistry.set_bool("rtx-defaults/pathtracing/cached/enabled", False)
-isregistry.set_int("rtx-defaults/pathtracing/fireflyFilter/maxIntensityPerSample", 10000)
-isregistry.set_int("rtx-defaults/pathtracing/fireflyFilter/maxIntensityPerSampleDiffuse", 50000)
-isregistry.set_float("rtx-defaults/pathtracing/optixDenoiser/blendFactor", 0.09)
-isregistry.set_int("rtx-defaults/pathtracing/aa/op", 2)
-isregistry.set_int("rtx-defaults/pathtracing/maxBounces", 32)
-isregistry.set_int("rtx-defaults/pathtracing/maxSpecularAndTransmissionBounces", 16)
-isregistry.set_int("rtx-defaults/post/dlss/execMode", 1)
-isregistry.set_int("rtx-defaults/translucency/maxRefractionBounces", 12)
+
+def set_carb_settings_for_fluid_isosurface():
+    """
+    Sets relevant rendering settings in the carb settings in order to use isosurface effectively
+    """
+    # Settings for Isosurface
+    isregistry = carb.settings.acquire_settings_interface()
+    # disable grid and lights
+    dOptions = isregistry.get_as_int("persistent/app/viewport/displayOptions")
+    dOptions &= ~(1 << 6 | 1 << 8)
+    isregistry.set_int("persistent/app/viewport/displayOptions", dOptions)
+    isregistry.set_bool(SETTING_UPDATE_TO_USD, True)
+    isregistry.set_int(SETTING_NUM_THREADS, 8)
+    isregistry.set_bool(SETTING_UPDATE_VELOCITIES_TO_USD, False)
+    isregistry.set_bool(SETTING_UPDATE_PARTICLES_TO_USD, False)     # TODO: Why does setting this value --> True result in no isosurface being rendered?
+    isregistry.set_int("persistent/simulation/minFrameRate", 60)
+    isregistry.set_bool("rtx-defaults/pathtracing/lightcache/cached/enabled", False)
+    isregistry.set_bool("rtx-defaults/pathtracing/cached/enabled", False)
+    isregistry.set_int("rtx-defaults/pathtracing/fireflyFilter/maxIntensityPerSample", 10000)
+    isregistry.set_int("rtx-defaults/pathtracing/fireflyFilter/maxIntensityPerSampleDiffuse", 50000)
+    isregistry.set_float("rtx-defaults/pathtracing/optixDenoiser/blendFactor", 0.09)
+    isregistry.set_int("rtx-defaults/pathtracing/aa/op", 2)
+    isregistry.set_int("rtx-defaults/pathtracing/maxBounces", 32)
+    isregistry.set_int("rtx-defaults/pathtracing/maxSpecularAndTransmissionBounces", 16)
+    isregistry.set_int("rtx-defaults/post/dlss/execMode", 1)
+    isregistry.set_int("rtx-defaults/translucency/maxRefractionBounces", 12)
 
 
 class PhysxParticleInstancer(BasePrim):
@@ -382,6 +387,10 @@ class MicroParticleSystem(BaseParticleSystem):
     def initialize(cls, simulator):
         # Run super first
         super().initialize(simulator=simulator)
+
+        # Set custom rendering settings if we're using a fluid isosurface
+        if cls.is_fluid and cls.use_isosurface:
+            set_carb_settings_for_fluid_isosurface()
 
         # Initialize class variables that are mutable so they don't get overridden by children classes
         cls.particle_instancers = OrderedDict()
