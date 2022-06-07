@@ -9,9 +9,11 @@ from omni.isaac.core.utils.stage import get_current_stage, get_stage_units, trav
 from omni.isaac.core.utils.bounds import compute_aabb, create_bbox_cache, compute_combined_aabb
 from omni.syntheticdata import helpers
 from pxr import Gf, Vt, Usd, Sdf, UsdGeom, UsdShade, UsdPhysics, PhysxSchema
+import carb
 import numpy as np
 
 from igibson.utils.constants import JointType
+from igibson.utils.types import PRIMITIVE_MESH_TYPES
 from igibson.utils.python_utils import assert_valid_key
 
 GF_TO_VT_MAPPING = {
@@ -313,3 +315,54 @@ def clear():
     CollisionAPI.clear()
     BoundingBoxAPI.clear()
 
+
+def create_mesh_prim_with_default_xform(primitive_type, prim_path, stage=None, u_patches=None, v_patches=None):
+    """
+    Computes the union of AABBs (world-frame oriented) for the prims specified at @prim_paths
+
+    Args:
+        primitive_type (str): Primitive mesh type, should be one of PRIMITIVE_MESH_TYPES to be valid
+        prim_path (str): Destination prim path to store the mesh prim
+        stage (Usd.Stage or None): If specified, should be specific stage to be used to load the mesh prim.
+            Otherwise, the current active stage will be used.
+        u_patches (int or None): If specified, should be an integer that represents how many segments to create in the
+            u-direction. E.g. 10 means 10 segments (and therefore 11 vertices) will be created.
+        v_patches (int or None): If specified, should be an integer that represents how many segments to create in the
+            v-direction. E.g. 10 means 10 segments (and therefore 11 vertices) will be created.
+            Both u_patches and v_patches need to be specified for them to be effective.
+    """
+
+    assert primitive_type in PRIMITIVE_MESH_TYPES, "Invalid primitive mesh type: {primitive_type}"
+    SETTING_U_SCALE = f"/persistent/app/mesh_generator/shapes/{primitive_type.lower()}/u_scale"
+    SETTING_V_SCALE = f"/persistent/app/mesh_generator/shapes/{primitive_type.lower()}/v_scale"
+    SETTING_HALF_SCALE = f"/persistent/app/mesh_generator/shapes/{primitive_type.lower()}/object_half_scale"
+    u_backup = carb.settings.get_settings().get(SETTING_U_SCALE)
+    v_backup = carb.settings.get_settings().get(SETTING_V_SCALE)
+    hs_backup = carb.settings.get_settings().get(SETTING_HALF_SCALE)
+    carb.settings.get_settings().set(SETTING_U_SCALE, 1)
+    carb.settings.get_settings().set(SETTING_V_SCALE, 1)
+
+    # Default half_scale (i.e. half-extent, half_height, radius) is 1.
+    # TODO (eric): change it to 0.5 once the mesh generator API accepts floating-number HALF_SCALE
+    #  (currently it only accepts integer-number and floors 0.5 into 0).
+    carb.settings.get_settings().set(SETTING_HALF_SCALE, 1)
+
+    stage = get_current_stage() if stage is None else stage
+    prim_path_from = Sdf.Path(omni.usd.get_stage_next_free_path(stage, primitive_type, True))
+    if u_patches is not None and v_patches is not None:
+        omni.kit.commands.execute(
+            "CreateMeshPrimWithDefaultXform",
+            prim_type=primitive_type,
+            u_patches=u_patches,
+            v_patches=v_patches,
+        )
+    else:
+        omni.kit.commands.execute(
+            "CreateMeshPrimWithDefaultXform",
+            prim_type=primitive_type,
+        )
+    omni.kit.commands.execute("MovePrim", path_from=prim_path_from, path_to=prim_path)
+
+    carb.settings.get_settings().set(SETTING_U_SCALE, u_backup)
+    carb.settings.get_settings().set(SETTING_V_SCALE, v_backup)
+    carb.settings.get_settings().set(SETTING_HALF_SCALE, hs_backup)

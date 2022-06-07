@@ -8,6 +8,17 @@ from omni.isaac.core.utils.types import JointsState as JS
 # See https://docs.omniverse.nvidia.com/py/isaacsim/source/extensions/omni.isaac.contact_sensor/docs/index.html?highlight=contact%20sensor#omni.isaac.contact_sensor._contact_sensor.CsRawData for more info.
 CsRawData = namedtuple("RawBodyData", ["time", "dt", "body0", "body1", "position", "normal", "impulse"])
 
+# Valid primitive mesh types
+PRIMITIVE_MESH_TYPES = {
+    "Cone",
+    "Cube",
+    "Cylinder",
+    "Disk",
+    "Plane",
+    "Sphere",
+    "Torus",
+}
+
 # Valid geom types
 GEOM_TYPES = {"Sphere", "Cube", "Capsule", "Cone", "Cylinder", "Mesh"}
 
