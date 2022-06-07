@@ -262,7 +262,7 @@ def import_rendering_channels(obj_prim, obj_category, model_root_path, usd_path)
                         # Apply the material if it exists
                         render_channel_fcn = RENDERING_CHANNEL_MAPPINGS.get(mat_type, None)
                         if render_channel_fcn is not None:
-                            render_channel_fcn(mat, os.path.join(mat_fpath, link_mat_file))
+                            render_channel_fcn(mat, os.path.join("materials", link_mat_file))
                         else:
                             # Warn user that we didn't find the correct rendering channel
                             print(f"Warning: could not find rendering channel function for material: {mat_type}, skipping")
@@ -283,7 +283,7 @@ def import_rendering_channels(obj_prim, obj_category, model_root_path, usd_path)
         # Apply the material if it exists
         render_channel_fcn = RENDERING_CHANNEL_MAPPINGS.get(mat_type, None)
         if render_channel_fcn is not None:
-            render_channel_fcn(default_mat, os.path.join(mat_fpath, mat_file))
+            render_channel_fcn(default_mat, os.path.join("materials", mat_file))
         else:
             # Warn user that we didn't find the correct rendering channel
             print(f"Warning: could not find rendering channel function for material: {mat_type}")
