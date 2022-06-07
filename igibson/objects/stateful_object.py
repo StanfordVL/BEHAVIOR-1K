@@ -214,17 +214,17 @@ class StatefulObject(BaseObject):
         self._emitter = emitter
 
         # Update settings.
-        bbox = self.bbox
+        bbox_extent = self.bbox_extent
         
         emitter.CreateAttribute("enabled", VT.Bool, False).Set(False)
         emitter.CreateAttribute("fuel", VT.Float, False).Set(1.0)
         emitter.CreateAttribute("coupleRateFuel", VT.Float, False).Set(0.5)
         emitter.CreateAttribute("coupleRateVelocity", VT.Float, False).Set(2.0)
-        emitter.CreateAttribute("halfSize", VT.Float3, False).Set((bbox[0]*0.4, bbox[1]*0.4, bbox[2]*0.15))
-        emitter.CreateAttribute("position", VT.Float3, False).Set((0, 0, bbox[2]*1.0))
+        emitter.CreateAttribute("halfSize", VT.Float3, False).Set((bbox_extent[0]*0.4, bbox_extent[1]*0.4, bbox_extent[2]*0.15))
+        emitter.CreateAttribute("position", VT.Float3, False).Set((0, 0, bbox_extent[2]*1.0))
         emitter.CreateAttribute("velocity", VT.Float3, False).Set((0, 0, 0))
 
-        simulate.CreateAttribute("densityCellSize", VT.Float, False).Set(bbox[2]*0.1)
+        simulate.CreateAttribute("densityCellSize", VT.Float, False).Set(bbox_extent[2]*0.1)
 
         vorticity.CreateAttribute("constantMask", VT.Float, False).Set(10.0)
 

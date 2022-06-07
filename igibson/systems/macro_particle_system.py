@@ -496,14 +496,14 @@ class VisualParticleSystem(MacroParticleSystem):
 
         # Sample scales of the particles to generate
         scales = np.random.uniform(cls.min_scale, cls.max_scale, (n_particles, 3))
-        bboxes = [(cls.particle_object.bbox * scale).tolist() for scale in scales]
+        bbox_extents = [(cls.particle_object.bbox_extent * scale).tolist() for scale in scales]
 
         # Sample locations for all particles
         # TODO: Does simulation need to play at this point in time? Answer: yes
         results = sample_cuboid_on_object(
             obj=obj,
             num_samples=n_particles,
-            cuboid_dimensions=bboxes,
+            cuboid_dimensions=bbox_extents,
             bimodal_mean_fraction=cls._SAMPLING_BIMODAL_MEAN_FRACTION,
             bimodal_stdev_fraction=cls._SAMPLING_BIMODAL_STDEV_FRACTION,
             axis_probabilities=cls._SAMPLING_AXIS_PROBABILITIES,
@@ -524,7 +524,7 @@ class VisualParticleSystem(MacroParticleSystem):
 
         else:
             # Use sampled points
-            for result, scale, bbox in zip(results, scales, bboxes):
+            for result, scale, bbox_extent in zip(results, scales, bbox_extents):
                 position, normal, quaternion, hit_link, reasons = result
 
                 # For now, we make sure all points were sampled successfully
@@ -535,7 +535,7 @@ class VisualParticleSystem(MacroParticleSystem):
                     surface_point = position
                     if cls._CLIP_INTO_OBJECTS:
                         # Shift the object halfway down.
-                        cuboid_base_to_center = particle.bbox[2] / 2.0
+                        cuboid_base_to_center = particle.bbox_extent[2] / 2.0
                         surface_point -= normal * cuboid_base_to_center
 
                     # Create particle
@@ -650,7 +650,7 @@ class StainSystem(VisualParticleSystem):
 
         # First set the bbox ranges -- depends on the object's bounding box
         obj = cls._group_objects[group]
-        median_aabb_dim = np.median(obj.bbox)
+        median_aabb_dim = np.median(obj.bbox_extent)
 
         # Compute lower and upper limits to bbox
         bbox_lower_limit_from_aabb = cls._BOUNDING_BOX_LOWER_LIMIT_FRACTION_OF_AABB * median_aabb_dim
@@ -668,7 +668,7 @@ class StainSystem(VisualParticleSystem):
         )
 
         # Convert these into scaling factors for the x and y axes for our particle object
-        particle_bbox = cls.particle_object.bbox
+        particle_bbox = cls.particle_object.bbox_extent
         cls.set_scale_limits(
             minimum=np.array([bbox_lower_limit / particle_bbox[0], bbox_lower_limit / particle_bbox[1], 1.0]),
             maximum=np.array([bbox_upper_limit / particle_bbox[0], bbox_upper_limit / particle_bbox[1], 1.0]),

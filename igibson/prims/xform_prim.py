@@ -446,12 +446,24 @@ class XFormPrim(BasePrim):
     @property
     def bbox(self):
         """
-        Get this xform's actual bounding box
+        Get this xform's actual bounding box, axis-aligned in the world frame
+
+        Returns:
+            2-tuple:
+                - 3-array: (x,y,z) lower corner of the bounding box
+                - 3-array: (x,y,z) upper corner of the bounding box
+        """
+        return BoundingBoxAPI.compute_aabb(self.prim_path)
+
+    @property
+    def bbox_extent(self):
+        """
+        Get this xform's actual bounding box extent
 
         Returns:
             3-array: (x,y,z) bounding box
         """
-        min_corner, max_corner = BoundingBoxAPI.compute_aabb(self.prim_path)
+        min_corner, max_corner = self.bbox
         return max_corner - min_corner
 
     @property
