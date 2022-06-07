@@ -86,10 +86,6 @@ class RigidPrim(XFormPrim):
         # run super first
         super()._post_load()
 
-        # Set visual only flag
-        self._visual_only = self._load_config["visual_only"] if \
-            "visual_only" in self._load_config and self._load_config["visual_only"] is not None else False
-
         # Apply rigid body and mass APIs
         self._rigid_api = UsdPhysics.RigidBodyAPI(self._prim) if self._prim.HasAPI(UsdPhysics.RigidBodyAPI) else \
             UsdPhysics.RigidBodyAPI.Apply(self._prim)
@@ -126,10 +122,13 @@ class RigidPrim(XFormPrim):
                 mesh_kwargs = {"prim_path": mesh_path, "name": f"{self._name}:{mesh_name}"}
                 if mesh.HasAPI(UsdPhysics.CollisionAPI):
                     self._collision_meshes[mesh_name] = CollisionGeomPrim(**mesh_kwargs)
-                    # Also set the collision enabling based on whether we're a visual only body
-                    self._collision_meshes[mesh_name].collision_enabled = not self._visual_only
                 else:
                     self._visual_meshes[mesh_name] = VisualGeomPrim(**mesh_kwargs)
+
+        # Set the visual-only attribute
+        # This automatically handles setting collisions / gravity appropriately
+        self.visual_only = self._load_config["visual_only"] if \
+            "visual_only" in self._load_config and self._load_config["visual_only"] is not None else False
 
         # Create contact sensor
         self._cs = _s.acquire_contact_sensor_interface()
@@ -170,10 +169,6 @@ class RigidPrim(XFormPrim):
             linear_velocity=lin_vel,
             angular_velocity=ang_vel,
         )
-
-        # Possibly disable gravity
-        if self._visual_only:
-            self.disable_gravity()
 
     # def _create_contact_sensor(self):
     #     """
@@ -425,6 +420,33 @@ class RigidPrim(XFormPrim):
                 this rigid body
         """
         return self._visual_meshes
+
+    @property
+    def visual_only(self):
+        """
+        Returns:
+            bool: Whether this link is a visual-only link (i.e.: no gravity or collisions applied)
+        """
+        return self._visual_only
+
+    @visual_only.setter
+    def visual_only(self, val):
+        """
+        Sets the visaul only state of this link
+
+        Args:
+            val (bool): Whether this link should be a visual-only link (i.e.: no gravity or collisions applied)
+        """
+        # Set gravity and collisions based on value
+        if val:
+            self.disable_collisions()
+            self.disable_gravity()
+        else:
+            self.enable_collisions()
+            self.enable_gravity()
+
+        # Also set the internal value
+        self._visual_only = val
 
     @property
     def volume(self):

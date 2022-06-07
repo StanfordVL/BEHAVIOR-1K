@@ -523,8 +523,8 @@ class DatasetObject(USDObject):
         for link in self._links.values():
             is_metalink = link.prim.GetAttribute("ig:is_metalink").Get() or False
             if is_metalink:
-                link.disable_collisions()
-                link.disable_gravity()
+                # Make sure this link is only visual (i.e.: no collisions or gravity enabled)
+                link.visual_only = True
 
     def set_bbox_center_position_orientation(self, pos, orn):
         # TODO - check to make sure works

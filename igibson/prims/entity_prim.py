@@ -149,10 +149,6 @@ class EntityPrim(XFormPrim):
         raise NotImplementedError("By default, an entity prim cannot be created from scratch.")
 
     def _post_load(self):
-        # Set visual only flag
-        self._visual_only = self._load_config["visual_only"] if \
-            "visual_only" in self._load_config and self._load_config["visual_only"] is not None else False
-
         # Setup links info FIRST before running any other post loading behavior
         # We iterate over all children of this object's prim,
         # and grab any that are presumed to be rigid bodies (i.e.: other Xforms)
@@ -166,7 +162,6 @@ class EntityPrim(XFormPrim):
                 link = RigidPrim(
                     prim_path=prim.GetPrimPath().__str__(),
                     name=f"{self._name}:{link_name}",
-                    load_config={"visual_only": self._visual_only},
                 )
                 # Also iterate through all children to infer joints and determine the children of those joints
                 # We will use this info to infer which link is the base link!
@@ -206,9 +201,10 @@ class EntityPrim(XFormPrim):
             link_a, link_b = self._links[a_name], self._links[b_name]
             link_a.add_filtered_collision_pair(prim=link_b)
 
-        # Possibly disable gravity
-        if self._visual_only:
-            self.disable_gravity()
+        # Set visual only flag
+        # This automatically handles setting collisions / gravity appropriately per-link
+        self.visual_only = self._load_config["visual_only"] if \
+            "visual_only" in self._load_config and self._load_config["visual_only"] is not None else False
 
         # Run super
         super()._post_load()
@@ -333,6 +329,29 @@ class EntityPrim(XFormPrim):
             np.ndarray: [description]
         """
         return self._dc.get_articulation_dof_properties(self._handle)
+
+    @property
+    def visual_only(self):
+        """
+        Returns:
+            bool: Whether this link is a visual-only link (i.e.: no gravity or collisions applied)
+        """
+        return self._visual_only
+
+    @visual_only.setter
+    def visual_only(self, val):
+        """
+        Sets the visaul only state of this link
+
+        Args:
+            val (bool): Whether this link should be a visual-only link (i.e.: no gravity or collisions applied)
+        """
+        # Iterate over all owned links and set their respective visual-only properties accordingly
+        for link in self._links.values():
+            link.visual_only = val
+
+        # Also set the internal value
+        self._visual_only = val
 
     def contact_list(self):
         """
