@@ -53,8 +53,7 @@ class FluidSink(AbsoluteObjectState, LinkBasedStateMixin):
 
         # Delete all recorded groups
         for name in names_to_remove:
-            inst = self.fluid_system.particle_instancers.pop(name)
-            self._simulator.stage.RemovePrim(inst.prim_path)
+            self.fluid_system.remove_particle_instancer(name)
 
     def _set_value(self, new_value):
         raise ValueError("set_value not supported for FluidSink.")
