@@ -19,6 +19,8 @@ from igibson.object_states.factory import (
 from igibson.object_states.object_state_base import REGISTERED_OBJECT_STATES, CachingEnabledObjectState
 from igibson.objects.object_base import BaseObject
 from igibson.renderer_settings.renderer_settings import RendererSettings
+from igibson.utils.constants import PrimType
+
 
 # Optionally import bddl for object taxonomy.
 try:
@@ -45,6 +47,7 @@ class StatefulObject(BaseObject):
             fixed_base=False,
             visual_only=False,
             self_collisions=False,
+            prim_type=PrimType.RIGID,
             load_config=None,
             abilities=None,
             **kwargs,
@@ -62,6 +65,7 @@ class StatefulObject(BaseObject):
         @param fixed_base: bool, whether to fix the base of this object or not
         visual_only (bool): Whether this object should be visual only (and not collide with any other objects)
         self_collisions (bool): Whether to enable self collisions for this object
+        prim_type (PrimType): Which type of prim the object is, Valid options are: {PrimType.RIGID, PrimType.CLOTH}
         load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
             loading this prim at runtime.
         @param abilities: dict in the form of {ability: {param: value}} containing
@@ -104,6 +108,7 @@ class StatefulObject(BaseObject):
             fixed_base=fixed_base,
             visual_only=visual_only,
             self_collisions=self_collisions,
+            prim_type=prim_type,
             load_config=load_config,
             **kwargs,
         )

@@ -14,6 +14,7 @@ from omni.physx.scripts import particleUtils
 from collections import OrderedDict
 import numpy as np
 from pxr import Gf, Vt, UsdShade, UsdGeom, PhysxSchema
+from omni.isaac.core.utils.stage import get_current_stage
 import logging
 
 
@@ -439,11 +440,11 @@ class MicroParticleSystem(BaseParticleSystem):
         raise NotImplementedError()
 
     @classproperty
-    def is_dynamic(cls):
+    def visual_only(cls):
         """
         Returns:
-            bool: Whether this particle system should be dynamic, i.e.: subject to collisions and physics. If False,
-                then generated particles will not move or collide
+            bool: Whether this particle system should be visual-only, i.e.: not subject to collisions and physics. If True,
+                the generated particles will not move or collide
         """
         raise NotImplementedError()
 
@@ -529,7 +530,7 @@ class MicroParticleSystem(BaseParticleSystem):
             prim_path=f"/World/{cls.name}",
             physics_scene_path=cls.simulator.get_physics_context().get_current_physics_scene_prim().GetPrimPath().pathString,
             particle_contact_offset=cls.particle_contact_offset,
-            visual_only=not cls.is_dynamic,
+            visual_only=cls.visual_only,
             smoothing=cls.use_smoothing,
             anisotropy=cls.use_anisotropy,
             isosurface=cls.use_isosurface,
@@ -603,7 +604,7 @@ class MicroParticleSystem(BaseParticleSystem):
             scales=np.random.uniform(cls.min_scale, cls.max_scale, size=(n_particles, 3)) if scales is None else scales,
             prototype_prim_paths=[pp.GetPrimPath().pathString for pp in cls.particle_prototypes],
             prototype_indices=prototype_indices,
-            enabled=cls.is_dynamic,
+            enabled=not cls.visual_only,
         )
 
         # Create the instancer object that wraps the raw prim
@@ -905,8 +906,8 @@ class FluidSystem(MicroParticleSystem):
         return True
 
     @classproperty
-    def is_dynamic(cls):
-        return True
+    def visual_only(cls):
+        return False
 
     @classproperty
     def use_smoothing(cls):
@@ -973,3 +974,39 @@ class WaterSystem(FluidSystem):
 
         # Return generated material
         return UsdShade.Material(get_prim_at_path(material_path))
+
+
+class ClothSystem(MicroParticleSystem):
+    """
+    Particle system class to simulate cloth.
+    """
+    @classproperty
+    def _register_system(cls):
+        # We should register this system since it's an "actual" system (not an intermediate class)
+        return True
+
+    @classproperty
+    def particle_contact_offset(cls):
+        # TODO (eric): figure out whether one offset can fit all
+        return 0.05
+
+    @classproperty
+    def visual_only(cls):
+        return False
+
+    @classproperty
+    def use_smoothing(cls):
+        return False
+
+    @classproperty
+    def use_anisotropy(cls):
+        return False
+
+    @classproperty
+    def use_isosurface(cls):
+        return False
+
+    @classmethod
+    def _create_particle_prototypes(cls):
+        return []
+

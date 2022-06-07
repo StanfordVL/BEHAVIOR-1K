@@ -24,6 +24,7 @@ class EmptyScene(Scene):
     def _load(self, simulator):
         # Load ground plane
         self.add_ground_plane(color=self.floor_plane_color, visible=self.floor_plane_visible)
+        self.initialize_systems(simulator)
 
     def get_random_point(self, floor=None):
         """

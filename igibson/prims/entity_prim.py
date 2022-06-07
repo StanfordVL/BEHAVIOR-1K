@@ -9,26 +9,25 @@
 from collections import Iterable, OrderedDict
 from typing import Optional, Tuple
 
-import carb
 import numpy as np
-from omni.isaac.core.controllers.articulation_controller import ArticulationController
-from omni.isaac.core.utils.prims import (
-    get_prim_at_path,
-    get_prim_parent,
-    get_prim_property,
-    is_prim_path_valid,
-    set_prim_property,
-)
+
 from omni.isaac.core.utils.rotations import gf_quat_to_np_array
 from omni.isaac.core.utils.transformations import tf_matrix_from_pose
 from omni.isaac.core.utils.types import DOFInfo
 from omni.isaac.dynamic_control import _dynamic_control
-from pxr import Gf, Usd, UsdGeom, UsdPhysics
+from pxr import Gf, Usd, UsdGeom
+from omni.isaac.core.controllers.articulation_controller import ArticulationController
 
+from omni.isaac.core.utils.prims import get_prim_property, set_prim_property, \
+    get_prim_parent, get_prim_at_path
+
+from igibson.prims.cloth_prim import ClothPrim
 from igibson.prims.joint_prim import JointPrim
 from igibson.prims.rigid_prim import RigidPrim
 from igibson.prims.xform_prim import XFormPrim
 from igibson.utils.types import JointsState
+from igibson.utils.constants import PrimType
+from igibson.utils.types import GEOM_TYPES
 
 
 class EntityPrim(XFormPrim):
@@ -74,6 +73,9 @@ class EntityPrim(XFormPrim):
             name=name,
             load_config=load_config,
         )
+
+        # This needs to be initialized to be used for _load() of PrimitiveObject
+        self._prim_type = self._load_config["prim_type"] if "prim_type" in self._load_config else PrimType.RIGID
 
     def _initialize(self):
         # Run super method
@@ -158,16 +160,15 @@ class EntityPrim(XFormPrim):
         self._links = OrderedDict()
         joint_children = set()
         for prim in self._prim.GetChildren():
-            # Only process prims that are an Xform
-            if prim.GetPrimTypeInfo().GetTypeName() == "Xform":
-                link_name = prim.GetName()
+            link = None
+            link_name = prim.GetName()
+            if self._prim_type == PrimType.RIGID and prim.GetPrimTypeInfo().GetTypeName() == "Xform":
+                # For rigid body object, process prims that are Xforms (e.g. rigid links)
                 link = RigidPrim(
                     prim_path=prim.GetPrimPath().__str__(),
                     name=f"{self._name}:{link_name}",
                     load_config={"visual_only": self._visual_only},
                 )
-                self._links[link_name] = link
-
                 # Also iterate through all children to infer joints and determine the children of those joints
                 # We will use this info to infer which link is the base link!
                 for child_prim in prim.GetChildren():
@@ -178,6 +179,16 @@ class EntityPrim(XFormPrim):
                         if len(relationships["physics:body0"].GetTargets()) > 0:
                             joint_children.add(relationships["physics:body1"].GetTargets()[0].pathString.split("/")[-1])
 
+            if self._prim_type == PrimType.CLOTH and prim.GetPrimTypeInfo().GetTypeName() in GEOM_TYPES:
+                # For cloth object, process prims that belong to any of the GEOM_TYPES (e.g. Cube, Mesh, etc)
+                link = ClothPrim(
+                    prim_path=prim.GetPrimPath().__str__(),
+                    name=f"{self._name}:{link_name}",
+                )
+
+            if link is not None:
+                self._links[link_name] = link
+
         # Infer the correct root link name -- this corresponds to whatever link does not have any joint existing
         # in the children joints
         valid_root_links = list(set(self._links.keys()) - joint_children)
@@ -186,6 +197,10 @@ class EntityPrim(XFormPrim):
         # assert len(valid_root_links) == 1, f"Only a single root link should have been found for this entity prim, " \
         #                                    f"but found multiple instead: {valid_root_links}"
         self._root_link_name = valid_root_links[0] if len(valid_root_links) == 1 else "base_link"
+
+        if self._prim_type == PrimType.CLOTH:
+            assert not self._visual_only, "Cloth cannot be visual-only."
+            assert len(self._links) == 1, "Cloth entity prim can only have one link."
 
         # Disable any requested collision pairs
         for a_name, b_name in self.disabled_collision_pairs:
@@ -859,7 +874,7 @@ class EntityPrim(XFormPrim):
                                                           quaternion is scalar-last (x, y, z, w). shape is (4, ).
                                                           Defaults to None, which means left unchanged.
         """
-        if self._root_handle is not None and self._dc.is_simulating():
+        if self._root_handle is not None and self._root_handle != _dynamic_control.INVALID_HANDLE and self._dc.is_simulating():
             current_position, current_orientation = self.get_position_orientation()
             if position is None:
                 position = current_position
@@ -878,7 +893,7 @@ class EntityPrim(XFormPrim):
                                            second index is quaternion orientation in the world frame of the prim.
                                            quaternion is scalar-last (x, y, z, w). shape is (4, ).
         """
-        if self._root_handle is not None and self._dc.is_simulating():
+        if self._root_handle is not None and self._root_handle != _dynamic_control.INVALID_HANDLE and self._dc.is_simulating():
             pose = self._dc.get_rigid_body_pose(self._root_handle)
             return np.asarray(pose.p), np.asarray(pose.r)
         else:
@@ -897,7 +912,7 @@ class EntityPrim(XFormPrim):
                                                           quaternion is scalar-last (x, y, z, w). shape is (4, ).
                                                           Defaults to None, which means left unchanged.
         """
-        if self._root_handle is not None and self._dc.is_simulating():
+        if self._root_handle is not None and self._root_handle != _dynamic_control.INVALID_HANDLE and self._dc.is_simulating():
             current_translation, current_orientation = self.get_local_pose()
             if translation is None:
                 translation = current_translation
@@ -930,7 +945,7 @@ class EntityPrim(XFormPrim):
                                            second index is quaternion orientation in the local frame of the prim.
                                            quaternion is scalar-last (x, y, z, w). shape is (4, ).
         """
-        if self._root_handle is not None and self._dc.is_simulating():
+        if self._root_handle is not None and self._root_handle != _dynamic_control.INVALID_HANDLE and self._dc.is_simulating():
             parent_world_tf = UsdGeom.Xformable(get_prim_parent(self._prim)).ComputeLocalToWorldTransform(
                 Usd.TimeCode.Default()
             )

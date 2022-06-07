@@ -82,12 +82,6 @@ class RigidPrim(XFormPrim):
             load_config=load_config,
         )
 
-    def _load(self, simulator=None):
-        # Run super first
-        prim = super()._load(simulator=simulator)
-
-        return prim
-
     def _post_load(self):
         # run super first
         super()._post_load()
