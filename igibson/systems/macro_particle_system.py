@@ -279,7 +279,15 @@ class MacroParticleSystem(BaseParticleSystem):
             int: Minimum unique ID number greater than zero that can be assigned to a new particle
         """
         # Aggregate all current particle IDs, and grab the unique minimum value
+        # Grab the current IDs -- we add -1 to them by default so that we're guaranteed to have a non-zero length
+        # array of IDs.
         current_idns = np.array([cls.particle_name2id(name=name) for name in cls.particles.keys()] + [-1])
+        # Grab the minimum, unique integer value greater than 0
+        # We do this by:
+        # 1. creating an integer sequence from 0 to max(current_idns) + 1
+        # 2. finding the subset of integers that are NOT shared with the current IDs we have
+        # 3. sorting these values in increasing order
+        # 4. grabbing the first number, which corresponds to the minimum, unique non-negative integer number
         return int(sorted(set(np.arange(current_idns.max() + 2)) - set(current_idns))[0])
 
 
