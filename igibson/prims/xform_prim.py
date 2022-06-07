@@ -145,6 +145,7 @@ class XFormPrim(BasePrim):
         else:
             xform_op_rot = UsdGeom.XformOp(self._prim.GetAttribute("xformOp:orient"))
         xformable.SetXformOpOrder([xform_op_translate, xform_op_rot, xform_op_scale])
+        # TODO: Figure out if we don't need this
         # Possibly set position and orientation
         # self.set_position_orientation(position=current_position, orientation=current_orientation)
         return
