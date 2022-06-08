@@ -192,6 +192,9 @@ class StatefulObject(BaseObject):
             self._create_steam_apis()
 
     def _create_texture_change_apis(self):
+        """
+        Create necessary apis for texture changes.
+        """
         looks_prim_path = f"{str(self._prim_path)}/Looks"
         looks_prim = get_prim_at_path(looks_prim_path)
         if not looks_prim:
@@ -205,7 +208,7 @@ class StatefulObject(BaseObject):
 
     def _create_steam_apis(self):
         """
-        Create necessary prims for steam effects.
+        Create necessary prims and apis for steam effects.
         """
         # Make sure that flow setting is enabled.
         renderer_setting = RendererSettings()
@@ -259,8 +262,7 @@ class StatefulObject(BaseObject):
         """
         self._emitter.CreateAttribute("enabled", VT.Bool, False).Set(value)
         if self._emitter is not None:
-            old_value = self._emitter.GetAttribute("enabled").Get()
-            if old_value != value:
+            if value != self._emitter.GetAttribute("enabled").Get():
                 self._emitter.GetAttribute("enabled").Set(value)
 
     def get_textures(self):
@@ -305,7 +307,8 @@ class StatefulObject(BaseObject):
     def _update_texture_change(self, object_state):
         """
         Update the texture based on the given object_state. E.g. if object_state is Frozen, update the diffuse color
-        to match the frozen state. If object_state is None, update the diffuse color to the default value.
+        to match the frozen state. If object_state is None, update the diffuse color to the default value. It modifies
+        the current albedo map by adding and scaling the values. See @self._update_albedo_value for details.
 
         Args:
             object_state (BooleanState or None): the object state that the diffuse color should match to
@@ -332,9 +335,11 @@ class StatefulObject(BaseObject):
             shader (UsdShade.Shader): the shader to use to update the albedo value
         """
         if object_state is None:
+            # This restore the albedo map to its original value
             albedo_add = 0.0
             diffuse_tint = (1.0, 1.0, 1.0)
         else:
+            # Query the object state for the parameters
             albedo_add, diffuse_tint = object_state.get_texture_change_params()
 
         if shader.GetInput("albedo_add").Get() != albedo_add:

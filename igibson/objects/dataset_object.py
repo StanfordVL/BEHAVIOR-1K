@@ -517,7 +517,9 @@ class DatasetObject(USDObject):
     def _update_texture_change(self, object_state):
         """
         Update the texture based on the given object_state. E.g. if object_state is Frozen, update the diffuse color
-        to match the frozen state. If object_state is None, update the diffuse color to the default value.
+        to match the frozen state. If object_state is None, update the diffuse color to the default value. It attempts
+        to load the cached texture map named DIFFUSE/albedo_[STATE_NAME].png. If the cached texture map does not exist,
+        it modifies the current albedo map by adding and scaling the values. See @self._update_albedo_value for details.
 
         Args:
             object_state (BooleanState or None): the object state that the diffuse color should match to
