@@ -8,9 +8,18 @@ from omni.isaac.core.utils.carb import set_carb_setting
 from omni.isaac.core.utils.stage import get_current_stage, get_stage_units, traverse_stage
 from omni.isaac.core.utils.bounds import compute_aabb, create_bbox_cache, compute_combined_aabb
 from omni.syntheticdata import helpers
+from omni.kit.primitive.mesh.evaluators.sphere import SphereEvaluator
+from omni.kit.primitive.mesh.evaluators.disk import DiskEvaluator
+from omni.kit.primitive.mesh.evaluators.plane import PlaneEvaluator
+from omni.kit.primitive.mesh.evaluators.cylinder import CylinderEvaluator
+from omni.kit.primitive.mesh.evaluators.torus import TorusEvaluator
+from omni.kit.primitive.mesh.evaluators.cone import ConeEvaluator
+from omni.kit.primitive.mesh.evaluators.cube import CubeEvaluator
+
 from pxr import Gf, Vt, Usd, Sdf, UsdGeom, UsdShade, UsdPhysics, PhysxSchema
 import carb
 import numpy as np
+import trimesh
 
 from igibson.utils.constants import JointType
 from igibson.utils.types import PRIMITIVE_MESH_TYPES
@@ -28,6 +37,16 @@ GF_TO_VT_MAPPING = {
     bool: Vt.BoolArray,
     str: Vt.StringArray,
     chr: Vt.CharArray,
+}
+
+MESH_PRIM_TYPE_TO_EVALUATOR_MAPPING = {
+    "Sphere": SphereEvaluator,
+    "Disk": DiskEvaluator,
+    "Plane": PlaneEvaluator,
+    "Cylinder": CylinderEvaluator,
+    "Torus": TorusEvaluator,
+    "Cone": ConeEvaluator,
+    "Cube": CubeEvaluator,
 }
 
 
@@ -333,19 +352,17 @@ def create_mesh_prim_with_default_xform(primitive_type, prim_path, stage=None, u
     """
 
     assert primitive_type in PRIMITIVE_MESH_TYPES, "Invalid primitive mesh type: {primitive_type}"
-    SETTING_U_SCALE = f"/persistent/app/mesh_generator/shapes/{primitive_type.lower()}/u_scale"
-    SETTING_V_SCALE = f"/persistent/app/mesh_generator/shapes/{primitive_type.lower()}/v_scale"
-    SETTING_HALF_SCALE = f"/persistent/app/mesh_generator/shapes/{primitive_type.lower()}/object_half_scale"
-    u_backup = carb.settings.get_settings().get(SETTING_U_SCALE)
-    v_backup = carb.settings.get_settings().get(SETTING_V_SCALE)
-    hs_backup = carb.settings.get_settings().get(SETTING_HALF_SCALE)
-    carb.settings.get_settings().set(SETTING_U_SCALE, 1)
-    carb.settings.get_settings().set(SETTING_V_SCALE, 1)
+    evaluator = MESH_PRIM_TYPE_TO_EVALUATOR_MAPPING[primitive_type]
+    u_backup = carb.settings.get_settings().get(evaluator.SETTING_U_SCALE)
+    v_backup = carb.settings.get_settings().get(evaluator.SETTING_V_SCALE)
+    hs_backup = carb.settings.get_settings().get(evaluator.SETTING_OBJECT_HALF_SCALE)
+    carb.settings.get_settings().set(evaluator.SETTING_U_SCALE, 1)
+    carb.settings.get_settings().set(evaluator.SETTING_V_SCALE, 1)
 
     # Default half_scale (i.e. half-extent, half_height, radius) is 1.
     # TODO (eric): change it to 0.5 once the mesh generator API accepts floating-number HALF_SCALE
     #  (currently it only accepts integer-number and floors 0.5 into 0).
-    carb.settings.get_settings().set(SETTING_HALF_SCALE, 1)
+    carb.settings.get_settings().set(evaluator.SETTING_OBJECT_HALF_SCALE, 1)
 
     stage = get_current_stage() if stage is None else stage
     prim_path_from = Sdf.Path(omni.usd.get_stage_next_free_path(stage, primitive_type, True))
@@ -363,6 +380,23 @@ def create_mesh_prim_with_default_xform(primitive_type, prim_path, stage=None, u
         )
     omni.kit.commands.execute("MovePrim", path_from=prim_path_from, path_to=prim_path)
 
-    carb.settings.get_settings().set(SETTING_U_SCALE, u_backup)
-    carb.settings.get_settings().set(SETTING_V_SCALE, v_backup)
-    carb.settings.get_settings().set(SETTING_HALF_SCALE, hs_backup)
+    carb.settings.get_settings().set(evaluator.SETTING_U_SCALE, u_backup)
+    carb.settings.get_settings().set(evaluator.SETTING_V_SCALE, v_backup)
+    carb.settings.get_settings().set(evaluator.SETTING_OBJECT_HALF_SCALE, hs_backup)
+
+
+def mesh_prim_to_trimesh_mesh(mesh_prim):
+    face_vertex_counts = np.array(mesh_prim.GetAttribute("faceVertexCounts").Get())
+    vertices = np.array(mesh_prim.GetAttribute("points").Get())
+    face_indices = np.array(mesh_prim.GetAttribute("faceVertexIndices").Get())
+
+    faces = []
+    i = 0
+    for count in face_vertex_counts:
+        for j in range(count - 2):
+            faces.append([face_indices[i], face_indices[i + j + 1], face_indices[i + j + 2]])
+        i += count
+
+    trimesh_mesh = trimesh.Trimesh(vertices=vertices, faces=faces)
+    assert trimesh_mesh.is_volume, f"Mesh prim [{mesh_prim.prim_path}] fails to be converted to a valid trimesh mesh."
+    return trimesh_mesh

@@ -20,7 +20,7 @@ import igibson.macros as m
 from igibson.prims.xform_prim import XFormPrim
 from igibson.prims.geom_prim import CollisionGeomPrim, VisualGeomPrim
 from igibson.utils.types import DynamicState, CsRawData, GEOM_TYPES
-import trimesh
+from igibson.utils.usd_utils import mesh_prim_to_trimesh_mesh
 
 # Import omni sensor based on type
 if m.IS_PUBLIC_ISAACSIM:
@@ -482,17 +482,8 @@ class RigidPrim(XFormPrim):
             assert mesh_type in GEOM_TYPES, f"Invalid collision mesh type: {mesh_type}"
             if mesh_type == "Mesh":
                 # We construct a trimesh object from this mesh in order to infer its volume
-                face_vertex_counts = np.array(mesh.GetAttribute("faceVertexCounts").Get())
-                if not (np.unique(face_vertex_counts).shape[0] == 1 and np.unique(face_vertex_counts)[0] == 3):
-                    raise ValueError(f"Cannot compute volume for non-triangular meshes")
-                trimesh_mesh = trimesh.Trimesh(
-                    vertices=np.array(mesh.GetAttribute("points").Get()),
-                    faces=np.array(mesh.GetAttribute("faceVertexIndices").Get()).reshape(-1, 3),
-                    vertex_normals=np.array(mesh.GetAttribute("normals").Get()),
-                )
-                assert trimesh_mesh.is_volume, f"Invalid collision mesh: {collision_mesh.prim_path}"
+                trimesh_mesh = mesh_prim_to_trimesh_mesh(mesh)
                 mesh_volume = trimesh_mesh.volume
-
             elif mesh_type == "Sphere":
                 mesh_volume = 4 / 3 * np.pi * (mesh.GetAttribute("radius").Get() ** 3)
             elif mesh_type == "Cube":

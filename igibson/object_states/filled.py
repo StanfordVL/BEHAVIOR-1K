@@ -5,7 +5,7 @@ from igibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from igibson.object_states.object_state_base import RelativeObjectState, BooleanState
 import igibson.utils.transform_utils as T
 from igibson.utils.python_utils import assert_valid_key
-import trimesh
+from igibson.utils.usd_utils import mesh_prim_to_trimesh_mesh
 
 
 if m.ENABLE_OMNI_PARTICLES:
@@ -212,16 +212,9 @@ def generate_points_in_volume_checker_function(obj, volume_link):
         mesh_type = sub_container_mesh.GetTypeName()
         if mesh_type == "Mesh":
             # For efficiency, we pre-compute the mesh using trimesh and find its corresponding faces and normals
-            face_vertex_counts = np.array(sub_container_mesh.GetAttribute("faceVertexCounts").Get())
-            if not (np.unique(face_vertex_counts).shape[0] == 1 and np.unique(face_vertex_counts)[0] == 3):
-                raise ValueError(f"Cannot create volume checker function for non-triangular meshes")
-            msh = trimesh.Trimesh(
-                    vertices=np.array(sub_container_mesh.GetAttribute("points").Get()),
-                    faces=np.array(sub_container_mesh.GetAttribute("faceVertexIndices").Get()).reshape(-1, 3),
-                    vertex_normals=np.array(sub_container_mesh.GetAttribute("normals").Get()),
-                )
-            face_centroids = msh.vertices[msh.faces].mean(axis=1)
-            face_normals = msh.face_normals
+            trimesh_mesh = mesh_prim_to_trimesh_mesh(sub_container_mesh)
+            face_centroids = trimesh_mesh.vertices[trimesh_mesh.faces].mean(axis=1)
+            face_normals = trimesh_mesh.face_normals
 
             # This function assumes that:
             # 1. @particle_positions are in the local container_link frame
@@ -234,7 +227,7 @@ def generate_points_in_volume_checker_function(obj, volume_link):
                 scale=np.array(mesh.GetAttribute("xformOp:scale").Get()),
                 particle_positions=particle_positions,
             )
-            vol_fcn = lambda mesh: msh.volume * np.product()
+            vol_fcn = lambda mesh: trimesh_mesh.volume
         elif mesh_type == "Sphere":
             fcn = lambda mesh, particle_positions: check_points_in_sphere(
                 size=mesh.GetAttribute("radius").Get(),
