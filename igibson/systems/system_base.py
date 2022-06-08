@@ -62,6 +62,13 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
         """
         pass
 
+    @classmethod
+    def reset(cls):
+        """
+        Reset this system
+        """
+        pass
+
     def __init__(self):
         raise ValueError("System classes should not be created!")
 

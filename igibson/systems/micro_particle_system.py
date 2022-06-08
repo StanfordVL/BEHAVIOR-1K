@@ -367,6 +367,9 @@ class MicroParticleSystem(BaseParticleSystem):
     min_scale = None                # (x,y,z) scaling
     max_scale = None                # (x,y,z) scaling
 
+    # Max particle instancer identification number -- this monotonically increases until reset() is called
+    max_instancer_idn = None
+
     @classproperty
     def n_particles(cls):
         """
@@ -398,6 +401,9 @@ class MicroParticleSystem(BaseParticleSystem):
         # Set the default scales
         cls.min_scale = np.ones(3)
         cls.max_scale = np.ones(3)
+
+        # Initialize max instancer idn
+        cls.max_instancer_idn = -1
 
         # Create the particle system
         cls.prim = cls._create_particle_system()
@@ -432,6 +438,12 @@ class MicroParticleSystem(BaseParticleSystem):
         #     prototype_prim_paths=[pp.GetPrimPath().pathString for pp in cls.particle_prototypes],
         #     enabled=cls.is_dynamic,
         # )
+
+    @classmethod
+    def reset(cls):
+        # Reset all internal variables
+        cls.remove_all_particle_instancers()
+        cls.max_instancer_idn = -1
 
     @classproperty
     def state_size(cls):
@@ -590,9 +602,9 @@ class MicroParticleSystem(BaseParticleSystem):
 
         # Automatically generate an identification number for this instancer if none is specified
         if idn is None:
-            idns = [cls.particle_instancer_name_to_idn(name) for name in cls.particle_instancers.keys()]
-            max_idn = max(idns) if len(idns) > 0 else -1
-            idn = max_idn + 1
+            idn = cls.max_instancer_idn + 1
+            # Also increment this counter
+            cls.max_instancer_idn += 1
 
         # Generate standardized prim path for this instancer
         name = cls.particle_instancer_idn_to_name(idn=idn)

@@ -29,6 +29,9 @@ class MacroParticleSystem(BaseParticleSystem):
     min_scale = None              # (x,y,z) scaling
     max_scale = None              # (x,y,z) scaling
 
+    # Max particle identification number -- this monotonically increases until reset() is called
+    max_particle_idn = None
+
     @classmethod
     def initialize(cls, simulator):
         # Run super method first
@@ -38,6 +41,13 @@ class MacroParticleSystem(BaseParticleSystem):
         cls.particles = OrderedDict()
         cls.min_scale = np.ones(3)
         cls.max_scale = np.ones(3)
+        cls.max_particle_idn = -1
+
+    @classmethod
+    def reset(cls):
+        # Reset all internal variables
+        cls.remove_all_particles()
+        cls.max_particle_idn = -1
 
     @classproperty
     def n_particles(cls):
@@ -215,6 +225,9 @@ class MacroParticleSystem(BaseParticleSystem):
         # Track this particle as well
         cls.particles[new_particle.name] = new_particle
 
+        # Increment idn counter
+        cls.max_particle_idn += 1
+
         return new_particle
 
     @classmethod
@@ -277,18 +290,9 @@ class MacroParticleSystem(BaseParticleSystem):
         """
         Returns:
             int: Minimum unique ID number greater than zero that can be assigned to a new particle
+                Note: This is
         """
-        # Aggregate all current particle IDs, and grab the unique minimum value
-        # Grab the current IDs -- we add -1 to them by default so that we're guaranteed to have a non-zero length
-        # array of IDs.
-        current_idns = np.array([cls.particle_name2id(name=name) for name in cls.particles.keys()] + [-1])
-        # Grab the minimum, unique integer value greater than 0
-        # We do this by:
-        # 1. creating an integer sequence from 0 to max(current_idns) + 1
-        # 2. finding the subset of integers that are NOT shared with the current IDs we have
-        # 3. sorting these values in increasing order
-        # 4. grabbing the first number, which corresponds to the minimum, unique non-negative integer number
-        return int(sorted(set(np.arange(current_idns.max() + 2)) - set(current_idns))[0])
+        return cls.max_particle_idn + 1
 
 
 class VisualParticleSystem(MacroParticleSystem):
