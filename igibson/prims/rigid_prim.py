@@ -260,7 +260,7 @@ class RigidPrim(XFormPrim):
         Args:
             velocity (np.ndarray): linear velocity to set the rigid prim to. Shape (3,).
         """
-        if self._handle is not None and self._dc.is_simulating():
+        if self.dc_is_accessible:
             self._dc.set_rigid_body_linear_velocity(self._handle, velocity)
         else:
             self._rigid_api.GetVelocityAttr().Set(Gf.Vec3f(velocity.tolist()))
@@ -271,7 +271,7 @@ class RigidPrim(XFormPrim):
         Returns:
             np.ndarray: current linear velocity of the the rigid prim. Shape (3,).
         """
-        if self._handle is not None and self._dc.is_simulating():
+        if self.dc_is_accessible:
             lin_vel = np.array(self._dc.get_rigid_body_linear_velocity(self._handle))
         else:
             lin_vel = self._rigid_api.GetVelocityAttr().Get()
@@ -283,7 +283,7 @@ class RigidPrim(XFormPrim):
         Args:
             velocity (np.ndarray): angular velocity to set the rigid prim to. Shape (3,).
         """
-        if self._handle is not None and self._dc.is_simulating():
+        if self.dc_is_accessible:
             self._dc.set_rigid_body_angular_velocity(self._handle, velocity)
         else:
             self._rigid_api.GetAngularVelocityAttr().Set(Gf.Vec3f(velocity.tolist()))
@@ -294,7 +294,7 @@ class RigidPrim(XFormPrim):
         Returns:
             np.ndarray: current angular velocity of the the rigid prim. Shape (3,).
         """
-        if self._handle is not None and self._dc.is_simulating():
+        if self.dc_is_accessible:
             return np.array(self._dc.get_rigid_body_angular_velocity(self._handle))
         else:
             return np.array(self._rigid_api.GetAngularVelocityAttr().Get())
@@ -310,7 +310,7 @@ class RigidPrim(XFormPrim):
                                                           quaternion is scalar-last (x, y, z, w). shape is (4, ).
                                                           Defaults to None, which means left unchanged.
         """
-        if self._handle is not None and self._dc.is_simulating():
+        if self.dc_is_accessible:
             current_position, current_orientation = self.get_position_orientation()
             if position is None:
                 position = current_position
@@ -331,7 +331,7 @@ class RigidPrim(XFormPrim):
                                            second index is quaternion orientation in the world frame of the prim.
                                            quaternion is scalar-last (x, y, z, w). shape is (4, ).
         """
-        if self._handle is not None and self._dc.is_simulating():
+        if self.dc_is_accessible:
             pose = self._dc.get_rigid_body_pose(self._handle)
             pos, ori = np.asarray(pose.p), np.asarray(pose.r)
         else:
@@ -352,7 +352,7 @@ class RigidPrim(XFormPrim):
                                                           quaternion is scalar-last (x, y, z, w). shape is (4, ).
                                                           Defaults to None, which means left unchanged.
         """
-        if self._handle is not None and self._dc.is_simulating():
+        if self.dc_is_accessible:
             current_translation, current_orientation = self.get_local_pose()
             translation = current_translation if translation is None else translation
             orientation = current_orientation if orientation is None else orientation
@@ -382,7 +382,7 @@ class RigidPrim(XFormPrim):
                                            second index is quaternion orientation in the local frame of the prim.
                                            quaternion is scalar-last (x, y, z, w). shape is (4, ).
         """
-        if self._handle is not None and self._dc.is_simulating():
+        if self.dc_is_accessible:
             parent_world_tf = UsdGeom.Xformable(get_prim_parent(self._prim)).ComputeLocalToWorldTransform(
                 Usd.TimeCode.Default()
             )
@@ -505,7 +505,17 @@ class RigidPrim(XFormPrim):
         Returns:
             float: mass of the rigid body in kg.
         """
-        return self._mass_api.GetMassAttr().Get()
+        raw_usd_mass = self._mass_api.GetMassAttr().Get()
+        # If our raw_usd_mass isn't specified, we check dynamic control if possible (sim is playing),
+        # otherwise we fallback to analytical computation of volume * density
+        if raw_usd_mass != 0:
+            mass = raw_usd_mass
+        elif self.dc_is_accessible:
+            mass = self.rigid_body_properties.mass
+        else:
+            mass = self.volume * self.density
+
+        return mass
 
     @mass.setter
     def mass(self, mass):
@@ -521,7 +531,19 @@ class RigidPrim(XFormPrim):
         Returns:
             float: density of the rigid body in kg / m^3.
         """
-        return self._mass_api.GetDensityAttr().Get()
+        raw_usd_mass = self._mass_api.GetMassAttr().Get()
+        # We first check if the raw usd mass is specified, since mass overrides density
+        # If it's specified, we infer density based on that value divided by volume
+        # Otherwise, we try to directly grab the raw usd density value, and if that value
+        # does not exist, we return 1000 since that is the canonical density assigned by omniverse
+        if raw_usd_mass != 0:
+            density = raw_usd_mass / self.volume
+        else:
+            density = self._mass_api.GetDensityAttr().Get()
+            if density == 0:
+                density = 1000.0
+
+        return density
 
     @density.setter
     def density(self, density):
@@ -538,6 +560,26 @@ class RigidPrim(XFormPrim):
             bool: Whether contact reporting is enabled for this rigid prim or not
         """
         return self._prim.HasAPI(PhysxSchema.PhysxContactReportAPI)
+
+    @property
+    def rigid_body_properties(self):
+        """
+        Returns:
+            None or RigidBodyProperty: Properties for this rigid body, if accessible. If they do not exist or
+                dc cannot be queried, this will return None
+        """
+        return self._dc.get_rigid_body_properties(self._handle) if self.dc_is_accessible else None
+
+    @property
+    def dc_is_accessible(self):
+        """
+        Checks if dynamic control interface is accessible (checks whether we have a dc handle for this body
+        and if dc is simulating)
+
+        Returns:
+            bool: Whether dc interface can be used or not
+        """
+        return self._handle is not None and self._dc.is_simulating()
 
     # def reset(self):
     #     """
