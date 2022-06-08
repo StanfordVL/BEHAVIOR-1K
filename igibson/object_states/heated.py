@@ -2,7 +2,6 @@ import numpy as np
 
 from igibson.object_states.object_state_base import AbsoluteObjectState, BooleanState, NONE
 from igibson.object_states.temperature import Temperature
-from igibson.object_states.steam_state_mixin import SteamStateMixin
 
 _DEFAULT_HEAT_TEMPERATURE = 40
 
@@ -12,7 +11,7 @@ _HEATED_SAMPLING_RANGE_MIN = 10.0
 _HEATED_SAMPLING_RANGE_MAX = 20.0
 
 
-class Heated(AbsoluteObjectState, BooleanState, SteamStateMixin):
+class Heated(AbsoluteObjectState, BooleanState):
     def __init__(self, obj, heat_temperature=_DEFAULT_HEAT_TEMPERATURE):
         super(Heated, self).__init__(obj)
         self.heat_temperature = heat_temperature
@@ -36,6 +35,3 @@ class Heated(AbsoluteObjectState, BooleanState, SteamStateMixin):
         return self.obj.states[Temperature].get_value() >= self.heat_temperature
 
     # Nothing needs to be done to save/load Heated since it will happen due to temperature caching.
-
-    def _update(self):
-        self.update_steam()

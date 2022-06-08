@@ -3,7 +3,6 @@ from collections import OrderedDict
 
 from igibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from igibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
-from igibson.object_states.texture_change_state_mixin import TextureChangeStateMixin
 from igibson.utils.constants import SemanticClass, SimulatorMode
 
 _TOGGLE_DISTANCE_THRESHOLD = 0.1
@@ -12,7 +11,7 @@ _TOGGLE_BUTTON_SCALE = 0.05
 _CAN_TOGGLE_STEPS = 5
 
 
-class ToggledOn(AbsoluteObjectState, BooleanState, TextureChangeStateMixin, LinkBasedStateMixin):
+class ToggledOn(AbsoluteObjectState, BooleanState, LinkBasedStateMixin):
     def __init__(self, obj):
         super(ToggledOn, self).__init__(obj)
         self.value = False
@@ -89,7 +88,13 @@ class ToggledOn(AbsoluteObjectState, BooleanState, TextureChangeStateMixin, Link
         show_marker.visible = True
         hidden_marker.visible = False
 
-        self.update_texture()
+    @staticmethod
+    def get_texture_change_params():
+        # Increase all channels by 0.1
+        albedo_add = 0.1
+        # Then scale all channels by 1.5x
+        diffuse_tint = (1.5, 1.5, 1.5)
+        return albedo_add, diffuse_tint
 
     @property
     def settable(self):

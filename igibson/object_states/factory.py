@@ -94,9 +94,35 @@ _STEAM_STATE_SET = frozenset(
     ]
 )
 
+_TEXTURE_CHANGE_STATE_SET = frozenset(
+    [
+        Burnt,
+        Cooked,
+        Frozen,
+        Soaked,
+        ToggledOn
+    ]
+)
+
+_TEXTURE_CHANGE_PRIORITY = {
+    Frozen: 4,
+    Burnt: 3,
+    Cooked: 2,
+    Soaked: 1,
+    ToggledOn: 0,
+}
+
 
 def get_steam_states():
     return _STEAM_STATE_SET
+
+
+def get_texture_change_states():
+    return _TEXTURE_CHANGE_STATE_SET
+
+
+def get_texture_change_priority():
+    return _TEXTURE_CHANGE_PRIORITY
 
 
 def get_default_states():

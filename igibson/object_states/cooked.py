@@ -1,11 +1,11 @@
 from igibson.object_states.max_temperature import MaxTemperature
 from igibson.object_states.object_state_base import AbsoluteObjectState, BooleanState, NONE
-from igibson.object_states.texture_change_state_mixin import TextureChangeStateMixin
+import numpy as np
 
 _DEFAULT_COOK_TEMPERATURE = 70
 
 
-class Cooked(AbsoluteObjectState, BooleanState, TextureChangeStateMixin):
+class Cooked(AbsoluteObjectState, BooleanState):
     def __init__(self, obj, cook_temperature=_DEFAULT_COOK_TEMPERATURE):
         super(Cooked, self).__init__(obj)
         self.cook_temperature = cook_temperature
@@ -28,8 +28,13 @@ class Cooked(AbsoluteObjectState, BooleanState, TextureChangeStateMixin):
     def _get_value(self):
         return self.obj.states[MaxTemperature].get_value() >= self.cook_temperature
 
+    @staticmethod
+    def get_texture_change_params():
+        # Increase all channels by 0.1
+        albedo_add = 0.1
+        # Then scale up "brown" color and scale down others
+        diffuse_tint = (1.5, 0.75, 0.25)
+        return albedo_add, diffuse_tint
+
     # Nothing needs to be done to save/load Burnt since it will happen due to
     # MaxTemperature caching.
-
-    def _update(self):
-        self.update_texture()

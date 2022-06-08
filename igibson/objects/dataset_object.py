@@ -14,6 +14,9 @@ import numpy as np
 import trimesh
 from scipy.spatial.transform import Rotation
 
+from omni.isaac.core.utils.prims import get_prim_at_path
+from omni.usd import get_shader_from_material
+
 import igibson
 from igibson.objects.usd_object import USDObject
 from igibson.utils.constants import AVERAGE_CATEGORY_SPECS, DEFAULT_JOINT_FRICTION, SPECIAL_JOINT_FRICTIONS, JointType
@@ -510,6 +513,50 @@ class DatasetObject(USDObject):
             if is_metalink:
                 link.disable_collisions()
                 link.disable_gravity()
+
+    def _update_texture_change(self, object_state):
+        """
+        Update the texture based on the given object_state. E.g. if object_state is Frozen, update the diffuse color
+        to match the frozen state. If object_state is None, update the diffuse color to the default value.
+
+        Args:
+            object_state (BooleanState or None): the object state that the diffuse color should match to
+        """
+        state_name = object_state.__name__ if object_state is not None else None
+        # Find the material prims to update.
+        looks_prim_path = f"{str(self._prim_path)}/Looks"
+        looks_prim = get_prim_at_path(looks_prim_path)
+        if not looks_prim:
+            return
+        for subprim in looks_prim.GetChildren():
+            if subprim.GetPrimTypeInfo().GetTypeName() != "Material":
+                continue
+            shader = get_shader_from_material(subprim)
+            texture_path = shader.GetInput("diffuse_texture").Get()
+            assert texture_path is not None, f"DatasetObject [{self.prim_path}] has invalid diffuse texture map."
+
+            # Get updated texture file path for state.
+            texture_absolute_path = texture_path.resolvedPath
+            texture_path_split = texture_absolute_path.split("/")
+            filedir, filename = "/".join(texture_path_split[:-1]), texture_path_split[-1]
+            assert filename[-4:] == ".png", f"Texture file {filename} does not end with .png"
+            filename_split = filename[:-4].split("_")
+            # Check all three file names for backward compatibility.
+            if len(filename_split) > 0 and filename_split[-1] not in ("DIFFUSE", "COMBINED", "albedo"):
+                filename_split.pop()
+            target_texture_path = f"{filedir}/{'_'.join(filename_split)}"
+            target_texture_path += f"_{state_name}.png" if state_name is not None else ".png"
+
+            if os.path.exists(target_texture_path):
+                # Set the relative path to the directory of the current stage
+                root_stage_path = os.path.dirname(self._simulator.stage.GetRootLayer().realPath)
+                target_texture_relative_path = os.path.relpath(target_texture_path, root_stage_path)
+                if shader.GetInput("diffuse_texture").Get().path != target_texture_relative_path:
+                    shader.GetInput("diffuse_texture").Set(target_texture_relative_path)
+            else:
+                print(f"Warning: DatasetObject [{self.prim_path}] does not have texture map: "
+                      f"[{target_texture_path}]. Falling back to directly updating albedo value.")
+                self._update_albedo_value(object_state, shader)
 
     def set_bbox_center_position_orientation(self, pos, orn):
         # TODO - check to make sure works

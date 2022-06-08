@@ -90,3 +90,5 @@ for _ in range(2000):
 report_states(obj1)
 report_states(obj2)
 report_states(obj3)
+
+sim.close()
