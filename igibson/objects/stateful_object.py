@@ -201,12 +201,11 @@ class StatefulObject(BaseObject):
         if not looks_prim:
             return
         for subprim in looks_prim.GetChildren():
-            if subprim.GetPrimTypeInfo().GetTypeName() != "Material":
-                continue
-            shader = get_shader_from_material(subprim)
-            shader.CreateInput("albedo_add", Sdf.ValueTypeNames.Float).Set(0.0)
-            shader.CreateInput("diffuse_tint", Sdf.ValueTypeNames.Color3f).Set(Gf.Vec3f([1.0, 1.0, 1.0]))
-            self._shaders.append(shader)
+            if subprim.GetPrimTypeInfo().GetTypeName() == "Material":
+                shader = get_shader_from_material(subprim)
+                shader.CreateInput("albedo_add", Sdf.ValueTypeNames.Float).Set(0.0)
+                shader.CreateInput("diffuse_tint", Sdf.ValueTypeNames.Color3f).Set(Gf.Vec3f([1.0, 1.0, 1.0]))
+                self._shaders.append(shader)
 
     def _create_steam_apis(self):
         """

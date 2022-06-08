@@ -524,6 +524,7 @@ class DatasetObject(USDObject):
         Args:
             object_state (BooleanState or None): the object state that the diffuse color should match to
         """
+        DEFAULT_ALBEDO_MAP_SUFFIX = frozenset({"DIFFUSE", "COMBINED", "albedo"})
         state_name = object_state.__name__ if object_state is not None else None
         for shader in self._shaders:
             texture_path = shader.GetInput("diffuse_texture").Get()
@@ -536,7 +537,7 @@ class DatasetObject(USDObject):
             assert filename[-4:] == ".png", f"Texture file {filename} does not end with .png"
             filename_split = filename[:-4].split("_")
             # Check all three file names for backward compatibility.
-            if len(filename_split) > 0 and filename_split[-1] not in ("DIFFUSE", "COMBINED", "albedo"):
+            if len(filename_split) > 0 and filename_split[-1] not in DEFAULT_ALBEDO_MAP_SUFFIX:
                 filename_split.pop()
             target_texture_path = f"{filedir}/{'_'.join(filename_split)}"
             target_texture_path += f"_{state_name}.png" if state_name is not None else ".png"
