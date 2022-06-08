@@ -463,9 +463,9 @@ class Simulator(SimulationContext):
         if self._apply_transitions:
             self._transition_rule_step()
 
-        # TODO (eric): omni has a bug that self.render() needs to be called multiple times for the latest result to
-        # show up. Still calling it once here for efficiency.
-        self.render()
+        # TODO (eric): After stage changes (e.g. pose, texture change), it will take two super().step(render=True) for
+        #  the result to propagate to the rendering. We could have called super().render() here but it will introduce
+        #  a big performance regression.
 
         self.frame_count += 1
 

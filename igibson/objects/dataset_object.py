@@ -525,15 +525,7 @@ class DatasetObject(USDObject):
             object_state (BooleanState or None): the object state that the diffuse color should match to
         """
         state_name = object_state.__name__ if object_state is not None else None
-        # Find the material prims to update.
-        looks_prim_path = f"{str(self._prim_path)}/Looks"
-        looks_prim = get_prim_at_path(looks_prim_path)
-        if not looks_prim:
-            return
-        for subprim in looks_prim.GetChildren():
-            if subprim.GetPrimTypeInfo().GetTypeName() != "Material":
-                continue
-            shader = get_shader_from_material(subprim)
+        for shader in self._shaders:
             texture_path = shader.GetInput("diffuse_texture").Get()
             assert texture_path is not None, f"DatasetObject [{self.prim_path}] has invalid diffuse texture map."
 

@@ -81,6 +81,7 @@ class StatefulObject(BaseObject):
         # Values that will be filled later
         self._states = None
         self._emitter = None
+        self._shaders = []
 
         # Load abilities from taxonomy if needed & possible
         if abilities is None:
@@ -205,6 +206,7 @@ class StatefulObject(BaseObject):
             shader = get_shader_from_material(subprim)
             shader.CreateInput("albedo_add", Sdf.ValueTypeNames.Float).Set(0.0)
             shader.CreateInput("diffuse_tint", Sdf.ValueTypeNames.Color3f).Set(Gf.Vec3f([1.0, 1.0, 1.0]))
+            self._shaders.append(shader)
 
     def _create_steam_apis(self):
         """
@@ -260,7 +262,6 @@ class StatefulObject(BaseObject):
         Args:
             value (bool): Value to set
         """
-        self._emitter.CreateAttribute("enabled", VT.Bool, False).Set(value)
         if self._emitter is not None:
             if value != self._emitter.GetAttribute("enabled").Get():
                 self._emitter.GetAttribute("enabled").Set(value)
@@ -272,14 +273,7 @@ class StatefulObject(BaseObject):
             list of (str): List of texture file paths
         """
         textures = []
-        looks_prim_path = f"{str(self._prim_path)}/Looks"
-        looks_prim = get_prim_at_path(looks_prim_path)
-        if not looks_prim:
-            return
-        for subprim in looks_prim.GetChildren():
-            if subprim.GetPrimTypeInfo().GetTypeName() != "Material":
-                continue
-            shader = get_shader_from_material(subprim)
+        for shader in self._shaders:
             texture_path = shader.GetInput("diffuse_texture").Get()
             if texture_path:
                 textures.append(texture_path.path)
@@ -313,15 +307,7 @@ class StatefulObject(BaseObject):
         Args:
             object_state (BooleanState or None): the object state that the diffuse color should match to
         """
-        # Find the material prims to update.
-        looks_prim_path = f"{str(self._prim_path)}/Looks"
-        looks_prim = get_prim_at_path(looks_prim_path)
-        if not looks_prim:
-            return
-        for subprim in looks_prim.GetChildren():
-            if subprim.GetPrimTypeInfo().GetTypeName() != "Material":
-                continue
-            shader = get_shader_from_material(subprim)
+        for shader in self._shaders:
             self._update_albedo_value(object_state, shader)
 
     @staticmethod
