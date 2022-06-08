@@ -2,8 +2,9 @@ import numpy as np
 from collections import OrderedDict
 import igibson.macros as m
 from igibson.object_states.link_based_state_mixin import LinkBasedStateMixin
-from igibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
+from igibson.object_states.object_state_base import RelativeObjectState, BooleanState
 import igibson.utils.transform_utils as T
+from igibson.utils.python_utils import assert_valid_key
 import trimesh
 
 
@@ -194,9 +195,9 @@ def generate_points_in_volume_checker_function(obj, volume_link):
     # Make sure volume link is parallel to root object link (i.e.: no local quaternion)
 
     volume_link_local_quat_raw = volume_link.prim.GetAttribute("xformOp:orient").Get()
-    assert np.isclose(np.linalg.norm(volume_link_local_quat_raw.imaginary), 0, atol=1e-3) and \
-        np.isclose(volume_link_local_quat_raw.real, 1, atol=1e-3),\
-        "Volume link local quaternion must be aligned with root link! (i.e.: quaternion [0, 0, 0, 1])"
+    assert np.isclose(volume_link_local_quat_raw.real, 1, atol=1e-3), \
+        f"Volume link local quaternion must be aligned with root link! (i.e.: quaternion [0, 0, 0, 1])! " \
+        f"Got: {np.array(volume_link_local_quat_raw)[1, 2, 3, 0]}"
 
     # Iterate through all visual meshes and keep track of any that are prefixed with container
     container_meshes = []
@@ -307,18 +308,34 @@ def generate_points_in_volume_checker_function(obj, volume_link):
         return check_points_in_volumes, calculate_volume
 
 
-class Filled(AbsoluteObjectState, BooleanState, LinkBasedStateMixin):
-    def __init__(self, obj, fluid):
+class Filled(RelativeObjectState, BooleanState, LinkBasedStateMixin):
+    def __init__(self, obj):
         super().__init__(obj)
         self.value = False
-        self.fluid_system = SYSTEMS_REGISTRY("__name__", f"{fluid}System", default_val=None)
-        self.check_in_volume = None            # Function to check whether particles are in volume for this container
+        self.check_in_volume = None        # Function to check whether particles are in volume for this container
         self.calculate_volume = None       # Function to calculate the real-world volume for this container
 
-    def _get_value(self):
-        return self.value
+    def _get_value(self, fluid):
+        systems = SYSTEMS_REGISTRY.get_dict("__name__")
+        fluid_system_name = f"{fluid}System"
+        assert_valid_key(key=fluid_system_name, valid_keys=systems, name="fluid system")
+        fluid_system = systems[fluid_system_name]
 
-    def _set_value(self, new_value):
+        # Check what volume is filled
+        if len(fluid_system.particle_instancers) > 0:
+            particle_positions = np.concatenate([inst.particle_positions for inst in fluid_system.particle_instancers.values()], axis=0)
+            particles_in_volume = self.check_in_volume(particle_positions)
+            particle_volume = 4 / 3 * np.pi * (fluid_system.particle_radius ** 3)
+            prop_filled = particle_volume * particles_in_volume.sum() / self.calculate_volume()
+            # If greater than threshold, then the volume is filled
+            value = prop_filled > VOLUME_FILL_PROPORTION
+        else:
+            # No fluid exists, so we're obviously empty
+            value = False
+
+        return value
+
+    def _set_value(self, fluid, new_value):
         # Cannot directly set fill state
         # TODO: Generate particles sampled from "true volume" mesh
         raise NotImplementedError()
@@ -326,37 +343,18 @@ class Filled(AbsoluteObjectState, BooleanState, LinkBasedStateMixin):
     def _initialize(self):
         super()._initialize()
         self.initialize_link_mixin()
-        fluid_source_position = self.get_link_position()
-        if fluid_source_position is None:
-            return
 
-        # Further initialize internal variables
-        self.fluid_groups = OrderedDict()
-        self._step_counter = 0
+        # If we found no link, directly return
+        if self.link is None:
+            return
 
         # Generate volume checker function for this object
         self.check_in_volume, self.calculate_volume = \
             generate_points_in_volume_checker_function(obj=self.obj, volume_link=self.link)
 
-    def _update(self):
-        # If we don't have a fluid system, we cannot be filled or do anything
-        if self.fluid_system is None:
-            return
-
-        # Check what volume is filled
-        if len(self.fluid_system.particle_instancers) > 0:
-            particle_positions = np.concatenate([inst.particle_positions for inst in self.fluid_system.particle_instancers.values()], axis=0)
-            particles_in_volume = self.check_in_volume(particle_positions)
-            particle_volume = 4 / 3 * np.pi * (self.fluid_system.particle_radius ** 3)
-            prop_filled = particle_volume * particles_in_volume.sum() / self.calculate_volume()
-            # If greater than threshold, then the volume is filled
-            self.value = prop_filled > VOLUME_FILL_PROPORTION
-        else:
-            # No fluid exists, so we're obviously empty
-            self.value = False
-
     @property
     def settable(self):
+        # TODO: Make True once set_value is implemented
         return False
 
     @staticmethod

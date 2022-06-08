@@ -1013,6 +1013,10 @@ class ClothSystem(MicroParticleSystem):
         return 0.05
 
     @classproperty
+    def is_fluid(cls):
+        return False
+
+    @classproperty
     def visual_only(cls):
         return False
 
