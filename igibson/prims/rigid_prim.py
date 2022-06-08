@@ -127,12 +127,8 @@ class RigidPrim(XFormPrim):
                     # We construct a trimesh object from this mesh in order to infer its center-of-mass and volume
                     # TODO: Cleaner way to aggregate this information? Right now we just skip if we encounter a primitive
                     mesh_vertices = mesh_prim.GetAttribute("points").Get()
-                    if mesh_vertices is not None and len(mesh_vertices) > 4:
-                        msh = trimesh.Trimesh(
-                            vertices=np.array(mesh_vertices),
-                            faces=np.array(mesh_prim.GetAttribute("faceVertexIndices").Get()).reshape(-1, 3),
-                            vertex_normals=np.array(mesh_prim.GetAttribute("normals").Get()),
-                        )
+                    if mesh_vertices is not None and len(mesh_vertices) >= 4:
+                        msh = mesh_prim_to_trimesh_mesh(mesh_prim)
                         coms.append(msh.center_mass)
                         vols.append(msh.volume)
                 else:
