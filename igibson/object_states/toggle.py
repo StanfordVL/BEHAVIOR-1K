@@ -90,10 +90,9 @@ class ToggledOn(AbsoluteObjectState, BooleanState, LinkBasedStateMixin):
 
     @staticmethod
     def get_texture_change_params():
-        # Increase all channels by 0.1
-        albedo_add = 0.1
-        # Then scale all channels by 1.5x
-        diffuse_tint = (1.5, 1.5, 1.5)
+        # By default, it keeps the original albedo unchanged.
+        albedo_add = 0.0
+        diffuse_tint = (1.0, 1.0, 1.0)
         return albedo_add, diffuse_tint
 
     @property
