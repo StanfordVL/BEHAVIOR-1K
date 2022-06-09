@@ -227,7 +227,7 @@ def generate_points_in_volume_checker_function(obj, volume_link):
                 scale=np.array(mesh.GetAttribute("xformOp:scale").Get()),
                 particle_positions=particle_positions,
             )
-            vol_fcn = lambda mesh: trimesh_mesh.volume
+            vol_fcn = lambda mesh: trimesh_mesh.volume if trimesh_mesh.is_volume else trimesh_mesh.convex_hull.volume
         elif mesh_type == "Sphere":
             fcn = lambda mesh, particle_positions: check_points_in_sphere(
                 size=mesh.GetAttribute("radius").Get(),
