@@ -13,6 +13,8 @@ from omni.isaac.core.utils.types import XFormPrimState
 from omni.isaac.core.materials import PreviewSurface, OmniGlass, OmniPBR, VisualMaterial
 from omni.isaac.core.utils.rotations import gf_quat_to_np_array
 from omni.isaac.core.utils.transformations import tf_matrix_from_pose
+from omni.isaac.core.utils.numpy import gf_quat_to_tensor
+from scipy.spatial.transform import Rotation
 from omni.isaac.core.utils.prims import (
     get_prim_at_path,
     move_prim,
@@ -28,6 +30,7 @@ from omni.isaac.core.utils.stage import get_current_stage
 from igibson.prims.prim_base import BasePrim
 from igibson.utils.transform_utils import quat2mat, mat2euler
 from igibson.utils.usd_utils import BoundingBoxAPI
+from scipy.spatial.transform import Rotation as R
 
 
 class XFormPrim(BasePrim):
@@ -145,11 +148,15 @@ class XFormPrim(BasePrim):
         else:
             xform_op_rot = UsdGeom.XformOp(self._prim.GetAttribute("xformOp:orient"))
         xformable.SetXformOpOrder([xform_op_translate, xform_op_rot, xform_op_scale])
-        # TODO: Figure out if we don't need this
-        # TODO: This messes with mesh poses
-        # Possibly set position and orientation
+
         self.set_position_orientation(position=current_position, orientation=current_orientation)
-        return
+        new_position, new_orientation = self.get_position_orientation()
+        r1 = R.from_quat(current_orientation).as_matrix()
+        r2 = R.from_quat(new_orientation).as_matrix()
+        # Make sure setting is done correctly
+        assert np.allclose(new_position, current_position) and np.allclose(r1, r2), \
+            f"{self.prim_path}: old_pos: {current_position}, new_pos: {new_position}, " \
+            f"old_orn: {current_orientation}, new_orn: {new_orientation}"
 
     # def reset(self):
     #     """
@@ -288,11 +295,20 @@ class XFormPrim(BasePrim):
         position = current_position if position is None else np.array(position)
         orientation = current_orientation if orientation is None else np.array(orientation)
         orientation = orientation[[3, 0, 1, 2]]     # Flip from x,y,z,w to w,x,y,z
-        my_world_transform = tf_matrix_from_pose(translation=position, orientation=orientation)
-        parent_world_tf = UsdGeom.Xformable(get_prim_parent(self._prim)).ComputeLocalToWorldTransform(
-            Usd.TimeCode.Default()
-        )
-        local_transform = np.matmul(np.linalg.inv(np.transpose(parent_world_tf)), my_world_transform)
+
+        mat = Gf.Transform()
+        mat.SetRotation(Gf.Rotation(Gf.Quatd(*orientation.tolist())))
+        mat.SetTranslation(Gf.Vec3d(*position.tolist()))
+
+        # mat.SetScale(Gf.Vec3d(*(self.get_world_scale() / self.scale)))
+        # TODO (eric): understand why this (mat.setScale) works - this works empirically but it's unclear why.
+        mat.SetScale(Gf.Vec3d(*self.scale))
+        my_world_transform = np.transpose(mat.GetMatrix())
+
+        parent_world_tf = UsdGeom.Xformable(get_prim_parent(self._prim)).ComputeLocalToWorldTransform(Usd.TimeCode.Default())
+        parent_world_transform = np.transpose(parent_world_tf)
+
+        local_transform = np.matmul(np.linalg.inv(parent_world_transform), my_world_transform)
         transform = Gf.Transform()
         transform.SetMatrix(Gf.Matrix4d(np.transpose(local_transform)))
         calculated_translation = transform.GetTranslation()
@@ -300,7 +316,6 @@ class XFormPrim(BasePrim):
         self.set_local_pose(
             translation=np.array(calculated_translation), orientation=gf_quat_to_np_array(calculated_orientation)[[1, 2, 3, 0]]     # Flip from w,x,y,z to x,y,z,w
         )
-        return
 
     def get_position_orientation(self):
         """

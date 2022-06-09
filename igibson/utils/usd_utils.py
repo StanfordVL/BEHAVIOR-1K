@@ -397,6 +397,5 @@ def mesh_prim_to_trimesh_mesh(mesh_prim):
             faces.append([face_indices[i], face_indices[i + j + 1], face_indices[i + j + 2]])
         i += count
 
-    trimesh_mesh = trimesh.Trimesh(vertices=vertices, faces=faces)
-    assert trimesh_mesh.is_volume, f"Mesh prim [{mesh_prim.prim_path}] fails to be converted to a valid trimesh mesh."
-    return trimesh_mesh
+    return trimesh.Trimesh(vertices=vertices, faces=faces)
+

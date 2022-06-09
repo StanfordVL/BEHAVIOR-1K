@@ -478,7 +478,7 @@ class RigidPrim(XFormPrim):
             if mesh_type == "Mesh":
                 # We construct a trimesh object from this mesh in order to infer its volume
                 trimesh_mesh = mesh_prim_to_trimesh_mesh(mesh)
-                mesh_volume = trimesh_mesh.volume
+                mesh_volume = trimesh_mesh.volume if trimesh_mesh.is_volume else trimesh_mesh.convex_hull.volume
             elif mesh_type == "Sphere":
                 mesh_volume = 4 / 3 * np.pi * (mesh.GetAttribute("radius").Get() ** 3)
             elif mesh_type == "Cube":
