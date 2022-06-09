@@ -18,7 +18,7 @@ from igibson.utils.constants import SemanticClass
 _HEATING_ELEMENT_LINK_NAME = "heat_source"
 
 _HEATING_ELEMENT_MARKER_SCALE = [1.0] * 3
-_HEATING_ELEMENT_MARKER_FILENAME = os.path.join(igibson.assets_path, "models/fire/fire.obj")
+# _HEATING_ELEMENT_MARKER_FILENAME = os.path.join(igibson.assets_path, "models/fire/fire.obj")
 
 # TODO: Delete default values for this and make them required.
 _DEFAULT_TEMPERATURE = 200
@@ -128,30 +128,32 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin):
 
         # Load visual markers
 
-        # Import at runtime to prevent circular imports
-        from igibson.objects.usd_object import USDObject
-        self.marker = USDObject(
-            prim_path=f"{self.obj.prim_path}/heat_source_marker",
-            usd_path=_HEATING_ELEMENT_MARKER_FILENAME,
-            name=f"{self.obj.name}_heat_source_marker",
-            class_id=SemanticClass.HEAT_SOURCE_MARKER,
-            scale=_HEATING_ELEMENT_MARKER_SCALE,
-            visible=False,
-            fixed_base=False,
-            visual_only=True,
-        )
-        # Import marker into simulator
-        self._simulator.import_object(self.marker, register=False, auto_initialize=True)
+        # TODO: Make fire effect from omni flow instead of loading in an explicit asset
+        # # Import at runtime to prevent circular imports
+        # from igibson.objects.usd_object import USDObject
+        # self.marker = USDObject(
+        #     prim_path=f"{self.obj.prim_path}/heat_source_marker",
+        #     usd_path=_HEATING_ELEMENT_MARKER_FILENAME,
+        #     name=f"{self.obj.name}_heat_source_marker",
+        #     class_id=SemanticClass.HEAT_SOURCE_MARKER,
+        #     scale=_HEATING_ELEMENT_MARKER_SCALE,
+        #     visible=False,
+        #     fixed_base=False,
+        #     visual_only=True,
+        # )
+        # # Import marker into simulator
+        # self._simulator.import_object(self.marker, register=False, auto_initialize=True)
 
     def _update(self):
         self.status, self.position = self._compute_state_and_position()
 
-        # Move the marker.
-        if self.position is not None:
-            self.marker.set_position(self.position)
-            self.marker.visible = True
-        else:
-            self.marker.visible = False
+        # TODO: Toggle fire effect
+        # # Move the marker.
+        # if self.position is not None:
+        #     self.marker.set_position(self.position)
+        #     self.marker.visible = True
+        # else:
+        #     self.marker.visible = False
 
     def _get_value(self):
         return self.status, self.position
