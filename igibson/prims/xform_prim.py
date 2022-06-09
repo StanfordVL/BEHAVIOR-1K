@@ -445,7 +445,7 @@ class XFormPrim(BasePrim):
         self.set_attribute("xformOp:scale", scale)
 
     @property
-    def bbox(self):
+    def aabb(self):
         """
         Get this xform's actual bounding box, axis-aligned in the world frame
 
@@ -457,25 +457,25 @@ class XFormPrim(BasePrim):
         return BoundingBoxAPI.compute_aabb(self.prim_path)
 
     @property
-    def bbox_extent(self):
+    def aabb_extent(self):
         """
         Get this xform's actual bounding box extent
 
         Returns:
             3-array: (x,y,z) bounding box
         """
-        min_corner, max_corner = self.bbox
+        min_corner, max_corner = self.aabb
         return max_corner - min_corner
 
     @property
-    def bbox_center(self):
+    def aabb_center(self):
         """
         Get this xform's actual bounding box center
 
         Returns:
             3-array: (x,y,z) bounding box center
         """
-        min_corner, max_corner = BoundingBoxAPI.compute_aabb(self.prim_path)
+        min_corner, max_corner = self.aabb
         return (max_corner + min_corner) / 2.0
 
     def add_filtered_collision_pair(self, prim):

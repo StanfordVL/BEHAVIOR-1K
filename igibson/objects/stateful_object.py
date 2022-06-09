@@ -214,7 +214,7 @@ class StatefulObject(BaseObject):
         self._emitter = emitter
 
         # Update settings.
-        bbox_extent = self.bbox_extent
+        bbox_extent = self.aabb_extent
         
         emitter.CreateAttribute("enabled", VT.Bool, False).Set(False)
         emitter.CreateAttribute("fuel", VT.Float, False).Set(1.0)
