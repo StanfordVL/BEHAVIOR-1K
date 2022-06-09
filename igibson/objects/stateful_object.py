@@ -8,13 +8,16 @@ import omni
 from omni.isaac.core.utils.prims import get_prim_at_path
 from omni.usd import get_shader_from_material
 from pxr.Sdf import ValueTypeNames as VT
+from pxr import Sdf, Gf
 
 from igibson.object_states.factory import (
     get_default_states,
     get_object_state_instance,
     get_state_name,
     get_states_for_ability,
+    get_texture_change_states,
     get_steam_states,
+    get_texture_change_priority,
 )
 from igibson.object_states.object_state_base import REGISTERED_OBJECT_STATES, CachingEnabledObjectState
 from igibson.objects.object_base import BaseObject
@@ -77,9 +80,8 @@ class StatefulObject(BaseObject):
         """
         # Values that will be filled later
         self._states = None
-        self._texture_states = []
-        self._extra_prims_flags = defaultdict(bool)
         self._emitter = None
+        self._shaders = []
 
         # Load abilities from taxonomy if needed & possible
         if abilities is None:
@@ -120,10 +122,6 @@ class StatefulObject(BaseObject):
         # Initialize all states
         for state in self._states.values():
             state.initialize(self._simulator)
-            
-        # Create steam prims if this object has states with steam effects.
-        if self._extra_prims_flags["has_steam_prims"]:
-            self._create_steam_prims()
 
     def initialize_states(self):
         """
@@ -183,13 +181,35 @@ class StatefulObject(BaseObject):
         # Now generate the states in topological order.
         self.initialize_states()
         for state_type, params in reversed(state_types_and_params):
-            if state_type in get_steam_states():
-                self._extra_prims_flags["has_steam_prims"] = True
             self._states[state_type] = get_object_state_instance(state_type, self, params)
 
-    def _create_steam_prims(self):
+    def _post_load(self):
+        super()._post_load()
+
+        if len(set(self.states) & set(get_texture_change_states())) > 0:
+            self._create_texture_change_apis()
+
+        if len(set(self.states) & set(get_steam_states())) > 0:
+            self._create_steam_apis()
+
+    def _create_texture_change_apis(self):
         """
-        Create necessary prims for steam effects.
+        Create necessary apis for texture changes.
+        """
+        looks_prim_path = f"{str(self._prim_path)}/Looks"
+        looks_prim = get_prim_at_path(looks_prim_path)
+        if not looks_prim:
+            return
+        for subprim in looks_prim.GetChildren():
+            if subprim.GetPrimTypeInfo().GetTypeName() == "Material":
+                shader = get_shader_from_material(subprim)
+                shader.CreateInput("albedo_add", Sdf.ValueTypeNames.Float).Set(0.0)
+                shader.CreateInput("diffuse_tint", Sdf.ValueTypeNames.Color3f).Set(Gf.Vec3f([1.0, 1.0, 1.0]))
+                self._shaders.append(shader)
+
+    def _create_steam_apis(self):
+        """
+        Create necessary prims and apis for steam effects.
         """
         # Make sure that flow setting is enabled.
         renderer_setting = RendererSettings()
@@ -202,7 +222,7 @@ class StatefulObject(BaseObject):
         flowRender_prim_path = self._prim_path+ "/flowRender"
 
         # Define prims.
-        stage = omni.usd.get_context().get_stage()
+        stage = self._simulator.stage
         emitter = stage.DefinePrim(flowEmitterBox_prim_path, "FlowEmitterBox")
         simulate = stage.DefinePrim(flowSimulate_prim_path, "FlowSimulate")
         offscreen = stage.DefinePrim(flowOffscreen_prim_path, "FlowOffscreen")
@@ -241,7 +261,9 @@ class StatefulObject(BaseObject):
         Args:
             value (bool): Value to set
         """
-        self._emitter.CreateAttribute("enabled", VT.Bool, False).Set(value)
+        if self._emitter is not None:
+            if value != self._emitter.GetAttribute("enabled").Get():
+                self._emitter.GetAttribute("enabled").Set(value)
 
     def get_textures(self):
         """Gets prim's texture files.
@@ -250,68 +272,66 @@ class StatefulObject(BaseObject):
             list of (str): List of texture file paths
         """
         textures = []
-        looks_prim_path = f"{str(self._prim_path)}/Looks"
-        looks_prim = get_prim_at_path(looks_prim_path)
-        if not looks_prim:
-            return
-        for subprim in looks_prim.GetChildren():
-            if subprim.GetPrimTypeInfo().GetTypeName() != "Material":
-                continue
-            shader = get_shader_from_material(subprim)
+        for shader in self._shaders:
             texture_path = shader.GetInput("diffuse_texture").Get()
             if texture_path:
                 textures.append(texture_path.path)
         return textures
 
-    def update_textures_for_state(self, state, value):
-        """Update prim's textures to represent @state.
+    def update_visuals(self):
+        """
+        Update the prim's visuals (texture change, steam/fire effects, etc).
+        Should be called after all the states are updated.
+        """
+        texture_change_states = []
+        emitter_enabled = False
+        for state in self.states:
+            if state in get_texture_change_states() and self.states[state].get_value():
+                texture_change_states.append(state)
+            if state in get_steam_states():
+                emitter_enabled = emitter_enabled or self.states[state].get_value()
+
+        self.set_emitter_enabled(emitter_enabled)
+
+        texture_change_states.sort(key=lambda s: get_texture_change_priority()[s])
+        object_state = texture_change_states[-1] if len(texture_change_states) > 0 else None
+        self._update_texture_change(object_state)
+
+    def _update_texture_change(self, object_state):
+        """
+        Update the texture based on the given object_state. E.g. if object_state is Frozen, update the diffuse color
+        to match the frozen state. If object_state is None, update the diffuse color to the default value. It modifies
+        the current albedo map by adding and scaling the values. See @self._update_albedo_value for details.
 
         Args:
-            state (BaseObjectState): State to represent
-            value (bool): Whether or not changing to the state
+            object_state (BooleanState or None): the object state that the diffuse color should match to
         """
-        # Determine the state to set.
-        TEXTURE_CHANGE_PRIORITY = {
-            "Frozen": 4,
-            "Burnt": 3,
-            "Cooked": 2,
-            "Soaked": 1,
-            "ToggledOn": 0,
-        }
-        if value and state.__name__ not in self._texture_states:
-            self._texture_states.append(state.__name__)
-            self._texture_states.sort(key=lambda s: TEXTURE_CHANGE_PRIORITY[s])
-        if not value and state.__name__ in self._texture_states:
-            self._texture_states.remove(state.__name__)
-        
-        state_to_set = self._texture_states[-1] if self._texture_states else None
+        for shader in self._shaders:
+            self._update_albedo_value(object_state, shader)
 
-        # Find the material prims to update.
-        looks_prim_path = f"{str(self._prim_path)}/Looks"
-        looks_prim = get_prim_at_path(looks_prim_path)
-        if not looks_prim:
-            return
-        for subprim in looks_prim.GetChildren():
-            if subprim.GetPrimTypeInfo().GetTypeName() != "Material":
-                continue
-            shader = get_shader_from_material(subprim)
-            texture_path = shader.GetInput("diffuse_texture").Get()
-            if texture_path is None:
-                continue
-            # Get updated texture file path for state.
-            texture_path_split = texture_path.path.split("/")
-            filedir, filename = "/".join(texture_path_split[:-1]), texture_path_split[-1]
-            assert filename[-4:] == ".png", f"Texture file {filename} does not end with .png"
-            filename_split = filename[:-4].split("_")
-            # Check both file names for backward compatibility.
-            if len(filename_split) > 0 and filename_split[-1] not in ("DIFFUSE", "albedo"):
-                filename_split.pop()
-            target_texture_path = f"{filedir}/{'_'.join(filename_split)}"
-            target_texture_path += f"_{state_to_set}.png" if state_to_set else ".png"
-            if not os.path.exists(target_texture_path):
-                print(f"Warning: get texture path failed because {target_texture_path} does not exist")
-                continue
-            shader.GetInput("diffuse_texture").Set(target_texture_path)
+    @staticmethod
+    def _update_albedo_value(object_state, shader):
+        """
+        Update the albedo value based on the given object_state. The final albedo value is
+        albedo_value = diffuse_tint * (albedo_value + albedo_add)
+
+        Args:
+            object_state (BooleanState or None): the object state that the diffuse color should match to
+            shader (UsdShade.Shader): the shader to use to update the albedo value
+        """
+        if object_state is None:
+            # This restore the albedo map to its original value
+            albedo_add = 0.0
+            diffuse_tint = (1.0, 1.0, 1.0)
+        else:
+            # Query the object state for the parameters
+            albedo_add, diffuse_tint = object_state.get_texture_change_params()
+
+        if shader.GetInput("albedo_add").Get() != albedo_add:
+            shader.GetInput("albedo_add").Set(albedo_add)
+
+        if not np.allclose(shader.GetInput("diffuse_tint").Get(), diffuse_tint):
+            shader.GetInput("diffuse_tint").Set(diffuse_tint)
 
     def _dump_state(self):
         # Grab state from super class

@@ -2,7 +2,6 @@ import numpy as np
 
 from igibson.object_states.object_state_base import AbsoluteObjectState, BooleanState, NONE
 from igibson.object_states.temperature import Temperature
-from igibson.object_states.texture_change_state_mixin import TextureChangeStateMixin
 
 _DEFAULT_FREEZE_TEMPERATURE = 0.0
 
@@ -12,7 +11,7 @@ _FROZEN_SAMPLING_RANGE_MAX = -10.0
 _FROZEN_SAMPLING_RANGE_MIN = -50.0
 
 
-class Frozen(AbsoluteObjectState, BooleanState, TextureChangeStateMixin):
+class Frozen(AbsoluteObjectState, BooleanState):
     def __init__(self, obj, freeze_temperature=_DEFAULT_FREEZE_TEMPERATURE):
         super(Frozen, self).__init__(obj)
         self.freeze_temperature = freeze_temperature
@@ -36,7 +35,12 @@ class Frozen(AbsoluteObjectState, BooleanState, TextureChangeStateMixin):
     def _get_value(self):
         return self.obj.states[Temperature].get_value() <= self.freeze_temperature
 
-    # Nothing needs to be done to save/load Frozen since it will happen due to temperature caching.
+    @staticmethod
+    def get_texture_change_params():
+        # Increase all channels by 0.3 (to make it white)
+        albedo_add = 0.3
+        # No final scaling
+        diffuse_tint = (1.0, 1.0, 1.0)
+        return albedo_add, diffuse_tint
 
-    def _update(self):
-        self.update_texture()
+    # Nothing needs to be done to save/load Frozen since it will happen due to temperature caching.

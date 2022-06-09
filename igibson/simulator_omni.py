@@ -35,6 +35,7 @@ from igibson.utils.usd_utils import clear as clear_uu, BoundingBoxAPI
 from igibson.utils.assets_utils import get_ig_avg_category_specs
 from igibson.scenes import Scene
 from igibson.objects.object_base import BaseObject
+from igibson.objects.stateful_object import StatefulObject
 from igibson.object_states.factory import get_states_by_dependency_order
 from igibson.transition_rules import DEFAULT_RULES, TransitionResults
 
@@ -352,6 +353,9 @@ class Simulator(SimulationContext):
                     if obj.initialized:
                         obj.states[state_type].update()
 
+        for obj in self.scene.objects:
+            if isinstance(obj, StatefulObject):
+                obj.update_visuals()
 
         # Clear the bounding box cache so that it gets updated during the next time it's called
         BoundingBoxAPI.clear()
@@ -458,7 +462,11 @@ class Simulator(SimulationContext):
         self._non_physics_step()
         if self._apply_transitions:
             self._transition_rule_step()
-        # self.sync()
+
+        # TODO (eric): After stage changes (e.g. pose, texture change), it will take two super().step(render=True) for
+        #  the result to propagate to the rendering. We could have called super().render() here but it will introduce
+        #  a big performance regression.
+
         self.frame_count += 1
 
     # TODO: Do we need this?
