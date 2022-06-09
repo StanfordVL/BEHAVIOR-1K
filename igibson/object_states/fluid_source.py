@@ -6,7 +6,6 @@ from igibson.object_states.object_state_base import AbsoluteObjectState
 from igibson.object_states.toggle import ToggledOn
 from collections import OrderedDict
 
-# TODO: FluidSink
 
 class FluidSource(AbsoluteObjectState, LinkBasedStateMixin):
     def __init__(self, obj):
@@ -58,9 +57,13 @@ class FluidSource(AbsoluteObjectState, LinkBasedStateMixin):
 
     def _update(self):
         fluid_source_position = self.get_link_position()
-        if fluid_source_position is None:
-            # Terminate early, this is a "dead" fluid source
+        if fluid_source_position is None or not self._simulator.is_playing():
+            # Terminate early, this is a "dead" fluid source or we're not stepping physics
             return
+
+        # Synchronize our tracked fluid groups with the fluid system -- some might have been deleted from a fluid sink
+        self.fluid_groups = OrderedDict([(name, inst) for name, inst in self.fluid_groups.items()
+                                         if name in self.fluid_system.particle_instancers])
 
         # Possibly increment our fluid generation counter if we're either (a) not using any toggle state (i.e.:
         # fluid source is always on), or (b) toggledon is True
@@ -72,9 +75,9 @@ class FluidSource(AbsoluteObjectState, LinkBasedStateMixin):
             positions = np.ones((self.n_particles_per_group, 3)) * fluid_source_position.reshape(1, 3)
             # Modify the z direction procedurally, to simulated a "falling" stream of fluid
             particle_dist = self.fluid_system.particle_contact_offset * 2
-            positions[:, -1] -= np.arange(0, particle_dist * self.n_particles_per_group, self.n_particles_per_group)
+            positions[:, -1] -= np.arange(0, particle_dist * self.n_particles_per_group, particle_dist)
             # Generate a new group, and store it internally
-            particle_instancer = self.fluid_system.generate_paticle_instancer(
+            particle_instancer = self.fluid_system.generate_particle_instancer(
                 n_particles=self.n_particles_per_group,
                 positions=positions,
             )

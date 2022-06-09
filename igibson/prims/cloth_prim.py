@@ -85,6 +85,14 @@ class ClothPrim(GeomPrim):
         pass
 
     @property
+    def volume(self):
+        raise NotImplementedError("Cannot get volume for ClothPrim")
+
+    @volume.setter
+    def volume(self, volume):
+        raise NotImplementedError("Cannot set volume for ClothPrim")
+
+    @property
     def mass(self):
         """
         Returns:
@@ -99,3 +107,11 @@ class ClothPrim(GeomPrim):
             mass (float): mass of the rigid body in kg.
         """
         self._mass_api.GetMassAttr().Set(mass)
+
+    @property
+    def density(self):
+        raise NotImplementedError("Cannot get density for ClothPrim")
+
+    @density.setter
+    def density(self, density):
+        raise NotImplementedError("Cannot set density for ClothPrim")

@@ -16,14 +16,14 @@ from igibson import app, ig_dataset_path
 #                 ("table_knife", "1")]
 # for category, model in test_objects:
 #     import_obj_urdf(obj_category=category, obj_model=model, skip_if_exist=False)
-#     import_obj_metadata(obj_category=category, obj_model=model, name=None)
+#     import_obj_metadata(obj_category=category, obj_model=model)
 
 for category in os.listdir(os.path.join(ig_dataset_path, "objects")):
     for model in os.listdir(os.path.join(ig_dataset_path, "objects", category)):
         print(category)
         print(model)
         import_obj_urdf(obj_category=category, obj_model=model, skip_if_exist=False)
-        import_obj_metadata(obj_category=category, obj_model=model, name=None)
+        import_obj_metadata(obj_category=category, obj_model=model)
 
 app.close()
 

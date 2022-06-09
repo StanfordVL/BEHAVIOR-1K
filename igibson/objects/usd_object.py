@@ -76,9 +76,16 @@ class USDObject(StatefulObject):
         Load the object into pybullet and set it to the correct pose
         """
         logging.info(f"Loading the following USD: {self._usd_path}")
+
+        # Make sure this is actually a USD object
+        assert self._usd_path[-4:] == ".usd", f"Cannot load a non-USD file as a USD object!"
+
         # Add reference to stage and grab prim
         add_reference_to_stage(usd_path=self._usd_path, prim_path=self._prim_path)
         prim = get_prim_at_path(self._prim_path)
+
+        # Make sure prim was loaded correctly
+        assert prim, f"Failed to load USD object from path: {self._usd_path}"
 
         return prim
 
@@ -99,18 +106,3 @@ class USDObject(StatefulObject):
             load_config=load_config,
             abilities=self._abilities,
         )
-
-    @property
-    def bbox(self):
-        # Override this function to pull directly from the native_bbox property if it exists
-        return super().bbox if self.native_bbox is not None else self.native_bbox * self.scale
-
-    @property
-    def native_bbox(self):
-        """
-        Get this object's native bounding box
-
-        Returns:
-            None or 3-array: (x,y,z) bounding box if it exists, else None
-        """
-        return np.array(self.get_attribute(attr="ig:nativeBB")) if "ig:nativeBB" in self.property_names else None

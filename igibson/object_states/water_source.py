@@ -13,12 +13,12 @@ class WaterSource(FluidSource):
 
     @property
     def n_particles_per_group(self):
-        return 10
+        return 5
 
     @property
     def n_steps_per_group(self):
-        return 10
+        return 5
 
     @staticmethod
     def get_state_link_name():
-        return "water_source"
+        return "water_source_link"

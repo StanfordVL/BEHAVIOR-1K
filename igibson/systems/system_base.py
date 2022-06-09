@@ -52,12 +52,20 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
         """
         Initializes this system. Default behavior is to simply store the @simulator reference internally
         """
+        assert not cls.initialized, f"Already initialized system {cls.name}!"
         cls.simulator = simulator
 
     @classmethod
     def update(cls):
         """
         Conduct any necessary internal updates after a simulation step
+        """
+        pass
+
+    @classmethod
+    def reset(cls):
+        """
+        Reset this system
         """
         pass
 

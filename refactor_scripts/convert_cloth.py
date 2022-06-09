@@ -11,6 +11,7 @@ import trimesh
 import numpy as np
 import shutil
 from import_urdfs_from_scene import import_obj_urdf
+from import_metadata import import_obj_metadata
 from omni.isaac.core.utils.stage import open_stage, get_current_stage
 from omni.isaac.core.utils.prims import get_prim_at_path, is_prim_path_valid
 from omni.kit.commands import execute
@@ -81,6 +82,8 @@ for category in CLOTH_CATEGORIES:
 
         # Use the import_obj_urdf to output to usd_file
         import_obj_urdf(category, model)
+        import_obj_metadata(obj_category=category, obj_model=model, import_render_channels=True)
+
         # Rename it to the cloth version
         shutil.move(usd_file, cloth_usd_file)
 

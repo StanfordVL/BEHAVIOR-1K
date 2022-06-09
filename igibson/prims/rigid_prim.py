@@ -20,6 +20,7 @@ import igibson.macros as m
 from igibson.prims.xform_prim import XFormPrim
 from igibson.prims.geom_prim import CollisionGeomPrim, VisualGeomPrim
 from igibson.utils.types import DynamicState, CsRawData, GEOM_TYPES
+from igibson.utils.usd_utils import mesh_prim_to_trimesh_mesh
 
 # Import omni sensor based on type
 if m.IS_PUBLIC_ISAACSIM:
@@ -85,10 +86,6 @@ class RigidPrim(XFormPrim):
         # run super first
         super()._post_load()
 
-        # Set visual only flag
-        self._visual_only = self._load_config["visual_only"] if \
-            "visual_only" in self._load_config and self._load_config["visual_only"] is not None else False
-
         # Apply rigid body and mass APIs
         self._rigid_api = UsdPhysics.RigidBodyAPI(self._prim) if self._prim.HasAPI(UsdPhysics.RigidBodyAPI) else \
             UsdPhysics.RigidBodyAPI.Apply(self._prim)
@@ -113,18 +110,39 @@ class RigidPrim(XFormPrim):
         # We iterate over all children of this object's prim,
         # and grab any that are presumed to be meshes
         self._collision_meshes, self._visual_meshes = OrderedDict(), OrderedDict()
+        prims_to_check = []
+        coms, vols = [], []
         for prim in self._prim.GetChildren():
-            # Only process prims that are an Xform
+            prims_to_check.append(prim)
+            for child in prim.GetChildren():
+                prims_to_check.append(child)
+        for prim in prims_to_check:
             if prim.GetPrimTypeInfo().GetTypeName() in GEOM_TYPES:
                 mesh_name, mesh_path = prim.GetName(), prim.GetPrimPath().__str__()
-                mesh_prim = get_prim_at_path(prim_path=mesh_path)
+                mesh = get_prim_at_path(prim_path=mesh_path)
                 mesh_kwargs = {"prim_path": mesh_path, "name": f"{self._name}:{mesh_name}"}
-                if mesh_prim.HasAPI(UsdPhysics.CollisionAPI):
+                if mesh.HasAPI(UsdPhysics.CollisionAPI):
                     self._collision_meshes[mesh_name] = CollisionGeomPrim(**mesh_kwargs)
-                    # Also set the collision enabling based on whether we're a visual only body
-                    self._collision_meshes[mesh_name].collision_enabled = not self._visual_only
+                    # We construct a trimesh object from this mesh in order to infer its center-of-mass and volume
+                    # TODO: Cleaner way to aggregate this information? Right now we just skip if we encounter a primitive
+                    mesh_vertices = mesh.GetAttribute("points").Get()
+                    if mesh_vertices is not None and len(mesh_vertices) >= 4:
+                        msh = mesh_prim_to_trimesh_mesh(mesh)
+                        coms.append(msh.center_mass)
+                        vols.append(msh.volume)
                 else:
                     self._visual_meshes[mesh_name] = VisualGeomPrim(**mesh_kwargs)
+
+        # If we have any collision meshes, we aggregate their center of mass and volume values to set the center of mass
+        # for this link
+        if len(coms) > 0:
+            com = (np.array(coms) * np.array(vols).reshape(-1, 1)).sum(axis=0) / np.sum(vols)
+            self.set_attribute("physics:centerOfMass", Gf.Vec3f(*com))
+
+        # Set the visual-only attribute
+        # This automatically handles setting collisions / gravity appropriately
+        self.visual_only = self._load_config["visual_only"] if \
+            "visual_only" in self._load_config and self._load_config["visual_only"] is not None else False
 
         # Create contact sensor
         self._cs = _s.acquire_contact_sensor_interface()
@@ -165,10 +183,6 @@ class RigidPrim(XFormPrim):
             linear_velocity=lin_vel,
             angular_velocity=ang_vel,
         )
-
-        # Possibly disable gravity
-        if self._visual_only:
-            self.disable_gravity()
 
     # def _create_contact_sensor(self):
     #     """
@@ -245,7 +259,7 @@ class RigidPrim(XFormPrim):
         Args:
             velocity (np.ndarray): linear velocity to set the rigid prim to. Shape (3,).
         """
-        if self._handle is not None and self._dc.is_simulating():
+        if self.dc_is_accessible:
             self._dc.set_rigid_body_linear_velocity(self._handle, velocity)
         else:
             self._rigid_api.GetVelocityAttr().Set(Gf.Vec3f(velocity.tolist()))
@@ -256,7 +270,7 @@ class RigidPrim(XFormPrim):
         Returns:
             np.ndarray: current linear velocity of the the rigid prim. Shape (3,).
         """
-        if self._handle is not None and self._dc.is_simulating():
+        if self.dc_is_accessible:
             lin_vel = np.array(self._dc.get_rigid_body_linear_velocity(self._handle))
         else:
             lin_vel = self._rigid_api.GetVelocityAttr().Get()
@@ -268,7 +282,7 @@ class RigidPrim(XFormPrim):
         Args:
             velocity (np.ndarray): angular velocity to set the rigid prim to. Shape (3,).
         """
-        if self._handle is not None and self._dc.is_simulating():
+        if self.dc_is_accessible:
             self._dc.set_rigid_body_angular_velocity(self._handle, velocity)
         else:
             self._rigid_api.GetAngularVelocityAttr().Set(Gf.Vec3f(velocity.tolist()))
@@ -279,7 +293,7 @@ class RigidPrim(XFormPrim):
         Returns:
             np.ndarray: current angular velocity of the the rigid prim. Shape (3,).
         """
-        if self._handle is not None and self._dc.is_simulating():
+        if self.dc_is_accessible:
             return np.array(self._dc.get_rigid_body_angular_velocity(self._handle))
         else:
             return np.array(self._rigid_api.GetAngularVelocityAttr().Get())
@@ -295,7 +309,7 @@ class RigidPrim(XFormPrim):
                                                           quaternion is scalar-last (x, y, z, w). shape is (4, ).
                                                           Defaults to None, which means left unchanged.
         """
-        if self._handle is not None and self._dc.is_simulating():
+        if self.dc_is_accessible:
             current_position, current_orientation = self.get_position_orientation()
             if position is None:
                 position = current_position
@@ -316,7 +330,7 @@ class RigidPrim(XFormPrim):
                                            second index is quaternion orientation in the world frame of the prim.
                                            quaternion is scalar-last (x, y, z, w). shape is (4, ).
         """
-        if self._handle is not None and self._dc.is_simulating():
+        if self.dc_is_accessible:
             pose = self._dc.get_rigid_body_pose(self._handle)
             pos, ori = np.asarray(pose.p), np.asarray(pose.r)
         else:
@@ -337,7 +351,7 @@ class RigidPrim(XFormPrim):
                                                           quaternion is scalar-last (x, y, z, w). shape is (4, ).
                                                           Defaults to None, which means left unchanged.
         """
-        if self._handle is not None and self._dc.is_simulating():
+        if self.dc_is_accessible:
             current_translation, current_orientation = self.get_local_pose()
             translation = current_translation if translation is None else translation
             orientation = current_orientation if orientation is None else orientation
@@ -367,7 +381,7 @@ class RigidPrim(XFormPrim):
                                            second index is quaternion orientation in the local frame of the prim.
                                            quaternion is scalar-last (x, y, z, w). shape is (4, ).
         """
-        if self._handle is not None and self._dc.is_simulating():
+        if self.dc_is_accessible:
             parent_world_tf = UsdGeom.Xformable(get_prim_parent(self._prim)).ComputeLocalToWorldTransform(
                 Usd.TimeCode.Default()
             )
@@ -422,12 +436,85 @@ class RigidPrim(XFormPrim):
         return self._visual_meshes
 
     @property
+    def visual_only(self):
+        """
+        Returns:
+            bool: Whether this link is a visual-only link (i.e.: no gravity or collisions applied)
+        """
+        return self._visual_only
+
+    @visual_only.setter
+    def visual_only(self, val):
+        """
+        Sets the visaul only state of this link
+
+        Args:
+            val (bool): Whether this link should be a visual-only link (i.e.: no gravity or collisions applied)
+        """
+        # Set gravity and collisions based on value
+        if val:
+            self.disable_collisions()
+            self.disable_gravity()
+        else:
+            self.enable_collisions()
+            self.enable_gravity()
+
+        # Also set the internal value
+        self._visual_only = val
+
+    @property
+    def volume(self):
+        """
+        Note: Currently it doesn't support Capsule type yet
+        Returns:
+            float: total volume of all the collision meshes of the rigid body in m^3.
+        """
+        # TODO (eric): revise this once omni exposes API to query volume of GeomPrims
+        volume = 0.0
+        for collision_mesh in self._collision_meshes.values():
+            mesh = collision_mesh.prim
+            mesh_type = mesh.GetPrimTypeInfo().GetTypeName()
+            assert mesh_type in GEOM_TYPES, f"Invalid collision mesh type: {mesh_type}"
+            if mesh_type == "Mesh":
+                # We construct a trimesh object from this mesh in order to infer its volume
+                trimesh_mesh = mesh_prim_to_trimesh_mesh(mesh)
+                mesh_volume = trimesh_mesh.volume
+            elif mesh_type == "Sphere":
+                mesh_volume = 4 / 3 * np.pi * (mesh.GetAttribute("radius").Get() ** 3)
+            elif mesh_type == "Cube":
+                mesh_volume = mesh.GetAttribute("size").Get() ** 3
+            elif mesh_type == "Cone":
+                mesh_volume = np.pi * (mesh.GetAttribute("radius").Get() ** 2) * mesh.GetAttribute("height").Get() / 3
+            elif mesh_type == "Cylinder":
+                mesh_volume = np.pi * (mesh.GetAttribute("radius").Get() ** 2) * mesh.GetAttribute("height").Get()
+            else:
+                raise ValueError(f"Cannot compute volume for mesh of type: {mesh_type}")
+
+            volume += mesh_volume * np.product(collision_mesh.get_world_scale())
+
+        return volume
+
+    @volume.setter
+    def volume(self, volume):
+        raise NotImplementedError("Cannot set volume directly for an link!")
+
+    @property
     def mass(self):
         """
         Returns:
             float: mass of the rigid body in kg.
         """
-        return self._mass_api.GetMassAttr().Get()
+        raw_usd_mass = self._mass_api.GetMassAttr().Get()
+        # If our raw_usd_mass isn't specified, we check dynamic control if possible (sim is playing),
+        # otherwise we fallback to analytical computation of volume * density
+        if raw_usd_mass != 0:
+            mass = raw_usd_mass
+        elif self.dc_is_accessible:
+            mass = self.rigid_body_properties.mass
+        else:
+            mass = self.volume * self.density
+
+        return mass
 
     @mass.setter
     def mass(self, mass):
@@ -443,7 +530,19 @@ class RigidPrim(XFormPrim):
         Returns:
             float: density of the rigid body in kg / m^3.
         """
-        return self._mass_api.GetDensityAttr().Get()
+        raw_usd_mass = self._mass_api.GetMassAttr().Get()
+        # We first check if the raw usd mass is specified, since mass overrides density
+        # If it's specified, we infer density based on that value divided by volume
+        # Otherwise, we try to directly grab the raw usd density value, and if that value
+        # does not exist, we return 1000 since that is the canonical density assigned by omniverse
+        if raw_usd_mass != 0:
+            density = raw_usd_mass / self.volume
+        else:
+            density = self._mass_api.GetDensityAttr().Get()
+            if density == 0:
+                density = 1000.0
+
+        return density
 
     @density.setter
     def density(self, density):
@@ -460,6 +559,26 @@ class RigidPrim(XFormPrim):
             bool: Whether contact reporting is enabled for this rigid prim or not
         """
         return self._prim.HasAPI(PhysxSchema.PhysxContactReportAPI)
+
+    @property
+    def rigid_body_properties(self):
+        """
+        Returns:
+            None or RigidBodyProperty: Properties for this rigid body, if accessible. If they do not exist or
+                dc cannot be queried, this will return None
+        """
+        return self._dc.get_rigid_body_properties(self._handle) if self.dc_is_accessible else None
+
+    @property
+    def dc_is_accessible(self):
+        """
+        Checks if dynamic control interface is accessible (checks whether we have a dc handle for this body
+        and if dc is simulating)
+
+        Returns:
+            bool: Whether dc interface can be used or not
+        """
+        return self._handle is not None and self._dc.is_simulating()
 
     # def reset(self):
     #     """

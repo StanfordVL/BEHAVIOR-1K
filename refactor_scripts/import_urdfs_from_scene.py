@@ -14,6 +14,7 @@ import omni.client
 from omni.physx.scripts import utils
 
 from refactor_scripts.expand_collision_obj_and_urdf import split_objs_in_urdf
+from refactor_scripts.preprocess_urdf_for_metalinks import update_obj_urdf_with_metalinks
 
 ##### SET THIS ######
 URDF = f"{ig_dataset_path}/scenes/Rs_int/urdf/Rs_int_best.urdf"
@@ -96,6 +97,8 @@ def import_nested_objs_from_element(element):
 
 
 def import_obj_urdf(obj_category, obj_model, skip_if_exist=False):
+    # Preprocess input URDF to account for metalinks
+    update_obj_urdf_with_metalinks(obj_category=obj_category, obj_model=obj_model)
     # Import URDF
     cfg = create_import_config()
     # Check if filepath exists

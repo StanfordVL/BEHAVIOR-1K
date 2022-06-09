@@ -44,6 +44,8 @@ _ALL_STATES = frozenset(
         Under,
         VerticalAdjacency,
         WaterSource,
+        WaterSink,
+        Filled,
     ]
     + ROOM_STATES
 )
@@ -71,6 +73,8 @@ _ABILITY_TO_STATE_MAPPING = {
     "sticky": [StickyAttachment],
     "toggleable": [ToggledOn],
     "waterSource": [WaterSource],
+    "waterSink": [WaterSink],
+    "fillable": [Filled],
 }
 
 _DEFAULT_STATE_SET = frozenset(
