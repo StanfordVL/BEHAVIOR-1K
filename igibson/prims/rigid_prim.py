@@ -119,16 +119,15 @@ class RigidPrim(XFormPrim):
         for prim in prims_to_check:
             if prim.GetPrimTypeInfo().GetTypeName() in GEOM_TYPES:
                 mesh_name, mesh_path = prim.GetName(), prim.GetPrimPath().__str__()
-                mesh_prim = get_prim_at_path(prim_path=mesh_path)
                 mesh = get_prim_at_path(prim_path=mesh_path)
                 mesh_kwargs = {"prim_path": mesh_path, "name": f"{self._name}:{mesh_name}"}
                 if mesh.HasAPI(UsdPhysics.CollisionAPI):
                     self._collision_meshes[mesh_name] = CollisionGeomPrim(**mesh_kwargs)
                     # We construct a trimesh object from this mesh in order to infer its center-of-mass and volume
                     # TODO: Cleaner way to aggregate this information? Right now we just skip if we encounter a primitive
-                    mesh_vertices = mesh_prim.GetAttribute("points").Get()
+                    mesh_vertices = mesh.GetAttribute("points").Get()
                     if mesh_vertices is not None and len(mesh_vertices) >= 4:
-                        msh = mesh_prim_to_trimesh_mesh(mesh_prim)
+                        msh = mesh_prim_to_trimesh_mesh(mesh)
                         coms.append(msh.center_mass)
                         vols.append(msh.volume)
                 else:
