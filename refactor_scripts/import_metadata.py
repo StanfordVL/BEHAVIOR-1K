@@ -150,7 +150,7 @@ def import_nested_models_metadata_from_element(element, model_pose_info, import_
                 bb = string_to_array(ele.get("bounding_box"))
                 pos = model_pose_info[name]["pos"]
                 quat = model_pose_info[name]["quat"]
-                import_obj_metadata(obj_category=category, obj_model=model, name=name, import_render_channels=import_render_channels)
+                import_obj_metadata(obj_category=category, obj_model=model, import_render_channels=import_render_channels)
                 obj_infos.add(obj_info)
 
         # If there's children nodes, we iterate over those
@@ -262,7 +262,7 @@ def import_rendering_channels(obj_prim, obj_category, model_root_path, usd_path)
                         # Apply the material if it exists
                         render_channel_fcn = RENDERING_CHANNEL_MAPPINGS.get(mat_type, None)
                         if render_channel_fcn is not None:
-                            render_channel_fcn(mat, os.path.join(mat_fpath, link_mat_file))
+                            render_channel_fcn(mat, os.path.join("materials", link_mat_file))
                         else:
                             # Warn user that we didn't find the correct rendering channel
                             print(f"Warning: could not find rendering channel function for material: {mat_type}, skipping")
@@ -271,6 +271,9 @@ def import_rendering_channels(obj_prim, obj_category, model_root_path, usd_path)
                     mat = rename_prim(prim=mat, name=f"material_{link_name}")
 
     # For any remaining materials, we write them to the default material
+    # default_mat = get_prim_at_path(f"{obj_prim.GetPrimPath().pathString}/Looks/material_material_0")
+    # default_mat = get_prim_at_path(f"{obj_prim.GetPrimPath().pathString}/Looks/material_default")
+    print(f"default mat: {default_mat}, obj: {obj_category}, {prim.GetPrimPath().pathString}")
     for mat_file in mat_files:
         # Copy this file into the materials folder
         mat_fpath = os.path.join(usd_dir, "materials")
@@ -280,7 +283,7 @@ def import_rendering_channels(obj_prim, obj_category, model_root_path, usd_path)
         # Apply the material if it exists
         render_channel_fcn = RENDERING_CHANNEL_MAPPINGS.get(mat_type, None)
         if render_channel_fcn is not None:
-            render_channel_fcn(default_mat, os.path.join(mat_fpath, mat_file))
+            render_channel_fcn(default_mat, os.path.join("materials", mat_file))
         else:
             # Warn user that we didn't find the correct rendering channel
             print(f"Warning: could not find rendering channel function for material: {mat_type}")
@@ -328,7 +331,7 @@ def add_xform_properties(prim):
 
 # TODO: Handle metalinks
 # TODO: Import heights per link folder into USD folder
-def import_obj_metadata(obj_category, obj_model, name, import_render_channels=False):
+def import_obj_metadata(obj_category, obj_model, import_render_channels=False):
     # Check if filepath exists
     model_root_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}"
     usd_path = f"{model_root_path}/usd/{obj_model}.usd"
@@ -355,14 +358,19 @@ def import_obj_metadata(obj_category, obj_model, name, import_render_channels=Fa
         meta_links = data["metadata"].pop("links")
         print("meta_links:", meta_links)
         for link_name,atrr in meta_links.items():
-            # Create new Xform prim that will contain info
-            link_prim = stage.DefinePrim(f"{prim.GetPath()}/{link_name}", "Xform")
+            # # Create new Xform prim that will contain info
+            link_prim = get_prim_at_path(f"{prim.GetPath()}/{link_name}_link")
 
             link_prim.CreateAttribute("ig:is_metalink", VT.Bool)
             link_prim.GetAttribute("ig:is_metalink").Set(True)
 
-            link_prim.CreateAttribute("ig:position", VT.Vector3f)
-            link_prim.GetAttribute("ig:position").Set(Gf.Vec3f(*atrr["xyz"]))
+            # # TODO! Validate that this works
+            # # test on water sink 02: water sink location is 0.1, 0.048, 0.32
+            # # water source location is -0.03724, 0.008, 0.43223
+            # add_xform_properties(prim=link_prim)
+            # link_prim.GetAttribute("xformOp:translate").Set(Gf.Vec3f(*atrr["xyz"]))
+            # if atrr["rpy"] is not None:
+            #     link_prim.GetAttribute("xformOp:orient").Set(Gf.Quatf(*(T.euler2quat(atrr["rpy"])[[3, 0, 1, 2]])))
 
             # link_prim.CreateAttribute("ig:orientation", VT.Quatf)
             # link_prim.GetAttribute("ig:orientation").Set(Gf.Quatf(*atrr["rpy"]))

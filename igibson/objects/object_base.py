@@ -14,7 +14,7 @@ from igibson.utils.constants import (
 )
 from pxr import UsdPhysics, PhysxSchema
 from igibson.utils.semantics_utils import CLASS_NAME_TO_CLASS_ID
-from igibson.utils.usd_utils import get_prim_nested_children, create_joint, CollisionAPI, BoundingBoxAPI
+from igibson.utils.usd_utils import get_prim_nested_children, create_joint, CollisionAPI
 from igibson.prims.entity_prim import EntityPrim
 from igibson.prims.xform_prim import XFormPrim
 from igibson.utils.constants import PrimType
@@ -184,17 +184,6 @@ class BaseObject(EntityPrim, metaclass=ABCMeta):
             (not self.fixed_base) and (self.n_links > 1) else super().articulation_root_path
 
     @property
-    def bbox(self):
-        """
-        Get this object's actual bounding box
-
-        Returns:
-            3-array: (x,y,z) bounding box
-        """
-        min_corner, max_corner = BoundingBoxAPI.compute_aabb(self.prim_path)
-        return max_corner - min_corner
-
-    @property
     def mass(self):
         """
         Returns:
@@ -208,9 +197,24 @@ class BaseObject(EntityPrim, metaclass=ABCMeta):
 
     @mass.setter
     def mass(self, mass):
-        # Cannot set mass directly for this object!
         raise NotImplementedError("Cannot set mass directly for an object!")
-    
+
+    @property
+    def volume(self):
+        """
+        Returns:
+             float: Cumulative volume of this potentially articulated object.
+        """
+        volume = 0.0
+        for link in self._links.values():
+            volume += link.volume
+
+        return volume
+
+    @volume.setter
+    def volume(self, volume):
+        raise NotImplementedError("Cannot set volume directly for an object!")
+
     @property
     def link_prim_paths(self):
         return [link.prim_path for link in self._links.values()]

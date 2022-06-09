@@ -4,7 +4,16 @@ from igibson.object_states.contact_bodies import ContactBodies
 from igibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
 from igibson.object_states.water_source import WaterSource
 
-# TODO: Have BooleanState automatically set the dump / load / serialize / deserialize functions
+
+# Proportion of fluid particles per group required to intersect with this object for them all to be absorbed
+# by a soakable object
+PARTICLE_GROUP_PROPORTION = 0.7
+
+# Soak threshold -- number of fluid particle required to be "absorbed" in order for the object to be
+# considered soaked
+SOAK_PARTICLE_THRESHOLD = 40
+
+
 class Soaked(AbsoluteObjectState, BooleanState):
     def __init__(self, obj):
         super(Soaked, self).__init__(obj)

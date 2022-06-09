@@ -160,10 +160,24 @@ def create_physx_particleset_pointinstancer(
         prototype_path = f"{prim_path}/particlePrototype"
         UsdGeom.Sphere.Define(stage, prototype_path)
         prototype_prim_paths = [prototype_path]
+    else:
+        # We copy the prototypes at the prims
+        # We need to make copies currently because omni behavior is weird (frozen particles)
+        # if multiple instancers share the same prototype prim for some reason
+        new_prototype_prim_paths = []
+        for i, p_path in enumerate(prototype_prim_paths):
+            new_path = f"{prim_path}/particlePrototype{i}"
+            omni.kit.commands.execute("CopyPrim", path_from=p_path, path_to=new_path)
+            new_prototype_prim_paths.append(new_path)
+        prototype_prim_paths = new_prototype_prim_paths
+
 
     # Add prototype mesh prim paths to the prototypes relationship attribute for this point set
     mesh_list = instancer.GetPrototypesRel()
     for prototype_prim_path in prototype_prim_paths:
+        # Make sure this prim is visible first
+        UsdGeom.Imageable(get_prim_at_path(prototype_prim_path)).MakeVisible()
+        # Add target
         mesh_list.AddTarget(Sdf.Path(prototype_prim_path))
 
     # Set particle instance default data

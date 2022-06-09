@@ -27,6 +27,7 @@ import carb
 from omni.isaac.core.utils.stage import get_current_stage
 from igibson.prims.prim_base import BasePrim
 from igibson.utils.transform_utils import quat2mat, mat2euler
+from igibson.utils.usd_utils import BoundingBoxAPI
 
 
 class XFormPrim(BasePrim):
@@ -144,6 +145,8 @@ class XFormPrim(BasePrim):
         else:
             xform_op_rot = UsdGeom.XformOp(self._prim.GetAttribute("xformOp:orient"))
         xformable.SetXformOpOrder([xform_op_translate, xform_op_rot, xform_op_scale])
+        # TODO: Figure out if we don't need this
+        # TODO: This messes with mesh poses
         # Possibly set position and orientation
         self.set_position_orientation(position=current_position, orientation=current_orientation)
         return
@@ -440,6 +443,40 @@ class XFormPrim(BasePrim):
         if "xformOp:scale" not in properties:
             carb.log_error("Scale property needs to be set for {} before setting its scale".format(self.name))
         self.set_attribute("xformOp:scale", scale)
+
+    @property
+    def aabb(self):
+        """
+        Get this xform's actual bounding box, axis-aligned in the world frame
+
+        Returns:
+            2-tuple:
+                - 3-array: (x,y,z) lower corner of the bounding box
+                - 3-array: (x,y,z) upper corner of the bounding box
+        """
+        return BoundingBoxAPI.compute_aabb(self.prim_path)
+
+    @property
+    def aabb_extent(self):
+        """
+        Get this xform's actual bounding box extent
+
+        Returns:
+            3-array: (x,y,z) bounding box
+        """
+        min_corner, max_corner = self.aabb
+        return max_corner - min_corner
+
+    @property
+    def aabb_center(self):
+        """
+        Get this xform's actual bounding box center
+
+        Returns:
+            3-array: (x,y,z) bounding box center
+        """
+        min_corner, max_corner = self.aabb
+        return (max_corner + min_corner) / 2.0
 
     def add_filtered_collision_pair(self, prim):
         """

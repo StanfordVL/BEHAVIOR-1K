@@ -386,6 +386,10 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         """
         Resets this scene
         """
+        # Reset all systems
+        for system in self.systems:
+            system.reset()
+
         # Reset the pose and joint configuration of all scene objects.
         if self._initial_state is not None:
             self.load_state(self._initial_state)
