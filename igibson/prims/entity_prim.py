@@ -472,7 +472,8 @@ class EntityPrim(XFormPrim):
                 Default is None, which assumes that all joints are being set.
             normalized (bool): Whether the inputted joint positions should be interpreted as normalized values. Default
                 is False
-            target (bool): Whether the desired joint positions are targets are direct joints to set
+            target (bool): Whether the positions being set are target values or manual values to immediately set.
+                Default is False, corresponding to an instantaneous setting of the positions
         """
         print(f"name: {self.name}, handle: {self._handle}, num dof: {self.n_dof}")
         # Run sanity checks -- make sure our handle is initialized and that we are articulated
@@ -514,7 +515,8 @@ class EntityPrim(XFormPrim):
                 Default is None, which assumes that all joints are being set.
             normalized (bool): Whether the inputted joint velocities should be interpreted as normalized values. Default
                 is False
-            target (bool): Whether the desired joint velocities are targets are direct joints to set
+            target (bool): Whether the velocities being set are target values or manual values to immediately set.
+                Default is False, corresponding to an instantaneous setting of the velocities
         """
         # Run sanity checks -- make sure our handle is initialized and that we are articulated
         assert self._handle is not None, "handles are not initialized yet!"
