@@ -40,8 +40,8 @@ for category in CLOTH_CATEGORIES:
             # face_indices_from_area = np.where(mesh.area_faces > AREA_THRESH)[0]
             edge_indices = np.where(mesh.edges_unique_length > THRESH)[0]
 
-            # Faces that have ALL edges longer than the threshold
-            face_indices_from_edge_length = np.where([len(np.intersect1d(face, edge_indices)) == 3 for face in mesh.faces_unique_edges])[0]
+            # Faces that have any edges longer than the threshold
+            face_indices_from_edge_length = np.where([len(np.intersect1d(face, edge_indices)) != 0 for face in mesh.faces_unique_edges])[0]
             # face_indices = np.union1d(face_indices_from_area, face_indices_from_edge_length)
             face_indices = face_indices_from_edge_length
             if len(face_indices) == 0:

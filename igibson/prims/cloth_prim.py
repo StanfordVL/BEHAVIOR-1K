@@ -8,6 +8,7 @@
 #
 
 from pxr import UsdPhysics
+from pxr.Sdf import ValueTypeNames as VT
 
 from omni.isaac.core.utils.stage import get_current_stage
 from omni.physx.scripts import particleUtils
@@ -77,6 +78,12 @@ class ClothPrim(GeomPrim):
             self_collision=True,
             self_collision_filter=True,
         )
+
+    def _initialize(self):
+        super()._initialize()
+        # TODO (eric): hacky way to get cloth rendering to work (otherwise, there exist some rendering artifacts).
+        self._prim.CreateAttribute("primvars:isVolume", VT.Bool, False).Set(True)
+        self._prim.GetAttribute("primvars:isVolume").Set(False)
 
     def update_handles(self):
         """

@@ -1010,7 +1010,7 @@ class ClothSystem(MicroParticleSystem):
     @classproperty
     def particle_contact_offset(cls):
         # TODO (eric): figure out whether one offset can fit all
-        return 0.05
+        return 0.025
 
     @classproperty
     def is_fluid(cls):
