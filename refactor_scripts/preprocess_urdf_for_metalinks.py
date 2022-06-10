@@ -225,5 +225,5 @@ def update_obj_urdf_with_metalinks(obj_category, obj_model):
         root_element=root,
         name=obj_model,
         dirpath=model_root_path,
-        unique_urdf=True,
+        unique_urdf=False,
     )
