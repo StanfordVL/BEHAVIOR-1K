@@ -23,6 +23,7 @@ from igibson.object_states.object_state_base import REGISTERED_OBJECT_STATES, Ca
 from igibson.objects.object_base import BaseObject
 from igibson.renderer_settings.renderer_settings import RendererSettings
 from igibson.utils.constants import PrimType
+from igibson.object_states import Soaked
 
 
 # Optionally import bddl for object taxonomy.
@@ -285,15 +286,22 @@ class StatefulObject(BaseObject):
         """
         texture_change_states = []
         emitter_enabled = False
-        for state in self.states:
-            if state in get_texture_change_states() and self.states[state].get_value():
-                texture_change_states.append(state)
-            if state in get_steam_states():
-                emitter_enabled = emitter_enabled or self.states[state].get_value()
+        for state_type, state in self.states.items():
+            if state_type in get_texture_change_states():
+                if state_type in [Soaked]:
+                    for fluid_system in state.fluid_systems:
+                        if state.get_value(fluid_system.name):
+                            texture_change_states.append(state)
+                            # Only need to do this once, since soaked handles all fluid systems
+                            break
+                elif state.get_value():
+                    texture_change_states.append(state)
+            if state_type in get_steam_states():
+                emitter_enabled = emitter_enabled or state.get_value()
 
         self.set_emitter_enabled(emitter_enabled)
 
-        texture_change_states.sort(key=lambda s: get_texture_change_priority()[s])
+        texture_change_states.sort(key=lambda s: get_texture_change_priority()[s.__class__])
         object_state = texture_change_states[-1] if len(texture_change_states) > 0 else None
         self._update_texture_change(object_state)
 
@@ -331,7 +339,7 @@ class StatefulObject(BaseObject):
             shader.GetInput("albedo_add").Set(albedo_add)
 
         if not np.allclose(shader.GetInput("diffuse_tint").Get(), diffuse_tint):
-            shader.GetInput("diffuse_tint").Set(diffuse_tint)
+            shader.GetInput("diffuse_tint").Set(Gf.Vec3f(diffuse_tint))
 
     def _dump_state(self):
         # Grab state from super class

@@ -2,6 +2,7 @@ import networkx as nx
 
 from igibson.object_states import *
 from igibson.object_states.object_state_base import BaseObjectState
+from igibson.object_states.fluid_source import FluidSource
 
 _ALL_STATES = frozenset(
     [
@@ -132,6 +133,8 @@ def get_texture_change_priority():
 def get_default_states():
     return _DEFAULT_STATE_SET
 
+def get_fluid_source_states():
+    return [state for state in _ALL_STATES if issubclass(state, FluidSource)]
 
 def get_all_states():
     return _ALL_STATES
