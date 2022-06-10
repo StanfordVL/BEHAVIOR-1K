@@ -135,6 +135,9 @@ class LightObject(StatefulObject):
         # Grab reference to light link
         self._light_link = XFormPrim(prim_path=f"{self._prim_path}/base_link/light", name=f"{self.name}:light_link")
 
+        # Apply Shaping API and set default cone angle attribute
+        shaping_api = UsdLux.ShapingAPI.Apply(self._light_link.prim).GetShapingConeAngleAttr().Set(180.0)
+
         # Optionally set the intensity
         if self._load_config.get("intensity", None) is not None:
             self.intensity = self._load_config["intensity"]

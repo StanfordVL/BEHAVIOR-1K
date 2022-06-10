@@ -302,7 +302,7 @@ class XFormPrim(BasePrim):
 
         # mat.SetScale(Gf.Vec3d(*(self.get_world_scale() / self.scale)))
         # TODO (eric): understand why this (mat.setScale) works - this works empirically but it's unclear why.
-        mat.SetScale(Gf.Vec3d(*self.scale))
+        mat.SetScale(Gf.Vec3d(*(self.scale.astype(np.float64))))
         my_world_transform = np.transpose(mat.GetMatrix())
 
         parent_world_tf = UsdGeom.Xformable(get_prim_parent(self._prim)).ComputeLocalToWorldTransform(Usd.TimeCode.Default())

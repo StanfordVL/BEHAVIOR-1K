@@ -395,6 +395,7 @@ def import_obj_metadata(obj_category, obj_model, import_render_channels=False):
                 light_type = LIGHT_MAPPING[light_info["type"]]
                 light_prim_path = f"/{obj_model}/{link_name}/light{i}"
                 light_prim = UsdLux.__dict__[f"{light_type}Light"].Define(stage, light_prim_path).GetPrim()
+                UsdLux.ShapingAPI.Apply(light_prim).GetShapingConeAngleAttr().Set(180.0)
                 add_xform_properties(prim=light_prim)
                 # Make sure light_prim has XForm properties
                 light = XFormPrim(prim_path=light_prim_path)
