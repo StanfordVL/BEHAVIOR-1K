@@ -354,7 +354,8 @@ class Simulator(SimulationContext):
                         obj.states[state_type].update()
 
         for obj in self.scene.objects:
-            if isinstance(obj, StatefulObject):
+            # Only update visuals for objects that have been initialized so far
+            if isinstance(obj, StatefulObject) and obj.initialized:
                 obj.update_visuals()
 
         # Clear the bounding box cache so that it gets updated during the next time it's called
