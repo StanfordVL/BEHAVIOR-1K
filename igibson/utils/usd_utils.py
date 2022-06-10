@@ -1,11 +1,12 @@
 import math
 import numpy as np
 from collections import Iterable
+import os
 
 import omni.usd
 from omni.isaac.core.utils.prims import get_prim_at_path, get_prim_path, is_prim_path_valid, get_prim_children
 from omni.isaac.core.utils.carb import set_carb_setting
-from omni.isaac.core.utils.stage import get_current_stage, get_stage_units, traverse_stage
+from omni.isaac.core.utils.stage import get_current_stage, get_stage_units, traverse_stage, add_reference_to_stage
 from omni.isaac.core.utils.bounds import compute_aabb, create_bbox_cache, compute_combined_aabb
 from omni.syntheticdata import helpers
 from omni.kit.primitive.mesh.evaluators.sphere import SphereEvaluator
@@ -398,4 +399,31 @@ def mesh_prim_to_trimesh_mesh(mesh_prim):
         i += count
 
     return trimesh.Trimesh(vertices=vertices, faces=faces)
+
+
+def add_usd_to_stage(usd_path, prim_path):
+    """
+    Adds USD file at @usd_path at the location @prim_path
+
+    Args:
+        usd_path (str): Absolute or relative path to the usd file to load
+        prim_path (str): Where loaded USD should exist on the stage
+
+    Returns:
+        Usd.Prim: Loaded USD prim
+    """
+    # Make sure this is actually a USD object
+    assert usd_path[-4:] == ".usd", f"Cannot load a non-USD file as a USD object!"
+
+    # Make sure the path exists
+    assert os.path.exists(usd_path), f"USD file {usd_path} does not exist!"
+
+    # Add reference to stage and grab prim
+    add_reference_to_stage(usd_path=usd_path, prim_path=prim_path)
+    prim = get_prim_at_path(prim_path)
+
+    # Make sure prim was loaded correctly
+    assert prim, f"Failed to load USD object from path: {usd_path}"
+
+    return prim
 

@@ -2,9 +2,9 @@ import logging
 import numpy as np
 from igibson.objects.stateful_object import StatefulObject
 
-from omni.isaac.core.utils.stage import add_reference_to_stage
 from omni.isaac.core.utils.prims import get_prim_at_path
 from igibson.utils.constants import PrimType
+from igibson.utils.usd_utils import add_usd_to_stage
 
 
 class USDObject(StatefulObject):
@@ -76,18 +76,7 @@ class USDObject(StatefulObject):
         Load the object into pybullet and set it to the correct pose
         """
         logging.info(f"Loading the following USD: {self._usd_path}")
-
-        # Make sure this is actually a USD object
-        assert self._usd_path[-4:] == ".usd", f"Cannot load a non-USD file as a USD object!"
-
-        # Add reference to stage and grab prim
-        add_reference_to_stage(usd_path=self._usd_path, prim_path=self._prim_path)
-        prim = get_prim_at_path(self._prim_path)
-
-        # Make sure prim was loaded correctly
-        assert prim, f"Failed to load USD object from path: {self._usd_path}"
-
-        return prim
+        return add_usd_to_stage(usd_path=self._usd_path, prim_path=self._prim_path)
 
     def _create_prim_with_same_kwargs(self, prim_path, name, load_config):
         # Add additional kwargs
