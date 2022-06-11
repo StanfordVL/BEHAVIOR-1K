@@ -122,3 +122,29 @@ class ClothPrim(GeomPrim):
     @density.setter
     def density(self, density):
         raise NotImplementedError("Cannot set density for ClothPrim")
+
+    def set_linear_velocity(self, velocity):
+        """Sets the linear velocity of the prim in stage.
+
+        Args:
+            velocity (np.ndarray): linear velocity to set the rigid prim to. Shape (3,).
+        """
+        # TODO (eric): Just a pass through for now.
+        return
+
+    def set_angular_velocity(self, velocity):
+        """Sets the angular velocity of the prim in stage.
+
+        Args:
+            velocity (np.ndarray): angular velocity to set the rigid prim to. Shape (3,).
+        """
+        # TODO (eric): Just a pass through for now.
+        return
+
+
+    def wake(self):
+        """
+        Enable physics for this rigid body
+        """
+        # TODO (eric): Just a pass through for now.
+        return

@@ -729,7 +729,7 @@ class DatasetObject(USDObject):
         links = {link_name: self._links[link_name]} if link_name is not None else self._links
         for link_name, link in links.items():
             # If the link has a bounding box annotation.
-            if link_name in self.native_link_bboxes:
+            if self.native_link_bboxes is not None and link_name in self.native_link_bboxes:
                 # If a visual bounding box does not exist in the dictionary, try switching to collision.
                 # We expect that every link has its collision bb annotated (or set to None if none exists).
                 if bbox_type == "visual" and "visual" not in self.native_link_bboxes[link_name]:

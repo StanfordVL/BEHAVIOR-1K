@@ -44,7 +44,7 @@ class _Dirty(AbsoluteObjectState, BooleanState):
             self.DIRT_CLASS.remove_all_group_particles(group=self.dirt_group)
         else:
             # Generate dirt particles
-            new_value = self.DIRT_CLASS.generate_particles_on_object(obj=self.obj)
+            new_value = self.DIRT_CLASS.generate_group_particles(group=self.dirt_group)
             # If we succeeded with generating particles (new_value = True), we are dirty, let's store additional info
             if new_value:
                 # Store how many particles there are now -- this is the "maximum" number possible

@@ -241,8 +241,7 @@ class MacroParticleSystem(BaseParticleSystem):
         assert name in cls.particles, f"Got invalid name for particle to remove {name}"
 
         particle = cls.particles.pop(name)
-        # TODO: This causes segfaults UNLESS simulator is stopped
-        # cls.simulator.stage.RemovePrim(particle.prim_path)
+        cls.simulator.stage.RemovePrim(particle.prim_path)
 
     @classmethod
     def _load_new_particle(cls, prim_path, name):
@@ -321,8 +320,6 @@ class VisualParticleSystem(MacroParticleSystem):
     _SAMPLING_BIMODAL_STDEV_FRACTION = 0.2
     _SAMPLING_MAX_ATTEMPTS = 20
 
-    # List, keeps track of particles that need to be removed after the next sim step
-    _particles_to_remove = None
 
     @classmethod
     def initialize(cls, simulator):
@@ -332,7 +329,6 @@ class VisualParticleSystem(MacroParticleSystem):
         # Initialize mutable class variables so they don't automatically get overridden by children classes
         cls._group_particles = OrderedDict()
         cls._group_objects = OrderedDict()
-        cls._particles_to_remove = []
 
     @classproperty
     def groups(cls):
@@ -341,16 +337,6 @@ class VisualParticleSystem(MacroParticleSystem):
             set of str: Current attachment particle group names
         """
         return set(cls._group_particles.keys())
-
-    @classmethod
-    def update(cls):
-        # Call super first
-        super().update()
-
-        # Remove any particles that have been requested to be removed
-        for particle in cls._particles_to_remove:
-            cls.remove_particle(name=particle.name)
-        cls._particles_to_remove = []
 
     @classmethod
     def _load_new_particle(cls, prim_path, name):
@@ -380,9 +366,6 @@ class VisualParticleSystem(MacroParticleSystem):
         cls._group_particles = OrderedDict()
         cls._group_objects = OrderedDict()
 
-        # Make sure particles to remove is empty
-        cls._particles_to_remove = []
-
     @classmethod
     def remove_particle(cls, name):
         """
@@ -394,7 +377,7 @@ class VisualParticleSystem(MacroParticleSystem):
         # Run super first
         super().remove_particle(name=name)
 
-        #  Remove this particle from its respective group as well
+        # Remove this particle from its respective group as well
         for group in cls._group_particles.values():
             # Maybe make this better? We have to manually search through the groups for this particle
             if name in group:
@@ -412,7 +395,7 @@ class VisualParticleSystem(MacroParticleSystem):
         # Make sure the group exists
         cls._validate_group(group=group)
         # Remove all particles from the group
-        for particle_name in cls._group_particles[group].keys():
+        for particle_name in list(cls._group_particles[group].keys()):
             cls.remove_particle(name=particle_name)
 
     @classmethod
@@ -532,7 +515,7 @@ class VisualParticleSystem(MacroParticleSystem):
 
         # If we aren't successful, then we terminate early
         if n_success < min_particles_for_success:
-            group = None
+            return False
 
         else:
             # Use sampled points
@@ -561,7 +544,7 @@ class VisualParticleSystem(MacroParticleSystem):
                     # Add to group
                     cls._group_particles[group][particle.name] = particle
 
-        return group
+            return True
 
     @classmethod
     def _validate_group(cls, group):
