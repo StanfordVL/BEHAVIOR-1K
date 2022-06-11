@@ -540,7 +540,7 @@ class DatasetObject(USDObject):
             object_state (BooleanState or None): the object state that the diffuse color should match to
         """
         DEFAULT_ALBEDO_MAP_SUFFIX = frozenset({"DIFFUSE", "COMBINED", "albedo"})
-        state_name = object_state.__name__ if object_state is not None else None
+        state_name = object_state.__class__.__name__ if object_state is not None else None
         for shader in self._shaders:
             texture_path = shader.GetInput("diffuse_texture").Get()
             assert texture_path is not None, f"DatasetObject [{self.prim_path}] has invalid diffuse texture map."
@@ -558,6 +558,8 @@ class DatasetObject(USDObject):
             target_texture_path += f"_{state_name}.png" if state_name is not None else ".png"
 
             if os.path.exists(target_texture_path):
+                # Since we are loading a pre-cached texture map, we need to reset the albedo value to the default
+                self._update_albedo_value(None, shader)
                 # Set the relative path to the directory of the current stage
                 root_stage_path = os.path.dirname(self._simulator.stage.GetRootLayer().realPath)
                 target_texture_relative_path = os.path.relpath(target_texture_path, root_stage_path)

@@ -11,11 +11,12 @@ from igibson.utils.physx_utils import create_physx_particle_system, create_physx
 import omni
 from omni.isaac.core.utils.prims import get_prim_at_path
 from omni.physx.scripts import particleUtils
+from omni.physx import get_physx_scene_query_interface
 from collections import OrderedDict
 import numpy as np
 from pxr import Gf, Vt, UsdShade, UsdGeom, PhysxSchema
 from omni.isaac.core.utils.stage import get_current_stage
-import logging
+from collections import defaultdict
 
 
 # physics settins
@@ -27,6 +28,8 @@ from omni.physx.bindings._physx import (
 )
 import carb
 
+# Garbage collect particle instancers where less than 25 percent of the particle are visible
+GC_THRESHOLD = 0.25
 
 def set_carb_settings_for_fluid_isosurface():
     """
@@ -959,6 +962,41 @@ class FluidSystem(MicroParticleSystem):
         prototype = UsdGeom.Sphere.Define(cls.simulator.stage, f"{cls.prim_path}/{cls.name}ParticlePrototype")
         prototype.CreateRadiusAttr().Set(cls.particle_radius)
         return [prototype.GetPrim()]
+
+    @classmethod
+    def cache(cls):
+        """
+        Cache the collision hits for all particle systems, to be used by the object state system to determine
+        if a particle is in contact with a given object.
+        """
+        particle_contacts = defaultdict(lambda: defaultdict(list))
+
+        particle_instancer = None
+        particle_idx = 0
+
+        def report_hit(hit):
+            base = "/".join(hit.rigid_body.split("/")[:-1])
+            body = cls.simulator.scene.object_registry("prim_path", base)
+            particle_contacts[body][particle_instancer].append(particle_idx)
+            return True
+
+        for system, value in cls.particle_instancers.items():
+            for idx, pos in enumerate(value.particle_positions):
+                particle_idx = idx
+                particle_instancer = system
+                get_physx_scene_query_interface().overlap_sphere(cls.particle_radius, pos, report_hit, False)
+
+        cls.state_cache = {
+            'particle_contacts': particle_contacts,
+        }
+
+    @classmethod
+    def update(cls):
+        # For each particle instance, garbage collect particles if the number of visible particles
+        # is below the garbage collection threshold (GC_THRESHOLD)
+        for instancer, value in cls.particle_instancers.items(): # type: ignore
+            if np.mean(value.particle_visibilities) <= GC_THRESHOLD:
+                cls.remove_particle_instancer(instancer)
 
 
 class WaterSystem(FluidSystem):

@@ -56,6 +56,13 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
         cls.simulator = simulator
 
     @classmethod
+    def cache(cls):
+        """
+        Cache any necessary system level state info used by the object state system.
+        """
+        pass
+
+    @classmethod
     def update(cls):
         """
         Conduct any necessary internal updates after a simulation step

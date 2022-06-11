@@ -345,6 +345,12 @@ class Simulator(SimulationContext):
         for particle_system in self.particle_systems:
             particle_system.update(self)
 
+        # Cache values from all of the micro and macro particle systems.
+        # This is used to store system-wide state which can be queried
+        # by the object state system.
+        for system in self.scene.systems:
+            system.cache()
+
         # Step the object states in global topological order (if the scene exists).
         if self.scene is not None:
             for state_type in self.object_state_types:
@@ -352,6 +358,12 @@ class Simulator(SimulationContext):
                     # Only update objects that have been initialized so far
                     if obj.initialized:
                         obj.states[state_type].update()
+
+        # Perform system level updates to the micro and macro particle systems.
+        # This allows for the states to handle changes in response to changes
+        # induced by the object state system.
+        for system in self.scene.systems:
+            system.update()
 
         for obj in self.scene.objects:
             # Only update visuals for objects that have been initialized so far
