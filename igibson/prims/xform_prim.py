@@ -12,17 +12,10 @@ from pxr import Gf, Usd, UsdGeom, UsdShade, UsdPhysics
 from omni.isaac.core.utils.types import XFormPrimState
 from omni.isaac.core.materials import PreviewSurface, OmniGlass, OmniPBR, VisualMaterial
 from omni.isaac.core.utils.rotations import gf_quat_to_np_array
-from omni.isaac.core.utils.transformations import tf_matrix_from_pose
-from omni.isaac.core.utils.numpy import gf_quat_to_tensor
-from scipy.spatial.transform import Rotation
 from omni.isaac.core.utils.prims import (
     get_prim_at_path,
-    move_prim,
-    query_parent_path,
     is_prim_path_valid,
-    define_prim,
     get_prim_parent,
-    get_prim_object_type,
 )
 import numpy as np
 import carb
