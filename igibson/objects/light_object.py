@@ -53,6 +53,8 @@ class LightObject(StatefulObject):
         name (str): Name for the object. Names need to be unique per scene.
         category (str): Category for the object. Defaults to "object".
         class_id (str): What class ID the object should be assigned in semantic segmentation rendering mode.
+        @param uuid: Unique unsigned-integer identifier to assign to this object (max 8-numbers).
+            If None is specified, then it will be auto-generated
         scale (None or float or 3-array): If specified, sets the scale for this object.
             A single number corresponds to uniform scaling along the x,y,z axes, whereas a 3-array 
             specifies per-axis scaling.
@@ -74,6 +76,7 @@ class LightObject(StatefulObject):
         name=None,
         category="light",
         class_id=None,
+        uuid=None,
         scale=None,
         rendering_params=None,
         load_config=None,
@@ -101,6 +104,7 @@ class LightObject(StatefulObject):
             name=name,
             category=category,
             class_id=class_id,
+            uuid=uuid,
             scale=scale,
             rendering_params=rendering_params,
             visible=True,

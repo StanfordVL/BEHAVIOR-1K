@@ -135,7 +135,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 prims that we can use as unique IDs to reference prims, e.g., prim.prim_path, prim.name, prim.handle, etc.
         """
         # Only use name and handle by default, the most general
-        return ["name", "prim_path", "root_handle"]
+        return ["name", "prim_path", "root_handle", "uuid"]
 
     @property
     def object_registry_group_keys(self):
@@ -186,6 +186,9 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # Store world prim
         self._world_prim = simulator.world_prim
 
+        # Clear the systems
+        self.clear_systems()
+
         self._load(simulator)
         self._loaded = True
 
@@ -204,6 +207,12 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         for system in self.systems:
             print(f"Initializing system: {system.name}")
             system.initialize(simulator=simulator)
+
+    def clear_systems(self):
+        # Clears systems so they can be re-initialized
+        for system in self.systems:
+            print(f"Clearing system: {system.name}")
+            system.clear()
 
     def _initialize(self):
         """

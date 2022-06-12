@@ -56,6 +56,16 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
         cls.simulator = simulator
 
     @classmethod
+    def clear(cls):
+        """
+        Clears this system, so that it may possibly be re-initialized. Useful for, e.g., when loading from a new
+        scene during the same sim instance
+        """
+        if cls.initialized:
+            cls.reset()
+            cls.simulator = None
+
+    @classmethod
     def cache(cls):
         """
         Cache any necessary system level state info used by the object state system.

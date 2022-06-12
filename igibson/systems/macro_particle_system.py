@@ -1,5 +1,6 @@
 import os
 import omni
+from omni.isaac.core.utils.prims import get_prim_at_path
 from igibson import assets_path
 from igibson.utils.usd_utils import create_joint
 from igibson.systems.particle_system_base import BaseParticleSystem
@@ -68,14 +69,15 @@ class MacroParticleSystem(BaseParticleSystem):
 
     @classproperty
     def state_size(cls):
-        # We have n_particles (1), each particle pose (7*n), scale (3*n), and
+        # We have max_particle_idn (1), n_particles (1), each particle pose (7*n), scale (3*n), and
         # possibly template pose (7), and template scale (3)
-        state_size = 10 * cls.n_particles + 1
+        state_size = 10 * cls.n_particles + 2
         return state_size if cls.particle_object is None else state_size + 10
 
     @classmethod
     def _dump_state(cls):
         return OrderedDict(
+            max_particle_idn=cls.max_particle_idn,
             n_particles=cls.n_particles,
             poses=[particle.get_position_orientation() for particle in cls.particles.values()],
             scales=[particle.scale for particle in cls.particles.values()],
@@ -95,6 +97,7 @@ class MacroParticleSystem(BaseParticleSystem):
         assert cls.n_particles == state["n_particles"], f"Inconsistent number of particles found when loading " \
                                                         f"particles state! Current number: {cls.n_particles}, " \
                                                         f"loaded number: {state['n_particles']}"
+        cls.max_particle_idn = state["max_particle_idn"]
 
         # Load the poses and scales
         for particle, pose, scale in zip(cls.particles.values(), state["poses"], state["scales"]):
@@ -110,6 +113,7 @@ class MacroParticleSystem(BaseParticleSystem):
     def _serialize(cls, state):
         # Array is n_particles + poses for all particles, then the template info
         states_flat = [
+            [state["max_particle_idn"]],
             [state["n_particles"]],
             *[np.concatenate(pose) for pose in state["poses"]],
             *state["scales"]
@@ -125,11 +129,12 @@ class MacroParticleSystem(BaseParticleSystem):
     def _deserialize(cls, state):
         # First index is number of particles, rest are the individual particle poses
         state_dict = OrderedDict()
-        n_particles = int(state[0])
+        state_dict["max_particle_idn"] = state[0]
+        n_particles = int(state[1])
         state_dict["n_particles"] = n_particles
 
         poses, scales = [], []
-        pose_offset_idx = 1                                 # This is where the pose info begins in the flattened array
+        pose_offset_idx = 2                                 # This is where the pose info begins in the flattened array
         scale_offset_idx = n_particles * 7 + pose_offset_idx  # This is where the scale info begins in the flattened array
         for i in range(n_particles):
             poses.append([
@@ -141,8 +146,8 @@ class MacroParticleSystem(BaseParticleSystem):
         state_dict["poses"] = poses
         state_dict["scales"] = scales
 
-        # Update idx -- one from n_particles + 10*n_particles for pose + scale
-        idx = 1 + n_particles * 10
+        # Update idx -- two from max_n_particles and n_particles + 10*n_particles for pose + scale
+        idx = 2 + n_particles * 10
 
         template_pose, template_scale = None, None
         # If our state size is larger than the current index we're at, this corresponds to the template info
@@ -197,12 +202,14 @@ class MacroParticleSystem(BaseParticleSystem):
         cls.particles = OrderedDict()
 
     @classmethod
-    def add_particle(cls, prim_path, scale=None, position=None, orientation=None):
+    def add_particle(cls, prim_path, idn=None, scale=None, position=None, orientation=None):
         """
         Adds a particle to this system.
 
         Args:
             prim_path (str): Absolute path to the newly created particle, minus the name for this particle
+            idn (None or int): If specified, should be unique identifier to assign to this particle. If not, will
+                automatically generate a new unique one
             scale (None or 3-array): Relative (x,y,z) scale of the particle, if any. If not specified, will
                 automatically be sampled based on cls.min_scale and cls.max_scale
             position (None or 3-array): Global (x,y,z) position to set this particle to, if any
@@ -212,7 +219,9 @@ class MacroParticleSystem(BaseParticleSystem):
             XFormPrim: Newly created particle instance, which is added internally as well
         """
         # Generate the new particle
-        name = cls.particle_id2name(idn=cls.get_next_particle_unique_idn())
+        name = cls.particle_idn2name(idn=cls.get_next_particle_unique_idn() if idn is None else idn)
+        # Make sure name doesn't already exist
+        assert name not in cls.particles.keys(), f"Cannot create particle with name {name} because it already exists!"
         new_particle = cls._load_new_particle(prim_path=f"{prim_path}/{name}", name=name)
 
         # Sample the scale and also make sure the particle is visible
@@ -259,7 +268,7 @@ class MacroParticleSystem(BaseParticleSystem):
         raise NotImplementedError()
 
     @classmethod
-    def particle_name2id(cls, name):
+    def particle_name2idn(cls, name):
         """
         Args:
             name (str): Particle name to grab its corresponding unique id number for
@@ -272,7 +281,7 @@ class MacroParticleSystem(BaseParticleSystem):
         return int(name.split(cls.particle_name_prefix)[-1])
 
     @classmethod
-    def particle_id2name(cls, idn):
+    def particle_idn2name(cls, idn):
         """
         Args:
             idn (int): Unique ID number assigned to the particle to grab the name for
@@ -338,14 +347,26 @@ class VisualParticleSystem(MacroParticleSystem):
         """
         return set(cls._group_particles.keys())
 
+    @classproperty
+    def state_size(cls):
+        # Get super size first
+        state_size = super().state_size
+
+        # Additionally, we have n_groups (1), with m_particles for each group (n), attached_obj_uuids (n), and
+        # particle ids and corresponding link info for each particle (m * 2)
+        return state_size + 1 + 2 * len(cls._group_particles) + \
+               sum([2 * cls.num_group_particles(group) for group in cls.groups])
+
     @classmethod
     def _load_new_particle(cls, prim_path, name):
-        # We copy the template prim and generate the new object
-        omni.kit.commands.execute(
-            "CopyPrim",
-            path_from=cls.particle_object.prim_path,
-            path_to=prim_path,
-        )
+        # We copy the template prim and generate the new object if the prim doesn't already exist, otherwise we
+        # reference the pre-existing one
+        if not get_prim_at_path(prim_path):
+            omni.kit.commands.execute(
+                "CopyPrim",
+                path_from=cls.particle_object.prim_path,
+                path_to=prim_path,
+            )
         return VisualGeomPrim(prim_path=prim_path, name=name)
 
     @classmethod
@@ -557,6 +578,161 @@ class VisualParticleSystem(MacroParticleSystem):
         """
         if group not in cls.groups:
             raise ValueError(f"Particle attachment group {group} does not exist!")
+
+    @classmethod
+    def _sync_particle_groups(cls, group_objects, particle_idns, particle_attached_link_names):
+        """
+        Synchronizes the particle groups based on desired identification numbers @group_idns
+
+        Args:
+            group_objects (list of BaseObject): Desired unique group objects that should be active for this particle system
+            particle_idns (list of list of int): Per-group unique id numbers for the particles assigned to that group.
+                List should be same length as @group_idns with sub-entries corresponding to the desired number of
+                particles assigned to that group
+            particle_attached_link_names (list of list of str): Per-group link names corresponding to the specific
+                links each particle is attached for each group. List should be same length as @group_idns with
+                sub-entries corresponding to the desired number of particles assigned to that group
+        """
+        # We have to be careful here -- some particle groups may have been deleted / are mismatched, so we need
+        # to update accordingly, potentially deleting stale groups and creating new groups as needed
+        name_to_info_mapping = {obj.name: {
+            "n_particles": len(p_idns),
+            "particle_idns": p_idns,
+            "link_names": link_names,
+        }
+            for obj, p_idns, link_names in
+            zip(group_objects, particle_idns, particle_attached_link_names)}
+
+        current_group_names = cls.groups
+        desired_group_names = set(obj.name for obj in group_objects)
+        groups_to_delete = current_group_names - desired_group_names
+        groups_to_create = desired_group_names - current_group_names
+        common_groups = current_group_names.intersection(desired_group_names)
+
+        # Sanity check the common groups, we will recreate any where there is a mismatch
+        print(f"common: {common_groups}")
+        for name in common_groups:
+            info = name_to_info_mapping[name]
+            if cls.num_group_particles(group=name) != info["n_particles"]:
+                print(f"Got mismatch in particle group {name} when syncing, deleting and recreating group now.")
+                # Add this group to both the delete and creation pile
+                groups_to_delete.add(name)
+                groups_to_create.add(name)
+
+        # Delete any groups we no longer want
+        print(f"del: {groups_to_delete}")
+        for name in groups_to_delete:
+            cls.remove_attachment_group(group=name)
+
+        # Create any groups we don't already have
+        print(f"create: {groups_to_create}")
+        for name in groups_to_create:
+            obj = cls.simulator.scene.object_registry("name", name)
+            info = name_to_info_mapping[name]
+            cls.create_attachment_group(obj=obj)
+
+            for particle_idn, link_name in zip(info["particle_idns"], info["link_names"]):
+                # Create the necessary particles
+                particle = cls.add_particle(
+                    prim_path=f"{obj.prim_path}/{link_name}",
+                    idn=int(particle_idn),
+                )
+                cls._group_particles[name][particle.name] = particle
+
+    @classmethod
+    def _dump_state(cls):
+        state = super()._dump_state()
+
+        # Add in per-group information
+        groups_dict = OrderedDict()
+        for group_name, group_particles in cls._group_particles.items():
+            groups_dict[group_name] = OrderedDict(
+                particle_attached_obj_uuid=cls._group_objects[group_name].uuid,
+                n_particles=len(group_particles),
+                particle_idns=[cls.particle_name2idn(name=name) for name in group_particles.keys()],
+                particle_attached_link_names=[prim.prim_path.split("/")[-2] for prim in group_particles.values()],
+            )
+
+        state["n_groups"] = len(cls._group_particles)
+        state["groups"] = groups_dict
+
+        return state
+
+    @classmethod
+    def _load_state(cls, state):
+        # First, we sync our particle systems
+        """
+        Load the internal state to this object as specified by @state. Should be implemented by subclass.
+
+        Args:
+            state (OrderedDict): Keyword-mapped states of this object to set
+        """
+        # Synchronize particle groups
+        cls._sync_particle_groups(
+            group_objects=[cls.simulator.scene.object_registry("uuid", info["particle_attached_obj_uuid"])
+                           for info in state["groups"].values()],
+            particle_idns=[info["particle_idns"] for info in state["groups"].values()],
+            particle_attached_link_names=[info["particle_attached_link_names"] for info in state["groups"].values()],
+        )
+
+        # Sanity check loading particles
+        assert cls.n_particles == state["n_particles"], f"Inconsistent number of particles found when loading " \
+                                                        f"particles state! Current number: {cls.n_particles}, " \
+                                                        f"loaded number: {state['n_particles']}"
+
+        # Run super
+        super()._load_state(state=state)
+
+    @classmethod
+    def _serialize(cls, state):
+        # Run super first
+        state_flat = super()._serialize(state=state)
+
+        groups_dict = state["groups"]
+        state_group_flat = [[state["n_groups"]]]
+        for group_name, group_dict in groups_dict.items():
+            group_obj_link2id = {link_name: i for i, link_name in enumerate(cls._group_objects[group_name].links.keys())}
+            state_group_flat += [
+                [group_dict["particle_attached_obj_uuid"]],
+                [group_dict["n_particles"]],
+                group_dict["particle_idns"],
+                [group_obj_link2id[link_name] for link_name in group_dict["particle_attached_links"]],
+            ]
+
+        return np.concatenate([*state_group_flat, state_flat])
+
+    @classmethod
+    def _deserialize(cls, state):
+        # Synchronize the particle groups
+        n_groups = int(state[0])
+        groups_dict = OrderedDict()
+        group_objs = []
+        # Index starts at 1 because index 0 is n_groups
+        idx = 1
+        for i in range(n_groups):
+            obj_uuid, n_particles = int(state[idx]), int(state[idx + 1])
+            obj = cls.simulator.scene.object_registry("uuid", obj_uuid)
+            group_obj_id2link = {i: link_name for i, link_name in enumerate(obj.links.keys())}
+            group_objs.append(obj)
+            groups_dict[obj.name] = OrderedDict(
+                particle_attached_obj_uuid=obj_uuid,
+                n_particles=n_particles,
+                particle_idns=[int(idn) for idn in state[idx + 2 : idx + 2 + n_particles]], # Idx + 2 because the first two are obj_uuid and n_particles
+                particle_attached_link_names=[group_obj_id2link[int(idn)] for idn in state[idx + 2 + n_particles : idx + 2 + n_particles * 2]],
+            )
+            idx += 2 + n_particles * 2
+        print(f"Syncing {cls.name} particles with {n_groups} groups..")
+        cls._sync_particle_groups(
+            group_objects=group_objs,
+            particle_idns=[group_info["particle_idns"] for group_info in groups_dict.values()],
+            particle_attached_link_names=[group_info["particle_attached_link_names"] for group_info in groups_dict.values()],
+        )
+
+        # Get super method
+        state_dict, idx_super = super()._deserialize(state=state[idx:])
+        state_dict["groups"] = groups_dict
+
+        return state_dict, idx + idx_super
 
 
 class DustSystem(VisualParticleSystem):

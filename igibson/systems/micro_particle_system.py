@@ -871,7 +871,7 @@ class MicroParticleSystem(BaseParticleSystem):
         for info_name in ("instancer_idns", "instancer_particle_groups", "instancer_particle_counts"):
             instancer_info[info_name] = state[idx: idx + n_instancers].astype(int).tolist()
             idx += n_instancers
-        print(f"Syncing particles. with {n_instancers} instancers..")
+        print(f"Syncing {cls.name} particles with {n_instancers} instancers..")
         cls._sync_particle_instancers(
             idns=instancer_info["instancer_idns"],
             particle_groups=instancer_info["instancer_particle_groups"],

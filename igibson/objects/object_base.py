@@ -29,6 +29,7 @@ class BaseObject(EntityPrim, metaclass=ABCMeta):
             name=None,
             category="object",
             class_id=None,
+            uuid=None,
             scale=1.0,
             rendering_params=None,
             visible=True,
@@ -47,6 +48,8 @@ class BaseObject(EntityPrim, metaclass=ABCMeta):
             at the time the object is added to the scene, using the object's category.
         @param category: Category for the object. Defaults to "object".
         @param class_id: What class ID the object should be assigned in semantic segmentation rendering mode.
+        @param uuid: Unique unsigned-integer identifier to assign to this object (max 8-numbers).
+            If None is specified, then it will be auto-generated
         @param scale: float or 3-array, sets the scale for this object. A single number corresponds to uniform scaling
             along the x,y,z axes, whereas a 3-array specifies per-axis scaling.
         @param rendering_params: Any relevant rendering settings for this object.
@@ -68,6 +71,8 @@ class BaseObject(EntityPrim, metaclass=ABCMeta):
             name = "{}_{}".format(category, address)
 
         # Store values
+        self.uuid = int(str(id(self))[-8:]) if uuid is None else uuid
+        assert len(str(self.uuid)) <= 8, f"UUID for this object must be at max 8-digits, got: {self.uuid}"
         self.category = category
         self.fixed_base = fixed_base
 
@@ -114,6 +119,11 @@ class BaseObject(EntityPrim, metaclass=ABCMeta):
             name=name,
             load_config=load_config,
         )
+
+        # TODO: Super hacky, think of a better way to preserve this info
+        # Update init info for this
+        self._init_info["args"]["name"] = self.name
+        self._init_info["args"]["uuid"] = self.uuid
 
     def load(self, simulator=None):
         # Run sanity check, any of these objects REQUIRE a simulator to be specified

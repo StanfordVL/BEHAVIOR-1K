@@ -23,6 +23,7 @@ class ControllableObject(BaseObject):
         name=None,
         category="object",
         class_id=None,
+        uuid=None,
         scale=1.0,
         rendering_params=None,
         visible=True,
@@ -45,6 +46,8 @@ class ControllableObject(BaseObject):
             at the time the object is added to the scene, using the object's category.
         @param category: Category for the object. Defaults to "object".
         @param class_id: What class ID the object should be assigned in semantic segmentation rendering mode.
+        @param uuid: Unique unsigned-integer identifier to assign to this object (max 8-numbers).
+            If None is specified, then it will be auto-generated
         @param scale: float or 3-array, sets the scale for this object. A single number corresponds to uniform scaling
             along the x,y,z axes, whereas a 3-array specifies per-axis scaling.
         @param rendering_params: Any relevant rendering settings for this object.
@@ -87,6 +90,7 @@ class ControllableObject(BaseObject):
             name=name,
             category=category,
             class_id=class_id,
+            uuid=uuid,
             scale=scale,
             rendering_params=rendering_params,
             visible=visible,
