@@ -6,14 +6,15 @@
 # distribution of this software and related documentation without an express
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 #
-
-from pxr import UsdPhysics
+from igibson.utils.usd_utils import array_to_vtarray
+from pxr import UsdPhysics, Gf
 from pxr.Sdf import ValueTypeNames as VT
 
 from omni.isaac.core.utils.stage import get_current_stage
 from omni.physx.scripts import particleUtils
 
 from igibson.prims.geom_prim import GeomPrim
+import numpy as np
 
 class ClothPrim(GeomPrim):
     """
@@ -79,11 +80,36 @@ class ClothPrim(GeomPrim):
             self_collision_filter=True,
         )
 
+
+
     def _initialize(self):
         super()._initialize()
         # TODO (eric): hacky way to get cloth rendering to work (otherwise, there exist some rendering artifacts).
         self._prim.CreateAttribute("primvars:isVolume", VT.Bool, False).Set(True)
         self._prim.GetAttribute("primvars:isVolume").Set(False)
+
+    @property
+    def particle_positions(self):
+        """
+        Returns:
+            np.array: (N, 3) numpy array, where each of the N particles' positions are expressed in (x,y,z)
+                cartesian coordinates relative to the world frame
+        """
+        return np.array(self.get_attribute(attr="points")) + self.get_position()
+
+    @particle_positions.setter
+    def particle_positions(self, pos):
+        """
+        Set the particle positions for this instancer
+
+        Args:
+            np.array: (N, 3) numpy array, where each of the N particles' desired positions are expressed in (x,y,z)
+                cartesian coordinates relative to the world frame
+        """
+        assert pos.shape[0] == self.particle_positions.shape[0], \
+            f"Got mismatch in particle setting size: {pos.shape[0]}, vs. number of particles {self.particle_positions.shape[0]}!"
+        pos = (pos - self.get_position()).astype(float)
+        self.set_attribute(attr="points", val=array_to_vtarray(arr=pos, element_type=Gf.Vec3f))
 
     def update_handles(self):
         """

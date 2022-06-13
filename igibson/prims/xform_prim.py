@@ -147,7 +147,7 @@ class XFormPrim(BasePrim):
         r1 = R.from_quat(current_orientation).as_matrix()
         r2 = R.from_quat(new_orientation).as_matrix()
         # Make sure setting is done correctly
-        assert np.allclose(new_position, current_position) and np.allclose(r1, r2), \
+        assert np.allclose(new_position, current_position, atol=1e-4) and np.allclose(r1, r2, atol=1e-4), \
             f"{self.prim_path}: old_pos: {current_position}, new_pos: {new_position}, " \
             f"old_orn: {current_orientation}, new_orn: {new_orientation}"
 

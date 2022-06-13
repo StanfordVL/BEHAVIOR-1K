@@ -602,7 +602,7 @@ def relative_pose_transform(pos1, quat1, pos0, quat0):
     """
     Computes relative forward transform from pose (pos0, quat0) to pose (pos1, quat1), i.e.: solves:
 
-    pose1 = transform @ pose0
+    pose1 = pose0 @ transform
 
     Args:
         pos1: (x,y,z) position to transform

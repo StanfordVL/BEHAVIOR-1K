@@ -240,7 +240,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         pos[self.base_control_idx] = 0.0
         pos[self.trunk_control_idx] = 0.02 + self.default_trunk_offset
         pos[self.camera_control_idx] = np.array([0.0, 0.45])
-        pos[self.gripper_control_idx[self.default_arm]] = np.array([0.05, 0.05])  # open gripper
+        pos[self.gripper_control_idx[self.default_arm]] = np.array([0.045, 0.045])  # open gripper
 
         # Choose arm based on setting
         if self.default_arm_pose == "vertical":
@@ -282,6 +282,14 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         Immediately set this robot's configuration to be in untucked mode
         """
         self.set_joint_positions(self.untucked_default_joint_pos)
+
+    def _post_load(self):
+        super()._post_load()
+        # The eef gripper links should be visual-only. They only contain a "ghost" box volume for detecting objects
+        # inside the gripper, in order to activate attachments (AG for Cloths).
+        for arm in self.arm_names:
+            self.eef_links[arm].visual_only = True
+            self.eef_links[arm].visible = False
 
     def _initialize(self):
         # Run super method first

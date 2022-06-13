@@ -192,12 +192,17 @@ def generate_points_in_volume_checker_function(obj, volume_link):
             where @vol is the total volume being checked (expressed in global scale) aggregated across
             all container sub-volumes
     """
-    # Make sure volume link is parallel to root object link (i.e.: no local quaternion)
-
-    volume_link_local_quat_raw = volume_link.prim.GetAttribute("xformOp:orient").Get()
-    assert np.isclose(volume_link_local_quat_raw.real, 1, atol=1e-3), \
-        f"Volume link local quaternion must be aligned with root link! (i.e.: quaternion [0, 0, 0, 1])! " \
-        f"Got: {np.array(volume_link_local_quat_raw)[1, 2, 3, 0]}"
+    # If the object doesn't have scale [1, 1, 1], we make sure the volume link has no relative orientation w.r.t to
+    # the object (root link) frame
+    # TODO (eric): make this more general: convert particle_positions from 1) global frame -> 2) object frame ->
+    #  3) link frame -> 4) mesh frame.
+    if not np.all(obj.scale == 1.0):
+        volume_link_quat = volume_link.get_orientation()
+        object_quat = obj.get_orientation()
+        quat_distance = T.quat_distance(volume_link_quat, object_quat)
+        assert np.isclose(quat_distance.real, 1, atol=1e-3), \
+            f"Volume link must have no relative orientation w.r.t the root link! (i.e.: quat distance [0, 0, 0, 1])! " \
+            f"Got quat distance: {quat_distance}"
 
     # Iterate through all visual meshes and keep track of any that are prefixed with container
     container_meshes = []
@@ -261,44 +266,44 @@ def generate_points_in_volume_checker_function(obj, volume_link):
         volume_checker_fcns.append(fcn)
         volume_calc_fcns.append(vol_fcn)
 
-        # Define the actual volume checker function
-        def check_points_in_volumes(particle_positions):
-            # Algo
-            # 1. Particles in global frame --> particles in volume link frame
-            # 2. Re-scale particles according to object top-level scale
-            # 3. For each volume checker function, apply volume checking
-            # 4. Aggregate across all functions with OR condition (any volume satisfied for that point)
+    # Define the actual volume checker function
+    def check_points_in_volumes(particle_positions):
+        # Algo
+        # 1. Particles in global frame --> particles in volume link frame
+        # 2. Re-scale particles according to object top-level scale
+        # 3. For each volume checker function, apply volume checking
+        # 4. Aggregate across all functions with OR condition (any volume satisfied for that point)
+        ######
 
-            ######
+        n_particles = len(particle_positions)
+        # Get pose of origin (global frame) in frame of volume link
+        # TODO (eric): this seems to assume there is no relative scaling between obj and volume link
+        volume_link_pos, volume_link_quat = volume_link.get_position_orientation()
+        particle_positions = get_particle_positions_in_frame(
+            pos=volume_link_pos,
+            quat=volume_link_quat,
+            scale=obj.scale,
+            particle_positions=particle_positions,
+        )
 
-            n_particles = len(particle_positions)
-            # Get pose of origin (global frame) in frame of volume link
-            volume_link_pos, volume_link_quat = volume_link.get_position_orientation()
-            particle_positions = get_particle_positions_in_frame(
-                pos=volume_link_pos,
-                quat=volume_link_quat,
-                scale=obj.scale,
-                particle_positions=particle_positions,
-            )
+        in_volumes = np.zeros(n_particles).astype(bool)
+        for checker_fcn, mesh in zip(volume_checker_fcns, container_meshes):
+            in_volumes |= checker_fcn(mesh, particle_positions)
 
-            in_volumes = np.zeros(n_particles).astype(bool)
-            for checker_fcn, mesh in zip(volume_checker_fcns, container_meshes):
-                in_volumes |= checker_fcn(mesh, particle_positions)
+        return in_volumes
 
-            return in_volumes
+    # Define the actual volume calculator function
+    def calculate_volume():
+        # Aggregate values across all subvolumes
+        # NOTE: Assumes all volumes are strictly disjointed (becuase we sum over all subvolumes to calculate
+        # total raw volume)
+        # TODO: Is there a way we can explicitly check if disjointed?
+        vols = [calc_fcn(mesh) * np.product(mesh.GetAttribute("xformOp:scale").Get())
+                for calc_fcn, mesh in zip(volume_calc_fcns, container_meshes)]
+        # Aggregate over all volumes and scale by the link's global scale
+        return np.sum(vols) * np.product(volume_link.get_world_scale())
 
-        # Define the actual volume calculator function
-        def calculate_volume():
-            # Aggregate values across all subvolumes
-            # NOTE: Assumes all volumes are strictly disjointed (becuase we sum over all subvolumes to calculate
-            # total raw volume)
-            # TODO: Is there a way we can explicitly check if disjointed?
-            vols = [calc_fcn(mesh) * np.product(mesh.GetAttribute("xformOp:scale").Get())
-                    for calc_fcn, mesh in zip(volume_calc_fcns, container_meshes)]
-            # Aggregate over all volumes and scale by the link's global scale
-            return np.sum(vols) * np.product(volume_link.get_world_scale())
-
-        return check_points_in_volumes, calculate_volume
+    return check_points_in_volumes, calculate_volume
 
 
 class Filled(RelativeObjectState, BooleanState, LinkBasedStateMixin):

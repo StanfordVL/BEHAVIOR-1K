@@ -213,7 +213,8 @@ class MultiFingerGripperController(GripperController):
                 # Make sure we don't have any invalid values (i.e.: fingers should be within the limits)
                 assert np.all(
                     (min_pos <= finger_pos) * (finger_pos <= max_pos)
-                ), "Got invalid finger joint positions when checking for grasp!"
+                ), f"Got invalid finger joint positions when checking for grasp! " \
+                   f"min: {min_pos}, max: {max_pos}, finger_pos: {finger_pos}"
 
                 # Check distance from both ends of the joint limits
                 dist_from_lower_limit = finger_pos - min_pos

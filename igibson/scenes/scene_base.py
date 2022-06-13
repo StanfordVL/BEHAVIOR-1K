@@ -145,7 +145,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 prims that we can use as grouping IDs to reference prims, e.g., prim.in_rooms
         """
         # None by default
-        return []
+        return ["prim_type"]
 
     @property
     def loaded(self):
