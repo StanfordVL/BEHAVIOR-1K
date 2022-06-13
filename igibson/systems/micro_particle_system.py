@@ -1,6 +1,7 @@
 import os
 from igibson import assets_path, app
 from igibson.prims.prim_base import BasePrim
+from igibson.systems.system_base import SYSTEMS_REGISTRY
 from igibson.systems.particle_system_base import BaseParticleSystem
 from igibson.utils.constants import SemanticClass
 from igibson.utils.python_utils import classproperty, Serializable, assert_valid_key
@@ -44,7 +45,7 @@ def set_carb_settings_for_fluid_isosurface():
     isregistry.set_bool(SETTING_UPDATE_TO_USD, True)
     isregistry.set_int(SETTING_NUM_THREADS, 8)
     isregistry.set_bool(SETTING_UPDATE_VELOCITIES_TO_USD, False)
-    isregistry.set_bool(SETTING_UPDATE_PARTICLES_TO_USD, False)     # TODO: Why does setting this value --> True result in no isosurface being rendered?
+    isregistry.set_bool(SETTING_UPDATE_PARTICLES_TO_USD, True)     # TODO: Why does setting this value --> True result in no isosurface being rendered?
     isregistry.set_int("persistent/simulation/minFrameRate", 60)
     isregistry.set_bool("rtx-defaults/pathtracing/lightcache/cached/enabled", False)
     isregistry.set_bool("rtx-defaults/pathtracing/cached/enabled", False)
@@ -56,6 +57,19 @@ def set_carb_settings_for_fluid_isosurface():
     isregistry.set_int("rtx-defaults/pathtracing/maxSpecularAndTransmissionBounces", 16)
     isregistry.set_int("rtx-defaults/post/dlss/execMode", 1)
     isregistry.set_int("rtx-defaults/translucency/maxRefractionBounces", 12)
+
+
+def get_fluid_systems():
+    """
+    Returns:
+        OrderedDict: Mapping from fluid system name to fluid system
+    """
+    systems = OrderedDict()
+    for system in SYSTEMS_REGISTRY.objects:
+        if issubclass(system, FluidSystem):
+            systems[system.name] = system
+
+    return systems
 
 
 class PhysxParticleInstancer(BasePrim):
@@ -163,6 +177,8 @@ class PhysxParticleInstancer(BasePrim):
             np.array: (N, 3) numpy array, where each of the N particles' desired positions are expressed in (x,y,z)
                 cartesian coordinates relative to this instancer's parent prim
         """
+        assert pos.shape[0] == self._n_particles, \
+            f"Got mismatch in particle setting size: {pos.shape[0]}, vs. number of particles {self._n_particles}!"
         pos = (pos - self.position).astype(float)
         self.set_attribute(attr="positions", val=array_to_vtarray(arr=pos, element_type=Gf.Vec3f))
 
@@ -189,6 +205,8 @@ class PhysxParticleInstancer(BasePrim):
             np.array: (N, 4) numpy array, where each of the N particles' desired orientations are expressed in (x,y,z,w)
                 quaternion coordinates relative to this instancer's parent prim
         """
+        assert quat.shape[0] == self._n_particles, \
+            f"Got mismatch in particle setting size: {quat.shape[0]}, vs. number of particles {self._n_particles}!"
         # Swap w position, since Quath takes (w,x,y,z)
         quat = quat[:, [3, 0, 1, 2]]
         self.set_attribute(attr="orientations", val=array_to_vtarray(arr=quat, element_type=Gf.Quath))
@@ -211,6 +229,8 @@ class PhysxParticleInstancer(BasePrim):
             np.array: (N, 3) numpy array, where each of the N particles' desired velocities are expressed in (x,y,z)
                 cartesian coordinates relative to this instancer's parent prim
         """
+        assert vel.shape[0] == self._n_particles, \
+            f"Got mismatch in particle setting size: {vel.shape[0]}, vs. number of particles {self._n_particles}!"
         self.set_attribute(attr="velocities", val=array_to_vtarray(arr=vel, element_type=Gf.Vec3f))
 
     @property
@@ -232,6 +252,8 @@ class PhysxParticleInstancer(BasePrim):
             np.array: (N, 3) numpy array, where each of the N particles' desired scales are expressed in (x,y,z)
                 cartesian coordinates relative to this instancer's parent prim
         """
+        assert scales.shape[0] == self._n_particles, \
+            f"Got mismatch in particle setting size: {scales.shape[0]}, vs. number of particles {self._n_particles}!"
         self.set_attribute(attr="scales", val=array_to_vtarray(arr=scales, element_type=Gf.Vec3f))
 
     @property
@@ -253,6 +275,8 @@ class PhysxParticleInstancer(BasePrim):
             np.array: (N,) numpy array, where each of the N particles' desired prototype_id
                 (i.e.: which prototype is being used for that particle)
         """
+        assert prototype_ids.shape[0] == self._n_particles, \
+            f"Got mismatch in particle setting size: {prototype_ids.shape[0]}, vs. number of particles {self._n_particles}!"
         self.set_attribute(attr="protoIndices", val=prototype_ids)
 
     @property
@@ -276,6 +300,8 @@ class PhysxParticleInstancer(BasePrim):
             np.array: (N,) numpy array, where each entry is the specific particle's desired visiblity
                 (1 if visible, 0 otherwise)
         """
+        assert visibilities.shape[0] == self._n_particles, \
+            f"Got mismatch in particle setting size: {visibilities.shape[0]}, vs. number of particles {self._n_particles}!"
         # We leverage the ids + invisibleIds prim fields to infer visibility
         # id = 1 means visible, id = 0 means invisible
         self.set_attribute(attr="ids", val=visibilities)
@@ -302,11 +328,12 @@ class PhysxParticleInstancer(BasePrim):
 
         # Set values appropriately
         self._n_particles = state["n_particles"]
-        self.particle_positions = state["particle_positions"]
-        self.particle_velocities = state["particle_velocities"]
-        self.particle_orientations = state["particle_orientations"]
-        self.particle_scales = state["particle_scales"]
-        self.particle_prototype_ids = state["particle_prototype_ids"]
+        for attr in ("positions", "velocities", "orientations", "scales", "prototype_ids"):
+            attr_name = f"particle_{attr}"
+            # Make sure the loaded state is a numpy array, it could have been accidentally casted into a list during
+            # JSON-serialization
+            attr_val = np.array(state[attr_name]) if not isinstance(attr_name, np.ndarray) else state[attr_name]
+            setattr(self, attr_name, attr_val)
 
     def _serialize(self, state):
         # Compress into a 1D array
@@ -387,7 +414,7 @@ class MicroParticleSystem(BaseParticleSystem):
         Returns:
             str: Path to this system's prim in the scene stage
         """
-        return cls.prim.GetPrimPath().pathString
+        return f"/World/{cls.name}"
 
     @classmethod
     def initialize(cls, simulator):
@@ -408,27 +435,55 @@ class MicroParticleSystem(BaseParticleSystem):
         # Initialize max instancer idn
         cls.max_instancer_idn = -1
 
-        # Create the particle system
-        cls.prim = cls._create_particle_system()
+        # Create the particle system if it doesn't already exist, otherwise sync with the pre-existing system
+        mat_path = f"{cls.prim_path}/{cls.name}_material"
+        prototype_path = f"{cls.prim_path}/prototypes"
 
-        # Create the particle material
-        cls.particle_material = cls._create_particle_material()
-        if cls.particle_material is not None:
-            # Move this material and standardize its naming scheme
-            path_from = cls.particle_material.GetPrim().GetPrimPath().pathString
-            mat_path = f"{cls.prim_path}/{cls.name}_material"
-            omni.kit.commands.execute("MovePrim", path_from=path_from, path_to=mat_path)
-            # Get updated reference to this material
-            cls.particle_material = UsdShade.Material(get_prim_at_path(mat_path))
+        if cls.particle_system_exists:
+            cls.prim = get_prim_at_path(cls.prim_path)
+            mat = get_prim_at_path(mat_path)
+            prototype_dir_prim = get_prim_at_path(prototype_path)
+            cls.particle_material = UsdShade.Material(mat) if mat else None
+            cls.particle_prototypes = [prototype_prim for prototype_prim in prototype_dir_prim.GetChildren()]
 
-            # Bind this material to our particle system
-            particleUtils.add_pbd_particle_material(simulator.stage, mat_path)
-            bind_material(prim_path=cls.prim_path, material_path=mat_path)
+            # Also need to synchronize any instancers we have
+            for prim in cls.prim.GetChildren():
+                name = prim.GetName()
+                if prim.GetPrimTypeInfo().GetTypeName() == "PointInstancer":
+                    cls.particle_instancers[name] = PhysxParticleInstancer(
+                        prim_path=prim.GetPrimPath().pathString,
+                        name=name,
+                        idn=cls.particle_instancer_name_to_idn(name=name),
+                    )
 
-        # Create the particle prototypes, and make them all invisible
-        cls.particle_prototypes = cls._create_particle_prototypes()
-        for prototype_prim in cls.particle_prototypes:
-            UsdGeom.Imageable(prototype_prim).MakeInvisible()
+        else:
+            cls.prim = cls._create_particle_system()
+
+            # Create the particle material
+            cls.particle_material = cls._create_particle_material()
+            if cls.particle_material is not None:
+                # Move this material and standardize its naming scheme
+                path_from = cls.particle_material.GetPrim().GetPrimPath().pathString
+                mat_path = f"{cls.prim_path}/{cls.name}_material"
+                omni.kit.commands.execute("MovePrim", path_from=path_from, path_to=mat_path)
+                # Get updated reference to this material
+                cls.particle_material = UsdShade.Material(get_prim_at_path(mat_path))
+
+                # Bind this material to our particle system
+                particleUtils.add_pbd_particle_material(simulator.stage, mat_path)
+                bind_material(prim_path=cls.prim_path, material_path=mat_path)
+
+            # Create the particle prototypes, move them to the appropriate directory, and make them all invisible
+            prototypes = cls._create_particle_prototypes()
+            cls.particle_prototypes = []
+            cls.simulator.stage.DefinePrim(prototype_path, "Scope")
+            for i, prototype_prim in enumerate(prototypes):
+                path_from = prototype_prim.GetPrimPath().pathString
+                path_to = f"{prototype_path}/{cls.name}ParticlePrototype{i}"
+                omni.kit.commands.execute("MovePrim", path_from=path_from, path_to=path_to)
+                prototype_prim_new = get_prim_at_path(path_to)
+                UsdGeom.Imageable(prototype_prim_new).MakeInvisible()
+                cls.particle_prototypes.append(prototype_prim_new)
 
         # # Create dummy
         # create_physx_particleset_pointinstancer(
@@ -437,9 +492,10 @@ class MicroParticleSystem(BaseParticleSystem):
         #     particle_group=0,
         #     positions=np.zeros((1, 3)),
         #     fluid=cls.is_fluid,
-        #     particle_density=cls.particle_density,
+        #     particle_mass=0.001,
+        #     particle_density=None,#cls.particle_density,
         #     prototype_prim_paths=[pp.GetPrimPath().pathString for pp in cls.particle_prototypes],
-        #     enabled=cls.is_dynamic,
+        #     enabled=not cls.visual_only,
         # )
 
     @classmethod
@@ -454,6 +510,16 @@ class MicroParticleSystem(BaseParticleSystem):
         # number of particles in each instancer (3n),
         # and the corresponding states in each instancer (X)
         return 1 + 3 * len(cls.particle_instancers) + sum(inst.state_size for inst in cls.particle_instancers.values())
+
+    @classproperty
+    def particle_system_exists(cls):
+        """
+        Returns:
+            bool: Whether this particle system already exists on the current stage. Useful for internal logic
+                synchronization during, e.g., initialization, where a USD snapshot may have been loaded with a particle
+                system already on the stage
+        """
+        return bool(get_prim_at_path(cls.prim_path))
 
     @classproperty
     def is_fluid(cls):
@@ -551,7 +617,7 @@ class MicroParticleSystem(BaseParticleSystem):
             Usd.Prim: Particle system prim created
         """
         return create_physx_particle_system(
-            prim_path=f"/World/{cls.name}",
+            prim_path=cls.prim_path,
             physics_scene_path=cls.simulator.get_physics_context().get_current_physics_scene_prim().GetPrimPath().pathString,
             particle_contact_offset=cls.particle_contact_offset,
             visual_only=cls.visual_only,
@@ -645,9 +711,9 @@ class MicroParticleSystem(BaseParticleSystem):
     @classmethod
     def generate_particle_instancer_from_mesh(
             cls,
-            idn,
-            particle_group,
             mesh_prim_path,
+            idn=None,
+            particle_group=0,
             sampling_distance=None,
             max_samples=5e5,
             sample_volume=True,
@@ -659,12 +725,13 @@ class MicroParticleSystem(BaseParticleSystem):
         located at @mesh_prim_path, and registers it internally
 
         Args:
-            idn (int): Unique identification number to assign to this particle instancer. This is used to
+            mesh_prim_path (str): Stage path to the mesh prim which will be converted into sampled particles
+            idn (None or int): Unique identification number to assign to this particle instancer. This is used to
                 deterministically reproduce individual particle instancer states dynamically, even if we
-                delete / add additional ones at runtime during simulation.
+                delete / add additional ones at runtime during simulation. If None, this system will generate a unique
+                identifier automatically.
             particle_group (int): ID for this particle set. Particles from different groups will automatically collide
                 with each other. Particles in the same group will have collision behavior dictated by @self_collision
-            mesh_prim_path (str): Stage path to the mesh prim which will be converted into sampled particles
             sampling_distance (None or float): If specified, sets the distance between sampled particles. If None,
                 a simulator autocomputed value will be used
             max_samples (int): Maximum number of particles to sample
@@ -693,18 +760,18 @@ class MicroParticleSystem(BaseParticleSystem):
         particle_set_api.CreateParticleSystemRel().SetTargets([cls.prim_path])
 
         # Apply the sampling API to our mesh prim and apply the sampling
-        sampling_api = PhysxSchema.PhysxParticleSamplingAPI.Apply(get_prim_at_path(mesh_prim_path))
+        mesh_prim = get_prim_at_path(mesh_prim_path)
+        sampling_api = PhysxSchema.PhysxParticleSamplingAPI.Apply(mesh_prim)
         sampling_api.CreateParticlesRel().AddTarget(points_prim_path)
         sampling_api.CreateSamplingDistanceAttr().Set(0 if sampling_distance is None else sampling_distance)
         sampling_api.CreateMaxSamplesAttr().Set(max_samples)
         sampling_api.CreateVolumeAttr().Set(sample_volume)
 
-        # We apply 5 app steps to propagate the sampling (make sure to pause the sim since particles still propagate
+        # We apply 1 physics step to propagate the sampling (make sure to pause the sim since particles still propagate
         # forward even if we don't explicitly call sim.step())
         sim_is_stopped, sim_is_playing = cls.simulator.is_stopped(), cls.simulator.is_playing()
         cls.simulator.pause()
-        for _ in range(5):
-            app.update()
+        cls.simulator.step_physics()
         if sim_is_stopped:
             cls.simulator.stop()
         elif sim_is_playing:
@@ -718,8 +785,10 @@ class MicroParticleSystem(BaseParticleSystem):
         # Make sure sampling was successful
         assert len(pos) > 0, "Failed to sample particle points from mesh prim!"
 
-        # Delete the points prim, we don't need it anymore
+        # Delete the points prim and sampling API, we don't need it anymore, and make the mesh prim invisible again
         cls.simulator.stage.RemovePrim(points_prim_path)
+        mesh_prim.RemoveAPI(PhysxSchema.PhysxParticleSamplingAPI)
+        UsdGeom.Imageable(mesh_prim).MakeInvisible()
 
         # Get information about our sampled points
         n_particles = len(pos)
@@ -944,7 +1013,7 @@ class FluidSystem(MicroParticleSystem):
     @classproperty
     def use_isosurface(cls):
         # TODO: Make true once omni bugs are fixed
-        return False
+        return True
 
     @classproperty
     def particle_radius(cls):
@@ -1010,12 +1079,14 @@ class WaterSystem(FluidSystem):
 
     @classproperty
     def particle_contact_offset(cls):
-        return 0.01
+        return 0.012
 
     @classproperty
     def particle_density(cls):
+        # TODO: Water density seems to be unstable, debug later?
         # Water is 1000 kg/m^3
-        return 1000.0
+        # return 1000.0
+        return 1.0
 
     @classmethod
     def _create_particle_material(cls):

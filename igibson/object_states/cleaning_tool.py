@@ -1,3 +1,4 @@
+import igibson.macros as m
 from igibson.object_states.aabb import AABB
 from igibson.object_states.contact_bodies import ContactBodies
 from igibson.object_states.dirty import Dusty, Stained
@@ -7,6 +8,8 @@ from igibson.object_states.soaked import Soaked
 from igibson.object_states.toggle import ToggledOn
 from igibson.utils.usd_utils import BoundingBoxAPI
 from igibson.systems.macro_particle_system import MacroParticleSystem, StainSystem
+if m.ENABLE_OMNI_PARTICLES:
+    from igibson.systems.micro_particle_system import WaterSystem
 
 _LINK_NAME = "cleaning_tool_area"
 
@@ -31,9 +34,10 @@ class CleaningTool(AbsoluteObjectState, LinkBasedStateMixin):
             if system.n_particles == 0:
                 continue
 
-            # We need to be soaked to clean stains.
+            # We need to be soaked with water to clean stains.
+            # TODO: Extend this to be an arbitrary fluid, or check some combination
             if system == StainSystem:
-                if Soaked not in self.obj.states or not self.obj.states[Soaked].get_value():
+                if Soaked not in self.obj.states or not self.obj.states[Soaked].get_value(WaterSystem):
                     continue
 
             # Time to check for colliding particles in our AABB.

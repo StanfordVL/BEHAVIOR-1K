@@ -249,6 +249,9 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             class_types=SerializableRegistry,
         )
 
+        # Add registry for systems -- this is already created externally, so we just pull it directly
+        registry.add(obj=SYSTEMS_REGISTRY)
+
         # Add registry for objects
         registry.add(obj=SerializableRegistry(
             name="object_registry",
@@ -266,9 +269,6 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             unique_keys=None,
             group_keys=["model_name"],
         ))
-
-        # Add registry for systems -- this is already created externally, so we just pull it directly
-        registry.add(obj=SYSTEMS_REGISTRY)
 
         return registry
 

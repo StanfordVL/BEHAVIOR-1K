@@ -1,6 +1,38 @@
 from abc import ABCMeta
-from igibson.utils.python_utils import classproperty, SerializableNonInstance, UniquelyNamedNonInstance
+from igibson.utils.python_utils import classproperty, assert_valid_key, \
+    SerializableNonInstance, UniquelyNamedNonInstance
 from igibson.utils.registry_utils import SerializableRegistry
+
+
+def get_system_from_element_name(name):
+    """
+    Grabs system based on its element name @name that it controls (e.g.: Water, Dust, Stain, etc....)
+
+    Args:
+        name (str): element name corresponding to the desired system to grab
+
+    Returns:
+        BaseSystem: Corresponding system singleton
+    """
+    systems = SYSTEMS_REGISTRY.get_dict("__name__")
+    system_name = f"{name}System"
+    assert_valid_key(key=system_name, valid_keys=systems, name="system name")
+    return systems[system_name]
+
+
+def get_element_name_from_system(system):
+    """
+    Grabs system element name representing the element being controlled by system @system
+
+    Args:
+        system (BaseSystem): system from which to grab element name
+
+    Returns:
+        BaseSystem: Corresponding system singleton
+    """
+    systems = {v: k for k, v in SYSTEMS_REGISTRY.get_dict("__name__").items()}
+    assert_valid_key(key=system, valid_keys=systems, name="system")
+    return systems[system].split("System")[0]
 
 
 class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):

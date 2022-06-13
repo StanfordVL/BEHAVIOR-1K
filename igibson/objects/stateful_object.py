@@ -21,6 +21,7 @@ from igibson.object_states.factory import (
 )
 from igibson.object_states.object_state_base import REGISTERED_OBJECT_STATES, CachingEnabledObjectState
 from igibson.objects.object_base import BaseObject
+from igibson.systems import get_system_from_element_name, get_element_name_from_system
 from igibson.renderer_settings.renderer_settings import RendererSettings
 from igibson.utils.constants import PrimType
 from igibson.object_states import Soaked
@@ -293,8 +294,8 @@ class StatefulObject(BaseObject):
         for state_type, state in self.states.items():
             if state_type in get_texture_change_states():
                 if state_type in [Soaked]:
-                    for fluid_system in state.fluid_systems:
-                        if state.get_value(fluid_system.name):
+                    for fluid_system in state.absorbed_particle_system_count.keys():
+                        if state.get_value(fluid_system):
                             texture_change_states.append(state)
                             # Only need to do this once, since soaked handles all fluid systems
                             break

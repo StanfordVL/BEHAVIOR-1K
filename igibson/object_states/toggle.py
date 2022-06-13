@@ -108,10 +108,8 @@ class ToggledOn(AbsoluteObjectState, BooleanState, LinkBasedStateMixin):
         self.value = state["value"]
         self.robot_can_toggle_steps = state["hand_in_marker_steps"]
 
-    @classmethod
-    def _serialize(cls, state):
+    def _serialize(self, state):
         return np.array([state["value"], state["hand_in_marker_steps"]])
 
-    @classmethod
-    def _deserialize(cls, state):
+    def _deserialize(self, state):
         return OrderedDict(value=state[0], hand_in_marker_steps=state[1]), 2

@@ -9,11 +9,11 @@ from igibson.utils.usd_utils import mesh_prim_to_trimesh_mesh
 
 
 if m.ENABLE_OMNI_PARTICLES:
-    from igibson.systems import SYSTEMS_REGISTRY
+    from igibson.systems import SYSTEMS_REGISTRY, get_fluid_systems, get_system_from_element_name, get_element_name_from_system
 
 
 # Proportion of object's volume that must be filled for object to be considered filled
-VOLUME_FILL_PROPORTION = 0.45
+VOLUME_FILL_PROPORTION = 0.3
 
 
 def get_particle_positions_in_frame(pos, quat, scale, particle_positions):
@@ -309,16 +309,10 @@ def generate_points_in_volume_checker_function(obj, volume_link):
 class Filled(RelativeObjectState, BooleanState, LinkBasedStateMixin):
     def __init__(self, obj):
         super().__init__(obj)
-        self.value = False
         self.check_in_volume = None        # Function to check whether particles are in volume for this container
         self.calculate_volume = None       # Function to calculate the real-world volume for this container
 
-    def _get_value(self, fluid):
-        systems = SYSTEMS_REGISTRY.get_dict("__name__")
-        fluid_system_name = f"{fluid}System"
-        assert_valid_key(key=fluid_system_name, valid_keys=systems, name="fluid system")
-        fluid_system = systems[fluid_system_name]
-
+    def _get_value(self, fluid_system):
         # Check what volume is filled
         if len(fluid_system.particle_instancers) > 0:
             particle_positions = np.concatenate([inst.particle_positions for inst in fluid_system.particle_instancers.values()], axis=0)
@@ -326,17 +320,34 @@ class Filled(RelativeObjectState, BooleanState, LinkBasedStateMixin):
             particle_volume = 4 / 3 * np.pi * (fluid_system.particle_radius ** 3)
             prop_filled = particle_volume * particles_in_volume.sum() / self.calculate_volume()
             # If greater than threshold, then the volume is filled
-            value = prop_filled > VOLUME_FILL_PROPORTION
+            # Explicit bool cast needed here because the type is bool_ instead of bool which is not JSON-Serializable
+            # This has to do with numpy, see https://stackoverflow.com/questions/58408054/typeerror-object-of-type-bool-is-not-json-serializable
+            value = bool(prop_filled > VOLUME_FILL_PROPORTION)
         else:
             # No fluid exists, so we're obviously empty
             value = False
 
         return value
 
-    def _set_value(self, fluid, new_value):
-        # Cannot directly set fill state
-        # TODO: Generate particles sampled from "true volume" mesh
-        raise NotImplementedError()
+    def _set_value(self, fluid_system, new_value):
+        # If we found no link, directly return
+        if self.link is None:
+            return
+
+        # First, check our current state
+        current_state = self.get_value(fluid_system)
+
+        # Only do something if we're changing state
+        if current_state != new_value:
+            if new_value:
+                # Going from False --> True, sample volume with particles
+                for container_mesh in self.link.visual_meshes.values():
+                    fluid_system.generate_particle_instancer_from_mesh(mesh_prim_path=container_mesh.prim_path)
+            else:
+                # Going from True --> False, hide all particles within the current volume to be garbage collected
+                # by fluid system
+                for inst in fluid_system.particle_instancers.values():
+                    inst.particle_visibilities = 1 - self.check_in_volume(inst.particle_positions)
 
     def _initialize(self):
         super()._initialize()
@@ -352,8 +363,7 @@ class Filled(RelativeObjectState, BooleanState, LinkBasedStateMixin):
 
     @property
     def settable(self):
-        # TODO: Make True once set_value is implemented
-        return False
+        return True
 
     @staticmethod
     def get_state_link_name():
@@ -363,3 +373,35 @@ class Filled(RelativeObjectState, BooleanState, LinkBasedStateMixin):
     @staticmethod
     def get_optional_dependencies():
         return []
+
+    @property
+    def state_size(self):
+        return len(get_fluid_systems())
+
+    def _dump_state(self):
+        # Store whether we're filled for each volume or not
+        state = OrderedDict()
+        for system in get_fluid_systems().values():
+            fluid_name = get_element_name_from_system(system)
+            state[fluid_name] = self.get_value(system)
+
+        return state
+
+    def _load_state(self, state):
+        # Check to see if the value is different from what we currently have
+        # This should always be the same, because our get_value() reads from the particle system, which should
+        # hav already updated / synchronized its state
+        for fluid_name, val in state.items():
+            assert val == self.get_value(get_system_from_element_name(fluid_name)), \
+            f"Expected state {self.__class__.__name__} to have synchronized values, but got current value: {self.get_value(get_system_from_element_name(fluid_name))} with desired value: {val}"
+
+    def _serialize(cls, state):
+        return np.array([val for val in state.values()], dtype=float)
+
+    def _deserialize(cls, state):
+        state_dict = OrderedDict()
+        for i, fluid_system in enumerate(get_fluid_systems().values()):
+            fluid_name = get_element_name_from_system(fluid_system)
+            state_dict[fluid_name] = bool(state[i])
+
+        return state_dict

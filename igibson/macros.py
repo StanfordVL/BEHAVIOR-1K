@@ -27,6 +27,9 @@ ENABLE_FLATCACHE = False
 # objects from tunneling through each other)
 ENABLE_CCD = False
 
+# Aggregate pairs setting -- default is 1024, but is often insufficient for large scenes
+GPU_PAIRS_CAPACITY = 32 * 1024
+
 # Whether the public version of IsaacSim is being used
 # TODO: Remove this once we unify omni version being used
 IS_PUBLIC_ISAACSIM = True

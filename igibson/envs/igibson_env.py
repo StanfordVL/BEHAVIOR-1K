@@ -402,7 +402,7 @@ class iGibsonEnv(BaseEnv):
 
         return obs, reward, done, info
 
-    def check_collision(self, objsA=None, linksA=None, objsB=None, linksB=None, step_sim=False):
+    def check_collision(self, objsA=None, linksA=None, objsB=None, linksB=None, step_physics=False):
         """
         Check whether the given object @objsA or any of @links has collision after one simulator step. If both
         are specified, will take the union of the two.
@@ -417,14 +417,14 @@ class iGibsonEnv(BaseEnv):
                 of @objsA or @linksA
             linksB (None or RigidPrim or list of RigidPrim): If specified, link(s) to check for collision with any
                 of @objsA or @linksA
-            step_sim (bool): Whether to step the simulation first before checking collisions. Default is False
+            step_physics (bool): Whether to step the physics first before checking collisions. Default is False
 
         Returns:
             bool: Whether any of @objsA or @linksA are in collision or not, possibly with @objsB or @linksB if specified
         """
-        # Run simulator step and update contacts
-        if step_sim:
-            self._simulator_step()
+        # Optionally step physics and then update contacts
+        if step_physics:
+            self._simulator.step_physics()
         collisions = self.update_collisions(filtered=True)
 
         # Run sanity checks and standardize inputs
@@ -533,6 +533,9 @@ class iGibsonEnv(BaseEnv):
         Returns:
             bool: Whether the placed object position is valid
         """
+        # Store state before checking robot position
+        state = self.dump_state(serialized=False)
+
         # Set the position of the object
         self.set_pos_orn_with_z_offset(obj=obj, pos=pos, ori=ori)
 
@@ -541,8 +544,14 @@ class iGibsonEnv(BaseEnv):
             obj.reset()
             obj.keep_still()
 
+        # Check whether we're in collision after taking a single physics step
+        in_collision = self.check_collision(objsA=obj, step_physics=True)
+
+        # Restore state after checking the collision
+        self.load_state(state, serialized=False)
+
         # Valid if there are no collisions
-        return not self.check_collision(objsA=obj)
+        return not in_collision
 
     def land(self, obj, pos, ori):
         """

@@ -846,7 +846,7 @@ class StainSystem(VisualParticleSystem):
         )
 
         # Run super method like normal to generate particles
-        super().generate_group_particles(
+        return super().generate_group_particles(
             group=group,
             n_particles=n_particles,
             min_particles_for_success=min_particles_for_success
