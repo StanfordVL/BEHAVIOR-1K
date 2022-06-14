@@ -195,15 +195,16 @@ class ControllableObject(BaseObject):
                 )
 
     def reset(self):
+        # Make sure simulation is playing, otherwise, we cannot reset because DC requires active running
+        # simulation in order to set joints
+        assert self._simulator.is_playing(), "Simulator must be playing in order to reset controllable object's joints!"
+
         # Run super first
         super().reset()
 
         # Additionally set the joint states based on the reset values
-        self.set_joints_state(state=JointsState(
-            positions=self._reset_joint_pos,
-            velocities=np.zeros(self._n_dof),
-            efforts=np.zeros(self._n_dof),
-        ), normalized=False)
+        self.set_joint_positions(positions=self._reset_joint_pos, target=False)
+        self.set_joint_velocities(velocities=np.zeros(self._n_dof), target=False)
 
         # Store dof idx mapping to dof name
         dof_names_ordered = [self._dc.get_dof_name(self._dc.get_articulation_dof(self._handle, i))
