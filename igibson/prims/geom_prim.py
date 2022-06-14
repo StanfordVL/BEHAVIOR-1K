@@ -25,7 +25,9 @@ import numpy as np
 import carb
 from omni.isaac.core.utils.stage import get_current_stage
 from omni.isaac.core.materials import PhysicsMaterial
+from omni.usd import get_shader_from_material
 from igibson.prims.xform_prim import XFormPrim
+from igibson.utils.usd_utils import update_shader_asset_paths
 
 
 class GeomPrim(XFormPrim):
@@ -334,4 +336,16 @@ class CollisionGeomPrim(GeomPrim):
 
 
 class VisualGeomPrim(GeomPrim):
-    pass
+
+    def _post_load(self):
+        # run super first
+        super()._post_load()
+
+        # Possibly update the shader associated with this geom if specified
+        # This may need to happen if we're initializing a geom on a machine that was NOT the original
+        # machine that loaded the USD
+        # This is an omni limitation that we need to work around
+        if "material:binding" in self._prim.GetPropertyNames():
+            for target in self._prim.GetProperty("material:binding").GetTargets():
+                shader = get_shader_from_material(prim=get_prim_at_path(target))
+                update_shader_asset_paths(shader=shader)

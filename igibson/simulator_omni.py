@@ -26,12 +26,12 @@ from omni.isaac.core.utils.viewports import set_camera_view
 from omni.isaac.core.loggers import DataLogger
 from typing import Optional, List
 
-from igibson import assets_path
+from igibson import assets_path, ig_dataset_path
 import igibson.macros as m
 from igibson.robots.robot_base import BaseRobot
 from igibson.utils.utils import NumpyEncoder
 from igibson.utils.python_utils import clear as clear_pu, create_object_from_init_info
-from igibson.utils.usd_utils import clear as clear_uu, BoundingBoxAPI
+from igibson.utils.usd_utils import clear as clear_uu, BoundingBoxAPI, get_usd_metadata, update_usd_metadata
 from igibson.utils.assets_utils import get_ig_avg_category_specs
 from igibson.scenes import Scene
 from igibson.objects.object_base import BaseObject
@@ -742,6 +742,10 @@ class Simulator(SimulationContext):
         scene_init_info = self.scene.get_init_info()
         scene_init_info_str = json.dumps(scene_init_info, cls=NumpyEncoder)
         self.world_prim.SetCustomDataByKey("scene_init_info", scene_init_info_str)
+
+        # Update USD Metadata -- we need this info in order to, e.g., update material filepaths appropriately
+        # in case this USD is opened on another machine
+        update_usd_metadata()
 
         # Save stage. This needs to happen at the end since some objects may get reset after sim.stop().
         self.stop()

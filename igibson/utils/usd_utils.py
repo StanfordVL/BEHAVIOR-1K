@@ -3,6 +3,7 @@ import numpy as np
 from collections import Iterable
 import os
 
+from collections import OrderedDict
 import omni.usd
 from omni.isaac.core.utils.prims import get_prim_at_path, get_prim_path, is_prim_path_valid, get_prim_children
 from omni.isaac.core.utils.carb import set_carb_setting
@@ -22,6 +23,7 @@ import carb
 import numpy as np
 import trimesh
 
+from igibson import assets_path, ig_dataset_path
 from igibson.utils.constants import JointType
 from igibson.utils.types import PRIMITIVE_MESH_TYPES
 from igibson.utils.python_utils import assert_valid_key
@@ -427,3 +429,69 @@ def add_usd_to_stage(usd_path, prim_path):
 
     return prim
 
+
+def get_world_prim():
+    """
+    Returns:
+        Usd.Prim: Active world prim in the current stage
+    """
+    return get_prim_at_path("/World")
+
+
+def get_usd_metadata():
+    """
+    Grabs the USD's metadata
+
+    Returns:
+        dict:
+            "source_ig_asset_path": Maps to absolute path string to asset_path that the USD was ORIGINALLY generated on
+            "source_ig_dataset_path": Maps to absolute path string to the ig_dataset_path that USD was ORIGINALLY
+                generated on
+    """
+    usd_metadata = get_world_prim().GetCustomDataByKey("usd_metadata")
+    usd_metadata = dict() if usd_metadata is None else usd_metadata
+
+    return OrderedDict(
+        source_ig_asset_path=usd_metadata.get("source_ig_asset_path", assets_path),
+        source_ig_dataset_path=usd_metadata.get("source_ig_dataset_path", ig_dataset_path),
+    )
+
+
+def update_usd_metadata():
+    """
+    Updates the internal USD metadata
+    """
+    usd_metadata = {
+        "source_ig_asset_path": assets_path,
+        "source_ig_dataset_path": ig_dataset_path,
+    }
+    get_world_prim().SetCustomDataByKey("usd_metadata", usd_metadata)
+
+
+def update_shader_asset_paths(shader):
+    """
+    Updates material shader paths appropriately so that a material can verifiably be used given the current machine setup.
+
+    Omni does NOT export materials when saving a USD, so if a USD is saved on one machine and ported to another one,
+    it will break unless we update the material paths to point to the new correct paths on the new machine.
+
+    Args:
+        shader (Usd.Shader): Shader prim whose input channels should be updated
+    """
+    # Update the material paths so that it's correct wrt to the local machine / directory setup that
+    # this prim and USD is being loaded on
+    for inp in shader.GetInputs():
+        if inp.GetTypeName().cppTypeName == "SdfAssetPath":
+            original_path = inp.Get().resolvedPath
+            # Only update the path if it's not the same root path
+            if ig_dataset_path not in original_path and assets_path not in original_path:
+                usd_metadata = get_usd_metadata()
+                source_asset_path = usd_metadata["source_ig_asset_path"]
+                source_ig_dataset_path = usd_metadata["source_ig_dataset_path"]
+                if source_asset_path in original_path:
+                    new_path = f"{assets_path}{original_path.split(source_asset_path)[-1]}"
+                elif source_ig_dataset_path in original_path:
+                    new_path = f"{ig_dataset_path}{original_path.split(source_ig_dataset_path)[-1]}"
+                else:
+                    raise ValueError(f"Could not find appropriate remapping for material asset path: {original_path}!")
+                inp.Set(new_path)
