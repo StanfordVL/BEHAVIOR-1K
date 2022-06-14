@@ -691,15 +691,18 @@ class Simulator(SimulationContext):
         # Load saved stage to get saved_info.
         self.load_stage(usd_path)
 
+        # TODO: Save / loading emptyscene fails because we're not loading the saved USD (no usd_path arg to pass into the scene constructor)
+        # TODO: Really need to iron this out in a cleaner way -- how to reload scene robustly?
+
         # Load saved info
         scene_state = json.loads(self.world_prim.GetCustomDataByKey("scene_state"))
         scene_init_info = json.loads(self.world_prim.GetCustomDataByKey("scene_init_info"))
-
+        # Overwrite the usd with our desired usd file
+        scene_init_info["args"]["usd_path"] = usd_path
         # Clear the current environment and delete any currently loaded scene.
         self.clear()
 
-        # Recreate and import the saved scene.
-        # Note that the imported scene only have the default objects loaded.
+        # Recreate and import the saved scene
         recreated_scene = create_object_from_init_info(scene_init_info)
         self.import_scene(scene=recreated_scene)
 
@@ -721,6 +724,8 @@ class Simulator(SimulationContext):
             usd_path (str): Full path of USD file to load, which contains information
                 to recreate the current scene.
         """
+        # TODO: Make sure all objects hvae been intiailized
+
         if not self.scene:
             logging.warning("Scene has not been loaded. Nothing to save.")
             return
@@ -735,8 +740,6 @@ class Simulator(SimulationContext):
         saved_state_str = json.dumps(self.scene.dump_state(serialized=False), cls=NumpyEncoder)
         self.world_prim.SetCustomDataByKey("scene_state", saved_state_str)
         scene_init_info = self.scene.get_init_info()
-        # Overwrite the usd with our desired usd file
-        scene_init_info["args"]["usd_path"] = usd_path
         scene_init_info_str = json.dumps(scene_init_info, cls=NumpyEncoder)
         self.world_prim.SetCustomDataByKey("scene_init_info", scene_init_info_str)
 
