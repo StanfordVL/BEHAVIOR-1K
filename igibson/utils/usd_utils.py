@@ -482,7 +482,7 @@ def update_shader_asset_paths(shader):
     # this prim and USD is being loaded on
     for inp in shader.GetInputs():
         if inp.GetTypeName().cppTypeName == "SdfAssetPath":
-            original_path = inp.Get().resolvedPath
+            original_path = inp.Get().path
             # Only update the path if it's not the same root path
             if ig_dataset_path not in original_path and assets_path not in original_path:
                 usd_metadata = get_usd_metadata()
