@@ -196,11 +196,11 @@ def generate_points_in_volume_checker_function(obj, volume_link):
     # the object (root link) frame
     # TODO (eric): make this more general: convert particle_positions from 1) global frame -> 2) object frame ->
     #  3) link frame -> 4) mesh frame.
-    if not np.all(obj.scale == 1.0):
+    if not np.all(np.isclose(obj.scale, 1, atol=1e-3)):
         volume_link_quat = volume_link.get_orientation()
         object_quat = obj.get_orientation()
         quat_distance = T.quat_distance(volume_link_quat, object_quat)
-        assert np.isclose(quat_distance.real, 1, atol=1e-3), \
+        assert np.isclose(quat_distance[3], 1, atol=1e-3), \
             f"Volume link must have no relative orientation w.r.t the root link! (i.e.: quat distance [0, 0, 0, 1])! " \
             f"Got quat distance: {quat_distance}"
 
