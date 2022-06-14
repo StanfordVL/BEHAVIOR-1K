@@ -44,20 +44,21 @@ class _Dirty(AbsoluteObjectState, BooleanState):
         return self.DIRT_CLASS.num_group_particles(group=self.dirt_group) > self._max_particles_for_clean
 
     def _set_value(self, new_value):
+        sampling_success = True
         if not new_value:
             # We remove all of this group's particles
             self.DIRT_CLASS.remove_all_group_particles(group=self.dirt_group)
         else:
             # Generate dirt particles
-            new_value = self.DIRT_CLASS.generate_group_particles(group=self.dirt_group)
+            sampling_success = self.DIRT_CLASS.generate_group_particles(group=self.dirt_group)
             # If we succeeded with generating particles (new_value = True), we are dirty, let's store additional info
-            if new_value:
+            if sampling_success:
                 # Store how many particles there are now -- this is the "maximum" number possible
                 clean_threshold = s.FLOOR_CLEAN_THRESHOLD if self.obj.category == "floors" else s.CLEAN_THRESHOLD
                 self._max_particles_for_clean = \
                     self.DIRT_CLASS.num_group_particles(group=self.dirt_group) * clean_threshold
 
-        return new_value
+        return sampling_success
 
     @property
     def state_size(self):

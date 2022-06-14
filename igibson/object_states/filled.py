@@ -332,7 +332,7 @@ class Filled(RelativeObjectState, BooleanState, LinkBasedStateMixin):
     def _set_value(self, fluid_system, new_value):
         # If we found no link, directly return
         if self.link is None:
-            return
+            return False
 
         # First, check our current state
         current_state = self.get_value(fluid_system)
@@ -348,6 +348,8 @@ class Filled(RelativeObjectState, BooleanState, LinkBasedStateMixin):
                 # by fluid system
                 for inst in fluid_system.particle_instancers.values():
                     inst.particle_visibilities = 1 - self.check_in_volume(inst.particle_positions)
+
+        return True
 
     def _initialize(self):
         super()._initialize()

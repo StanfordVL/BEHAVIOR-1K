@@ -1221,7 +1221,7 @@ class ManipulationRobot(BaseRobot):
         for cloth_obj in cloth_objs:
             attachment_point_pos = cloth_obj.links["attachment_point"].get_position()
             particles_in_volume = self._ag_check_in_volume[arm]([attachment_point_pos])
-            if particles_in_volume.sum() > 0 and gripper_finger_close:
+            if particles_in_volume.sum() > 0:
                 return cloth_obj, cloth_obj.links["attachment_point"], attachment_point_pos
 
         return None
