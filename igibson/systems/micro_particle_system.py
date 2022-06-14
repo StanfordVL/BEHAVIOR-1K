@@ -208,6 +208,7 @@ class PhysxParticleInstancer(BasePrim):
         assert quat.shape[0] == self._n_particles, \
             f"Got mismatch in particle setting size: {quat.shape[0]}, vs. number of particles {self._n_particles}!"
         # Swap w position, since Quath takes (w,x,y,z)
+        quat = quat.astype(float)
         quat = quat[:, [3, 0, 1, 2]]
         self.set_attribute(attr="orientations", val=array_to_vtarray(arr=quat, element_type=Gf.Quath))
 
@@ -231,6 +232,7 @@ class PhysxParticleInstancer(BasePrim):
         """
         assert vel.shape[0] == self._n_particles, \
             f"Got mismatch in particle setting size: {vel.shape[0]}, vs. number of particles {self._n_particles}!"
+        vel = vel.astype(float)
         self.set_attribute(attr="velocities", val=array_to_vtarray(arr=vel, element_type=Gf.Vec3f))
 
     @property
@@ -254,6 +256,7 @@ class PhysxParticleInstancer(BasePrim):
         """
         assert scales.shape[0] == self._n_particles, \
             f"Got mismatch in particle setting size: {scales.shape[0]}, vs. number of particles {self._n_particles}!"
+        scales = scales.astype(float)
         self.set_attribute(attr="scales", val=array_to_vtarray(arr=scales, element_type=Gf.Vec3f))
 
     @property

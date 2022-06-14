@@ -15,6 +15,7 @@ from omni.isaac.core.utils.rotations import gf_quat_to_np_array
 from omni.isaac.core.utils.transformations import tf_matrix_from_pose
 from omni.isaac.core.utils.types import DOFInfo
 from omni.isaac.dynamic_control import _dynamic_control
+from omni.isaac.core.utils.stage import get_current_stage
 from pxr import Gf, Usd, UsdGeom, UsdPhysics, PhysxSchema
 from omni.isaac.core.controllers.articulation_controller import ArticulationController
 import omni
@@ -1288,7 +1289,7 @@ class EntityPrim(XFormPrim):
 
         assert self._prim_type == PrimType.CLOTH, "create_attachment_point_link should only be called for Cloth"
         link_name = "attachment_point"
-        stage = self._simulator.stage
+        stage = get_current_stage()
         link_prim = stage.DefinePrim(f"{self._prim_path}/{link_name}", "Xform")
         vis_prim = UsdGeom.Sphere.Define(stage, f"{self._prim_path}/{link_name}/visuals").GetPrim()
         col_prim = UsdGeom.Sphere.Define(stage, f"{self._prim_path}/{link_name}/collisions").GetPrim()
@@ -1298,6 +1299,13 @@ class EntityPrim(XFormPrim):
         # unstable. Empirically 0.03m works reasonably well.
         vis_prim.GetAttribute("radius").Set(0.03)
         col_prim.GetAttribute("radius").Set(0.03)
+
+        # Need to sync the extents
+        extent = vis_prim.GetAttribute("extent").Get()
+        extent[0] = Gf.Vec3f(-0.03, -0.03, -0.03)
+        extent[1] = Gf.Vec3f(0.03, 0.03, 0.03)
+        vis_prim.GetAttribute("extent").Set(extent)
+        col_prim.GetAttribute("extent").Set(extent)
 
         # Add collision API to collision geom
         UsdPhysics.CollisionAPI.Apply(col_prim)

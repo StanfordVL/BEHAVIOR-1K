@@ -45,7 +45,7 @@ class Soaked(AbsoluteObjectState, BooleanState):
         assert self.absorbed_particle_system_count[fluid_system] <= self.absorbed_particle_threshold
         return self.absorbed_particle_system_count[fluid_system] == self.absorbed_particle_threshold
 
-    def _set_value(self, new_value, fluid_system):
+    def _set_value(self, fluid_system, new_value):
         assert_valid_key(key=fluid_system, valid_keys=self.absorbed_particle_system_count, name="fluid element name")
         self.absorbed_particle_system_count[fluid_system] = self.absorbed_particle_threshold if new_value else 0
         return True
