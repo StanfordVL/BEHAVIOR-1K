@@ -15,7 +15,7 @@ from igibson.object_states.toggle import ToggledOn
 from igibson.objects.visual_marker import VisualMarker
 from igibson.utils.constants import SemanticClass
 
-_HEATING_ELEMENT_LINK_NAME = "heat_source"
+_HEATING_ELEMENT_LINK_NAME = "heat_source_link"
 
 _HEATING_ELEMENT_MARKER_SCALE = [1.0] * 3
 # _HEATING_ELEMENT_MARKER_FILENAME = os.path.join(igibson.assets_path, "models/fire/fire.obj")

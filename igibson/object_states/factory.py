@@ -93,6 +93,12 @@ _DEFAULT_STATE_SET = frozenset(
     ]
 )
 
+_FIRE_STATE_SET = frozenset(
+    [
+        HeatSourceOrSink,
+    ]
+)
+
 _STEAM_STATE_SET = frozenset(
     [
         Heated,
@@ -116,6 +122,10 @@ _TEXTURE_CHANGE_PRIORITY = {
     Soaked: 1,
     ToggledOn: 0,
 }
+
+
+def get_fire_states():
+    return _FIRE_STATE_SET
 
 
 def get_steam_states():

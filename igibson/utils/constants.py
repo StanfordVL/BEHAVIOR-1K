@@ -65,6 +65,11 @@ class PrimType(IntEnum):
     CLOTH = 1
 
 
+class EmitterType(IntEnum):
+    FIRE = 0
+    STEAM = 1
+
+
 # TODO: Clean up this class to be better enum with sanity checks
 # Joint types
 class JointType:

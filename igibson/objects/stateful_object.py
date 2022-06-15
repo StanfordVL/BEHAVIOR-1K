@@ -16,6 +16,7 @@ from igibson.object_states.factory import (
     get_state_name,
     get_states_for_ability,
     get_texture_change_states,
+    get_fire_states,
     get_steam_states,
     get_texture_change_priority,
 )
@@ -23,7 +24,7 @@ from igibson.object_states.object_state_base import REGISTERED_OBJECT_STATES, Ca
 from igibson.objects.object_base import BaseObject
 from igibson.systems import get_system_from_element_name, get_element_name_from_system
 from igibson.renderer_settings.renderer_settings import RendererSettings
-from igibson.utils.constants import PrimType
+from igibson.utils.constants import PrimType, EmitterType
 from igibson.object_states import Soaked
 
 
@@ -85,7 +86,7 @@ class StatefulObject(BaseObject):
         """
         # Values that will be filled later
         self._states = None
-        self._emitter = None
+        self._emitters = OrderedDict()
         self._shaders = []
 
         # Load abilities from taxonomy if needed & possible
@@ -196,7 +197,10 @@ class StatefulObject(BaseObject):
             self._create_texture_change_apis()
 
         if len(set(self.states) & set(get_steam_states())) > 0:
-            self._create_steam_apis()
+            self._create_emitter_apis(EmitterType.STEAM)
+
+        if len(set(self.states) & set(get_fire_states())) > 0:
+            self._create_emitter_apis(EmitterType.FIRE)
 
     def _create_texture_change_apis(self):
         """
@@ -213,63 +217,126 @@ class StatefulObject(BaseObject):
                 shader.CreateInput("diffuse_tint", Sdf.ValueTypeNames.Color3f).Set(Gf.Vec3f([1.0, 1.0, 1.0]))
                 self._shaders.append(shader)
 
-    def _create_steam_apis(self):
+
+    def _create_emitter_apis(self, emitter_type):
         """
         Create necessary prims and apis for steam effects.
+
+        Args:
+            emitter_type (EmitterType): Emitter to create
         """
         # Make sure that flow setting is enabled.
         renderer_setting = RendererSettings()
         renderer_setting.common_settings.flow_settings.enable()
 
+        # Specify emitter config.
+        emitter_config = {}
+        if emitter_type == EmitterType.FIRE:
+            emitter_config["name"] = "/flowEmitterSphere"
+            emitter_config["type"] = "FlowEmitterSphere"
+            emitter_config["fuel"] = 0.6
+            emitter_config["coupleRateFuel"] = 1.2
+            emitter_config["buoyancyPerTemp"] = 0.04
+            emitter_config["burnPerTemp"] = 4
+            emitter_config["gravity"] = (0, 0, -60.0)
+            emitter_config["constantMask"] = 5.0
+            emitter_config["attenuation"] = 0.5
+        elif emitter_type == EmitterType.STEAM:
+            emitter_config["name"] = "/flowEmitterBox"
+            emitter_config["type"] = "FlowEmitterBox"
+            emitter_config["fuel"] = 1.0
+            emitter_config["coupleRateFuel"] = 0.5
+            emitter_config["buoyancyPerTemp"] = 0.05
+            emitter_config["burnPerTemp"] = 0.5
+            emitter_config["gravity"] = (0, 0, -50.0)
+            emitter_config["constantMask"] = 10.0
+            emitter_config["attenuation"] = 1.5
+
         # Define prim paths.
-        flowEmitterBox_prim_path = self._prim_path + "/flowEmitterBox"
+        flowEmitter_prim_path = self._prim_path + emitter_config["name"]
         flowSimulate_prim_path = self._prim_path+ "/flowSimulate"
         flowOffscreen_prim_path = self._prim_path + "/flowOffscreen"
         flowRender_prim_path = self._prim_path+ "/flowRender"
 
         # Define prims.
         stage = self._simulator.stage
-        emitter = stage.DefinePrim(flowEmitterBox_prim_path, "FlowEmitterBox")
+        emitter = stage.DefinePrim(flowEmitter_prim_path, emitter_config["type"])
         simulate = stage.DefinePrim(flowSimulate_prim_path, "FlowSimulate")
         offscreen = stage.DefinePrim(flowOffscreen_prim_path, "FlowOffscreen")
         renderer = stage.DefinePrim(flowRender_prim_path, "FlowRender")
         advection = stage.DefinePrim(flowSimulate_prim_path + "/advection", "FlowAdvectionCombustionParams")
+        smoke = stage.DefinePrim(flowSimulate_prim_path + "/advection/smoke", "FlowAdvectionCombustionParams")
         vorticity = stage.DefinePrim(flowSimulate_prim_path + "/vorticity", "FlowVorticityParams")
         rayMarch = stage.DefinePrim(flowRender_prim_path + "/rayMarch", "FlowRayMarchParams")
+        colormap = stage.DefinePrim(flowOffscreen_prim_path + "/colormap", "FlowRayMarchColormapParams")
 
-        self._emitter = emitter
+        self._emitters[emitter_type] = emitter
+        self.update_emitter_position(emitter_type)
 
-        # Update settings.
-        bbox_extent = self.aabb_extent
-        
+        # Update emitter general settings.
         emitter.CreateAttribute("enabled", VT.Bool, False).Set(False)
-        emitter.CreateAttribute("fuel", VT.Float, False).Set(1.0)
-        emitter.CreateAttribute("coupleRateFuel", VT.Float, False).Set(0.5)
+        emitter.CreateAttribute("fuel", VT.Float, False).Set(emitter_config["fuel"])
+        emitter.CreateAttribute("coupleRateFuel", VT.Float, False).Set(emitter_config["coupleRateFuel"])
         emitter.CreateAttribute("coupleRateVelocity", VT.Float, False).Set(2.0)
-        emitter.CreateAttribute("halfSize", VT.Float3, False).Set((bbox_extent[0]*0.4, bbox_extent[1]*0.4, bbox_extent[2]*0.15))
-        emitter.CreateAttribute("position", VT.Float3, False).Set((0, 0, bbox_extent[2]*1.0))
         emitter.CreateAttribute("velocity", VT.Float3, False).Set((0, 0, 0))
+        advection.CreateAttribute("buoyancyPerTemp", VT.Float, False).Set(emitter_config["buoyancyPerTemp"])
+        advection.CreateAttribute("burnPerTemp", VT.Float, False).Set(emitter_config["burnPerTemp"])
+        advection.CreateAttribute("gravity", VT.Float3, False).Set(emitter_config["gravity"])
+        vorticity.CreateAttribute("constantMask", VT.Float, False).Set(emitter_config["constantMask"])
+        rayMarch.CreateAttribute("attenuation", VT.Float, False).Set(emitter_config["attenuation"])
 
-        simulate.CreateAttribute("densityCellSize", VT.Float, False).Set(bbox_extent[2]*0.1)
+        # Update emitter unique settings.
+        if emitter_type == EmitterType.FIRE:
+            # TODO: get radius of heat_source_link from metadata.
+            radius = 0.05
+            emitter.CreateAttribute("radius", VT.Float, False).Set(radius)
+            simulate.CreateAttribute("densityCellSize", VT.Float, False).Set(radius*0.2)
+            smoke.CreateAttribute("fade", Sdf.ValueTypeNames.Float, False).Set(2.0)
+            # Set fire colormap.
+            rgbaPoints = []
+            rgbaPoints.append(Gf.Vec4f(0.0154, 0.0177, 0.0154, 0.004902))
+            rgbaPoints.append(Gf.Vec4f(0.03575, 0.03575, 0.03575, 0.504902))
+            rgbaPoints.append(Gf.Vec4f(0.03575, 0.03575, 0.03575, 0.504902))
+            rgbaPoints.append(Gf.Vec4f(1, 0.1594, 0.0134, 0.8))
+            rgbaPoints.append(Gf.Vec4f(13.53, 2.99, 0.12599, 0.8))
+            rgbaPoints.append(Gf.Vec4f(78, 39, 6.1, 0.7))
+            colormap.CreateAttribute("rgbaPoints", Sdf.ValueTypeNames.Float4Array, False).Set(rgbaPoints)
+        elif emitter_type == EmitterType.STEAM:
+            bbox_extent = self.aabb_extent
+            emitter.CreateAttribute("halfSize", VT.Float3, False).Set((bbox_extent[0]*0.4, bbox_extent[1]*0.4, bbox_extent[2]*0.15))
+            simulate.CreateAttribute("densityCellSize", VT.Float, False).Set(bbox_extent[2]*0.1)
 
-        vorticity.CreateAttribute("constantMask", VT.Float, False).Set(10.0)
 
-        advection.CreateAttribute("buoyancyPerTemp", VT.Float, False).Set(0.05)
-        advection.CreateAttribute("burnPerTemp", VT.Float, False).Set(0.5)
-        advection.CreateAttribute("gravity", VT.Float3, False).Set((0, 0, -50.0))
-
-        rayMarch.CreateAttribute("attenuation", VT.Float, False).Set(1.5)
-
-    def set_emitter_enabled(self, value):
+    def set_emitter_enabled(self, emitter_type, value):
         """
-        Enable/disable the emitter prim for steam effect.
+        Enable/disable the emitter prim for fire/steam effect.
 
         Args:
+            emitter_type (EmitterType): Emitter to set
             value (bool): Value to set
         """
-        if self._emitter is not None:
-            if value != self._emitter.GetAttribute("enabled").Get():
-                self._emitter.GetAttribute("enabled").Set(value)
+        if emitter_type not in self._emitters:
+            return
+        if value != self._emitters[emitter_type].GetAttribute("enabled").Get():
+            self._emitters[emitter_type].GetAttribute("enabled").Set(value)
+
+    def update_emitter_position(self, emitter_type):
+        """
+        Update the position of the emitter prim for fire/steam effect.
+
+        Args:
+            emitter_type (EmitterType): Emitter to update
+        """
+        base_link_pos = self.get_position()
+        if emitter_type == EmitterType.FIRE:
+            heat_link = self.links["heat_source_link"]
+            heat_link_pos = heat_link.get_local_pose()[0]
+            self._emitters[emitter_type].CreateAttribute("position", VT.Float3, False).Set(
+                (heat_link_pos[0], heat_link_pos[1], heat_link_pos[2]))
+        elif emitter_type == EmitterType.STEAM:
+            bbox_extent = self.aabb_extent
+            self._emitters[emitter_type].CreateAttribute("position", VT.Float3, False).Set(
+                (base_link_pos[0], base_link_pos[1], base_link_pos[2]+bbox_extent[2]*0.5))
 
     def get_textures(self):
         """Gets prim's texture files.
@@ -290,7 +357,7 @@ class StatefulObject(BaseObject):
         Should be called after all the states are updated.
         """
         texture_change_states = []
-        emitter_enabled = False
+        emitter_enabled = defaultdict(bool)
         for state_type, state in self.states.items():
             if state_type in get_texture_change_states():
                 if state_type in [Soaked]:
@@ -302,9 +369,15 @@ class StatefulObject(BaseObject):
                 elif state.get_value():
                     texture_change_states.append(state)
             if state_type in get_steam_states():
-                emitter_enabled = emitter_enabled or state.get_value()
+                emitter_enabled[EmitterType.STEAM] |= state.get_value()
+            if state_type in get_fire_states():
+                # Currently, the only state that uses fire is HeatSourceOrSink, whose get_value()
+                # returns (heat_source_state, heat_source_position).
+                emitter_enabled[EmitterType.FIRE] |= state.get_value()[0]
 
-        self.set_emitter_enabled(emitter_enabled)
+            for emitter_type in emitter_enabled:
+                self.update_emitter_position(emitter_type)
+                self.set_emitter_enabled(emitter_type, emitter_enabled[emitter_type])
 
         texture_change_states.sort(key=lambda s: get_texture_change_priority()[s.__class__])
         object_state = texture_change_states[-1] if len(texture_change_states) > 0 else None
