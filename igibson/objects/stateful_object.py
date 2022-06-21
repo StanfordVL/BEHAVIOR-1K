@@ -232,7 +232,7 @@ class StatefulObject(BaseObject):
         # Specify emitter config.
         emitter_config = {}
         if emitter_type == EmitterType.FIRE:
-            emitter_config["name"] = "/flowEmitterSphere"
+            emitter_config["name"] = "flowEmitterSphere"
             emitter_config["type"] = "FlowEmitterSphere"
             emitter_config["fuel"] = 0.6
             emitter_config["coupleRateFuel"] = 1.2
@@ -242,7 +242,7 @@ class StatefulObject(BaseObject):
             emitter_config["constantMask"] = 5.0
             emitter_config["attenuation"] = 0.5
         elif emitter_type == EmitterType.STEAM:
-            emitter_config["name"] = "/flowEmitterBox"
+            emitter_config["name"] = "flowEmitterBox"
             emitter_config["type"] = "FlowEmitterBox"
             emitter_config["fuel"] = 1.0
             emitter_config["coupleRateFuel"] = 0.5
@@ -253,10 +253,11 @@ class StatefulObject(BaseObject):
             emitter_config["attenuation"] = 1.5
 
         # Define prim paths.
-        flowEmitter_prim_path = self._prim_path + emitter_config["name"]
-        flowSimulate_prim_path = self._prim_path+ "/flowSimulate"
-        flowOffscreen_prim_path = self._prim_path + "/flowOffscreen"
-        flowRender_prim_path = self._prim_path+ "/flowRender"
+        # The flow system is created under the root link so that it automatically updates its pose as the object moves
+        flowEmitter_prim_path = f"{self._prim_path}/{self.root_link_name}/{emitter_config['name']}"
+        flowSimulate_prim_path = f"{self._prim_path}/{self.root_link_name}/flowSimulate"
+        flowOffscreen_prim_path = f"{self._prim_path}/{self.root_link_name}/flowOffscreen"
+        flowRender_prim_path = f"{self._prim_path}/{self.root_link_name}/flowRender"
 
         # Define prims.
         stage = self._simulator.stage
@@ -302,9 +303,11 @@ class StatefulObject(BaseObject):
             rgbaPoints.append(Gf.Vec4f(78, 39, 6.1, 0.7))
             colormap.CreateAttribute("rgbaPoints", Sdf.ValueTypeNames.Float4Array, False).Set(rgbaPoints)
         elif emitter_type == EmitterType.STEAM:
+            MIN_HALF_HEIGHT = 0.03
             bbox_extent = self.aabb_extent
-            emitter.CreateAttribute("halfSize", VT.Float3, False).Set((bbox_extent[0]*0.4, bbox_extent[1]*0.4, bbox_extent[2]*0.15))
-            simulate.CreateAttribute("densityCellSize", VT.Float, False).Set(bbox_extent[2]*0.1)
+            emitter.CreateAttribute("halfSize", VT.Float3, False).Set(
+                (bbox_extent[0] * 0.4, bbox_extent[1] * 0.4, max(MIN_HALF_HEIGHT, bbox_extent[2] * 0.15)))
+            simulate.CreateAttribute("densityCellSize", VT.Float, False).Set(bbox_extent[2] * 0.1)
 
 
     def set_emitter_enabled(self, emitter_type, value):
@@ -327,16 +330,18 @@ class StatefulObject(BaseObject):
         Args:
             emitter_type (EmitterType): Emitter to update
         """
-        base_link_pos = self.get_position()
         if emitter_type == EmitterType.FIRE:
+            # Assume the heat_source_link is a direct child of the base_link
             heat_link = self.links["heat_source_link"]
             heat_link_pos = heat_link.get_local_pose()[0]
+            # local position w.r.t to the base link frame
             self._emitters[emitter_type].CreateAttribute("position", VT.Float3, False).Set(
                 (heat_link_pos[0], heat_link_pos[1], heat_link_pos[2]))
         elif emitter_type == EmitterType.STEAM:
             bbox_extent = self.aabb_extent
+            # local position w.r.t to the base link frame
             self._emitters[emitter_type].CreateAttribute("position", VT.Float3, False).Set(
-                (base_link_pos[0], base_link_pos[1], base_link_pos[2]+bbox_extent[2]*0.5))
+                (0, 0, bbox_extent[2] * 0.5))
 
     def get_textures(self):
         """Gets prim's texture files.
