@@ -173,8 +173,8 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
                 0.0,  # wheels
                 0.02,  # trunk
                 0.0,
-                0.0,  # head
                 1.1707963267948966,
+                0.0,  # head
                 1.4707963267948965,
                 -0.4,
                 1.6707963267948966,
@@ -374,7 +374,7 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         """
         :return Array[int]: Indices in low-level control vector corresponding to [tilt, pan] camera joints.
         """
-        return np.array([3, 4])
+        return np.array([3, 5])
 
     @property
     def arm_control_idx(self):
@@ -382,7 +382,7 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         :return dict[str, Array[int]]: Dictionary mapping arm appendage name to indices in low-level control
             vector corresponding to arm joints.
         """
-        return {self.default_arm: np.array([5, 6, 7, 8, 9, 10, 11])}
+        return {self.default_arm: np.array([4, 6, 7, 8, 9, 10, 11])}
 
     @property
     def gripper_control_idx(self):
