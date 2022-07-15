@@ -1,13 +1,12 @@
 import numpy as np
+from igibson.utils.python_utils import Serializable
+from collections import OrderedDict
 
 
-class Filter(object):
+class Filter(Serializable):
     """
     A base class for filtering a noisy data stream in an online fashion.
     """
-
-    def __init__(self):
-        pass
 
     def estimate(self, observation):
         """
@@ -23,19 +22,26 @@ class Filter(object):
         """
         pass
 
-    def dump_state(self):
-        """
-        :return Any: the state of the object other than what's not included in pybullet state.
-        """
-        return None
+    @property
+    def state_size(self):
+        # No state by default
+        return 0
 
-    def load_state(self, dump):
-        """
-        Load the state of the object other than what's not included in pybullet state.
+    def _dump_state(self):
+        # Default is no state (empty dict)
+        return OrderedDict()
 
-        :param dump: Any: the dumped state
-        """
-        return
+    def _load_state(self, state):
+        # Default is no state (empty dict), so this is a no-op
+        pass
+
+    def _serialize(self, state):
+        # Default is no state, so do nothing
+        return np.array([])
+
+    def _deserialize(self, state):
+        # Default is no state, so do nothing
+        return OrderedDict(), 0
 
 
 class MovingAverageFilter(Filter):
@@ -49,12 +55,14 @@ class MovingAverageFilter(Filter):
         :param obs_dim: The dimension of the points to filter.
         :param filter_width: The number of past samples to take the moving average over.
         """
+        self.obs_dim = obs_dim
+        assert filter_width > 0, f"MovingAverageFilter must have a non-zero size! Got: {filter_width}"
         self.filter_width = filter_width
-        self.past_samples = []
-        self.past_samples_sum = np.zeros(obs_dim)
-        self.num_samples = 0
+        self.past_samples = np.zeros((filter_width, obs_dim))
+        self.current_idx = 0
+        self.fully_filled = False               # Whether the entire filter buffer is filled or not
 
-        super(MovingAverageFilter, self).__init__()
+        super().__init__()
 
     def estimate(self, observation):
         """
@@ -62,43 +70,76 @@ class MovingAverageFilter(Filter):
         :param observation: New observation to hold internal estimate of state.
         :return: New estimate of state.
         """
-        if self.num_samples == self.filter_width:
-            val = self.past_samples.pop(0)
-            self.past_samples_sum -= val
-            self.num_samples -= 1
-        self.past_samples.append(np.array(observation))
-        self.past_samples_sum += observation
-        self.num_samples += 1
+        # Write the newest observation at the appropriate index
+        self.past_samples[self.current_idx, :] = np.array(observation)
 
-        return self.past_samples_sum / self.num_samples
+        # Compute value based on whether we're fully filled or not
+        if not self.fully_filled:
+            val = self.past_samples[:self.current_idx + 1, :].mean(axis=0)
+            # Denote that we're fully filled if we're at the end of the buffer
+            if self.current_idx == self.filter_width - 1:
+                self.fully_filled = True
+        else:
+            val = self.past_samples.mean(axis=0)
+
+        # Increment the index to write the next sample to
+        self.current_idx = (self.current_idx + 1) % self.filter_width
+
+        return val
 
     def reset(self):
         # Clear internal state
-        self.past_samples = []
-        self.past_samples_sum *= 0.0
-        self.num_samples = 0
+        self.past_samples *= 0.0
+        self.current_idx = 0
+        self.fully_filled = False
 
-    def dump_state(self):
-        """
-        :return Any: the state of the object other than what's not included in pybullet state.
-        """
-        return {
-            "filter_width": self.filter_width,
-            "past_samples": [item.tolist() for item in self.past_samples],
-            "past_samples_sum": self.past_samples_sum.tolist(),
-            "num_samples": self.num_samples,
-        }
+    @property
+    def state_size(self):
+        return super().state_size + self.filter_width * self.obs_dim + 2
 
-    def load_state(self, dump):
-        """
-        Load the state of the object other than what's not included in pybullet state.
+    def _dump_state(self):
+        # Run super init first
+        state = super()._dump_state()
 
-        :param dump: Any: the dumped state
-        """
-        assert self.filter_width == dump["filter_width"], "filter width mismatch"
-        self.past_samples = [np.array(item) for item in dump["past_samples"]]
-        self.past_samples_sum = np.array(dump["past_samples_sum"])
-        self.num_samples = dump["num_samples"]
+        # Add info from this filter
+        state["past_samples"] = np.array(self.past_samples)
+        state["current_idx"] = self.current_idx
+        state["fully_filled"] = self.fully_filled
+
+        return state
+
+    def _load_state(self, state):
+        # Run super first
+        super()._load_state(state=state)
+
+        # Load relevant info for this filter
+        self.past_samples = np.array(state["past_samples"])
+        self.current_idx = state["current_idx"]
+        self.fully_filled = state["fully_filled"]
+
+    def _serialize(self, state):
+        # Run super first
+        state_flat = super()._serialize(state=state)
+
+        # Serialize state for this filter
+        return np.concatenate([
+            state_flat,
+            state["past_samples"].flatten(),
+            [state["current_idx"]],
+            [state["fully_filled"]],
+        ])
+
+    def _deserialize(self, state):
+        # Run super first
+        state_dict, idx = super()._deserialize(state=state)
+
+        # Deserialize state for this filter
+        samples_len = self.filter_width * self.obs_dim
+        state_dict["past_samples"] = state[idx: idx + samples_len]
+        state_dict["current_idx"] = int(state[idx + samples_len])
+        state_dict["fully_filled"] = bool(state[idx + samples_len + 1])
+
+        return state_dict, idx + samples_len + 1
 
 
 class ExponentialAverageFilter(Filter):
@@ -110,13 +151,14 @@ class ExponentialAverageFilter(Filter):
     def __init__(self, obs_dim, alpha=0.9):
         """
         :param obs_dim: The dimension of the points to filter.
-        :param filter_width: The number of past samples to take the moving average over.
+        :param alpha: The relative weighting of new samples relative to older samples
         """
+        self.obs_dim = obs_dim
         self.avg = np.zeros(obs_dim)
         self.num_samples = 0
         self.alpha = alpha
 
-        super(ExponentialAverageFilter, self).__init__()
+        super().__init__()
 
     def estimate(self, observation):
         """
@@ -129,34 +171,59 @@ class ExponentialAverageFilter(Filter):
 
         return np.array(self.avg)
 
-    def dump_state(self):
-        """
-        :return Any: the state of the object other than what's not included in pybullet state.
-        """
-        return {
-            "alpha": self.alpha,
-            "avg": self.avg.tolist(),
-            "num_samples": self.num_samples,
-        }
+    def reset(self):
+        # Clear internal state
+        self.avg *= 0.0
+        self.num_samples = 0
 
-    def load_state(self, dump):
-        """
-        Load the state of the object other than what's not included in pybullet state.
+    @property
+    def state_size(self):
+        return super().state_size + self.obs_dim + 1
 
-        :param dump: Any: the dumped state
-        """
-        assert self.alpha == dump["alpha"], "filter alpha mismatch"
-        self.avg = np.array(dump["avg"])
-        self.num_samples = dump["num_samples"]
+    def _dump_state(self):
+        # Run super init first
+        state = super()._dump_state()
+
+        # Add info from this filter
+        state["avg"] = np.array(self.avg)
+        state["num_samples"] = self.num_samples
+
+        return state
+
+    def _load_state(self, state):
+        # Run super first
+        super()._load_state(state=state)
+
+        # Load relevant info for this filter
+        self.avg = np.array(state["avg"])
+        self.num_samples = state["num_samples"]
+
+    def _serialize(self, state):
+        # Run super first
+        state_flat = super()._serialize(state=state)
+
+        # Serialize state for this filter
+        return np.concatenate([
+            state_flat,
+            state["avg"],
+            [state["num_samples"]],
+        ])
+
+    def _deserialize(self, state):
+        # Run super first
+        state_dict, idx = super()._deserialize(state=state)
+
+        # Deserialize state for this filter
+        state_dict["avg"] = state[idx: idx + self.obs_dim]
+        state_dict["num_samples"] = int(state[idx + self.obs_dim])
+
+        return state_dict, idx + self.obs_dim
 
 
-class Subsampler(object):
+class Subsampler:
     """
     A base class for subsampling a data stream in an online fashion.
     """
-
-    def __init__(self):
-        pass
 
     def subsample(self, observation):
         """

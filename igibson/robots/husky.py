@@ -12,13 +12,6 @@ class Husky(LocomotionRobot):
     Reference: https://clearpathrobotics.com/, http://wiki.ros.org/Robots/Husky
     """
 
-    @property
-    def model_name(self):
-        """
-        :return str: robot model name
-        """
-        return "Husky"
-
     def _create_discrete_action_space(self):
         raise ValueError("Husky does not support discrete actions!")
 
@@ -31,5 +24,9 @@ class Husky(LocomotionRobot):
         return np.zeros(self.n_joints)
 
     @property
-    def model_file(self):
+    def usd_path(self):
         return os.path.join(igibson.assets_path, "models/husky/husky/husky.usd")
+
+    @property
+    def urdf_path(self):
+        return os.path.join(igibson.assets_path, "models/husky/husky.urdf")

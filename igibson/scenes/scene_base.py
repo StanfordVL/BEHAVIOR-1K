@@ -497,9 +497,11 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             size=size,
             color=np.array(color),
             visible=visible,
-            static_friction=static_friction,
-            dynamic_friction=dynamic_friction,
-            restitution=restitution,
+
+            # TODO: update with new PhysicsMaterial API
+            # static_friction=static_friction,
+            # dynamic_friction=dynamic_friction,
+            # restitution=restitution,
         )
 
     def update_initial_state(self):

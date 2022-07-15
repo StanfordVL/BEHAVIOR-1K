@@ -40,5 +40,9 @@ class Freight(TwoWheelRobot):
         return np.zeros(self.n_joints)
 
     @property
-    def model_file(self):
+    def usd_path(self):
         return os.path.join(igibson.assets_path, "models/fetch/freight/freight.usd")
+
+    @property
+    def urdf_path(self):
+        return os.path.join(igibson.assets_path, "models/fetch/freight.urdf")

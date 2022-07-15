@@ -271,6 +271,11 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         # Tiago does not support discrete actions
         raise ValueError("Fetch does not support discrete actions!")
 
+    @property
+    def discrete_action_list(self):
+        # Not supported for this robot
+        raise NotImplementedError()
+
     def tuck(self):
         """
         Immediately set this robot's configuration to be in tucked mode
@@ -345,9 +350,8 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         # TODO: Get omnidirectional base working
         controllers["base"] = "NullJointController"
         controllers["camera"] = "JointController"
-        # TODO: Revert to IK once implemented
         for arm in self.arm_names:
-            controllers["arm_{}".format(arm)] = "JointController" #"InverseKinematicsController"
+            controllers["arm_{}".format(arm)] = "InverseKinematicsController"
             controllers["gripper_{}".format(arm)] = "MultiFingerGripperController"
 
         return controllers
@@ -358,34 +362,20 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         cfg = super()._default_controller_config
 
         for arm in self.arm_names:
-            if arm == "left":
-                # Use default IK controller -- also need to override joint idx being controlled to include trunk in default
-                # IK arm controller
-                cfg["arm_{}".format(arm)]["InverseKinematicsController"]["dof_idx"] = np.concatenate(
-                    [self.trunk_control_idx, self.arm_control_idx[arm]]
-                )
+            for arm_cfg in cfg["arm_{}".format(arm)].values():
 
-                cfg["arm_{}".format(arm)]["JointController"]["dof_idx"] = np.concatenate(
-                    [self.trunk_control_idx, self.arm_control_idx[arm]]
-                )
+                if arm == "left":
+                    # Need to override joint idx being controlled to include trunk in default arm controller configs
+                    arm_cfg["dof_idx"] = np.concatenate([self.trunk_control_idx, self.arm_control_idx[arm]])
 
-            # If using rigid trunk, we also clamp its limits
-            if self.rigid_trunk:
-                cfg["arm_{}".format(arm)]["InverseKinematicsController"]["control_limits"]["position"][0][
-                    self.trunk_control_idx
-                ] = self.untucked_default_joint_pos[self.trunk_control_idx]
-                cfg["arm_{}".format(arm)]["InverseKinematicsController"]["control_limits"]["position"][1][
-                    self.trunk_control_idx
-                ] = self.untucked_default_joint_pos[self.trunk_control_idx]
-                cfg["arm_{}".format(arm)]["JointController"]["control_limits"]["position"][0][
-                    self.trunk_control_idx
-                ] = self.untucked_default_joint_pos[self.trunk_control_idx]
-                cfg["arm_{}".format(arm)]["JointController"]["control_limits"]["position"][1][
-                    self.trunk_control_idx
-                ] = self.untucked_default_joint_pos[self.trunk_control_idx]
-
-            # Must also create a default controller for each gripper
-
+                # If using rigid trunk, we also clamp its limits
+                # TODO: How to handle for right arm which has a fixed trunk internally even though the trunk is moving
+                # via the left arm??
+                if self.rigid_trunk:
+                    arm_cfg["control_limits"]["position"][0][self.trunk_control_idx] = \
+                        self.untucked_default_joint_pos[self.trunk_control_idx]
+                    arm_cfg["control_limits"]["position"][1][self.trunk_control_idx] = \
+                        self.untucked_default_joint_pos[self.trunk_control_idx]
 
         return cfg
 
@@ -503,8 +493,17 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
                 in self.arm_names}
 
     @property
-    def model_file(self):
+    def usd_path(self):
         return os.path.join(igibson.assets_path, "models/tiago/tiago_dual_omnidirectional_stanford/tiago_dual_omnidirectional_stanford.usd")
+
+    @property
+    def robot_arm_descriptor_yamls(self):
+        return {"left": os.path.join(igibson.assets_path, "models/tiago/tiago_dual_omnidirectional_stanford_left_arm_descriptor.yaml"),
+                "right": os.path.join(igibson.assets_path, "models/tiago/tiago_dual_omnidirectional_stanford_right_arm_fixed_trunk_descriptor.yaml")}
+
+    @property
+    def urdf_path(self):
+        return os.path.join(igibson.assets_path, "models/tiago/tiago_dual_omnidirectional_stanford.urdf")
 
     def dump_config(self):
         cfg = super().dump_config()

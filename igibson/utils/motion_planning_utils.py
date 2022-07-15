@@ -66,64 +66,13 @@ from igibson.scenes.gibson_indoor_scene import StaticTraversableScene
 from igibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
 import igibson.utils.transform_utils as T
 from igibson.utils.utils import l2_distance, rotate_vector_2d
+from igibson.utils.control_utils import IKSolver
 
-import lula
 
 SEARCHED = []
 # Setting this higher unfortunately causes things to become impossible to pick up (they touch their hosts)
 BODY_MAX_DISTANCE = 0.05
 HAND_MAX_DISTANCE = 0
-
-
-class IKSolver:
-    """
-    Class for thinly wrapping Lula IK solver
-    """
-
-    def __init__(
-        self,
-        robot_description_path,
-        robot_urdf_path,
-        eef_name,
-        default_joint_pos,
-    ):
-        # Create robot description, kinematics, and config
-        self.robot_description = lula.load_robot(robot_description_path, robot_urdf_path)
-        self.kinematics = self.robot_description.kinematics()
-        self.config = lula.CyclicCoordDescentIkConfig()
-        self.eef_name = eef_name
-        self.default_joint_pos = default_joint_pos
-
-    def solve(
-        self,
-        target_pos,
-        target_quat,
-        initial_joint_pos=None,
-    ):
-        """
-        Backs out joint positions to achieve desired @target_pos and @target_quat
-
-        Args:
-            target_pos (3-array): desired (x,y,z) local target cartesian position in robot's base coordinate frame
-            target_quat (3-array): desired (x,y,z,w) local target quaternion orientation in robot's base coordinate frame
-            initial_joint_pos (None or n-array): If specified, will set the initial cspace seed when solving for joint
-                positions. Otherwise, will use self.default_joint_pos
-
-        Returns:
-            None or n-array: Joint positions for reaching desired target_pos and target_quat, otherwise None if no
-                solution was found
-        """
-        pos = np.array(target_pos, dtype=np.float64).reshape(3,1)
-        rot = np.array(T.quat2mat(target_quat), dtype=np.float64)
-        ik_target_pose = lula.Pose3(lula.Rotation3(rot), pos)
-
-        # Set the cspace seed
-        initial_joint_pos = self.default_joint_pos if initial_joint_pos is None else np.array(initial_joint_pos)
-        self.config.cspace_seeds = [initial_joint_pos]
-
-        # Compute target joint positions
-        ik_results = lula.compute_ik_ccd(self.kinematics, ik_target_pose, self.eef_name, self.config)
-        return np.array(ik_results.cspace_position)
 
 
 class MotionPlanner:

@@ -99,3 +99,11 @@ class USDObject(StatefulObject):
             load_config=load_config,
             abilities=self._abilities,
         )
+
+    @property
+    def usd_path(self):
+        """
+        :return str: absolute path to this model's USD file. By default, this is the loaded usd path
+        passed in as an argument
+        """
+        return self._usd_path

@@ -76,6 +76,7 @@ class InteractiveTraversableScene(TraversableScene):
         """
         # TODO: Update
         :param scene_model: Scene model, e.g.: Rs_int
+        # TODO: Update doc -- usd_file / usd_path naming convention is too ambiguous / similar
         :param usd_file: name of usd file to load (without .urdf), default to ig_dataset/scenes/<scene_model>/urdf/<urdf_file>.urdf
         :param usd_path: full path of URDF file to load (with .urdf)
         # :param pybullet_filename: optional specification of which pybullet file to restore after initialization

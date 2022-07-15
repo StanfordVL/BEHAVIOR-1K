@@ -1,9 +1,9 @@
 import numpy as np
 
-
 import igibson.utils.transform_utils as T
 from igibson.controllers import ControlType, ManipulationController
 from igibson.utils.filters import MovingAverageFilter
+from igibson.utils.control_utils import IKSolver
 
 # Different modes
 IK_MODE_COMMAND_DIMS = {
@@ -27,32 +27,31 @@ class InverseKinematicsController(ManipulationController):
 
     def __init__(
         self,
-        base_body_id,
-        task_link_id,
         task_name,
+        robot_description_path,
+        robot_urdf_path,
+        eef_name,
         control_freq,
-        default_joint_pos,
-        joint_damping,
+        default_joint_pos,          # TODO: Currently doesn't do anything in Lula
         control_limits,
-        joint_idx,
+        dof_idx,
         command_input_limits="default",
         command_output_limits=((-0.2, -0.2, -0.2, -0.5, -0.5, -0.5), (0.2, 0.2, 0.2, 0.5, 0.5, 0.5)),
         kv=2.0,
         mode="pose_delta_ori",
         smoothing_filter_size=None,
         workspace_pose_limiter=None,
-        joint_range_tolerance=0.01,
     ):
         """
-        :param base_body_id: int, unique pybullet ID corresponding to the pybullet body being controlled by IK
-        :param task_link_id: int, pybullet link ID corresponding to the link within the body being controlled by IK
         :param task_name: str, name assigned to this task frame for computing IK control. During control calculations,
             the inputted control_dict should include entries named <@task_name>_pos_relative and
             <@task_name>_quat_relative. See self._command_to_control() for what these values should entail.
+        :param robot_description_path: str, path to robot descriptor yaml file
+        :param robot_urdf_path: str, path to robot urdf file
+        :param eef_name: str, end effector frame name
         :param control_freq: int, controller loop frequency
-        :param default_joint_pos: Array[float], default joint positions, used as part of nullspace controller in IK
-        :param joint_damping: Array[float], joint damping parameters associated with each joint
-            in the body being controlled
+        :param default_joint_pos: Array[float], default joint positions, used as part of nullspace controller in IK.
+            Note that this should correspond to ALL the joints; the exact indices will be extracted via @dof_idx
         :param control_limits: Dict[str, Tuple[Array[float], Array[float]]]: The min/max limits to the outputted
             control signal. Should specify per-actuator type limits, i.e.:
 
@@ -62,7 +61,7 @@ class InverseKinematicsController(ManipulationController):
             "has_limit": [...bool...]
 
             Values outside of this range will be clipped, if the corresponding joint index in has_limit is True.
-        :param joint_idx: Array[int], specific joint indices controlled by this robot. Used for inferring
+        :param dof_idx: Array[int], specific dof indices controlled by this robot. Used for inferring
             controller-relevant values during control computations
         :param command_input_limits: None or "default" or Tuple[float, float] or Tuple[Array[float], Array[float]],
             if set, is the min/max acceptable inputted command. Values outside of this range will be clipped.
@@ -93,11 +92,9 @@ class InverseKinematicsController(ManipulationController):
 
             where pos_command is (x,y,z) cartesian position values, command_quat is (x,y,z,w) quarternion orientation
             values, and the returned tuple is the processed (pos, quat) command.
-        :param joint_range_tolerance: float, amount to add to each side of the inputted joint range, to improve IK
-            convergence stability (e.g.: for joint_ranges = 0 for no limits, prevents NaNs from occurring)
         """
         # Store arguments
-        control_dim = len(joint_damping)
+        control_dim = len(dof_idx)
         self.control_filter = (
             None
             if smoothing_filter_size in {None, 0}
@@ -107,21 +104,49 @@ class InverseKinematicsController(ManipulationController):
         self.mode = mode
         self.kv = kv
         self.workspace_pose_limiter = workspace_pose_limiter
-        self.base_body_id = base_body_id
-        self.task_link_id = task_link_id
         self.task_name = task_name
-        self.default_joint_pos = np.array(default_joint_pos)
-        self.joint_damping = np.array(joint_damping)
-        self.joint_range_tolerance = joint_range_tolerance
+        self.default_joint_pos = default_joint_pos[dof_idx]
+
+        # Create the lula IKSolver
+        self.solver = IKSolver(
+            robot_description_path=robot_description_path,
+            robot_urdf_path=robot_urdf_path,
+            eef_name=eef_name,
+            default_joint_pos=default_joint_pos,
+        )
 
         # Other variables that will be filled in at runtime
         self._quat_target = None
+
+        # If the mode is set as absolute orientation and using default config,
+        # change input and output limits accordingly.
+        # By default, the input limits are set as 1, so we modify this to have a correct range.
+        # The output orientation limits are also set to be values assuming delta commands, so those are updated too
+        if self.mode == "pose_absolute_ori":
+            if command_input_limits is not None:
+                if command_input_limits == "default":
+                    command_input_limits = [
+                        [-1.0, -1.0, -1.0, -np.pi, -np.pi, -np.pi],
+                        [1.0, 1.0, 1.0, np.pi, np.pi, np.pi],
+                    ]
+                else:
+                    command_input_limits[0][3:] = -np.pi
+                    command_input_limits[1][3:] = np.pi
+            if command_output_limits is not None:
+                if command_output_limits == "default":
+                    command_output_limits = [
+                        [-1.0, -1.0, -1.0, -np.pi, -np.pi, -np.pi],
+                        [1.0, 1.0, 1.0, np.pi, np.pi, np.pi],
+                    ]
+                else:
+                    command_output_limits[0][3:] = -np.pi
+                    command_output_limits[1][3:] = np.pi
 
         # Run super init
         super().__init__(
             control_freq=control_freq,
             control_limits=control_limits,
-            joint_idx=joint_idx,
+            dof_idx=dof_idx,
             command_input_limits=command_input_limits,
             command_output_limits=command_output_limits,
         )
@@ -132,42 +157,49 @@ class InverseKinematicsController(ManipulationController):
             self.control_filter.reset()
         self._quat_target = None
 
-    def dump_state(self):
-        """
-        :return Any: the state of the object other than what's not included in pybullet state.
-        """
-        dump = {"quat_target": self._quat_target if self._quat_target is None else self._quat_target.tolist()}
-        if self.control_filter is not None:
-            dump["control_filter"] = self.control_filter.dump_state()
-        return dump
+    @property
+    def state_size(self):
+        # Add 4 for internal quat target and the state size from the control filter
+        return super().state_size + 4 + self.control_filter.state_size
 
-    def load_state(self, dump):
-        """
-        Load the state of the object other than what's not included in pybullet state.
+    def _dump_state(self):
+        # Run super first
+        state = super()._dump_state()
 
-        :param dump: Any: the dumped state
-        """
-        self._quat_target = dump["quat_target"] if dump["quat_target"] is None else np.array(dump["quat_target"])
-        if self.control_filter is not None:
-            self.control_filter.load_state(dump["control_filter"])
+        # Add internal quaternion target and filter state
+        state["quat_target"] = self._quat_target
+        state["control_filter"] = self.control_filter.dump_state(serialized=False)
 
-    @staticmethod
-    def _pose_in_base_to_pose_in_world(pose_in_base, base_in_world):
-        """
-        Convert a pose in the base frame to a pose in the world frame.
+        return state
 
-        :param pose_in_base: Tuple[Array[float], Array[float]], Cartesian xyz position,
-            quaternion xyzw orientation tuple corresponding to the desired pose in its local base frame
-        :param base_in_world: Tuple[Array[float], Array[float]], Cartesian xyz position,
-            quaternion xyzw orientation tuple corresponding to the base pose in the global static frame
+    def _load_state(self, state):
+        # Run super first
+        super()._load_state(state=state)
 
-        :return Tuple[Array[float], Array[float]]: Cartesian xyz position,
-            quaternion xyzw orientation tuple corresponding to the desired pose in the global static frame
-        """
-        pose_in_base_mat = T.pose2mat(pose_in_base)
-        base_pose_in_world_mat = T.pose2mat(base_in_world)
-        pose_in_world_mat = T.pose_in_A_to_pose_in_B(pose_A=pose_in_base_mat, pose_A_in_B=base_pose_in_world_mat)
-        return T.mat2pose(pose_in_world_mat)
+        # Load relevant info for this controller
+        self._quat_target = state["quat_target"]
+        self.control_filter.load_state(state["control_filter"], serialized=False)
+
+    def _serialize(self, state):
+        # Run super first
+        state_flat = super()._serialize(state=state)
+
+        # Serialize state for this controller
+        return np.concatenate([
+            state_flat,
+            np.zeros(4) if state["quat_target"] is None else state["quat_target"],      # Encode None as zeros for consistent serialization size
+            self.control_filter.serialize(state=state["control_filter"]),
+        ])
+
+    def _deserialize(self, state):
+        # Run super first
+        state_dict, idx = super()._deserialize(state=state)
+
+        # Deserialize state for this controller
+        state_dict["quat_target"] = None if np.all(state[idx: idx + 4] == 0.0) else state[idx: idx + 4]
+        state_dict["control_filter"] = self.control_filter.deserialize(state=state[idx + 4: idx + 4 + self.control_filter.state_size])
+
+        return state_dict, idx + 4 + self.control_filter.state_size
 
     def _command_to_control(self, command, control_dict):
         """
@@ -220,59 +252,29 @@ class InverseKinematicsController(ManipulationController):
         if self.workspace_pose_limiter is not None:
             target_pos, target_quat = self.workspace_pose_limiter(target_pos, target_quat, control_dict)
 
-        # Convert to world frame
-        target_pos, target_quat = self._pose_in_base_to_pose_in_world(
-            pose_in_base=(target_pos, target_quat),
-            base_in_world=(np.array(control_dict["base_pos"]), np.array(control_dict["base_quat"])),
-        )
-
         # Calculate and return IK-backed out joint angles
-        joint_targets = self._calc_joint_angles_from_ik(target_pos=target_pos, target_quat=target_quat)
-
-        # Grab the resulting error and scale it by the velocity gain
-        u = -self.kv * (control_dict["joint_position"] - joint_targets)
-
-        # Return these commanded velocities, (only the relevant joint idx)
-        return u[self.joint_idx]
-
-    def _calc_joint_angles_from_ik(self, target_pos, target_quat):
-        """
-        Solves for joint angles given the ik target position and orientation
-
-        Note that this outputs joint angles for the entire pybullet robot body! It is the responsibility of the
-        associated Robot class to filter out the redundant / non-impact joints from the computation
-
-        Args:
-            target_pos (3-array): absolute (x, y, z) eef position command (in robot base frame)
-            target_quat (4-array): absolute (x, y, z, w) eef quaternion command (in robot base frame)
-
-        Returns:
-            n-array: corresponding joint positions to match the inputted targets
-        """
-        # Run IK
-        cmd_joint_pos = np.array(
-            p.calculateInverseKinematics(
-                bodyIndex=self.base_body_id,
-                endEffectorLinkIndex=self.task_link_id,
-                targetPosition=target_pos.tolist(),
-                targetOrientation=target_quat.tolist(),
-                lowerLimits=(self._control_limits[ControlType.POSITION][0] - self.joint_range_tolerance).tolist(),
-                upperLimits=(self._control_limits[ControlType.POSITION][1] + self.joint_range_tolerance).tolist(),
-                jointRanges=(
-                    self._control_limits[ControlType.POSITION][1]
-                    - self._control_limits[ControlType.POSITION][0]
-                    + 2 * self.joint_range_tolerance
-                ).tolist(),
-                restPoses=self.default_joint_pos.tolist(),
-                jointDamping=self.joint_damping.tolist(),
-            )
+        current_joint_pos = control_dict["joint_position"][self.dof_idx]
+        target_joint_pos = self.solver.solve(
+            target_pos=target_pos,
+            target_quat=target_quat,
+            initial_joint_pos=current_joint_pos,
         )
+
+        if target_joint_pos is None:
+            # Print warning that we couldn't find a valid solution, and return the current joint configuration
+            # instead so that we execute a no-op control
+            print(f"Could not find valid IK configuration! Returning no-op control instead.")
+            target_joint_pos = current_joint_pos
 
         # Optionally pass through smoothing filter for better stability
         if self.control_filter is not None:
-            cmd_joint_pos = self.control_filter.estimate(cmd_joint_pos)
+            target_joint_pos = self.control_filter.estimate(target_joint_pos)
 
-        return cmd_joint_pos
+        # Grab the resulting error and scale it by the velocity gain
+        u = -self.kv * (current_joint_pos - target_joint_pos)
+
+        # Return these commanded velocities (this only includes the relevant dof idx)
+        return u
 
     @property
     def control_type(self):

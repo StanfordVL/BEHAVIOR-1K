@@ -219,6 +219,11 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
             raise ValueError("Unknown default arm pose: {}".format(self.default_arm_pose))
         return pos
 
+    @property
+    def discrete_action_list(self):
+        # Not supported for this robot
+        raise NotImplementedError()
+
     def _create_discrete_action_space(self):
         # Fetch does not support discrete actions
         raise ValueError("Fetch does not support discrete actions!")
@@ -285,8 +290,7 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         # We use multi finger gripper, differential drive, and IK controllers as default
         controllers["base"] = "DifferentialDriveController"
         controllers["camera"] = "JointController"
-        # TODO: Revert to IK once implemented
-        controllers["arm_{}".format(self.default_arm)] = "JointController" #"InverseKinematicsController"
+        controllers["arm_{}".format(self.default_arm)] = "InverseKinematicsController"
         controllers["gripper_{}".format(self.default_arm)] = "MultiFingerGripperController"
 
         return controllers
@@ -296,20 +300,16 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         # Grab defaults from super method first
         cfg = super()._default_controller_config
 
-        # Use default IK controller -- also need to override joint idx being controlled to include trunk in default
-        # IK arm controller
-        cfg["arm_{}".format(self.default_arm)]["InverseKinematicsController"]["dof_idx"] = np.concatenate(
-            [self.trunk_control_idx, self.arm_control_idx[self.default_arm]]
-        )
+        # Need to override joint idx being controlled to include trunk in default arm controller configs
+        for arm_cfg in cfg[f"arm_{self.default_arm}"].values():
+            arm_cfg["dof_idx"] = np.concatenate([self.trunk_control_idx, self.arm_control_idx[self.default_arm]])
 
-        # If using rigid trunk, we also clamp its limits
-        if self.rigid_trunk:
-            cfg["arm_{}".format(self.default_arm)]["InverseKinematicsController"]["control_limits"]["position"][0][
-                self.trunk_control_idx
-            ] = self.untucked_default_joint_pos[self.trunk_control_idx]
-            cfg["arm_{}".format(self.default_arm)]["InverseKinematicsController"]["control_limits"]["position"][1][
-                self.trunk_control_idx
-            ] = self.untucked_default_joint_pos[self.trunk_control_idx]
+            # If using rigid trunk, we also clamp its limits
+            if self.rigid_trunk:
+                arm_cfg["control_limits"]["position"][0][self.trunk_control_idx] = \
+                    self.untucked_default_joint_pos[self.trunk_control_idx]
+                arm_cfg["control_limits"]["position"][1][self.trunk_control_idx] = \
+                    self.untucked_default_joint_pos[self.trunk_control_idx]
 
         return cfg
 
@@ -424,8 +424,16 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         return {self.default_arm: ["r_gripper_finger_joint", "l_gripper_finger_joint"]}
 
     @property
-    def model_file(self):
+    def usd_path(self):
         return os.path.join(igibson.assets_path, "models/fetch/fetch/fetch.usd")
+
+    @property
+    def robot_arm_descriptor_yamls(self):
+        return {self.default_arm: os.path.join(igibson.assets_path, "models/fetch/fetch_descriptor.yaml")}
+
+    @property
+    def urdf_path(self):
+        return os.path.join(igibson.assets_path, "models/fetch/fetch.urdf")
 
     def dump_config(self):
         cfg = super().dump_config()

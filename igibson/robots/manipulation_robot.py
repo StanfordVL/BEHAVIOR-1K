@@ -862,6 +862,14 @@ class ManipulationRobot(BaseRobot):
             joint.set_vel(vel=0.0, normalized=False, target=False)
 
     @property
+    def robot_arm_descriptor_yamls(self):
+        """
+        :return: Dict[str, str]: Dictionary mapping arm appendage name to files path to the descriptor
+            of the robot for IK Controller.
+        """
+        raise NotImplementedError
+
+    @property
     def _default_arm_joint_controller_configs(self):
         """
         :return: Dict[str, Any] Dictionary mapping arm appendage name to default controller config to control that
@@ -880,7 +888,6 @@ class ManipulationRobot(BaseRobot):
             }
         return dic
 
-    # TODO - update
     @property
     def _default_arm_ik_controller_configs(self):
         """
@@ -891,12 +898,12 @@ class ManipulationRobot(BaseRobot):
         for arm in self.arm_names:
             dic[arm] = {
                 "name": "InverseKinematicsController",
-                "base_body_id": None, #self.base_link.body_id,
-                "task_link_id": None, #self.eef_links[arm].link_id,
-                "task_name": "eef_{}".format(arm),
+                "task_name": f"eef_{arm}",
+                "robot_description_path": self.robot_arm_descriptor_yamls[arm],
+                "robot_urdf_path": self.urdf_path,
+                "eef_name": self.eef_link_names[arm],
                 "control_freq": self._control_freq,
                 "default_joint_pos": self.default_joint_pos,
-                "joint_damping": None, #self.joint_damping,
                 "control_limits": self.control_limits,
                 "dof_idx": self.arm_control_idx[arm],
                 "command_output_limits": (

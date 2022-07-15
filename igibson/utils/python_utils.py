@@ -91,9 +91,6 @@ class Recreatable(metaclass=RecreatableAbcMeta):
     the classes inheriting it.
     """
 
-    def __init__(self):
-        pass
-
     def get_init_info(self):
         """
         Grabs relevant initialization information for this class instance. Useful for directly

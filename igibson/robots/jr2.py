@@ -55,7 +55,7 @@ class JR2(ManipulationRobot, TwoWheelRobot):
             configurations for this robot. This will override any default values specified by this class.
         :param base_name: None or str, robot link name that will represent the entire robot's frame of reference. If not None,
             this should correspond to one of the link names found in this robot's corresponding URDF / MJCF file.
-            None defaults to the first link name used in @model_file
+            None defaults to the first link name used in @usd_path
         :param scale: int, scaling factor for model (default is 1)
         :param self_collision: bool, whether to enable self collision
         :param class_id: SemanticClass, semantic class this robot belongs to. Default is SemanticClass.ROBOTS.
@@ -218,5 +218,9 @@ class JR2(ManipulationRobot, TwoWheelRobot):
         return {self.default_arm: []}
 
     @property
-    def model_file(self):
+    def usd_path(self):
+        return os.path.join(igibson.assets_path, "models/jr2_urdf/jr2_kinova.urdf")
+
+    @property
+    def urdf_path(self):
         return os.path.join(igibson.assets_path, "models/jr2_urdf/jr2_kinova.urdf")

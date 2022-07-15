@@ -159,7 +159,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         return "BehaviorRobot"
 
     @property
-    def model_file(self):
+    def usd_path(self):
         raise ValueError("BehaviorRobot does not have a single model. It should be loaded using its custom loader.")
 
     def _load(self, simulator):
