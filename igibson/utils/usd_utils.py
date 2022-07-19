@@ -482,7 +482,7 @@ def update_shader_asset_paths(shader):
     # this prim and USD is being loaded on
     for inp in shader.GetInputs():
         if inp.GetTypeName().cppTypeName == "SdfAssetPath":
-            original_path = inp.Get().path
+            original_path = inp.Get().path if inp.Get().resolvedPath == "" else inp.Get().resolvedPath
             # Only update the path if it's not the same root path
             if ig_dataset_path not in original_path and assets_path not in original_path:
                 usd_metadata = get_usd_metadata()
@@ -493,5 +493,6 @@ def update_shader_asset_paths(shader):
                 elif source_ig_dataset_path in original_path:
                     new_path = f"{ig_dataset_path}{original_path.split(source_ig_dataset_path)[-1]}"
                 else:
+                    breakpoint()
                     raise ValueError(f"Could not find appropriate remapping for material asset path: {original_path}!")
                 inp.Set(new_path)
