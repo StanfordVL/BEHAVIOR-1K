@@ -332,6 +332,8 @@ class StatefulObject(BaseObject):
         """
         if emitter_type == EmitterType.FIRE:
             # Assume the heat_source_link is a direct child of the base_link
+            if "heat_source_link" not in self.links:
+                return
             heat_link = self.links["heat_source_link"]
             heat_link_pos = heat_link.get_local_pose()[0]
             # local position w.r.t to the base link frame
