@@ -84,10 +84,10 @@ def import_nested_objs_from_element(element):
             # Skip world link
             if name == "world":
                 pass
-            # Import building components in different way from default objects
-            elif category in {"ceilings", "walls", "floors"} and obj_info not in obj_infos:
-                import_building_urdf(obj_category=category, obj_model=model, skip_if_exist=False)
-                obj_infos.add(obj_info)
+            # # Import IG2 building components in different way from default objects
+            # elif from_ig2 and category in {"ceilings", "walls", "floors"} and obj_info not in obj_infos:
+            #     import_ig2_building_urdf(scene_id=model, category=category, skip_if_exist=False)
+            #     obj_infos.add(obj_info)
             elif obj_info not in obj_infos:
                 import_obj_urdf(obj_category=category, obj_model=model, skip_if_exist=False)
                 obj_infos.add(obj_info)
@@ -118,17 +118,19 @@ def import_obj_urdf(obj_category, obj_model, skip_if_exist=False):
         add_reference_to_stage(usd_path=usd_path, import_config=cfg)
 
 
-def import_building_urdf(obj_category, obj_model, skip_if_exist=False):
-    # For floors, ceilings, walls
+def import_ig2_building_urdf(scene_id, category, skip_if_exist=False):
+    # For floors, ceilings, walls from ig2
     # Import URDF
     cfg = create_import_config()
     # Check if filepath exists
-    usd_path = f"{ig_dataset_path}/scenes/{obj_model}/usd/{obj_category}/{obj_model}_{obj_category}.usd"
+    obj_category = f"{category}"
+    obj_model = f"{scene_id}"
+    usd_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}/usd/{obj_model}.usd"
     if not (skip_if_exist and exists(usd_path)):
-        urdf_path = f"{ig_dataset_path}/scenes/{obj_model}/urdf/{obj_model}_{obj_category}.urdf"
-        print(f"Converting collision meshes from {obj_category}, {obj_model}...")
+        urdf_path = f"{ig_dataset_path}/scenes/{scene_id}/urdf/{obj_model}.urdf"
+        print(f"Converting IG2 building collision meshes from {scene_id}, {category}...")
         urdf_path = split_objs_in_urdf(urdf_fpath=urdf_path, name_suffix="split", mesh_fpath_offset="..")
-        print(f"Importing {obj_category}, {obj_model}...")
+        print(f"Importing IG2 building {scene_id}, {category}...")
         # Only import if it doesn't exist
         omni.kit.commands.execute(
             "URDFParseAndImportFile",
