@@ -481,9 +481,11 @@ class MicroParticleSystem(BaseParticleSystem):
             cls.particle_prototypes = []
             cls.simulator.stage.DefinePrim(prototype_path, "Scope")
             for i, prototype_prim in enumerate(prototypes):
-                path_from = prototype_prim.GetPrimPath().pathString
-                path_to = f"{prototype_path}/{cls.name}ParticlePrototype{i}"
-                omni.kit.commands.execute("MovePrim", path_from=path_from, path_to=path_to)
+                # TODO: Omni no longer likes prototypes being created in nested locations. Where to place now?
+                # path_from = prototype_prim.GetPrimPath().pathString
+                # path_to = f"{prototype_path}/{cls.name}ParticlePrototype{i}"
+                # omni.kit.commands.execute("MovePrim", path_from=path_from, path_to=path_to)
+                path_to = prototype_prim.GetPrimPath().pathString
                 prototype_prim_new = get_prim_at_path(path_to)
                 UsdGeom.Imageable(prototype_prim_new).MakeInvisible()
                 cls.particle_prototypes.append(prototype_prim_new)
