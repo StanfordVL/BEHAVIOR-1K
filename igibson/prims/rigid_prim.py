@@ -23,10 +23,7 @@ from igibson.utils.types import DynamicState, CsRawData, GEOM_TYPES
 from igibson.utils.usd_utils import mesh_prim_to_trimesh_mesh
 
 # Import omni sensor based on type
-if m.IS_PUBLIC_ISAACSIM:
-    from omni.isaac.contact_sensor import _contact_sensor as _s
-else:
-    from omni.isaac.isaac_sensor import _isaac_sensor as _s
+from omni.isaac.isaac_sensor import _isaac_sensor as _s
 
 
 class RigidPrim(XFormPrim):
@@ -165,8 +162,7 @@ class RigidPrim(XFormPrim):
 
         # We grab contact info for the first time before setting our internal handle, because this changes the dc handle
         if self.contact_reporting_enabled:
-            self._cs.get_body_contact_raw_data(self._prim_path) if m.IS_PUBLIC_ISAACSIM else \
-                self._cs.get_rigid_body_raw_data(self._prim_path)
+            self._cs.get_rigid_body_raw_data(self._prim_path)
 
         # Grab handle to this rigid body and get name
         self.update_handles()
@@ -240,8 +236,7 @@ class RigidPrim(XFormPrim):
         #     "Cannot grab contacts for this rigid prim without Physx's contact report API being added!"
         contacts = []
         if self.contact_reporting_enabled:
-            raw_data = self._cs.get_body_contact_raw_data(self._prim_path) if m.IS_PUBLIC_ISAACSIM else \
-                self._cs.get_rigid_body_raw_data(self._prim_path)
+            raw_data = self._cs.get_rigid_body_raw_data(self._prim_path)
             for c in raw_data:
                 # contact sensor handles and dynamic articulation handles are not comparable
                 # every prim has a cs to convert (cs) handle to prim path (decode_body_name)

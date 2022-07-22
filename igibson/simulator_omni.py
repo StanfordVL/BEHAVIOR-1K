@@ -38,12 +38,7 @@ from igibson.objects.object_base import BaseObject
 from igibson.objects.stateful_object import StatefulObject
 from igibson.object_states.factory import get_states_by_dependency_order
 from igibson.transition_rules import DEFAULT_RULES, TransitionResults
-
-# Import viewport getter based on isaacsim version
-if m.IS_PUBLIC_ISAACSIM:
-    from omni.kit.viewport import get_viewport_interface as acquire_viewport_interface
-else:
-    from omni.kit.viewport_legacy import acquire_viewport_interface
+from omni.kit.viewport_legacy import acquire_viewport_interface
 
 
 class Simulator(SimulationContext):
@@ -209,15 +204,9 @@ class Simulator(SimulationContext):
         self._physics_context.set_gravity(value=-self.gravity)
         # Also make sure we invert the collision group filter settings so that different collision groups cannot
         # collide with each other, and modify settings for speed optimization
-
-        if m.IS_PUBLIC_ISAACSIM:
-            # Only have access to invert collision filter and CCD setting, no flatcache
-            self._physics_context._physx_scene_api.GetInvertCollisionGroupFilterAttr().Set(True)
-            self._physics_context._physx_scene_api.GetEnableCCDAttr().Set(m.ENABLE_CCD)
-        else:
-            self._physics_context.set_invert_collision_group_filter(True)
-            self._physics_context.enable_ccd(m.ENABLE_CCD)
-            self._physics_context.enable_flatcache(m.ENABLE_FLATCACHE)
+        self._physics_context.set_invert_collision_group_filter(True)
+        self._physics_context.enable_ccd(m.ENABLE_CCD)
+        self._physics_context.enable_flatcache(m.ENABLE_FLATCACHE)
 
         # Enable GPU dynamics based on whether we need omni particles feature
         if m.ENABLE_OMNI_PARTICLES:
@@ -915,7 +904,7 @@ class Simulator(SimulationContext):
         self._init_stage(
             physics_dt=self._initial_physics_dt,
             rendering_dt=self._initial_rendering_dt,
-            stage_units_in_meters=self._stage_units_in_meters if m.IS_PUBLIC_ISAACSIM else self._initial_stage_units_in_meters,
+            stage_units_in_meters=self._initial_stage_units_in_meters,
         )
         self._set_physics_engine_settings()
         self._setup_default_callback_fns()

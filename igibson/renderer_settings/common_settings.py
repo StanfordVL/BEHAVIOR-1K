@@ -1,9 +1,6 @@
 import carb
 import igibson.macros as m
-if m.IS_PUBLIC_ISAACSIM:
-    from omni.kit.settings import SettingType
-else:
-    from omni.kit.widget.settings import SettingType
+from omni.kit.widget.settings import SettingType
 
 from igibson.renderer_settings.settings_base import SettingItem, SettingsBase, SubSettingsBase
 
