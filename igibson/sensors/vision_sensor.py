@@ -19,10 +19,7 @@ from omni.isaac.core.utils.stage import get_current_stage
 from pxr import Gf, UsdGeom
 
 # Import viewport getter based on isaacsim version
-if m.IS_PUBLIC_ISAACSIM:
-    from omni.kit.viewport import get_viewport_interface as acquire_viewport_interface
-else:
-    from omni.kit.viewport_legacy import acquire_viewport_interface
+from omni.kit.viewport_legacy import acquire_viewport_interface
 
 # Make sure synthetic data extension is enabled
 ext_manager = app.app.get_extension_manager()
@@ -186,22 +183,10 @@ class VisionSensor(BaseSensor):
         is_initialized = False
         sensors = []
 
-        # Initialize differently based on what version of Isaac Sim we're using
-        if m.IS_PUBLIC_ISAACSIM:
-            while not is_initialized and time.time() < (start + timeout):
-                for name in names:
-                    sensors.append(sensors_util.create_or_retrieve_sensor(self._viewport, self._RAW_SENSOR_TYPES[name]))
-                app.update()
-                is_initialized = not any([not self._sd.is_sensor_initialized(s) for s in sensors])
-            if not is_initialized:
-                uninitialized = [s for s in sensors if not self._sd.is_sensor_initialized(s)]
-                raise TimeoutError(f"Unable to initialized sensors: [{uninitialized}] within {timeout} seconds.")
-
-        else:
-            for name in names:
-                sensors.append(sensors_util.create_or_retrieve_sensor(self._viewport, self._RAW_SENSOR_TYPES[name]))
-            app.update()
-
+        # Initialize sensors
+        for name in names:
+            sensors.append(sensors_util.create_or_retrieve_sensor(self._viewport, self._RAW_SENSOR_TYPES[name]))
+        app.update()
         app.update()  # Extra frame required to prevent access violation error
 
     def _get_obs(self):
