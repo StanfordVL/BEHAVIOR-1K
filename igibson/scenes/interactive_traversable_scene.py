@@ -384,35 +384,6 @@ class InteractiveTraversableScene(TraversableScene):
 
         return quality_check
 
-    def _set_first_n_objects(self, first_n_objects):
-        """
-        Only load the first N objects. Hidden API for debugging purposes.
-
-        :param first_n_objects: only load the first N objects (integer)
-        """
-        raise ValueError(
-            "The _set_first_n_object function is now deprecated due to "
-            "incompatibility with recent object state features. Please "
-            "use the load_object_categories method for limiting the "
-            "objects to be loaded from the scene."
-        )
-
-    def _set_obj_names_to_load(self, obj_name_list):
-        """
-        Only load in objects with the given string names. Hidden API as is only
-        used internally in the VR benchmark. This function automatically
-        adds walls, floors and ceilings to the room.
-
-        :param obj_name_list: list of string object names. These names must
-            all be in the scene URDF file.
-        """
-        raise ValueError(
-            "The _set_obj_names_to_load function is now deprecated due "
-            "to incompatibility with recent object state features. Please "
-            "use the load_object_categories method for limiting the "
-            "objects to be loaded from the scene."
-        )
-
     # TODO
     def open_one_obj(self, body_id, mode="random"):
         """
@@ -584,48 +555,45 @@ class InteractiveTraversableScene(TraversableScene):
         # Non-robot object
         else:
             usd_path = None
-            # Walls, floors, ceilings
-            if category in {"walls", "floors", "ceilings"}:
-                usd_path = f"{ig_dataset_path}/scenes/{model}/usd/{category}/{model}_{category}.usd"
 
-            # Other objects -- need to sanity check to make sure we want to load them
-            else:
-                # Do not load these object categories (can blacklist building structures as well)
-                not_blacklisted = self.not_load_object_categories is None or category not in self.not_load_object_categories
+            # Need to sanity check to make sure we want to load them
 
-                # Only load these object categories (no need to white list building structures)
-                whitelisted = self.load_object_categories is None or category in self.load_object_categories
+            # Do not load these object categories (can blacklist building structures as well)
+            not_blacklisted = self.not_load_object_categories is None or category not in self.not_load_object_categories
 
-                # This object is not located in one of the selected rooms, skip
-                valid_room = self.load_room_instances is None or len(set(self.load_room_instances) & set(in_rooms)) >= 0
+            # Only load these object categories (no need to white list building structures)
+            whitelisted = self.load_object_categories is None or category in self.load_object_categories
 
-                # We only load this model if all the above conditions are met
-                if not_blacklisted and whitelisted and valid_room:
+            # This object is not located in one of the selected rooms, skip
+            valid_room = self.load_room_instances is None or len(set(self.load_room_instances) & set(in_rooms)) >= 0
 
-                    # Make sure objects exist in the actual requested category
-                    category_path = get_ig_category_path(category)
-                    assert len(os.listdir(category_path)) != 0, "No models in category folder {}".format(category_path)
+            # We only load this model if all the above conditions are met
+            if not_blacklisted and whitelisted and valid_room:
 
-                    # Potentially grab random object
-                    if model == "random":
-                        if random_group is None:
-                            model = random.choice(os.listdir(category_path))
+                # Make sure objects exist in the actual requested category
+                category_path = get_ig_category_path(category)
+                assert len(os.listdir(category_path)) != 0, "No models in category folder {}".format(category_path)
+
+                # Potentially grab random object
+                if model == "random":
+                    if random_group is None:
+                        model = random.choice(os.listdir(category_path))
+                    else:
+                        # Using random group to assign the same model to a group of objects
+                        # E.g. we want to use the same model for a group of chairs around the same dining table
+                        # random_group is a unique integer within the category
+                        random_group_key = (category, random_group)
+
+                        if random_group_key in self.random_groups:
+                            model = self.random_groups[random_group_key]
                         else:
-                            # Using random group to assign the same model to a group of objects
-                            # E.g. we want to use the same model for a group of chairs around the same dining table
-                            # random_group is a unique integer within the category
-                            random_group_key = (category, random_group)
+                            # We create a new unique entry for this random group if it doesn't already exist
+                            model = random.choice(os.listdir(category_path))
+                            self.random_groups[random_group_key] = model
 
-                            if random_group_key in self.random_groups:
-                                model = self.random_groups[random_group_key]
-                            else:
-                                # We create a new unique entry for this random group if it doesn't already exist
-                                model = random.choice(os.listdir(category_path))
-                                self.random_groups[random_group_key] = model
-
-                    model_path = get_ig_model_path(category, model)
-                    # TODO: Remove "usd" in the middle when we simply have the model directory directly contain the USD
-                    usd_path = os.path.join(model_path, "usd", model + ".usd")
+                model_path = get_ig_model_path(category, model)
+                # TODO: Remove "usd" in the middle when we simply have the model directory directly contain the USD
+                usd_path = os.path.join(model_path, "usd", model + ".usd")
 
             # Only create the object if a valid usd_path is specified
             if usd_path is not None:
@@ -808,11 +776,7 @@ class InteractiveTraversableScene(TraversableScene):
             # Only process prims that are an Xform
             if prim.GetPrimTypeInfo().GetTypeName() == "Xform":
                 name = prim.GetName()
-
                 category = prim.GetAttribute("ig:category").Get()
-                # # Skip over the wall, floor, or ceilings (#TODO: Can we make this more elegant?)
-                # if category in {"walls", "floors", "ceilings"}:
-                #     continue
 
                 # Create the object and load it into the simulator
                 obj, info = self._create_obj_from_template_xform(simulator=simulator, prim=prim)
@@ -824,10 +788,9 @@ class InteractiveTraversableScene(TraversableScene):
                     simulator.import_object(obj, auto_initialize=False)
                     # If we have additional info specified, we also directly set it's bounding box position since this is a known quantity
                     # This is also the only time we'll be able to set fixed object poses
-                    if category not in {"walls", "floors", "ceilings"}:
-                        pos = info["bbox_center_pos"]
-                        ori = info["bbox_center_ori"]
-                        obj.set_bbox_center_position_orientation(pos, ori)
+                    pos = info["bbox_center_pos"]
+                    ori = info["bbox_center_ori"]
+                    obj.set_bbox_center_position_orientation(pos, ori)
 
     def _load_objects_from_scene_info(self, simulator):
         """
