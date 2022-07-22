@@ -1,4 +1,5 @@
 from igibson import ig_dataset_path
+import igibson.utils.transform_utils as T
 import xml.etree.ElementTree as ET
 import numpy as np
 import os
@@ -197,7 +198,12 @@ def update_obj_urdf_with_metalinks(obj_category, obj_model):
     with open(metadata_fpath, "r") as f:
         metadata = json.load(f)
 
-    # Pop meta inks
+
+    # Pop meta links
+    assert not ("links" in metadata and "meta_links" in metadata), \
+        "Only expected one of links and meta_links to be found in metadata, but found both!"
+
+    # OLD FORMAT
     if "links" in metadata:
         meta_links = metadata.pop("links")
         print("meta_links:", meta_links)
@@ -216,6 +222,28 @@ def update_obj_urdf_with_metalinks(obj_category, obj_model):
                 parent_link_name="base_link",
                 pos=pos,
                 rpy=rpy,
+            )
+    # NEW FORMAT
+    if "meta_links" in metadata:
+        meta_links = metadata.pop("meta_links")
+        print("meta_links:", meta_links)
+        for link_name, attrs in meta_links.items():
+            # TODO: Hardcoded for now
+            attrs = attrs["base_link"]["0"]
+            pos = attrs.get("position", None)
+            quat = attrs.get("orientation", None)
+            pos = [0, 0, 0] if pos is None else pos
+            quat = [0, 0, 0, 1.0] if quat is None else quat
+
+            # TODO: Don't hardcode parent to be base_link!
+
+            # Create metalink
+            create_metalink(
+                root_element=root,
+                metalink_name=link_name,
+                parent_link_name="base_link",
+                pos=pos,
+                rpy=T.quat2euler(quat),
             )
 
     # Grab all elements
