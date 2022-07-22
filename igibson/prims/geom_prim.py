@@ -348,4 +348,7 @@ class VisualGeomPrim(GeomPrim):
         if "material:binding" in self._prim.GetPropertyNames():
             for target in self._prim.GetProperty("material:binding").GetTargets():
                 shader = get_shader_from_material(prim=get_prim_at_path(target))
-                update_shader_asset_paths(shader=shader)
+                if shader is None:
+                    print(f"Warning: No shader found for prim {self._prim_path}! Not updating shader asset paths.")
+                else:
+                    update_shader_asset_paths(shader=shader)
