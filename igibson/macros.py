@@ -18,7 +18,10 @@ ENABLE_ROBOT_CONTACT_REPORTING = True
 
 # Whether to use omni's particles feature (e.g. for fluids) or not
 # This also dictates whether we need to use GPU dynamics or not
-ENABLE_OMNI_PARTICLES = False
+ENABLE_OMNI_PARTICLES = True
+
+# Whether to use high-fidelity rendering (this includes, e.g., isosurfaces)
+ENABLE_HQ_RENDERING = False
 
 # Whether to use omni's flatcache feature or not (can speed up simulation)
 ENABLE_FLATCACHE = False
