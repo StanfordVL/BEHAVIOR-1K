@@ -16,7 +16,7 @@ IMPORT_RENDER_CHANNELS = True
 
 if __name__ == "__main__":
     urdf = f"{ig_dataset_path}/scenes/{SCENE}/urdf/{SCENE}_best.urdf"
-    usd_out = f"{ig_dataset_path}/scenes/{SCENE}/urdf/{SCENE}_best_template.usd"
+    usd_out = f"{ig_dataset_path}/scenes/{SCENE}/usd/{SCENE}_best_template.usd"
 
     import_objects_from_scene_urdf(urdf=urdf)
     import_models_metadata_from_scene(urdf=urdf, import_render_channels=IMPORT_RENDER_CHANNELS)
