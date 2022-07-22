@@ -18,6 +18,10 @@ from copy import deepcopy
 from omni.isaac.core.utils.stage import open_stage, get_current_stage, close_stage
 from omni.isaac.core.prims.xform_prim import XFormPrim
 import igibson.utils.transform_utils as T
+import trimesh
+from igibson.utils.usd_utils import BoundingBoxAPI
+from collections import OrderedDict
+
 
 ##### SET THIS ######
 URDF = f"{ig_dataset_path}/scenes/Rs_int/urdf/Rs_int_best.urdf"
@@ -98,6 +102,16 @@ RENDERING_CHANNEL_MAPPINGS = {
     "emission": set_mtl_emission,
 }
 
+MTL_MAP_TYPE_MAPPINGS = {
+    "map_kd": "albedo",
+    "map_bump": "normal",
+    "map_pr": "roughness",
+    "map_pm": "metalness",
+    "map_tf": "opacity",
+    "map_ke": "emission",
+    "map_ks": "ao",
+}
+
 
 def string_to_array(string):
     """
@@ -141,15 +155,15 @@ def import_nested_models_metadata_from_element(element, model_pose_info, import_
             if name == "world":
                 # Skip this
                 pass
-            # Process ceiling, walls, floor separately
-            elif category in {"ceilings", "walls", "floors"} and obj_info not in obj_infos:
-                import_building_metadata(obj_category=category, obj_model=model, name=name, import_render_channels=import_render_channels)
-                obj_infos.add(obj_info)
+            # # Process ceiling, walls, floor separately
+            # elif category in {"ceilings", "walls", "floors"} and obj_info not in obj_infos:
+            #     import_building_metadata(obj_category=category, obj_model=model, name=name, import_render_channels=import_render_channels)
+            #     obj_infos.add(obj_info)
             elif obj_info not in obj_infos:
                 print(name)
-                bb = string_to_array(ele.get("bounding_box"))
-                pos = model_pose_info[name]["pos"]
-                quat = model_pose_info[name]["quat"]
+                # bb = string_to_array(ele.get("bounding_box"))
+                # pos = model_pose_info[name]["pos"]
+                # quat = model_pose_info[name]["quat"]
                 import_obj_metadata(obj_category=category, obj_model=model, import_render_channels=import_render_channels)
                 obj_infos.add(obj_info)
 
@@ -176,10 +190,33 @@ def rename_prim(prim, name):
     return get_prim_at_path(path_to)
 
 
-def import_rendering_channels(obj_prim, obj_category, model_root_path, usd_path):
+def get_visual_objs_from_urdf(urdf_path):
+    # Will return a dictionary mapping link name (e.g.: base_link) to dictionary of owned visual meshes mapping mesh
+    # name to visual obj file for that mesh
+    visual_objs = OrderedDict()
+    # Parse URDF
+    tree = ET.parse(urdf_path)
+    root = tree.getroot()
+    for ele in root:
+        if ele.tag == "link":
+            name = ele.get("name").replace("-", "_")
+            visual_objs[name] = OrderedDict()
+            for sub_ele in ele:
+                if sub_ele.tag == "visual":
+                    visual_mesh_name = sub_ele.get('name').replace("-", "_")
+                    obj_file = sub_ele.find(".//mesh").get("filename")
+                    if obj_file is None:
+                        print(f"Warning: No obj file found associated with {name}/{visual_mesh_name}!")
+                    visual_objs[name][visual_mesh_name] = obj_file
+
+    return visual_objs
+
+
+def import_rendering_channels(obj_prim, obj_category, obj_model, model_root_path, usd_path):
     usd_dir = "/".join(usd_path.split("/")[:-1])
-    mat_dir = f"{model_root_path}/material/{obj_category}" if \
-        obj_category in {"ceilings", "walls", "floors"} else f"{model_root_path}/material"
+    # mat_dir = f"{model_root_path}/material/{obj_category}" if \
+    #     obj_category in {"ceilings", "walls", "floors"} else f"{model_root_path}/material"
+    mat_dir = f"{model_root_path}/material"
     # Compile all material files we have
     mat_files = set(os.listdir(mat_dir))
 
@@ -199,95 +236,196 @@ def import_rendering_channels(obj_prim, obj_category, model_root_path, usd_path)
                 continue
             print(f"Removed material prim {subprim.GetPath()}:", stage.RemovePrim(subprim.GetPath()))
 
-    # Create new default material for this object.
-    mtl_created_list = []
-    omni.kit.commands.execute(
-        "CreateAndBindMdlMaterialFromLibrary",
-        mdl_name="OmniPBR.mdl",
-        mtl_name="OmniPBR",
-        mtl_created_list=mtl_created_list,
-    )
-    default_mat = get_prim_at_path(mtl_created_list[0])
-    default_mat = rename_prim(prim=default_mat, name=f"default_material")
-    print("Created default material:", default_mat.GetPath())
+    # # Create new default material for this object.
+    # mtl_created_list = []
+    # omni.kit.commands.execute(
+    #     "CreateAndBindMdlMaterialFromLibrary",
+    #     mdl_name="OmniPBR.mdl",
+    #     mtl_name="OmniPBR",
+    #     mtl_created_list=mtl_created_list,
+    # )
+    # default_mat = get_prim_at_path(mtl_created_list[0])
+    # default_mat = rename_prim(prim=default_mat, name=f"default_material")
+    # print("Created default material:", default_mat.GetPath())
+    #
+    # # We may delete this default material if it's never used
+    # default_mat_is_used = False
 
-    # Iterate over all children of the object prim, if /<obj_name>/<link_name>/visual exists, then we
-    # know <link_name> is a valid link, and we check explicitly for these material files in our set
-    # Note: we assume that the link name is included as a string within the mat_file!
-    for prim in obj_prim.GetChildren():
-        if prim.GetPrimTypeInfo().GetTypeName() == "Xform":
-            # This could be a link, check if it owns a visual subprim
-            link_name = prim.GetName()
-            visual_prim = get_prim_at_path(f"{prim.GetPrimPath().pathString}/visuals")
-            print(f"path: {prim.GetPrimPath().pathString}/visuals")
-            print(f"visual prim: {visual_prim}")
+    # Grab all visual objs for this object
+    urdf_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}/{obj_model}_split.urdf"
+    visual_objs = get_visual_objs_from_urdf(urdf_path)
 
-            if visual_prim:
-                # Aggregate all material files for this prim
-                link_mat_files = []
-                for mat_file in deepcopy(mat_files):
-                    if link_name in mat_file:
-                        # Add this mat file and remove it from the set
-                        link_mat_files.append(mat_file)
-                        mat_files.remove(mat_file)
-                # Potentially write material files for this prim if we have any valid materials
-                print("link_mat_files:", link_mat_files)
-                if not link_mat_files:
-                    # Bind default material to the visual prim
-                    shade = UsdShade.Material(default_mat)
-                    UsdShade.MaterialBindingAPI(visual_prim).Bind(shade, UsdShade.Tokens.strongerThanDescendants)
-                else:
-                    # Create new material for this link
-                    mtl_created_list = []
-                    omni.kit.commands.execute(
-                        "CreateAndBindMdlMaterialFromLibrary",
-                        mdl_name="OmniPBR.mdl",
-                        mtl_name="OmniPBR",
-                        mtl_created_list=mtl_created_list,
-                    )
-                    print(f"Created material for link {link_name}:", mtl_created_list[0])
-                    mat = get_prim_at_path(mtl_created_list[0])
+    # Extract absolute paths to mtl files for each link
+    link_mtl_files = OrderedDict()          # maps link name to dictionary mapping mesh name to mtl file
+    mtl_infos = OrderedDict()               # maps mtl name to dictionary mapping material channel name to png file
+    mat_files = OrderedDict()               # maps mtl name to corresponding list of material filenames
+    for link_name, link_meshes in visual_objs.items():
+        link_mtl_files[link_name] = OrderedDict()
+        for mesh_name, obj_file in link_meshes.items():
+            # Get absolute path and open the obj file
+            obj_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}/{obj_file}"
+            with open(obj_path, "r") as f:
+                mtls = []
+                for line in f.readlines():
+                    if "mtllib" in line and line[0] != "#":
+                        mtls.append(line.split("mtllib ")[-1].split("\n")[0])
+                assert len(mtls) == 1, f"Only one mtl is supported per obj file in omniverse -- found {len(mtls)}!"
+            mtl = mtls[0]
+            # TODO: Make name unique
+            mtl_name = mtl.split(".")[0].replace("-", "_")
+            link_mtl_files[link_name][mesh_name] = mtl_name
+            mtl_infos[mtl_name] = OrderedDict()
+            mat_files[mtl_name] = []
+            # Open the mtl file
+            mtl_path = f"{'/'.join(obj_path.split('/')[:-1])}/{mtl}"
+            with open(mtl_path, "r") as f:
+                # Read any lines beginning with map that aren't commented out
+                for line in f.readlines():
+                    if line[:4] == "map_":
+                        map_type, map_file = line.split(" ")
+                        map_filename = map_file.split("/")[-1].split("\n")[0]
+                        mat_files[mtl_name].append(map_filename)
+                        mtl_infos[mtl_name][MTL_MAP_TYPE_MAPPINGS[map_type.lower()]] = map_filename
 
-                    shade = UsdShade.Material(mat)
-                    # Bind the created link material to the visual prim
-                    UsdShade.MaterialBindingAPI(visual_prim).Bind(shade, UsdShade.Tokens.strongerThanDescendants)
+    # Next, for each material information, we create a new material and port the material files to the USD directory
+    mat_new_fpath = os.path.join(usd_dir, "materials")
+    shaders = OrderedDict()                 # maps mtl name to shader prim
+    for mtl_name, mtl_info in mtl_infos.items():
+        for mat_file in mat_files[mtl_name]:
+            shutil.copy(os.path.join(mat_dir, mat_file), mat_new_fpath)
 
-                    # Iterate over all material channels and write them to the material
-                    for link_mat_file in link_mat_files:
-                        # Copy this file into the materials folder
-                        mat_fpath = os.path.join(usd_dir, "materials")
-                        shutil.copy(os.path.join(mat_dir, link_mat_file), mat_fpath)
-                        # Check if any valid rendering channel
-                        mat_type = link_mat_file.split("_")[-1].split(".")[0].lower()
-                        # Apply the material if it exists
-                        render_channel_fcn = RENDERING_CHANNEL_MAPPINGS.get(mat_type, None)
-                        if render_channel_fcn is not None:
-                            render_channel_fcn(mat, os.path.join("materials", link_mat_file))
-                        else:
-                            # Warn user that we didn't find the correct rendering channel
-                            print(f"Warning: could not find rendering channel function for material: {mat_type}, skipping")
+        # Create the new material
+        mtl_created_list = []
+        omni.kit.commands.execute(
+            "CreateAndBindMdlMaterialFromLibrary",
+            mdl_name="OmniPBR.mdl",
+            mtl_name="OmniPBR",
+            mtl_created_list=mtl_created_list,
+        )
+        mat = get_prim_at_path(mtl_created_list[0])
 
-                    # Rename material
-                    mat = rename_prim(prim=mat, name=f"material_{link_name}")
+        # Apply all rendering channels for this material
+        for mat_type, mat_file in mtl_info.items():
+            render_channel_fcn = RENDERING_CHANNEL_MAPPINGS.get(mat_type, None)
+            if render_channel_fcn is not None:
+                render_channel_fcn(mat, os.path.join("materials", mat_file))
+            else:
+                # Warn user that we didn't find the correct rendering channel
+                print(f"Warning: could not find rendering channel function for material: {mat_type}, skipping")
 
-    # For any remaining materials, we write them to the default material
-    # default_mat = get_prim_at_path(f"{obj_prim.GetPrimPath().pathString}/Looks/material_material_0")
-    # default_mat = get_prim_at_path(f"{obj_prim.GetPrimPath().pathString}/Looks/material_default")
-    print(f"default mat: {default_mat}, obj: {obj_category}, {prim.GetPrimPath().pathString}")
-    for mat_file in mat_files:
-        # Copy this file into the materials folder
-        mat_fpath = os.path.join(usd_dir, "materials")
-        shutil.copy(os.path.join(mat_dir, mat_file), mat_fpath)
-        # Check if any valid rendering channel
-        mat_type = mat_file.split("_")[-1].split(".")[0].lower()
-        # Apply the material if it exists
-        render_channel_fcn = RENDERING_CHANNEL_MAPPINGS.get(mat_type, None)
-        if render_channel_fcn is not None:
-            render_channel_fcn(default_mat, os.path.join("materials", mat_file))
+        # Rename material
+        mat = rename_prim(prim=mat, name=mtl_name)
+        shade = UsdShade.Material(mat)
+        shaders[mtl_name] = shade
+        print(f"Created material {mtl_name}:", mtl_created_list[0])
+
+    # Bind each (visual) mesh to its appropriate material in the object
+    # We'll loop over each link, create a list of 2-tuples each consisting of (mesh_prim_path, mtl_name) to be bound
+    root_prim_path = obj_prim.GetPrimPath().pathString
+    for link_name, mesh_mtl_names in link_mtl_files.items():
+        # Special case -- omni always calls the visuals "visuals" by default if there's only a single visual mesh for the
+        # given
+        if len(mesh_mtl_names) == 1:
+            mesh_mtl_infos = [(f"{root_prim_path}/{link_name}/visuals", list(mesh_mtl_names.values())[0])]
         else:
-            # Warn user that we didn't find the correct rendering channel
-            print(f"Warning: could not find rendering channel function for material: {mat_type}")
+            mesh_mtl_infos = []
+            for mesh_name, mtl_name in mesh_mtl_names.items():
+                # Omni only accepts a-z, A-Z as valid start characters for prim names
+                # So we check if there is an invalid character, and modify it as we know Omni does
+                if not ord("a") <= ord(mesh_name[0]) <= ord("z") and not ord("A") <= ord(mesh_name[0]) <= ord("Z"):
+                    mesh_name = "a_" + mesh_name[1:]
+                mesh_mtl_infos.append((f"{root_prim_path}/{link_name}/visuals/{mesh_name}", mtl_name))
+        for mesh_prim_path, mtl_name in mesh_mtl_infos:
+            visual_prim = get_prim_at_path(mesh_prim_path)
+            assert visual_prim, f"Error: Did not find valid visual prim at {mesh_prim_path}!"
+            # Bind the created link material to the visual prim
+            print(f"Binding material {mtl_name}, shader {shaders[mtl_name]}, to prim {mesh_prim_path}...")
+            UsdShade.MaterialBindingAPI(visual_prim).Bind(shaders[mtl_name], UsdShade.Tokens.strongerThanDescendants)
 
+    # ###################################
+    #
+    # # Iterate over all children of the object prim, if /<obj_name>/<link_name>/visual exists, then we
+    # # know <link_name> is a valid link, and we check explicitly for these material files in our set
+    # # Note: we assume that the link name is included as a string within the mat_file!
+    # for prim in obj_prim.GetChildren():
+    #     if prim.GetPrimTypeInfo().GetTypeName() == "Xform":
+    #         # This could be a link, check if it owns a visual subprim
+    #         link_name = prim.GetName()
+    #         visual_prim = get_prim_at_path(f"{prim.GetPrimPath().pathString}/visuals")
+    #         print(f"path: {prim.GetPrimPath().pathString}/visuals")
+    #         print(f"visual prim: {visual_prim}")
+    #
+    #         if visual_prim:
+    #             # Aggregate all material files for this prim
+    #             link_mat_files = []
+    #             for mat_file in deepcopy(mat_files):
+    #                 if link_name in mat_file:
+    #                     # Add this mat file and remove it from the set
+    #                     link_mat_files.append(mat_file)
+    #                     mat_files.remove(mat_file)
+    #             # Potentially write material files for this prim if we have any valid materials
+    #             print("link_mat_files:", link_mat_files)
+    #             if not link_mat_files:
+    #                 # Bind default material to the visual prim
+    #                 shade = UsdShade.Material(default_mat)
+    #                 UsdShade.MaterialBindingAPI(visual_prim).Bind(shade, UsdShade.Tokens.strongerThanDescendants)
+    #                 default_mat_is_used = True
+    #             else:
+    #                 # Create new material for this link
+    #                 mtl_created_list = []
+    #                 omni.kit.commands.execute(
+    #                     "CreateAndBindMdlMaterialFromLibrary",
+    #                     mdl_name="OmniPBR.mdl",
+    #                     mtl_name="OmniPBR",
+    #                     mtl_created_list=mtl_created_list,
+    #                 )
+    #                 print(f"Created material for link {link_name}:", mtl_created_list[0])
+    #                 mat = get_prim_at_path(mtl_created_list[0])
+    #
+    #                 shade = UsdShade.Material(mat)
+    #                 # Bind the created link material to the visual prim
+    #                 UsdShade.MaterialBindingAPI(visual_prim).Bind(shade, UsdShade.Tokens.strongerThanDescendants)
+    #
+    #                 # Iterate over all material channels and write them to the material
+    #                 for link_mat_file in link_mat_files:
+    #                     # Copy this file into the materials folder
+    #                     mat_fpath = os.path.join(usd_dir, "materials")
+    #                     shutil.copy(os.path.join(mat_dir, link_mat_file), mat_fpath)
+    #                     # Check if any valid rendering channel
+    #                     mat_type = link_mat_file.split("_")[-1].split(".")[0].lower()
+    #                     # Apply the material if it exists
+    #                     render_channel_fcn = RENDERING_CHANNEL_MAPPINGS.get(mat_type, None)
+    #                     if render_channel_fcn is not None:
+    #                         render_channel_fcn(mat, os.path.join("materials", link_mat_file))
+    #                     else:
+    #                         # Warn user that we didn't find the correct rendering channel
+    #                         print(f"Warning: could not find rendering channel function for material: {mat_type}, skipping")
+    #
+    #                 # Rename material
+    #                 mat = rename_prim(prim=mat, name=f"material_{link_name}")
+    #
+    # # For any remaining materials, we write them to the default material
+    # # default_mat = get_prim_at_path(f"{obj_prim.GetPrimPath().pathString}/Looks/material_material_0")
+    # # default_mat = get_prim_at_path(f"{obj_prim.GetPrimPath().pathString}/Looks/material_default")
+    # print(f"default mat: {default_mat}, obj: {obj_category}, {prim.GetPrimPath().pathString}")
+    # for mat_file in mat_files:
+    #     # Copy this file into the materials folder
+    #     mat_fpath = os.path.join(usd_dir, "materials")
+    #     shutil.copy(os.path.join(mat_dir, mat_file), mat_fpath)
+    #     # Check if any valid rendering channel
+    #     mat_type = mat_file.split("_")[-1].split(".")[0].lower()
+    #     # Apply the material if it exists
+    #     render_channel_fcn = RENDERING_CHANNEL_MAPPINGS.get(mat_type, None)
+    #     if render_channel_fcn is not None:
+    #         render_channel_fcn(default_mat, os.path.join("materials", mat_file))
+    #         default_mat_is_used = True
+    #     else:
+    #         # Warn user that we didn't find the correct rendering channel
+    #         print(f"Warning: could not find rendering channel function for material: {mat_type}")
+    #
+    # # Possibly delete the default material prim if it was never used
+    # if not default_mat_is_used:
+    #     stage.RemovePrim(default_mat.GetPrimPath())
 
 def add_xform_properties(prim):
     properties_to_remove = [
@@ -349,6 +487,13 @@ def import_obj_metadata(obj_category, obj_model, import_render_channels=False):
             with open(data_path, "r") as f:
                 data[data_group] = json.load(f)
 
+    # If certain metadata doesn't exist, populate with some core info
+    if "base_link_offset" not in data["metadata"]:
+        data["metadata"]["base_link_offset"] = [0, 0, 0]
+    if "bbox_size" not in data["metadata"]:
+        low_bb, high_bb = BoundingBoxAPI.compute_aabb(prim.GetPrimPath().pathString)
+        data["metadata"]["bbox_size"] = (high_bb - low_bb).tolist()
+
     # Pop bb and base link offset and meta links info
     base_link_offset = data["metadata"].pop("base_link_offset")
     default_bb = data["metadata"].pop("bbox_size")
@@ -390,10 +535,10 @@ def import_obj_metadata(obj_category, obj_model, import_render_channels=False):
     lights = data["metadata"].get("meta_links", dict()).get("lights", None)
     if lights is not None:
         for link_name, light_infos in lights.items():
-            for i, light_info in enumerate(light_infos):
+            for light_name, light_info in light_infos.items():
                 # Create the light in the scene
                 light_type = LIGHT_MAPPING[light_info["type"]]
-                light_prim_path = f"/{obj_model}/{link_name}/light{i}"
+                light_prim_path = f"/{obj_model}/{link_name}/light{light_name}"
                 light_prim = UsdLux.__dict__[f"{light_type}Light"].Define(stage, light_prim_path).GetPrim()
                 UsdLux.ShapingAPI.Apply(light_prim).GetShapingConeAngleAttr().Set(180.0)
                 add_xform_properties(prim=light_prim)
@@ -456,7 +601,7 @@ def import_obj_metadata(obj_category, obj_model, import_render_channels=False):
     # print(f"looks children: {looks_prim.GetChildren()}")
     # print(f"mat prim: {mat_prim}")
     if import_render_channels:
-        import_rendering_channels(obj_prim=prim, obj_category=obj_category, model_root_path=model_root_path, usd_path=usd_path)
+        import_rendering_channels(obj_prim=prim, obj_category=obj_category, obj_model=obj_model, model_root_path=model_root_path, usd_path=usd_path)
 
     # Save stage
     stage.Save()
