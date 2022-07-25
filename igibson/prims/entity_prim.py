@@ -489,7 +489,6 @@ class EntityPrim(XFormPrim):
             target (bool): Whether the positions being set are target values or manual values to immediately set.
                 Default is False, corresponding to an instantaneous setting of the positions
         """
-        print(f"name: {self.name}, handle: {self._handle}, num dof: {self.n_dof}")
         # Run sanity checks -- make sure our handle is initialized and that we are articulated
         assert self._handle is not None, "handles are not initialized yet!"
         self.assert_articulated()
