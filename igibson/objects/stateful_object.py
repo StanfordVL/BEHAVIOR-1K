@@ -21,6 +21,7 @@ from igibson.object_states.factory import (
     get_texture_change_priority,
 )
 from igibson.object_states.object_state_base import REGISTERED_OBJECT_STATES, CachingEnabledObjectState
+from igibson.object_states.heat_source_or_sink import HeatSourceOrSink
 from igibson.objects.object_base import BaseObject
 from igibson.systems import get_system_from_element_name, get_element_name_from_system
 from igibson.renderer_settings.renderer_settings import RendererSettings
@@ -199,7 +200,7 @@ class StatefulObject(BaseObject):
         if len(set(self.states) & set(get_steam_states())) > 0:
             self._create_emitter_apis(EmitterType.STEAM)
 
-        if len(set(self.states) & set(get_fire_states())) > 0:
+        if len(set(self.states) & set(get_fire_states())) > 0 and self.states[HeatSourceOrSink].get_state_link_name() in self._links:
             self._create_emitter_apis(EmitterType.FIRE)
 
     def _create_texture_change_apis(self):
@@ -330,11 +331,9 @@ class StatefulObject(BaseObject):
         Args:
             emitter_type (EmitterType): Emitter to update
         """
-        if emitter_type == EmitterType.FIRE:
+        if emitter_type == EmitterType.FIRE and self.states[HeatSourceOrSink].get_state_link_name() in self._links:
             # Assume the heat_source_link is a direct child of the base_link
-            if "heat_source_link" not in self.links:
-                return
-            heat_link = self.links["heat_source_link"]
+            heat_link = self.links[self.states[HeatSourceOrSink].get_state_link_name()]
             heat_link_pos = heat_link.get_local_pose()[0]
             # local position w.r.t to the base link frame
             self._emitters[emitter_type].CreateAttribute("position", VT.Float3, False).Set(
