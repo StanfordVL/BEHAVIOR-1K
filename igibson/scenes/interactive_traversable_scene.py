@@ -185,7 +185,7 @@ class InteractiveTraversableScene(TraversableScene):
                 fname = usd_file
             else:
                 if not self.object_randomization:
-                    fname = "{}_best".format(self.scene_model)
+                    fname = "{}_best_template".format(self.scene_model)
                 else:
                     fname = self.scene_model if self.predefined_object_randomization_idx is None else \
                         "{}_random_{}".format(self.scene_model, self.predefined_object_randomization_idx)
@@ -735,13 +735,12 @@ class InteractiveTraversableScene(TraversableScene):
         self._world_prim = simulator.world_prim
 
         # Check if current stage is a template based on ig:isTemplate value, and set the value to False if it does not exist
-        is_template = False
-        # TODO: Need to set template to false by default after loading everything
         if "ig:isTemplate" in self._world_prim.GetPropertyNames():
             is_template = self._world_prim.GetAttribute("ig:isTemplate").Get()
         else:
             # Create the property
             self._world_prim.CreateAttribute("ig:isTemplate", VT.Bool)
+            is_template = True
 
         # Set this to be False -- we are no longer a template after we load
         self._world_prim.GetAttribute("ig:isTemplate").Set(False)
