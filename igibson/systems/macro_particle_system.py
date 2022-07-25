@@ -486,14 +486,15 @@ class VisualParticleSystem(MacroParticleSystem):
         return group
 
     @classmethod
-    def generate_group_particles(cls, group, n_particles=_N_PARTICLES_PER_GROUP, min_particles_for_success=1):
+    def generate_group_particles(cls, group, n_particles=None, min_particles_for_success=1):
         """
         Generates @n_particles new particle objects and samples their locations on the surface of object @obj. Note
         that if any objects are in the group already, they will be removed
 
         Args:
             group (str): Object on which to sample particle locations
-            n_particles (int): Number of particles to sample on the surface of @obj
+            n_particles (None or int): Number of particles to sample on the surface of @obj. If None, default number
+                will be used (cls._N_PARTICLES_PER_GROUP)
             min_particles_for_success (int): Minimum number of particles required to be sampled successfully in order
                 for this generation process to be considered successful
 
@@ -511,6 +512,7 @@ class VisualParticleSystem(MacroParticleSystem):
         obj = cls._group_objects[group]
 
         # Sample scales of the particles to generate
+        n_particles = cls._N_PARTICLES_PER_GROUP if n_particles is None else n_particles
         scales = np.random.uniform(cls.min_scale, cls.max_scale, (n_particles, 3))
         bbox_extents = [(cls.particle_object.aabb_extent * scale).tolist() for scale in scales]
 
@@ -815,7 +817,7 @@ class StainSystem(VisualParticleSystem):
         cls.particle_object = stain_object.links["base_link"].visual_meshes["visuals"]
 
     @classmethod
-    def generate_group_particles(cls, group, n_particles=_N_PARTICLES_PER_GROUP, min_particles_for_success=1):
+    def generate_group_particles(cls, group, n_particles=None, min_particles_for_success=1):
         # Make sure the group exists
         cls._validate_group(group=group)
 
