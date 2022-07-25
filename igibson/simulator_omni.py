@@ -21,7 +21,7 @@ from omni.isaac.core.utils.stage import clear_stage, save_stage, open_stage
 from omni.isaac.dynamic_control import _dynamic_control
 import omni.kit.loop._loop as omni_loop
 import builtins
-from pxr import Usd, UsdGeom, Sdf, UsdPhysics, PhysxSchema
+from pxr import Usd, Gf, UsdGeom, Sdf, UsdPhysics, PhysxSchema
 from omni.isaac.core.utils.viewports import set_camera_view
 from omni.isaac.core.loggers import DataLogger
 from typing import Optional, List
@@ -33,10 +33,12 @@ from igibson.utils.utils import NumpyEncoder
 from igibson.utils.python_utils import clear as clear_pu, create_object_from_init_info
 from igibson.utils.usd_utils import clear as clear_uu, BoundingBoxAPI, get_usd_metadata, update_usd_metadata
 from igibson.utils.assets_utils import get_ig_avg_category_specs
+from igibson.utils.camera_utils import CameraMover
 from igibson.scenes import Scene
 from igibson.objects.object_base import BaseObject
 from igibson.objects.stateful_object import StatefulObject
 from igibson.object_states.factory import get_states_by_dependency_order
+from igibson.sensors.vision_sensor import VisionSensor
 from igibson.transition_rules import DEFAULT_RULES, TransitionResults
 from omni.kit.viewport_legacy import acquire_viewport_interface
 
@@ -123,6 +125,7 @@ class Simulator(SimulationContext):
         # Store other references to variables that will be initialized later
         self._viewer = None
         self._viewer_camera = None
+        self._camera_mover = None
         self._scene = None
         self.particle_systems = []
         self.frame_count = 0
@@ -192,9 +195,34 @@ class Simulator(SimulationContext):
         Args:
             prim_path (str): Path to check for / create the viewer camera
         """
-        self._viewer_camera = get_prim_at_path(prim_path=prim_path) if is_prim_path_valid(prim_path=prim_path) else \
-            UsdGeom.Camera.Define(self.stage, "/World/viewer_camera").GetPrim()
-        self._viewer.set_active_camera(str(self._viewer_camera.GetPrimPath()))
+        vp = acquire_viewport_interface()
+        viewers_to_names = {vp.get_viewport_window(h): vp.get_viewport_window_name(h) for h in vp.get_instance_list()}
+        self._viewer_camera = VisionSensor(
+            prim_path=prim_path,
+            name=prim_path.split("/")[-1],                  # Assume name is the lowest-level name in the prim_path
+            modalities="rgb",
+            image_height=self.viewer_height,
+            image_width=self.viewer_width,
+            viewport_name=viewers_to_names[self._viewer],
+        )
+        if not self._viewer_camera.loaded:
+            self._viewer_camera.load(simulator=self)
+
+        # We update its clipping range so that it doesn't clip nearby objects (default min is 1 m)
+        self._viewer_camera.set_attribute("clippingRange", Gf.Vec2f(0.001, 10000000.0))
+
+        # In order for camera changes to propagate, we must toggle its visibility
+        self._viewer_camera.visible = False
+        # A single render step has to happen here before we toggle visibility for changes to propagate
+        self.render()
+        self._viewer_camera.visible = True
+
+        # Initialize the sensor
+        self._viewer_camera.initialize()
+
+        # Also need to potentially update our camera mover if it already exists
+        if self._camera_mover is not None:
+            self._camera_mover.set_cam(cam=self._viewer_camera)
 
     def _set_physics_engine_settings(self):
         """
@@ -233,6 +261,13 @@ class Simulator(SimulationContext):
         # Set viewer camera and frame size
         self._set_viewer_camera()
         self._viewer.set_texture_resolution(self.viewer_width, self.viewer_height)
+
+    def enable_viewer_camera_teleoperation(self):
+        """
+        Enables keyboard control of the active viewer camera for this simulation
+        """
+        self._camera_mover = CameraMover(cam=self._viewer_camera, sim=self)
+        self._camera_mover.print_info()
 
     def import_scene(self, scene):
         """
@@ -536,7 +571,19 @@ class Simulator(SimulationContext):
 
     @property
     def viewer(self):
+        """
+        Returns:
+            ViewportWindow: Active viewport window instance shown in the omni UI
+        """
         return self._viewer
+
+    @property
+    def viewer_camera(self):
+        """
+        Returns:
+            VisionSensor: Active camera sensor corresponding to the active viewport window instance shown in the omni UI
+        """
+        return self._viewer_camera
 
     @property
     def world_prim(self):
