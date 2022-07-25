@@ -493,6 +493,5 @@ def update_shader_asset_paths(shader):
                 elif source_ig_dataset_path in original_path:
                     new_path = f"{ig_dataset_path}{original_path.split(source_ig_dataset_path)[-1]}"
                 else:
-                    breakpoint()
                     raise ValueError(f"Could not find appropriate remapping for material asset path: {original_path}!")
                 inp.Set(new_path)
