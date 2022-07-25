@@ -6,6 +6,7 @@
 # distribution of this software and related documentation without an express
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 #
+import logging
 from abc import ABC, abstractmethod
 from pxr import Gf, Usd, UsdGeom, UsdShade
 from omni.isaac.core.utils.rotations import gf_quat_to_np_array
@@ -62,7 +63,7 @@ class BasePrim(Serializable, UniquelyNamed, Recreatable, ABC):
 
         # Run some post-loading steps if this prim has already been loaded
         if is_prim_path_valid(prim_path=self._prim_path):
-            print(f"prim {name} already exists")
+            logging.debug(f"prim {name} already exists, skipping load")
             self._prim = get_prim_at_path(prim_path=self._prim_path)
             self._loaded = True
             # Run post load.
