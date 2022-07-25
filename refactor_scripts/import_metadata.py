@@ -21,6 +21,7 @@ import igibson.utils.transform_utils as T
 import trimesh
 from igibson.utils.usd_utils import BoundingBoxAPI
 from collections import OrderedDict
+from pathlib import Path
 
 
 ##### SET THIS ######
@@ -203,8 +204,8 @@ def get_visual_objs_from_urdf(urdf_path):
             visual_objs[name] = OrderedDict()
             for sub_ele in ele:
                 if sub_ele.tag == "visual":
-                    visual_mesh_name = sub_ele.get('name').replace("-", "_")
-                    obj_file = sub_ele.find(".//mesh").get("filename")
+                    visual_mesh_name = sub_ele.get('name', "visuals").replace("-", "_")
+                    obj_file = None if sub_ele.find(".//mesh") is None else sub_ele.find(".//mesh").get("filename")
                     if obj_file is None:
                         print(f"Warning: No obj file found associated with {name}/{visual_mesh_name}!")
                     visual_objs[name][visual_mesh_name] = obj_file
@@ -214,13 +215,15 @@ def get_visual_objs_from_urdf(urdf_path):
 
 def import_rendering_channels(obj_prim, obj_category, obj_model, model_root_path, usd_path):
     usd_dir = "/".join(usd_path.split("/")[:-1])
-    # mat_dir = f"{model_root_path}/material/{obj_category}" if \
-    #     obj_category in {"ceilings", "walls", "floors"} else f"{model_root_path}/material"
-    mat_dir = f"{model_root_path}/material"
-    # Compile all material files we have
-    mat_files = set(os.listdir(mat_dir))
+    # # mat_dir = f"{model_root_path}/material/{obj_category}" if \
+    # #     obj_category in {"ceilings", "walls", "floors"} else f"{model_root_path}/material"
+    # mat_dir = f"{model_root_path}/material"
+    # # Compile all material files we have
+    # mat_files = set(os.listdir(mat_dir))
 
     # Remove the material prims as we will create them explictly later.
+    # TODO: Be a bit more smart about this. a material procedurally generated will lose its material without it having
+    # be regenerated
     stage = omni.usd.get_context().get_stage()
     for prim in obj_prim.GetChildren():
         looks_prim = None
@@ -259,40 +262,49 @@ def import_rendering_channels(obj_prim, obj_category, obj_model, model_root_path
     link_mtl_files = OrderedDict()          # maps link name to dictionary mapping mesh name to mtl file
     mtl_infos = OrderedDict()               # maps mtl name to dictionary mapping material channel name to png file
     mat_files = OrderedDict()               # maps mtl name to corresponding list of material filenames
+    mtl_old_dirs = OrderedDict()            # maps mtl name to corresponding directory where the mtl file exists
+    mat_old_paths = OrderedDict()           # maps mtl name to corresponding list of relative mat paths from mtl directory
     for link_name, link_meshes in visual_objs.items():
         link_mtl_files[link_name] = OrderedDict()
         for mesh_name, obj_file in link_meshes.items():
-            # Get absolute path and open the obj file
-            obj_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}/{obj_file}"
-            with open(obj_path, "r") as f:
-                mtls = []
-                for line in f.readlines():
-                    if "mtllib" in line and line[0] != "#":
-                        mtls.append(line.split("mtllib ")[-1].split("\n")[0])
-                assert len(mtls) == 1, f"Only one mtl is supported per obj file in omniverse -- found {len(mtls)}!"
-            mtl = mtls[0]
-            # TODO: Make name unique
-            mtl_name = mtl.split(".")[0].replace("-", "_")
-            link_mtl_files[link_name][mesh_name] = mtl_name
-            mtl_infos[mtl_name] = OrderedDict()
-            mat_files[mtl_name] = []
-            # Open the mtl file
-            mtl_path = f"{'/'.join(obj_path.split('/')[:-1])}/{mtl}"
-            with open(mtl_path, "r") as f:
-                # Read any lines beginning with map that aren't commented out
-                for line in f.readlines():
-                    if line[:4] == "map_":
-                        map_type, map_file = line.split(" ")
-                        map_filename = map_file.split("/")[-1].split("\n")[0]
-                        mat_files[mtl_name].append(map_filename)
-                        mtl_infos[mtl_name][MTL_MAP_TYPE_MAPPINGS[map_type.lower()]] = map_filename
+            # Get absolute path and open the obj file if it exists:
+            if obj_file is not None:
+                obj_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}/{obj_file}"
+                with open(obj_path, "r") as f:
+                    mtls = []
+                    for line in f.readlines():
+                        if "mtllib" in line and line[0] != "#":
+                            mtls.append(line.split("mtllib ")[-1].split("\n")[0])
+                    assert len(mtls) == 1, f"Only one mtl is supported per obj file in omniverse -- found {len(mtls)}!"
+                mtl = mtls[0]
+                # TODO: Make name unique
+                mtl_name = ".".join(os.path.basename(mtl).split(".")[:-1]).replace("-", "_").replace(".", "_")
+                mtl_old_dir = f"{'/'.join(obj_path.split('/')[:-1])}"
+                link_mtl_files[link_name][mesh_name] = mtl_name
+                mtl_infos[mtl_name] = OrderedDict()
+                mtl_old_dirs[mtl_name] = mtl_old_dir
+                mat_files[mtl_name] = []
+                mat_old_paths[mtl_name] = []
+                # Open the mtl file
+                mtl_path = f"{mtl_old_dir}/{mtl}"
+                with open(mtl_path, "r") as f:
+                    # Read any lines beginning with map that aren't commented out
+                    for line in f.readlines():
+                        if line[:4] == "map_":
+                            map_type, map_file = line.split(" ")
+                            map_file = map_file.split("\n")[0]
+                            map_filename = map_file.split("/")[-1]
+                            mat_files[mtl_name].append(map_filename)
+                            mat_old_paths[mtl_name].append(map_file)
+                            mtl_infos[mtl_name][MTL_MAP_TYPE_MAPPINGS[map_type.lower()]] = map_filename
 
     # Next, for each material information, we create a new material and port the material files to the USD directory
     mat_new_fpath = os.path.join(usd_dir, "materials")
+    Path(mat_new_fpath).mkdir(parents=True, exist_ok=True)
     shaders = OrderedDict()                 # maps mtl name to shader prim
     for mtl_name, mtl_info in mtl_infos.items():
-        for mat_file in mat_files[mtl_name]:
-            shutil.copy(os.path.join(mat_dir, mat_file), mat_new_fpath)
+        for mat_old_path in mat_old_paths[mtl_name]:
+            shutil.copy(os.path.join(mtl_old_dirs[mtl_name], mat_old_path), mat_new_fpath)
 
         # Create the new material
         mtl_created_list = []
