@@ -13,7 +13,6 @@ import numpy as np
 from pxr.Sdf import ValueTypeNames as VT
 from omni.isaac.core.utils.rotations import gf_quat_to_np_array
 
-from igibson import ig_dataset_path
 from igibson.objects.dataset_object import DatasetObject
 from igibson.scenes.traversable_scene import TraversableScene
 from igibson.maps.segmentation_map import SegmentationMap
@@ -26,10 +25,7 @@ from igibson.utils.assets_utils import (
     get_ig_scene_path,
 )
 from igibson.utils.python_utils import create_object_from_init_info
-from igibson.utils.utils import NumpyEncoder, rotate_vector_3d
-from igibson.utils.registry_utils import SerializableRegistry
 from igibson.utils.constants import JointType
-from igibson.utils.utils import NumpyEncoder, rotate_vector_3d
 
 SCENE_SOURCE_PATHS = {
     "IG": get_ig_scene_path,

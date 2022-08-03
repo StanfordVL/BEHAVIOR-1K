@@ -14,7 +14,7 @@ class EmptyScene(Scene):
 
     def __init__(
             self,
-            floor_plane_visible=False,
+            floor_plane_visible=True,
             floor_plane_color=(1.0, 1.0, 1.0),
     ):
         super(EmptyScene, self).__init__()
