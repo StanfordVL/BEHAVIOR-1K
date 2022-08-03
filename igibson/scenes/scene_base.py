@@ -24,7 +24,7 @@ import gc
 from igibson import app
 from igibson.utils.python_utils import classproperty, Serializable, Registerable, Recreatable
 from igibson.utils.registry_utils import SerializableRegistry
-from igibson.utils.utils import NumpyEncoder
+from igibson.utils.config_utils import NumpyEncoder
 from igibson.objects.object_base import BaseObject
 from igibson.objects.dataset_object import DatasetObject
 from igibson.systems import SYSTEMS_REGISTRY

@@ -13,7 +13,7 @@ from igibson.scenes.interactive_traversable_scene import InteractiveIndoorScene
 from igibson.simulator import Simulator
 from igibson.utils.assets_utils import get_ig_assets_version
 from igibson.utils.constants import AVAILABLE_MODALITIES, NamedRenderingPresets
-from igibson.utils.utils import parse_config
+from igibson.utils.config_utils import parse_config
 
 
 def benchmark_rendering(scene_list, rendering_presets_list, modality_list):

@@ -21,7 +21,7 @@ from igibson.robots.turtlebot import Turtlebot
 from igibson.scenes.gibson_indoor_scene import StaticIndoorScene
 from igibson.scenes.interactive_traversable_scene import InteractiveIndoorScene
 from igibson.simulator import Simulator
-from igibson.utils.utils import parse_config
+from igibson.utils.config_utils import parse_config
 
 interactive = True
 

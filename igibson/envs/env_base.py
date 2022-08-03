@@ -8,7 +8,7 @@ from igibson.scenes import REGISTERED_SCENES
 from igibson.simulator_omni import Simulator
 # from igibson.simulator_vr import SimulatorVR
 from igibson.utils.gym_utils import GymObservable
-from igibson.utils.utils import parse_config
+from igibson.utils.config_utils import parse_config
 from igibson.utils.python_utils import merge_nested_dicts, create_class_from_registry_and_config, Serializable, Recreatable
 
 
@@ -30,9 +30,9 @@ class BaseEnv(gym.Env, GymObservable, Serializable, Recreatable):
         device_idx=0,
     ):
         """
-        :param configs (str or list of str): config_file path(s). If multiple configs are specified, they will
-            be merged sequentially in the order specified. This allows procedural generation of a "full" config from
-            small sub-configs.
+        :param configs (str or dict or list of str or dict): config_file path(s) or raw config dictionaries.
+            If multiple configs are specified, they will be merged sequentially in the order specified.
+            This allows procedural generation of a "full" config from small sub-configs.
         :param scene_model: override scene_model in config file
         :param action_timestep: environment executes action per action_timestep second
         :param physics_timestep: physics timestep for pybullet
@@ -45,7 +45,7 @@ class BaseEnv(gym.Env, GymObservable, Serializable, Recreatable):
         super().__init__()
 
         # Convert config file(s) into a single parsed dict
-        configs = [configs] if isinstance(configs, str) else configs
+        configs = configs if isinstance(configs, list) or isinstance(configs, tuple) else [configs]
 
         # Initial default config
         self.config = self.default_config
@@ -345,8 +345,8 @@ class BaseEnv(gym.Env, GymObservable, Serializable, Recreatable):
 
             # Rendering kwargs
             "render": {
-                "viewer_width": 128,
-                "viewer_height": 128,
+                "viewer_width": 1280,
+                "viewer_height": 720,
                 "vertical_fov": 90,
                 # "optimized_renderer": True,
             },

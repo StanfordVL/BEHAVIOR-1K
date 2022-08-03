@@ -20,7 +20,7 @@ from igibson.render.mesh_renderer.mesh_renderer_settings import MeshRendererSett
 from igibson.robots.behavior_robot import BehaviorRobot
 from igibson.scenes.empty_scene import EmptyScene
 from igibson.simulator import Simulator
-from igibson.utils.utils import parse_config
+from igibson.utils.config_utils import parse_config
 
 
 def plan_base_motion_br(

@@ -42,9 +42,9 @@ class iGibsonEnv(BaseEnv):
         automatic_reset=False,
     ):
         """
-        :param configs (str or list of str): config_file path(s). If multiple configs are specified, they will
-            be merged sequentially in the order specified. This allows procedural generation of a "full" config from
-            small sub-configs.
+        :param configs (str or dict or list of str or dict): config_file path(s) or raw config dictionaries.
+            If multiple configs are specified, they will be merged sequentially in the order specified.
+            This allows procedural generation of a "full" config from small sub-configs.
         :param scene_model: override scene_id in config file
         :param action_timestep: environment executes action per action_timestep second
         :param physics_timestep: physics timestep for pybullet

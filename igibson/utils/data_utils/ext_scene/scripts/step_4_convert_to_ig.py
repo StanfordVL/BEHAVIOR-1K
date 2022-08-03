@@ -17,7 +17,7 @@ from igibson.utils.assets_utils import (
     get_ig_category_path,
     get_ig_scene_path,
 )
-from igibson.utils.utils import parse_config
+from igibson.utils.config_utils import parse_config
 
 """
 Script to update all urdfs

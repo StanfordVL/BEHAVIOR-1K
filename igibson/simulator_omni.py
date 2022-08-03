@@ -29,7 +29,7 @@ from typing import Optional, List
 from igibson import assets_path, ig_dataset_path
 import igibson.macros as m
 from igibson.robots.robot_base import BaseRobot
-from igibson.utils.utils import NumpyEncoder
+from igibson.utils.config_utils import NumpyEncoder
 from igibson.utils.python_utils import clear as clear_pu, create_object_from_init_info
 from igibson.utils.usd_utils import clear as clear_uu, BoundingBoxAPI, get_usd_metadata, update_usd_metadata
 from igibson.utils.assets_utils import get_ig_avg_category_specs

@@ -12,7 +12,7 @@ from igibson.robots.turtlebot import Turtlebot
 from igibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
 from igibson.simulator_omni import Simulator
 from igibson.utils.assets_utils import get_ig_assets_version
-from igibson.utils.utils import parse_config
+from igibson.utils.config_utils import parse_config
 
 
 # Params to be set as needed.

@@ -158,7 +158,7 @@ class KeyboardController:
                 else:
                     self.keypress_mapping[" "] = {"idx": info["start_idx"], "val": 1.0}
                     self.persistent_gripper_action = 1.0
-            elif info["name"] == "NullGripperController":
+            elif info["name"] == "NullJointController":
                 # We won't send actions if using a null gripper controller
                 self.keypress_mapping[" "] = {"idx": info["start_idx"], "val": None}
             else:

@@ -8,7 +8,7 @@ from IPython import embed
 
 import igibson
 from igibson.envs.igibson_env import iGibsonEnv
-from igibson.utils.utils import parse_config
+from igibson.utils.config_utils import parse_config
 
 
 def parse_args():

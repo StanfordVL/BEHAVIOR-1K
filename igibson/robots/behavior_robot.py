@@ -494,7 +494,7 @@ class BehaviorRobot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             {
                 "gripper_%s"
                 % arm: {
-                    "NullGripperController": self._default_gripper_null_controller_configs[arm],
+                    "NullJointController": self._default_gripper_null_controller_configs[arm],
                     "MultiFingerGripperController": self._default_gripper_multi_finger_controller_configs[arm],
                 }
                 for arm in self.arm_names

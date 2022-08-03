@@ -8,7 +8,7 @@ from igibson.render.mesh_renderer.mesh_renderer_settings import MeshRendererSett
 from igibson.scenes.empty_scene import EmptyScene
 from igibson.simulator import Simulator
 from igibson.utils.assets_utils import get_ig_model_path
-from igibson.utils.utils import parse_config
+from igibson.utils.config_utils import parse_config
 
 
 def main(random_selection=False, headless=False, short_exec=False):
