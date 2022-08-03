@@ -4,23 +4,17 @@ Example script demo'ing robot control.
 Options for random actions, as well as selection of robot action space
 """
 import logging
-import platform
 import random
 import sys
-import time
 from collections import OrderedDict
 
 import numpy as np
 
 import carb
 import omni
-from pxr import Gf
 
-from igibson import Simulator, app
-from igibson.robots import REGISTERED_ROBOTS, ManipulationRobot
-from igibson.scenes.empty_scene import EmptyScene
-from igibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
-from igibson.sensors.vision_sensor import VisionSensor
+import igibson as ig
+from igibson.robots import REGISTERED_ROBOTS
 
 CONTROL_MODES = OrderedDict(
     random="Use autonomous random actions (default)",
@@ -225,7 +219,7 @@ class KeyboardController:
                     self.gripper_direction[component] = 1.0
                     self.persistent_gripper_action[component] = 1.0
                     self.binary_grippers.append(component)
-            elif info["name"] == "NullGripperController":
+            elif info["name"] == "NullJointController":
                 # We won't send actions if using a null gripper controller
                 self.keypress_mapping[carb.input.KeyboardInput.T] = {"idx": None, "val": None}
             else:
@@ -262,8 +256,7 @@ class KeyboardController:
 
             elif event.input == carb.input.KeyboardInput.ESCAPE:
                 # Terminate immediately
-                app.close()
-                exit(0)
+                ig.shutdown()
 
             else:
                 # Handle all other actions and update accordingly
@@ -384,27 +377,37 @@ def main(random_selection=False, headless=False, short_exec=False):
     """
     logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
 
-    # Create an initial headless dummy scene so we can load the requested robot and extract useful info
-    sim = Simulator()
-    scene = EmptyScene()
-    sim.import_scene(scene)
+    # Choose scene to load
+    scene_model = choose_from_options(options=SCENES, name="scene", random_selection=random_selection)
 
-    # Get robot to create
+    # Choose robot to create
     robot_name = choose_from_options(
         options=list(sorted(REGISTERED_ROBOTS.keys())), name="robot", random_selection=random_selection
     )
-    robot = REGISTERED_ROBOTS[robot_name](
-        prim_path="/World/robot",
-        name="robot",
-        action_type="continuous",
-    )
-    sim.import_object(robot)
 
-    # Play and step simulator so that robot is fully initialized
-    sim.play()
-    sim.step()
+    # Create the config for generating the environment we want
+    scene_cfg = OrderedDict()
+    if scene_model == "empty":
+        scene_cfg["type"] = "EmptyScene"
+    else:
+        scene_cfg["type"] = "InteractiveTraversableScene"
+        scene_cfg["scene_model"] = scene_model
 
-    # Get controller choice
+    # Add the robot we want to load
+    robot0_cfg = OrderedDict()
+    robot0_cfg["type"] = robot_name
+    robot0_cfg["obs_modalities"] = ["rgb", "depth"]
+    robot0_cfg["action_type"] = "continuous"
+    robot0_cfg["action_normalize"] = True
+
+    # Compile config
+    cfg = OrderedDict(scene=scene_cfg, robots=[robot0_cfg])
+
+    # Create the environment
+    env = ig.iGibsonEnv(configs=cfg, action_timestep=1/60., physics_timestep=1/60.)
+
+    # Choose robot controller to use
+    robot = env.robots[0]
     controller_choices = choose_controllers(robot=robot, random_selection=random_selection)
 
     # Choose control mode
@@ -413,66 +416,21 @@ def main(random_selection=False, headless=False, short_exec=False):
     else:
         control_mode = choose_from_options(options=CONTROL_MODES, name="control mode")
 
-    # Choose scene to load
-    scene_id = choose_from_options(options=SCENES, name="scene", random_selection=random_selection)
+    # Update the control mode of the robot
+    controller_config = {component: {"name": name} for component, name in controller_choices.items()}
+    robot.reload_controllers(controller_config=controller_config)
 
-    # Clear simulator and reload actual desired robot configuration
-    sim.clear()
-
-    # Load scene
-    scene = EmptyScene(floor_plane_visible=True) if scene_id == "empty" else InteractiveTraversableScene(scene_id)
-    sim.import_scene(scene)
-
-    # Create a reference to the default viewer camera that already exists in the simulator
-    cam = VisionSensor(
-        prim_path="/World/viewer_camera",
-        name="camera",
-        modalities="rgb",
-        image_height=720,
-        image_width=1280,
-        viewport_name="Viewport",
-    )
-    # We update its clipping range so that it doesn't clip nearby objects (default min is 1 m)
-    cam.set_attribute("clippingRange", Gf.Vec2f(0.001, 10000000.0))
-    # In order for camera changes to propagate, we must toggle its visibility
-    cam.visible = False
-    # A single step has to happen here before we toggle visibility for changes to propagate
-    sim.step()
-    cam.visible = True
-    # Initialize the camera sensor and update its pose so it points towards the robot
-    cam.initialize()
-    sim.step()
-    cam.set_position_orientation(
-        position=np.array([4.32248, -5.74338, 6.85436]),
-        orientation=np.array([0.39592, 0.13485, 0.29286, 0.85982]),
+    # Update the viewer camera's pose so it points towards the robot
+    env.simulator.viewer_camera.set_position_orientation(
+        position=np.array([1.46949, -3.97358, 2.21529]),
+        orientation=np.array([0.56829048, 0.09569975, 0.13571846, 0.80589577]),
     )
 
-    # Load robot
-    robot = REGISTERED_ROBOTS[robot_name](
-        prim_path="/World/robot",
-        name="robot",
-        # visual_only=True,
-        action_type="continuous",
-        action_normalize=True,
-        controller_config={
-            component: {"name": controller_name} for component, controller_name in controller_choices.items()
-        },
-    )
-    sim.import_object(robot)
-
-    # Reset the robot
-    robot.set_position([0, 0, 0])
-
-    # Play and step simulator so that robot is fully initialized
-    sim.play()
-    sim.step()
-
-    # Reset robot and make sure it is not moving
-    robot.reset()
-    robot.keep_still()
+    # Reset environment
+    env.reset()
 
     # Create teleop controller
-    action_generator = KeyboardController(robot=robot, simulator=sim)
+    action_generator = KeyboardController(robot=robot, simulator=env.simulator)
 
     # Print out relevant keyboard info if using keyboard teleop
     if control_mode == "teleop":
@@ -486,16 +444,13 @@ def main(random_selection=False, headless=False, short_exec=False):
     max_steps = -1 if not short_exec else 100
     step = 0
     while step != max_steps:
-        action = (
-            action_generator.get_random_action() if control_mode == "random" else action_generator.get_teleop_action()
-        )
-        robot.apply_action(action)
+        action = action_generator.get_random_action() if control_mode == "random" else action_generator.get_teleop_action()
         for _ in range(10):
-            sim.step()
+            env.step(action=action)
             step += 1
 
-    # Always shut the simulation down cleanly at the end
-    app.close()
+    # Always shut igibson down cleanly at the end
+    ig.shutdown()
 
 
 if __name__ == "__main__":
