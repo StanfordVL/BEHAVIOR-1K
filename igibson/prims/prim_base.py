@@ -141,6 +141,8 @@ class BasePrim(Serializable, UniquelyNamed, Recreatable, ABC):
         # Remove prim
         if simulator:
             simulator.stage.RemovePrim(self.prim_path)
+            # Also clear the name so we can reuse this later
+            self.remove_names(include_all_owned=True, skip_ids={id(simulator)})
         else:
             get_current_stage().RemovePrim(self.prim_path)
 

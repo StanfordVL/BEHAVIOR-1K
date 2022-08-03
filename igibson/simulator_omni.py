@@ -355,7 +355,8 @@ class Simulator(SimulationContext):
         Args:
             obj (BaseObject): a non-robot object to load
         """
-        self._scene.remove_object(obj)
+        self._scene.remove_object(obj, simulator=self)
+        self.app.update()
 
     def _non_physics_step(self):
         """

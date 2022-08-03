@@ -350,15 +350,15 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
     #     """
     #     # Remove all object, robot, system info
 
-
-    def remove_object(self, obj):
+    def remove_object(self, obj, simulator):
         # Remove from the appropriate registry
         if isinstance(obj, BaseRobot):
             self.robot_registry.remove(obj)
         else:
             self.object_registry.remove(obj)
+
         # Remove from omni stage
-        obj.remove(self)
+        obj.remove(simulator=simulator)
 
     # TODO: Integrate good features of this
     #
