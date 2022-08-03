@@ -444,7 +444,6 @@ class XFormPrim(BasePrim):
             scale (float or np.ndarray): scale to be applied to the prim's dimensions. shape is (3, ).
                                           Defaults to None, which means left unchanged.
         """
-        print(f"setting scale: {scale}")
         scale = np.array(scale) if isinstance(scale, Iterable) else np.ones(3) * scale
         scale = Gf.Vec3d(*scale.tolist())
         properties = self.prim.GetPropertyNames()
