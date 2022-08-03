@@ -35,7 +35,7 @@ class VisionSensor(BaseSensor):
     """
     Vision sensor that handles a variety of modalities, including:
 
-        - RGB (normal, filled)
+        - RGB (normal)
         - Depth (normal, linear)
         - Normals
         - Segmentation (semantic, instance)
@@ -65,7 +65,6 @@ class VisionSensor(BaseSensor):
     """
     _SENSOR_HELPERS = OrderedDict(
         rgb=sensors_util.get_rgb,
-        rgb_filled=get_rgb_filled,
         depth=sensors_util.get_depth,
         depth_linear=sensors_util.get_depth_linear,
         normal=sensors_util.get_normals,
@@ -325,6 +324,29 @@ class VisionSensor(BaseSensor):
             app.update()
 
     @property
+    def clipping_range(self):
+        """
+        Returns:
+            2-tuple: [min, max] value of the sensor's clipping range, in meters
+        """
+        return np.array(self.get_attribute("clippingRange"))
+
+    @clipping_range.setter
+    def clipping_range(self, limits):
+        """
+        Sets the clipping range @limits for this sensor
+
+        Args:
+            limits (2-tuple): [min, max] value of the sensor's clipping range, in meters
+        """
+        self.set_attribute(attr="clippingRange", val=Gf.Vec2f(*limits))
+        # In order for sensor changes to propagate, we must toggle its visibility
+        self.visible = False
+        # A single update step has to happen here before we toggle visibility for changes to propagate
+        app.update()
+        self.visible = True
+
+    @property
     def _obs_space_mapping(self):
         # Make sure bbox obs aren't being used, since they are variable in size!
         for modality in {"bbox_2d_tight", "bbox_2d_loose", "bbox_3d", "camera", "pose"}:
@@ -336,7 +358,6 @@ class VisionSensor(BaseSensor):
         # (shape, low, high)
         obs_space_mapping = OrderedDict(
             rgb=((self.image_height, self.image_width, 4), 0, 255, np.uint8),
-            rgb_filled=((self.image_height, self.image_width, 3), 0, 255, np.uint8),
             depth=((self.image_height, self.image_width, 1), 0.0, 1.0, np.float32),
             depth_linear=((self.image_height, self.image_width, 1), 0.0, np.inf, np.float32),
             normal=((self.image_height, self.image_width, 3), -1.0, 1.0, np.float32),
