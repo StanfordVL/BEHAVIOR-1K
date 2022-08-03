@@ -119,6 +119,12 @@ app = OmniApp(
 )
 
 from igibson.simulator_omni import Simulator
+from igibson.envs.igibson_env import iGibsonEnv
+
+
+def shutdown():
+    app.close()
+    exit(0)
 
 
 # from omni.isaac.kit import SimulationApp

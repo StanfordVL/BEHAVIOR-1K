@@ -209,13 +209,7 @@ class Simulator(SimulationContext):
             self._viewer_camera.load(simulator=self)
 
         # We update its clipping range so that it doesn't clip nearby objects (default min is 1 m)
-        self._viewer_camera.set_attribute("clippingRange", Gf.Vec2f(0.001, 10000000.0))
-
-        # In order for camera changes to propagate, we must toggle its visibility
-        self._viewer_camera.visible = False
-        # A single render step has to happen here before we toggle visibility for changes to propagate
-        self.render()
-        self._viewer_camera.visible = True
+        self._viewer_camera.clipping_range = [0.001, 10000000.0]
 
         # Initialize the sensor
         self._viewer_camera.initialize()
@@ -615,25 +609,29 @@ class Simulator(SimulationContext):
     #     self._scene._finalize()
     #     return
 
+    def _clear_state(self):
+        """
+        Clears the internal state of this simulation
+        """
+        # Clear uniquely named items and other internal states
+        clear_pu()
+        clear_uu()
+
     def clear(self) -> None:
         """Clears the stage leaving the PhysicsScene only if under /World.
         """
         # Stop the physics
         self.stop()
 
-        # TODO: Handle edge-case for when we clear sim without loading new scene in. self._scene should be None
-        # but scene.load(sim) requires scene to be defined!
-
-        # Clear uniquely named items and other internal states
-        clear_pu()
-        clear_uu()
-
         # if self.scene is not None:
         #     self.scene.clear()
-        self._current_tasks = dict()
+        # self._current_tasks = dict()
         self._scene_finalized = False
         self._scene = None
         self._data_logger = DataLogger()
+
+        # TODO: Handle edge-case for when we clear sim without loading new scene in. self._scene should be None
+        # but scene.load(sim) requires scene to be defined!
 
         # def check_deletable_prim(prim_path):
         #     print(f"checking prim path: {prim_path}")
@@ -650,9 +648,9 @@ class Simulator(SimulationContext):
         #     return True
         #
         # clear_stage(predicate=check_deletable_prim)
-        self.load_stage(usd_path=f"{assets_path}/models/misc/clear_stage.usd")
 
-        return
+        # Load dummy stage, but don't clear sim to prevent circular loops
+        self.load_stage(usd_path=f"{assets_path}/models/misc/clear_stage.usd")
 
     # def reset(self) -> None:
     #     """ Resets the stage to its initial state and each object included in the Scene to its default state
@@ -761,7 +759,7 @@ class Simulator(SimulationContext):
             usd_path (str): Full path of USD file to load, which contains information
                 to recreate the current scene.
         """
-        # TODO: Make sure all objects hvae been intiailized
+        # TODO: Make sure all objects have been initialized
 
         if not self.scene:
             logging.warning("Scene has not been loaded. Nothing to save.")
@@ -935,6 +933,9 @@ class Simulator(SimulationContext):
         if not self.is_stopped():
             logging.warning("Stopping simulation in order to load stage.")
             self.stop()
+
+        # Clear simulation state
+        self._clear_state()
 
         open_stage(usd_path=usd_path)
 
