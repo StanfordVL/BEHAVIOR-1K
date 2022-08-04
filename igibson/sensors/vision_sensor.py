@@ -11,7 +11,6 @@ from igibson.sensors.sensor_base import BaseSensor
 from igibson.utils.constants import MAX_CLASS_COUNT, MAX_INSTANCE_COUNT
 from igibson.utils.python_utils import assert_valid_key, classproperty
 from igibson.utils.usd_utils import get_camera_params, get_semantic_objects_pose
-from igibson.utils.vision_utils import get_rgb_filled
 from igibson.utils.transform_utils import euler2quat, quat2euler
 
 import carb
@@ -51,7 +50,7 @@ class VisionSensor(BaseSensor):
         modalities (str or list of str): Modality(s) supported by this sensor. Default is "all", which corresponds
             to all modalities being used. Otherwise, valid options should be part of cls.all_modalities.
             For this vision sensor, this includes any of:
-                {rgb, rgb_filled, depth, depth_linear, normal, seg_semantic, seg_instance, flow, bbox_2d_tight,
+                {rgb, depth, depth_linear, normal, seg_semantic, seg_instance, flow, bbox_2d_tight,
                 bbox_2d_loose, bbox_3d, camera, pose}
         enabled (bool): Whether this sensor should be enabled by default
         noise (None or BaseSensorNoise): If specified, sensor noise model to apply to this sensor.

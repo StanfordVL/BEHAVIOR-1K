@@ -102,6 +102,7 @@ class KeyboardController:
         """
         # Store relevant info from robot
         self.simulator = simulator
+        self.robot = robot
         self.action_dim = robot.action_dim
         self.controller_info = OrderedDict()
         idx = 0
@@ -201,10 +202,10 @@ class KeyboardController:
                     self.joint_command_idx.append(cmd_idx)
                 self.joint_control_idx += info["dofs"].tolist()
             elif info["name"] == "DifferentialDriveController":
-                self.keypress_mapping[carb.input.KeyboardInput.I] = {"idx": info["start_idx"] + 0, "val": 0.2}
-                self.keypress_mapping[carb.input.KeyboardInput.K] = {"idx": info["start_idx"] + 0, "val": -0.2}
-                self.keypress_mapping[carb.input.KeyboardInput.L] = {"idx": info["start_idx"] + 1, "val": -0.1}
-                self.keypress_mapping[carb.input.KeyboardInput.J] = {"idx": info["start_idx"] + 1, "val": 0.1}
+                self.keypress_mapping[carb.input.KeyboardInput.I] = {"idx": info["start_idx"] + 0, "val": 0.4}
+                self.keypress_mapping[carb.input.KeyboardInput.K] = {"idx": info["start_idx"] + 0, "val": -0.4}
+                self.keypress_mapping[carb.input.KeyboardInput.L] = {"idx": info["start_idx"] + 1, "val": -0.2}
+                self.keypress_mapping[carb.input.KeyboardInput.J] = {"idx": info["start_idx"] + 1, "val": 0.2}
             elif info["name"] == "InverseKinematicsController":
                 self.ik_arms.append(component)
                 self.keypress_mapping.update(self.generate_ik_keypress_mapping(controller_info=info))
@@ -253,6 +254,10 @@ class KeyboardController:
                     if event.input == carb.input.KeyboardInput.KEY_5 \
                     else min(len(self.binary_grippers) - 1, self.active_gripper_idx + 1)
                 print(f"Now controlling gripper {self.binary_grippers[self.active_gripper_idx]} with binary toggling")
+
+            elif event.input == carb.input.KeyboardInput.R:
+                # Render the sensors from the robot's camera and lidar
+                self.robot.visualize_sensors()
 
             elif event.input == carb.input.KeyboardInput.ESCAPE:
                 # Terminate immediately
@@ -366,6 +371,9 @@ class KeyboardController:
         print_command("5, 6", "toggle between the different gripper(s) using binary control")
         print_command("t", "toggle gripper (open/close)")
         print()
+        print("Sensor Rendering")
+        print_command("r", "render the onboard sensors (RGB, Depth, Normals, Instance Segmentation, Occupancy Map")
+        print()
         print("*" * 30)
         print()
 
@@ -396,7 +404,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     # Add the robot we want to load
     robot0_cfg = OrderedDict()
     robot0_cfg["type"] = robot_name
-    robot0_cfg["obs_modalities"] = ["rgb", "depth"]
+    robot0_cfg["obs_modalities"] = ["rgb", "depth", "seg_instance", "normal", "scan", "occupancy_grid"]
     robot0_cfg["action_type"] = "continuous"
     robot0_cfg["action_normalize"] = True
 

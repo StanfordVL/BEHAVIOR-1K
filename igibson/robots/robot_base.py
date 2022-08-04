@@ -1,22 +1,17 @@
 import inspect
 import logging
-from abc import ABCMeta, abstractmethod
-from collections import OrderedDict
+from abc import abstractmethod
 from copy import deepcopy
-
-import gym
+from collections import OrderedDict
 import numpy as np
-
-from future.utils import with_metaclass
-
-from igibson.controllers import ControlType, create_controller
-# # from igibson.external.pybullet_tools.utils import get_joint_info
+import matplotlib.pyplot as plt
 import igibson.macros as m
-from igibson.sensors import create_sensor, SENSOR_PRIMS_TO_SENSOR_CLS, ALL_SENSOR_MODALITIES
+from igibson.sensors import create_sensor, SENSOR_PRIMS_TO_SENSOR_CLS, ALL_SENSOR_MODALITIES, VisionSensor, ScanSensor
 from igibson.objects.usd_object import USDObject
 from igibson.objects.controllable_object import ControllableObject
 from igibson.utils.gym_utils import GymObservable
 from igibson.utils.python_utils import Registerable, classproperty
+from igibson.utils.vision_utils import segmentation_to_rgb
 from igibson.utils.utils import rotate_vector_3d
 from pxr import PhysxSchema
 
@@ -333,6 +328,71 @@ class BaseRobot(USDObject, ControllableObject, GymObservable, Registerable):
         for sensor in self._sensors.values():
             if modality in sensor.all_modalities:
                 sensor.remove_modality(modality=modality)
+
+    def visualize_sensors(self):
+        """
+        Renders this robot's key sensors, visualizing them via matplotlib plots
+        """
+        frames = OrderedDict()
+        remaining_obs_modalities = deepcopy(self.obs_modalities)
+        for sensor in self.sensors.values():
+            obs = sensor.get_obs()
+            sensor_frames = []
+            if isinstance(sensor, VisionSensor):
+                # We check for rgb, depth, normal, seg_instance
+                for modality in ["rgb", "depth", "normal", "seg_instance"]:
+                    if modality in sensor.modalities:
+                        ob = obs[modality]
+                        if modality == "rgb":
+                            # Ignore alpha channel, map to floats
+                            ob = ob[:, :, :3] / 255.0
+                        elif modality == "seg_instance":
+                            # Map IDs to rgb
+                            ob = segmentation_to_rgb(ob, N=256) / 255.0
+                        elif modality == "normal":
+                            # Re-map to 0 - 1 range
+                            ob = (ob + 1.0) / 2.0
+                        else:
+                            # Depth, nothing to do here
+                            pass
+                        # Add this observation to our frames and remove the modality
+                        sensor_frames.append((modality, ob))
+                        remaining_obs_modalities -= {modality}
+                    else:
+                        # Warn user that we didn't find this modality
+                        print(f"Modality {modality} is not active in sensor {sensor.name}, skipping...")
+            elif isinstance(sensor, ScanSensor):
+                # We check for occupancy_grid
+                occupancy_grid = obs.get("occupancy_grid", None)
+                if occupancy_grid is not None:
+                    sensor_frames.append(("occupancy_grid", occupancy_grid))
+                    remaining_obs_modalities -= {"occupancy_grid"}
+
+            # Map the sensor name to the frames for that sensor
+            frames[sensor.name] = sensor_frames
+
+        # Warn user that any remaining modalities are not able to be visualized
+        if len(remaining_obs_modalities) > 0:
+            print(f"Modalities: {remaining_obs_modalities} cannot be visualized, skipping...")
+
+        # Write all the frames to a plot
+        for sensor_name, sensor_frames in frames.items():
+            n_sensor_frames = len(sensor_frames)
+            if n_sensor_frames > 0:
+                fig, axes = plt.subplots(nrows=1, ncols=n_sensor_frames)
+                if n_sensor_frames == 1:
+                    axes = [axes]
+                # Dump frames and set each subtitle
+                for i, (modality, frame) in enumerate(sensor_frames):
+                    axes[i].imshow(frame)
+                    axes[i].set_title(modality)
+                    axes[i].set_axis_off()
+                # Set title
+                fig.suptitle(sensor_name)
+                plt.show(block=False)
+
+        # One final plot show so all the figures get rendered
+        plt.show()
 
     @property
     def sensors(self):
