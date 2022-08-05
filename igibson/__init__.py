@@ -118,15 +118,16 @@ app = OmniApp(
     debug=m.DEBUG,
 )
 
+# Next import must be simulator
 from igibson.simulator_omni import Simulator
-from igibson.envs.igibson_env import iGibsonEnv
 
+# Create simulator (this is a singleton so it's okay that it's global)
+sim = Simulator()
 
+# Import any remaining items we want to access directly from the main igibson import
+from igibson.envs import Environment
+
+# Define convenience function for shutting down iGibson cleanly
 def shutdown():
     app.close()
     exit(0)
-
-
-# from omni.isaac.kit import SimulationApp
-# app = SimulationApp({"headless": False})
-# from omni.isaac.core import World as Simulator

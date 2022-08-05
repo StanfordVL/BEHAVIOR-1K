@@ -43,6 +43,11 @@ from igibson.transition_rules import DEFAULT_RULES, TransitionResults
 from omni.kit.viewport_legacy import acquire_viewport_interface
 
 
+# Define some global defaults
+DEFAULT_VIEWER_WIDTH = 1280
+DEFAULT_VIEWER_HEIGHT = 720
+
+
 class Simulator(SimulationContext):
     """ This class inherits from SimulationContext which provides the following.
 
@@ -78,7 +83,7 @@ class Simulator(SimulationContext):
             :param viewer_width: width of the camera image
             :param viewer_height: height of the camera image
             :param vertical_fov: vertical field of view of the camera image in degrees
-            :param device_idx: GPU device index to run rendering on
+            :param device: None or str, specifies the device to be used if running on the gpu with torch backend
             apply_transitions (bool): True to apply the transition rules.
         """
 
@@ -90,16 +95,17 @@ class Simulator(SimulationContext):
             physics_dt: float = 1.0 / 60.0,
             rendering_dt: float = 1.0 / 60.0,
             stage_units_in_meters: float = 1.0,
-            viewer_width=1280,
-            viewer_height=720,
+            viewer_width=DEFAULT_VIEWER_WIDTH,
+            viewer_height=DEFAULT_VIEWER_HEIGHT,
             vertical_fov=90,
-            device_idx=0,
+            device=None,
             apply_transitions=False,
     ) -> None:
         super().__init__(
             physics_dt=physics_dt,
             rendering_dt=rendering_dt,
             stage_units_in_meters=stage_units_in_meters,
+            device=device,
         )
         if Simulator._world_initialized:
             return
@@ -117,10 +123,7 @@ class Simulator(SimulationContext):
         assert n_physics_timesteps_per_render.is_integer(), "render_timestep must be a multiple of physics_timestep"
         self.n_physics_timesteps_per_render = int(n_physics_timesteps_per_render)
         self.gravity = gravity
-        self.viewer_width = viewer_width
-        self.viewer_height = viewer_height
         self.vertical_fov = vertical_fov        # TODO: This currently does nothing
-        self.device_idx = device_idx            # TODO: This currently does nothing
 
         # Store other references to variables that will be initialized later
         self._viewer = None
@@ -136,6 +139,8 @@ class Simulator(SimulationContext):
         # self._set_physics_engine_settings()
         # TODO: Make this toggleable so we don't always have a viewer if we don't want to
         self._set_viewer_settings()
+        self.viewer_width = viewer_width
+        self.viewer_height = viewer_height
 
         # List of objects that need to be initialized during whenever the next sim step occurs
         self._objects_to_initialize = []
@@ -164,9 +169,9 @@ class Simulator(SimulationContext):
         gravity=9.81,
         physics_dt: float = 1.0 / 60.0,
         rendering_dt: float = 1.0 / 60.0,
-        stage_units_in_meters: float = 0.01,
-        viewer_width=1280,
-        viewer_height=720,
+        stage_units_in_meters: float = 1.0,
+        viewer_width=DEFAULT_VIEWER_WIDTH,
+        viewer_height=DEFAULT_VIEWER_HEIGHT,
         vertical_fov=90,
         device_idx=0,
         apply_transitions=False,
@@ -243,6 +248,44 @@ class Simulator(SimulationContext):
         self._physics_context.set_gpu_found_lost_pairs_capacity(m.GPU_PAIRS_CAPACITY)
         self._physics_context.set_gpu_total_aggregate_pairs_capacity(m.GPU_PAIRS_CAPACITY)
 
+    @property
+    def viewer_height(self):
+        """
+        Returns:
+            int: viewer height of this sensor, in pixels
+        """
+        # If the viewer camera hasn't been created yet, utilize the default width
+        return DEFAULT_VIEWER_HEIGHT if self._viewer_camera is None else self._viewer_camera.viewer_height
+
+    @viewer_height.setter
+    def viewer_height(self, height):
+        """
+        Sets the viewer height @height for this sensor
+
+        Args:
+            height (int): viewer height, in pixels
+        """
+        self._viewer_camera.viewer_height = height
+
+    @property
+    def viewer_width(self):
+        """
+        Returns:
+            int: viewer width of this sensor, in pixels
+        """
+        # If the viewer camera hasn't been created yet, utilize the default height
+        return DEFAULT_VIEWER_WIDTH if self._viewer_camera is None else self._viewer_camera.viewer_width
+
+    @viewer_width.setter
+    def viewer_width(self, width):
+        """
+        Sets the viewer width @width for this sensor
+
+        Args:
+            width (int): viewer width, in pixels
+        """
+        self._viewer_camera.viewer_width = width
+
     def _set_viewer_settings(self):
         """
         Initializes a reference to the viewer in the App, and sets the frame size
@@ -254,7 +297,6 @@ class Simulator(SimulationContext):
 
         # Set viewer camera and frame size
         self._set_viewer_camera()
-        self._viewer.set_texture_resolution(self.viewer_width, self.viewer_height)
 
     def enable_viewer_camera_teleoperation(self):
         """
@@ -969,3 +1011,24 @@ class Simulator(SimulationContext):
         Shuts down the iGibson application
         """
         self._app.close()
+
+    @property
+    def device(self) -> str:
+        """
+        Returns:
+            device (None or str): Device used in simulation backend
+        """
+        return self._device
+
+    @device.setter
+    def device(self, device):
+        """
+        Sets the device used for sim backend
+
+        Args:
+            device (None or str): Device to set for the simulation backend
+        """
+        self._device = device
+        if self._device is not None and "cuda" in self._device:
+            device_id = self._settings.get_as_int("/physics/cudaDevice")
+            self._device = f"cuda:{device_id}"
