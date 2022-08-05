@@ -96,12 +96,11 @@ class KeyboardController:
     Simple class for controlling iGibson robots using keyboard commands
     """
 
-    def __init__(self, robot, simulator):
+    def __init__(self, robot):
         """
         :param robot: BaseRobot, robot to control
         """
         # Store relevant info from robot
-        self.simulator = simulator
         self.robot = robot
         self.action_dim = robot.action_dim
         self.controller_info = OrderedDict()
@@ -412,7 +411,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     cfg = OrderedDict(scene=scene_cfg, robots=[robot0_cfg])
 
     # Create the environment
-    env = ig.iGibsonEnv(configs=cfg, action_timestep=1/60., physics_timestep=1/60.)
+    env = ig.Environment(configs=cfg, action_timestep=1/60., physics_timestep=1/60.)
 
     # Choose robot controller to use
     robot = env.robots[0]
@@ -428,8 +427,8 @@ def main(random_selection=False, headless=False, short_exec=False):
     controller_config = {component: {"name": name} for component, name in controller_choices.items()}
     robot.reload_controllers(controller_config=controller_config)
 
-    # Update the viewer camera's pose so it points towards the robot
-    env.simulator.viewer_camera.set_position_orientation(
+    # Update the simulator's viewer camera's pose so it points towards the robot
+    ig.sim.viewer_camera.set_position_orientation(
         position=np.array([1.46949, -3.97358, 2.21529]),
         orientation=np.array([0.56829048, 0.09569975, 0.13571846, 0.80589577]),
     )
@@ -438,7 +437,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     env.reset()
 
     # Create teleop controller
-    action_generator = KeyboardController(robot=robot, simulator=env.simulator)
+    action_generator = KeyboardController(robot=robot)
 
     # Print out relevant keyboard info if using keyboard teleop
     if control_mode == "teleop":
