@@ -20,7 +20,8 @@ from bddl.condition_evaluation import Negation
 from bddl.logic_base import AtomicFormula
 from bddl.object_taxonomy import ObjectTaxonomy
 
-import igibson
+import igibson as ig
+from igibson import sim
 from igibson.object_states.on_floor import RoomFloor
 from igibson.objects.dataset_object import DatasetObject
 from igibson.objects.multi_object_wrappers import ObjectGrouper, ObjectMultiplexer
@@ -172,7 +173,7 @@ class BehaviorTask(BaseTask):
         assert success, f"Failed to initialize Behavior Activity. Feedback:\n{self.feedback}"
 
         # Get the name of the scene
-        self.scene_model = env.simulator.scene.scene_model
+        self.scene_model = sim.scene.scene_model
 
         # Highlight any task relevant objects if requested
         if self.highlight_task_relevant_objs:
@@ -289,9 +290,9 @@ class BehaviorTask(BaseTask):
                     return "You have assigned room type for [{}], but [{}] is sampleable. Only non-sampleable objects can have room assignment.".format(
                         obj_cat, obj_cat
                     )
-                if room_type not in env.simulator.scene.room_sem_name_to_ins_name:
+                if room_type not in sim.scene.room_sem_name_to_ins_name:
                     # Missing room type
-                    return "Room type [{}] missing in scene [{}].".format(room_type, env.simulator.scene.scene_id)
+                    return "Room type [{}] missing in scene [{}].".format(room_type, sim.scene.scene_id)
                 if room_type not in self.room_type_to_object_instance:
                     self.room_type_to_object_instance[room_type] = []
                 self.room_type_to_object_instance[room_type].append(obj_inst)
@@ -368,7 +369,7 @@ class BehaviorTask(BaseTask):
                 if obj_cat == "stove.n.01":
                     categories += self.object_taxonomy.get_subtree_igibson_categories("burner.n.02")
 
-                for room_inst in env.simulator.scene.room_sem_name_to_ins_name[room_type]:
+                for room_inst in sim.scene.room_sem_name_to_ins_name[room_type]:
                     if obj_cat == FLOOR_SYNSET:
                         # TODO: remove after split floors
                         # Create a RoomFloor for each room instance
@@ -376,14 +377,14 @@ class BehaviorTask(BaseTask):
                         room_floor = RoomFloor(
                             category="room_floor",
                             name="room_floor_{}".format(room_inst),
-                            scene=env.simulator.scene,
+                            scene=sim.scene,
                             room_instance=room_inst,
-                            floor_obj=env.simulator.scene.object_registry("name", "floors"),
+                            floor_obj=sim.scene.object_registry("name", "floors"),
                         )
                         scene_objs = [room_floor]
                     else:
                         # A list of scene objects that satisfy the requested categories
-                        room_objs = env.simulator.scene.object_registry("in_rooms", room_inst, default_val=[])
+                        room_objs = sim.scene.object_registry("in_rooms", room_inst, default_val=[])
                         scene_objs = [obj for obj in room_objs if obj.category in categories]
 
                     if len(scene_objs) != 0:
@@ -445,7 +446,7 @@ class BehaviorTask(BaseTask):
 
                 model_path = get_ig_model_path(category, model)
                 usd_path = os.path.join(model_path, "usd", f"{model}.usd")
-                obj_name = "{}_{}".format(category, len(env.simulator.scene.objects))
+                obj_name = "{}_{}".format(category, len(sim.scene.objects))
 
                 # create the object
                 simulator_obj = DatasetObject(
@@ -459,8 +460,8 @@ class BehaviorTask(BaseTask):
                 num_new_obj += 1
 
                 # Load the object into the simulator
-                assert env.simulator.scene.loaded, "Scene is not loaded"
-                env.simulator.import_object(simulator_obj)
+                assert sim.scene.loaded, "Scene is not loaded"
+                sim.import_object(simulator_obj)
 
                 # Set these objects to be far-away locations
                 simulator_obj.set_position(np.array([100.0 + num_new_obj - 1, 100.0, -100.0]))
@@ -503,7 +504,7 @@ class BehaviorTask(BaseTask):
             matched_sim_obj = None
             # TODO: remove after split floors
             if "floor.n.01" in obj_inst:
-                floor_obj = env.simulator.scene.object_registry("name", "floors")
+                floor_obj = sim.scene.object_registry("name", "floors")
                 bddl_object_scope = floor_obj.bddl_object_scope.split(",")
                 bddl_object_scope = {item.split(":")[0]: item.split(":")[1] for item in bddl_object_scope}
                 assert obj_inst in bddl_object_scope
@@ -511,7 +512,7 @@ class BehaviorTask(BaseTask):
                 matched_sim_obj = RoomFloor(
                     category="room_floor",
                     name=bddl_object_scope[obj_inst],
-                    scene=env.simulator.scene,
+                    scene=sim.scene,
                     room_instance=room_inst,
                     floor_obj=floor_obj,
                 )
@@ -519,7 +520,7 @@ class BehaviorTask(BaseTask):
                 matched_sim_obj = self.get_agent(env)
             else:
                 print(f"checking objects...")
-                for sim_obj in env.simulator.scene.objects:
+                for sim_obj in sim.scene.objects:
                     print(f"checking bddl obj scope for obj: {sim_obj.name}")
                     if hasattr(sim_obj, "bddl_object_scope") and sim_obj.bddl_object_scope == obj_inst:
                         matched_sim_obj = sim_obj
@@ -583,7 +584,7 @@ class BehaviorTask(BaseTask):
                             if condition.STATE_NAME in KINEMATICS_STATES and positive and scene_obj in condition.body:
                                 # Use pybullet GUI for debugging
                                 if self.debug_object_sampling is not None and self.debug_object_sampling == condition.body[0]:
-                                    igibson.debug_sampling = True
+                                    ig.debug_sampling = True
                                     obj_pos = obj.get_position()
 
                                     # TODO - set viewer camera
@@ -825,7 +826,7 @@ class BehaviorTask(BaseTask):
 
         for obj_name, obj in clutter_scene.objects_by_name.items():
             # Do not allow duplicate object categories
-            if obj.category in env.simulator.scene.objects_by_category:
+            if obj.category in sim.scene.objects_by_category:
                 continue
 
             bbox_center_pos, bbox_center_orn = clutter_scene.object_states[obj_name]["bbox_center_pose"]
@@ -890,7 +891,7 @@ class BehaviorTask(BaseTask):
 
         # Actually load the object into the simulator
         for obj in objects_to_add:
-            env.simulator.import_object(obj)
+            sim.import_object(obj)
 
         # Restore clutter objects to their correct poses
         clutter_scene.restore_object_states(clutter_scene.object_states)
@@ -913,7 +914,7 @@ class BehaviorTask(BaseTask):
     def _get_obs(self, env):
         low_dim_obs = OrderedDict()
         low_dim_obs["robot_pos"] = np.array(env.robots[0].get_position())
-        low_dim_obs["robot_orn"] = np.array(env.robots[0].get_rpy())
+        low_dim_obs["robot_quat"] = np.array(env.robots[0].get_orientation())
 
         i = 0
         for _, v in self.object_scope.items():
@@ -921,7 +922,7 @@ class BehaviorTask(BaseTask):
             if isinstance(v, DatasetObject):
                 low_dim_obs[f"obj_{i}_valid"] = np.array([1.0])
                 low_dim_obs[f"obj_{i}_pos"] = v.get_position()
-                low_dim_obs[f"obj_{i}_orn"] = T.quat2euler(v.get_orientation())     # TODO: WHy euler instead of quat?
+                low_dim_obs[f"obj_{i}_quat"] = v.get_orientation()
                 for arm in env.robots[0].arm_names:
                     grasping_object = env.robots[0].is_grasping(arm=arm, candidate_obj=v)
                     low_dim_obs[f"obj_{i}_pos_in_gripper_{arm}"] = np.array([float(grasping_object)])

@@ -11,6 +11,8 @@ from igibson.termination_conditions.max_collision import MaxCollision
 from igibson.termination_conditions.falling import Falling
 from igibson.termination_conditions.timeout import Timeout
 from igibson.utils.python_utils import classproperty
+from igibson.utils.sim_utils import land_object, test_valid_pose
+import igibson.utils.transform_utils as T
 
 
 FURNITURE_CATEGORIES = {
@@ -119,8 +121,8 @@ class FurnitureClosingTask(BaseTask):
     def _sample_initial_pose(self, env):
 
         _, initial_pos = env.scene.get_random_point(floor=self._floor)
-        initial_ori = np.array([0, 0, np.random.uniform(0, np.pi * 2)])
-        return initial_pos, initial_ori
+        initial_quat = T.euler2quat(np.array([0, 0, np.random.uniform(0, np.pi * 2)]))
+        return initial_pos, initial_quat
 
     def _reset_agent(self, env):
         # We attempt to sample valid initial poses and goal positions
@@ -129,11 +131,11 @@ class FurnitureClosingTask(BaseTask):
         # Store the state of the environment now, so that we can restore it after each setting attempt
         state = env.dump_state(serialized=True)
 
-        success, initial_pos, initial_ori = False, None, None
+        success, initial_pos, initial_quat = False, None, None
         for i in range(max_trials):
-            initial_pos, initial_ori = self._sample_initial_pose(env)
+            initial_pos, initial_quat = self._sample_initial_pose(env)
             # Make sure the sampled robot start pose and goal position are both collision-free
-            success = env.test_valid_position(env.robots[self._robot_idn], initial_pos, initial_ori)
+            success = test_valid_pose(env.robots[self._robot_idn], initial_pos, initial_quat)
 
             # Load the original state
             env.load_state(state=state, serialized=True)
@@ -147,7 +149,7 @@ class FurnitureClosingTask(BaseTask):
             logging.warning("WARNING: Failed to reset robot without collision")
 
         # Land the robot
-        env.land(env.robots[self._robot_idn], initial_pos, initial_ori)
+        land_object(env.robots[self._robot_idn], initial_pos, initial_quat)
 
     def _get_obs(self, env):
         # No task-specific obs of any kind

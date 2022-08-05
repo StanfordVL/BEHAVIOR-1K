@@ -2,6 +2,7 @@ import numpy as np
 from collections import OrderedDict
 import logging
 
+from igibson import sim
 from igibson.objects.primitive_object import PrimitiveObject
 from igibson.reward_functions.collision_reward import CollisionReward
 from igibson.reward_functions.point_goal_reward import PointGoalReward
@@ -14,6 +15,8 @@ from igibson.termination_conditions.point_goal import PointGoal
 from igibson.termination_conditions.timeout import Timeout
 from igibson.utils.utils import cartesian_to_polar, l2_distance, rotate_vector_3d
 from igibson.utils.python_utils import classproperty, assert_valid_key
+from igibson.utils.sim_utils import land_object, test_valid_pose
+import igibson.utils.transform_utils as T
 
 
 # Valid point navigation reward types
@@ -30,8 +33,8 @@ class PointNavigationTask(BaseTask):
         floor (int): Which floor to navigate on
         initial_pos (None or 3-array): If specified, should be (x,y,z) global initial position to place the robot
             at the start of each task episode. If None, a collision-free value will be randomly sampled
-        initial_ori (None or 3-array): If specified, should be (r,p,y) global euler orientation to place the robot
-            at the start of each task episode. If None, a value will be randomly sampled about the z-axis
+        initial_quat (None or 4-array): If specified, should be (x,y,z,w) global quaternion orientation to place the
+            robot at the start of each task episode. If None, a value will be randomly sampled about the z-axis
         goal_pos (None or 3-array): If specified, should be (x,y,z) global goal position to reach for the given task
             episode. If None, a collision-free value will be randomly sampled
         goal_tolerance (float): Distance between goal position and current position below which is considered a task
@@ -61,7 +64,7 @@ class PointNavigationTask(BaseTask):
             robot_idn=0,
             floor=0,
             initial_pos=None,
-            initial_ori=None,
+            initial_quat=None,
             goal_pos=None,
             goal_tolerance=0.5,
             goal_in_polar=False,
@@ -79,13 +82,13 @@ class PointNavigationTask(BaseTask):
         self._robot_idn = robot_idn
         self._floor = floor
         self._initial_pos = initial_pos if initial_pos is None else np.array(initial_pos)
-        self._initial_ori = initial_ori if initial_ori is None else np.array(initial_ori)
+        self._initial_quat = initial_quat if initial_quat is None else np.array(initial_quat)
         self._goal_pos = goal_pos if goal_pos is None else np.array(goal_pos)
         self._goal_tolerance = goal_tolerance
         self._goal_in_polar = goal_in_polar
         self._path_range = path_range
         self._randomize_initial_pos = initial_pos is None
-        self._randomize_initial_ori = initial_ori is None
+        self._randomize_initial_quat = initial_quat is None
         self._randomize_goal_pos = goal_pos is None
         self._visualize_goal = visualize_goal
         self._visualize_path = visualize_path
@@ -168,8 +171,8 @@ class PointNavigationTask(BaseTask):
         )
 
         # Load the objects into the simulator
-        env.simulator.import_object(self._initial_pos_marker)
-        env.simulator.import_object(self._goal_pos_marker)
+        sim.import_object(self._initial_pos_marker)
+        sim.import_object(self._goal_pos_marker)
 
         # Additionally generate waypoints along the path if we're building the map in the environment
         if env.scene.trav_map.build_graph:
@@ -185,7 +188,7 @@ class PointNavigationTask(BaseTask):
                     visual_only=True,
                     rgba=np.array([0, 1, 0, 0.3]),
                 )
-                env.simulator.import_object(waypoint)
+                sim.import_object(waypoint)
                 waypoints.append(waypoint)
 
             # Store waypoints
@@ -204,7 +207,7 @@ class PointNavigationTask(BaseTask):
         Returns:
             3-tuple:
                 - 3-array: (x,y,z) global sampled initial position
-                - 3-array: (r,p,y) global sampled initial orientation in euler form
+                - 4-array: (x,y,z,w) global sampled initial orientation in quaternion form
                 - 3-array: (x,y,z) global sampled goal position
         """
         # Possibly sample initial pos
@@ -214,8 +217,8 @@ class PointNavigationTask(BaseTask):
             initial_pos = self._initial_pos
 
         # Possibly sample initial ori
-        initial_ori = np.array([0, 0, np.random.uniform(0, np.pi * 2)]) if self._randomize_initial_ori else \
-            self._initial_ori
+        initial_quat = T.euler2quat(np.array([0, 0, np.random.uniform(0, np.pi * 2)])) if \
+            self._randomize_initial_quat else self._initial_quat
 
         # Possibly sample goal pos
         if self._randomize_goal_pos:
@@ -237,9 +240,9 @@ class PointNavigationTask(BaseTask):
             goal_pos = self._goal_pos
 
         # Add additional logging info
-        logging.info("Sampled initial pose: {}, {}".format(initial_pos, initial_ori))
+        logging.info("Sampled initial pose: {}, {}".format(initial_pos, initial_quat))
         logging.info("Sampled goal position: {}".format(goal_pos))
-        return initial_pos, initial_ori, goal_pos
+        return initial_pos, initial_quat, goal_pos
 
     def _get_geodesic_potential(self, env):
         """
@@ -289,12 +292,12 @@ class PointNavigationTask(BaseTask):
         # Store the state of the environment now, so that we can restore it after each setting attempt
         state = env.dump_state(serialized=True)
 
-        initial_pos, initial_ori, goal_pos = None, None, None
+        initial_pos, initial_quat, goal_pos = None, None, None
         for i in range(max_trials):
-            initial_pos, initial_ori, goal_pos = self._sample_initial_pose_and_goal_pos(env)
+            initial_pos, initial_quat, goal_pos = self._sample_initial_pose_and_goal_pos(env)
             # Make sure the sampled robot start pose and goal position are both collision-free
-            success = env.test_valid_position(
-                env.robots[self._robot_idn], initial_pos, initial_ori
+            success = test_valid_pose(
+                env.robots[self._robot_idn], initial_pos, initial_quat
             ) and env.test_valid_position(env.robots[self._robot_idn], goal_pos)
 
             # Load the original state
@@ -309,11 +312,11 @@ class PointNavigationTask(BaseTask):
             logging.warning("WARNING: Failed to reset robot without collision")
 
         # Land the robot
-        env.land(env.robots[self._robot_idn], initial_pos, initial_ori)
+        land_object(env.robots[self._robot_idn], initial_pos, initial_quat)
 
         # Store the sampled values internally
         self._initial_pos = initial_pos
-        self._initial_ori = initial_ori
+        self._initial_quat = initial_quat
         self._goal_pos = goal_pos
 
         # Update visuals if requested

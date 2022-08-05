@@ -4,6 +4,7 @@ from collections import OrderedDict
 from igibson.tasks.task_base import BaseTask
 from igibson.scenes.scene_base import Scene
 from igibson.utils.python_utils import classproperty
+from igibson.utils.sim_utils import land_object
 
 
 class DummyTask(BaseTask):
@@ -27,7 +28,7 @@ class DummyTask(BaseTask):
         # Place agent(s) at origin by default
         for robot in env.robots:
             robot.reset()
-            env.land(robot, np.zeros(3), np.zeros(3))
+            land_object(robot, np.zeros(3), np.array([0, 0, 0, 1]))
 
     def _get_obs(self, env):
         # No task-specific obs of any kind

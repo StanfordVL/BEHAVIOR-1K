@@ -1,10 +1,12 @@
 import numpy as np
 
-from igibson import ig_dataset_path
+from igibson import ig_dataset_path, sim
 from igibson.objects.dataset_object import DatasetObject
 from igibson.robots.turtlebot import Turtlebot
 from igibson.tasks.point_navigation_task import PointNavigationTask
 from igibson.utils.python_utils import classproperty
+from igibson.utils.sim_utils import land_object, test_valid_pose
+import igibson.utils.transform_utils as T
 
 
 class PointNavigationObstacleTask(PointNavigationTask):
@@ -17,8 +19,8 @@ class PointNavigationObstacleTask(PointNavigationTask):
         floor (int): Which floor to navigate on
         initial_pos (None or 3-array): If specified, should be (x,y,z) global initial position to place the robot
             at the start of each task episode. If None, a collision-free value will be randomly sampled
-        initial_ori (None or 3-array): If specified, should be (r,p,y) global euler orientation to place the robot
-            at the start of each task episode. If None, a value will be randomly sampled about the z-axis
+        initial_quat (None or 4-array): If specified, should be (x,y,z,w) global quaternion orientation to place the
+            robot at the start of each task episode. If None, a value will be randomly sampled about the z-axis
         goal_pos (None or 3-array): If specified, should be (x,y,z) global goal position to reach for the given task
             episode. If None, a collision-free value will be randomly sampled
         goal_tolerance (float): Distance between goal position and current position below which is considered a task
@@ -48,7 +50,7 @@ class PointNavigationObstacleTask(PointNavigationTask):
             robot_idn=0,
             floor=0,
             initial_pos=None,
-            initial_ori=None,
+            initial_quat=None,
             goal_pos=None,
             goal_tolerance=0.1,
             goal_in_polar=False,
@@ -74,7 +76,7 @@ class PointNavigationObstacleTask(PointNavigationTask):
             robot_idn=robot_idn,
             floor=floor,
             initial_pos=initial_pos,
-            initial_ori=initial_ori,
+            initial_quat=initial_quat,
             goal_pos=goal_pos,
             goal_tolerance=goal_tolerance,
             goal_in_polar=goal_in_polar,
@@ -119,8 +121,8 @@ class PointNavigationObstacleTask(PointNavigationTask):
             state = env.dump_state(serialized=True)
             for _ in range(max_trials):
                 _, pos = env.scene.get_random_point(floor=self._floor)
-                ori = np.array([0, 0, np.random.uniform(0, np.pi * 2)])
-                success = env.test_valid_position(obj, pos, ori)
+                quat = T.euler2quat(np.array([0, 0, np.random.uniform(0, np.pi * 2)]))
+                success = test_valid_pose(obj, pos, quat)
                 env.load_state(state=state, serialized=True)
                 if success:
                     break
@@ -128,7 +130,7 @@ class PointNavigationObstacleTask(PointNavigationTask):
             if not success:
                 print("WARNING: Failed to reset interactive obj without collision")
 
-            env.land(obj, pos, ori)
+            land_object(obj, pos, ori)
 
     def _reset_scene(self, env):
         # Run super first
@@ -171,7 +173,7 @@ class PointNavigationStaticObstacleTask(PointNavigationObstacleTask):
                 name=f"task_obstacle{i}",
             )
             # Import into the simulator, add to the ignore collisions, and store internally
-            env.simulator.import_object(obj=obstacle)
+            sim.import_object(obj=obstacle)
             env.add_ignore_robot_object_collision(robot_idn=self._robot_idn, obj=obstacle)
             obstacles.append(obstacle)
 
@@ -188,8 +190,8 @@ class PointNavigationDynamicObstacleTask(PointNavigationObstacleTask):
         floor (int): Which floor to navigate on
         initial_pos (None or 3-array): If specified, should be (x,y,z) global initial position to place the robot
             at the start of each task episode. If None, a collision-free value will be randomly sampled
-        initial_ori (None or 3-array): If specified, should be (r,p,y) global euler orientation to place the robot
-            at the start of each task episode. If None, a value will be randomly sampled about the z-axis
+        initial_quat (None or 4-array): If specified, should be (x,y,z,w) global quaternion orientation to place the
+            robot at the start of each task episode. If None, a value will be randomly sampled about the z-axis
         goal_pos (None or 3-array): If specified, should be (x,y,z) global goal position to reach for the given task
             episode. If None, a collision-free value will be randomly sampled
         goal_tolerance (float): Distance between goal position and current position below which is considered a task
@@ -221,7 +223,7 @@ class PointNavigationDynamicObstacleTask(PointNavigationObstacleTask):
             robot_idn=0,
             floor=0,
             initial_pos=None,
-            initial_ori=None,
+            initial_quat=None,
             goal_pos=None,
             goal_tolerance=0.1,
             goal_in_polar=False,
@@ -248,7 +250,7 @@ class PointNavigationDynamicObstacleTask(PointNavigationObstacleTask):
             robot_idn=robot_idn,
             floor=floor,
             initial_pos=initial_pos,
-            initial_ori=initial_ori,
+            initial_quat=initial_quat,
             goal_pos=goal_pos,
             goal_tolerance=goal_tolerance,
             goal_in_polar=goal_in_polar,
@@ -272,7 +274,7 @@ class PointNavigationDynamicObstacleTask(PointNavigationObstacleTask):
                 prim_path=f"/World/task_obstacle{i}",
                 name=f"task_obscale{i}",
             )
-            env.simulator.import_object(obstacle)
+            sim.import_object(obstacle)
             obstacles.append(obstacle)
 
         return obstacles
