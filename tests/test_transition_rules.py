@@ -3,7 +3,7 @@ import numpy as np
 from igibson import object_states, app, ig_dataset_path
 from igibson.objects.dataset_object import DatasetObject
 from igibson.scenes.empty_scene import EmptyScene
-from igibson.simulator_omni import Simulator
+from igibson.simulator import Simulator
 import igibson.transition_rules as transition_rules
 
 

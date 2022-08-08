@@ -8,7 +8,7 @@ from igibson.robots.turtlebot import Turtlebot
 from igibson.scenes.gibson_indoor_scene import StaticIndoorScene
 from igibson.scenes.stadium_scene import StadiumScene
 from igibson.simulator import Simulator
-from igibson.utils.assets_utils import download_assets, download_demo_data
+from igibson.utils.asset_utils import download_assets, download_demo_data
 
 
 def test_import_building():

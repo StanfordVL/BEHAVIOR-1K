@@ -7,7 +7,7 @@ from PIL import Image
 import igibson
 from igibson.render.mesh_renderer.mesh_renderer_cpu import MeshRenderer
 from igibson.render.mesh_renderer.mesh_renderer_settings import MeshRendererSettings
-from igibson.utils.assets_utils import get_ig_model_path
+from igibson.utils.asset_utils import get_ig_model_path
 
 
 def test_render_pbr():

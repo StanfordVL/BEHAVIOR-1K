@@ -4,7 +4,7 @@ from time import time
 import igibson
 from igibson.envs.igibson_env import iGibsonEnv
 from igibson.tasks.task_base import BaseTask
-from igibson.utils.assets_utils import download_assets, download_demo_data
+from igibson.utils.asset_utils import download_assets, download_demo_data
 
 
 def test_env():

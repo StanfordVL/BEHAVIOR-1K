@@ -6,7 +6,7 @@ import igibson
 from igibson.envs.igibson_env import iGibsonEnv
 from igibson.sensors.scan_sensor import ScanSensor
 from igibson.sensors.vision_sensor import VisionSensor
-from igibson.utils.assets_utils import download_assets, download_demo_data
+from igibson.utils.asset_utils import download_assets, download_demo_data
 from igibson.utils.constants import MAX_CLASS_COUNT
 
 

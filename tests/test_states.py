@@ -14,8 +14,8 @@ from igibson.objects.ycb_object import YCBObject
 from igibson.objects.primitive_object import PrimitiveObject
 from igibson.scenes.empty_scene import EmptyScene
 from igibson.sensors.vision_sensor import VisionSensor
-from igibson.simulator_omni import Simulator
-from igibson.utils.assets_utils import download_assets, get_ig_model_path
+from igibson.simulator import Simulator
+from igibson.utils.asset_utils import download_assets, get_ig_model_path
 from igibson.utils.usd_utils import create_joint
 
 if m.ENABLE_OMNI_PARTICLES:

@@ -11,7 +11,7 @@ import igibson
 from igibson.robots.turtlebot import Turtlebot
 from igibson.scenes.interactive_traversable_scene import InteractiveIndoorScene
 from igibson.simulator import Simulator
-from igibson.utils.assets_utils import get_ig_assets_version
+from igibson.utils.asset_utils import get_ig_assets_version
 from igibson.utils.constants import AVAILABLE_MODALITIES, NamedRenderingPresets
 from igibson.utils.config_utils import parse_config
 

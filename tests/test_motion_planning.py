@@ -5,7 +5,7 @@ import numpy as np
 
 import igibson
 from igibson.envs.igibson_env import iGibsonEnv
-from igibson.utils.assets_utils import download_assets, download_demo_data
+from igibson.utils.asset_utils import download_assets, download_demo_data
 from igibson.utils.motion_planning_wrapper import MotionPlanningWrapper
 
 
