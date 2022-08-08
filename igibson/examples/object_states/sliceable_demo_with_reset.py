@@ -9,8 +9,8 @@ from igibson.objects.usd_object import URDFObject
 from igibson.objects.multi_object_wrappers import ObjectGrouper, ObjectMultiplexer
 from igibson.scenes.empty_scene import EmptyScene
 from igibson.simulator import Simulator
-from igibson.utils.assets_utils import get_ig_model_path
-from igibson.utils.utils import restoreState
+from igibson.utils.asset_utils import get_ig_model_path
+# from igibson.utils.utils import restoreState
 
 
 def main(random_selection=False, headless=False, short_exec=False):

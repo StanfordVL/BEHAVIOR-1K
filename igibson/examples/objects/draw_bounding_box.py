@@ -11,7 +11,7 @@ import igibson
 from igibson.objects.usd_object import URDFObject
 from igibson.scenes.empty_scene import EmptyScene
 from igibson.simulator import Simulator
-from igibson.utils import utils
+import igibson.utils.transform_utils as T
 
 
 def main(random_selection=False, headless=False, short_exec=False):
@@ -57,7 +57,7 @@ def main(random_selection=False, headless=False, short_exec=False):
                 bbox_frame_vertex_positions = np.array(list(itertools.product((1, -1), repeat=3))) * (
                     bbox_bf_extent / 2
                 )
-                bbox_transform = utils.quat_pos_to_mat(bbox_center, bbox_orn)
+                bbox_transform = T.pose2mat((bbox_center, bbox_orn))
                 world_frame_vertex_positions = trimesh.transformations.transform_points(
                     bbox_frame_vertex_positions, bbox_transform
                 )

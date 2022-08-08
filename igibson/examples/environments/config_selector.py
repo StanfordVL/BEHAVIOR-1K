@@ -6,9 +6,8 @@ import yaml
 
 import igibson
 from igibson.envs.igibson_env import iGibsonEnv
-from igibson.render.profiler import Profiler
-from igibson.utils.assets_utils import folder_is_hidden
-from igibson.utils.utils import let_user_pick
+from igibson.utils.asset_utils import folder_is_hidden
+from igibson.utils.ui_utils import choose_from_options
 
 
 def main(random_selection=False, headless=False, short_exec=False):
@@ -27,7 +26,7 @@ def main(random_selection=False, headless=False, short_exec=False):
             if (not folder_is_hidden(f) and os.path.isfile(os.path.join(ig_config_path, f)))
         ]
     )
-    config_id = available_configs[let_user_pick(available_configs, random_selection=random_selection) - 1]
+    config_id = choose_from_options(options=available_configs, name="config file", random_selection=random_selection)
     logging.info("Using config file " + config_id)
     config_filename = os.path.join(igibson.example_config_path, config_id)
     config_data = yaml.load(open(config_filename, "r"), Loader=yaml.FullLoader)

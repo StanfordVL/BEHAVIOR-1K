@@ -6,7 +6,7 @@ import numpy as np
 import tqdm
 import trimesh
 
-from igibson.utils.assets_utils import get_all_object_models
+from igibson.utils.asset_utils import get_all_object_models
 
 SKIP_EXISTING = True
 IGNORE_ERRORS = False

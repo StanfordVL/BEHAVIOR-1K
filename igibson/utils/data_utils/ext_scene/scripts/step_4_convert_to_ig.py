@@ -11,7 +11,7 @@ import numpy as np
 
 import igibson
 from igibson.scenes.interactive_traversable_scene import SCENE_SOURCE
-from igibson.utils.assets_utils import (
+from igibson.utils.asset_utils import (
     get_3dfront_scene_path,
     get_cubicasa_scene_path,
     get_ig_category_path,

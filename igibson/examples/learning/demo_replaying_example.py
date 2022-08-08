@@ -12,7 +12,7 @@ from igibson.envs.igibson_env import iGibsonEnv
 from igibson.render.mesh_renderer.mesh_renderer_cpu import MeshRendererSettings
 from igibson.render.mesh_renderer.mesh_renderer_vr import VrSettings
 from igibson.utils.git_utils import project_git_info
-from igibson.utils.ig_logging import IGLogReader, IGLogWriter
+from igibson.utils.log_utils import IGLogReader, IGLogWriter
 from igibson.utils.config_utils import parse_config, parse_str_config
 
 

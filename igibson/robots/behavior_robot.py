@@ -25,7 +25,6 @@ from abc import ABC, abstractmethod
 import numpy as np
 
 from igibson import assets_path
-from igibson.objects.visual_marker import VisualMarker
 from igibson.robots.active_camera_robot import ActiveCameraRobot
 from igibson.robots.locomotion_robot import LocomotionRobot
 from igibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot

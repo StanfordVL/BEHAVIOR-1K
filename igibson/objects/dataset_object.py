@@ -21,9 +21,9 @@ import igibson
 from igibson.objects.usd_object import USDObject
 from igibson.utils.constants import AVERAGE_CATEGORY_SPECS, DEFAULT_JOINT_FRICTION, SPECIAL_JOINT_FRICTIONS, JointType
 import igibson.utils.transform_utils as T
-from igibson.utils.utils import rotate_vector_3d
 from igibson.utils.usd_utils import BoundingBoxAPI
 from igibson.utils.constants import PrimType
+
 
 class DatasetObject(USDObject):
     """
@@ -704,8 +704,8 @@ class DatasetObject(USDObject):
             if parent_name in scales and child_name not in scales:
                 scale_in_parent_lf = scales[parent_name]
                 # The location of the joint frame is scaled using the scale in the parent frame
-                jnt_frame_rot = T.mat2euler(T.quat2mat(joint.local_orientation))
-                scale_in_child_lf = np.absolute(rotate_vector_3d(scale_in_parent_lf, *jnt_frame_rot, cck=True))
+                jnt_frame_rot = T.quat2mat(joint.local_orientation)
+                scale_in_child_lf = jnt_frame_rot.T @ np.array(scale_in_parent_lf)
                 scales[child_name] = scale_in_child_lf
 
         return scales

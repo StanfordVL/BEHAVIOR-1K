@@ -28,9 +28,6 @@ from igibson.utils.config_utils import NumpyEncoder
 from igibson.objects.object_base import BaseObject
 from igibson.objects.dataset_object import DatasetObject
 from igibson.systems import SYSTEMS_REGISTRY
-
-# from igibson.objects.particles import Particle
-# from igibson.objects.visual_marker import VisualMarker
 from igibson.robots.robot_base import BaseRobot
 
 # Global dicts that will contain mappings

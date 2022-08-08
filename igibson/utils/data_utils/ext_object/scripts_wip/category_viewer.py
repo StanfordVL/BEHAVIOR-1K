@@ -7,7 +7,7 @@ import igibson
 from igibson.objects.usd_object import URDFObject
 from igibson.scenes.empty_scene import EmptyScene
 from igibson.simulator import Simulator
-from igibson.utils.assets_utils import download_assets, get_ig_avg_category_specs
+from igibson.utils.asset_utils import download_assets, get_ig_avg_category_specs
 
 download_assets()
 

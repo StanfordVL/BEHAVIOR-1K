@@ -1,21 +1,12 @@
 import logging
-import os
-import pickle
-import sys
 from abc import ABC
-
-import cv2
-import networkx as nx
-import numpy as np
-from future.utils import with_metaclass
-from PIL import Image
 
 from igibson.scenes.scene_base import Scene
 from igibson.maps.traversable_map import TraversableMap
 from igibson.utils.python_utils import classproperty
 
 
-class TraversableScene(Scene, ABC):
+class TraversableScene(Scene):
     """
     Traversable scene class.
     Contains the functionalities for navigation such as shortest path computation

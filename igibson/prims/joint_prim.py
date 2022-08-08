@@ -27,7 +27,7 @@ import carb
 from omni.isaac.core.utils.stage import get_current_stage
 from igibson.prims.prim_base import BasePrim
 from igibson.utils.usd_utils import create_joint
-from igibson.utils.types import JointsState
+from igibson.utils.omni_types import JointsState
 from igibson.utils.transform_utils import quat_inverse, quat_multiply
 from igibson.utils.constants import JointType
 from igibson.utils.python_utils import assert_valid_key

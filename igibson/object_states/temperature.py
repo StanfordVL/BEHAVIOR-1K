@@ -4,7 +4,7 @@ from igibson.object_states.heat_source_or_sink import HeatSourceOrSink
 from igibson.object_states.inside import Inside
 from igibson.object_states.object_state_base import AbsoluteObjectState
 from igibson.object_states.pose import Pose
-from igibson.utils.utils import l2_distance
+import igibson.utils.transform_utils as T
 
 # TODO: Consider sourcing default temperature from scene
 # Default ambient temperature.
@@ -55,7 +55,7 @@ class Temperature(AbsoluteObjectState):
                     position, _ = self.obj.states[Pose].get_value()
 
                     # Compute distance to heat source from our position.
-                    dist = l2_distance(heat_source_position, position)
+                    dist = T.l2_distance(heat_source_position, position)
                     if dist > heat_source.distance_threshold:
                         continue
                 else:

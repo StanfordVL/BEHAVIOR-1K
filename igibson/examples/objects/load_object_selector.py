@@ -1,6 +1,7 @@
 import logging
 import os
 from sys import platform
+from collections import OrderedDict
 
 import yaml
 
@@ -13,13 +14,14 @@ from igibson.robots.turtlebot import Turtlebot
 from igibson.scenes.empty_scene import EmptyScene
 from igibson.scenes.gibson_indoor_scene import StaticIndoorScene
 from igibson.simulator import Simulator
-from igibson.utils.assets_utils import (
+from igibson.utils.asset_utils import (
     get_all_object_categories,
     get_ig_avg_category_specs,
     get_ig_model_path,
     get_object_models_of_category,
 )
-from igibson.utils.utils import let_user_pick, parse_config
+from igibson.utils.config_utils import parse_config
+from igibson.utils.ui_utils import choose_from_options
 
 
 def main(random_selection=False, headless=False, short_exec=False):
@@ -32,8 +34,8 @@ def main(random_selection=False, headless=False, short_exec=False):
     and executing actions
     """
     logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
-    scene_options = ["Empty scene", "Interactive scene (iG)", "Static scene (Gibson)"]
-    type_of_scene = let_user_pick(scene_options, random_selection=random_selection) - 1
+    scene_options = OrderedDict((i, scene_type) for i, scene_type in enumerate(["Empty scene", "Interactive scene (iG)", "Static scene (Gibson)"]))
+    type_of_scene = choose_from_options(options=scene_options, name="scene type", random_selection=random_selection)
 
     if type_of_scene == 0:  # Empty
         config = parse_config(os.path.join(igibson.example_config_path, "turtlebot_static_nav.yaml"))
@@ -44,7 +46,7 @@ def main(random_selection=False, headless=False, short_exec=False):
             image_height=512,
             rendering_settings=settings,
         )
-        scene = EmptyScene(floor_plane_rgba=[0.6, 0.6, 0.6, 1])
+        scene = EmptyScene(floor_plane_color=[0.6, 0.6, 0.6])
         # scene.load_object_categories(benchmark_names)
         s.import_scene(scene)
         robot_config = config["robot"]
@@ -92,13 +94,11 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Select a category to load
     available_obj_categories = get_all_object_categories()
-    obj_category = available_obj_categories[
-        let_user_pick(available_obj_categories, random_selection=random_selection) - 1
-    ]
+    obj_category = choose_from_options(options=available_obj_categories, name="object category", random_selection=random_selection)
 
     # Select a model to load
     available_obj_models = get_object_models_of_category(obj_category)
-    obj_model = available_obj_models[let_user_pick(available_obj_models, random_selection=random_selection) - 1]
+    obj_model = choose_from_options(options=available_obj_models, name="object model", random_selection=random_selection)
 
     # Load the specs of the object categories, e.g., common scaling factor
     avg_category_spec = get_ig_avg_category_specs()

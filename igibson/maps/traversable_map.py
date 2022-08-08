@@ -8,7 +8,7 @@ import networkx as nx
 import numpy as np
 from PIL import Image
 
-from igibson.utils.utils import l2_distance
+import igibson.utils.transform_utils as T
 
 
 class TraversableMap:
@@ -139,7 +139,7 @@ class TraversableMap:
                             and 0 <= n[1] < self.trav_map_size
                             and trav_map[n[0], n[1]] > 0
                         ):
-                            g.add_edge(n, (i, j), weight=l2_distance(n, (i, j)))
+                            g.add_edge(n, (i, j), weight=T.l2_distance(n, (i, j)))
 
             # only take the largest connected component
             largest_cc = max(nx.connected_components(g), key=len)
@@ -231,14 +231,14 @@ class TraversableMap:
         if not g.has_node(target_map):
             nodes = np.array(g.nodes)
             closest_node = tuple(nodes[np.argmin(np.linalg.norm(nodes - target_map, axis=1))])
-            g.add_edge(closest_node, target_map, weight=l2_distance(closest_node, target_map))
+            g.add_edge(closest_node, target_map, weight=T.l2_distance(closest_node, target_map))
 
         if not g.has_node(source_map):
             nodes = np.array(g.nodes)
             closest_node = tuple(nodes[np.argmin(np.linalg.norm(nodes - source_map, axis=1))])
-            g.add_edge(closest_node, source_map, weight=l2_distance(closest_node, source_map))
+            g.add_edge(closest_node, source_map, weight=T.l2_distance(closest_node, source_map))
 
-        path_map = np.array(nx.astar_path(g, source_map, target_map, heuristic=l2_distance))
+        path_map = np.array(nx.astar_path(g, source_map, target_map, heuristic=T.l2_distance))
 
         path_world = self.map_to_world(path_map)
         geodesic_distance = np.sum(np.linalg.norm(path_world[1:] - path_world[:-1], axis=1))

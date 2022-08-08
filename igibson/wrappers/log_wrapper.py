@@ -2,7 +2,7 @@ import os
 import datetime
 
 from igibson.wrappers.wrapper_base import BaseWrapper
-from igibson.utils.ig_logging import IGLogWriter
+from igibson.utils.log_utils import IGLogWriter
 
 
 class LogWrapper(BaseWrapper):

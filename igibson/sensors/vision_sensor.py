@@ -60,7 +60,6 @@ class VisionSensor(BaseSensor):
         image_width (int): Width of generated images, in pixels
         viewport_name (None or str): If specified, will link this camera to the specified viewport, overriding its
             current camera. Otherwise, creates a new viewport
-
     """
     _SENSOR_HELPERS = OrderedDict(
         rgb=sensors_util.get_rgb,

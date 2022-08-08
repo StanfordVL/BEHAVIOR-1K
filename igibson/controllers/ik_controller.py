@@ -2,7 +2,7 @@ import numpy as np
 
 import igibson.utils.transform_utils as T
 from igibson.controllers import ControlType, ManipulationController
-from igibson.utils.filters import MovingAverageFilter
+from igibson.utils.processing_utils import MovingAverageFilter
 from igibson.utils.control_utils import IKSolver
 
 # Different modes

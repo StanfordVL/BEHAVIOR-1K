@@ -16,7 +16,7 @@ from omni.isaac.core.utils.rotations import gf_quat_to_np_array
 from igibson.objects.dataset_object import DatasetObject
 from igibson.scenes.traversable_scene import TraversableScene
 from igibson.maps.segmentation_map import SegmentationMap
-from igibson.utils.assets_utils import (
+from igibson.utils.asset_utils import (
     get_3dfront_scene_path,
     get_cubicasa_scene_path,
     get_ig_category_ids,

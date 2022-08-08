@@ -12,7 +12,7 @@ from igibson.objects.controllable_object import ControllableObject
 from igibson.utils.gym_utils import GymObservable
 from igibson.utils.python_utils import Registerable, classproperty
 from igibson.utils.vision_utils import segmentation_to_rgb
-from igibson.utils.utils import rotate_vector_3d
+import igibson.utils.transform_utils as T
 from pxr import PhysxSchema
 
 # Global dicts that will contain mappings
@@ -196,21 +196,20 @@ class BaseRobot(USDObject, ControllableObject, GymObservable, Registerable):
     def get_state(self):
         """
         Calculate proprioceptive states for the robot. By default, this is:
-            [pos, rpy, lin_vel, ang_vel, joint_states]
+            [pos, quat, lin_vel, ang_vel, joint_states]
 
         :return Array[float]: Flat array of proprioceptive states (e.g.: [position, orientation, ...])
         """
         # Grab relevant states
-        pos = self.get_position()
-        rpy = self.get_rpy()
+        pos, quat = self.get_position_orientation()
         joints_state = self.get_joints_state(normalized=False).flatten()
 
         # rotate linear and angular velocities to local frame
-        lin_vel = rotate_vector_3d(self.get_linear_velocity(), *rpy)
-        ang_vel = rotate_vector_3d(self.get_angular_velocity(), *rpy)
+        lin_vel = T.quat2mat(quat).T @ self.get_linear_velocity()
+        ang_vel = T.quat2mat(quat).T @ self.get_angular_velocity()
 
         # Compile and return state
-        state = np.concatenate([pos, rpy, lin_vel, ang_vel, joints_state])
+        state = np.concatenate([pos, quat, lin_vel, ang_vel, joints_state])
         return state
 
     def can_toggle(self, toggle_position, toggle_distance_threshold):
@@ -280,7 +279,6 @@ class BaseRobot(USDObject, ControllableObject, GymObservable, Registerable):
             "joint_qvel": joints_state.velocities,
             "joint_qeffort": joints_state.efforts,
             "robot_pos": pos,
-            "robot_rpy": self.get_rpy(),
             "robot_quat": ori,
             "robot_lin_vel": self.get_linear_velocity(),
             "robot_ang_vel": self.get_angular_velocity(),

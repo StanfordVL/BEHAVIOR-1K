@@ -1,5 +1,5 @@
 from igibson.termination_conditions.termination_condition_base import SuccessCondition
-from igibson.utils.utils import l2_distance
+import igibson.utils.transform_utils as T
 
 
 class ReachingGoal(SuccessCondition):
@@ -25,5 +25,5 @@ class ReachingGoal(SuccessCondition):
 
     def _step(self, task, env, action):
         # Terminate if point goal is reached (distance below threshold)
-        return l2_distance(env.scene.robots[self._robot_idn].get_end_effector_position(), task.goal_pos) < \
+        return T.l2_distance(env.scene.robots[self._robot_idn].get_end_effector_position(), task.goal_pos) < \
                self._distance_tol

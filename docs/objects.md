@@ -111,7 +111,7 @@ from igibson.robots.turtlebot import Turtlebot
 from igibson.scenes.empty_scene import EmptyScene
 from igibson.scenes.gibson_indoor_scene import StaticIndoorScene
 from igibson.simulator import Simulator
-from igibson.utils.assets_utils import get_ig_avg_category_specs, get_ig_category_path, get_ig_model_path
+from igibson.utils.asset_utils import get_ig_avg_category_specs, get_ig_category_path, get_ig_model_path
 from igibson.utils.utils import let_user_pick, parse_config
 
 

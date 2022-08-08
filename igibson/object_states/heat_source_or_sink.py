@@ -12,7 +12,6 @@ from igibson.object_states.open import Open
 from igibson.object_states.toggle import ToggledOn
 
 # The name of the heat source link inside URDF files.
-from igibson.objects.visual_marker import VisualMarker
 from igibson.utils.constants import SemanticClass
 
 _HEATING_ELEMENT_LINK_NAME = "heat_source_link"

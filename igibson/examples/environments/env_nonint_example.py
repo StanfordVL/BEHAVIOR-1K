@@ -7,7 +7,7 @@ import yaml
 import igibson
 from igibson.envs.igibson_env import iGibsonEnv
 from igibson.render.profiler import Profiler
-from igibson.utils.assets_utils import download_assets, download_demo_data
+from igibson.utils.asset_utils import download_assets, download_demo_data
 
 
 def main(random_selection=False, headless=False, short_exec=False):

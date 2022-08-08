@@ -3,7 +3,7 @@ from collections import OrderedDict
 
 from igibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from igibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
-from igibson.utils.constants import SemanticClass, SimulatorMode
+from igibson.utils.constants import SemanticClass
 
 _TOGGLE_DISTANCE_THRESHOLD = 0.1
 _TOGGLE_LINK_NAME = "toggle_button_link"

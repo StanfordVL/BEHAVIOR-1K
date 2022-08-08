@@ -5,9 +5,8 @@ from igibson.utils.python_utils import assert_valid_key
 
 from pxr import Gf, Usd, Sdf, UsdGeom, UsdPhysics, PhysxSchema, UsdShade
 from omni.isaac.core.utils.stage import add_reference_to_stage, get_current_stage
-from igibson.utils.constants import PrimType
+from igibson.utils.constants import PrimType, PRIMITIVE_MESH_TYPES
 from igibson.utils.usd_utils import create_mesh_prim_with_default_xform
-from igibson.utils.types import PRIMITIVE_MESH_TYPES
 import omni
 import carb
 

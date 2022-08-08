@@ -4,7 +4,7 @@ from omni.isaac.core.utils.viewports import set_camera_view
 from igibson import ig_dataset_path, object_states
 from igibson.objects.dataset_object import DatasetObject
 from igibson.scenes.empty_scene import EmptyScene
-from igibson.simulator_omni import Simulator
+from igibson.simulator import Simulator
 
 sim = Simulator()
 

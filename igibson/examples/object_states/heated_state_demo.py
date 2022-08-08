@@ -2,7 +2,7 @@ import numpy as np
 from igibson import object_states, ig_dataset_path
 from igibson.objects.dataset_object import DatasetObject
 from igibson.scenes.empty_scene import EmptyScene
-from igibson.simulator_omni import Simulator
+from igibson.simulator import Simulator
 
 # Import scene.
 sim = Simulator()

@@ -10,7 +10,6 @@ from igibson.object_states.object_state_base import BooleanState, RelativeObject
 from igibson.object_states.pose import Pose
 from igibson.object_states.utils import sample_kinematics
 from igibson.utils.usd_utils import BoundingBoxAPI
-from igibson.utils.utils import restoreState
 
 
 class Inside(PositionalValidationMemoizedObjectStateMixin, KinematicsMixin, RelativeObjectState, BooleanState):

@@ -10,7 +10,6 @@ from igibson import object_states
 # from igibson.external.pybullet_tools.utils import get_aabb_center, get_aabb_extent, get_link_pose, matrix_from_quat
 from igibson.object_states.aabb import AABB
 from igibson.utils import sampling_utils
-from igibson.utils.utils import restoreState
 
 _ON_TOP_RAY_CASTING_SAMPLING_PARAMS = {
     # "hit_to_plane_threshold": 0.1,  # TODO: Tune this parameter.

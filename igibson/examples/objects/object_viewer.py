@@ -6,13 +6,13 @@ from igibson.objects.usd_object import URDFObject
 from igibson.render.mesh_renderer.mesh_renderer_settings import MeshRendererSettings
 from igibson.scenes.empty_scene import EmptyScene
 from igibson.simulator import Simulator
-from igibson.utils.assets_utils import (
+from igibson.utils.asset_utils import (
     get_all_object_categories,
     get_ig_avg_category_specs,
     get_ig_model_path,
     get_object_models_of_category,
 )
-from igibson.utils.utils import let_user_pick
+from igibson.utils.ui_utils import choose_from_options
 
 
 def main(random_selection=False, headless=False, short_exec=False):
@@ -38,13 +38,11 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Select a category to load
     available_obj_categories = get_all_object_categories()
-    obj_category = available_obj_categories[
-        let_user_pick(available_obj_categories, random_selection=random_selection) - 1
-    ]
+    obj_category = choose_from_options(options=available_obj_categories, name="object category", random_selection=random_selection)
 
     # Select a model to load
     available_obj_models = get_object_models_of_category(obj_category)
-    obj_model = available_obj_models[let_user_pick(available_obj_models, random_selection=random_selection) - 1]
+    obj_model = choose_from_options(options=available_obj_models, name="object model", random_selection=random_selection)
 
     logging.info("Visualizing category {}, model {}".format(obj_category, obj_model))
 

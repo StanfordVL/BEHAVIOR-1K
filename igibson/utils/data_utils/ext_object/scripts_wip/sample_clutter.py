@@ -11,7 +11,7 @@ from igibson.objects.usd_object import URDFObject
 from igibson.render.mesh_renderer.mesh_renderer_settings import MeshRendererSettings
 from igibson.scenes.interactive_traversable_scene import InteractiveIndoorScene
 from igibson.simulator import Simulator
-from igibson.utils.assets_utils import get_ig_avg_category_specs
+from igibson.utils.asset_utils import get_ig_avg_category_specs
 
 
 def main(args):

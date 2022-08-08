@@ -2,7 +2,7 @@ import numpy as np
 
 from igibson.tasks.point_navigation_task import PointNavigationTask
 from igibson.termination_conditions.point_goal import PointGoal
-from igibson.utils.utils import l2_distance
+import igibson.utils.transform_utils as T
 
 
 # Valid point navigation reward types
@@ -114,7 +114,7 @@ class PointReachingTask(PointNavigationTask):
 
     def _get_l2_potential(self, env):
         # Distance calculated from robot EEF, not base!
-        return l2_distance(env.robots[self._robot_idn].get_end_effector_position(), self._goal_pos)
+        return T.l2_distance(env.robots[self._robot_idn].get_end_effector_position(), self._goal_pos)
 
     def _get_obs(self, env):
         # Get obs from super

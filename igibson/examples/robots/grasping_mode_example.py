@@ -17,7 +17,7 @@ from igibson.objects.ycb_object import YCBObject
 from igibson.robots import REGISTERED_ROBOTS
 from igibson.scenes.empty_scene import EmptyScene
 from igibson.simulator import Simulator
-from igibson.utils.assets_utils import get_ig_avg_category_specs, get_ig_category_path, get_ig_model_path
+from igibson.utils.asset_utils import get_ig_avg_category_specs, get_ig_category_path, get_ig_model_path
 
 GRASPING_MODES = OrderedDict(
     sticky="Sticky Mitten - Objects are magnetized when they touch the fingers and a CLOSE command is given",

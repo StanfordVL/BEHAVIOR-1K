@@ -1,6 +1,7 @@
 import logging
 import os
 from sys import platform
+from collections import OrderedDict
 
 import numpy as np
 import yaml
@@ -16,8 +17,9 @@ from igibson.robots.turtlebot import Turtlebot
 from igibson.scenes.empty_scene import EmptyScene
 from igibson.scenes.gibson_indoor_scene import StaticIndoorScene
 from igibson.simulator import Simulator
-from igibson.utils.assets_utils import get_ig_avg_category_specs, get_ig_category_path, get_ig_model_path
-from igibson.utils.utils import let_user_pick, parse_config
+from igibson.utils.asset_utils import get_ig_avg_category_specs, get_ig_category_path, get_ig_model_path
+from igibson.utils.config_utils import parse_config
+from igibson.utils.ui_utils import choose_from_options
 
 
 def main(random_selection=False, headless=False, short_exec=False):
@@ -30,8 +32,8 @@ def main(random_selection=False, headless=False, short_exec=False):
     and executing actions
     """
     logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
-    scene_options = ["Empty scene", "Interactive scene (iG)", "Static scene (Gibson)"]
-    type_of_scene = let_user_pick(scene_options, random_selection=random_selection) - 1
+    scene_options = OrderedDict((i, scene_type) for i, scene_type in enumerate(["Empty scene", "Interactive scene (iG)", "Static scene (Gibson)"]))
+    type_of_scene = choose_from_options(options=scene_options, name="scene type", random_selection=random_selection)
 
     if type_of_scene == 0:  # Empty
         config = parse_config(os.path.join(igibson.example_config_path, "turtlebot_static_nav.yaml"))

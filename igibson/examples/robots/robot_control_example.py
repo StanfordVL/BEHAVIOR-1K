@@ -4,7 +4,6 @@ Example script demo'ing robot control.
 Options for random actions, as well as selection of robot action space
 """
 import logging
-import random
 import sys
 from collections import OrderedDict
 
@@ -15,6 +14,7 @@ import omni
 
 import igibson as ig
 from igibson.robots import REGISTERED_ROBOTS
+from igibson.utils.ui_utils import choose_from_options
 
 CONTROL_MODES = OrderedDict(
     random="Use autonomous random actions (default)",
@@ -25,40 +25,6 @@ SCENES = OrderedDict(
     Rs_int="Realistic interactive home environment (default)",
     empty="Empty environment with no objects",
 )
-
-
-def choose_from_options(options, name, random_selection=False):
-    """
-    Prints out options from a list, and returns the requested option.
-
-    :param options: dict or Array, options to choose from. If dict, the value entries are assumed to be docstrings
-        explaining the individual options
-    :param name: str, name of the options
-    :param random_selection: bool, if the selection is random (for automatic demo execution). Default False
-
-    :return str: Requested option
-    """
-    # Select robot
-    print("\nHere is a list of available {}s:\n".format(name))
-
-    for k, option in enumerate(options):
-        docstring = ": {}".format(options[option]) if isinstance(options, dict) else ""
-        print("[{}] {}{}".format(k + 1, option, docstring))
-    print()
-
-    if not random_selection:
-        try:
-            s = input("Choose a {} (enter a number from 1 to {}): ".format(name, len(options)))
-            # parse input into a number within range
-            k = min(max(int(s), 1), len(options)) - 1
-        except:
-            k = 0
-            print("Input is not valid. Use {} by default.".format(list(options)[k]))
-    else:
-        k = random.choice(range(len(options)))
-
-    # Return requested option
-    return list(options)[k]
 
 
 def choose_controllers(robot, random_selection=False):

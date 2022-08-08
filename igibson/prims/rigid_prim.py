@@ -19,7 +19,8 @@ import carb
 import igibson.macros as m
 from igibson.prims.xform_prim import XFormPrim
 from igibson.prims.geom_prim import CollisionGeomPrim, VisualGeomPrim
-from igibson.utils.types import DynamicState, CsRawData, GEOM_TYPES
+from igibson.utils.constants import GEOM_TYPES
+from igibson.utils.omni_types import DynamicState, CsRawData
 from igibson.utils.usd_utils import mesh_prim_to_trimesh_mesh
 
 # Import omni sensor based on type

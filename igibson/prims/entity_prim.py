@@ -27,9 +27,8 @@ from igibson.prims.cloth_prim import ClothPrim
 from igibson.prims.joint_prim import JointPrim
 from igibson.prims.rigid_prim import RigidPrim
 from igibson.prims.xform_prim import XFormPrim
-from igibson.utils.types import JointsState
-from igibson.utils.constants import PrimType
-from igibson.utils.types import GEOM_TYPES
+from igibson.utils.omni_types import JointsState
+from igibson.utils.constants import PrimType, GEOM_TYPES
 import igibson.macros as m
 
 

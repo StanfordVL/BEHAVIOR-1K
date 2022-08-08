@@ -6,7 +6,7 @@ import numpy as np
 from PIL import Image
 
 import igibson
-from igibson.utils.assets_utils import (
+from igibson.utils.asset_utils import (
     get_3dfront_scene_path,
     get_cubicasa_scene_path,
     get_ig_scene_path,

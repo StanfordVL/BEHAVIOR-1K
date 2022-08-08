@@ -2,7 +2,7 @@ import numpy as np
 from collections import OrderedDict
 import logging
 
-from igibson import sim
+import igibson as ig
 from igibson.objects.primitive_object import PrimitiveObject
 from igibson.reward_functions.collision_reward import CollisionReward
 from igibson.reward_functions.point_goal_reward import PointGoalReward
@@ -13,7 +13,6 @@ from igibson.termination_conditions.max_collision import MaxCollision
 from igibson.termination_conditions.falling import Falling
 from igibson.termination_conditions.point_goal import PointGoal
 from igibson.termination_conditions.timeout import Timeout
-from igibson.utils.utils import cartesian_to_polar, l2_distance, rotate_vector_3d
 from igibson.utils.python_utils import classproperty, assert_valid_key
 from igibson.utils.sim_utils import land_object, test_valid_pose
 import igibson.utils.transform_utils as T
@@ -171,8 +170,8 @@ class PointNavigationTask(BaseTask):
         )
 
         # Load the objects into the simulator
-        sim.import_object(self._initial_pos_marker)
-        sim.import_object(self._goal_pos_marker)
+        ig.sim.import_object(self._initial_pos_marker)
+        ig.sim.import_object(self._goal_pos_marker)
 
         # Additionally generate waypoints along the path if we're building the map in the environment
         if env.scene.trav_map.build_graph:
@@ -188,7 +187,7 @@ class PointNavigationTask(BaseTask):
                     visual_only=True,
                     rgba=np.array([0, 1, 0, 0.3]),
                 )
-                sim.import_object(waypoint)
+                ig.sim.import_object(waypoint)
                 waypoints.append(waypoint)
 
             # Store waypoints
@@ -228,7 +227,7 @@ class PointNavigationTask(BaseTask):
                 if env.scene.trav_map.build_graph:
                     _, dist = env.scene.get_shortest_path(self._floor, initial_pos[:2], goal_pos[:2], entire_path=False)
                 else:
-                    dist = l2_distance(initial_pos, goal_pos)
+                    dist = T.l2_distance(initial_pos, goal_pos)
                 # If a path range is specified, make sure distance is valid
                 if self._path_range is None or self._path_range[0] < dist < self._path_range[1]:
                     in_range_dist = True
@@ -261,7 +260,7 @@ class PointNavigationTask(BaseTask):
         :param env: environment instance
         :return: L2 distance to the target position
         """
-        return l2_distance(env.robots[self._robot_idn].get_position()[:2], self._goal_pos[:2])
+        return T.l2_distance(env.robots[self._robot_idn].get_position()[:2], self._goal_pos[:2])
 
     def get_potential(self, env):
         """
@@ -358,27 +357,25 @@ class PointNavigationTask(BaseTask):
         :param pos: a 3D point in global frame
         :return: the same 3D point in agent's local frame
         """
-        return rotate_vector_3d(np.array(pos) - np.array(env.robots[self._robot_idn].get_position()),
-                                *env.robots[self._robot_idn].get_rpy())
+        delta_pos_global = np.array(pos) - env.robots[self._robot_idn].get_position()
+        return T.quat2mat(env.robots[self._robot_idn].get_orientation()).T @ delta_pos_global
 
     def _get_obs(self, env):
         # Get relative position of goal with respect to the current agent position
         xy_pos_to_goal = self._global_pos_to_robot_frame(env, self._goal_pos)[:2]
         if self._goal_in_polar:
-            xy_pos_to_goal = np.array(cartesian_to_polar(*xy_pos_to_goal))
+            xy_pos_to_goal = np.array(T.cartesian_to_polar(*xy_pos_to_goal))
 
-        # linear velocity along the x-axis
-        linear_velocity = rotate_vector_3d(env.robots[self._robot_idn].get_linear_velocity(),
-                                           *env.robots[self._robot_idn].get_rpy())[0]
-        # angular velocity along the z-axis
-        angular_velocity = rotate_vector_3d(env.robots[self._robot_idn].get_angular_velocity(),
-                                            *env.robots[self._robot_idn].get_rpy())[2]
+        # linear velocity and angular velocity
+        quat = env.robots[self._robot_idn].get_orientation()
+        lin_vel = T.quat2mat(quat).T @ env.robots[self._robot_idn].get_linear_velocity()
+        ang_vel = T.quat2mat(quat).T @ env.robots[self._robot_idn].get_angular_velocity()
 
         # Compose observation dict
         low_dim_obs = OrderedDict(
             xy_pos_to_goal=xy_pos_to_goal,
-            robot_lin_vel=np.array([linear_velocity]),
-            robot_ang_vel=np.array([angular_velocity]),
+            robot_lin_vel=lin_vel,
+            robot_ang_vel=ang_vel,
         )
 
         # We have no non-low-dim obs, so return empty dict for those
@@ -448,7 +445,7 @@ class PointNavigationTask(BaseTask):
 
         # Update other internal variables
         new_robot_pos = env.robots[self._robot_idn].get_position()
-        self._path_length += l2_distance(self._current_robot_pos[:2], new_robot_pos[:2])
+        self._path_length += T.l2_distance(self._current_robot_pos[:2], new_robot_pos[:2])
         self._current_robot_pos = new_robot_pos
 
         return reward, done, info

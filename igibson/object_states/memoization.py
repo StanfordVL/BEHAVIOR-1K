@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 
 from igibson.object_states.pose import Pose
-from igibson.utils.utils import l2_distance
+import igibson.utils.transform_utils as T
 
 POSITIONAL_VALIDATION_EPSILON = 1e-5
 
@@ -56,7 +56,7 @@ class PositionalValidationMemoizedObjectStateMixin(MemoizedObjectStateMixin):
             if np.all(np.asarray(new_pos) == np.asarray(old_pos)):
                 continue
 
-            dist = l2_distance(new_pos, old_pos)
+            dist = T.l2_distance(new_pos, old_pos)
             if dist > POSITIONAL_VALIDATION_EPSILON:
                 return False
 

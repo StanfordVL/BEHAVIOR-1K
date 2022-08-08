@@ -6,7 +6,6 @@ from igibson.object_states.adjacency import VerticalAdjacency
 from igibson.object_states.memoization import PositionalValidationMemoizedObjectStateMixin
 from igibson.object_states.object_state_base import BooleanState, RelativeObjectState
 from igibson.object_states.utils import sample_kinematics
-from igibson.utils.utils import restoreState
 
 
 class Under(PositionalValidationMemoizedObjectStateMixin, RelativeObjectState, BooleanState):

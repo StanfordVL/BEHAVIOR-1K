@@ -4,7 +4,7 @@ import os
 import numpy as np
 
 from igibson.scenes.traversable_scene import TraversableScene
-from igibson.utils.assets_utils import get_scene_path, get_texture_file
+from igibson.utils.asset_utils import get_scene_path, get_texture_file
 from igibson.utils.constants import SemanticClass
 
 # TODO

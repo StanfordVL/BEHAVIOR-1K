@@ -4,7 +4,7 @@ from collections import namedtuple
 import numpy as np
 
 from igibson import app
-from igibson.utils.assets_utils import get_assisted_grasping_categories
+from igibson.utils.asset_utils import get_assisted_grasping_categories
 import igibson.utils.transform_utils as T
 from igibson.controllers import (
     IsGraspingState,

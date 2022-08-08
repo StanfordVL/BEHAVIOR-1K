@@ -13,11 +13,10 @@ from igibson.utils.constants import (
     SemanticClass,
 )
 from pxr import UsdPhysics, PhysxSchema
-from igibson.utils.semantics_utils import CLASS_NAME_TO_CLASS_ID
 from igibson.utils.usd_utils import get_prim_nested_children, create_joint, CollisionAPI
 from igibson.prims.entity_prim import EntityPrim
 from igibson.prims.xform_prim import XFormPrim
-from igibson.utils.constants import PrimType
+from igibson.utils.constants import PrimType, CLASS_NAME_TO_CLASS_ID
 
 
 class BaseObject(EntityPrim, metaclass=ABCMeta):
