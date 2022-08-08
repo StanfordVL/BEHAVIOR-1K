@@ -958,8 +958,88 @@ def matrix_inverse(matrix):
     return np.linalg.inv(matrix)
 
 
+def rotate_vec_3d(vec0, vec1):
+    """
+    Rotates vector @vec0 by the (r,p,y) rotation defined by @vec1
+
+    Args:
+         vec0 (3-array): Initial vector to rotate
+         vec1 (3-array): (r,p,y) vector to rotate @vec0 by
+    """
+    return euler2mat(vec1) @ vec0
+
+
+def l2_distance(v1, v2):
+    """Returns the L2 distance between vector v1 and v2."""
+    return np.linalg.norm(np.array(v1) - np.array(v2))
+
+
+
+def frustum(left, right, bottom, top, znear, zfar):
+    """Create view frustum matrix."""
+    assert right != left
+    assert bottom != top
+    assert znear != zfar
+
+    M = np.zeros((4, 4), dtype=np.float32)
+    M[0, 0] = +2.0 * znear / (right - left)
+    M[2, 0] = (right + left) / (right - left)
+    M[1, 1] = +2.0 * znear / (top - bottom)
+    # TODO: Put this back to 3,1
+    # M[3, 1] = (top + bottom) / (top - bottom)
+    M[2, 1] = (top + bottom) / (top - bottom)
+    M[2, 2] = -(zfar + znear) / (zfar - znear)
+    M[3, 2] = -2.0 * znear * zfar / (zfar - znear)
+    M[2, 3] = -1.0
+    return M
+
+
+def ortho(left, right, bottom, top, znear, zfar):
+    """Create orthonormal projection matrix."""
+    assert right != left
+    assert bottom != top
+    assert znear != zfar
+
+    M = np.zeros((4, 4), dtype=np.float32)
+    M[0, 0] = 2.0 / (right - left)
+    M[1, 1] = 2.0 / (top - bottom)
+    M[2, 2] = -2.0 / (zfar - znear)
+    M[3, 0] = -(right + left) / (right - left)
+    M[3, 1] = -(top + bottom) / (top - bottom)
+    M[3, 2] = -(zfar + znear) / (zfar - znear)
+    M[3, 3] = 1.0
+    return M
+
+
+def perspective(fovy, aspect, znear, zfar):
+    """Create perspective projection matrix."""
+    # fovy is in degree
+    assert znear != zfar
+    h = np.tan(fovy / 360.0 * np.pi) * znear
+    w = h * aspect
+    return frustum(-w, w, -h, h, znear, zfar)
+
+
+def anorm(x, axis=None, keepdims=False):
+    """Compute L2 norms alogn specified axes."""
+    return np.linalg.norm(x, axis=axis, keepdims=keepdims)
+
+
+def normalize(v, axis=None, eps=1e-10):
+    """L2 Normalize along specified axes."""
+    return v / max(anorm(v, axis=axis, keepdims=True), eps)
+
+
+def cartesian_to_polar(x, y):
+    """Convert cartesian coordinate to polar coordinate"""
+    rho = np.sqrt(x ** 2 + y ** 2)
+    phi = np.arctan2(y, x)
+    return rho, phi
+
+
 def deg2rad(deg):
     return deg * np.pi / 180.
+
 
 def rad2deg(rad):
     return rad * 180. / np.pi

@@ -65,7 +65,6 @@ from igibson.sensors.scan_sensor import ScanSensor
 from igibson.scenes.gibson_indoor_scene import StaticTraversableScene
 from igibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
 import igibson.utils.transform_utils as T
-from igibson.utils.utils import l2_distance, rotate_vector_2d
 from igibson.utils.control_utils import IKSolver
 
 
@@ -305,12 +304,12 @@ class MotionPlanner:
                 half_occupancy_range = self.occupancy_range / 2.0
                 robot_position_xy = self.robot.get_position()[:2]
                 corners = [
-                    robot_position_xy + rotate_vector_2d(local_corner, -yaw)
+                    robot_position_xy + (T.euler2mat([0, 0, yaw]) @ local_corner)[:2]
                     for local_corner in [
-                        np.array([half_occupancy_range, half_occupancy_range]),
-                        np.array([half_occupancy_range, -half_occupancy_range]),
-                        np.array([-half_occupancy_range, half_occupancy_range]),
-                        np.array([-half_occupancy_range, -half_occupancy_range]),
+                        np.array([half_occupancy_range, half_occupancy_range, 0]),
+                        np.array([half_occupancy_range, -half_occupancy_range, 0]),
+                        np.array([-half_occupancy_range, half_occupancy_range, 0]),
+                        np.array([-half_occupancy_range, -half_occupancy_range, 0]),
                     ]
                 ]
             else:
@@ -470,7 +469,7 @@ class MotionPlanner:
             position_arm_shoulder_in_wf, _ = p.multiplyTransforms(
                 body_pos, body_orn, position_arm_shoulder_in_bf, [0, 0, 0, 1]
             )
-            if l2_distance(ee_position, position_arm_shoulder_in_wf) > 0.7:  # TODO: get max distance
+            if T.l2_distance(ee_position, position_arm_shoulder_in_wf) > 0.7:  # TODO: get max distance
                 return None
             else:
                 if ee_orientation is not None:
@@ -549,7 +548,7 @@ class MotionPlanner:
             self.robot.set_joint_positions(current_joint_pos)
             # app.update()
 
-            dist = l2_distance(self.robot.get_eef_position(arm=arm), ee_position)
+            dist = T.l2_distance(self.robot.get_eef_position(arm=arm), ee_position)
             if dist > self.arm_ik_threshold:
                 # input(f"Distance from pose: {dist}, max: {self.arm_ik_threshold}")
                 log.warning("IK solution is not close enough to the desired pose. Distance: {}".format(dist))
@@ -928,7 +927,7 @@ class MotionPlanner:
     #         desired_y_dir_normalized = desired_y_dir / np.linalg.norm(desired_y_dir)
     #         desired_z_dir_normalized = np.cross(desired_x_dir_normalized, desired_y_dir_normalized)
     #         rot_matrix = np.column_stack((desired_x_dir_normalized, desired_y_dir_normalized, desired_z_dir_normalized))
-    #         quatt = quatXYZWFromRotMat(rot_matrix)
+    #         quatt = T.mat2quat(rot_matrix)
     #     else:
     #         log.warning("Planning pulling with end-effector orientation {}".format(ee_pulling_orn))
     #         quatt = ee_pulling_orn
@@ -1330,7 +1329,7 @@ class MotionPlanner:
     #     desired_y_dir_normalized = desired_y_dir / np.linalg.norm(desired_y_dir)
     #     desired_z_dir_normalized = np.cross(desired_x_dir_normalized, desired_y_dir_normalized)
     #     rot_matrix = np.column_stack((desired_x_dir_normalized, desired_y_dir_normalized, desired_z_dir_normalized))
-    #     quatt = quatXYZWFromRotMat(rot_matrix)
+    #     quatt = T.mat2quat(rot_matrix)
     #     """
     #     quatt = (0, 0.7071068, 0, 0.7071068)
     #     if plan_full_pre_toggle_motion:

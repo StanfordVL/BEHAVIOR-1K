@@ -6,7 +6,7 @@ import xml.etree.ElementTree as ET
 import numpy as np
 
 import igibson
-from igibson.utils.utils import get_rpy_from_transform
+import igibson.utils.transform_utils as T
 
 
 def insert_geometric_primitive(obj, insert_visual_mesh=True):
@@ -74,7 +74,7 @@ if __name__ == "__main__":
                             "mvbb_meta": mvbb_meta,
                             "base_link_offset": np.array(metadata["base_link_offset"]),
                             "size": size,
-                            "euler": get_rpy_from_transform(np.reshape(object_data["transform"], [3, 3])),
+                            "euler": T.mat2euler(np.reshape(object_data["transform"], [3, 3])),
                         }
                         idx += 1
     new_urdfs = []

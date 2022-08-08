@@ -4,7 +4,7 @@ import time
 
 import numpy as np
 
-from igibson.utils.utils import normalizeListVec
+import igibson.utils.transform_utils as T
 
 # List of all VR button idx/press combos, which will be used to form a compact binary representation
 # These are taken from the openvr.h header file
@@ -305,7 +305,7 @@ def get_normalized_translation_vec(right_frac, forward_frac, right, forward):
     """Generates a normalized translation vector that is a linear combination of forward and right."""
     vr_offset_vec = [right[i] * right_frac + forward[i] * forward_frac for i in range(3)]
     vr_offset_vec[2] = 0
-    return normalizeListVec(vr_offset_vec)
+    return T.normalize(vr_offset_vec).aslist()
 
 
 def translate_vr_position_by_vecs(right_frac, forward_frac, right, forward, curr_offset, movement_speed):

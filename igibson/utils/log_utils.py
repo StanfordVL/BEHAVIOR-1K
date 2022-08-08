@@ -18,7 +18,7 @@ from igibson.utils.config_utils import dump_config, parse_str_config
 from igibson.utils.vr_utils import VR_BUTTON_COMBO_NUM, VrData, convert_button_data_to_binary
 
 
-class IGLogWriter(object):
+class IGLogWriter:
     """Class that handles saving of physics data, VR data, iGATUS task data and user-defined actions.
 
     Usage:

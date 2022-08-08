@@ -2,7 +2,7 @@ import numpy as np
 from collections import Iterable
 import logging
 
-from igibson import sim
+import igibson as ig
 from igibson.robots.robot_base import BaseRobot
 import igibson.utils.transform_utils as T
 
@@ -19,7 +19,7 @@ def get_collisions(objects):
             by their prim_paths
     """
     # Make sure sim is playing
-    assert sim.is_playing(), "Cannot get collisions while sim is not playing!"
+    assert ig.sim.is_playing(), "Cannot get collisions while sim is not playing!"
 
     objects = objects if isinstance(objects, Iterable) else [objects]
     # Grab collisions
@@ -47,11 +47,11 @@ def check_collision(objsA=None, linksA=None, objsB=None, linksB=None, step_physi
         bool: Whether any of @objsA or @linksA are in collision or not, possibly with @objsB or @linksB if specified
     """
     # Make sure sim is playing
-    assert sim.is_playing(), "Cannot check collisions while sim is not playing!"
+    assert ig.sim.is_playing(), "Cannot check collisions while sim is not playing!"
 
     # Optionally step physics and then update contacts
     if step_physics:
-        sim.step_physics()
+        ig.sim.step_physics()
 
     # Run sanity checks and standardize inputs
     assert objsA is not None or linksA is not None, \
@@ -135,10 +135,10 @@ def test_valid_pose(obj, pos, quat=None):
         bool: Whether the placed object position is valid
     """
     # Make sure sim is playing
-    assert sim.is_playing(), "Cannot test valid pose while sim is not playing!"
+    assert ig.sim.is_playing(), "Cannot test valid pose while sim is not playing!"
 
     # Store state before checking object position
-    state = sim.scene.dump_state(serialized=False)
+    state = ig.sim.scene.dump_state(serialized=False)
 
     # Set the position of the object
     obj.set_position_orientation(position=pos, orientation=quat)
@@ -152,7 +152,7 @@ def test_valid_pose(obj, pos, quat=None):
     in_collision = check_collision(objsA=obj, step_physics=True)
 
     # Restore state after checking the collision
-    sim.scene.load_state(state, serialized=False)
+    ig.sim.scene.load_state(state, serialized=False)
 
     # Valid if there are no collisions
     return not in_collision
@@ -169,7 +169,7 @@ def land_object(obj, pos, quat):
             If None, a random orientation about the z-axis will be sampled
     """
     # Make sure sim is playing
-    assert sim.is_playing(), "Cannot land object while sim is not playing!"
+    assert ig.sim.is_playing(), "Cannot land object while sim is not playing!"
 
     # Set the object's pose
     quat = T.euler2quat([0, 0, np.random.uniform(0, np.pi * 2)]) if quat is None else quat
@@ -184,10 +184,10 @@ def land_object(obj, pos, quat):
     # Check to make sure we landed successfully
     # land for maximum 1 second, should fall down ~5 meters
     land_success = False
-    max_simulator_step = int(1.0 / sim.get_rendering_dt())
+    max_simulator_step = int(1.0 / ig.sim.get_rendering_dt())
     for _ in range(max_simulator_step):
         # Run a sim step and see if we have any contacts
-        sim.step()
+        ig.sim.step()
         land_success = check_collision(objsA=obj)
         if land_success:
             # Once we're successful, we can break immediately

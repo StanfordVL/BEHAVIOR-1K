@@ -221,4 +221,3 @@ def create_physx_particleset_pointinstancer(
     physicsUtils.set_or_add_translate_op(instancer, Gf.Vec3f(0, 0, 0))
 
     return instancer_prim
-

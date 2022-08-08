@@ -24,8 +24,7 @@ import numpy as np
 import trimesh
 
 from igibson import assets_path, ig_dataset_path
-from igibson.utils.constants import JointType
-from igibson.utils.types import PRIMITIVE_MESH_TYPES
+from igibson.utils.constants import JointType, PRIMITIVE_MESH_TYPES
 from igibson.utils.python_utils import assert_valid_key
 
 GF_TO_VT_MAPPING = {
@@ -329,6 +328,7 @@ class BoundingBoxAPI:
         """
         lower, upper = container
         return np.less_equal(lower, point).all() and np.less_equal(point, upper).all()
+
 
 def clear():
     """
