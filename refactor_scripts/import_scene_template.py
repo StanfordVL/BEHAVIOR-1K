@@ -1,5 +1,5 @@
 from igibson import app, ig_dataset_path
-from igibson.simulator_omni import Simulator
+from igibson.simulator import Simulator
 import pxr.Vt
 from pxr import Usd
 from pxr import Gf

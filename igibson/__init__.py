@@ -119,13 +119,18 @@ app = OmniApp(
 )
 
 # Next import must be simulator
-from igibson.simulator_omni import Simulator
+sim = None
+from igibson.simulator import Simulator
 
 # Create simulator (this is a singleton so it's okay that it's global)
 sim = Simulator()
 
 # Import any remaining items we want to access directly from the main igibson import
 from igibson.envs import Environment
+from igibson.scenes import REGISTERED_SCENES
+from igibson.robots import REGISTERED_ROBOTS
+from igibson.controllers import REGISTERED_CONTROLLERS
+from igibson.tasks import REGISTERED_TASKS
 
 # Define convenience function for shutting down iGibson cleanly
 def shutdown():

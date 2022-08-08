@@ -1,541 +1,1034 @@
+# Copyright (c) 2021, NVIDIA CORPORATION.  All rights reserved.
+#
+# NVIDIA CORPORATION and its licensors retain all intellectual property
+# and proprietary rights in and to this software, related documentation
+# and any modifications thereto.  Any use, reproduction, disclosure or
+# distribution of this software and related documentation without an express
+# license agreement from NVIDIA CORPORATION is strictly prohibited.
+#
+from collections import defaultdict
+import itertools
 import logging
-import os
-import platform
 
-import numpy as np
+import json
+import omni
+import carb
+from omni.isaac.core.simulation_context import SimulationContext
+from omni.isaac.core.tasks import BaseTask
+from omni.isaac.core.utils.prims import is_prim_ancestral, get_prim_type_name, is_prim_no_delete, get_prim_at_path, \
+    is_prim_path_valid
+from omni.isaac.core.utils.stage import clear_stage, save_stage, open_stage
+from omni.isaac.dynamic_control import _dynamic_control
+import omni.kit.loop._loop as omni_loop
+import builtins
+from pxr import Usd, Gf, UsdGeom, Sdf, UsdPhysics, PhysxSchema
+from omni.isaac.core.utils.viewports import set_camera_view
+from omni.isaac.core.loggers import DataLogger
+from typing import Optional, List
 
-import igibson
-from igibson.object_states.factory import get_states_by_dependency_order
-from igibson.objects.object_base import BaseObject
-from igibson.objects.particles import Particle, ParticleSystem
-from igibson.objects.visual_marker import VisualMarker
-from igibson.render.mesh_renderer.materials import ProceduralMaterial, RandomizedMaterial
-from igibson.render.mesh_renderer.mesh_renderer_cpu import MeshRenderer
-from igibson.render.mesh_renderer.mesh_renderer_settings import MeshRendererSettings
-from igibson.render.mesh_renderer.mesh_renderer_tensor import MeshRendererG2G
-from igibson.render.viewer import Viewer, ViewerSimple
-from igibson.robots.behavior_robot import BehaviorRobot
+from igibson import assets_path, ig_dataset_path
+import igibson.macros as m
 from igibson.robots.robot_base import BaseRobot
-from igibson.scenes.scene_base import Scene
-from igibson.utils.assets_utils import get_ig_avg_category_specs
-from igibson.utils.constants import PYBULLET_BASE_LINK_INDEX, PyBulletSleepState, SimulatorMode
-from igibson.utils.mesh_util import quat2rotmat, xyz2mat, xyzw2wxyz
+from igibson.utils.config_utils import NumpyEncoder
+from igibson.utils.python_utils import clear as clear_pu, create_object_from_init_info
+from igibson.utils.usd_utils import clear as clear_uu, BoundingBoxAPI, get_usd_metadata, update_usd_metadata
+from igibson.utils.asset_utils import get_ig_avg_category_specs
+from igibson.utils.ui_utils import CameraMover
+from igibson.scenes import Scene
+from igibson.objects.object_base import BaseObject
+from igibson.objects.stateful_object import StatefulObject
+from igibson.object_states.factory import get_states_by_dependency_order
+from igibson.sensors.vision_sensor import VisionSensor
+from igibson.transition_rules import DEFAULT_RULES, TransitionResults
+from omni.kit.viewport_legacy import acquire_viewport_interface
 
 
-def load_without_pybullet_vis(load_func):
-    """
-    Load without pybullet visualizer.
-    """
-
-    def wrapped_load_func(*args, **kwargs):
-        p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, False)
-        res = load_func(*args, **kwargs)
-        p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, True)
-        return res
-
-    return wrapped_load_func
+# Define some global defaults
+DEFAULT_VIEWER_WIDTH = 1280
+DEFAULT_VIEWER_HEIGHT = 720
 
 
-class Simulator:
-    """
-    Simulator class is a wrapper of physics simulator (omniverse) and corresponding renderer, it loads objects into
-    omniverse and its renderer and syncs the pose of objects and robot parts.
-    """
+class Simulator(SimulationContext):
+    """ This class inherits from SimulationContext which provides the following.
+
+        SimulationContext provide functions that take care of many time-related events such as
+        perform a physics or a render step for instance. Adding/ removing callback functions that
+        gets triggered with certain events such as a physics step, timeline event
+        (pause or play..etc), stage open/ close..etc.
+
+        It also includes an instance of PhysicsContext which takes care of many physics related
+        settings such as setting physics dt, solver type..etc.
+
+        In addition to what is provided from SimulationContext, this class allows the user to add a
+        task to the world and it contains a scene object.
+
+        To control the default reset state of different objects easily, the object could be added to
+        a Scene. Besides this, the object is bound to a short keyword that facilitates objects retrievals,
+        like in a dict.
+
+        Checkout the required tutorials at
+        https://docs.omniverse.nvidia.com/app_isaacsim/app_isaacsim/overview.html
+
+        Args:
+            :param gravity: gravity on z direction.
+            physics_dt (Optional[float], optional): dt between physics steps. Defaults to 1.0 / 60.0.
+            rendering_dt (Optional[float], optional): dt between rendering steps. Note: rendering means
+                                                       rendering a frame of the current application and not
+                                                       only rendering a frame to the viewports/ cameras. So UI
+                                                       elements of Isaac Sim will be refereshed with this dt
+                                                       as well if running non-headless.
+                                                       Defaults to 1.0 / 60.0.
+            stage_units_in_meters (float, optional): The metric units of assets. This will affect gravity value..etc.
+                                                      Defaults to 0.01.
+            :param viewer_width: width of the camera image
+            :param viewer_height: height of the camera image
+            :param vertical_fov: vertical field of view of the camera image in degrees
+            :param device: None or str, specifies the device to be used if running on the gpu with torch backend
+            apply_transitions (bool): True to apply the transition rules.
+        """
+
+    _world_initialized = False
 
     def __init__(
-        self,
-        gravity=9.8,
-        physics_timestep=1 / 120.0,
-        render_timestep=1 / 30.0,
-        solver_iterations=100,
-        mode="gui_interactive",
-        image_width=128,
-        image_height=128,
-        vertical_fov=90,
-        device_idx=0,
-        rendering_settings=MeshRendererSettings(),
-    ):
-        """
-        :param gravity: gravity on z direction.
-        :param physics_timestep: timestep of physical simulation, p.stepSimulation()
-        :param render_timestep: timestep of rendering, and Simulator.step() function
-        :param solver_iterations: number of solver iterations to feed into pybullet, can be reduced to increase speed.
-            pybullet default value is 50.
-        :param use_variable_step_num: whether to use a fixed (1) or variable physics step number
-        :param mode: choose mode from headless, headless_tensor, gui_interactive, gui_non_interactive
-        :param image_width: width of the camera image
-        :param image_height: height of the camera image
-        :param vertical_fov: vertical field of view of the camera image in degrees
-        :param device_idx: GPU device index to run rendering on
-        :param rendering_settings: settings to use for mesh renderer
-        :param use_pb_gui: concurrently display the interactive pybullet gui (for debugging)
-        """
-        # physics simulator
+            self,
+            gravity=9.81,
+            physics_dt: float = 1.0 / 60.0,
+            rendering_dt: float = 1.0 / 60.0,
+            stage_units_in_meters: float = 1.0,
+            viewer_width=DEFAULT_VIEWER_WIDTH,
+            viewer_height=DEFAULT_VIEWER_HEIGHT,
+            vertical_fov=90,
+            device=None,
+            apply_transitions=False,
+    ) -> None:
+        super().__init__(
+            physics_dt=physics_dt,
+            rendering_dt=rendering_dt,
+            stage_units_in_meters=stage_units_in_meters,
+            device=device,
+        )
+        if Simulator._world_initialized:
+            return
+        Simulator._world_initialized = True
+        self._scene_finalized = False
+        # self._current_tasks = dict()
+        self._dc_interface = _dynamic_control.acquire_dynamic_control_interface()
+        # if not builtins.ISAAC_LAUNCHED_FROM_TERMINAL:
+        #     self.start_simulation()
+        set_camera_view()
+        self._data_logger = DataLogger()
+
+        # Store other internal vars
+        n_physics_timesteps_per_render = rendering_dt / physics_dt
+        assert n_physics_timesteps_per_render.is_integer(), "render_timestep must be a multiple of physics_timestep"
+        self.n_physics_timesteps_per_render = int(n_physics_timesteps_per_render)
         self.gravity = gravity
-        self.physics_timestep = physics_timestep
-        self.render_timestep = render_timestep
-        self.solver_iterations = solver_iterations
-        self.physics_timestep_num = self.render_timestep / self.physics_timestep
-        assert self.physics_timestep_num.is_integer(), "render_timestep must be a multiple of physics_timestep"
+        self.vertical_fov = vertical_fov        # TODO: This currently does nothing
 
-        self.physics_timestep_num = int(self.physics_timestep_num)
-        self.mode = SimulatorMode[mode.upper()]
-
-        self.image_width = image_width
-        self.image_height = image_height
-        self.vertical_fov = vertical_fov
-        self.device_idx = device_idx
-        self.rendering_settings = rendering_settings
-
-        self.viewer = None
-        self.renderer = None
-
-        # Initialize other variables
-        self.visual_objects = None
-
-        # TODO: Current thing being worked on
-        self.initialize_renderer()
-
-        self.initialize_physics_engine()
-        self.initialize_viewers()
-        self.initialize_variables()
-
-        # Set of categories that can be grasped by assisted grasping
-        self.object_state_types = get_states_by_dependency_order()
-
-        self.assist_grasp_category_allow_list = self.gen_assisted_grasping_categories()
-        self.assist_grasp_mass_thresh = 10.0
-
-    def set_timestep(self, physics_timestep, render_timestep):
-        """
-        Set physics timestep and render (action) timestep.
-
-        :param physics_timestep: physics timestep for pybullet
-        :param render_timestep: rendering timestep for renderer
-        """
-        self.physics_timestep = physics_timestep
-        self.render_timestep = render_timestep
-        p.setTimeStep(self.physics_timestep)
-
-    def disconnect(self, release_renderer=True):
-        """
-        Clean up the simulator.
-
-        :param release_renderer: whether to release the MeshRenderer
-        """
-        if p.getConnectionInfo(self.cid)["isConnected"]:
-            # print("******************PyBullet Logging Information:")
-            p.resetSimulation(physicsClientId=self.cid)
-            p.disconnect(self.cid)
-            # print("PyBullet Logging Information******************")
-        if release_renderer:
-            self.renderer.release()
-
-    def reload(self):
-        """
-        Destroy the MeshRenderer and physics simulator and start again.
-        """
-        self.disconnect()
-
-        self.initialize_renderer()
-        self.initialize_physics_engine()
-        self.initialize_viewers()
-        self.initialize_variables()
-
-    def initialize_variables(self):
-        """
-        Intialize miscellaneous variables
-        """
-        self.scene = None
+        # Store other references to variables that will be initialized later
+        self._viewer = None
+        self._viewer_camera = None
+        self._camera_mover = None
+        self._scene = None
         self.particle_systems = []
         self.frame_count = 0
         self.body_links_awake = 0
-        # First sync always sync all objects (regardless of their sleeping states)
-        self.first_sync = True
+        self.first_sync = True          # First sync always sync all objects (regardless of their sleeping states)
 
-    def initialize_renderer(self):
-        """
-        Initialize the MeshRenderer.
-        """
-        self.visual_objects = {}
-        if self.mode == SimulatorMode.HEADLESS_TENSOR:
-            self.renderer = MeshRendererG2G(
-                width=self.image_width,
-                height=self.image_height,
-                vertical_fov=self.vertical_fov,
-                device_idx=self.device_idx,
-                rendering_settings=self.rendering_settings,
-                simulator=self,
-            )
-        elif self.mode in [SimulatorMode.GUI_INTERACTIVE, SimulatorMode.GUI_NON_INTERACTIVE, SimulatorMode.HEADLESS]:
-            self.renderer = MeshRenderer(
-                width=self.image_width,
-                height=self.image_height,
-                vertical_fov=self.vertical_fov,
-                device_idx=self.device_idx,
-                rendering_settings=self.rendering_settings,
-                simulator=self,
-            )
+        # Initialize viewer
+        # self._set_physics_engine_settings()
+        # TODO: Make this toggleable so we don't always have a viewer if we don't want to
+        self._set_viewer_settings()
+        self.viewer_width = viewer_width
+        self.viewer_height = viewer_height
+
+        # List of objects that need to be initialized during whenever the next sim step occurs
+        self._objects_to_initialize = []
+
+        # TODO: Fix
+        # Set of categories that can be grasped by assisted grasping
+        self.object_state_types = get_states_by_dependency_order()
+
+        # Set of all non-Omniverse transition rules to apply.
+        self._apply_transitions = apply_transitions
+        self._transition_rules = DEFAULT_RULES
+
+        # Toggle simulator state once so that downstream omni features can be used without bugs
+        # e.g.: particle sampling, which for some reason requires sim.play() to be called at least once
+        self.play()
+        self.stop()
+
+        # Finally, update the physics settings
+        # This needs to be done now, after an initial step + stop for some reason if we want to use GPU
+        # dynamics, otherwise we get very strange behavior, e.g., PhysX complains about invalid transforms
+        # and crashes
+        self._set_physics_engine_settings()
+
+    def __new__(
+        cls,
+        gravity=9.81,
+        physics_dt: float = 1.0 / 60.0,
+        rendering_dt: float = 1.0 / 60.0,
+        stage_units_in_meters: float = 1.0,
+        viewer_width=DEFAULT_VIEWER_WIDTH,
+        viewer_height=DEFAULT_VIEWER_HEIGHT,
+        vertical_fov=90,
+        device_idx=0,
+        apply_transitions=False,
+    ) -> None:
+        # Overwrite since we have different kwargs
+        if Simulator._instance is None:
+            Simulator._instance = object.__new__(cls)
         else:
-            raise Exception(
-                "The available render modes are headless, headless_tensor, gui_interactive, and gui_non_interactive."
-            )
+            carb.log_info("Simulator is defined already, returning the previously defined one")
+        return Simulator._instance
 
-    def initialize_physics_engine(self):
+    def _reset_variables(self):
         """
-        Initialize the physics engine (pybullet).
+        Reset state of internal variables
         """
-        if self.use_pb_gui:
-            self.cid = p.connect(p.GUI)
+        self.particle_systems = []
+        self.frame_count = 0
+        self.body_links_awake = 0
+        self.first_sync = True          # First sync always sync all objects (regardless of their sleeping states)
+
+    def _set_viewer_camera(self, prim_path="/World/viewer_camera"):
+        """
+        Creates a camera prim dedicated for this viewer at @prim_path if it doesn't exist,
+        and sets this camera as the active camera for the viewer
+
+        Args:
+            prim_path (str): Path to check for / create the viewer camera
+        """
+        vp = acquire_viewport_interface()
+        viewers_to_names = {vp.get_viewport_window(h): vp.get_viewport_window_name(h) for h in vp.get_instance_list()}
+        self._viewer_camera = VisionSensor(
+            prim_path=prim_path,
+            name=prim_path.split("/")[-1],                  # Assume name is the lowest-level name in the prim_path
+            modalities="rgb",
+            image_height=self.viewer_height,
+            image_width=self.viewer_width,
+            viewport_name=viewers_to_names[self._viewer],
+        )
+        if not self._viewer_camera.loaded:
+            self._viewer_camera.load(simulator=self)
+
+        # We update its clipping range so that it doesn't clip nearby objects (default min is 1 m)
+        self._viewer_camera.clipping_range = [0.001, 10000000.0]
+
+        # Initialize the sensor
+        self._viewer_camera.initialize()
+
+        # Also need to potentially update our camera mover if it already exists
+        if self._camera_mover is not None:
+            self._camera_mover.set_cam(cam=self._viewer_camera)
+
+    def _set_physics_engine_settings(self):
+        """
+        Set the physics engine with specified settings
+        """
+        assert self.is_stopped(), f"Cannot set simulator physics settings while simulation is playing!"
+        self._physics_context.set_gravity(value=-self.gravity)
+        # Also make sure we invert the collision group filter settings so that different collision groups cannot
+        # collide with each other, and modify settings for speed optimization
+        self._physics_context.set_invert_collision_group_filter(True)
+        self._physics_context.enable_ccd(m.ENABLE_CCD)
+        self._physics_context.enable_flatcache(m.ENABLE_FLATCACHE)
+
+        # Enable GPU dynamics based on whether we need omni particles feature
+        if m.ENABLE_OMNI_PARTICLES:
+            self._physics_context.enable_gpu_dynamics(True)
+            self._physics_context.set_broadphase_type("GPU")
         else:
-            self.cid = p.connect(p.DIRECT)
+            self._physics_context.enable_gpu_dynamics(False)
+            self._physics_context.set_broadphase_type("MBP")
 
-        # Needed for deterministic action replay
-        # TODO(mjlbach) consider making optional and benchmark
-        p.resetSimulation()
-        p.setPhysicsEngineParameter(deterministicOverlappingPairs=1)
-        p.setPhysicsEngineParameter(numSolverIterations=self.solver_iterations)
-        p.setTimeStep(self.physics_timestep)
-        p.setGravity(0, 0, -self.gravity)
-        p.setPhysicsEngineParameter(enableFileCaching=0)
+        # Set GPU Pairs capacity
+        self._physics_context.set_gpu_found_lost_aggregate_pairs_capacity(m.GPU_PAIRS_CAPACITY)
+        self._physics_context.set_gpu_found_lost_pairs_capacity(m.GPU_PAIRS_CAPACITY)
+        self._physics_context.set_gpu_total_aggregate_pairs_capacity(m.GPU_PAIRS_CAPACITY)
 
-        # Set the collision mask mode to the AND mode, e.g. B3_FILTER_GROUPAMASKB_AND_GROUPBMASKA. This means two objs
-        # will collide only if *BOTH* of them have collision masks that enable collisions with the other.
-        p.setPhysicsEngineParameter(collisionFilterMode=0)
+    @property
+    def viewer_height(self):
+        """
+        Returns:
+            int: viewer height of this sensor, in pixels
+        """
+        # If the viewer camera hasn't been created yet, utilize the default width
+        return DEFAULT_VIEWER_HEIGHT if self._viewer_camera is None else self._viewer_camera.viewer_height
 
-    def initialize_viewers(self):
-        if self.mode == SimulatorMode.GUI_NON_INTERACTIVE:
-            self.viewer = ViewerSimple(renderer=self.renderer)
-        elif self.mode == SimulatorMode.GUI_INTERACTIVE:
-            self.viewer = Viewer(simulator=self, renderer=self.renderer)
+    @viewer_height.setter
+    def viewer_height(self, height):
+        """
+        Sets the viewer height @height for this sensor
 
-    @load_without_pybullet_vis
+        Args:
+            height (int): viewer height, in pixels
+        """
+        self._viewer_camera.viewer_height = height
+
+    @property
+    def viewer_width(self):
+        """
+        Returns:
+            int: viewer width of this sensor, in pixels
+        """
+        # If the viewer camera hasn't been created yet, utilize the default height
+        return DEFAULT_VIEWER_WIDTH if self._viewer_camera is None else self._viewer_camera.viewer_width
+
+    @viewer_width.setter
+    def viewer_width(self, width):
+        """
+        Sets the viewer width @width for this sensor
+
+        Args:
+            width (int): viewer width, in pixels
+        """
+        self._viewer_camera.viewer_width = width
+
+    def _set_viewer_settings(self):
+        """
+        Initializes a reference to the viewer in the App, and sets the frame size
+        """
+        # Store reference to viewer (see https://docs.omniverse.nvidia.com/app_isaacsim/app_isaacsim/reference_python_snippets.html#get-camera-parameters)
+        viewport = acquire_viewport_interface()
+        viewport_handle = viewport.get_instance("Viewport")
+        self._viewer = viewport.get_viewport_window(viewport_handle)
+
+        # Set viewer camera and frame size
+        self._set_viewer_camera()
+
+    def enable_viewer_camera_teleoperation(self):
+        """
+        Enables keyboard control of the active viewer camera for this simulation
+        """
+        self._camera_mover = CameraMover(cam=self._viewer_camera, sim=self)
+        self._camera_mover.print_info()
+
     def import_scene(self, scene):
         """
         Import a scene into the simulator. A scene could be a synthetic one or a realistic Gibson Environment.
 
         :param scene: a scene object to load
         """
+        assert self.is_stopped(), "Simulator must be stopped while importing a scene!"
         assert isinstance(scene, Scene), "import_scene can only be called with Scene"
-        scene.load(self)
-        self.scene = scene
 
-    @load_without_pybullet_vis
-    def import_particle_system(self, particle_system):
+        # Clear the existing scene if any
+        self.clear()
+
+        self._scene = scene
+        self._scene.load(self)
+
+        # Make sure simulator is not running, then start it so that we can initialize the scene
+        assert self.is_stopped(), "Simulator must be stopped after importing a scene!"
+        self.play()
+
+        # Initialize the scene
+        self._scene.initialize()
+
+        # Need to one more step for particle systems to work
+        self.step()
+        self.stop()
+
+    # # TODO
+    # def import_particle_system(self, particle_system):
+    #     """
+    #     Import a particle system into the simulator. Called by objects owning a particle-system, via reference to the Simulator instance.
+    #
+    #     :param particle_system: a ParticleSystem object to load
+    #     """
+    #
+    #     assert isinstance(
+    #         particle_system, ParticleSystem
+    #     ), "import_particle_system can only be called with ParticleSystem"
+    #
+    #     self.particle_systems.append(particle_system)
+    #     particle_system.initialize(self)
+
+    def initialize_object_on_next_sim_step(self, obj):
         """
-        Import a particle system into the simulator. Called by objects owning a particle-system, via reference to the Simulator instance.
+        Initializes the object upon the next simulation step
 
-        :param particle_system: a ParticleSystem object to load
+        Args:
+            obj (BasePrim): Object to initialize as soon as a new sim step is called
         """
+        self._objects_to_initialize.append(obj)
 
-        assert isinstance(
-            particle_system, ParticleSystem
-        ), "import_particle_system can only be called with ParticleSystem"
-
-        self.particle_systems.append(particle_system)
-        particle_system.initialize(self)
-
-    @load_without_pybullet_vis
-    def import_object(self, obj):
+    def import_object(self, obj, register=True, auto_initialize=True):
         """
-        Import a non-robot object into the simulator.
+        Import an object into the simulator.
 
-        :param obj: a non-robot object to load
+        Args:
+            obj (BaseObject): an object to load
+            register (bool): whether to register this object internally in the scene registry
+            auto_initialize (bool): If True, will auto-initialize the requested object on the next simulation step.
+                Otherwise, we assume that the object will call initialize() on its own!
         """
         assert isinstance(obj, BaseObject), "import_object can only be called with BaseObject"
 
-        if isinstance(obj, VisualMarker) or isinstance(obj, Particle):
-            # Marker objects can be imported without a scene.
-            obj.load(self)
-        else:
-            # Non-marker objects require a Scene to be imported.
-            # Load the object in pybullet. Returns a pybullet id that we can use to load it in the renderer
-            assert self.scene is not None, "import_object needs to be called after import_scene"
-            self.scene.add_object(obj, self, _is_call_from_simulator=True)
+        # TODO
+        # if False:#isinstance(obj, VisualMarker) or isinstance(obj, Particle):
+        #     # Marker objects can be imported without a scene.
+        #     obj.load(self)
+        # else:
 
-    @load_without_pybullet_vis
-    def import_robot(self, robot):
-        logging.warning(
-            "DEPRECATED: simulator.import_robot(...) has been deprecated in favor of import_object and will be removed "
-            "in a future release. Please use simulator.import_object(...) for equivalent functionality."
-        )
-        self.import_object(robot)
+        # Make sure scene is loaded -- objects should not be loaded unless we have a reference to a scene
+        assert self.scene is not None, "import_object needs to be called after import_scene"
 
-    @load_without_pybullet_vis
-    def load_object_in_renderer(
-        self,
-        obj,
-        body_id,
-        class_id,
-        link_name_to_vm=None,
-        visual_mesh_to_material=None,
-        use_pbr=True,
-        use_pbr_mapping=True,
-        shadow_caster=True,
-        softbody=False,
-        texture_scale=1.0,
-    ):
+        # Load the object in omniverse by adding it to the scene
+        self.scene.add_object(obj, self, register=register, _is_call_from_simulator=True)
+
+        # Lastly, additionally add this object automatically to be initialized as soon as another simulator step occurs
+        # if requested
+        if auto_initialize:
+            self.initialize_object_on_next_sim_step(obj=obj)
+    
+    def remove_object(self, obj):
         """
-        Load an object into the MeshRenderer. The object should be already loaded into pybullet.
+        Remove a non-robot object from the simulator.
 
-        :param obj: an object to load
-        :param body_id: pybullet body id
-        :param class_id: class id to render semantics
-        :param link_name_to_vm: a link-name-to-visual-mesh mapping
-        :param visual_mesh_to_material: a visual-mesh-to-material mapping
-        :param use_pbr: whether to use PBR
-        :param use_pbr_mapping: whether to use PBR mapping
-        :param shadow_caster: whether to cast shadow
-        :param softbody: whether the instance group is for a soft body
-        :param texture_scale: texture scale for the object, downsample to save memory
+        Args:
+            obj (BaseObject): a non-robot object to load
         """
-        # First, grab all the visual shapes.
-        if link_name_to_vm:
-            # If a manual link-name-to-visual-mesh mapping is given, use that to generate list of shapes.
-            shapes = []
-            for link_id in list(range(p.getNumJoints(body_id))) + [-1]:
-                if link_id == PYBULLET_BASE_LINK_INDEX:
-                    link_name = p.getBodyInfo(body_id)[0].decode("utf-8")
-                else:
-                    link_name = p.getJointInfo(body_id, link_id)[12].decode("utf-8")
-
-                collision_shapes = p.getCollisionShapeData(body_id, link_id)
-                collision_shapes = [item for item in collision_shapes if item[2] == p.GEOM_MESH]
-                # a link can have multiple collision meshes due to boxification,
-                # and we want to query the original collision mesh for information
-
-                if len(collision_shapes) == 0:
-                    continue
-                else:
-                    _, _, _, dimensions, filename, rel_pos, rel_orn = collision_shapes[0]
-
-                filenames = link_name_to_vm[link_name]
-                for filename in filenames:
-                    overwrite_material = None
-                    if visual_mesh_to_material is not None and filename in visual_mesh_to_material:
-                        overwrite_material = visual_mesh_to_material[filename]
-
-                    shapes.append(
-                        (link_id, p.GEOM_MESH, dimensions, filename, rel_pos, rel_orn, [0, 0, 0], overwrite_material)
-                    )
-        else:
-            # Pull the visual shapes from pybullet
-            shapes = []
-            for shape in p.getVisualShapeData(body_id):
-                link_id, type, dimensions, filename, rel_pos, rel_orn, color = shape[1:8]
-
-                if filename:
-                    filename = filename.decode("utf-8")
-
-                # visual meshes frame are transformed from the urdfLinkFrame as origin to comLinkFrame as origin
-                dynamics_info = p.getDynamicsInfo(body_id, link_id)
-                inertial_pos, inertial_orn = dynamics_info[3], dynamics_info[4]
-                rel_pos, rel_orn = p.multiplyTransforms(
-                    *p.invertTransform(inertial_pos, inertial_orn), rel_pos, rel_orn
-                )
-                shapes.append((link_id, type, dimensions, filename, rel_pos, rel_orn, color, None))
-
-        # Now that we have the visual shapes, let's add them to the renderer.
-        visual_objects = []
-        link_ids = []
-        poses_rot = []
-        poses_trans = []
-        for shape in shapes:
-            link_id, type, dimensions, filename, rel_pos, rel_orn, color, overwrite_material = shape
-
-            # Specify a filename if our object is not a mesh
-            if type == p.GEOM_SPHERE:
-                filename = os.path.join(igibson.assets_path, "models/mjcf_primitives/sphere8.obj")
-                dimensions = [dimensions[0] / 0.5, dimensions[0] / 0.5, dimensions[0] / 0.5]
-            elif type == p.GEOM_CAPSULE or type == p.GEOM_CYLINDER:
-                filename = os.path.join(igibson.assets_path, "models/mjcf_primitives/cylinder16.obj")
-                dimensions = [dimensions[1] / 0.5, dimensions[1] / 0.5, dimensions[0]]
-                if not os.path.exists(filename):
-                    logging.info(
-                        "Cylinder mesh file cannot be found in the assets. Consider removing the assets folder and downloading the newest version using download_assets(). Using a cube for backcompatibility"
-                    )
-                    filename = os.path.join(igibson.assets_path, "models/mjcf_primitives/cube.obj")
-                    dimensions = [dimensions[0] / 0.5, dimensions[0] / 0.5, dimensions[0] / 0.5]
-            elif type == p.GEOM_BOX:
-                filename = os.path.join(igibson.assets_path, "models/mjcf_primitives/cube.obj")
-            elif type == p.GEOM_PLANE:
-                filename = os.path.join(igibson.assets_path, "models/mjcf_primitives/cube.obj")
-                dimensions = [100, 100, 0.01]
-
-            # Always load overwrite material
-            if overwrite_material is not None:
-                if isinstance(overwrite_material, RandomizedMaterial):
-                    self.renderer.load_randomized_material(overwrite_material, texture_scale)
-                elif isinstance(overwrite_material, ProceduralMaterial):
-                    self.renderer.load_procedural_material(overwrite_material, texture_scale)
-
-            # Load the visual object if it doesn't already exist.
-            if (filename, tuple(dimensions), tuple(rel_pos), tuple(rel_orn)) not in self.visual_objects.keys():
-                self.renderer.load_object(
-                    filename,
-                    transform_orn=rel_orn,
-                    transform_pos=rel_pos,
-                    input_kd=color[:3],
-                    scale=np.array(dimensions),
-                    texture_scale=texture_scale,
-                    overwrite_material=overwrite_material,
-                )
-                self.visual_objects[(filename, tuple(dimensions), tuple(rel_pos), tuple(rel_orn))] = (
-                    len(self.renderer.visual_objects) - 1
-                )
-
-            # Keep track of the objects we just loaded.
-            visual_objects.append(self.visual_objects[(filename, tuple(dimensions), tuple(rel_pos), tuple(rel_orn))])
-            link_ids.append(link_id)
-
-            # Keep track of the positions.
-            if link_id == PYBULLET_BASE_LINK_INDEX:
-                pos, orn = p.getBasePositionAndOrientation(body_id)
-            else:
-                pos, orn = p.getLinkState(body_id, link_id)[:2]
-            poses_rot.append(np.ascontiguousarray(quat2rotmat(xyzw2wxyz(orn))))
-            poses_trans.append(np.ascontiguousarray(xyz2mat(pos)))
-
-        # Finally, create and add the instance group for this object.
-        self.renderer.add_instance_group(
-            object_ids=visual_objects,
-            link_ids=link_ids,
-            pybullet_uuid=body_id,
-            ig_object=obj,
-            class_id=class_id,
-            poses_trans=poses_trans,
-            poses_rot=poses_rot,
-            softbody=softbody,
-            dynamic=True,
-            use_pbr=use_pbr,
-            use_pbr_mapping=use_pbr_mapping,
-            shadow_caster=shadow_caster,
-        )
-
-        # Add the instance onto the object as well.
-        # TODO: Remove condition and/or migrate to owning classes.
-        if hasattr(obj, "renderer_instances"):
-            obj.renderer_instances.append(self.renderer.instances[-1])
+        self._scene.remove_object(obj, simulator=self)
+        self.app.update()
 
     def _non_physics_step(self):
         """
         Complete any non-physics steps such as state updates.
         """
+        # Check to see if any objects should be initialized (only done IF we're playing)
+        if len(self._objects_to_initialize) > 0 and self.is_playing():
+            for obj in self._objects_to_initialize:
+                obj.initialize()
+            self._objects_to_initialize = []
+            # Also update the scene registry
+            # TODO: A better place to put this perhaps?
+            self._scene.object_registry.update(keys="root_handle")
+
         # Step all of the particle systems.
         for particle_system in self.particle_systems:
             particle_system.update(self)
 
-        # Step the object states in global topological order.
-        for state_type in self.object_state_types:
-            for obj in self.scene.get_objects_with_state(state_type):
-                obj.states[state_type].update()
+        # Cache values from all of the micro and macro particle systems.
+        # This is used to store system-wide state which can be queried
+        # by the object state system.
+        for system in self.scene.systems:
+            system.cache()
 
-        # Step the object procedural materials based on the updated object states.
-        for obj in self.scene.get_objects():
-            if hasattr(obj, "procedural_material") and obj.procedural_material is not None:
-                obj.procedural_material.update()
+        # Step the object states in global topological order (if the scene exists).
+        if self.scene is not None:
+            for state_type in self.object_state_types:
+                for obj in self.scene.get_objects_with_state(state_type):
+                    # Only update objects that have been initialized so far
+                    if obj.initialized:
+                        obj.states[state_type].update()
 
-    def step(self):
+        # Perform system level updates to the micro and macro particle systems.
+        # This allows for the states to handle changes in response to changes
+        # induced by the object state system.
+        for system in self.scene.systems:
+            system.update()
+
+        for obj in self.scene.objects:
+            # Only update visuals for objects that have been initialized so far
+            if isinstance(obj, StatefulObject) and obj.initialized:
+                obj.update_visuals()
+
+        # Clear the bounding box cache so that it gets updated during the next time it's called
+        BoundingBoxAPI.clear()
+
+    def _transition_rule_step(self):
+        """Applies all internal non-Omniverse transition rules."""
+        # Create a dict from rule to filter to objects we care about.
+        obj_dict = defaultdict(lambda: defaultdict(list))
+        for obj in self.scene.objects:
+            for rule in self._transition_rules:
+                for f in rule.filters:
+                    if f(obj):
+                        obj_dict[rule][f].append(obj)
+
+        # For each rule, create a subset of the dict and apply it if applicable.
+        added_obj_attrs = []
+        removed_objs = []
+        for rule in self._transition_rules:
+            if rule not in obj_dict:
+                continue
+            # Create lists of objects that this rule potentially cares about.
+            # Skip the rule if any of the object lists is empty.
+            obj_list_rule = list(obj_dict[rule][f] for f in rule.filters)
+            if any(not obj_list_filter for obj_list_filter in obj_list_rule):
+                continue
+            # For each possible combination of objects, check if the rule is
+            # applicable, and if so, apply the transition defined by the rule.
+            # If objects are to be added / removed, the transition function is
+            # expected to return an instance of TransitionResults containing
+            # information about those objects.
+            # TODO: Consider optimizing itertools.product.
+            # TODO: Track what needs to be added / removed at the Scene object level.
+            # Comments from a PR on possible changes:
+            # - Make the transition function immediately apply the transition.
+            # - Addition / removal tracking on the Scene object.
+            # - Check if the objects are still in the scene in each step.
+            for obj_tuple in itertools.product(*obj_list_rule):
+                if rule.condition(self, *obj_tuple):
+                    t_results = rule.transition(self, *obj_tuple)
+                    if isinstance(t_results, TransitionResults):
+                        added_obj_attrs.extend(t_results.add)
+                        removed_objs.extend(t_results.remove)
+
+        # Process all transition results.
+        for added_obj_attr in added_obj_attrs:
+            new_obj = added_obj_attr.obj
+            self.import_object(added_obj_attr.obj)
+            pos, orn = added_obj_attr.pos, added_obj_attr.orn
+            new_obj.set_position_orientation(position=pos, orientation=orn)
+        for removed_obj in removed_objs:
+            self.remove_object(removed_obj)
+
+    def reset_scene(self):
         """
-        Step the simulation at self.render_timestep and update positions in renderer.
+        Resets ths scene (if it exists) and its corresponding objects
         """
-        for _ in range(self.physics_timestep_num):
-            p.stepSimulation()
+        if self.scene is not None and self.scene.initialized:
+            self.scene.reset()
+
+    def play(self):
+        super().play()
+
+        # Update all object / robot handles
+        if self.scene is not None and self.scene.initialized:
+            for obj in self.scene.objects:
+                # Only need to update handles if object is already initialized as well
+                if obj.initialized:
+                    obj.update_handles()
+
+            for robot in self.scene.robots:
+                # Only need to update handles if robot is already initialized as well
+                if robot.initialized:
+                    robot.update_handles()
+
+        # Check to see if any objects should be initialized
+        if len(self._objects_to_initialize) > 0:
+            for obj in self._objects_to_initialize:
+                obj.initialize()
+            self._objects_to_initialize = []
+            # Also update the scene registry
+            # TODO: A better place to put this perhaps?
+            self._scene.object_registry.update(keys="root_handle")
+
+    def step(self, render=True, force_playing=False):
+        """
+        Step the simulation at self.render_timestep
+
+        Args:
+            render (bool): Whether rendering should occur or not
+            force_playing (bool): If True, will force physics to propagate (i.e.: set simulation, if paused / stopped,
+                to "play" mode)
+        """
+        # Possibly force playing
+        if force_playing and not self.is_playing():
+            self.play()
+
+        for i in range(self.n_physics_timesteps_per_render - 1):
+            # No rendering for intermediate steps for efficiency
+            super().step(render=False)
+
+        # Render on final step unless input says otherwise
+        super().step(render=render)
 
         self._non_physics_step()
-        self.sync()
+        if self._apply_transitions:
+            self._transition_rule_step()
+
+        # TODO (eric): After stage changes (e.g. pose, texture change), it will take two super().step(render=True) for
+        #  the result to propagate to the rendering. We could have called super().render() here but it will introduce
+        #  a big performance regression.
+
         self.frame_count += 1
 
-    def sync(self, force_sync=False):
+    def step_physics(self, current_time=None):
         """
-        Update positions in renderer without stepping the simulation. Usually used in the reset() function.
+        Step the physics a single step.
 
-        :param force_sync: whether to force sync the objects in renderer
+        Args:
+            current_time (None or float): If specified, determines the current time at which the sim is being stepped
         """
-        self.body_links_awake = 0
-        for instance in self.renderer.instances:
-            if instance.dynamic:
-                self.body_links_awake += self.update_position(instance, force_sync=force_sync or self.first_sync)
-        if self.viewer is not None:
-            self.viewer.update()
-        if self.first_sync:
-            self.first_sync = False
+        self._physics_context._step(current_time=self.current_time if current_time is None else current_time)
 
-    def gen_assisted_grasping_categories(self):
-        """
-        Generate a list of categories that can be grasped using assisted grasping,
-        using labels provided in average category specs file.
-        """
-        assisted_grasp_category_allow_list = set()
-        avg_category_spec = get_ig_avg_category_specs()
-        for k, v in avg_category_spec.items():
-            if v["enable_ag"]:
-                assisted_grasp_category_allow_list.add(k)
-        return assisted_grasp_category_allow_list
+    # TODO: Do we need this?
+    # def sync(self, force_sync=False):
+    #     """
+    #     Update positions in renderer without stepping the simulation. Usually used in the reset() function.
+    #
+    #     :param force_sync: whether to force sync the objects in renderer
+    #     """
+    #     self.body_links_awake = 0
+    #     for instance in self.renderer.instances:
+    #         if instance.dynamic:
+    #             self.body_links_awake += self.update_position(instance, force_sync=force_sync or self.first_sync)
+    #     if self.viewer is not None:
+    #         self.viewer.update()
+    #     if self.first_sync:
+    #         self.first_sync = False
 
-    def can_assisted_grasp(self, body_id, c_link):
-        """
-        Check whether an object with the given body_id can be grasped. This is done
-        by checking its category to see if is in the allowlist.
+    def is_paused(self) -> bool:
+        """Returns: True if the simulator is paused."""
+        return not (self.is_stopped() or self.is_playing())
 
-        :param body_id: pybullet body id
-        :param c_link: link index or -1 for the base
+    @classmethod
+    def clear_instance(cls):
+        SimulationContext.clear_instance()
+        Simulator._world_initialized = None
+        return
+
+    def __del__(self):
+        SimulationContext.__del__(self)
+        Simulator._world_initialized = None
+        return
+
+    @property
+    def dc_interface(self) -> _dynamic_control.DynamicControl:
+        """[summary]
+
+        Returns:
+            _dynamic_control.DynamicControl: [description]
         """
-        if (
-            not hasattr(self.scene, "objects_by_id")
-            or body_id not in self.scene.objects_by_id
-            or not hasattr(self.scene.objects_by_id[body_id], "category")
-            or self.scene.objects_by_id[body_id].category == "object"
-        ):
-            mass = p.getDynamicsInfo(body_id, c_link)[0]
-            return mass <= self.assist_grasp_mass_thresh
+        return self._dc_interface
+
+    @property
+    def scene(self) -> Scene:
+        """[summary]
+
+        Returns:
+            Scene: [description]
+        """
+        return self._scene
+
+    @property
+    def viewer(self):
+        """
+        Returns:
+            ViewportWindow: Active viewport window instance shown in the omni UI
+        """
+        return self._viewer
+
+    @property
+    def viewer_camera(self):
+        """
+        Returns:
+            VisionSensor: Active camera sensor corresponding to the active viewport window instance shown in the omni UI
+        """
+        return self._viewer_camera
+
+    @property
+    def world_prim(self):
+        """
+        Returns:
+            Usd.Prim: Prim at /World
+        """
+        return get_prim_at_path(prim_path="/World")
+
+    # def get_current_tasks(self) -> List[BaseTask]:
+    #     """[summary]
+    #
+    #     Returns:
+    #         List[BaseTask]: [description]
+    #     """
+    #     return self._current_tasks
+    #
+    # def get_task(self, name: str) -> BaseTask:
+    #     if name not in self._current_tasks:
+    #         raise Exception("task name {} doesn't exist in the current world tasks.".format(name))
+    #     return self._current_tasks[name]
+
+    # def _finalize_scene(self) -> None:
+    #     """[summary]
+    #     """
+    #     if not builtins.ISAAC_LAUNCHED_FROM_TERMINAL:
+    #         self.play()
+    #     self._scene._finalize()
+    #     return
+
+    def _clear_state(self):
+        """
+        Clears the internal state of this simulation
+        """
+        # Clear uniquely named items and other internal states
+        clear_pu()
+        clear_uu()
+
+    def clear(self) -> None:
+        """Clears the stage leaving the PhysicsScene only if under /World.
+        """
+        # Stop the physics
+        self.stop()
+
+        # if self.scene is not None:
+        #     self.scene.clear()
+        # self._current_tasks = dict()
+        self._scene_finalized = False
+        self._scene = None
+        self._data_logger = DataLogger()
+
+        # TODO: Handle edge-case for when we clear sim without loading new scene in. self._scene should be None
+        # but scene.load(sim) requires scene to be defined!
+
+        # def check_deletable_prim(prim_path):
+        #     print(f"checking prim path: {prim_path}")
+        #     if is_prim_no_delete(prim_path):
+        #         return False
+        #     if is_prim_ancestral(prim_path):
+        #         return False
+        #     if get_prim_type_name(prim_path=prim_path) == "PhysicsScene":
+        #         return False
+        #     if prim_path == "/World":
+        #         return False
+        #     if prim_path == "/":
+        #         return False
+        #     return True
+        #
+        # clear_stage(predicate=check_deletable_prim)
+
+        # Load dummy stage, but don't clear sim to prevent circular loops
+        self.load_stage(usd_path=f"{assets_path}/models/misc/clear_stage.usd")
+
+    # def reset(self) -> None:
+    #     """ Resets the stage to its initial state and each object included in the Scene to its default state
+    #         as specified by .set_default_state and the __init__ funcs.
+    #
+    #         Note:
+    #         - All tasks should be added before the first reset is called unless a .clear() was called.
+    #         - All articulations should be added before the first reset is called unless a .clear() was called.
+    #         - This method takes care of initializing articulation handles with the first reset called.
+    #         - This will do one step internally regardless
+    #         - calls post_reset on each object in the Scene
+    #         - calls post_reset on each Task
+    #
+    #         things like setting pd gains for instance should happend at a Task reset or a Robot reset since
+    #         the defaults are restored after .stop() is called.
+    #     """
+    #     if not self._scene_finalized:
+    #         for task in self._current_tasks.values():
+    #             task.set_up_scene(self.scene)
+    #         self._finalize_scene()
+    #         self._scene_finalized = True
+    #     self.stop()
+    #     for task in self._current_tasks.values():
+    #         task.cleanup()
+    #     self.play()
+    #     self.scene.post_reset()
+    #     for task in self._current_tasks.values():
+    #         task.post_reset()
+    #     return
+    #
+    # async def reset_async(self) -> None:
+    #     """Resets the stage to its initial state and each object included in the Scene to its default state
+    #         as specified by .set_default_state and the __init__ funcs.
+    #
+    #         Note:
+    #         - All tasks should be added before the first reset is called unless a .clear() was called.
+    #         - All articulations should be added before the first reset is called unless a .clear() was called.
+    #         - This method takes care of initializing articulation handles with the first reset called.
+    #         - This will do one step internally regardless
+    #         - calls post_reset on each object in the Scene
+    #         - calls post_reset on each Task
+    #
+    #         things like setting pd gains for instance should happend at a Task reset or a Robot reset since
+    #         the defaults are restored after .stop() is called.
+    #     """
+    #     if not self._scene_finalized:
+    #         for task in self._current_tasks.values():
+    #             task.set_up_scene(self.scene)
+    #         await self.play_async()
+    #         self._finalize_scene()
+    #         self._scene_finalized = True
+    #     await self.stop_async()
+    #     for task in self._current_tasks.values():
+    #         task.cleanup()
+    #     await self.play_async()
+    #     self._scene.post_reset()
+    #     for task in self._current_tasks.values():
+    #         task.post_reset()
+    #     return
+
+    def restore(self, usd_path):
+        """
+        Restore a simulation environment from @usd_path.
+
+        Args:
+            usd_path (str): Full path of USD file to load, which contains information
+                to recreate a scene.
+        """
+        if not usd_path.endswith(".usd"):
+            logging.error(f"You have to define the full usd_path to load from. Got: {usd_path}")
+            return
+
+        # Load saved stage to get saved_info.
+        self.load_stage(usd_path)
+
+        # TODO: Save / loading emptyscene fails because we're not loading the saved USD (no usd_path arg to pass into the scene constructor)
+        # TODO: Really need to iron this out in a cleaner way -- how to reload scene robustly?
+
+        # Load saved info
+        scene_state = json.loads(self.world_prim.GetCustomDataByKey("scene_state"))
+        scene_init_info = json.loads(self.world_prim.GetCustomDataByKey("scene_init_info"))
+        # Overwrite the usd with our desired usd file
+        scene_init_info["args"]["usd_path"] = usd_path
+        # Clear the current environment and delete any currently loaded scene.
+        self.clear()
+
+        # Recreate and import the saved scene
+        recreated_scene = create_object_from_init_info(scene_init_info)
+        self.import_scene(scene=recreated_scene)
+
+        # Start the simulation and restore the dynamic state of the scene and then pause again
+        self.play()
+        self.scene.load_state(scene_state, serialized=False)
+        self.app.update()
+        self.pause()
+
+        logging.info("The saved simulation environment loaded.")
+
+        return
+
+    def save(self, usd_path):
+        """
+        Saves the current simulation environment to @usd_path.
+
+        Args:
+            usd_path (str): Full path of USD file to load, which contains information
+                to recreate the current scene.
+        """
+        # TODO: Make sure all objects have been initialized
+
+        if not self.scene:
+            logging.warning("Scene has not been loaded. Nothing to save.")
+            return
+        if not usd_path.endswith(".usd"):
+            logging.error(f"You have to define the full usd_path to save the scene to. Got: {usd_path}")
+            return
+
+        # Update scene info
+        self.scene.update_scene_info()
+
+        # Dump saved current state and also scene init info
+        saved_state_str = json.dumps(self.scene.dump_state(serialized=False), cls=NumpyEncoder)
+        self.world_prim.SetCustomDataByKey("scene_state", saved_state_str)
+        scene_init_info = self.scene.get_init_info()
+        scene_init_info_str = json.dumps(scene_init_info, cls=NumpyEncoder)
+        self.world_prim.SetCustomDataByKey("scene_init_info", scene_init_info_str)
+
+        # Update USD Metadata -- we need this info in order to, e.g., update material filepaths appropriately
+        # in case this USD is opened on another machine
+        update_usd_metadata()
+
+        # Save stage. This needs to happen at the end since some objects may get reset after sim.stop().
+        self.stop()
+        self.stage.Export(usd_path)
+
+        logging.info("The current simulation environment saved.")
+
+        return
+
+    def add_task(self, task: BaseTask) -> None:
+        """Tasks should have a unique name.
+
+
+        Args:
+            task (BaseTask): [description]
+        """
+        if task.name in self._current_tasks:
+            raise Exception("Task name should be unique in the world")
+        self._current_tasks[task.name] = task
+        return
+
+    def get_observations(self, task_name: Optional[str] = None) -> dict:
+        """Gets observations from all the tasks that were added
+
+        Args:
+            task_name (Optional[str], optional): [description]. Defaults to None.
+
+        Returns:
+            dict: [description]
+        """
+        if task_name is not None:
+            return self._current_tasks[task_name].get_observations()
         else:
-            return self.scene.objects_by_id[body_id].category in self.assist_grasp_category_allow_list
+            observations = dict()
+            for task in self._current_tasks.values():
+                observations.update(task.get_observations())
+            return observations
 
-    def set_hidden_state(self, obj, hide=True):
+    def calculate_metrics(self, task_name: Optional[str] = None) -> None:
+        """Gets metrics from all the tasks that were added
+
+        Args:
+            task_name (Optional[str], optional): [description]. Defaults to None.
+
+        Returns:
+            [type]: [description]
         """
-        Set the hidden state of an object to be either hidden or not hidden.
-        The object passed in must inherent from Object at the top level.
+        if task_name is not None:
+            return self._current_tasks[task_name].calculate_metrics()
+        else:
+            metrics = dict()
+            for task in self._current_tasks.values():
+                metrics.update(task.calculate_metrics())
+            return metrics
 
-        Note: this function must be called after step() in the rendering loop.
-        Note 2: this function only works with the optimized renderer - please use the renderer hidden
-        list to hide objects in the non-optimized renderer.
+    def is_done(self, task_name: Optional[str] = None) -> None:
+        """[summary]
 
-        :param obj: an object to set the hidden state
-        :param hide: the hidden state to set
+        Args:
+            task_name (Optional[str], optional): [description]. Defaults to None.
+
+        Returns:
+            [type]: [description]
         """
-        # Find instance corresponding to this id in the renderer
-        for instance in self.renderer.instances:
-            if instance.pybullet_uuid in obj.get_body_ids():
-                instance.hidden = hide
-                self.renderer.update_hidden_highlight_state([instance])
-                return
+        if task_name is not None:
+            return self._current_tasks[task_name].is_done()
+        else:
+            result = [task.is_done() for task in self._current_tasks.values()]
+            return all(result)
 
-    @staticmethod
-    def update_position(instance, force_sync=False):
+    # def step(self, render: bool = True) -> None:
+    #     """Steps the physics simulation while rendering or without.
+    #
+    #        - Note: task pre_step is called here.
+    #
+    #     Args:
+    #         render (bool, optional): Set to False to only do a physics simulation without rendering. Note:
+    #                                  app UI will be frozen (since its not rendering) in this case.
+    #                                  Defaults to True.
+    #
+    #     """
+    #     if self._scene_finalized:
+    #         for task in self._current_tasks.values():
+    #             task.pre_step(self.current_time_step_index, self.current_time)
+    #     if self.scene._enable_bounding_box_computations:
+    #         self.scene._bbox_cache.SetTime(Usd.TimeCode(self._current_time))
+    #     SimulationContext.step(self, render=render)
+    #     if self._data_logger.is_started():
+    #         if self._data_logger._data_frame_logging_func is None:
+    #             raise Exception("You need to add data logging function before starting the data logger")
+    #         data = self._data_logger._data_frame_logging_func(tasks=self.get_current_tasks(), scene=self.scene)
+    #         self._data_logger.add_data(
+    #             data=data, current_time_step=self.current_time_step_index, current_time=self.current_time
+    #         )
+    #     return
+
+    def step_async(self, step_size: float) -> None:
+        """Calls all functions that should be called pre stepping the physics
+
+           - Note: task pre_step is called here.
+
+        Args:
+            step_size (float): [description]
+
+        Raises:
+            Exception: [description]
         """
-        Update the position of an object or a robot in renderer.
+        if self._scene_finalized:
+            for task in self._current_tasks.values():
+                task.pre_step(self.current_time_step_index, self.current_time)
+        if self.scene._enable_bounding_box_computations:
+            self.scene._bbox_cache.SetTime(Usd.TimeCode(self._current_time))
+        if self._data_logger.is_started():
+            if self._data_logger._data_frame_logging_func is None:
+                raise Exception("You need to add data logging function before starting the data logger")
+            data = self._data_logger._data_frame_logging_func(tasks=self.get_current_tasks(), scene=self.scene)
+            self._data_logger.add_data(
+                data=data, current_time_step=self.current_time_step_index, current_time=self.current_time
+            )
+        return
 
-        :param instance: an instance in the renderer
-        :param force_sync: whether to force sync the object
+    def get_data_logger(self) -> DataLogger:
+        """Returns the data logger of the world.
+
+        Returns:
+            DataLogger: [description]
         """
-        body_links_awake = 0
-        for j, link_id in enumerate(instance.link_ids):
-            dynamics_info = p.getDynamicsInfo(instance.pybullet_uuid, link_id)
-            if len(dynamics_info) == 13 and not force_sync:
-                activation_state = dynamics_info[12]
-            else:
-                activation_state = PyBulletSleepState.AWAKE
+        return self._data_logger
 
-            if activation_state not in [PyBulletSleepState.AWAKE, PyBulletSleepState.ISLAND_AWAKE]:
-                continue
+    def save_stage(self, usd_path):
+        """
+        Save the current stage in this simulator to specified @usd_path
 
-            if link_id == PYBULLET_BASE_LINK_INDEX:
-                pos, orn = p.getBasePositionAndOrientation(instance.pybullet_uuid)
-            else:
-                pos, orn = p.getLinkState(instance.pybullet_uuid, link_id)[:2]
+        Args:
+            usd_path (str): Absolute filepath to where this stage should be saved
+        """
+        # Make sure simulator is stopped
+        assert self.is_stopped(), "Simulator must be stopped before the stage can be saved!"
+        save_stage(usd_path=usd_path)
 
-            instance.set_position_for_part(xyz2mat(pos), j)
-            instance.set_rotation_for_part(quat2rotmat(xyzw2wxyz(orn)), j)
-            body_links_awake += 1
-        return body_links_awake
+    # TODO: Extend to update internal info
+    def load_stage(self, usd_path):
+        """
+        Open the stage specified by USD file at @usd_path
+
+        Args:
+            usd_path (str): Absolute filepath to USD stage that should be loaded
+        """
+        # Stop the physics if we're playing
+        if not self.is_stopped():
+            logging.warning("Stopping simulation in order to load stage.")
+            self.stop()
+
+        # Clear simulation state
+        self._clear_state()
+
+        open_stage(usd_path=usd_path)
+
+        # Re-initialize necessary internal vars
+        self._app = omni.kit.app.get_app_interface()
+        self._framework = carb.get_framework()
+        self._timeline = omni.timeline.get_timeline_interface()
+        self._timeline.set_auto_update(True)
+        self._dynamic_control = _dynamic_control.acquire_dynamic_control_interface()
+        self._cached_rate_limit_enabled = self._settings.get_as_bool("/app/runLoops/main/rateLimitEnabled")
+        self._cached_rate_limit_frequency = self._settings.get_as_int("/app/runLoops/main/rateLimitFrequency")
+        self._cached_min_frame_rate = self._settings.get_as_int("persistent/simulation/minFrameRate")
+        self._loop_runner = omni_loop.acquire_loop_interface()
+
+        self._init_stage(
+            physics_dt=self._initial_physics_dt,
+            rendering_dt=self._initial_rendering_dt,
+            stage_units_in_meters=self._initial_stage_units_in_meters,
+        )
+        self._set_physics_engine_settings()
+        self._setup_default_callback_fns()
+        self._stage_open_callback = (
+            omni.usd.get_context().get_stage_event_stream().create_subscription_to_pop(self._stage_open_callback_fn)
+        )
+
+        # Set the viewer camera
+        self._set_viewer_camera()
+
+    def close(self):
+        """
+        Shuts down the iGibson application
+        """
+        self._app.close()
+
+    @property
+    def device(self) -> str:
+        """
+        Returns:
+            device (None or str): Device used in simulation backend
+        """
+        return self._device
+
+    @device.setter
+    def device(self, device):
+        """
+        Sets the device used for sim backend
+
+        Args:
+            device (None or str): Device to set for the simulation backend
+        """
+        self._device = device
+        if self._device is not None and "cuda" in self._device:
+            device_id = self._settings.get_as_int("/physics/cudaDevice")
+            self._device = f"cuda:{device_id}"

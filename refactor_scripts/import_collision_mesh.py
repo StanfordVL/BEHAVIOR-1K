@@ -1,6 +1,6 @@
 import igibson
 from igibson import ig_dataset_path
-from igibson.simulator_omni import Simulator
+from igibson.simulator import Simulator
 from pxr import Usd, UsdGeom, Gf
 import pxr.Vt
 from pxr.Sdf import ValueTypeNames as VT
