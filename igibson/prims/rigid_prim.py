@@ -16,6 +16,7 @@ import numpy as np
 from omni.isaac.dynamic_control import _dynamic_control
 import carb
 
+from igibson.macros import gm
 from igibson.prims.xform_prim import XFormPrim
 from igibson.prims.geom_prim import CollisionGeomPrim, VisualGeomPrim
 from igibson.utils.constants import GEOM_TYPES
@@ -92,7 +93,7 @@ class RigidPrim(XFormPrim):
             UsdPhysics.MassAPI.Apply(self._prim)
 
         # Only create contact report api if we're not visual only
-        if (not self._visual_only) and m.ENABLE_GLOBAL_CONTACT_REPORTING:
+        if (not self._visual_only) and gm.ENABLE_GLOBAL_CONTACT_REPORTING:
             self._physx_rigid_api = PhysxSchema.PhysxContactReportAPI(self._prim) if \
                 self._prim.HasAPI(PhysxSchema.PhysxContactReportAPI) else \
                 PhysxSchema.PhysxContactReportAPI.Apply(self._prim)
