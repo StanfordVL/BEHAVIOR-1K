@@ -1,12 +1,16 @@
-from igibson.settings import settings
+from igibson.macros import create_module_macros
 from igibson.object_states import AABB
 from igibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
-from igibson.utils.constants import SemanticClass
 from igibson.systems.macro_particle_system import DustSystem, StainSystem
 from collections import OrderedDict
 import numpy as np
 
-s = settings.object_states.dirty
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
+
+m.CLEAN_THRESHOLD = 0.5
+m.FLOOR_CLEAN_THRESHOLD = 0.75
+m.MIN_PARTICLES_FOR_SAMPLING_SUCCESS = 5
 
 
 class _Dirty(AbsoluteObjectState, BooleanState):
@@ -60,7 +64,7 @@ class _Dirty(AbsoluteObjectState, BooleanState):
                 # If we succeeded with generating particles (new_value = True), we are dirty, let's store additional info
                 if sampling_success:
                     # Store how many particles there are now -- this is the "maximum" number possible
-                    clean_threshold = s.FLOOR_CLEAN_THRESHOLD if self.obj.category == "floors" else s.CLEAN_THRESHOLD
+                    clean_threshold = m.FLOOR_CLEAN_THRESHOLD if self.obj.category == "floors" else m.CLEAN_THRESHOLD
                     self._max_particles_for_clean = \
                         self.DIRT_CLASS.num_group_particles(group=self.dirt_group) * clean_threshold
 

@@ -1,4 +1,3 @@
-from abc import ABCMeta
 from igibson.utils.python_utils import classproperty, assert_valid_key, \
     SerializableNonInstance, UniquelyNamedNonInstance
 from igibson.utils.registry_utils import SerializableRegistry

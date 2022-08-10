@@ -88,7 +88,7 @@ from igibson.scenes.gibson_indoor_scene import StaticIndoorScene
 from igibson.scenes.interactive_traversable_scene import InteractiveIndoorScene
 from igibson.simulator import Simulator
 from igibson.utils.asset_utils import get_available_g_scenes
-from igibson.utils.utils import let_user_pick
+from igibson.utils.object_state_utils import let_user_pick
 
 
 def main():
@@ -154,7 +154,7 @@ from igibson.render.profiler import Profiler
 from igibson.scenes.interactive_traversable_scene import InteractiveIndoorScene
 from igibson.simulator import Simulator
 from igibson.utils.asset_utils import get_available_ig_scenes
-from igibson.utils.utils import let_user_pick
+from igibson.utils.object_state_utils import let_user_pick
 
 
 def main():

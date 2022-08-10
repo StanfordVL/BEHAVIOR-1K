@@ -29,7 +29,7 @@ from igibson.prims.rigid_prim import RigidPrim
 from igibson.prims.xform_prim import XFormPrim
 from igibson.utils.omni_types import JointsState
 from igibson.utils.constants import PrimType, GEOM_TYPES
-import igibson.macros as m
+from igibson.macros import gm
 
 
 class EntityPrim(XFormPrim):
@@ -203,7 +203,7 @@ class EntityPrim(XFormPrim):
         if self._prim_type == PrimType.CLOTH:
             assert not self._visual_only, "Cloth cannot be visual-only."
             assert len(self._links) == 1, "Cloth entity prim can only have one link."
-            if m.AG_CLOTH:
+            if gm.AG_CLOTH:
                 self.create_attachment_point_link()
 
         # Disable any requested collision pairs

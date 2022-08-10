@@ -5,7 +5,7 @@ import yaml
 import builtins
 
 # TODO: Need to fix somehow -- igibson gets imported first BEFORE we can actually modify the macros
-import igibson.macros as m
+from igibson.macros import gm
 
 builtins.ISAAC_LAUNCHED_FROM_JUPYTER = (
     os.getenv("ISAAC_JUPYTER_KERNEL") is not None
@@ -113,9 +113,9 @@ from igibson.app_omni import OmniApp
 # Create app as a global reference so any submodule can access it
 app = OmniApp(
     {
-        "headless": m.HEADLESS,
+        "headless": gm.HEADLESS,
     },
-    debug=m.DEBUG,
+    debug=gm.DEBUG,
 )
 
 # Next import must be simulator

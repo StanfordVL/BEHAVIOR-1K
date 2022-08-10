@@ -1,14 +1,19 @@
 import numpy as np
 from collections import OrderedDict
 
+from igibson.macros import create_module_macros
 from igibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from igibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
 from igibson.utils.constants import SemanticClass
 
-_TOGGLE_DISTANCE_THRESHOLD = 0.1
-_TOGGLE_LINK_NAME = "toggle_button_link"
-_TOGGLE_BUTTON_SCALE = 0.05
-_CAN_TOGGLE_STEPS = 5
+
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
+
+m.TOGGLE_DISTANCE_THRESHOLD = 0.1
+m.TOGGLE_LINK_NAME = "toggle_button_link"
+m.TOGGLE_BUTTON_SCALE = 0.05
+m.CAN_TOGGLE_STEPS = 5
 
 
 class ToggledOn(AbsoluteObjectState, BooleanState, LinkBasedStateMixin):
@@ -26,7 +31,7 @@ class ToggledOn(AbsoluteObjectState, BooleanState, LinkBasedStateMixin):
 
     @staticmethod
     def get_state_link_name():
-        return _TOGGLE_LINK_NAME
+        return m.TOGGLE_LINK_NAME
 
     def _initialize(self):
         super(ToggledOn, self)._initialize()
@@ -38,7 +43,7 @@ class ToggledOn(AbsoluteObjectState, BooleanState, LinkBasedStateMixin):
                 primitive_type="Sphere",
                 name=f"{self.obj.name}_visual_marker_on",
                 class_id=SemanticClass.TOGGLE_MARKER,
-                radius=_TOGGLE_BUTTON_SCALE,
+                radius=m.TOGGLE_BUTTON_SCALE,
                 visible=True,
                 fixed_base=False,
                 visual_only=True,
@@ -49,7 +54,7 @@ class ToggledOn(AbsoluteObjectState, BooleanState, LinkBasedStateMixin):
                 primitive_type="Sphere",
                 name=f"{self.obj.name}_visual_marker_off",
                 class_id=SemanticClass.TOGGLE_MARKER,
-                radius=_TOGGLE_BUTTON_SCALE,
+                radius=m.TOGGLE_BUTTON_SCALE,
                 visible=True,
                 fixed_base=False,
                 visual_only=True,
@@ -68,7 +73,7 @@ class ToggledOn(AbsoluteObjectState, BooleanState, LinkBasedStateMixin):
         robot_can_toggle = False
         # detect marker and hand interaction
         for robot in self._simulator.scene.robots:
-            robot_can_toggle = robot.can_toggle(button_position_on_object, _TOGGLE_DISTANCE_THRESHOLD)
+            robot_can_toggle = robot.can_toggle(button_position_on_object, m.TOGGLE_DISTANCE_THRESHOLD)
             if robot_can_toggle:
                 break
 
@@ -77,7 +82,7 @@ class ToggledOn(AbsoluteObjectState, BooleanState, LinkBasedStateMixin):
         else:
             self.robot_can_toggle_steps = 0
 
-        if self.robot_can_toggle_steps == _CAN_TOGGLE_STEPS:
+        if self.robot_can_toggle_steps == m.CAN_TOGGLE_STEPS:
             self.value = not self.value
 
         # Choose which marker to put on object vs which to put away

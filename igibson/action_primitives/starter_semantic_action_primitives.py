@@ -20,7 +20,7 @@ from igibson import object_states
 from igibson.action_primitives.action_primitive_set_base import ActionPrimitiveError, BaseActionPrimitiveSet
 # from igibson.external.pybullet_tools.utils import set_joint_position
 from igibson.object_states.on_floor import RoomFloor
-from igibson.object_states.utils import get_center_extent, sample_kinematics
+from igibson.utils.object_state_utils import get_center_extent, sample_kinematics
 # from igibson.objects.articulated_object import URDFObject
 # from igibson.objects.object_base import BaseObject
 # from igibson.robots import BaseRobot, behavior_robot

@@ -5,7 +5,6 @@ import math
 import numpy as np
 import time
 
-import igibson.macros as m
 from igibson import app
 from igibson.sensors.sensor_base import BaseSensor
 from igibson.utils.constants import MAX_CLASS_COUNT, MAX_INSTANCE_COUNT

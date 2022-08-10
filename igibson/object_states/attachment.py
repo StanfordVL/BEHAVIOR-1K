@@ -2,13 +2,18 @@ from abc import abstractmethod
 
 from pxr import Gf
 
+from igibson.macros import create_module_macros
 import igibson.utils.transform_utils as T
 from igibson.object_states.contact_bodies import ContactBodies
 from igibson.object_states.object_state_base import BooleanState, RelativeObjectState
 from igibson.utils.usd_utils import BoundingBoxAPI, create_joint
 
+
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
+
 # After detachment, an object cannot be attached again within this number of steps.
-_DEFAULT_ATTACH_PROTECTION_COUNTDOWN = 10
+m.DEFAULT_ATTACH_PROTECTION_COUNTDOWN = 10
 
 
 class Attached(RelativeObjectState, BooleanState):
@@ -71,7 +76,7 @@ class Attached(RelativeObjectState, BooleanState):
             self.attached_joint_paths = [None, None]
             # The object should not be able to attach again within some steps after unattaching.
             # Otherwise the object may be attached right away.
-            self.attach_protection_countdown = _DEFAULT_ATTACH_PROTECTION_COUNTDOWN
+            self.attach_protection_countdown = m.DEFAULT_ATTACH_PROTECTION_COUNTDOWN
             # Wake up objects so that passive forces like gravity can be applied.
             self.obj.wake()
             other.wake()

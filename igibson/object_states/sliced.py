@@ -1,17 +1,22 @@
 import numpy as np
 from collections import OrderedDict
 from igibson import ig_dataset_path
+from igibson.macros import create_module_macros
 import igibson.utils.transform_utils as T
 from igibson.object_states import *
 from igibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
 
+
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
+
 # TODO: propagate dusty/stained to object parts
-_DEFAULT_SLICE_FORCE = 10
-_STASH_POSITION = [-100, -100, -100]
+m.DEFAULT_SLICE_FORCE = 10
+m.STASH_POSITION = [-100, -100, -100]
 
 
 class Sliced(AbsoluteObjectState, BooleanState):
-    def __init__(self, obj, slice_force=_DEFAULT_SLICE_FORCE):
+    def __init__(self, obj, slice_force=m.DEFAULT_SLICE_FORCE):
         super(Sliced, self).__init__(obj)
         self.slice_force = slice_force
         self.value = False

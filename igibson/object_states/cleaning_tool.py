@@ -1,4 +1,4 @@
-import igibson.macros as m
+from igibson.macros import gm, create_module_macros
 from igibson.object_states.aabb import AABB
 from igibson.object_states.contact_bodies import ContactBodies
 from igibson.object_states.dirty import Dusty, Stained
@@ -8,10 +8,14 @@ from igibson.object_states.soaked import Soaked
 from igibson.object_states.toggle import ToggledOn
 from igibson.utils.usd_utils import BoundingBoxAPI
 from igibson.systems.macro_particle_system import MacroParticleSystem, StainSystem
-if m.ENABLE_OMNI_PARTICLES:
+if gm.ENABLE_OMNI_PARTICLES:
     from igibson.systems.micro_particle_system import WaterSystem
 
-_LINK_NAME = "cleaning_tool_area"
+
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
+
+m.LINK_NAME = "cleaning_tool_area"
 
 
 class CleaningTool(AbsoluteObjectState, LinkBasedStateMixin):
@@ -20,7 +24,7 @@ class CleaningTool(AbsoluteObjectState, LinkBasedStateMixin):
 
     @staticmethod
     def get_state_link_name():
-        return _LINK_NAME
+        return m.LINK_NAME
 
     def _initialize(self):
         self.initialize_link_mixin()

@@ -1,6 +1,6 @@
 import os
 from igibson import assets_path, app
-import igibson.macros as m
+from igibson.macros import gm, create_module_macros
 from igibson.prims.prim_base import BasePrim
 from igibson.systems.system_base import SYSTEMS_REGISTRY
 from igibson.systems.particle_system_base import BaseParticleSystem
@@ -30,8 +30,12 @@ from omni.physx.bindings._physx import (
 )
 import carb
 
+
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
+
 # Garbage collect particle instancers where less than 25 percent of the particle are visible
-GC_THRESHOLD = 0.25
+m.GC_THRESHOLD = 0.25
 
 def set_carb_settings_for_fluid_isosurface():
     """
@@ -426,7 +430,7 @@ class MicroParticleSystem(BaseParticleSystem):
         super().initialize(simulator=simulator)
 
         # Set custom rendering settings if we're using a fluid isosurface
-        if cls.is_fluid and cls.use_isosurface and m.ENABLE_HQ_RENDERING:
+        if cls.is_fluid and cls.use_isosurface and gm.ENABLE_HQ_RENDERING:
             set_carb_settings_for_fluid_isosurface()
 
         # Initialize class variables that are mutable so they don't get overridden by children classes
@@ -464,7 +468,7 @@ class MicroParticleSystem(BaseParticleSystem):
             cls.prim = cls._create_particle_system()
 
             # Create the particle material (only if we're using high-quality rendering since this takes time)
-            cls.particle_material = cls._create_particle_material() if m.ENABLE_HQ_RENDERING else None
+            cls.particle_material = cls._create_particle_material() if gm.ENABLE_HQ_RENDERING else None
             if cls.particle_material is not None:
                 # Move this material and standardize its naming scheme
                 path_from = cls.particle_material.GetPrim().GetPrimPath().pathString
@@ -627,9 +631,9 @@ class MicroParticleSystem(BaseParticleSystem):
             physics_scene_path=cls.simulator.get_physics_context().get_current_physics_scene_prim().GetPrimPath().pathString,
             particle_contact_offset=cls.particle_contact_offset,
             visual_only=cls.visual_only,
-            smoothing=cls.use_smoothing and m.ENABLE_HQ_RENDERING,
-            anisotropy=cls.use_anisotropy and m.ENABLE_HQ_RENDERING,
-            isosurface=cls.use_isosurface and m.ENABLE_HQ_RENDERING,
+            smoothing=cls.use_smoothing and gm.ENABLE_HQ_RENDERING,
+            anisotropy=cls.use_anisotropy and gm.ENABLE_HQ_RENDERING,
+            isosurface=cls.use_isosurface and gm.ENABLE_HQ_RENDERING,
         ).GetPrim()
 
     @classmethod
@@ -1067,9 +1071,9 @@ class FluidSystem(MicroParticleSystem):
     @classmethod
     def update(cls):
         # For each particle instance, garbage collect particles if the number of visible particles
-        # is below the garbage collection threshold (GC_THRESHOLD)
+        # is below the garbage collection threshold (m.GC_THRESHOLD)
         for instancer, value in cls.particle_instancers.items(): # type: ignore
-            if np.mean(value.particle_visibilities) <= GC_THRESHOLD:
+            if np.mean(value.particle_visibilities) <= m.GC_THRESHOLD:
                 cls.remove_particle_instancer(instancer)
 
 

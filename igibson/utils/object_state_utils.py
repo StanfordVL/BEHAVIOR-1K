@@ -6,28 +6,32 @@ from IPython import embed
 from scipy.spatial.transform import Rotation as R
 
 import igibson
+from igibson.macros import create_module_macros, Dict
 from igibson import object_states
 # from igibson.external.pybullet_tools.utils import get_aabb_center, get_aabb_extent, get_link_pose, matrix_from_quat
 from igibson.object_states.aabb import AABB
 from igibson.utils import sampling_utils
 
-_ON_TOP_RAY_CASTING_SAMPLING_PARAMS = {
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
+
+m.ON_TOP_RAY_CASTING_SAMPLING_PARAMS = Dict({
     # "hit_to_plane_threshold": 0.1,  # TODO: Tune this parameter.
     "max_angle_with_z_axis": 0.17,
     "bimodal_stdev_fraction": 1e-6,
     "bimodal_mean_fraction": 1.0,
     "max_sampling_attempts": 50,
     "aabb_offset": 0.01,
-}
+})
 
-_INSIDE_RAY_CASTING_SAMPLING_PARAMS = {
+m.INSIDE_RAY_CASTING_SAMPLING_PARAMS = Dict({
     # "hit_to_plane_threshold": 0.1,  # TODO: Tune this parameter.
     "max_angle_with_z_axis": 0.17,
     "bimodal_stdev_fraction": 0.4,
     "bimodal_mean_fraction": 0.5,
     "max_sampling_attempts": 100,
     "aabb_offset": -0.01,
-}
+})
 
 
 def get_center_extent(obj_states):
@@ -106,9 +110,9 @@ def sample_kinematics(
         else:
             if use_ray_casting_method:
                 if predicate == "onTop":
-                    params = _ON_TOP_RAY_CASTING_SAMPLING_PARAMS
+                    params = m.ON_TOP_RAY_CASTING_SAMPLING_PARAMS
                 elif predicate == "inside":
-                    params = _INSIDE_RAY_CASTING_SAMPLING_PARAMS
+                    params = m.INSIDE_RAY_CASTING_SAMPLING_PARAMS
                 else:
                     assert False, "predicate is not onTop or inside: {}".format(predicate)
 

@@ -27,7 +27,7 @@ from omni.isaac.core.loggers import DataLogger
 from typing import Optional, List
 
 from igibson import assets_path, ig_dataset_path
-import igibson.macros as m
+from igibson.macros import gm, create_module_macros
 from igibson.robots.robot_base import BaseRobot
 from igibson.utils.config_utils import NumpyEncoder
 from igibson.utils.python_utils import clear as clear_pu, create_object_from_init_info
@@ -41,11 +41,6 @@ from igibson.object_states.factory import get_states_by_dependency_order
 from igibson.sensors.vision_sensor import VisionSensor
 from igibson.transition_rules import DEFAULT_RULES, TransitionResults
 from omni.kit.viewport_legacy import acquire_viewport_interface
-
-
-# Define some global defaults
-DEFAULT_VIEWER_WIDTH = 1280
-DEFAULT_VIEWER_HEIGHT = 720
 
 
 class Simulator(SimulationContext):
@@ -95,8 +90,8 @@ class Simulator(SimulationContext):
             physics_dt: float = 1.0 / 60.0,
             rendering_dt: float = 1.0 / 60.0,
             stage_units_in_meters: float = 1.0,
-            viewer_width=DEFAULT_VIEWER_WIDTH,
-            viewer_height=DEFAULT_VIEWER_HEIGHT,
+            viewer_width=gm.DEFAULT_VIEWER_WIDTH,
+            viewer_height=gm.DEFAULT_VIEWER_HEIGHT,
             vertical_fov=90,
             device=None,
             apply_transitions=False,
@@ -170,8 +165,8 @@ class Simulator(SimulationContext):
         physics_dt: float = 1.0 / 60.0,
         rendering_dt: float = 1.0 / 60.0,
         stage_units_in_meters: float = 1.0,
-        viewer_width=DEFAULT_VIEWER_WIDTH,
-        viewer_height=DEFAULT_VIEWER_HEIGHT,
+        viewer_width=gm.DEFAULT_VIEWER_WIDTH,
+        viewer_height=gm.DEFAULT_VIEWER_HEIGHT,
         vertical_fov=90,
         device_idx=0,
         apply_transitions=False,
@@ -232,11 +227,11 @@ class Simulator(SimulationContext):
         # Also make sure we invert the collision group filter settings so that different collision groups cannot
         # collide with each other, and modify settings for speed optimization
         self._physics_context.set_invert_collision_group_filter(True)
-        self._physics_context.enable_ccd(m.ENABLE_CCD)
-        self._physics_context.enable_flatcache(m.ENABLE_FLATCACHE)
+        self._physics_context.enable_ccd(gm.ENABLE_CCD)
+        self._physics_context.enable_flatcache(gm.ENABLE_FLATCACHE)
 
         # Enable GPU dynamics based on whether we need omni particles feature
-        if m.ENABLE_OMNI_PARTICLES:
+        if gm.ENABLE_OMNI_PARTICLES:
             self._physics_context.enable_gpu_dynamics(True)
             self._physics_context.set_broadphase_type("GPU")
         else:
@@ -244,9 +239,9 @@ class Simulator(SimulationContext):
             self._physics_context.set_broadphase_type("MBP")
 
         # Set GPU Pairs capacity
-        self._physics_context.set_gpu_found_lost_aggregate_pairs_capacity(m.GPU_PAIRS_CAPACITY)
-        self._physics_context.set_gpu_found_lost_pairs_capacity(m.GPU_PAIRS_CAPACITY)
-        self._physics_context.set_gpu_total_aggregate_pairs_capacity(m.GPU_PAIRS_CAPACITY)
+        self._physics_context.set_gpu_found_lost_aggregate_pairs_capacity(gm.GPU_PAIRS_CAPACITY)
+        self._physics_context.set_gpu_found_lost_pairs_capacity(gm.GPU_PAIRS_CAPACITY)
+        self._physics_context.set_gpu_total_aggregate_pairs_capacity(gm.GPU_PAIRS_CAPACITY)
 
     @property
     def viewer_height(self):
@@ -255,7 +250,7 @@ class Simulator(SimulationContext):
             int: viewer height of this sensor, in pixels
         """
         # If the viewer camera hasn't been created yet, utilize the default width
-        return DEFAULT_VIEWER_HEIGHT if self._viewer_camera is None else self._viewer_camera.viewer_height
+        return gm.DEFAULT_VIEWER_HEIGHT if self._viewer_camera is None else self._viewer_camera.viewer_height
 
     @viewer_height.setter
     def viewer_height(self, height):
@@ -274,7 +269,7 @@ class Simulator(SimulationContext):
             int: viewer width of this sensor, in pixels
         """
         # If the viewer camera hasn't been created yet, utilize the default height
-        return DEFAULT_VIEWER_WIDTH if self._viewer_camera is None else self._viewer_camera.viewer_width
+        return gm.DEFAULT_VIEWER_WIDTH if self._viewer_camera is None else self._viewer_camera.viewer_width
 
     @viewer_width.setter
     def viewer_width(self, width):

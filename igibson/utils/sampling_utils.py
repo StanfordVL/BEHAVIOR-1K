@@ -11,16 +11,21 @@ from scipy.stats import truncnorm
 from omni.physx import get_physx_scene_query_interface
 
 import igibson as ig
+from igibson.macros import create_module_macros
 import igibson.utils.transform_utils as T
 
-_DEFAULT_AABB_OFFSET = 0.1
-_PARALLEL_RAY_NORMAL_ANGLE_TOLERANCE = 1.0  # Around 60 degrees
-_DEFAULT_HIT_TO_PLANE_THRESHOLD = 0.05
-_DEFAULT_MAX_ANGLE_WITH_Z_AXIS = 3 * np.pi / 4
-_DEFAULT_MAX_SAMPLING_ATTEMPTS = 10
-_DEFAULT_CUBOID_BOTTOM_PADDING = 0.005
+
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
+
+m.DEFAULT_AABB_OFFSET = 0.1
+m.PARALLEL_RAY_NORMAL_ANGLE_TOLERANCE = 1.0  # Around 60 degrees
+m.DEFAULT_HIT_TO_PLANE_THRESHOLD = 0.05
+m.DEFAULT_MAX_ANGLE_WITH_Z_AXIS = 3 * np.pi / 4
+m.DEFAULT_MAX_SAMPLING_ATTEMPTS = 10
+m.DEFAULT_CUBOID_BOTTOM_PADDING = 0.005
 # We will cast an additional parallel ray for each additional this much distance.
-_DEFAULT_NEW_RAY_PER_HORIZONTAL_DISTANCE = 0.1
+m.DEFAULT_NEW_RAY_PER_HORIZONTAL_DISTANCE = 0.1
 
 
 def fit_plane(points):
@@ -69,7 +74,7 @@ def draw_debug_markers(hit_positions):
 
 
 def get_parallel_rays(
-    source, destination, offset, new_ray_per_horizontal_distance=_DEFAULT_NEW_RAY_PER_HORIZONTAL_DISTANCE
+    source, destination, offset, new_ray_per_horizontal_distance=m.DEFAULT_NEW_RAY_PER_HORIZONTAL_DISTANCE
 ):
     """Given a ray described by a source and a destination, sample parallel rays and return together with input ray.
 
@@ -296,10 +301,10 @@ def sample_cuboid_on_object(
     bimodal_stdev_fraction,
     axis_probabilities,
     undo_padding=False,
-    aabb_offset=_DEFAULT_AABB_OFFSET,
-    max_sampling_attempts=_DEFAULT_MAX_SAMPLING_ATTEMPTS,
-    max_angle_with_z_axis=_DEFAULT_MAX_ANGLE_WITH_Z_AXIS,
-    hit_to_plane_threshold=_DEFAULT_HIT_TO_PLANE_THRESHOLD,
+    aabb_offset=m.DEFAULT_AABB_OFFSET,
+    max_sampling_attempts=m.DEFAULT_MAX_SAMPLING_ATTEMPTS,
+    max_angle_with_z_axis=m.DEFAULT_MAX_ANGLE_WITH_Z_AXIS,
+    hit_to_plane_threshold=m.DEFAULT_HIT_TO_PLANE_THRESHOLD,
     refuse_downwards=False,
 ):
     """
@@ -450,7 +455,7 @@ def sample_cuboid_on_object(
                 print(ray_res)
             hit_positions = np.array([ray_res.get("position", np.zeros(3)) for ray_res in cast_results])
             projected_hits = get_projection_onto_plane(hit_positions, plane_centroid, plane_normal)
-            padding = _DEFAULT_CUBOID_BOTTOM_PADDING * plane_normal
+            padding = m.DEFAULT_CUBOID_BOTTOM_PADDING * plane_normal
             projected_hits += padding
             center_projected_hit = projected_hits[center_idx]
             cuboid_centroid = center_projected_hit + plane_normal * this_cuboid_dimensions[2] / 2.0
@@ -529,7 +534,7 @@ def check_normal_similarity(center_hit_normal, hit_normals, refusal_log):
     )
     parallel_hit_normal_angles_to_hit_normal = np.arccos(parallel_hit_main_hit_dot_products)
     all_rays_hit_with_similar_normal = np.all(
-        parallel_hit_normal_angles_to_hit_normal < _PARALLEL_RAY_NORMAL_ANGLE_TOLERANCE
+        parallel_hit_normal_angles_to_hit_normal < m.PARALLEL_RAY_NORMAL_ANGLE_TOLERANCE
     )
     if not all_rays_hit_with_similar_normal:
         if ig.debug_sampling:

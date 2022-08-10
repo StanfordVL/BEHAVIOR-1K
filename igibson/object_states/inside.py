@@ -8,7 +8,7 @@ from igibson.object_states.kinematics import KinematicsMixin
 from igibson.object_states.memoization import PositionalValidationMemoizedObjectStateMixin
 from igibson.object_states.object_state_base import BooleanState, RelativeObjectState
 from igibson.object_states.pose import Pose
-from igibson.object_states.utils import sample_kinematics
+from igibson.utils.object_state_utils import sample_kinematics
 from igibson.utils.usd_utils import BoundingBoxAPI
 
 

@@ -2,7 +2,7 @@ import gym
 from collections import OrderedDict
 
 import igibson as ig
-import igibson.macros as m
+from igibson.macros import gm, create_module_macros
 from igibson.robots import REGISTERED_ROBOTS
 from igibson.tasks import REGISTERED_TASKS
 from igibson.scenes import REGISTERED_SCENES
@@ -13,8 +13,11 @@ from igibson.utils.python_utils import assert_valid_key, merge_nested_dicts, cre
     Serializable, Recreatable
 
 
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
+
 # How many predefined randomized scene object configurations we have per scene
-N_PREDEFINED_OBJ_RANDOMIZATIONS = 10
+m.N_PREDEFINED_OBJ_RANDOMIZATIONS = 10
 
 
 class Environment(gym.Env, GymObservable, Serializable, Recreatable):
@@ -44,7 +47,7 @@ class Environment(gym.Env, GymObservable, Serializable, Recreatable):
         # Store settings and other initialized values
         self._automatic_reset = automatic_reset
         self._predefined_object_randomization_idx = 0
-        self._n_predefined_object_randomizations = N_PREDEFINED_OBJ_RANDOMIZATIONS
+        self._n_predefined_object_randomizations = m.N_PREDEFINED_OBJ_RANDOMIZATIONS
         self.action_timestep = action_timestep
 
         # Initialize other placeholders that will be filled in later
@@ -464,9 +467,9 @@ class Environment(gym.Env, GymObservable, Serializable, Recreatable):
         ig.sim.step()
 
         # Grab collisions and store internally
-        if m.ENABLE_GLOBAL_CONTACT_REPORTING:
+        if gm.ENABLE_GLOBAL_CONTACT_REPORTING:
             collision_objects = self.scene.objects + self.robots
-        elif m.ENABLE_ROBOT_CONTACT_REPORTING:
+        elif gm.ENABLE_ROBOT_CONTACT_REPORTING:
             collision_objects = self.robots
         else:
             collision_objects = []
@@ -516,6 +519,7 @@ class Environment(gym.Env, GymObservable, Serializable, Recreatable):
         self._current_step = 0
         self._collision_step = 0
 
+    # TODO: Match super class signature?
     def reset(self):
         """
         Reset episode.

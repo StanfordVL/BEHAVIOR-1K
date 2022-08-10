@@ -1,17 +1,22 @@
 import numpy as np
 from collections import OrderedDict
+from igibson.macros import create_module_macros
 from igibson.object_states.heat_source_or_sink import HeatSourceOrSink
 from igibson.object_states.inside import Inside
 from igibson.object_states.object_state_base import AbsoluteObjectState
 from igibson.object_states.pose import Pose
 import igibson.utils.transform_utils as T
 
+
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
+
 # TODO: Consider sourcing default temperature from scene
 # Default ambient temperature.
-DEFAULT_TEMPERATURE = 23.0  # degrees Celsius
+m.DEFAULT_TEMPERATURE = 23.0  # degrees Celsius
 
 # What fraction of the temperature difference with the default temperature should be decayed every step.
-TEMPERATURE_DECAY_SPEED = 0.02  # per second. We'll do the conversion to steps later.
+m.TEMPERATURE_DECAY_SPEED = 0.02  # per second. We'll do the conversion to steps later.
 
 
 class Temperature(AbsoluteObjectState):
@@ -26,7 +31,7 @@ class Temperature(AbsoluteObjectState):
     def __init__(self, obj):
         super(Temperature, self).__init__(obj)
 
-        self.value = DEFAULT_TEMPERATURE
+        self.value = m.DEFAULT_TEMPERATURE
 
     def _get_value(self):
         return self.value
@@ -70,7 +75,7 @@ class Temperature(AbsoluteObjectState):
         # Apply temperature decay if not affected by any heat source.
         if not affected_by_heat_source:
             new_temperature += (
-                (DEFAULT_TEMPERATURE - self.value) * TEMPERATURE_DECAY_SPEED * self._simulator.get_rendering_dt()
+                (m.DEFAULT_TEMPERATURE - self.value) * m.TEMPERATURE_DECAY_SPEED * self._simulator.get_rendering_dt()
             )
 
         self.value = new_temperature

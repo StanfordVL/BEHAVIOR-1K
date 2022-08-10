@@ -2,7 +2,6 @@ from abc import ABCMeta
 
 import carb
 import numpy as np
-import igibson.macros as m
 from omni.kit.widget.settings import SettingType
 
 

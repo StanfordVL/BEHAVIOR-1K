@@ -10,7 +10,6 @@ from igibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
 from igibson.robots.locomotion_robot import LocomotionRobot
 from igibson.utils.python_utils import assert_valid_key
 from igibson.utils.usd_utils import JointType
-import igibson.macros as m
 
 DEFAULT_ARM_POSES = {
     "vertical",

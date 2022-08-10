@@ -1,10 +1,15 @@
 import numpy as np
+from igibson.macros import create_module_macros
 from igibson.object_states import ContactBodies, Sliced
 from igibson.object_states.link_based_state_mixin import LinkBasedStateMixin
-from igibson.object_states.object_state_base import AbsoluteObjectState, NONE
+from igibson.object_states.object_state_base import AbsoluteObjectState
 from omni.isaac.utils._isaac_utils import math as math_utils
 
-_SLICER_LINK_NAME = "slicer"
+
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
+
+m.SLICER_LINK_NAME = "slicer"
 
 
 class Slicer(AbsoluteObjectState, LinkBasedStateMixin):
@@ -13,7 +18,7 @@ class Slicer(AbsoluteObjectState, LinkBasedStateMixin):
 
     @staticmethod
     def get_state_link_name():
-        return _SLICER_LINK_NAME
+        return m.SLICER_LINK_NAME
 
     def _initialize(self):
         self.initialize_link_mixin()

@@ -5,11 +5,15 @@ import logging
 from inspect import isclass
 import numpy as np
 from collections import OrderedDict, Iterable
+from igibson.macros import create_module_macros
 from igibson.utils.python_utils import Serializable, SerializableNonInstance, UniquelyNamed
 
 
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
+
 # Token identifier for default values if a key doesn't exist in a given object
-DOES_NOT_EXIST = "DOES_NOT_EXIST"
+m.DOES_NOT_EXIST = "DOES_NOT_EXIST"
 
 
 class Registry(UniquelyNamed):
@@ -45,7 +49,7 @@ class Registry(UniquelyNamed):
             default_key="name",
             unique_keys=None,
             group_keys=None,
-            default_value=DOES_NOT_EXIST,
+            default_value=m.DOES_NOT_EXIST,
     ):
         """
         Args:

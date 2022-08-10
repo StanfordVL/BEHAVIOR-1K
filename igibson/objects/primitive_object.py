@@ -11,7 +11,7 @@ import omni
 import carb
 
 
-
+# Define valid objects that can be created
 VALID_RADIUS_OBJECTS = {"Cone", "Cylinder", "Disk", "Sphere"}
 VALID_HEIGHT_OBJECTS = {"Cone", "Cylinder"}
 VALID_SIZE_OBJECTS = {"Cube", "Torus"}

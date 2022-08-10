@@ -3,26 +3,27 @@ import os
 import numpy as np
 
 
-import igibson
+from igibson.macros import create_module_macros
 from igibson.object_states.aabb import AABB
 from igibson.object_states.inside import Inside
 from igibson.object_states.link_based_state_mixin import LinkBasedStateMixin
-from igibson.object_states.object_state_base import AbsoluteObjectState, NONE
+from igibson.object_states.object_state_base import AbsoluteObjectState
 from igibson.object_states.open import Open
 from igibson.object_states.toggle import ToggledOn
 
-# The name of the heat source link inside URDF files.
-from igibson.utils.constants import SemanticClass
 
-_HEATING_ELEMENT_LINK_NAME = "heat_source_link"
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
 
-_HEATING_ELEMENT_MARKER_SCALE = [1.0] * 3
-# _HEATING_ELEMENT_MARKER_FILENAME = os.path.join(igibson.assets_path, "models/fire/fire.obj")
+m.HEATING_ELEMENT_LINK_NAME = "heat_source_link"
+
+m.HEATING_ELEMENT_MARKER_SCALE = [1.0] * 3
+# m.HEATING_ELEMENT_MARKER_FILENAME = os.path.join(igibson.assets_path, "models/fire/fire.obj")
 
 # TODO: Delete default values for this and make them required.
-_DEFAULT_TEMPERATURE = 200
-_DEFAULT_HEATING_RATE = 0.04
-_DEFAULT_DISTANCE_THRESHOLD = 0.2
+m.DEFAULT_TEMPERATURE = 200
+m.DEFAULT_HEATING_RATE = 0.04
+m.DEFAULT_DISTANCE_THRESHOLD = 0.2
 
 
 class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin):
@@ -39,9 +40,9 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin):
     def __init__(
         self,
         obj,
-        temperature=_DEFAULT_TEMPERATURE,
-        heating_rate=_DEFAULT_HEATING_RATE,
-        distance_threshold=_DEFAULT_DISTANCE_THRESHOLD,
+        temperature=m.DEFAULT_TEMPERATURE,
+        heating_rate=m.DEFAULT_HEATING_RATE,
+        distance_threshold=m.DEFAULT_DISTANCE_THRESHOLD,
         requires_toggled_on=False,
         requires_closed=False,
         requires_inside=False,
@@ -100,7 +101,7 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin):
 
     @staticmethod
     def get_state_link_name():
-        return _HEATING_ELEMENT_LINK_NAME
+        return m.HEATING_ELEMENT_LINK_NAME
 
     def _compute_state_and_position(self):
         # Find the link first. Note that the link is only required
@@ -132,10 +133,10 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin):
         # from igibson.objects.usd_object import USDObject
         # self.marker = USDObject(
         #     prim_path=f"{self.obj.prim_path}/heat_source_marker",
-        #     usd_path=_HEATING_ELEMENT_MARKER_FILENAME,
+        #     usd_path=m.HEATING_ELEMENT_MARKER_FILENAME,
         #     name=f"{self.obj.name}_heat_source_marker",
         #     class_id=SemanticClass.HEAT_SOURCE_MARKER,
-        #     scale=_HEATING_ELEMENT_MARKER_SCALE,
+        #     scale=m.HEATING_ELEMENT_MARKER_SCALE,
         #     visible=False,
         #     fixed_base=False,
         #     visual_only=True,

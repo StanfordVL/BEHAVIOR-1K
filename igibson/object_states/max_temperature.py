@@ -1,4 +1,4 @@
-from igibson.object_states.object_state_base import AbsoluteObjectState, NONE
+from igibson.object_states.object_state_base import AbsoluteObjectState
 from igibson.object_states.temperature import Temperature
 import numpy as np
 from collections import OrderedDict

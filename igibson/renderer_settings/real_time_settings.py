@@ -1,5 +1,4 @@
 import carb
-import igibson.macros as m
 from omni.kit.widget.settings import SettingType
 
 from igibson.renderer_settings.settings_base import SettingItem, SettingsBase, SubSettingsBase

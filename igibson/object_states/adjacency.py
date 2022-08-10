@@ -2,19 +2,22 @@ from collections import namedtuple
 
 import numpy as np
 
-
-from igibson.object_states.object_state_base import CachingEnabledObjectState, NONE
+from igibson.macros import create_module_macros
+from igibson.object_states.object_state_base import CachingEnabledObjectState
 from igibson.object_states.pose import Pose
 from igibson.utils.sampling_utils import raytest_batch
 
-_MAX_ITERATIONS = 10
-_MAX_DISTANCE_VERTICAL = 5.0
-_MAX_DISTANCE_HORIZONTAL = 5.0
+
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
+m.MAX_ITERATIONS = 10
+m.MAX_DISTANCE_VERTICAL = 5.0
+m.MAX_DISTANCE_HORIZONTAL = 5.0
 
 # How many 2-D bases to try during horizontal adjacency check. When 1, only the standard axes will be considered.
 # When 2, standard axes + 45 degree rotated will be considered. The tried axes will be equally spaced. The higher
 # this number, the lower the possibility of false negatives in Inside and NextTo.
-_HORIZONTAL_AXIS_COUNT = 5
+m.HORIZONTAL_AXIS_COUNT = 5
 
 AxisAdjacencyList = namedtuple("AxisAdjacencyList", ("positive_neighbors", "negative_neighbors"))
 
@@ -81,7 +84,7 @@ def compute_adjacencies(obj, axes, max_distance):
     prim_paths = obj.link_prim_paths
 
     # Cast rays repeatedly until the max number of casting is reached
-    for i in range(_MAX_ITERATIONS):
+    for i in range(m.MAX_ITERATIONS):
         # Find which directions still need ray casting
         unfinished_directions = np.nonzero(finalized != True)[0]
         num_directions_to_cast = unfinished_directions.shape[0]
@@ -130,7 +133,7 @@ class VerticalAdjacency(CachingEnabledObjectState):
 
     def _compute_value(self):
         # Call the adjacency computation with th Z axis.
-        bodies_by_axis = compute_adjacencies(self.obj, np.array([[0, 0, 1]]), _MAX_DISTANCE_VERTICAL)
+        bodies_by_axis = compute_adjacencies(self.obj, np.array([[0, 0, 1]]), m.MAX_DISTANCE_VERTICAL)
 
         # Return the adjacencies from the only axis we passed in.
         return bodies_by_axis[0]
@@ -153,7 +156,7 @@ class HorizontalAdjacency(CachingEnabledObjectState):
     and negative directions of each axis.
 
     The value of the state is List[List[AxisAdjacencyList]], where the list dimensions are
-    _HORIZONTAL_AXIS_COUNT and 2. The first index is used to choose between the different planes,
+    m.HORIZONTAL_AXIS_COUNT and 2. The first index is used to choose between the different planes,
     the second index to choose between the orthogonal axes of that plane. Given a plane/axis combo,
     the item in the list is a AxisAdjacencyList containing adjacencies in both directions of the
     axis.
@@ -161,14 +164,14 @@ class HorizontalAdjacency(CachingEnabledObjectState):
     If the idea of orthogonal bases is not relevant (and your use case simply requires checking
     adjacencies in each direction), the flatten_planes() function can be used on the state value
     to reduce the output to List[AxisAdjacencyList], a list of adjacency lists for all
-    2 * _HORIZONTAL_AXIS_COUNT directions.
+    2 * m.HORIZONTAL_AXIS_COUNT directions.
     """
 
     def _compute_value(self):
-        coordinate_planes = get_equidistant_coordinate_planes(_HORIZONTAL_AXIS_COUNT)
+        coordinate_planes = get_equidistant_coordinate_planes(m.HORIZONTAL_AXIS_COUNT)
 
         # Flatten the axis dimension and input into compute_adjacencies.
-        bodies_by_axis = compute_adjacencies(self.obj, coordinate_planes.reshape(-1, 3), _MAX_DISTANCE_HORIZONTAL)
+        bodies_by_axis = compute_adjacencies(self.obj, coordinate_planes.reshape(-1, 3), m.MAX_DISTANCE_HORIZONTAL)
 
         # Now reshape the bodies_by_axis to group by coordinate planes.
         bodies_by_plane = list(zip(bodies_by_axis[::2], bodies_by_axis[1::2]))

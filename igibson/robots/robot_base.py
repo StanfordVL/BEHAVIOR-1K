@@ -5,7 +5,7 @@ from copy import deepcopy
 from collections import OrderedDict
 import numpy as np
 import matplotlib.pyplot as plt
-import igibson.macros as m
+from igibson.macros import gm
 from igibson.sensors import create_sensor, SENSOR_PRIMS_TO_SENSOR_CLS, ALL_SENSOR_MODALITIES, VisionSensor, ScanSensor
 from igibson.objects.usd_object import USDObject
 from igibson.objects.controllable_object import ControllableObject
@@ -141,7 +141,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable, Registerable):
         # Possibly force enabling of contact sensing for this robot if we set the global flag
         # TODO: Remove this once we have a more optimized solution
         # Only create contact report api if we're not visual only
-        if (not self._visual_only) and m.ENABLE_ROBOT_CONTACT_REPORTING:
+        if (not self._visual_only) and gm.ENABLE_ROBOT_CONTACT_REPORTING:
             for link in self._links.values():
                 PhysxSchema.PhysxContactReportAPI(link.prim) if \
                     link.prim.HasAPI(PhysxSchema.PhysxContactReportAPI) else \

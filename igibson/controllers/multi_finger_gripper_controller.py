@@ -1,5 +1,6 @@
 import numpy as np
 
+from igibson.macros import create_module_macros
 from igibson.controllers import IsGraspingState, ControlType, GripperController
 from igibson.utils.python_utils import assert_valid_key
 
@@ -9,9 +10,13 @@ VALID_MODES = {
     "independent",
 }
 
+
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
+
 # is_grasping heuristics parameters
-POS_TOLERANCE = 0.002  # arbitrary heuristic
-VEL_TOLERANCE = 0.01  # arbitrary heuristic
+m.POS_TOLERANCE = 0.002  # arbitrary heuristic
+m.VEL_TOLERANCE = 0.01  # arbitrary heuristic
 
 
 class MultiFingerGripperController(GripperController):
@@ -183,7 +188,7 @@ class MultiFingerGripperController(GripperController):
                 self._control == self._control[0]
             ), f"MultiFingerGripperController has different values in the command for non-independent mode: {self._control}"
 
-            assert POS_TOLERANCE > self._limit_tolerance, (
+            assert m.POS_TOLERANCE > self._limit_tolerance, (
                 "Joint position tolerance for is_grasping heuristics checking is smaller than or equal to the "
                 "gripper controller's tolerance of zero-ing out velocities, which makes the heuristics invalid."
             )
@@ -193,14 +198,14 @@ class MultiFingerGripperController(GripperController):
             # For joint position control, if the desired positions are the same as the current positions, is_grasping unknown
             if (
                     self._motor_type == "position"
-                    and np.mean(np.abs(finger_pos - self._control)) < POS_TOLERANCE
+                    and np.mean(np.abs(finger_pos - self._control)) < m.POS_TOLERANCE
             ):
                 is_grasping = IsGraspingState.UNKNOWN
 
             # For joint velocity / torque control, if the desired velocities / torques are zeros, is_grasping unknown
             elif (
                     self._motor_type in {"velocity", "torque"}
-                    and np.mean(np.abs(self._control)) < VEL_TOLERANCE
+                    and np.mean(np.abs(self._control)) < m.VEL_TOLERANCE
             ):
                 is_grasping = IsGraspingState.UNKNOWN
 
@@ -220,14 +225,14 @@ class MultiFingerGripperController(GripperController):
                 dist_from_lower_limit = finger_pos - min_pos
                 dist_from_upper_limit = max_pos - finger_pos
 
-                # If the joint positions are not near the joint limits with some tolerance (POS_TOLERANCE)
+                # If the joint positions are not near the joint limits with some tolerance (m.POS_TOLERANCE)
                 valid_grasp_pos = (
-                        np.mean(dist_from_lower_limit) > POS_TOLERANCE
-                        and np.mean(dist_from_upper_limit) > POS_TOLERANCE
+                        np.mean(dist_from_lower_limit) > m.POS_TOLERANCE
+                        and np.mean(dist_from_upper_limit) > m.POS_TOLERANCE
                 )
 
-                # And the joint velocities are close to zero with some tolerance (VEL_TOLERANCE)
-                valid_grasp_vel = np.all(np.abs(finger_vel) < VEL_TOLERANCE)
+                # And the joint velocities are close to zero with some tolerance (m.VEL_TOLERANCE)
+                valid_grasp_vel = np.all(np.abs(finger_vel) < m.VEL_TOLERANCE)
 
                 # Then the gripper is grasping something, which stops the gripper from reaching its desired state
                 is_grasping = (

@@ -4,10 +4,6 @@ import numpy as np
 from igibson.utils.python_utils import classproperty, Serializable, Registerable, Recreatable
 
 
-# Hacky method to serialize "None" values as a number -- we choose magic number 400 since:
-# sum([ord(c) for c in "None"]) = 400!
-NONE = 400.0
-
 # Global dicts that will contain mappings
 REGISTERED_OBJECT_STATES = OrderedDict()
 
