@@ -2,14 +2,20 @@ import os
 
 import numpy as np
 
-
-import igibson
+import igibson as ig
+from igibson.macros import create_module_macros
 from igibson.controllers import ControlType
 from igibson.robots.active_camera_robot import ActiveCameraRobot
 from igibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
 from igibson.robots.locomotion_robot import LocomotionRobot
 from igibson.utils.python_utils import assert_valid_key
 from igibson.utils.usd_utils import JointType
+from igibson.utils.transform_utils import euler2quat, quat2euler, quat2mat
+from igibson.prims.joint_prim import Virtual6DOFJoint
+
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
+
 
 DEFAULT_ARM_POSES = {
     "vertical",
@@ -23,6 +29,11 @@ RESET_JOINT_OPTIONS = {
     "tuck",
     "untuck",
 }
+
+
+m.BASE_POSE_SETTER_CALLBACK_NAME = "tiago_base_pose_setter"
+m.BODY_LINEAR_VELOCITY = 0.05  # linear velocity thresholds in meters/frame
+m.BODY_ANGULAR_VELOCITY = 0.05  # angular velocity thresholds in radians/frame
 
 
 class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
@@ -121,6 +132,9 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         self.default_trunk_offset = default_trunk_offset
         assert_valid_key(key=default_arm_pose, valid_keys=DEFAULT_ARM_POSES, name="default_arm_pose")
         self.default_arm_pose = default_arm_pose
+
+        # Other args that will be created at runtime
+        self._base_pose_update_delta = None
 
         # Parse reset joint pos if specifying special string
         if isinstance(reset_joint_pos, str):
@@ -296,6 +310,24 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
         return dic
 
+    def _setup_virtual_joints(self):
+        """
+        Sets up the virtual joints for the omnidirectional base.
+        Returns:
+            OrderDict[str: VirtualJointPrim] for each dof
+        """
+        virtual_joint_prim_path = self.prim_path + "/virtual_joint_base"
+        # create the virtual joint prims for x, y, rz
+        virtual_joints = Virtual6DOFJoint(
+            prim_path=virtual_joint_prim_path,
+            joint_name="virtual_joint_base",
+            dof=['x', 'y', 'rz'],
+            get_state_callback=self.get_position_orientation,
+            command_pos_callback=self._update_base_pose_callback_function,
+            reset_pos_callback=self._reset_base_pose,
+        ).joints
+        return virtual_joints
+
     @property
     def default_proprio_obs(self):
         obs_keys = super().default_proprio_obs
@@ -315,8 +347,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         controllers = super()._default_controllers
 
         # We use multi finger gripper, differential drive, and IK controllers as default
-        # TODO: Get omnidirectional base working
-        controllers["base"] = "NullJointController"
+        controllers["base"] = "JointController"
         controllers["camera"] = "JointController"
         for arm in self.arm_names:
             controllers["arm_{}".format(arm)] = "InverseKinematicsController"
@@ -325,9 +356,30 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         return controllers
 
     @property
+    def _default_base_controller_configs(self):
+        dic = {
+            "name": "JointController",
+            "control_freq": self._control_freq,
+            "control_limits": self.control_limits,
+            "use_delta_commands": False,
+            "motor_type": "position",
+            "compute_delta_in_quat_space": [(3, 4, 5)],
+            "dof_idx": self.base_control_idx,
+            "command_input_limits": (
+                np.array([-m.BODY_LINEAR_VELOCITY] * 3 + [-m.BODY_ANGULAR_VELOCITY] * 3),
+                np.array([m.BODY_LINEAR_VELOCITY] * 3 + [m.BODY_ANGULAR_VELOCITY] * 3),
+            ),
+            "command_output_limits": None,
+        }
+        return dic
+
+    @property
     def _default_controller_config(self):
         # Grab defaults from super method first
         cfg = super()._default_controller_config
+
+        # Get default base controller for omnidirectional Tiago
+        cfg["base"] = {"JointController": self._default_base_controller_configs}
 
         for arm in self.arm_names:
             for arm_cfg in cfg["arm_{}".format(arm)].values():
@@ -392,9 +444,15 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
     @property
     def base_control_idx(self):
         """
-        :return Array[int]: Indices in low-level control vector corresponding to [Left, Right] wheel joints.
+        :return Array[int]: Indices in low-level control vector corresponding to the virtual planar joints.
         """
-        return np.array([], dtype=int)
+        joints = list(self.joints.keys())
+        return np.array(
+            [
+                joints.index(f"virtual_joint_base_{component}")
+                for component in ["x", "y", "rz"]
+            ]
+        )
 
     @property
     def trunk_control_idx(self):
@@ -454,16 +512,16 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
     @property
     def usd_path(self):
-        return os.path.join(igibson.assets_path, "models/tiago/tiago_dual_omnidirectional_stanford/tiago_dual_omnidirectional_stanford.usd")
+        return os.path.join(ig.assets_path, "models/tiago/tiago_dual_omnidirectional_stanford/tiago_dual_omnidirectional_stanford.usd")
 
     @property
     def robot_arm_descriptor_yamls(self):
-        return {"left": os.path.join(igibson.assets_path, "models/tiago/tiago_dual_omnidirectional_stanford_left_arm_descriptor.yaml"),
-                "right": os.path.join(igibson.assets_path, "models/tiago/tiago_dual_omnidirectional_stanford_right_arm_fixed_trunk_descriptor.yaml")}
+        return {"left": os.path.join(ig.assets_path, "models/tiago/tiago_dual_omnidirectional_stanford_left_arm_descriptor.yaml"),
+                "right": os.path.join(ig.assets_path, "models/tiago/tiago_dual_omnidirectional_stanford_right_arm_fixed_trunk_descriptor.yaml")}
 
     @property
     def urdf_path(self):
-        return os.path.join(igibson.assets_path, "models/tiago/tiago_dual_omnidirectional_stanford.urdf")
+        return os.path.join(ig.assets_path, "models/tiago/tiago_dual_omnidirectional_stanford.urdf")
 
     def dump_config(self):
         cfg = super().dump_config()
@@ -473,3 +531,38 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         cfg["default_arm_pose"] = self.default_arm_pose
 
         return cfg
+
+    def _reset_base_pose(self, pose):
+        """
+        Call back function to get the base's state
+        """
+        self.set_position_orientation(pose[:3], pose[3:])
+
+    def remove(self, simulator=None):
+        # Call super first
+        super().remove(simulator=simulator)
+
+        # Also remove the callback for the base
+        ig.sim.remove_physics_callback(callback_name=m.BASE_POSE_SETTER_CALLBACK_NAME)
+
+    def _update_base_pose_callback_function(self, delta):
+        """
+        Updates the callback function used by the simulator before every physics simulation step
+        """
+        # Check if the physics callback exists -- if not, add it to the set of callbacks
+        if not ig.sim.physics_callback_exists(callback_name=m.BASE_POSE_SETTER_CALLBACK_NAME):
+            ig.sim.add_physics_callback(callback_name=m.BASE_POSE_SETTER_CALLBACK_NAME, callback_fn=self._set_base_pose_callback)
+
+        # Update the delta value used in the callback
+        self._base_pose_update_delta = np.array(delta)
+
+    def _set_base_pose_callback(self, step_size=None):
+        """
+        Call back function called directly from the simulator to update the base's position
+        """
+        # Grab the delta, then update the robot's pose
+        delta = self._base_pose_update_delta * ig.sim.get_physics_dt() / ig.sim.get_rendering_dt()
+        cur_pos, cur_orn = self.get_position_orientation()
+        new_pos = cur_pos + np.matmul(quat2mat(cur_orn), np.array(delta[:3]))
+        new_orn = euler2quat(quat2euler(cur_orn) + delta[3:])
+        self.set_position_orientation(new_pos, new_orn)

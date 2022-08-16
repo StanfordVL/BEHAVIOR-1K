@@ -82,6 +82,7 @@ class ControllableObject(BaseObject):
         self._dof_to_joints = None          # OrderedDict that will map DOF indices to JointPrims
         self._last_action = None
         self._controllers = None
+        self.dof_names_ordered = None
 
         # Run super init
         super().__init__(
@@ -103,13 +104,6 @@ class ControllableObject(BaseObject):
     def _initialize(self):
         # Run super first
         super()._initialize()
-
-        # TODO! For BehaviorRobot
-        # # Set up any virtual joints for any non-base bodies.
-        # virtual_joints = {joint.joint_name: joint for joint in self._setup_virtual_joints()}
-        # assert self._joints.keys().isdisjoint(virtual_joints.keys())
-        # self._joints.update(virtual_joints)
-
         # Fill in the DOF to joint mapping
         self._dof_to_joints = OrderedDict()
         idx = 0
@@ -161,8 +155,12 @@ class ControllableObject(BaseObject):
         self._controller_config = self._generate_controller_config(custom_config=self._controller_config)
 
         # Store dof idx mapping to dof name
-        dof_names_ordered = [self._dc.get_dof_name(self._dc.get_articulation_dof(self._handle, i))
-                             for i in range(self.n_dof)]
+
+        # TODO: Verify that this modification has no side effects
+        # dof_names_ordered = [self._dc.get_dof_name(self._dc.get_articulation_dof(self._handle, i))
+        #                      for i in range(self.n_dof)]
+        self.dof_names_ordered = list(self._joints.keys())
+
         # Initialize controllers to create
         self._controllers = OrderedDict()
         # Loop over all controllers, in the order corresponding to @action dim
@@ -178,7 +176,7 @@ class ControllableObject(BaseObject):
             # Update the control modes of each joint based on the outputted control from the controllers
             for dof in self._controllers[name].dof_idx:
                 control_type = self._controllers[name].control_type
-                self._joints[dof_names_ordered[dof]].set_control_type(
+                self._joints[self.dof_names_ordered[dof]].set_control_type(
                     control_type=control_type,
                     kp=self.default_kp if control_type == ControlType.POSITION else None,
                     kd=self.default_kd if control_type == ControlType.VELOCITY else None,
@@ -236,18 +234,14 @@ class ControllableObject(BaseObject):
 
         # Additionally set the joint states based on the reset values
         self.set_joint_positions(positions=self._reset_joint_pos, target=False)
-        self.set_joint_velocities(velocities=np.zeros(self._n_dof), target=False)
-
-        # Store dof idx mapping to dof name
-        dof_names_ordered = [self._dc.get_dof_name(self._dc.get_articulation_dof(self._handle, i))
-                             for i in range(self.n_dof)]
+        self.set_joint_velocities(velocities=np.zeros(self._n_physical_dof), target=False)
 
         # Update the control modes of each joint based on the outputted control from the controllers
         # Omni resets them after every reset
         for controller in self._controllers.values():
             for dof in controller.dof_idx:
                 control_type = controller.control_type
-                self._joints[dof_names_ordered[dof]].set_control_type(
+                self._joints[self.dof_names_ordered[dof]].set_control_type(
                     control_type=control_type,
                     kp=self.default_kp if control_type == ControlType.POSITION else None,
                     kd=self.default_kd if control_type == ControlType.VELOCITY else None,
@@ -256,10 +250,6 @@ class ControllableObject(BaseObject):
         # Reset all controllers
         for controller in self._controllers.values():
             controller.reset()
-
-    def _setup_virtual_joints(self):
-        """Create and return any virtual joints an object might need. Subclasses can implement this as necessary."""
-        return []
 
     @abstractmethod
     def _create_discrete_action_space(self):
@@ -344,8 +334,8 @@ class ControllableObject(BaseObject):
             idx += controller.command_dim
 
         # Compose controls
-        u_vec = np.zeros(self._n_dof)
-        u_type_vec = np.array([ControlType.POSITION] * self._n_dof)
+        u_vec = np.zeros(self.n_dof)
+        u_type_vec = np.array([ControlType.POSITION] * self.n_dof)
         for group, ctrl in control.items():
             idx = self._controllers[group].dof_idx
             u_vec[idx] = ctrl["value"]
@@ -383,12 +373,12 @@ class ControllableObject(BaseObject):
         """
         # Run sanity check
         if indices is None:
-            assert len(control) == len(control_type) == self._n_dof, (
+            assert len(control) == len(control_type) == self.n_dof, (
                 "Control signals, control types, and number of DOF should all be the same!"
-                "Got {}, {}, and {} respectively.".format(len(control), len(control_type), self._n_dof)
+                "Got {}, {}, and {} respectively.".format(len(control), len(control_type), self.n_dof)
             )
             # Set indices manually so that we're standardized
-            indices = np.arange(self._n_dof)
+            indices = np.arange(self.n_dof)
         else:
             assert len(control) == len(control_type) == len(indices), (
                 "Control signals, control types, and indices should all be the same!"

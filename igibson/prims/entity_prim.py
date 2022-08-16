@@ -62,7 +62,8 @@ class EntityPrim(XFormPrim):
         self._root_handle = None                # Handle to the root rigid body of this articulation
         self._root_link_name = None             # Name of the root link
         self._dofs_infos = None
-        self._n_dof = None
+        self._n_physical_dof = None             # physical dof with dynamic control
+        self._n_virtual_dof = None              # virtual dof, default is 0 (if there is no virtual joint)
         self._default_joints_state = None
         self._links = None
         self._joints = None
@@ -95,6 +96,8 @@ class EntityPrim(XFormPrim):
         # Get dynamic control info
         self._dc = _dynamic_control.acquire_dynamic_control_interface()
         self.update_handles()
+
+        n_virtual_dof = 0
 
         # Handle case separately based on whether the handle is valid (i.e.: whether we are actually articulated or not)
         if self._handle != _dynamic_control.INVALID_HANDLE:
@@ -137,13 +140,22 @@ class EntityPrim(XFormPrim):
             root_prim = get_prim_at_path(body_path)
             n_dof = 0
 
+        # Set up any virtual joints for any non-base bodies.
+        virtual_joints = self._setup_virtual_joints()
+        assert self._joints.keys().isdisjoint(virtual_joints.keys())
+        for joint in virtual_joints.values():
+            n_virtual_dof += joint.n_dof
+            joint.initialize()
+        self._joints.update(virtual_joints)
+
         # Make sure root prim stored is the same as the one found during initialization
         assert self.root_prim == root_prim, \
             f"Mismatch in root prims! Original was {self.root_prim.GetPrimPath()}, " \
             f"initialized is {root_prim.GetPrimPath()}!"
 
         # Store values internally
-        self._n_dof = n_dof
+        self._n_physical_dof = n_dof
+        self._n_virtual_dof = n_virtual_dof
 
         print(f"root handle: {self._root_handle}, root prim path: {self._dc.get_rigid_body_path(self._root_handle)}")
 
@@ -300,7 +312,7 @@ class EntityPrim(XFormPrim):
         Returns:
             int: [description]
         """
-        return self._n_dof
+        return self._n_physical_dof + self._n_virtual_dof
 
     @property
     def n_joints(self):
@@ -365,6 +377,10 @@ class EntityPrim(XFormPrim):
 
         # Also set the internal value
         self._visual_only = val
+
+    def _setup_virtual_joints(self):
+        """Create and return any virtual joints an object might need. Subclasses can implement this as necessary."""
+        return OrderedDict()
 
     def contact_list(self):
         """
@@ -501,7 +517,7 @@ class EntityPrim(XFormPrim):
 
         # Possibly set specific values in the array if indies are specified
         if indices is None:
-            new_positions = positions
+            new_positions = positions[:self._n_physical_dof]
         else:
             new_positions = dof_states["pos"]
             new_positions[indices] = positions
