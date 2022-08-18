@@ -344,9 +344,9 @@ class Environment(gym.Env, GymObservable, Serializable, Recreatable):
             (self._predefined_object_randomization_idx + 1) % self._n_predefined_object_randomizations
         self.load()
 
-    def clean(self):
+    def close(self):
         """
-        Clean up the environment.
+        Clean up the environment and shut down the simulation.
         """
         ig.sim.close()
 
@@ -391,8 +391,6 @@ class Environment(gym.Env, GymObservable, Serializable, Recreatable):
             filtered_link_prims = {link.prim_path for link in filtered_links}
             # Loop over all filtered objects and compose them
             filtered_obj_prims = {link.prim_path for obj in filtered_objs for link in obj.links.values()}
-            # Get union of robot and obj prims
-            filtered_robot_obj_prims = robot_prims.union(filtered_obj_prims)
             # Iterate over all collision pairs
             for col_pair in collisions:
                 # First check for self_collision -- we check by first subtracting all filtered links from the col_pair
@@ -427,12 +425,6 @@ class Environment(gym.Env, GymObservable, Serializable, Recreatable):
         """
         info["episode_length"] = self._current_step
         info["collision_step"] = self._collision_step
-
-    def close(self):
-        """
-        Synonymous function with clean.
-        """
-        self.clean()
 
     def step(self, action=None):
         """
