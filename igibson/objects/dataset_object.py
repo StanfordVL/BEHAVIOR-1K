@@ -705,7 +705,7 @@ class DatasetObject(USDObject):
                 scale_in_parent_lf = scales[parent_name]
                 # The location of the joint frame is scaled using the scale in the parent frame
                 jnt_frame_rot = T.quat2mat(joint.local_orientation)
-                scale_in_child_lf = jnt_frame_rot.T @ np.array(scale_in_parent_lf)
+                scale_in_child_lf = np.absolute(jnt_frame_rot.T @ np.array(scale_in_parent_lf))
                 scales[child_name] = scale_in_child_lf
 
         return scales
