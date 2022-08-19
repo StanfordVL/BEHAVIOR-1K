@@ -244,13 +244,31 @@ class Simulator(SimulationContext):
         self._physics_context.set_gpu_total_aggregate_pairs_capacity(gm.GPU_PAIRS_CAPACITY)
 
     @property
+    def viewer_visibility(self):
+        """
+        Returns:
+            bool: Whether the viewer is visible or not
+        """
+        return self._viewer_camera.viewer_visibility
+
+    @viewer_visibility.setter
+    def viewer_visibility(self, visible):
+        """
+        Sets whether the viewer should be visible or not in the Omni UI
+
+        Args:
+            visible (bool): Whether the viewer should be visible or not
+        """
+        self._viewer_camera.viewer_visibility = visible
+
+    @property
     def viewer_height(self):
         """
         Returns:
             int: viewer height of this sensor, in pixels
         """
         # If the viewer camera hasn't been created yet, utilize the default width
-        return gm.DEFAULT_VIEWER_HEIGHT if self._viewer_camera is None else self._viewer_camera.viewer_height
+        return gm.DEFAULT_VIEWER_HEIGHT if self._viewer_camera is None else self._viewer_camera.image_height
 
     @viewer_height.setter
     def viewer_height(self, height):
@@ -260,7 +278,7 @@ class Simulator(SimulationContext):
         Args:
             height (int): viewer height, in pixels
         """
-        self._viewer_camera.viewer_height = height
+        self._viewer_camera.image_height = height
 
     @property
     def viewer_width(self):
@@ -269,7 +287,7 @@ class Simulator(SimulationContext):
             int: viewer width of this sensor, in pixels
         """
         # If the viewer camera hasn't been created yet, utilize the default height
-        return gm.DEFAULT_VIEWER_WIDTH if self._viewer_camera is None else self._viewer_camera.viewer_width
+        return gm.DEFAULT_VIEWER_WIDTH if self._viewer_camera is None else self._viewer_camera.image_width
 
     @viewer_width.setter
     def viewer_width(self, width):
@@ -279,7 +297,7 @@ class Simulator(SimulationContext):
         Args:
             width (int): viewer width, in pixels
         """
-        self._viewer_camera.viewer_width = width
+        self._viewer_camera.image_width = width
 
     def _set_viewer_settings(self):
         """
@@ -297,7 +315,7 @@ class Simulator(SimulationContext):
         """
         Enables keyboard control of the active viewer camera for this simulation
         """
-        self._camera_mover = CameraMover(cam=self._viewer_camera, sim=self)
+        self._camera_mover = CameraMover(cam=self._viewer_camera)
         self._camera_mover.print_info()
 
     def import_scene(self, scene):

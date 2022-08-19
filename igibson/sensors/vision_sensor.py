@@ -277,6 +277,26 @@ class VisionSensor(BaseSensor):
         self._viewport.set_camera_target(self._prim_path, x, y, z, rotate)
 
     @property
+    def viewer_visibility(self):
+        """
+        Returns:
+            bool: Whether the viewer is visible or not
+        """
+        return self._viewport.is_visible()
+
+    @viewer_visibility.setter
+    def viewer_visibility(self, visible):
+        """
+        Sets whether the viewer should be visible or not in the Omni UI
+
+        Args:
+            visible (bool): Whether the viewer should be visible or not
+        """
+        self._viewport.set_visible(visible)
+        # Requires 1 update to propagate changes
+        app.update()
+
+    @property
     def image_height(self):
         """
         Returns:
