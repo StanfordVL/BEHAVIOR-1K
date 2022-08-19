@@ -374,7 +374,7 @@ class OmniApp:
             self._app.update()
         # Otherwise, we remove all components that aren't the viewer
         else:
-            for name in ["Console", "Main ToolBar", "Stage", "Layer", "Property", "Render Settings", "Content"]:
+            for name in ["Console", "Main ToolBar", "Stage", "Layer", "Property", "Render Settings", "Content", "Flow"]:
                 window = omni.ui.Workspace.get_window(name)
                 window.visible = False
                 self._app.update()
