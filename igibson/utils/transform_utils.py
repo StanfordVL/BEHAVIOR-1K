@@ -392,13 +392,12 @@ def mat2quat(rmat):
     return R.from_matrix(M).as_quat()
 
 
-def euler2mat(euler, seq="xyz"):
+def euler2mat(euler):
     """
     Converts euler angles into rotation matrix form
 
     Args:
         euler (np.array): (r,p,y) angles
-        seq (str): Order sequence of the euler angle rotation. Default is "xyz"
 
     Returns:
         np.array: 3x3 rotation matrix
@@ -410,22 +409,21 @@ def euler2mat(euler, seq="xyz"):
     euler = np.asarray(euler, dtype=np.float64)
     assert euler.shape[-1] == 3, "Invalid shaped euler {}".format(euler)
 
-    return R.from_euler(seq, euler).as_matrix()
+    return R.from_euler("xyz", euler).as_matrix()
 
 
-def mat2euler(rmat, seq="xyz"):
+def mat2euler(rmat):
     """
     Converts given rotation matrix to euler angles in radian.
 
     Args:
         rmat (np.array): 3x3 rotation matrix
-        seq (str): Order sequence of the euler angle rotation. Default is "xyz"
 
     Returns:
         np.array: (r,p,y) converted euler angles in radian vec3 float
     """
     M = np.array(rmat, dtype=np.float32, copy=False)[:3, :3]
-    return R.from_matrix(M).as_euler(seq)
+    return R.from_matrix(M).as_euler("xyz")
 
 
 def pose2mat(pose):
@@ -494,13 +492,12 @@ def axisangle2quat(vec):
     return R.from_rotvec(vec).as_quat()
 
 
-def euler2quat(euler, seq="xyz"):
+def euler2quat(euler):
     """
     Converts euler angles into quaternion form
 
     Args:
         euler (np.array): (r,p,y) angles
-        seq (str): Order sequence of the euler angle rotation. Default is "xyz"
 
     Returns:
         np.array: (x,y,z,w) float quaternion angles
@@ -508,16 +505,15 @@ def euler2quat(euler, seq="xyz"):
     Raises:
         AssertionError: [Invalid input shape]
     """
-    return R.from_euler(seq, euler).as_quat()
+    return R.from_euler("xyz", euler).as_quat()
 
 
-def quat2euler(quat, seq="xyz"):
+def quat2euler(quat):
     """
     Converts euler angles into quaternion form
 
     Args:
         quat (np.array): (x,y,z,w) float quaternion angles
-        seq (str): Order sequence of the euler angle rotation. Default is "xyz"
 
     Returns:
         np.array: (r,p,y) angles
@@ -525,7 +521,7 @@ def quat2euler(quat, seq="xyz"):
     Raises:
         AssertionError: [Invalid input shape]
     """
-    return R.from_quat(quat).as_euler(seq)
+    return R.from_quat(quat).as_euler("xyz")
 
 
 def pose_in_A_to_pose_in_B(pose_A, pose_A_in_B):
@@ -958,21 +954,9 @@ def matrix_inverse(matrix):
     return np.linalg.inv(matrix)
 
 
-def rotate_vec_3d(vec0, vec1):
-    """
-    Rotates vector @vec0 by the (r,p,y) rotation defined by @vec1
-
-    Args:
-         vec0 (3-array): Initial vector to rotate
-         vec1 (3-array): (r,p,y) vector to rotate @vec0 by
-    """
-    return euler2mat(vec1) @ vec0
-
-
 def l2_distance(v1, v2):
     """Returns the L2 distance between vector v1 and v2."""
     return np.linalg.norm(np.array(v1) - np.array(v2))
-
 
 
 def frustum(left, right, bottom, top, znear, zfar):
