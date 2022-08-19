@@ -11,6 +11,7 @@ import json
 from os.path import exists
 from pxr.UsdGeom import Tokens
 from omni.physx.scripts.utils import setCollider
+from omni.isaac.core.utils.stage import add_reference_to_stage, save_stage
 
 ##### SET THIS ######
 URDF = f"{ig_dataset_path}/scenes/Rs_int/urdf/Rs_int_best.urdf"
@@ -73,7 +74,8 @@ def import_obj_collision_mesh(obj_category, obj_model, name):
     replace_all_nested_collision_meshes(base_prim)
 
     # Save stage
-    sim.save_stage(usd_path=usd_path)
+    sim.stop()
+    save_stage(usd_path=usd_path)
 
 import_models_collision_mesh_from_scene(urdf=URDF)
 

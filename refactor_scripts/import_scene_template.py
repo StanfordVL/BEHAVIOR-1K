@@ -51,7 +51,8 @@ def import_models_template_from_scene(urdf, usd_out):
     world.GetAttribute("ig:isTemplate").Set(True)
 
     # Save scene
-    sim.save_stage(usd_out)
+    sim.stop()
+    save_stage(usd_out)
 
 
 def import_nested_models_template_from_element(element, model_pose_info):

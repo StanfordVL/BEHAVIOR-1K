@@ -17,7 +17,7 @@ from omni.isaac.core.simulation_context import SimulationContext
 from omni.isaac.core.tasks import BaseTask
 from omni.isaac.core.utils.prims import is_prim_ancestral, get_prim_type_name, is_prim_no_delete, get_prim_at_path, \
     is_prim_path_valid
-from omni.isaac.core.utils.stage import clear_stage, save_stage, open_stage
+from omni.isaac.core.utils.stage import open_stage
 from omni.isaac.dynamic_control import _dynamic_control
 import omni.kit.loop._loop as omni_loop
 import builtins
@@ -125,10 +125,6 @@ class Simulator(SimulationContext):
         self._viewer_camera = None
         self._camera_mover = None
         self._scene = None
-        self.particle_systems = []
-        self.frame_count = 0
-        self.body_links_awake = 0
-        self.first_sync = True          # First sync always sync all objects (regardless of their sleeping states)
 
         # Initialize viewer
         # self._set_physics_engine_settings()
@@ -182,10 +178,7 @@ class Simulator(SimulationContext):
         """
         Reset state of internal variables
         """
-        self.particle_systems = []
-        self.frame_count = 0
-        self.body_links_awake = 0
-        self.first_sync = True          # First sync always sync all objects (regardless of their sleeping states)
+        pass
 
     def _set_viewer_camera(self, prim_path="/World/viewer_camera"):
         """
@@ -558,8 +551,6 @@ class Simulator(SimulationContext):
         # TODO (eric): After stage changes (e.g. pose, texture change), it will take two super().step(render=True) for
         #  the result to propagate to the rendering. We could have called super().render() here but it will introduce
         #  a big performance regression.
-
-        self.frame_count += 1
 
     def step_physics(self, current_time=None):
         """
@@ -965,17 +956,6 @@ class Simulator(SimulationContext):
         """
         return self._data_logger
 
-    def save_stage(self, usd_path):
-        """
-        Save the current stage in this simulator to specified @usd_path
-
-        Args:
-            usd_path (str): Absolute filepath to where this stage should be saved
-        """
-        # Make sure simulator is stopped
-        assert self.is_stopped(), "Simulator must be stopped before the stage can be saved!"
-        save_stage(usd_path=usd_path)
-
     # TODO: Extend to update internal info
     def load_stage(self, usd_path):
         """
@@ -988,6 +968,9 @@ class Simulator(SimulationContext):
         if not self.is_stopped():
             logging.warning("Stopping simulation in order to load stage.")
             self.stop()
+
+        # Store physics dt and rendering dt to reuse later
+        physics_dt, rendering_dt = self.get_physics_dt(), self.get_rendering_dt()
 
         # Clear simulation state
         self._clear_state()
@@ -1006,8 +989,8 @@ class Simulator(SimulationContext):
         self._loop_runner = omni_loop.acquire_loop_interface()
 
         self._init_stage(
-            physics_dt=self._initial_physics_dt,
-            rendering_dt=self._initial_rendering_dt,
+            physics_dt=physics_dt,
+            rendering_dt=rendering_dt,
             stage_units_in_meters=self._initial_stage_units_in_meters,
         )
         self._set_physics_engine_settings()
