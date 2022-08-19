@@ -913,7 +913,8 @@ class BehaviorTask(BaseTask):
     def _get_obs(self, env):
         low_dim_obs = OrderedDict()
         low_dim_obs["robot_pos"] = np.array(env.robots[0].get_position())
-        low_dim_obs["robot_quat"] = np.array(env.robots[0].get_orientation())
+        low_dim_obs["robot_ori_cos"] = np.cos(env.robots[0].get_rpy())
+        low_dim_obs["robot_ori_sin"] = np.sin(env.robots[0].get_rpy())
 
         i = 0
         for _, v in self.object_scope.items():
@@ -921,7 +922,8 @@ class BehaviorTask(BaseTask):
             if isinstance(v, DatasetObject):
                 low_dim_obs[f"obj_{i}_valid"] = np.array([1.0])
                 low_dim_obs[f"obj_{i}_pos"] = v.get_position()
-                low_dim_obs[f"obj_{i}_quat"] = v.get_orientation()
+                low_dim_obs[f"obj_{i}_ori_cos"] = np.cos(v.get_rpy())
+                low_dim_obs[f"obj_{i}_ori_sin"] = np.sin(v.get_rpy())
                 for arm in env.robots[0].arm_names:
                     grasping_object = env.robots[0].is_grasping(arm=arm, candidate_obj=v)
                     low_dim_obs[f"obj_{i}_pos_in_gripper_{arm}"] = np.array([float(grasping_object)])

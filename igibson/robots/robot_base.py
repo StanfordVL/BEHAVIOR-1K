@@ -271,7 +271,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable, Registerable):
         :return dict: keyword-mapped proprioception observations available for this robot. Can be extended by subclasses
         """
         joints_state = self.get_joints_state(normalized=False)
-        pos, ori = self.get_position_orientation()
+        pos, ori = self.get_position(), self.get_rpy()
         return {
             "joint_qpos": joints_state.positions,
             "joint_qpos_sin": np.sin(joints_state.positions),
@@ -279,7 +279,8 @@ class BaseRobot(USDObject, ControllableObject, GymObservable, Registerable):
             "joint_qvel": joints_state.velocities,
             "joint_qeffort": joints_state.efforts,
             "robot_pos": pos,
-            "robot_quat": ori,
+            "robot_ori_cos": np.cos(ori),
+            "robot_ori_sin": np.sin(ori),
             "robot_lin_vel": self.get_linear_velocity(),
             "robot_ang_vel": self.get_angular_velocity(),
         }
