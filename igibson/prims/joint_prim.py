@@ -495,7 +495,7 @@ class JointPrim(BasePrim):
         """
         # Only support revolute and prismatic joints for now
         assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
-        self._dof_properties[0].stiffness = damping
+        self._dof_properties[0].damping = damping
         self._dc.set_dof_properties(self._dof_handles[0], self._dof_properties[0])
 
     @property
