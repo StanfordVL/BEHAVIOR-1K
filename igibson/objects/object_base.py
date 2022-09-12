@@ -143,7 +143,6 @@ class BaseObject(EntityPrim, metaclass=ABCMeta):
             self.visible = self._load_config["visible"]
 
         # Add fixed joint if we're fixing the base
-        print(f"obj {self.name} is fixed base: {self.fixed_base}")
         if self.fixed_base:
             # Create fixed joint, and set Body0 to be this object's root prim
             create_joint(
