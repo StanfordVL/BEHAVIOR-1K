@@ -4,6 +4,7 @@ import igibson.utils.transform_utils as T
 from igibson.controllers import ControlType, ManipulationController
 from igibson.utils.processing_utils import MovingAverageFilter
 from igibson.utils.control_utils import IKSolver
+from igibson.utils.python_utils import assert_valid_key
 
 # Different modes
 IK_MODE_COMMAND_DIMS = {
@@ -37,6 +38,7 @@ class InverseKinematicsController(ManipulationController):
         dof_idx,
         command_input_limits="default",
         command_output_limits=((-0.2, -0.2, -0.2, -0.5, -0.5, -0.5), (0.2, 0.2, 0.2, 0.5, 0.5, 0.5)),
+        motor_type="velocity",
         kv=2.0,
         mode="pose_delta_ori",
         smoothing_filter_size=None,
@@ -71,7 +73,9 @@ class InverseKinematicsController(ManipulationController):
             then all inputted command values will be scaled from the input range to the output range.
             If either is None, no scaling will be used. If "default", then this range will automatically be set
             to the @control_limits entry corresponding to self.control_type
-        :param kv: float, Gain applied to error between IK-commanded joint positions and current joint positions
+        :param motor_type: str, type of motor being controlled, one of {position, velocity}
+        :param kv: float, Gain applied to error between IK-commanded joint positions and current joint positions if
+            using @motor_type = velocity
         :param mode: str, mode to use when computing IK. In all cases, position commands are 3DOF delta (dx,dy,dz)
             cartesian values, relative to the robot base frame. Valid options are:
                 - "pose_absolute_ori": 6DOF (dx,dy,dz,ax,ay,az) control over pose,
@@ -95,6 +99,8 @@ class InverseKinematicsController(ManipulationController):
         """
         # Store arguments
         control_dim = len(dof_idx)
+        assert_valid_key(key=motor_type.lower(), valid_keys=ControlType.VALID_TYPES_STR, name="motor_type")
+        self._motor_type = motor_type.lower()
         self.control_filter = (
             None
             if smoothing_filter_size in {None, 0}
@@ -270,15 +276,16 @@ class InverseKinematicsController(ManipulationController):
         if self.control_filter is not None:
             target_joint_pos = self.control_filter.estimate(target_joint_pos)
 
-        # Grab the resulting error and scale it by the velocity gain
-        u = -self.kv * (current_joint_pos - target_joint_pos)
+        # Grab the resulting error and scale it by the velocity gain, or else simply use the target_joint_pos
+        u = -self.kv * (current_joint_pos - target_joint_pos) if \
+            self.control_type == ControlType.VELOCITY else target_joint_pos
 
         # Return these commanded velocities (this only includes the relevant dof idx)
         return u
 
     @property
     def control_type(self):
-        return ControlType.VELOCITY
+        return ControlType.get_type(type_str=self._motor_type)
 
     @property
     def command_dim(self):
