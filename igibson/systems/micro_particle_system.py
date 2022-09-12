@@ -1,5 +1,5 @@
 import os
-from igibson import assets_path, app
+import time
 from igibson.macros import gm, create_module_macros
 from igibson.prims.prim_base import BasePrim
 from igibson.systems.system_base import SYSTEMS_REGISTRY
@@ -9,7 +9,7 @@ from igibson.utils.python_utils import classproperty, Serializable, assert_valid
 from igibson.utils.sampling_utils import sample_cuboid_on_object
 from igibson.utils.usd_utils import create_joint, array_to_vtarray
 from igibson.utils.physx_utils import create_physx_particle_system, create_physx_particleset_pointinstancer, \
-    bind_material
+    bind_material, get_prototype_path_from_particle_system_path
 import omni
 from omni.isaac.core.utils.prims import get_prim_at_path
 from omni.physx.scripts import particleUtils
@@ -429,10 +429,6 @@ class MicroParticleSystem(BaseParticleSystem):
         # Run super first
         super().initialize(simulator=simulator)
 
-        # Set custom rendering settings if we're using a fluid isosurface
-        if cls.is_fluid and cls.use_isosurface and gm.ENABLE_HQ_RENDERING:
-            set_carb_settings_for_fluid_isosurface()
-
         # Initialize class variables that are mutable so they don't get overridden by children classes
         cls.particle_instancers = OrderedDict()
 
@@ -445,7 +441,7 @@ class MicroParticleSystem(BaseParticleSystem):
 
         # Create the particle system if it doesn't already exist, otherwise sync with the pre-existing system
         mat_path = f"{cls.prim_path}/{cls.name}_material"
-        prototype_path = f"{cls.prim_path}/prototypes"
+        prototype_path = get_prototype_path_from_particle_system_path(particle_system_path=cls.prim_path)
 
         if cls.particle_system_exists:
             cls.prim = get_prim_at_path(cls.prim_path)
@@ -485,15 +481,23 @@ class MicroParticleSystem(BaseParticleSystem):
             prototypes = cls._create_particle_prototypes()
             cls.particle_prototypes = []
             cls.simulator.stage.DefinePrim(prototype_path, "Scope")
+            cls.simulator.stage.DefinePrim(f"{prototype_path}/{cls.name}", "Scope")
             for i, prototype_prim in enumerate(prototypes):
                 # TODO: Omni no longer likes prototypes being created in nested locations. Where to place now?
-                # path_from = prototype_prim.GetPrimPath().pathString
-                # path_to = f"{prototype_path}/{cls.name}ParticlePrototype{i}"
-                # omni.kit.commands.execute("MovePrim", path_from=path_from, path_to=path_to)
-                path_to = prototype_prim.GetPrimPath().pathString
+                path_from = prototype_prim.GetPrimPath().pathString
+                path_to = f"{prototype_path}/{cls.name}/ParticlePrototype{i}"
+                omni.kit.commands.execute("MovePrim", path_from=path_from, path_to=path_to)
+                # path_to = prototype_prim.GetPrimPath().pathString
                 prototype_prim_new = get_prim_at_path(path_to)
                 UsdGeom.Imageable(prototype_prim_new).MakeInvisible()
                 cls.particle_prototypes.append(prototype_prim_new)
+
+        # Set custom rendering settings if we're using a fluid isosurface
+        if cls.is_fluid and cls.use_isosurface and gm.ENABLE_HQ_RENDERING:
+            set_carb_settings_for_fluid_isosurface()
+
+            # We also modify the grid smoothing radius to avoid "blobby" appearances
+            cls.prim.GetAttribute("physxParticleIsosurface:gridSmoothingRadius").Set(0.0001)
 
         # # Create dummy
         # create_physx_particleset_pointinstancer(
@@ -786,6 +790,8 @@ class MicroParticleSystem(BaseParticleSystem):
             cls.simulator.stop()
         elif sim_is_playing:
             cls.simulator.play()
+        time.sleep(0.1)                         # Empirically validated for ~2500 samples (0.02 time doesn't work)
+        cls.simulator.render()                  # Rendering is needed after an initial, nontrivial amount of time for the particles to actually be sampled
 
         # Grab the actual positions, we will write this to a new instancer that's not tied to the sampler
         # The points / instancer tied to the sampled mesh seems to operate a bit weirdly, which is why we do it this way
@@ -793,7 +799,7 @@ class MicroParticleSystem(BaseParticleSystem):
         pos = points.GetAttribute(attr).Get()
 
         # Make sure sampling was successful
-        assert len(pos) > 0, "Failed to sample particle points from mesh prim!"
+        assert pos is not None and len(pos) > 0, "Failed to sample particle points from mesh prim!"
 
         # Delete the points prim and sampling API, we don't need it anymore, and make the mesh prim invisible again
         cls.simulator.stage.RemovePrim(points_prim_path)
@@ -1095,7 +1101,7 @@ class WaterSystem(FluidSystem):
         # TODO: Water density seems to be unstable, debug later?
         # Water is 1000 kg/m^3
         # return 1000.0
-        return 1.0
+        return 500.0
 
     @classmethod
     def _create_particle_material(cls):
@@ -1128,7 +1134,7 @@ class ClothSystem(MicroParticleSystem):
     @classproperty
     def particle_contact_offset(cls):
         # TODO (eric): figure out whether one offset can fit all
-        return 0.025
+        return 0.005
 
     @classproperty
     def is_fluid(cls):
