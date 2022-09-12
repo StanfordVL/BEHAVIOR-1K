@@ -101,7 +101,6 @@ class EntityPrim(XFormPrim):
 
         # Handle case separately based on whether the handle is valid (i.e.: whether we are actually articulated or not)
         if self._handle != _dynamic_control.INVALID_HANDLE:
-            print(f"initializing obj: {self.name}, articulation root path: {self.articulation_root_path}, handle: {self._handle}, new handle: {self._dc.get_articulation(self.articulation_root_path)}, root handle: {self._root_handle}")
             root_prim = get_prim_at_path(self._dc.get_rigid_body_path(self._root_handle))
             n_dof = self._dc.get_articulation_dof_count(self._handle)
 
@@ -156,8 +155,6 @@ class EntityPrim(XFormPrim):
         # Store values internally
         self._n_physical_dof = n_dof
         self._n_virtual_dof = n_virtual_dof
-
-        print(f"root handle: {self._root_handle}, root prim path: {self._dc.get_rigid_body_path(self._root_handle)}")
 
     def _load(self, simulator=None):
         # By default, this prim cannot be instantiated from scratch!
@@ -214,7 +211,7 @@ class EntityPrim(XFormPrim):
 
         if self._prim_type == PrimType.CLOTH:
             assert not self._visual_only, "Cloth cannot be visual-only."
-            assert len(self._links) == 1, "Cloth entity prim can only have one link."
+            assert len(self._links) == 1, f"Cloth entity prim can only have one link; got: {len(self._links)}"
             if gm.AG_CLOTH:
                 self.create_attachment_point_link()
 
@@ -1077,7 +1074,6 @@ class EntityPrim(XFormPrim):
         :return: Array[float], minimum values for this robot's joints. If joint does not have a range, returns -1000
             for that joint
         """
-        print(f"{[joint.lower_limit for joint in self._joints.values()]}")
         return np.array([joint.lower_limit for joint in self._joints.values()])
 
     @property

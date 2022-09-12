@@ -168,7 +168,6 @@ class RigidPrim(XFormPrim):
         # Grab handle to this rigid body and get name
         self.update_handles()
         self._body_name = self._dc.get_rigid_body_name(self._handle)
-        print(f"handle: {self._handle}, body name: {self._body_name}")
 
         # Set the default state
         pos, ori = self.get_position_orientation()
@@ -547,6 +546,22 @@ class RigidPrim(XFormPrim):
             density (float): density of the rigid body in kg / m^3.
         """
         self._mass_api.GetDensityAttr().Set(density)
+
+    @property
+    def ccd_enabled(self):
+        """
+        Returns:
+            bool: whether CCD is enabled or not for this link
+        """
+        return self.get_attribute("physxRigidBody:enableCCD")
+
+    @ccd_enabled.setter
+    def ccd_enabled(self, enabled):
+        """
+        Args:
+            enabled (bool): whether CCD should be enabled or not for this link
+        """
+        self.set_attribute("physxRigidBody:enableCCD", enabled)
 
     @property
     def contact_reporting_enabled(self):

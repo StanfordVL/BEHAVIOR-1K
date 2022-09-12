@@ -91,7 +91,6 @@ class XFormPrim(BasePrim):
 
         # Optionally set the scale and visibility
         if "scale" in self._load_config and self._load_config["scale"] is not None:
-            print(f"scale: {self._load_config['scale']}")
             self.scale = self._load_config["scale"]
 
     def _initialize(self):
