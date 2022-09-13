@@ -352,3 +352,14 @@ class VisualGeomPrim(GeomPrim):
                     print(f"Warning: No shader found for prim {self._prim_path}! Not updating shader asset paths.")
                 else:
                     update_shader_asset_paths(shader=shader)
+
+
+class CollisionVisualGeomPrim(CollisionGeomPrim, VisualGeomPrim):
+
+    def _post_load(self):
+        # run super first
+        super()._post_load()
+
+        # The purpose should be default, not guide as set by CollisionGeomPrim
+        # this is to make sure the geom is visualized, even though it's also collidable
+        self.purpose = "default"
