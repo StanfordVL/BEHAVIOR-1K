@@ -10,6 +10,7 @@ from collections import defaultdict
 import itertools
 import logging
 
+import numpy as np
 import json
 import omni
 import carb
@@ -41,6 +42,13 @@ from igibson.object_states.factory import get_states_by_dependency_order
 from igibson.sensors.vision_sensor import VisionSensor
 from igibson.transition_rules import DEFAULT_RULES, TransitionResults
 from omni.kit.viewport_legacy import acquire_viewport_interface
+
+
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
+
+m.DEFAULT_VIEWER_CAMERA_POS = (-0.201028, -2.72566 ,  1.0654)
+m.DEFAULT_VIEWER_CAMERA_QUAT = (0.68196617, -0.00155408, -0.00166678,  0.73138017)
 
 
 class Simulator(SimulationContext):
@@ -201,8 +209,10 @@ class Simulator(SimulationContext):
         if not self._viewer_camera.loaded:
             self._viewer_camera.load(simulator=self)
 
-        # We update its clipping range so that it doesn't clip nearby objects (default min is 1 m)
+        # We update its clipping range and focal length so we get a good FOV and so that it doesn't clip
+        # nearby objects (default min is 1 m)
         self._viewer_camera.clipping_range = [0.001, 10000000.0]
+        self._viewer_camera.focal_length = 17.0
 
         # Initialize the sensor
         self._viewer_camera.initialize()
@@ -999,14 +1009,18 @@ class Simulator(SimulationContext):
             omni.usd.get_context().get_stage_event_stream().create_subscription_to_pop(self._stage_open_callback_fn)
         )
 
-        # Set the viewer camera
+        # Set the viewer camera, and then set its default pose
         self._set_viewer_camera()
+        ig.sim.viewer_camera.set_position_orientation(
+            position=np.array(m.DEFAULT_VIEWER_CAMERA_POS),
+            orientation=np.array(m.DEFAULT_VIEWER_CAMERA_QUAT),
+        )
 
     def close(self):
         """
         Shuts down the iGibson application
         """
-        self._app.close()
+        self._app.shutdown()
 
     @property
     def device(self) -> str:

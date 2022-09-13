@@ -364,6 +364,24 @@ class VisionSensor(BaseSensor):
         self.visible = True
 
     @property
+    def focal_length(self):
+        """
+        Returns:
+            float: focal length of this sensor, in meters
+        """
+        return self.get_attribute("focalLength")
+
+    @focal_length.setter
+    def focal_length(self, length):
+        """
+        Sets the focal length @length for this sensor
+
+        Args:
+            length (float): focal length of this sensor, in meters
+        """
+        self.set_attribute("focalLength", length)
+
+    @property
     def _obs_space_mapping(self):
         # Make sure bbox obs aren't being used, since they are variable in size!
         for modality in {"bbox_2d_tight", "bbox_2d_loose", "bbox_3d", "camera", "pose"}:
