@@ -4,7 +4,7 @@ from igibson.objects.stateful_object import StatefulObject
 
 from omni.isaac.core.utils.prims import get_prim_at_path
 from igibson.utils.constants import PrimType
-from igibson.utils.usd_utils import add_usd_to_stage
+from igibson.utils.usd_utils import add_asset_to_stage
 
 
 class USDObject(StatefulObject):
@@ -80,7 +80,7 @@ class USDObject(StatefulObject):
         Load the object into pybullet and set it to the correct pose
         """
         logging.info(f"Loading the following USD: {self._usd_path}")
-        return add_usd_to_stage(usd_path=self._usd_path, prim_path=self._prim_path)
+        return add_asset_to_stage(asset_path=self._usd_path, prim_path=self._prim_path)
 
     def _create_prim_with_same_kwargs(self, prim_path, name, load_config):
         # Add additional kwargs

@@ -159,12 +159,12 @@ class TraversableMap:
             trav_map[node[0], node[1]] = 255
 
     @property
-    def num_floors(self):
+    def n_floors(self):
         return len(self.floor_heights)
 
     def get_random_point(self, floor=None):
         """
-        Sample a random point on the given floor number. If not given, sample a random floor number (assumes @num_floors
+        Sample a random point on the given floor number. If not given, sample a random floor number (assumes @n_floors
         is then specified).
 
         :param floor: floor number
@@ -172,7 +172,7 @@ class TraversableMap:
         :return point: randomly sampled point in [x, y, z]
         """
         if floor is None:
-            floor = np.random.randint(0, self.num_floors)
+            floor = np.random.randint(0, self.n_floors)
         trav = self.floor_map[floor]
         trav_space = np.where(trav == 255)
         idx = np.random.randint(0, high=trav_space[0].shape[0])
