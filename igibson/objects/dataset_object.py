@@ -17,7 +17,7 @@ from scipy.spatial.transform import Rotation
 from omni.isaac.core.utils.prims import get_prim_at_path
 from omni.usd import get_shader_from_material
 
-import igibson
+import igibson as ig
 from igibson.objects.usd_object import USDObject
 from igibson.utils.constants import AVERAGE_CATEGORY_SPECS, DEFAULT_JOINT_FRICTION, SPECIAL_JOINT_FRICTIONS, JointType
 import igibson.utils.transform_utils as T
@@ -38,6 +38,7 @@ class DatasetObject(USDObject):
         usd_path=None,
         name=None,
         category="object",
+        model=None,
         class_id=None,
         uuid=None,
         scale=None,
@@ -66,10 +67,17 @@ class DatasetObject(USDObject):
     ):
         """
         @param prim_path: str, global path in the stage to this object
-        @param usd_path: str, global path to the USD file to load
+        @param usd_path: str, global path to the USD file to load. Either this or a combination of @category + @model
+            will be used to infer the raw USD file location from which to load.
         @param name: Name for the object. Names need to be unique per scene. If no name is set, a name will be generated
             at the time the object is added to the scene, using the object's category.
         @param category: Category for the object. Defaults to "object".
+        @param model: str or None, if @usd_path is not specified and @model is specified in conjunction with @category,
+            the usd filepath will be inferred based on the set ig_dataset_path global variable, from the following
+            location:
+
+                {ig_dataset_path}/objects/{category}/{model}/usd/{model}.usd
+
         @param class_id: What class ID the object should be assigned in semantic segmentation rendering mode.
         @param uuid: Unique unsigned-integer identifier to assign to this object (max 8-numbers).
             If None is specified, then it will be auto-generated
@@ -171,6 +179,13 @@ class DatasetObject(USDObject):
         #
         # self.prepare_visual_mesh_to_material()
 
+        # Infer the correct usd path to use
+        if usd_path is None:
+            assert model is not None, f"Either usd_path or model and category must be specified in order to create a" \
+                                      f"DatasetObject!"
+            usd_path = f"{ig.ig_dataset_path}/objects/{category}/{model}/usd/{model}.usd"
+
+        # Post-process the usd path if we're generating a cloth object
         if prim_type == PrimType.CLOTH:
             assert usd_path.endswith(".usd"), f"usd_path [{usd_path}] is invalid."
             usd_path = usd_path[:-4] + "_cloth.usd"
