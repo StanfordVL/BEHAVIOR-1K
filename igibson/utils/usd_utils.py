@@ -403,29 +403,30 @@ def mesh_prim_to_trimesh_mesh(mesh_prim):
     return trimesh.Trimesh(vertices=vertices, faces=faces)
 
 
-def add_usd_to_stage(usd_path, prim_path):
+def add_asset_to_stage(asset_path, prim_path):
     """
-    Adds USD file at @usd_path at the location @prim_path
+    Adds asset file (either USD or OBJ) at @asset_path at the location @prim_path
 
     Args:
-        usd_path (str): Absolute or relative path to the usd file to load
-        prim_path (str): Where loaded USD should exist on the stage
+        asset_path (str): Absolute or relative path to the asset file to load
+        prim_path (str): Where loaded asset should exist on the stage
 
     Returns:
-        Usd.Prim: Loaded USD prim
+        Usd.Prim: Loaded prim as a USD prim
     """
-    # Make sure this is actually a USD object
-    assert usd_path[-4:] == ".usd", f"Cannot load a non-USD file as a USD object!"
+    # Make sure this is actually a supported asset type
+    assert asset_path[-4:].lower() in {".usd", ".obj"}, f"Cannot load a non-USD or non-OBJ file as a USD prim!"
+    asset_type = asset_path[-3:]
 
     # Make sure the path exists
-    assert os.path.exists(usd_path), f"USD file {usd_path} does not exist!"
+    assert os.path.exists(asset_path), f"{asset_type.upper()} file {asset_path} does not exist!"
 
     # Add reference to stage and grab prim
-    add_reference_to_stage(usd_path=usd_path, prim_path=prim_path)
+    add_reference_to_stage(usd_path=asset_path, prim_path=prim_path)
     prim = get_prim_at_path(prim_path)
 
     # Make sure prim was loaded correctly
-    assert prim, f"Failed to load USD object from path: {usd_path}"
+    assert prim, f"Failed to load {asset_type.upper()} object from path: {asset_path}"
 
     return prim
 
