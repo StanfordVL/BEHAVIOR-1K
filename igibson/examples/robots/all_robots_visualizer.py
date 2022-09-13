@@ -1,14 +1,10 @@
 import logging
-import os
 
 import numpy as np
 
-import igibson
-from igibson.render.mesh_renderer.mesh_renderer_settings import MeshRendererSettings
+import igibson as ig
 from igibson.robots import REGISTERED_ROBOTS
-from igibson.scenes.empty_scene import EmptyScene
-from igibson.simulator import Simulator
-from igibson.utils.config_utils import parse_config
+from igibson.scenes import EmptyScene
 
 
 def main(random_selection=False, headless=False, short_exec=False):
@@ -17,54 +13,61 @@ def main(random_selection=False, headless=False, short_exec=False):
     Loads all robots in an empty scene, generate random actions
     """
     logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
-    # Create empty scene
-    settings = MeshRendererSettings(enable_shadow=False, msaa=False, texture_scale=0.5)
-    s = Simulator(
-        mode="gui_interactive" if not headless else "headless",
-        image_width=512,
-        image_height=512,
-        rendering_settings=settings,
-    )
-    scene = EmptyScene(floor_plane_rgba=[0.6, 0.6, 0.6, 1])
-    s.import_scene(scene)
+    # Create empty scene with no robots in it initially
+    cfg = {
+        "scene": {
+            "type": "EmptyScene",
+        }
+    }
 
-    # Create one instance of each robot aligned along the y axis
-    position = [0, 0, 0]
-    robots = {}
-    for robot_config_file in os.listdir(os.path.join(igibson.example_config_path, "robots")):
-        config = parse_config(os.path.join(igibson.example_config_path, "robots", robot_config_file))
-        robot_config = config["robot"]
-        robot_name = robot_config.pop("name")
-        robot = REGISTERED_ROBOTS[robot_name](**robot_config)
-        s.import_object(robot)
-        robot.set_position(position)
+    env = ig.Environment(configs=cfg, action_timestep=1/60., physics_timestep=1/60.)
+
+    # Iterate over all robots and demo their motion
+    for robot_name, robot_cls in REGISTERED_ROBOTS.items():
+        # Create and import robot
+        robot = robot_cls(
+            prim_path=f"/World/{robot_name}",
+            name=robot_name,
+            obs_modalities=[],              # We're just moving robots around so don't load any observation modalities
+        )
+        ig.sim.import_object(robot)
+
+        # At least one step is always needed while sim is playing for any imported object to be fully initialized
+        ig.sim.play()
+        ig.sim.step()
+
+        # Reset robot and make sure it's not moving
         robot.reset()
         robot.keep_still()
-        robots[robot_name] = (robot, position[1])
+
+        # Log information
         logging.info("Loaded " + robot_name)
         logging.info("Moving " + robot_name)
 
         if not headless:
-            # Set viewer in front
-            s.viewer.initial_pos = [1.6, 0, 1.3]
-            s.viewer.initial_view_direction = [-0.7, 0, -0.7]
-            s.viewer.reset_viewer()
+            # Set viewer in front facing robot
+            ig.sim.viewer_camera.set_position_orientation(
+                position=np.array([4.32248, -5.74338, 6.85436]),
+                orientation=np.array([0.39592, 0.13485, 0.29286, 0.85982]),
+            )
 
-        for _ in range(100):  # keep still for 10 seconds
-            s.step()
+        # Hold still briefly so viewer can see robot
+        for _ in range(100):
+            ig.sim.step()
 
+        # Then apply random actions for a bit
         for _ in range(30):
             action = np.random.uniform(-1, 1, robot.action_dim)
             robot.apply_action(action)
             for _ in range(10):
-                s.step()
+                ig.sim.step()
 
-        robot.keep_still()
-        s.reload()
-        scene = EmptyScene(floor_plane_rgba=[0.6, 0.6, 0.6, 1])
-        s.import_scene(scene)
+        # Re-import the scene
+        ig.sim.stop()
+        ig.sim.import_scene(EmptyScene())
 
-    s.disconnect()
+    # Always shut igibson down cleanly at the end
+    ig.shutdown()
 
 
 if __name__ == "__main__":

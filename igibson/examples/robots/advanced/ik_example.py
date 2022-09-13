@@ -3,24 +3,27 @@ import logging
 import time
 
 import numpy as np
+from collections import OrderedDict
+
+import igibson as ig
+from igibson.objects import PrimitiveObject
+from igibson.robots import Fetch
+from igibson.scenes import EmptyScene
+from igibson.sensors import VisionSensor
+from igibson.utils.control_utils import IKSolver
 
 import carb
 import omni
-
-from igibson import Simulator, app
-from igibson.objects.primitive_object import PrimitiveObject
-from igibson.robots.fetch import Fetch
-from igibson.scenes.empty_scene import EmptyScene
-from igibson.sensors.vision_sensor import VisionSensor
-from igibson.utils.control_utils import IKSolver
 from pxr import Gf
 
 
 def main(random_selection=False, headless=False, short_exec=False):
     """
-    Example of usage of inverse kinematics solver
-    This is a pybullet functionality but we keep an example because it can be useful and we do not provide a direct
-    API from iGibson
+    Minimal example of usage of inverse kinematics solver
+
+    This example showcases how to construct your own IK functionality using omniverse's native lula library
+    without explicitly utilizing all of iGibson's class abstractions, and also showcases how to manipulate
+    the simulator at a lower-level than the main Environment entry point.
     """
     logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
 
@@ -40,48 +43,40 @@ def main(random_selection=False, headless=False, short_exec=False):
     else:
         programmatic_pos = True
 
-    # Create simulator, scene, and robot (Fetch)
-    sim = Simulator()
-    scene = EmptyScene(floor_plane_visible=True)
-    sim.import_scene(scene)
+    # Import scene and robot (Fetch)
+    scene = EmptyScene()
+    ig.sim.import_scene(scene)
 
-    # Create a reference to the default viewer camera that already exists in the simulator
-    cam = VisionSensor(
-        prim_path="/World/viewer_camera",
-        name="camera",
-        modalities="rgb",
-        image_height=720,
-        image_width=1280,
-        viewport_name="Viewport",
-    )
-    # We update its clipping range so that it doesn't clip nearby objects (default min is 1 m)
-    cam.set_attribute("clippingRange", Gf.Vec2f(0.001, 10000000.0))
-    # In order for camera changes to propagate, we must toggle its visibility
-    cam.visible = False
-    # A single step has to happen here before we toggle visibility for changes to propagate
-    sim.step()
-    cam.visible = True
-    # Initialize the camera sensor and update its pose so it points towards the robot
-    cam.initialize()
-    sim.step()
-    cam.set_position_orientation(
+    # Update the viewer camera's pose so that it points towards the robot
+    ig.sim.viewer_camera.set_position_orientation(
         position=np.array([4.32248, -5.74338, 6.85436]),
         orientation=np.array([0.39592, 0.13485, 0.29286, 0.85982]),
     )
 
-    # Create Fetch robot -- this by default utilizes IK Control for its arm!
-    # Note that since we only care about IK functionality, we turn off physics for its arm (making it "visual_only")
-    # This means that both gravity and collisions are disabled for the robot
-    # Note that any object can also have its visual_only attribute set to True!
-    robot = Fetch(prim_path="/World/robot", name="robot", visual_only=True)
-    sim.import_object(robot)
+    # Create Fetch robot
+    # Note that since we only care about IK functionality, we fix the base (this also makes the robot more stable)
+    # (any object can also have its fixed_base attribute set to True!)
+    # Note that since we're going to be setting joint position targets, we also need to make sure the robot's arm joints
+    # (which includes the trunk) are being controlled using joint positions
+    robot = Fetch(
+        prim_path="/World/robot",
+        name="robot",
+        fixed_base=True,
+        controller_config={
+            "arm_0": {
+                "name": "JointController",
+                "motor_type": "position",
+            }
+        }
+    )
+    ig.sim.import_object(robot)
 
     # Set robot base at the origin
     robot.set_position_orientation(np.array([0, 0, 0]), np.array([0, 0, 0, 1]))
     # At least one simulation step while the simulator is playing must occur for the robot (or in general, any object)
     # to be fully initialized after it is imported into the simulator
-    sim.play()
-    sim.step()
+    ig.sim.play()
+    ig.sim.step()
     # Make sure none of the joints are moving
     robot.keep_still()
 
@@ -106,10 +101,10 @@ def main(random_selection=False, headless=False, short_exec=False):
         )
         if joint_pos is not None:
             logging.info("Solution found. Setting new arm configuration.")
-            robot.set_joint_positions(joint_pos, indices=control_idx)
+            robot.set_joint_positions(joint_pos, indices=control_idx, target=True)
         else:
             logging.info("EE position not reachable.")
-        sim.step()
+        ig.sim.step()
 
     if programmatic_pos or headless:
         # Sanity check IK using pre-defined hardcoded positions
@@ -127,12 +122,12 @@ def main(random_selection=False, headless=False, short_exec=False):
             visual_only=True,
             rgba=[1.0, 0, 0, 1.0],
         )
-        sim.import_object(marker)
+        ig.sim.import_object(marker)
 
         # Get initial EE position and set marker to that location
         command = robot.get_eef_position()
         marker.set_position(command)
-        sim.step()
+        ig.sim.step()
 
         # Setup callbacks for grabbing keyboard inputs from omni
         exit_now = False
@@ -156,7 +151,7 @@ def main(random_selection=False, headless=False, short_exec=False):
                     if delta_cmd is not None:
                         command = command + delta_cmd
                         marker.set_position(command)
-                        sim.step()
+                        ig.sim.step()
 
             # Callback must return True if valid
             return True
@@ -172,10 +167,10 @@ def main(random_selection=False, headless=False, short_exec=False):
 
         # Loop until the user requests an exit
         while not exit_now:
-            sim.step()
+            ig.sim.step()
 
     # Always shut the simulation down cleanly at the end
-    app.close()
+    ig.app.close()
 
 
 def input_to_xyz_delta_command(inp, delta=0.01):
