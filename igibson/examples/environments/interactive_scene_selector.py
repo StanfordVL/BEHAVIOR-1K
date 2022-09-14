@@ -1,10 +1,11 @@
 import logging
 import os
+from sys import platform
 
 import yaml
 
 import igibson as ig
-from igibson.utils.asset_utils import folder_is_hidden
+from igibson.utils.asset_utils import get_available_ig_scenes
 from igibson.utils.ui_utils import choose_from_options
 
 
@@ -15,35 +16,26 @@ def main(random_selection=False, headless=False, short_exec=False):
     using the Gym interface, resetting it 10 times.
     """
     logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
-
-    # Grab all configs and choose one to load
-    ig_config_path = ig.example_config_path
-    available_configs = sorted(
-        [
-            f
-            for f in os.listdir(ig_config_path)
-            if (not folder_is_hidden(f) and os.path.isfile(os.path.join(ig_config_path, f)))
-        ]
-    )
-    config_id = choose_from_options(options=available_configs, name="config file", random_selection=random_selection)
-    logging.info("Using config file " + config_id)
-    config_filename = os.path.join(ig.example_config_path, config_id)
+    config_filename = os.path.join(ig.example_config_path, "turtlebot_nav.yaml")
     config = yaml.load(open(config_filename, "r"), Loader=yaml.FullLoader)
 
     # Uncomment the following line to accelerate loading with only the building
     # config["scene"]["load_object_categories"] = ["floors", "walls", "ceilings"]
 
-    # Load the environment
+    # Choose the scene to load, modify the config appropriately, and create the environment
+    ig_scenes = get_available_ig_scenes()
+    scene_model = choose_from_options(options=ig_scenes, name="scene model", random_selection=random_selection)
+    print(f"scene model: {scene_model}")
+    config["scene"]["scene_model"] = scene_model
     env = ig.Environment(configs=config)
 
+    # Run a simple loop and reset periodically
     max_iterations = 10 if not short_exec else 1
     for j in range(max_iterations):
         logging.info("Resetting environment")
         env.reset()
         for i in range(100):
             action = env.action_space.sample()
-            for robot_name in action.keys():
-                action[robot_name] = action[robot_name] * 0.05
             state, reward, done, info = env.step(action)
             if done:
                 logging.info("Episode finished after {} timesteps".format(i + 1))

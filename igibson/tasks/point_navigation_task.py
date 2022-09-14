@@ -297,7 +297,7 @@ class PointNavigationTask(BaseTask):
             # Make sure the sampled robot start pose and goal position are both collision-free
             success = test_valid_pose(
                 env.robots[self._robot_idn], initial_pos, initial_quat
-            ) and env.test_valid_position(env.robots[self._robot_idn], goal_pos)
+            ) and test_valid_pose(env.robots[self._robot_idn], goal_pos)
 
             # Load the original state
             env.load_state(state=state, serialized=True)
