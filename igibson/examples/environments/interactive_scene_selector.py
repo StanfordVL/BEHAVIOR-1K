@@ -1,6 +1,5 @@
 import logging
 import os
-from sys import platform
 
 import yaml
 
