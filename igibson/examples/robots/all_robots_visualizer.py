@@ -66,8 +66,8 @@ def main(random_selection=False, headless=False, short_exec=False):
         ig.sim.stop()
         ig.sim.import_scene(EmptyScene())
 
-    # Always shut igibson down cleanly at the end
-    ig.shutdown()
+    # Always shut down the environment cleanly at the end
+    env.close()
 
 
 if __name__ == "__main__":
