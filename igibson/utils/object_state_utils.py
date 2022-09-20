@@ -1,16 +1,19 @@
 import cv2
 import numpy as np
 
-import trimesh
 from IPython import embed
 from scipy.spatial.transform import Rotation as R
 
-import igibson
+import igibson as ig
 from igibson.macros import create_module_macros, Dict
 from igibson import object_states
-# from igibson.external.pybullet_tools.utils import get_aabb_center, get_aabb_extent, get_link_pose, matrix_from_quat
 from igibson.object_states.aabb import AABB
 from igibson.utils import sampling_utils
+from igibson.utils.sim_utils import check_collision
+import igibson.utils.transform_utils as T
+
+from omni.physx import acquire_physx_scene_query_interface
+
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -37,30 +40,33 @@ m.INSIDE_RAY_CASTING_SAMPLING_PARAMS = Dict({
 def get_center_extent(obj_states):
     assert AABB in obj_states
     aabb = obj_states[AABB].get_value()
-    center, extent = get_aabb_center(aabb), get_aabb_extent(aabb)
+    center, extent = (aabb[0] + aabb[1]) / 2.0, aabb[1] - aabb[0]
     return center, extent
 
 
-def detect_closeness(bodyA, distance=0.01):
+def too_close_to_contact(obj, distance=0.01):
+    # We check via a heuristic; grabbing object's 1/2 aabb as effective radius, and then adding @distance to it as the
+    # buffer space. Then we run overlap_box call to physx to see if we hit anything that's not ourselves
     too_close = False
-    for body_id in range(p.getNumBodies()):
-        # Ignore self-closeness
-        if body_id == bodyA:
-            continue
-        closest_points = p.getClosestPoints(bodyA, body_id, distance=distance)
-        if len(closest_points) > 0:
+
+    def hit_callback(hit):
+        nonlocal too_close
+        # If the hit includes a rigid body that's NOT the object, then we've hit something else, and we're too close
+        if obj.prim_path not in hit.rigid_body:
             too_close = True
-            break
+
+        # True will continue iterating through the hits; once we've already hit something else, we can terminate early
+        return not too_close
+
+    psqi = acquire_physx_scene_query_interface()
+    psqi.overlap_box(
+        halfExtent=obj.aabb_extent / 2.0 + distance,
+        pos=obj.aabb_center,
+        rot=np.array([0, 0, 0, 1.0]),
+        reportFn=hit_callback,
+        anyHit=False,
+    )
     return too_close
-
-
-def detect_collision_with_others(bodyA):
-    collision = False
-    for item in p.getContactPoints(bodyA=bodyA):
-        # Ignore self-collision
-        if item[2] != bodyA:
-            collision = True
-    return collision
 
 
 def sample_kinematics(
@@ -73,25 +79,32 @@ def sample_kinematics(
     z_offset=0.05,
     skip_falling=False,
 ):
+    # Can only sample kinematics for binary_states currently
     if not binary_state:
         raise NotImplementedError()
 
+    # TODO: This seems hacky -- can we generalize this in any way?
     sample_on_floor = predicate == "onFloor"
 
+    # Don't run kinematics under certain conditions
     if not use_ray_casting_method and not sample_on_floor and predicate not in objB.supporting_surfaces:
         return False
 
-    objA.force_wakeup()
+    # Wake objects accordingly
+    objA.wake()
     if not sample_on_floor:
-        objB.force_wakeup()
+        objB.wake()
 
-    state_id = p.saveState()
+    # Save the state of the simulator
+    state = ig.sim.dump_state()
+
+    # Attempt sampling
     for i in range(max_trials):
         pos = None
         if hasattr(objA, "orientations") and objA.orientations is not None:
             orientation = objA.sample_orientation()
         else:
-            orientation = [0, 0, 0, 1]
+            orientation = np.array([0, 0, 0, 1.0])
 
         # Orientation needs to be set for stable_z_on_aabb to work correctly
         # Position needs to be set to be very far away because the object's
@@ -100,7 +113,11 @@ def sample_kinematics(
         objA.set_position_orientation(old_pos, orientation)
 
         if sample_on_floor:
-            _, pos = objB.scene.get_random_point_by_room_instance(objB.room_instance)
+            # Run import here to avoid circular imports
+            from igibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
+            assert isinstance(ig.sim.scene, InteractiveTraversableScene), \
+                "Active scene must be an InteractiveTraversableScene in order to sample kinematics on!"
+            _, pos = ig.sim.scene.seg_map.get_random_point_by_room_instance(objB.room_instance)
 
             if pos is not None:
                 # Get the combined AABB.
@@ -114,14 +131,14 @@ def sample_kinematics(
                 elif predicate == "inside":
                     params = m.INSIDE_RAY_CASTING_SAMPLING_PARAMS
                 else:
-                    assert False, "predicate is not onTop or inside: {}".format(predicate)
+                    raise ValueError(f"predicate must be either onTop or inside in order to use ray casting-based "
+                                     f"kinematic sampling, but instead got: {predicate}")
 
                 # Retrieve base CoM frame-aligned bounding box parallel to the XY plane
                 parallel_bbox_center, parallel_bbox_orn, parallel_bbox_extents, _ = objA.get_base_aligned_bbox(
                     xy_aligned=True
                 )
 
-                # TODO: Get this to work with non-URDFObject objects.
                 sampling_results = sampling_utils.sample_cuboid_on_object(
                     objB,
                     num_samples=1,
@@ -129,7 +146,7 @@ def sample_kinematics(
                     axis_probabilities=[0, 0, 1],
                     refuse_downwards=True,
                     undo_padding=True,
-                    **params
+                    **params,
                 )
 
                 sampled_vector = sampling_results[0][0]
@@ -154,11 +171,18 @@ def sample_kinematics(
                     rotated_diff = additional_rotation.apply(diff)
                     pos = sampled_vector + rotated_diff
             else:
+                # Object B must be a dataset object since it must have supporting surfaces metadata pre-annotated
+                # Run import here to avoid circular imports
+                from igibson.objects.dataset_object import DatasetObject
+                assert isinstance(objB, DatasetObject), \
+                    f"objB must be an instance of DatasetObject in order to use non-ray casting-based " \
+                    f"kinematic sampling!"
+
                 random_idx = np.random.randint(len(objB.supporting_surfaces[predicate].keys()))
-                body_id, link_id = list(objB.supporting_surfaces[predicate].keys())[random_idx]
-                random_height_idx = np.random.randint(len(objB.supporting_surfaces[predicate][(body_id, link_id)]))
-                height, height_map = objB.supporting_surfaces[predicate][(body_id, link_id)][random_height_idx]
-                obj_half_size = np.max(objA.bounding_box) / 2 * 100
+                objB_link_name = list(objB.supporting_surfaces[predicate].keys())[random_idx]
+                random_height_idx = np.random.randint(len(objB.supporting_surfaces[predicate][objB_link_name]))
+                height, height_map = objB.supporting_surfaces[predicate][objB_link_name][random_height_idx]
+                obj_half_size = np.max(objA.aabb_extent) / 2 * 100
                 obj_half_size_scaled = np.array([obj_half_size / objB.scale[1], obj_half_size / objB.scale[0]])
                 obj_half_size_scaled = np.ceil(obj_half_size_scaled).astype(np.int)
                 height_map_eroded = cv2.erode(height_map, np.ones(obj_half_size_scaled, np.uint8))
@@ -175,20 +199,10 @@ def sample_kinematics(
                     pos = np.array([x, y, z])
                     pos *= objB.scale
 
-                    # the supporting surface is defined w.r.t to the link frame, not
-                    # the inertial frame
-                    if link_id == -1:
-                        link_pos, link_orn = p.getBasePositionAndOrientation(body_id)
-                        dynamics_info = p.getDynamicsInfo(body_id, -1)
-                        inertial_pos = dynamics_info[3]
-                        inertial_orn = dynamics_info[4]
-                        inv_inertial_pos, inv_inertial_orn = p.invertTransform(inertial_pos, inertial_orn)
-                        link_pos, link_orn = p.multiplyTransforms(
-                            link_pos, link_orn, inv_inertial_pos, inv_inertial_orn
-                        )
-                    else:
-                        link_pos, link_orn = get_link_pose(body_id, link_id)
-                    pos = matrix_from_quat(link_orn).dot(pos) + np.array(link_pos)
+                    # the supporting surface is defined w.r.t to the link frame, so we need to convert it into
+                    # the world frame
+                    link_pos, link_quat = objB.links[objB_link_name].get_position_orientation()
+                    pos = T.quat2mat(link_quat).dot(pos) + np.array(link_pos)
                     # Get the combined AABB.
                     lower, _ = objA.states[object_states.AABB].get_value()
                     # Move the position to a stable Z for the object.
@@ -199,27 +213,29 @@ def sample_kinematics(
         else:
             pos[2] += z_offset
             objA.set_position_orientation(pos, orientation)
-            success = not any(detect_closeness(bid) for bid in objA.get_body_ids())
+            # Step physics
+            ig.sim.step_physics()
+            success = not objA.in_contact()
 
-        if igibson.debug_sampling:
+        if ig.debug_sampling:
             print("sample_kinematics", success)
             embed()
 
         if success:
             break
         else:
-            restoreState(state_id)
-
-    p.removeState(state_id)
+            ig.sim.load_state(state)
 
     if success and not skip_falling:
         objA.set_position_orientation(pos, orientation)
 
         # Let it fall for 0.2 second
-        physics_timestep = p.getPhysicsEngineParameters()["fixedTimeStep"]
-        for _ in range(int(0.2 / physics_timestep)):
-            p.stepSimulation()
-            if any(detect_collision_with_others(bid) for bid in objA.get_body_ids()):
+        for _ in range(int(0.2 / ig.sim.get_physics_dt())):
+            ig.sim.step_physics()
+            if objA.in_contact():
                 break
+
+        # Render at the end
+        ig.sim.render()
 
     return success
