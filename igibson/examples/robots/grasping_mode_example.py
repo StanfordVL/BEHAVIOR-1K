@@ -129,9 +129,8 @@ def main(random_selection=False, headless=False, short_exec=False):
     step = 0
     while step != max_steps:
         action = action_generator.get_random_action() if random_selection else action_generator.get_teleop_action()
-        robot.apply_action(action)
         for _ in range(10):
-            env.step(action=action)
+            env.step(action)
             step += 1
 
     # Always shut down the environment cleanly at the end

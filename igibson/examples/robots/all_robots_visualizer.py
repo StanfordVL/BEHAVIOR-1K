@@ -58,9 +58,8 @@ def main(random_selection=False, headless=False, short_exec=False):
         # Then apply random actions for a bit
         for _ in range(30):
             action = np.random.uniform(-1, 1, robot.action_dim)
-            robot.apply_action(action)
             for _ in range(10):
-                ig.sim.step()
+                env.step(action)
 
         # Re-import the scene
         ig.sim.stop()
