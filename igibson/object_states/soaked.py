@@ -72,7 +72,7 @@ class Soaked(AbsoluteObjectState, BooleanState):
                 assert self.absorbed_particle_threshold >= self.absorbed_particle_system_count[fluid_system]
 
                 particles_to_absorb = min(len(particle_idxs), self.absorbed_particle_threshold - self.absorbed_particle_system_count[fluid_system])
-                particle_idxs_to_absorb = particle_idxs[:particles_to_absorb]
+                particle_idxs_to_absorb = list(particle_idxs)[:particles_to_absorb]
 
                 # Hide particles in contact with the object
                 particle_visibilities = fluid_system.particle_instancers[instancer].particle_visibilities
