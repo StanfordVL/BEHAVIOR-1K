@@ -513,7 +513,7 @@ class VisualParticleSystem(MacroParticleSystem):
 
         # Sample scales of the particles to generate
         n_particles = cls._N_PARTICLES_PER_GROUP if n_particles is None else n_particles
-        scales = np.random.uniform(cls.min_scale, cls.max_scale, (n_particles, 3))
+        scales = np.random.uniform(cls.min_scale, cls.max_scale, (n_particles, 3)) / obj.scale
         bbox_extents = [(cls.particle_object.aabb_extent * scale).tolist() for scale in scales]
 
         # Sample locations for all particles
@@ -760,6 +760,7 @@ class DustSystem(VisualParticleSystem):
             name="dust_template",
             class_id=SemanticClass.DIRT,
             size=0.030,
+            rgba=[0.2, 0.2, 0.1, 1.0],
             visible=False,
             fixed_base=False,
             visual_only=True,
