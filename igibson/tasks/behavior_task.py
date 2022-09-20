@@ -820,7 +820,7 @@ class BehaviorTask(BaseTask):
         :param existing_objects: A list of objects that needs to be kept min_distance away when loading the new objects
         :param min_distance: A minimum distance to require for objects to load
         """
-        state = env.dump_state(serialized=True)
+        state = ig.sim.dump_state(serialized=True)
         objects_to_add = []
 
         for obj_name, obj in clutter_scene.objects_by_name.items():

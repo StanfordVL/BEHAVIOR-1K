@@ -1,6 +1,6 @@
 import numpy as np
 
-from igibson import ig_dataset_path, sim
+import igibson as ig
 from igibson.objects.dataset_object import DatasetObject
 from igibson.robots.turtlebot import Turtlebot
 from igibson.tasks.point_navigation_task import PointNavigationTask
@@ -118,12 +118,12 @@ class PointNavigationObstacleTask(PointNavigationTask):
 
         for obj in self._obstacles:
             # Save the state of this environment so we can restore it immediately after
-            state = env.dump_state(serialized=True)
+            state = ig.sim.dump_state(serialized=True)
             for _ in range(max_trials):
                 _, pos = env.scene.get_random_point(floor=self._floor)
                 quat = T.euler2quat(np.array([0, 0, np.random.uniform(0, np.pi * 2)]))
                 success = test_valid_pose(obj, pos, quat)
-                env.load_state(state=state, serialized=True)
+                ig.sim.load_state(state=state, serialized=True)
                 if success:
                     break
 
@@ -169,11 +169,11 @@ class PointNavigationStaticObstacleTask(PointNavigationObstacleTask):
             o_category, o_model = obstacle_choices[obstacle_id]
             obstacle = DatasetObject(
                 prim_path=f"/World/task_obstacle{i}",
-                usd_path=f"{ig_dataset_path}/objects/{o_category}/{o_model}/{o_model}.usd",
+                usd_path=f"{ig.ig_dataset_path}/objects/{o_category}/{o_model}/{o_model}.usd",
                 name=f"task_obstacle{i}",
             )
             # Import into the simulator, add to the ignore collisions, and store internally
-            sim.import_object(obj=obstacle)
+            ig.sim.import_object(obj=obstacle)
             env.add_ignore_robot_object_collision(robot_idn=self._robot_idn, obj=obstacle)
             obstacles.append(obstacle)
 
@@ -274,7 +274,7 @@ class PointNavigationDynamicObstacleTask(PointNavigationObstacleTask):
                 prim_path=f"/World/task_obstacle{i}",
                 name=f"task_obscale{i}",
             )
-            sim.import_object(obstacle)
+            ig.sim.import_object(obstacle)
             obstacles.append(obstacle)
 
         return obstacles

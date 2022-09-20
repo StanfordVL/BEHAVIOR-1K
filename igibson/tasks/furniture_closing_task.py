@@ -3,7 +3,7 @@ from collections import OrderedDict
 
 import numpy as np
 
-
+import igibson as ig
 from igibson.reward_functions.potential_reward import PotentialReward
 from igibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
 from igibson.tasks.task_base import BaseTask
@@ -129,7 +129,7 @@ class FurnitureClosingTask(BaseTask):
         success, max_trials = False, 100
 
         # Store the state of the environment now, so that we can restore it after each setting attempt
-        state = env.dump_state(serialized=True)
+        state = ig.sim.dump_state(serialized=True)
 
         success, initial_pos, initial_quat = False, None, None
         for i in range(max_trials):
@@ -138,7 +138,7 @@ class FurnitureClosingTask(BaseTask):
             success = test_valid_pose(env.robots[self._robot_idn], initial_pos, initial_quat)
 
             # Load the original state
-            env.load_state(state=state, serialized=True)
+            ig.sim.load_state(state=state, serialized=True)
 
             # Don't need to continue iterating if we succeeded
             if success:

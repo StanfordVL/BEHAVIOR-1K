@@ -289,7 +289,7 @@ class PointNavigationTask(BaseTask):
         success, max_trials = False, 100
 
         # Store the state of the environment now, so that we can restore it after each setting attempt
-        state = env.dump_state(serialized=True)
+        state = ig.sim.dump_state(serialized=True)
 
         initial_pos, initial_quat, goal_pos = None, None, None
         for i in range(max_trials):
@@ -300,7 +300,7 @@ class PointNavigationTask(BaseTask):
             ) and test_valid_pose(env.robots[self._robot_idn], goal_pos)
 
             # Load the original state
-            env.load_state(state=state, serialized=True)
+            ig.sim.load_state(state=state, serialized=True)
 
             # Don't need to continue iterating if we succeeded
             if success:
