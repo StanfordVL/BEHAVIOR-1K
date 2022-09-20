@@ -42,6 +42,12 @@ gm.ENABLE_CCD = False
 # Aggregate pairs setting -- default is 1024, but is often insufficient for large scenes
 gm.GPU_PAIRS_CAPACITY = 32 * 1024
 
+# Maximum particle contacts allowed
+gm.GPU_MAX_PARTICLE_CONTACTS = 1024 * 1024
+
+# Whether to enable object state logic or not
+gm.ENABLE_OBJECT_STATES = True
+
 # Default settings for the omni UI viewer
 gm.DEFAULT_VIEWER_WIDTH = 1280
 gm.DEFAULT_VIEWER_HEIGHT = 720

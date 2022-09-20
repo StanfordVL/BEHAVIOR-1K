@@ -241,10 +241,11 @@ class Simulator(SimulationContext, Serializable):
             self._physics_context.enable_gpu_dynamics(False)
             self._physics_context.set_broadphase_type("MBP")
 
-        # Set GPU Pairs capacity
+        # Set GPU Pairs capacity and other GPU settings
         self._physics_context.set_gpu_found_lost_aggregate_pairs_capacity(gm.GPU_PAIRS_CAPACITY)
         self._physics_context.set_gpu_found_lost_pairs_capacity(gm.GPU_PAIRS_CAPACITY)
         self._physics_context.set_gpu_total_aggregate_pairs_capacity(gm.GPU_PAIRS_CAPACITY)
+        self._physics_context.set_gpu_max_particle_contacts(gm.GPU_MAX_PARTICLE_CONTACTS)
 
     @property
     def viewer_visibility(self):
@@ -423,34 +424,33 @@ class Simulator(SimulationContext, Serializable):
             # TODO: A better place to put this perhaps?
             self._scene.object_registry.update(keys="root_handle")
 
-        # Step all of the particle systems.
-        for particle_system in self.particle_systems:
-            particle_system.update(self)
+        # Propagate states if the feature is enabled
+        if gm.ENABLE_OBJECT_STATES:
 
-        # Cache values from all of the micro and macro particle systems.
-        # This is used to store system-wide state which can be queried
-        # by the object state system.
-        for system in self.scene.systems:
-            system.cache()
+            # Cache values from all of the micro and macro particle systems.
+            # This is used to store system-wide state which can be queried
+            # by the object state system.
+            for system in self.scene.systems:
+                system.cache()
 
-        # Step the object states in global topological order (if the scene exists).
-        if self.scene is not None:
-            for state_type in self.object_state_types:
-                for obj in self.scene.get_objects_with_state(state_type):
-                    # Only update objects that have been initialized so far
-                    if obj.initialized:
-                        obj.states[state_type].update()
+            # Step the object states in global topological order (if the scene exists).
+            if self.scene is not None:
+                for state_type in self.object_state_types:
+                    for obj in self.scene.get_objects_with_state(state_type):
+                        # Only update objects that have been initialized so far
+                        if obj.initialized:
+                            obj.states[state_type].update()
 
-        # Perform system level updates to the micro and macro particle systems.
-        # This allows for the states to handle changes in response to changes
-        # induced by the object state system.
-        for system in self.scene.systems:
-            system.update()
+            # Perform system level updates to the micro and macro particle systems.
+            # This allows for the states to handle changes in response to changes
+            # induced by the object state system.
+            for system in self.scene.systems:
+                system.update()
 
-        for obj in self.scene.objects:
-            # Only update visuals for objects that have been initialized so far
-            if isinstance(obj, StatefulObject) and obj.initialized:
-                obj.update_visuals()
+            for obj in self.scene.objects:
+                # Only update visuals for objects that have been initialized so far
+                if isinstance(obj, StatefulObject) and obj.initialized:
+                    obj.update_visuals()
 
         # Clear the bounding box cache so that it gets updated during the next time it's called
         BoundingBoxAPI.clear()
@@ -646,27 +646,6 @@ class Simulator(SimulationContext, Serializable):
         """
         return get_prim_at_path(prim_path="/World")
 
-    # def get_current_tasks(self) -> List[BaseTask]:
-    #     """[summary]
-    #
-    #     Returns:
-    #         List[BaseTask]: [description]
-    #     """
-    #     return self._current_tasks
-    #
-    # def get_task(self, name: str) -> BaseTask:
-    #     if name not in self._current_tasks:
-    #         raise Exception("task name {} doesn't exist in the current world tasks.".format(name))
-    #     return self._current_tasks[name]
-
-    # def _finalize_scene(self) -> None:
-    #     """[summary]
-    #     """
-    #     if not builtins.ISAAC_LAUNCHED_FROM_TERMINAL:
-    #         self.play()
-    #     self._scene._finalize()
-    #     return
-
     def _clear_state(self):
         """
         Clears the internal state of this simulation
@@ -708,66 +687,7 @@ class Simulator(SimulationContext, Serializable):
         # clear_stage(predicate=check_deletable_prim)
 
         # Load dummy stage, but don't clear sim to prevent circular loops
-        self.load_stage(usd_path=f"{assets_path}/models/misc/clear_stage.usd")
-
-    # def reset(self) -> None:
-    #     """ Resets the stage to its initial state and each object included in the Scene to its default state
-    #         as specified by .set_default_state and the __init__ funcs.
-    #
-    #         Note:
-    #         - All tasks should be added before the first reset is called unless a .clear() was called.
-    #         - All articulations should be added before the first reset is called unless a .clear() was called.
-    #         - This method takes care of initializing articulation handles with the first reset called.
-    #         - This will do one step internally regardless
-    #         - calls post_reset on each object in the Scene
-    #         - calls post_reset on each Task
-    #
-    #         things like setting pd gains for instance should happend at a Task reset or a Robot reset since
-    #         the defaults are restored after .stop() is called.
-    #     """
-    #     if not self._scene_finalized:
-    #         for task in self._current_tasks.values():
-    #             task.set_up_scene(self.scene)
-    #         self._finalize_scene()
-    #         self._scene_finalized = True
-    #     self.stop()
-    #     for task in self._current_tasks.values():
-    #         task.cleanup()
-    #     self.play()
-    #     self.scene.post_reset()
-    #     for task in self._current_tasks.values():
-    #         task.post_reset()
-    #     return
-    #
-    # async def reset_async(self) -> None:
-    #     """Resets the stage to its initial state and each object included in the Scene to its default state
-    #         as specified by .set_default_state and the __init__ funcs.
-    #
-    #         Note:
-    #         - All tasks should be added before the first reset is called unless a .clear() was called.
-    #         - All articulations should be added before the first reset is called unless a .clear() was called.
-    #         - This method takes care of initializing articulation handles with the first reset called.
-    #         - This will do one step internally regardless
-    #         - calls post_reset on each object in the Scene
-    #         - calls post_reset on each Task
-    #
-    #         things like setting pd gains for instance should happend at a Task reset or a Robot reset since
-    #         the defaults are restored after .stop() is called.
-    #     """
-    #     if not self._scene_finalized:
-    #         for task in self._current_tasks.values():
-    #             task.set_up_scene(self.scene)
-    #         await self.play_async()
-    #         self._finalize_scene()
-    #         self._scene_finalized = True
-    #     await self.stop_async()
-    #     for task in self._current_tasks.values():
-    #         task.cleanup()
-    #     await self.play_async()
-    #     self._scene.post_reset()
-    #     for task in self._current_tasks.values():
-    #         task.post_reset()
-    #     return
+        self.load_stage(usd_path=f"{ig.assets_path}/models/misc/clear_stage.usd")
 
     def restore(self, usd_path):
         """
