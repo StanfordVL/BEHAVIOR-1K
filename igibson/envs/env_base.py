@@ -426,34 +426,32 @@ class Environment(gym.Env, GymObservable, Serializable, Recreatable):
         info["episode_length"] = self._current_step
         info["collision_step"] = self._collision_step
 
-    def step(self, action=None):
+    def step(self, action):
         """
         Apply robot's action and return the next state, reward, done and info,
         following OpenAI Gym's convention
 
-        :param action: gym.spaces.Dict, dict, np.array, or None, robot actions
+        :param action: gym.spaces.Dict, dict, np.array, robot actions
         :return: state: next observation
         :return: reward: reward of this time step
         :return: done: whether the episode is terminated
         :return: info: info dictionary with any useful information
         """
-        # Apply actions if specified
-        if action is not None:
-            # If the action is not a dictionary, convert into a dictionary
-            if not isinstance(action, dict) and not isinstance(action, gym.spaces.Dict):
-                action_dict = OrderedDict()
-                idx = 0
-                for robot in self.robots:
-                    action_dim = robot.action_dim
-                    action_dict[robot.name] = action[idx: idx + action_dim]
-                    idx += action_dim
-            else:
-                # Our inputted action is the action dictionary
-                action_dict = action
-
-            # Iterate over all robots and apply actions
+        # If the action is not a dictionary, convert into a dictionary
+        if not isinstance(action, dict) and not isinstance(action, gym.spaces.Dict):
+            action_dict = OrderedDict()
+            idx = 0
             for robot in self.robots:
-                robot.apply_action(action_dict[robot.name])
+                action_dim = robot.action_dim
+                action_dict[robot.name] = action[idx: idx + action_dim]
+                idx += action_dim
+        else:
+            # Our inputted action is the action dictionary
+            action_dict = action
+
+        # Iterate over all robots and apply actions
+        for robot in self.robots:
+            robot.apply_action(action_dict[robot.name])
 
         # Run simulation step
         ig.sim.step()
