@@ -20,7 +20,7 @@ m = create_module_macros(module_path=__file__)
 m.N_PREDEFINED_OBJ_RANDOMIZATIONS = 10
 
 
-class Environment(gym.Env, GymObservable, Serializable, Recreatable):
+class Environment(gym.Env, GymObservable, Recreatable):
     """
     Core environment class that handles loading scene, robot(s), and task, following OpenAI Gym interface.
     """
@@ -465,7 +465,7 @@ class Environment(gym.Env, GymObservable, Serializable, Recreatable):
             collision_objects = []
 
         # Update current collisions and corresponding count
-        self._current_collisions = self._filter_collisions(collisions=get_collisions(objects=collision_objects))
+        self._current_collisions = self._filter_collisions(collisions=get_collisions(prims=collision_objects))
 
         # Update the collision count
         self._collision_step += int(len(self._current_collisions) > 0)
@@ -686,32 +686,3 @@ class Environment(gym.Env, GymObservable, Serializable, Recreatable):
                 "activity_instance_id": 0,
             }
         }
-
-    @property
-    def state_size(self):
-        # Total state size is the state size of our scene
-        return self._scene.state_size
-
-    def _dump_state(self):
-        # Default state is from the scene
-        return self._scene.dump_state(serialized=False)
-
-    def _load_state(self, state):
-        # Default state is from the scene
-        self._scene.load_state(state=state, serialized=False)
-
-    def load_state(self, state, serialized=False):
-        # Run super first
-        super().load_state(state=state, serialized=serialized)
-
-        # # We also need to manually update the simulator app
-        # self._simulator.app.update()
-
-    def _serialize(self, state):
-        # Default state is from the scene
-        return self._scene.serialize(state=state)
-
-    def _deserialize(self, state):
-        # Default state is from the scene
-        end_idx = self._scene.state_size
-        return self._scene.deserialize(state=state[:end_idx]), end_idx

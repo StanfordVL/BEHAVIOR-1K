@@ -27,11 +27,11 @@ from omni.isaac.core.utils.viewports import set_camera_view
 from omni.isaac.core.loggers import DataLogger
 from typing import Optional, List
 
-from igibson import assets_path, ig_dataset_path
+import igibson as ig
 from igibson.macros import gm, create_module_macros
 from igibson.robots.robot_base import BaseRobot
 from igibson.utils.config_utils import NumpyEncoder
-from igibson.utils.python_utils import clear as clear_pu, create_object_from_init_info
+from igibson.utils.python_utils import clear as clear_pu, create_object_from_init_info, Serializable
 from igibson.utils.usd_utils import clear as clear_uu, BoundingBoxAPI, get_usd_metadata, update_usd_metadata
 from igibson.utils.asset_utils import get_ig_avg_category_specs
 from igibson.utils.ui_utils import CameraMover
@@ -51,7 +51,7 @@ m.DEFAULT_VIEWER_CAMERA_POS = (-0.201028, -2.72566 ,  1.0654)
 m.DEFAULT_VIEWER_CAMERA_QUAT = (0.68196617, -0.00155408, -0.00166678,  0.73138017)
 
 
-class Simulator(SimulationContext):
+class Simulator(SimulationContext, Serializable):
     """ This class inherits from SimulationContext which provides the following.
 
         SimulationContext provide functions that take care of many time-related events such as
@@ -1042,3 +1042,32 @@ class Simulator(SimulationContext):
         if self._device is not None and "cuda" in self._device:
             device_id = self._settings.get_as_int("/physics/cudaDevice")
             self._device = f"cuda:{device_id}"
+
+    @property
+    def state_size(self):
+        # Total state size is the state size of our scene
+        return self._scene.state_size
+
+    def _dump_state(self):
+        # Default state is from the scene
+        return self._scene.dump_state(serialized=False)
+
+    def _load_state(self, state):
+        # Default state is from the scene
+        self._scene.load_state(state=state, serialized=False)
+
+    def load_state(self, state, serialized=False):
+        # Run super first
+        super().load_state(state=state, serialized=serialized)
+
+        # # We also need to manually update the simulator app
+        # self._simulator.app.update()
+
+    def _serialize(self, state):
+        # Default state is from the scene
+        return self._scene.serialize(state=state)
+
+    def _deserialize(self, state):
+        # Default state is from the scene
+        end_idx = self._scene.state_size
+        return self._scene.deserialize(state=state[:end_idx]), end_idx
