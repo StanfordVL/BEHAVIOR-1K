@@ -3,122 +3,188 @@ from collections import Iterable
 import logging
 
 import igibson as ig
-from igibson.robots.robot_base import BaseRobot
 import igibson.utils.transform_utils as T
 
 
-def get_collisions(objects):
+def get_collisions(prims=None, prims_check=None, prims_exclude=None, step_physics=False):
     """
-    Grab collisions that occurred during the most recent physics timestep
+    Grab collisions that occurred during the most recent physics timestep associated with prims @prims
 
     Args:
-        objects (RigidPrim or EntityPrim or list of RigidPrim or EntityPrim): objects to check for collisions
-
-    Returns:
-        set of 2-tuple: Unique collision pairs occurring in the simulation at the current timestep, represented
-            by their prim_paths
-    """
-    # Make sure sim is playing
-    assert ig.sim.is_playing(), "Cannot get collisions while sim is not playing!"
-
-    objects = objects if isinstance(objects, Iterable) else [objects]
-    # Grab collisions
-    return {(c.body0, c.body1) for obj in objects for c in obj.contact_list()}
-
-
-def check_collision(objsA=None, linksA=None, objsB=None, linksB=None, step_physics=False):
-    """
-    Check whether the given object @objsA or any of @links has collision after one simulator step. If both
-    are specified, will take the union of the two.
-
-    Note: This natively checks for collisions with @objsA and @linksA. If @objsB and @linksB are None, any valid
-        collision will trigger a True
-
-    Args:
-        objsA (None or EntityPrim or list of EntityPrim): If specified, object(s) to check for collision
-        linksA (None or RigidPrim or list of RigidPrim): If specified, link(s) to check for collision
-        objsB (None or EntityPrim or list of EntityPrim): If specified, object(s) to check for collision with any
-            of @objsA or @linksA
-        linksB (None or RigidPrim or list of RigidPrim): If specified, link(s) to check for collision with any
-            of @objsA or @linksA
+        prims (None or EntityPrim or RigidPrim or tuple of EntityPrim or RigidPrim): Prim(s) to check for collision.
+            If None, will check against all objects currently in the scene.
+        prims_check (None or EntityPrim or RigidPrim or tuple of EntityPrim or RigidPrim): If specified, will
+            only check for collisions with these specific prim(s)
+        prims_exclude (None or EntityPrim or RigidPrim or tuple of EntityPrim or RigidPrim): If specified, will
+            explicitly ignore any collisions with these specific prim(s)
         step_physics (bool): Whether to step the physics first before checking collisions. Default is False
 
     Returns:
-        bool: Whether any of @objsA or @linksA are in collision or not, possibly with @objsB or @linksB if specified
+        set of 2-tuple: Unique collision pairs occurring in the simulation at the current timestep between the
+        specified prim(s), represented by their prim_paths
     """
+    # Avoid circular imports
+    from igibson.prims.entity_prim import EntityPrim
+    from igibson.prims.rigid_prim import RigidPrim
+
     # Make sure sim is playing
-    assert ig.sim.is_playing(), "Cannot check collisions while sim is not playing!"
+    assert ig.sim.is_playing(), "Cannot get collisions while sim is not playing!"
 
     # Optionally step physics and then update contacts
     if step_physics:
         ig.sim.step_physics()
 
-    # Run sanity checks and standardize inputs
-    assert objsA is not None or linksA is not None, \
-        "Either objsA or linksA must be specified for collision checking!"
+    # Standardize inputs
+    prims = ig.sim.scene.objects if prims is None else prims if isinstance(prims, Iterable) else [prims]
+    prims_check = [] if prims_check is None else prims_check if isinstance(prims_check, Iterable) else [prims_check]
+    prims_exclude = [] if prims_exclude is None else prims_exclude if isinstance(prims_exclude, Iterable) else [prims_exclude]
 
-    objsA = [] if objsA is None else [objsA] if not isinstance(objsA, Iterable) else objsA
-    linksA = [] if linksA is None else [linksA] if not isinstance(linksA, Iterable) else linksA
-    objsB = [] if objsB is None else [objsB] if not isinstance(objsB, Iterable) else objsB
-    linksB = [] if linksB is None else [linksB] if not isinstance(linksB, Iterable) else linksB
+    def prims_to_rigid_prim_set(inp_prims):
+        out = set()
+        for prim in inp_prims:
+            if isinstance(prim, EntityPrim):
+                out.update({link for link in prim.links.values()})
+            elif isinstance(prim, RigidPrim):
+                out.add(prim)
+            else:
+                raise ValueError(f"Inputted prims must be either EntityPrim or RigidPrim instances "
+                                 f"when getting collisions! Type: {type(prim)}")
+        return out
 
-    # Grab all link prim paths owned by the collision set A
-    paths_A = {link.prim_path for obj in objsA for link in obj.links.values()}
-    paths_A = paths_A.union({link.prim_path for link in linksA})
+    # Convert into prim paths to check for collision
+    def get_paths_from_rigid_prims(inp_prims):
+        return {prim.prim_path for prim in inp_prims}
 
-    # Determine whether we're checking any collision from collision set A
-    check_any_collision = objsB is None and linksB is None
+    def get_contacts(inp_prims):
+        return {(c.body0, c.body1) for prim in inp_prims for c in prim.contact_list()}
+
+    rprims = prims_to_rigid_prim_set(prims)
+    rprims_check = prims_to_rigid_prim_set(prims_check)
+    rprims_exclude = prims_to_rigid_prim_set(prims_exclude)
+
+    paths = get_paths_from_rigid_prims(rprims)
+    paths_check = get_paths_from_rigid_prims(rprims_check)
+    paths_exclude = get_paths_from_rigid_prims(rprims_exclude)
+
+    # Run sanity checks
+    assert paths_check.isdisjoint(paths_exclude), \
+        f"Paths to check and paths to ignore collisions for should be mutually exclusive! " \
+        f"paths_check: {paths_check}, paths_exclude: {paths_exclude}"
+
+    # Determine whether we're checking / filtering any collision from collision set A
+    should_check_collisions = len(paths_check) > 0
+    should_filter_collisions = len(paths_exclude) > 0
 
     # Get all collisions from the objects set
-    collisions = get_collisions(objects=objsA + linksA + objsB + linksB)
+    collisions = get_contacts(rprims)
 
-    in_collision = False
-    if check_any_collision:
-        # Immediately check collisions
-        for col_pair in collisions:
-            if len(set(col_pair) - paths_A) < 2:
-                in_collision = True
-                break
-    else:
-        # Grab all link prim paths owned by the collision set B
-        paths_B = {link.prim_path for obj in objsB for link in obj.links.values()}
-        paths_B = paths_B.union({link.prim_path for link in linksB})
-        paths_shared = paths_A.intersection(paths_B)
-        paths_disjoint = paths_A.union(paths_B) - paths_shared
-        is_AB_shared = len(paths_shared) > 0
+    # Only run the following (expensive) code if we are actively using filtering criteria
+    if should_check_collisions or should_filter_collisions:
 
-        # Check collisions specifically between groups A and B
-        for col_pair in collisions:
-            col_pair = set(col_pair)
-            # Two cases -- either paths_A and paths_B overlap or they don't. Process collision checking logic
-            # separately for each case
-            if is_AB_shared:
-                # Two cases for valid collision: there is a shared collision body in this pair or there isn't.
-                # Process separately in each case
-                col_pair_no_shared = col_pair - paths_shared
-                if len(col_pair_no_shared) < 2:
-                    # Make sure this set minus the disjoint set results in empty col_pair remaining -- this means
-                    # a valid pair combo was found
-                    if len(col_pair_no_shared - paths_disjoint) == 0:
-                        in_collision = True
-                        break
-                else:
-                    # Make sure A and B sets each have an entry in the col pair for a valid collision
-                    if len(col_pair - paths_A) == 1 and len(col_pair - paths_B) == 1:
-                        in_collision = True
-                        break
-            else:
-                # Make sure A and B sets each have an entry in the col pair for a valid collision
-                if len(col_pair - paths_A) == 1 and len(col_pair - paths_B) == 1:
-                    in_collision = True
-                    break
+        # First filter out unnecessary collisions
+        if should_filter_collisions:
+            # First filter pass, remove the intersection of the main contacts and the contacts from the exclusion set minus
+            # the intersection between the exclusion and normal set
+            # This filters out any matching collisions in the exclusion set that are NOT an overlap
+            # between @rprims and @rprims_exclude
+            rprims_exclude_intersect = rprims_exclude.intersection(rprims)
+            exclude_disjoint_collisions = get_contacts(rprims_exclude - rprims_exclude_intersect)
+            collisions.difference_update(exclude_disjoint_collisions)
+
+            # Second filter pass, we remove collisions that may include self-collisions
+            # This is a bit more tricky because we need to actually look at the individual contact pairs to determine
+            # whether it's a collision (which may include a self-collision) that should be filtered
+            # We do this by grabbing the contacts of the intersection between the exclusion and normal rprims sets,
+            # and then making sure the resulting contact pair sets are completely disjoint from the paths intersection
+            exclude_intersect_collisions = get_contacts(rprims_exclude_intersect)
+            collisions.difference_update({pair for pair in exclude_intersect_collisions if paths.issuperset(set(pair))})
+
+        # Now, we additionally check for explicit collisions, filtering out any that do not meet this criteria
+        # This is essentially the inverse of the filter collision process, where we do two passes again, but for each
+        # case we look at the union rather than the subtraction of the two sets
+        if should_check_collisions:
+            # First check pass, keep the intersection of the main contacts and the contacts from the check set minus
+            # the intersection between the check and normal set
+            # This keeps any matching collisions in the check set that overlap between @rprims and @rprims_check
+            rprims_check_intersect = rprims_check.intersection(rprims)
+            check_disjoint_collisions = get_contacts(rprims_check - rprims_check_intersect)
+            valid_other_collisions = collisions.intersection(check_disjoint_collisions)
+
+            # Second check pass, we additionally keep collisions that may include self-collisions
+            # This is a bit more tricky because we need to actually look at the individual contact pairs to determine
+            # whether it's a collision (which may include a self-collision) that should be kept
+            # We do this by grabbing the contacts of the intersection between the check and normal rprims sets,
+            # and then making sure the resulting contact pair sets is strictly a subset of the original set
+            # Lastly, we only keep the intersection of this resulting set with the original collision set, so that
+            # any previously filtered collisions are respected
+            check_intersect_collisions = get_contacts(rprims_check_intersect)
+            valid_intersect_collisions = collisions.intersection({pair for pair in check_intersect_collisions if paths.issuperset(set(pair))})
+
+            # Collisions is union of valid other and valid self collisions
+            collisions = valid_other_collisions.union(valid_intersect_collisions)
 
     # Only going into this if it is for logging --> efficiency
     if logging.root.level <= logging.DEBUG:
         for item in collisions:
             logging.debug("linkA:{}, linkB:{}".format(item[0], item[1]))
 
-    return in_collision
+    return collisions
+
+
+def check_collision(prims=None, prims_check=None, prims_exclude=None, step_physics=False):
+    """
+    Checks if any valid collisions occurred during the most recent physics timestep associated with prims @prims
+
+    Args:
+        prims (None or EntityPrim or RigidPrim or tuple of EntityPrim or RigidPrim): Prim(s) to check for collision.
+            If None, will check against all objects currently in the scene.
+        prims_check (None or EntityPrim or RigidPrim or tuple of EntityPrim or RigidPrim): If specified, will
+            only check for collisions with these specific prim(s)
+        prims_exclude (None or EntityPrim or RigidPrim or tuple of EntityPrim or RigidPrim): If specified, will
+            explicitly ignore any collisions with these specific prim(s)
+        step_physics (bool): Whether to step the physics first before checking collisions. Default is False
+
+    Returns:
+        bool: True if a valid collision has occurred, else False
+    """
+    return len(get_collisions(
+        prims=prims,
+        prims_check=prims_check,
+        prims_exclude=prims_exclude,
+        step_physics=step_physics)) > 0
+
+
+def filter_collisions(collisions, filter_prims):
+    """
+    Filters collision pairs @collisions based on a set of prims @filter_prims.
+
+    Args:
+        collisions (set of 2-tuple): Collision pairs that should be filtered
+        filter_prims (EntityPrim or RigidPrim or tuple of EntityPrim or RigidPrim): Prim(s) specifying which
+            collisions to filter for
+
+    Returns:
+        set of 2-tuple: Filtered collision pairs
+    """
+    # Avoid circular imports
+    from igibson.prims.entity_prim import EntityPrim
+    from igibson.prims.rigid_prim import RigidPrim
+
+    paths = set()
+    for prim in filter_prims:
+        if isinstance(prim, EntityPrim):
+            paths.update({link for link in prim.links.values()})
+        elif isinstance(prim, RigidPrim):
+            paths.add(prim)
+        else:
+            raise ValueError("Inputted prims must be either EntityPrim or RigidPrim instances when getting collisions!")
+
+    filtered_collisions = set()
+    for pair in collisions:
+        if set(pair).isdisjoint(paths):
+            filtered_collisions.add(pair)
+
+    return filtered_collisions
 
 
 def test_valid_pose(obj, pos, quat=None):
@@ -144,12 +210,14 @@ def test_valid_pose(obj, pos, quat=None):
     obj.set_position_orientation(position=pos, orientation=quat)
 
     # If we're placing a robot, make sure it's reset and not moving
+    # Run import here to avoid circular imports
+    from igibson.robots.robot_base import BaseRobot
     if isinstance(obj, BaseRobot):
         obj.reset()
         obj.keep_still()
 
     # Check whether we're in collision after taking a single physics step
-    in_collision = check_collision(objsA=obj, step_physics=True)
+    in_collision = check_collision(prims=obj, step_physics=True)
 
     # Restore state after checking the collision
     ig.sim.scene.load_state(state, serialized=False)
@@ -176,6 +244,8 @@ def land_object(obj, pos, quat):
     obj.set_position_orientation(position=pos, orientation=quat)
 
     # If we're placing a robot, make sure it's reset and not moving
+    # Run import here to avoid circular imports
+    from igibson.robots.robot_base import BaseRobot
     is_robot = isinstance(obj, BaseRobot)
     if is_robot:
         obj.reset()
@@ -188,7 +258,7 @@ def land_object(obj, pos, quat):
     for _ in range(max_simulator_step):
         # Run a sim step and see if we have any contacts
         ig.sim.step()
-        land_success = check_collision(objsA=obj)
+        land_success = check_collision(prims=obj)
         if land_success:
             # Once we're successful, we can break immediately
             print(f"Landed object {obj.name} successfully!")
