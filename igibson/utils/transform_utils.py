@@ -392,6 +392,24 @@ def mat2quat(rmat):
     return R.from_matrix(M).as_quat()
 
 
+def vec2quat(vec, up=(0, 0, 1.0)):
+    """
+    Converts given 3d-direction vector @vec to quaternion orientation with respect to another direction vector @up
+
+    Args:
+        vec (3-array): (x,y,z) direction vector (possible non-normalized)
+        up (3-array): (x,y,z) direction vector representing the canonical up direction (possible non-normalized)
+    """
+    # See https://stackoverflow.com/questions/15873996/converting-a-direction-vector-to-a-quaternion-rotation
+    # Take cross product of @up and @vec to get @s_n, and then cross @vec and @s_n to get @u_n
+    # Then compose 3x3 rotation matrix and convert into quaternion
+    vec_n = vec / np.linalg.norm(vec)       # x
+    up_n = up / np.linalg.norm(up)
+    s_n = np.cross(up_n, vec_n)             # y
+    u_n = np.cross(vec_n, s_n)              # z
+    return mat2quat(np.array([vec_n, s_n, u_n]).T)
+
+
 def euler2mat(euler):
     """
     Converts euler angles into rotation matrix form
