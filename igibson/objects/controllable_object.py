@@ -23,7 +23,7 @@ class ControllableObject(BaseObject):
         category="object",
         class_id=None,
         uuid=None,
-        scale=1.0,
+        scale=None,
         rendering_params=None,
         visible=True,
         fixed_base=False,

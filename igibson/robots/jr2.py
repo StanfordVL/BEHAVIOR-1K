@@ -31,7 +31,7 @@ class JR2(ManipulationRobot, TwoWheelRobot):
         reset_joint_pos=None,
         controller_config=None,
         base_name=None,
-        scale=1.0,
+        scale=None,
         self_collision=True,
         class_id=None,
         rendering_params=None,
