@@ -4,6 +4,7 @@ import random
 from transforms3d import euler
 
 from igibson.robots.manipulation_robot import IsGraspingState
+from igibson.utils.sim_utils import check_collision
 from omni.isaac.core.utils.prims import get_prim_at_path
 
 log = logging.getLogger(__name__)
@@ -62,7 +63,7 @@ from igibson import app, assets_path
 from igibson.objects.primitive_object import PrimitiveObject
 from igibson.robots.manipulation_robot import ManipulationRobot
 from igibson.sensors.scan_sensor import ScanSensor
-from igibson.scenes.gibson_indoor_scene import StaticTraversableScene
+from igibson.scenes.static_traversable_scene import StaticTraversableScene
 from igibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
 import igibson.utils.transform_utils as T
 from igibson.utils.control_utils import IKSolver
@@ -267,7 +268,7 @@ class MotionPlanner:
         log.debug("Motion planning base goal: {}".format(goal))
 
         # Save state to reload
-        state = self.env.dump_state(serialized=False)
+        state = ig.sim.dump_state(serialized=False)
         x, y, theta = goal
         print(f"goal: {x},{y},{theta}")
 
@@ -358,7 +359,7 @@ class MotionPlanner:
             log.debug("Path NOT found!")
 
         # Restore original state
-        self.env.load_state(state=state, serialized=False)
+        ig.sim.load_state(state=state, serialized=False)
         # app.update()
 
         return path
@@ -373,7 +374,7 @@ class MotionPlanner:
         if path is not None:
             # If we are not keeping the last location, se save the state to reload it after the visualization
             if not keep_last_location:
-                initial_state = self.env.dump_state(serialized=False)
+                initial_state = ig.sim.dump_state(serialized=False)
 
             grasping_object = self.robot.is_grasping() == IsGraspingState.TRUE
             grasped_obj = self.robot._ag_obj_in_hand[self.robot.default_arm]
@@ -411,7 +412,7 @@ class MotionPlanner:
 
             if not keep_last_location:
                 log.info("Not keeping the last state, only visualizing the path and restoring at the end")
-                self.env.load_state(state=initial_state, serialized=False)
+                ig.sim.load_state(state=initial_state, serialized=False)
                 # app.update()
 
     def get_ik_parameters(self, arm="default"):
@@ -501,10 +502,10 @@ class MotionPlanner:
 
         # jnt_state = self.robot.get_joints_state()
 
-        state = self.env.dump_state(serialized=False)
+        state = ig.sim.dump_state(serialized=False)
         # self.simulator_step()
         # self.simulator_step()
-        # self.env.load_state(state=state, serialized=False)
+        # ig.sim.load_state(state=state, serialized=False)
         # self.simulator_step()
         # self.simulator_step()
         # for i in range(100):
@@ -565,7 +566,7 @@ class MotionPlanner:
                 # self.reset_object_states()
                 # TODO: have a principled way for stashing and resetting object states
                 # arm should not have any collision
-                collision_free = not self.env.check_collision(linksA=self.robot.arm_links[arm], step_sim=True)
+                collision_free = not check_collision(prims=self.robot.arm_links[arm], step_physics=True)
 
                 if not collision_free:
                     n_attempt += 1
@@ -573,10 +574,10 @@ class MotionPlanner:
                     continue
 
                 # gripper should not have any self-collision
-                collision_free = not self.env.check_collision(
-                    linksA=[self.robot.eef_links[arm]] + self.robot.finger_links[arm],
-                    objsB=self.robot,
-                    step_sim=False,
+                collision_free = not check_collision(
+                    prims=[self.robot.eef_links[arm]] + self.robot.finger_links[arm],
+                    prims_check=self.robot,
+                    step_physics=False,
                 )
                 if not collision_free:
                     n_attempt += 1
@@ -587,13 +588,13 @@ class MotionPlanner:
             # p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, True)
 
             # Restore state
-            self.env.load_state(state=state, serialized=False)
+            ig.sim.load_state(state=state, serialized=False)
             # app.update()
             log.debug("IK Solver found a valid configuration")
             return control_joint_pos
 
         # p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, True)
-        self.env.load_state(state=state, serialized=False)
+        ig.sim.load_state(state=state, serialized=False)
         # app.update()
         # self.episode_metrics['arm_ik_time'] += time() - ik_start
         log.debug("IK Solver failed to find a configuration")
@@ -749,7 +750,7 @@ class MotionPlanner:
             log.warning("Requested line of length 0. Returning a path with only one configuration: initial_arm_pose")
             return [initial_arm_pose]
 
-        state = self.env.dump_state(serialized=False)
+        state = ig.sim.dump_state(serialized=False)
 
         # Start planning from the given pose
         if self.robot_type != "BehaviorRobot":
@@ -783,7 +784,7 @@ class MotionPlanner:
             start_restore = time.time()
             # print('start restore {}'.format(start_restore-start_joint_pose))
             if joint_pose is None:
-                self.env.load_state(state=state, serialized=False)
+                ig.sim.load_state(state=state, serialized=False)
                 # app.update()
                 log.warning("Failed to retrieve IK solution for EE line path. Failure.")
                 return None
@@ -791,7 +792,7 @@ class MotionPlanner:
             line_path.append(joint_pose)
             end_restore = time.time()
             # print('end restore {}'.format(end_restore - start_restore))
-        self.env.load_state(state=state, serialized=False)
+        ig.sim.load_state(state=state, serialized=False)
         # app.update()
         return line_path
 
@@ -1380,7 +1381,7 @@ class MotionPlanner:
             log.warn("Visualizing arm path for the default arm: {}".format(arm))
 
         if not keep_last_location:
-            state = self.env.dump_state(serialized=False)
+            state = ig.sim.dump_state(serialized=False)
 
         if grasped_obj is not None:
             if self.robot_type != "BehaviorRobot":
@@ -1442,7 +1443,7 @@ class MotionPlanner:
                     self.simulator_sync()
 
         if not keep_last_location:
-            self.env.load_state(state=state, serialized=False)
+            ig.sim.load_state(state=state, serialized=False)
 
     def set_marker_position(self, pos):
         """
