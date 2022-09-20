@@ -3,10 +3,10 @@ import numpy as np
 from igibson.objects.stateful_object import StatefulObject
 from igibson.utils.python_utils import assert_valid_key
 
-from pxr import Gf, Usd, Sdf, UsdGeom, UsdPhysics, PhysxSchema, UsdShade
-from omni.isaac.core.utils.stage import add_reference_to_stage, get_current_stage
+from pxr import Gf, Usd, Sdf, Vt, UsdGeom, UsdPhysics, PhysxSchema, UsdShade
+from omni.isaac.core.utils.prims import get_prim_at_path
 from igibson.utils.constants import PrimType, PRIMITIVE_MESH_TYPES
-from igibson.utils.usd_utils import create_mesh_prim_with_default_xform
+from igibson.utils.usd_utils import create_primitive_mesh
 import omni
 import carb
 
@@ -89,13 +89,14 @@ class PrimitiveObject(StatefulObject):
         load_config = dict() if load_config is None else load_config
         load_config["color"] = np.array(rgba[:3])
         load_config["opacity"] = rgba[3]
-        load_config["radius"] = 1.0 if radius is None else radius
-        load_config["height"] = 1.0 if height is None else height
-        load_config["size"] = 1.0 if size is None else size
+        load_config["radius"] = radius
+        load_config["height"] = height
+        load_config["size"] = size
 
         # Initialize other internal variables
         self._vis_geom = None
         self._col_geom = None
+        self._extents = None            # (x,y,z extents)
 
         # Make sure primitive type is valid
         assert_valid_key(key=primitive_type, valid_keys=PRIMITIVE_MESH_TYPES, name="primitive mesh type")
@@ -132,13 +133,8 @@ class PrimitiveObject(StatefulObject):
         if self._prim_type == PrimType.RIGID:
             # Define a nested mesh corresponding to the root link for this prim
             base_link = stage.DefinePrim(f"{self._prim_path}/base_link", "Xform")
-            visual_mesh_path = f"{self._prim_path}/base_link/visual"
-            create_mesh_prim_with_default_xform(self._primitive_type, visual_mesh_path, stage=stage)
-            collision_mesh_path = f"{self._prim_path}/base_link/collision"
-            create_mesh_prim_with_default_xform(self._primitive_type, collision_mesh_path, stage=stage)
-
-            self._vis_geom = UsdGeom.Mesh.Define(stage, visual_mesh_path)
-            self._col_geom = UsdGeom.Mesh.Define(stage, collision_mesh_path)
+            self._vis_geom = create_primitive_mesh(prim_path=f"{self._prim_path}/base_link/visual", primitive_type=self._primitive_type)
+            self._col_geom = create_primitive_mesh(prim_path=f"{self._prim_path}/base_link/collision", primitive_type=self._primitive_type)
 
             # Add collision API to collision geom
             UsdPhysics.CollisionAPI.Apply(self._col_geom.GetPrim())
@@ -147,13 +143,17 @@ class PrimitiveObject(StatefulObject):
 
         elif self._prim_type == PrimType.CLOTH:
             # For Cloth, the base link itself is a cloth mesh
-            visual_mesh_path = f"{self._prim_path}/base_link"
             # TODO (eric): configure u_patches and v_patches
-            create_mesh_prim_with_default_xform(self._primitive_type, visual_mesh_path, stage=stage,
-                                                u_patches=None, v_patches=None)
-            self._vis_prim = UsdGeom.Mesh.Define(stage, visual_mesh_path)
-            self._col_prim = None
+            self._vis_geom = create_primitive_mesh(
+                prim_path=f"{self._prim_path}/base_link",
+                primitive_type=self._primitive_type,
+                u_patches=None,
+                v_patches=None,
+            )
+            self._col_geom = None
 
+        # Set extents at default value of 1 (this value may be modified if size, radius, or height are changed)
+        self._extents = np.ones(3)
 
         return prim
 
@@ -169,13 +169,16 @@ class PrimitiveObject(StatefulObject):
         visual_geom_prim.color = self._load_config["color"]
         visual_geom_prim.opacity = self._load_config["opacity"]
 
-        # Possibly set scalings
-        if self._primitive_type in VALID_RADIUS_OBJECTS:
-            self.radius = self._load_config["radius"]
-        if self._primitive_type in VALID_HEIGHT_OBJECTS:
-            self.height = self._load_config["height"]
-        if self._primitive_type in VALID_SIZE_OBJECTS:
-            self.size = self._load_config["size"]
+        # Possibly set scalings (only if the scale value is not set)
+        if self._load_config["scale"] is not None:
+            logging.warning("Custom scale specified for primitive object, so ignoring radius, height, and size arguments!")
+        else:
+            if self._load_config["radius"] is not None:
+                self.radius = self._load_config["radius"]
+            if self._load_config["height"] is not None:
+                self.height = self._load_config["height"]
+            if self._load_config["size"] is not None:
+                self.size = self._load_config["size"]
 
     @property
     def radius(self):
@@ -188,8 +191,7 @@ class PrimitiveObject(StatefulObject):
             float: radius for this object
         """
         assert_valid_key(key=self._primitive_type, valid_keys=VALID_RADIUS_OBJECTS, name="primitive object with radius")
-        # Scale 1 1 1 --> side length 2, so radius is 1/2 side = scale
-        return self.scale[0]
+        return self._extents[0] / 2.0
 
     @radius.setter
     def radius(self, radius):
@@ -202,12 +204,29 @@ class PrimitiveObject(StatefulObject):
             radius (float): radius to set
         """
         assert_valid_key(key=self._primitive_type, valid_keys=VALID_RADIUS_OBJECTS, name="primitive object with radius")
-        original_scale = self.scale
-        if self._primitive_type == "Sphere":
-            original_scale[:] = radius
-        else:
-            original_scale[:2] = radius
-        self.scale = original_scale
+        original_extent = self._extents
+        attr_pairs = []
+        for geom in self._vis_geom, self._col_geom:
+            if geom is not None:
+                for attr in (geom.GetPointsAttr(), geom.GetNormalsAttr()):
+                    vals = np.array(attr.Get()).astype(np.float64)
+                    attr_pairs.append([attr, vals])
+
+        # Calculate how much to scale extents by and then modify the points / normals accordingly
+        scaling_factor = 2.0 * radius / original_extent[0]
+        for attr, vals in attr_pairs:
+            # If this is a sphere, modify all 3 axes
+            if self._primitive_type == "Sphere":
+                vals = vals * scaling_factor
+            # Otherwise, just modify the first two dimensions
+            else:
+                vals[:, :2] = vals[:, :2] * scaling_factor
+            # Set the value
+            attr.Set(Vt.Vec3fArray([Gf.Vec3f(*v) for v in vals]))
+
+        # Update the extents variable
+        self._extents = np.ones(3) * radius * 2.0 if self._primitive_type == "Sphere" else \
+            np.array([radius * 2.0, radius * 2.0, self._extents[2]])
 
     @property
     def height(self):
@@ -220,9 +239,7 @@ class PrimitiveObject(StatefulObject):
             float: height for this object
         """
         assert_valid_key(key=self._primitive_type, valid_keys=VALID_HEIGHT_OBJECTS, name="primitive object with height")
-
-        # TODO (eric): currently scale [1, 1, 1] will have height 2.0
-        return self.scale[2] * 2.0
+        return self._extents[2]
 
     @height.setter
     def height(self, height):
@@ -235,11 +252,20 @@ class PrimitiveObject(StatefulObject):
             height (float): height to set
         """
         assert_valid_key(key=self._primitive_type, valid_keys=VALID_HEIGHT_OBJECTS, name="primitive object with height")
-        original_scale = self.scale
+        original_extent = self._extents
 
-        # TODO (eric): currently scale [1, 1, 1] will have height 2.0
-        original_scale[2] = height / 2.0
-        self.scale = original_scale
+        # Calculate the correct scaling factor and scale the points and normals appropriately
+        scaling_factor = height / original_extent[2]
+        for geom in self._vis_geom, self._col_geom:
+            if geom is not None:
+                for attr in (geom.GetPointsAttr(), geom.GetNormalsAttr()):
+                    vals = np.array(attr.Get()).astype(np.float64)
+                    # Scale the z axis by the scaling factor
+                    vals[:, 2] = vals[:, 2] * scaling_factor
+                    attr.Set(Vt.Vec3fArray([Gf.Vec3f(*v) for v in vals]))
+
+        # Update the extents variable
+        self._extents[2] = height
 
     @property
     def size(self):
@@ -252,9 +278,7 @@ class PrimitiveObject(StatefulObject):
             float: size for this object
         """
         assert_valid_key(key=self._primitive_type, valid_keys=VALID_SIZE_OBJECTS, name="primitive object with size")
-
-        # TODO (eric): currently scale [1, 1, 1] will have size 2.0
-        return self.scale[0] * 2.0
+        return self._extents[0]
 
     @size.setter
     def size(self, size):
@@ -267,11 +291,20 @@ class PrimitiveObject(StatefulObject):
             size (float): size to set
         """
         assert_valid_key(key=self._primitive_type, valid_keys=VALID_SIZE_OBJECTS, name="primitive object with size")
-        original_scale = self.scale
 
-        # TODO (eric): currently scale [1, 1, 1] will have size 2.0
-        original_scale[:] = size / 2.0
-        self.scale = original_scale
+        original_extent = self._extents
+
+        # Calculate the correct scaling factor and scale the points and normals appropriately
+        scaling_factor = size / original_extent[0]
+        for geom in self._vis_geom, self._col_geom:
+            if geom is not None:
+                for attr in (geom.GetPointsAttr(), geom.GetNormalsAttr()):
+                    # Scale all three axes by the scaling factor
+                    vals = np.array(attr.Get()).astype(np.float64) * scaling_factor
+                    attr.Set(Vt.Vec3fArray([Gf.Vec3f(*v) for v in vals]))
+
+        # Update the extents variable
+        self._extents = np.ones(3) * size
 
     def _create_prim_with_same_kwargs(self, prim_path, name, load_config):
         # Add additional kwargs (fit_avg_dim_volume and bounding_box are already captured in load_config)

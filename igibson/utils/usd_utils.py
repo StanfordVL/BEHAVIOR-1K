@@ -23,6 +23,7 @@ import carb
 import numpy as np
 import trimesh
 
+import igibson as ig
 from igibson import assets_path, ig_dataset_path
 from igibson.utils.constants import JointType, PRIMITIVE_MESH_TYPES
 from igibson.utils.python_utils import assert_valid_key
@@ -340,7 +341,7 @@ def clear():
 
 def create_mesh_prim_with_default_xform(primitive_type, prim_path, stage=None, u_patches=None, v_patches=None):
     """
-    Computes the union of AABBs (world-frame oriented) for the prims specified at @prim_paths
+    Creates a mesh prim of the specified @primitive_type at the specified @prim_path
 
     Args:
         primitive_type (str): Primitive mesh type, should be one of PRIMITIVE_MESH_TYPES to be valid
@@ -401,6 +402,41 @@ def mesh_prim_to_trimesh_mesh(mesh_prim):
         i += count
 
     return trimesh.Trimesh(vertices=vertices, faces=faces)
+
+
+def create_primitive_mesh(prim_path, primitive_type, extents=1.0, u_patches=None, v_patches=None):
+    """
+    Helper function that generates a UsdGeom.Mesh prim at specified @prim_path of type @primitive_type.
+
+    NOTE: Generated mesh prim will, by default, have extents equaling [1, 1, 1]
+
+    Args:
+        prim_path (str): Where the loaded mesh should exist on the stage
+        primitive_type (str): Type of primitive mesh to create. Should be one of:
+            {"Cone", "Cube", "Cylinder", "Disk", "Plane", "Sphere", "Torus"}
+        extents (float or 3-array): Specifies the extents of the generated mesh. Default is 1.0, i.e.:
+            generated mesh will be in be contained in a [1,1,1] sized bounding box
+        u_patches (int or None): If specified, should be an integer that represents how many segments to create in the
+            u-direction. E.g. 10 means 10 segments (and therefore 11 vertices) will be created.
+        v_patches (int or None): If specified, should be an integer that represents how many segments to create in the
+            v-direction. E.g. 10 means 10 segments (and therefore 11 vertices) will be created.
+            Both u_patches and v_patches need to be specified for them to be effective.
+
+    Returns:
+        UsdGeom.Mesh: Generated primitive mesh as a prim on the active stage
+    """
+    assert_valid_key(key=primitive_type, valid_keys=PRIMITIVE_MESH_TYPES, name="primitive mesh type")
+    create_mesh_prim_with_default_xform(primitive_type, prim_path, stage=ig.sim.stage, u_patches=u_patches, v_patches=v_patches)
+    mesh = UsdGeom.Mesh.Define(ig.sim.stage, prim_path)
+
+    # Modify the points and normals attributes so that total extents is the desired
+    # This means multiplying omni's default by extents / 2.0
+    extents = np.ones(3) * extents if isinstance(extents, float) else np.array(extents)
+    for attr in (mesh.GetPointsAttr(), mesh.GetNormalsAttr()):
+        vals = np.array(attr.Get()).astype(np.float64)
+        attr.Set(Vt.Vec3fArray([Gf.Vec3f(*(val * extents / 2.0)) for val in vals]))
+
+    return mesh
 
 
 def add_asset_to_stage(asset_path, prim_path):
