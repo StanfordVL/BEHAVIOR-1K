@@ -554,9 +554,11 @@ class Simulator(SimulationContext, Serializable):
         # Render on final step unless input says otherwise
         super().step(render=render)
 
-        self._non_physics_step()
-        if self._apply_transitions:
-            self._transition_rule_step()
+        # Additionally run non physics things if we have a valid scene
+        if self._scene is not None:
+            self._non_physics_step()
+            if self._apply_transitions:
+                self._transition_rule_step()
 
         # TODO (eric): After stage changes (e.g. pose, texture change), it will take two super().step(render=True) for
         #  the result to propagate to the rendering. We could have called super().render() here but it will introduce
@@ -846,118 +848,6 @@ class Simulator(SimulationContext, Serializable):
 
         return
 
-    def add_task(self, task: BaseTask) -> None:
-        """Tasks should have a unique name.
-
-
-        Args:
-            task (BaseTask): [description]
-        """
-        if task.name in self._current_tasks:
-            raise Exception("Task name should be unique in the world")
-        self._current_tasks[task.name] = task
-        return
-
-    def get_observations(self, task_name: Optional[str] = None) -> dict:
-        """Gets observations from all the tasks that were added
-
-        Args:
-            task_name (Optional[str], optional): [description]. Defaults to None.
-
-        Returns:
-            dict: [description]
-        """
-        if task_name is not None:
-            return self._current_tasks[task_name].get_observations()
-        else:
-            observations = dict()
-            for task in self._current_tasks.values():
-                observations.update(task.get_observations())
-            return observations
-
-    def calculate_metrics(self, task_name: Optional[str] = None) -> None:
-        """Gets metrics from all the tasks that were added
-
-        Args:
-            task_name (Optional[str], optional): [description]. Defaults to None.
-
-        Returns:
-            [type]: [description]
-        """
-        if task_name is not None:
-            return self._current_tasks[task_name].calculate_metrics()
-        else:
-            metrics = dict()
-            for task in self._current_tasks.values():
-                metrics.update(task.calculate_metrics())
-            return metrics
-
-    def is_done(self, task_name: Optional[str] = None) -> None:
-        """[summary]
-
-        Args:
-            task_name (Optional[str], optional): [description]. Defaults to None.
-
-        Returns:
-            [type]: [description]
-        """
-        if task_name is not None:
-            return self._current_tasks[task_name].is_done()
-        else:
-            result = [task.is_done() for task in self._current_tasks.values()]
-            return all(result)
-
-    # def step(self, render: bool = True) -> None:
-    #     """Steps the physics simulation while rendering or without.
-    #
-    #        - Note: task pre_step is called here.
-    #
-    #     Args:
-    #         render (bool, optional): Set to False to only do a physics simulation without rendering. Note:
-    #                                  app UI will be frozen (since its not rendering) in this case.
-    #                                  Defaults to True.
-    #
-    #     """
-    #     if self._scene_finalized:
-    #         for task in self._current_tasks.values():
-    #             task.pre_step(self.current_time_step_index, self.current_time)
-    #     if self.scene._enable_bounding_box_computations:
-    #         self.scene._bbox_cache.SetTime(Usd.TimeCode(self._current_time))
-    #     SimulationContext.step(self, render=render)
-    #     if self._data_logger.is_started():
-    #         if self._data_logger._data_frame_logging_func is None:
-    #             raise Exception("You need to add data logging function before starting the data logger")
-    #         data = self._data_logger._data_frame_logging_func(tasks=self.get_current_tasks(), scene=self.scene)
-    #         self._data_logger.add_data(
-    #             data=data, current_time_step=self.current_time_step_index, current_time=self.current_time
-    #         )
-    #     return
-
-    def step_async(self, step_size: float) -> None:
-        """Calls all functions that should be called pre stepping the physics
-
-           - Note: task pre_step is called here.
-
-        Args:
-            step_size (float): [description]
-
-        Raises:
-            Exception: [description]
-        """
-        if self._scene_finalized:
-            for task in self._current_tasks.values():
-                task.pre_step(self.current_time_step_index, self.current_time)
-        if self.scene._enable_bounding_box_computations:
-            self.scene._bbox_cache.SetTime(Usd.TimeCode(self._current_time))
-        if self._data_logger.is_started():
-            if self._data_logger._data_frame_logging_func is None:
-                raise Exception("You need to add data logging function before starting the data logger")
-            data = self._data_logger._data_frame_logging_func(tasks=self.get_current_tasks(), scene=self.scene)
-            self._data_logger.add_data(
-                data=data, current_time_step=self.current_time_step_index, current_time=self.current_time
-            )
-        return
-
     def get_data_logger(self) -> DataLogger:
         """Returns the data logger of the world.
 
@@ -980,7 +870,14 @@ class Simulator(SimulationContext, Serializable):
             self.stop()
 
         # Store physics dt and rendering dt to reuse later
-        physics_dt, rendering_dt = self.get_physics_dt(), self.get_rendering_dt()
+        # Note that the stage may have been deleted previously; if so, we use the default values
+        # of 1/60, 1/60
+        try:
+            physics_dt = self.get_physics_dt()
+        except:
+            print("WARNING: Invalid or non-existent physics scene found. Setting physics dt to 1/60.")
+            physics_dt = 1/60.
+        rendering_dt = self.get_rendering_dt()
 
         # Clear simulation state
         self._clear_state()
