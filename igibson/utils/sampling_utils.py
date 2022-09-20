@@ -565,7 +565,7 @@ def check_rays_hit_object(cast_results, body_names, refusal_log, threshold=1.0):
     ray_hits = [ray_res["hit"] and ray_res["rigidBody"] in body_names for ray_res in cast_results]
     if not (sum(ray_hits) / len(cast_results)) >= threshold:
         if ig.debug_sampling:
-            refusal_log.append(f"hits {[ray_res['rigidBody'] for ray_res in cast_results if ray_res['hit']]}")
+            refusal_log.append(f"{sum(ray_hits)} / {len(cast_results)} < {threshold} hits: {[ray_res['rigidBody'] for ray_res in cast_results if ray_res['hit']]}")
 
         return False, ray_hits
 
