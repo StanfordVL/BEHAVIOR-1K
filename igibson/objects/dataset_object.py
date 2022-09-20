@@ -15,6 +15,8 @@ import trimesh
 from scipy.spatial.transform import Rotation
 
 from omni.isaac.core.utils.prims import get_prim_at_path
+from omni.isaac.core.utils.rotations import gf_quat_to_np_array
+
 from omni.usd import get_shader_from_material
 
 import igibson as ig
@@ -225,14 +227,13 @@ class DatasetObject(USDObject):
         for predicate, links in heights_info.items():
             height_maps = {}
             for link_name, heights in links.items():
-                link_path = self._links[link_name].prim_path
-                height_maps[link_path] = []
+                height_maps[link_name] = []
                 for i, z_value in enumerate(heights):
                     # Get boolean birds-eye view xy-mask image for this surface
                     img_fname = os.path.join(usd_dir, "height_maps_per_link", predicate, link_name, f"{i}.png")
                     xy_map = cv2.imread(img_fname, 0)
                     # Add this map to the supporting surfaces for this link and predicate combination
-                    height_maps[link_path].append((z_value, xy_map))
+                    height_maps[link_name].append((z_value, xy_map))
             # Add this heights map to the overall supporting surfaces
             self.supporting_surfaces[predicate] = height_maps
 
@@ -245,12 +246,9 @@ class DatasetObject(USDObject):
         """
         if self.orientations is None:
             raise ValueError("No orientation probabilities set")
-        indices = list(range(len(self.orientations)))
-        orientations = [np.array(o["rotation"]) for o in self.orientations]
-        probabilities = [o["prob"] for o in self.orientations]
+        probabilities = [o["prob"] for o in self.orientations.values()]
         probabilities = np.array(probabilities) / np.sum(probabilities)
-        chosen_orientation_idx = np.random.choice(indices, p=probabilities)
-        chosen_orientation = orientations[chosen_orientation_idx]
+        chosen_orientation = np.array(np.random.choice(list(self.orientations.values()), p=probabilities)["rotation"])
 
         # Randomize yaw from -pi to pi
         rot_num = np.random.uniform(-1, 1)
@@ -261,7 +259,7 @@ class DatasetObject(USDObject):
                 [0.0, 0.0, 1.0],
             ]
         )
-        rotated_quat = T.mat2quat(np.dot(rot_matrix, T.quat2mat(chosen_orientation)))
+        rotated_quat = T.mat2quat(rot_matrix @ T.quat2mat(chosen_orientation))
         return rotated_quat
 
     # def prepare_visual_mesh_to_material(self):
@@ -519,7 +517,7 @@ class DatasetObject(USDObject):
         #
         #     body_ids.append(body_id)
 
-        # self.load_supporting_surfaces()
+        self.load_supporting_surfaces()
 
         # Run super last
         super()._post_load()
@@ -713,15 +711,26 @@ class DatasetObject(USDObject):
         """
         scales = {self.root_link.body_name: self.scale}
 
-        for joint_name, joint in self._joints.items():
-            parent_name = joint.parent_name
-            child_name = joint.child_name
-            if parent_name in scales and child_name not in scales:
-                scale_in_parent_lf = scales[parent_name]
-                # The location of the joint frame is scaled using the scale in the parent frame
-                jnt_frame_rot = T.quat2mat(joint.local_orientation)
-                scale_in_child_lf = np.absolute(jnt_frame_rot.T @ np.array(scale_in_parent_lf))
-                scales[child_name] = scale_in_child_lf
+        # We iterate through all links in this object, and check for any joint prims that exist
+        # We traverse manually this way instead of accessing the self._joints dictionary, because
+        # the dictionary only includes articulated joints and not fixed joints!
+        for link in self._links.values():
+            for prim in link.prim.GetChildren():
+                if "joint" in prim.GetTypeName().lower():
+                    # Grab relevant joint information
+                    parent_name = prim.GetProperty("physics:body0").GetTargets()[0].pathString.split("/")[-1]
+                    child_name = prim.GetProperty("physics:body1").GetTargets()[0].pathString.split("/")[-1]
+                    if parent_name in scales and child_name not in scales:
+                        scale_in_parent_lf = scales[parent_name]
+                        # The location of the joint frame is scaled using the scale in the parent frame
+                        quat0 = gf_quat_to_np_array(prim.GetAttribute("physics:localRot0").Get())[[1, 2, 3, 0]]
+                        quat1 = gf_quat_to_np_array(prim.GetAttribute("physics:localRot1").Get())[[1, 2, 3, 0]]
+
+                        # Invert the child link relationship, and multiply the two rotations together to get the final rotation
+                        local_ori = T.quat_multiply(quaternion1=T.quat_inverse(quat1), quaternion0=quat0)
+                        jnt_frame_rot = T.quat2mat(local_ori)
+                        scale_in_child_lf = np.absolute(jnt_frame_rot.T @ np.array(scale_in_parent_lf))
+                        scales[child_name] = scale_in_child_lf
 
         return scales
 
