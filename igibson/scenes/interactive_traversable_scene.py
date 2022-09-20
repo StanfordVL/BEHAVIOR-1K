@@ -190,10 +190,6 @@ class InteractiveTraversableScene(TraversableScene):
         # Store values internally
         self.scene_file = scene_file
 
-    def get_objects_with_state(self, state):
-        # We overload this method to provide a faster implementation.
-        return self.object_registry("states", state, [])
-
     def filter_rooms_and_object_categories(
         self, load_object_categories, not_load_object_categories, load_room_types, load_room_instances
     ):
@@ -257,27 +253,6 @@ class InteractiveTraversableScene(TraversableScene):
             obj.randomize_texture()
 
     # TODO
-    def check_collision(self, body_a, body_b=None, link_a=None, fixed_body_ids=None):
-        """
-        Helper function to check for collision for scene quality
-        """
-        if body_b is None:
-            assert link_a is not None
-            pts = p.getContactPoints(bodyA=body_a, linkIndexA=link_a)
-        else:
-            assert body_b is not None
-            pts = p.getContactPoints(bodyA=body_a, bodyB=body_b)
-
-        # contactDistance < 0 means actual penetration
-        pts = [elem for elem in pts if elem[8] < 0.0]
-
-        # only count collision with fixed body ids if provided
-        if fixed_body_ids is not None:
-            pts = [elem for elem in pts if elem[2] in fixed_body_ids]
-
-        return len(pts) > 0
-
-    # TODO
     def check_scene_quality(self, simulator):
         """
         Helper function to check for scene quality.
@@ -317,7 +292,7 @@ class InteractiveTraversableScene(TraversableScene):
         # check if these overlapping bboxes have collision
         simulator.step()
         for obj_a, obj_b in overlapped_objs:
-            has_collision = obj_a.in_contact(objects=obj_b)
+            has_collision = obj_a.in_contact(prims=obj_b)
             quality_check = quality_check and (not has_collision)
             if has_collision:
                 body_body_collision.append((obj_a, obj_b))
@@ -355,7 +330,7 @@ class InteractiveTraversableScene(TraversableScene):
                         joint.set_pos(pos=j_pos)
                         simulator.step()
                         # TODO: I don't think this is working properly -- we currently don't check for self collision between fixed_obj and joint
-                        has_collision = fixed_obj.in_contact(objects=self.fixed_objects, links=joint)
+                        has_collision = fixed_obj.in_contact(prims=[self.fixed_objects] + [joint])
                         joint_quality = joint_quality and (not has_collision)
 
                 if not joint_quality:
@@ -642,7 +617,7 @@ class InteractiveTraversableScene(TraversableScene):
                 #     non_kinematic_states = json.loads(link.attrib["states"])
                 # else:
                 #     non_kinematic_states = None
-                print(f"obj: {name}, bbox center pos: {bbox_center_pos}, bbox center ori: {bbox_center_ori}")
+                # print(f"obj: {name}, bbox center pos: {bbox_center_pos}, bbox center ori: {bbox_center_ori}")
 
             # self.object_states.add_object(
             #     obj_name=name,
