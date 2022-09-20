@@ -104,9 +104,6 @@ logging.info("Example config path: {}".format(example_config_path))
 # whether to enable debugging mode for object sampling
 debug_sampling = False
 
-# whether to ignore visual shape when importing to pybullet
-ignore_visual_shape = True
-
 # Finally, we must create the igibson application
 from igibson.app_omni import OmniApp
 
