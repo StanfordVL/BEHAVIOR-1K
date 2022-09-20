@@ -14,4 +14,4 @@ class Touching(KinematicsMixin, RelativeObjectState, BooleanState):
         assert ContactBodies in objA_states
         assert ContactBodies in objB_states
 
-        return self.obj.in_contact(objects=other)
+        return self.obj.in_contact(prims=other)
