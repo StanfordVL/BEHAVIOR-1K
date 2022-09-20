@@ -13,7 +13,6 @@ render:
 scene:
   type: InteractiveTraversableScene
   scene_model: Rs_int
-  usd_path: /cvgl2/u/jdwong/PAIR/iGibson3/igibson/data/ig_dataset/scenes/Rs_int/urdf/Rs_int_best_template.usd
   trav_map_resolution: 0.1
   trav_map_erosion: 2
   trav_map_with_objects: true

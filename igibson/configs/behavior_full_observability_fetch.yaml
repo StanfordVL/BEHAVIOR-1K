@@ -1,65 +1,67 @@
-# scene
-scene: igibson
-scene_id: Beechwood_1_int
-clutter: false
-build_graph: true
-load_texture: true
-pybullet_load_texture: true
-should_open_all_doors: false
+# TODO: Verify works!
 
-# domain randomization
-texture_randomization_freq: null
-object_randomization_freq: null
-
-# robot
-robot:
-  name: Fetch
-  action_type: continuous
-  action_normalize: true
-  base_name: null
-  scale: 1.0
-  self_collision: true
-  rendering_params: null
-  grasping_mode: assisted
-  rigid_trunk: false
-  default_trunk_offset: 0.365
-  default_arm_pose: diagonal30
-  controller_config:
-    base:
-      name: DifferentialDriveController
-    arm_0:
-      name: InverseKinematicsController
-      kv: 2.0
-    gripper_0:
-      name: MultiFingerGripperController
-      mode: binary
-    camera:
-      name: JointController
-      use_delta_commands: False
-
-# task
-task: cleaning_cupboards
-task_id: 0
-instance_id: 0
-online_sampling: false
-
-# discount factor
-discount_factor: 0.99
-
-# termination condition
-max_step: 500
-
-# sensor spec
-output: [proprioception, rgb, highlight, depth, seg, ins_seg, task_obs]
-# image
-fisheye: false
-image_width: 128
-image_height: 128
-vertical_fov: 120
-# depth
-depth_low: 0.0
-depth_high: 10.0
-
-# sensor noise
-depth_noise_rate: 0.0
-scan_noise_rate: 0.0
+## scene
+#scene: igibson
+#scene_id: Beechwood_1_int
+#clutter: false
+#build_graph: true
+#load_texture: true
+#pybullet_load_texture: true
+#should_open_all_doors: false
+#
+## domain randomization
+#texture_randomization_freq: null
+#object_randomization_freq: null
+#
+## robot
+#robot:
+#  name: Fetch
+#  action_type: continuous
+#  action_normalize: true
+#  base_name: null
+#  scale: 1.0
+#  self_collision: true
+#  rendering_params: null
+#  grasping_mode: assisted
+#  rigid_trunk: false
+#  default_trunk_offset: 0.365
+#  default_arm_pose: diagonal30
+#  controller_config:
+#    base:
+#      name: DifferentialDriveController
+#    arm_0:
+#      name: InverseKinematicsController
+#      kv: 2.0
+#    gripper_0:
+#      name: MultiFingerGripperController
+#      mode: binary
+#    camera:
+#      name: JointController
+#      use_delta_commands: False
+#
+## task
+#task: cleaning_cupboards
+#task_id: 0
+#instance_id: 0
+#online_sampling: false
+#
+## discount factor
+#discount_factor: 0.99
+#
+## termination condition
+#max_step: 500
+#
+## sensor spec
+#output: [proprioception, rgb, highlight, depth, seg, ins_seg, task_obs]
+## image
+#fisheye: false
+#image_width: 128
+#image_height: 128
+#vertical_fov: 120
+## depth
+#depth_low: 0.0
+#depth_high: 10.0
+#
+## sensor noise
+#depth_noise_rate: 0.0
+#scan_noise_rate: 0.0
