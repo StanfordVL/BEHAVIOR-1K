@@ -253,6 +253,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
         return registry
 
+    # TODO: Refactor
     def object_exists(self, name: str) -> bool:
         """[summary]
 
@@ -272,9 +273,9 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Get the objects with a given state in the scene.
 
         :param state: state of the objects to get
-        :return: a list of objects with the given state
+        :return: a set of objects with the given state
         """
-        return [item for item in self.objects if hasattr(item, "states") and state in item.states]
+        return self.object_registry("states", state, set())
 
     def _add_object(self, obj):
         """
