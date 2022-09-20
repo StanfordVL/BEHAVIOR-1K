@@ -841,6 +841,7 @@ class MicroParticleSystem(BaseParticleSystem):
         # Remove instancer from our tracking and delete its prim
         instancer = cls.particle_instancers.pop(name)
         cls.simulator.stage.RemovePrim(instancer.prim_path)
+        cls.simulator.stage.RemovePrim(f"{get_prototype_path_from_particle_system_path(particle_system_path=cls.prim_path)}/{name}")
 
     @classmethod
     def particle_instancer_name_to_idn(cls, name):
@@ -1053,7 +1054,7 @@ class FluidSystem(MicroParticleSystem):
         Cache the collision hits for all particle systems, to be used by the object state system to determine
         if a particle is in contact with a given object.
         """
-        particle_contacts = defaultdict(lambda: defaultdict(list))
+        particle_contacts = defaultdict(lambda: defaultdict(set))
 
         particle_instancer = None
         particle_idx = 0
@@ -1061,14 +1062,14 @@ class FluidSystem(MicroParticleSystem):
         def report_hit(hit):
             base = "/".join(hit.rigid_body.split("/")[:-1])
             body = cls.simulator.scene.object_registry("prim_path", base)
-            particle_contacts[body][particle_instancer].append(particle_idx)
+            particle_contacts[body][particle_instancer].add(particle_idx)
             return True
 
         for system, value in cls.particle_instancers.items():
             for idx, pos in enumerate(value.particle_positions):
                 particle_idx = idx
                 particle_instancer = system
-                get_physx_scene_query_interface().overlap_sphere(cls.particle_radius, pos, report_hit, False)
+                get_physx_scene_query_interface().overlap_sphere(cls.particle_contact_offset, pos, report_hit, False)
 
         cls.state_cache = {
             'particle_contacts': particle_contacts,
