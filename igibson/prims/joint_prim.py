@@ -29,7 +29,6 @@ from igibson.macros import create_module_macros
 from igibson.prims.prim_base import BasePrim
 from igibson.utils.usd_utils import create_joint
 from igibson.utils.omni_types import JointsState
-from igibson.utils.transform_utils import quat_inverse, quat_multiply
 from igibson.utils.constants import JointType
 from igibson.utils.python_utils import assert_valid_key
 import igibson.utils.transform_utils as T
@@ -197,7 +196,14 @@ class JointPrim(BasePrim):
         """
         Updates all internal handles for this prim, in case they change since initialization
         """
-        self._handle = self._dc.get_joint(self._prim_path)
+        # TODO: A bit hacky way to get the joint handle, ideally we'd simply do dc.get_joint(), but this doesn't seem to work as expected?
+        self._handle = None
+        for i in range(self._dc.get_articulation_joint_count(self._art)):
+            joint_handle = self._dc.get_articulation_joint(self._art, i)
+            joint_path = self._dc.get_joint_path(joint_handle)
+            if joint_path == self._prim_path:
+                self._handle = joint_handle
+                break
 
     def get_default_state(self):
         """
@@ -351,7 +357,7 @@ class JointPrim(BasePrim):
         quat1 = gf_quat_to_np_array(self.get_attribute("physics:localRot1"))[[1, 2, 3, 0]]
 
         # Invert the child link relationship, and multiply the two rotations together to get the final rotation
-        return quat_multiply(quaternion1=quat_inverse(quat1), quaternion0=quat0)
+        return T.quat_multiply(quaternion1=T.quat_inverse(quat1), quaternion0=quat0)
 
     @property
     def joint_name(self):
