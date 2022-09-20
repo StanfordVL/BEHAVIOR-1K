@@ -28,6 +28,7 @@ from igibson.prims.joint_prim import JointPrim
 from igibson.prims.rigid_prim import RigidPrim
 from igibson.prims.xform_prim import XFormPrim
 from igibson.utils.omni_types import JointsState
+from igibson.utils.sim_utils import check_collision
 from igibson.utils.constants import PrimType, GEOM_TYPES
 from igibson.macros import gm
 
@@ -404,38 +405,21 @@ class EntityPrim(XFormPrim):
         body1_contacts = {c.body1 for c in contact_list if c.body1 not in link_paths}
         return body0_contacts.union(body1_contacts)
 
-    def in_contact(self, objects=None, links=None):
+    def in_contact(self, prims=None):
         """
-        Returns whether this object is in contact with any object in @objects or link in @links. Note that at least
-        one should be specified (both can be specified, in which case this will check for any contacts amongst the
-        specified objects OR the specified links
+        Returns whether this entity is in contact with any prim(s) @prims. If no @prims is specified,
+        then this will check for any contact.
+
+        NOTE: If checking for self-collisions, set prims=self
 
         Args:
-            objects (None or EntityPrim or list of EntityPrim): Object(s) to check for collision with
-            links (None or RigidPrim or list of RigidPrim): Link(s) to check for collision with
+            prims (None or EntityPrim or RigidPrim or tuple of EntityPrim or RigidPrim): Prim(s) to check for collision.
+            If None, will check against all objects currently in the scene.
 
         Returns:
-            bool: Whether this object is in contact with the specified object(s) and / or link(s)
+            bool: Whether this object is in contact with the specified prim(s)
         """
-        # Make sure at least one of objects or links are specified
-        assert objects is not None or links is not None, "At least one of objects or links must be specified to check" \
-                                                         "for contact!"
-
-        # Standardize inputs
-        objects = [] if objects is None else (objects if isinstance(objects, Iterable) else [objects])
-        links = [] if links is None else (links if isinstance(objects, Iterable) else [links])
-
-        # Get list of link prim paths to check for contact with
-        link_paths = {link.prim_path for link in links}
-        for obj in objects:
-            link_paths = link_paths.union({link.prim_path for link in obj.links.values()})
-
-        # Grab all contacts for this object prim
-        in_contact_paths = self.in_contact_links()
-        valid_contacts = link_paths.intersection(in_contact_paths)
-
-        # We're in contact if any of our current contacts are the requested contact
-        return len(valid_contacts) > 0
+        return check_collision(prims=self, prims_check=prims, step_physics=False)
 
     def get_dof_index(self, dof_name: str) -> int:
         """[summary]
