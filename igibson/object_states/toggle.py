@@ -37,9 +37,6 @@ class ToggledOn(AbsoluteObjectState, BooleanState, LinkBasedStateMixin):
     def _initialize(self):
         super(ToggledOn, self)._initialize()
         if self.initialize_link_mixin():
-            # Import at runtime to prevent circular imports
-
-            # TODO: Create mesh, NOT a primitive object!
             mesh_prim_path = f"{self.link.prim_path}/visual_marker"
             mesh = create_primitive_mesh(
                 prim_path=mesh_prim_path,
