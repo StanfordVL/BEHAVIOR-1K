@@ -155,10 +155,24 @@ class Registry(UniquelyNamed):
         Args:
             obj (any): Instance to remove from this registry
         """
-        for k in self.unique_keys:
-            self.get_dict(k).pop(self._get_obj_attr(obj=obj, attr=k))
-        for k in self.group_keys:
-            self.get_dict(k)[self._get_obj_attr(obj=obj, attr=k)].remove(obj)
+        # Iterate over all keys
+        for k in self.all_keys:
+            # Grab the attribute from the object
+            obj_attr = self._get_obj_attr(obj=obj, attr=k)
+            # Standardize input as a list
+            obj_attr = obj_attr if \
+                isinstance(obj_attr, Iterable) and not isinstance(obj_attr, str) else [obj_attr]
+
+            # Loop over all values in this attribute and remove them from all mappings
+            for attr in obj_attr:
+                mapping = self.get_dict(k)
+                if k in self.unique_keys:
+                    # Handle unique case -- in this case, we just directly pop the value from the dictionary
+                    mapping.pop(attr)
+                else:
+                    # Not unique case
+                    # We remove a value from the resulting set
+                    mapping[attr].remove(obj)
 
     def update(self, keys=None):
         """
