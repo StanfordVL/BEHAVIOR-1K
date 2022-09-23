@@ -275,7 +275,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         :param state: state of the objects to get
         :return: a set of objects with the given state
         """
-        return self.object_registry("states", state, set())
+        return self.object_registry("states", state, set()).union(self.robot_registry("states", state, set()))
 
     def _add_object(self, obj):
         """
