@@ -1,9 +1,10 @@
 import logging
+import numpy as np
 
+import igibson as ig
 from igibson import object_states
-from igibson.objects.ycb_object import YCBObject
-from igibson.scenes.interactive_traversable_scene import InteractiveIndoorScene
-from igibson.simulator import Simulator
+from igibson.macros import gm
+from igibson.objects import PrimitiveObject
 
 
 def main(random_selection=False, headless=False, short_exec=False):
@@ -13,54 +14,68 @@ def main(random_selection=False, headless=False, short_exec=False):
     Loads also a cleaning tool that can be soaked in water and used to clean objects if moved manually
     """
     logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
-    s = Simulator(
-        mode="gui_interactive" if not headless else "headless", image_width=1280, image_height=720, device_idx=0
-    )
-    if not headless:
-        # Set a better viewing direction
-        s.viewer.initial_pos = [-0.7, 2.4, 1.1]
-        s.viewer.initial_view_direction = [0, 0.9, -0.5]
-        s.viewer.reset_viewer()
 
-    # Only load a few objects
-    load_object_categories = ["breakfast_table", "bottom_cabinet", "sink", "stove", "fridge", "window"]
-    scene = InteractiveIndoorScene(
-        "Rs_int", texture_randomization=False, object_randomization=False, load_object_categories=load_object_categories
-    )
-    s.import_scene(scene)
+    # Make sure object states are enabled
+    assert gm.ENABLE_OBJECT_STATES, f"Object states must be enabled in macros.py in order to use this demo!"
 
-    # Load a cleaning tool
-    block = YCBObject(name="036_wood_block", abilities={"soakable": {}, "cleaningTool": {}})
-    s.import_object(block)
+    # Create the scene config to load -- Rs_int with only a few object categories loaded
+    cfg = {
+        "scene": {
+            "type": "InteractiveTraversableScene",
+            "scene_model": "Rs_int",
+            "load_object_categories": ["floors", "walls", "ceilings", "breakfast_table", "bottom_cabinet", "sink", "stove", "fridge", "window"],
+        }
+    }
+
+    env = ig.Environment(configs=cfg, action_timestep=1/60., physics_timestep=1/60.)
+
+    # Load a cleaning tool (a block with the ability to be soaked and is a cleaning tool)
+    block = PrimitiveObject(
+        prim_path="/World/block",
+        name="block",
+        primitive_type="Cube",
+        scale=[0.15, 0.1, 0.03],
+        rgba=[0.5, 1.0, 1.0, 1.0],
+        abilities={"soakable": {}, "cleaningTool": {}},
+    )
+    ig.sim.import_object(block)
     block.set_position([-1.4, 3.0, 1.5])
 
     # Set everything that can go dirty and activate the water sources
-    stateful_objects = set(
-        scene.get_objects_with_state(object_states.Dusty)
-        + scene.get_objects_with_state(object_states.Stained)
-        + scene.get_objects_with_state(object_states.WaterSource)
-    )
-    for obj in stateful_objects:
-        if object_states.Dusty in obj.states:
-            logging.info("Setting object to be Dusty")
-            obj.states[object_states.Dusty].set_value(True)
+    dusty_objects = env.scene.get_objects_with_state(object_states.Dusty)
+    stained_objects = env.scene.get_objects_with_state(object_states.Stained)
+    water_source_objects = env.scene.get_objects_with_state(object_states.WaterSource)
 
-        if object_states.Stained in obj.states:
-            logging.info("Setting object to be Stained")
-            obj.states[object_states.Stained].set_value(True)
+    for obj in dusty_objects:
+        logging.info(f"Setting object {obj.name} to be Dusty")
+        obj.states[object_states.Dusty].set_value(True)
 
-        if object_states.WaterSource in obj.states and object_states.ToggledOn in obj.states:
-            logging.info("Setting water source object to be ToggledOn")
+    for obj in stained_objects:
+        logging.info(f"Setting object {obj.name} to be Stained")
+        obj.states[object_states.Stained].set_value(True)
+
+    for obj in water_source_objects:
+        if object_states.ToggledOn in obj.states:
+            logging.info(f"Setting water source object {obj} to be ToggledOn")
             obj.states[object_states.ToggledOn].set_value(True)
+
+    # Set the camera to be in a good position
+    ig.sim.viewer_camera.set_position_orientation(
+        position=np.array([-0.825556,  2.42499 ,  1.04104 ]),
+        orientation=np.array([0.56919735, 0.09896035, 0.13981109, 0.80416049]),
+    )
 
     max_steps = -1 if not short_exec else 1000
     step = 0
     try:
+        for i in range(200):
+            env.step(np.array([]))
         while step != max_steps:
-            s.step()
+            env.step(np.array([]))      # Empty action since no robots in the environment
             step += 1
     finally:
-        s.disconnect()
+        # Always close environment at the end
+        env.close()
 
 
 if __name__ == "__main__":
