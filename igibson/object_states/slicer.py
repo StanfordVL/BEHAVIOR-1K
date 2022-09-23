@@ -9,7 +9,7 @@ from omni.isaac.utils._isaac_utils import math as math_utils
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
-m.SLICER_LINK_NAME = "slicer"
+m.SLICER_LINK_NAME = "slicer_link"
 
 
 class Slicer(AbsoluteObjectState, LinkBasedStateMixin):
