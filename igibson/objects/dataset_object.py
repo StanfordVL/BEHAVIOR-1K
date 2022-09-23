@@ -246,9 +246,13 @@ class DatasetObject(USDObject):
         """
         if self.orientations is None:
             raise ValueError("No orientation probabilities set")
-        probabilities = [o["prob"] for o in self.orientations.values()]
-        probabilities = np.array(probabilities) / np.sum(probabilities)
-        chosen_orientation = np.array(np.random.choice(list(self.orientations.values()), p=probabilities)["rotation"])
+        if len(self.orientations) == 0:
+            # Set default value
+            chosen_orientation = np.array([0, 0, 0, 1.0])
+        else:
+            probabilities = [o["prob"] for o in self.orientations.values()]
+            probabilities = np.array(probabilities) / np.sum(probabilities)
+            chosen_orientation = np.array(np.random.choice(list(self.orientations.values()), p=probabilities)["rotation"])
 
         # Randomize yaw from -pi to pi
         rot_num = np.random.uniform(-1, 1)
