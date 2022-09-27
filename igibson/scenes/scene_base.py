@@ -247,8 +247,8 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             name="robot_registry",
             class_types=BaseRobot,
             default_key="name",
-            unique_keys=None,
-            group_keys=["model_name"],
+            unique_keys=self.object_registry_unique_keys,
+            group_keys=["model_name"] + self.object_registry_group_keys,
         ))
 
         return registry
