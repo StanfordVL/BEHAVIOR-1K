@@ -1,22 +1,18 @@
-import os
 from collections import OrderedDict
-
-import math
 import numpy as np
 import time
+import gym
 
 from igibson import app
 from igibson.sensors.sensor_base import BaseSensor
-from igibson.utils.constants import MAX_CLASS_COUNT, MAX_INSTANCE_COUNT
+from igibson.utils.constants import MAX_CLASS_COUNT, MAX_INSTANCE_COUNT, MAX_VIEWER_SIZE, VALID_OMNI_CHARS
 from igibson.utils.python_utils import assert_valid_key, classproperty
-from igibson.utils.usd_utils import get_camera_params, get_semantic_objects_pose
+from igibson.utils.usd_utils import get_camera_params
 from igibson.utils.transform_utils import euler2quat, quat2euler
 
 import carb
 from omni.isaac.core.utils.stage import get_current_stage
 from pxr import Gf, UsdGeom
-
-# Import viewport getter based on isaacsim version
 from omni.kit.viewport_legacy import acquire_viewport_interface
 
 # Make sure synthetic data extension is enabled
@@ -41,7 +37,6 @@ class VisionSensor(BaseSensor):
         - 2D Bounding boxes (tight, loose)
         - 3D Bounding boxes
         - Camera state
-        - Pose of objects with a semantic label
 
     Args:
         prim_path (str): prim path of the Prim to encapsulate or create.
@@ -50,7 +45,7 @@ class VisionSensor(BaseSensor):
             to all modalities being used. Otherwise, valid options should be part of cls.all_modalities.
             For this vision sensor, this includes any of:
                 {rgb, depth, depth_linear, normal, seg_semantic, seg_instance, flow, bbox_2d_tight,
-                bbox_2d_loose, bbox_3d, camera, pose}
+                bbox_2d_loose, bbox_3d, camera}
         enabled (bool): Whether this sensor should be enabled by default
         noise (None or BaseSensorNoise): If specified, sensor noise model to apply to this sensor.
         load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
@@ -72,7 +67,6 @@ class VisionSensor(BaseSensor):
         bbox_2d_loose=sensors_util.get_bounding_box_2d_loose,
         bbox_3d=sensors_util.get_bounding_box_3d,
         camera=get_camera_params,
-        pose=get_semantic_objects_pose,
     )
 
     # Define raw sensor types
@@ -195,12 +189,11 @@ class VisionSensor(BaseSensor):
         # Process each sensor modality individually
         for modality in self.modalities:
             mod_kwargs = dict()
-            if modality not in {"pose"}:
-                mod_kwargs["viewport"] = self._viewport
-                if modality == "seg_instance":
-                    mod_kwargs.update({"parsed": True, "return_mapping": True})
-                elif modality == "bbox_3d":
-                    mod_kwargs.update({"parsed": True, "return_corners": True})
+            mod_kwargs["viewport"] = self._viewport
+            if modality == "seg_instance":
+                mod_kwargs.update({"parsed": True, "return_mapping": True})
+            elif modality == "bbox_3d":
+                mod_kwargs.update({"parsed": True, "return_corners": True})
             obs[modality] = self._SENSOR_HELPERS[modality](**mod_kwargs)
 
         return obs
@@ -221,22 +214,6 @@ class VisionSensor(BaseSensor):
         xform_translate_op = self.get_attribute("xformOp:translate")
         xform_orient_op = self.get_attribute("xformOp:rotateXYZ")
         return np.array(xform_translate_op), euler2quat(np.array(xform_orient_op))
-
-    # def set_local_pose(self, translation=None, orientation=None):
-    #     # We have to overwrite this because camera prims can't set their quat for some reason ):
-    #     properties = self.prim.GetPropertyNames()
-    #     if translation is not None:
-    #         translation = Gf.Vec3d(*translation.tolist())
-    #         if "xformOp:translate" not in properties:
-    #             carb.log_error(
-    #                 "Translate property needs to be set for {} before setting its position".format(self.name)
-    #             )
-    #         self.set_attribute("xformOp:translate", translation)
-    #     if orientation is not None:
-    #         xform_op = self._prim.GetAttribute("xformOp:rotateXYZ")
-    #         # Convert to euler and set
-    #         rot_euler = quat2euler(quat=orientation)
-    #         xform_op.Set(Gf.Vec3f(*rot_euler.tolist()))
 
     def set_window_position(self, x, y):
         """Set the position of the viewport window.
@@ -383,14 +360,51 @@ class VisionSensor(BaseSensor):
 
     @property
     def _obs_space_mapping(self):
-        # Make sure bbox obs aren't being used, since they are variable in size!
-        for modality in {"bbox_2d_tight", "bbox_2d_loose", "bbox_3d", "camera", "pose"}:
-            assert modality not in self._modalities, \
-                f"Cannot use bounding box, camera, or pose modalities for observation space " \
-                f"because it is variable in size!"
+        # Generate the complex space types for special modalities:
+        # {"bbox_2d_tight", "bbox_2d_loose", "bbox_3d", "camera"}
+        bbox_3d_space = gym.spaces.Sequence(space=gym.spaces.Tuple((
+            gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=int),  # uniqueId
+            gym.spaces.Text(min_length=1, max_length=50, charset=VALID_OMNI_CHARS),  # name
+            gym.spaces.Text(min_length=1, max_length=50, charset=VALID_OMNI_CHARS),  # semanticLabel
+            gym.spaces.Text(min_length=0, max_length=50, charset=VALID_OMNI_CHARS),  # metadata
+            gym.spaces.Sequence(space=gym.spaces.Box(low=0, high=MAX_INSTANCE_COUNT, shape=(), dtype=np.uint)),   # instanceIds
+            gym.spaces.Box(low=0, high=MAX_CLASS_COUNT, shape=(), dtype=np.uint),  # semanticId
+            gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=float), # x_min
+            gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=float), # y_min
+            gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=float), # z_min
+            gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=float), # x_max
+            gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=float), # y_max
+            gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=float), # z_max
+            gym.spaces.Box(low=-np.inf, high=np.inf, shape=(4, 4), dtype=float), # transform
+            gym.spaces.Box(low=-np.inf, high=np.inf, shape=(8, 3), dtype=float), # corners
+        )))
 
-        # Set the remaining modalities' values
-        # (shape, low, high)
+        bbox_2d_space = gym.spaces.Sequence(space=gym.spaces.Tuple((
+            gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=int),  # uniqueId
+            gym.spaces.Text(min_length=1, max_length=50, charset=VALID_OMNI_CHARS),  # name
+            gym.spaces.Text(min_length=1, max_length=50, charset=VALID_OMNI_CHARS),  # semanticLabel
+            gym.spaces.Text(min_length=0, max_length=50, charset=VALID_OMNI_CHARS),  # metadata
+            gym.spaces.Sequence(space=gym.spaces.Box(low=0, high=MAX_INSTANCE_COUNT, shape=(), dtype=np.uint)), # instanceIds
+            gym.spaces.Box(low=0, high=MAX_CLASS_COUNT, shape=(), dtype=np.uint),  # semanticId
+            gym.spaces.Box(low=0, high=MAX_VIEWER_SIZE, shape=(), dtype=int),  # x_min
+            gym.spaces.Box(low=0, high=MAX_VIEWER_SIZE, shape=(), dtype=int),  # y_min
+            gym.spaces.Box(low=0, high=MAX_VIEWER_SIZE, shape=(), dtype=int),  # x_max
+            gym.spaces.Box(low=0, high=MAX_VIEWER_SIZE, shape=(), dtype=int),  # y_max
+        )))
+
+        camera_space = gym.spaces.Dict(OrderedDict(
+            pose=gym.spaces.Box(low=-np.inf, high=np.inf, shape=(4, 4), dtype=float),
+            fov=gym.spaces.Box(low=0, high=np.inf, shape=(), dtype=float),
+            focal_length=gym.spaces.Box(low=0, high=np.inf, shape=(), dtype=float),
+            horizontal_aperature=gym.spaces.Box(low=0, high=np.inf, shape=(), dtype=float),
+            view_projection_matrix=gym.spaces.Box(low=-np.inf, high=np.inf, shape=(4, 4), dtype=float),
+            resolution=gym.spaces.Dict(OrderedDict(
+                width=gym.spaces.Box(low=1, high=MAX_VIEWER_SIZE, shape=(), dtype=np.uint),
+                height=gym.spaces.Box(low=1, high=MAX_VIEWER_SIZE, shape=(), dtype=np.uint),
+            )),
+            clipping_range=gym.spaces.Box(low=0, high=np.inf, shape=(2,), dtype=float),
+        ))
+
         obs_space_mapping = OrderedDict(
             rgb=((self.image_height, self.image_width, 4), 0, 255, np.uint8),
             depth=((self.image_height, self.image_width, 1), 0.0, 1.0, np.float32),
@@ -399,6 +413,10 @@ class VisionSensor(BaseSensor):
             seg_semantic=((self.image_height, self.image_width), 0.0, np.inf, np.float32),
             seg_instance=((self.image_height, self.image_width), 0.0, np.inf, np.float32),
             flow=((self.image_height, self.image_width, 3), -np.inf, np.inf, np.float32),
+            bbox_2d_tight=bbox_2d_space,
+            bbox_2d_loose=bbox_2d_space,
+            bbox_3d=bbox_3d_space,
+            camera=camera_space,
         )
 
         return obs_space_mapping
@@ -409,5 +427,5 @@ class VisionSensor(BaseSensor):
 
     @classproperty
     def no_noise_modalities(cls):
-        # bounding boxes, camera state, and pose should not have noise
-        return {"bbox_2d_tight", "bbox_2d_loose", "bbox_3d", "camera", "pose"}
+        # bounding boxes and camera state should not have noise
+        return {"bbox_2d_tight", "bbox_2d_loose", "bbox_3d", "camera"}

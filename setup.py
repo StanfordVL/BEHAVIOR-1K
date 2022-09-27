@@ -21,7 +21,7 @@ setup(
     zip_safe=False,
     packages=find_packages(),
     install_requires=[
-        "gym>=0.23",
+        "gym>=0.26",
         "numpy>=1.16.0",
         "GitPython",
         # "scipy>=1.4",

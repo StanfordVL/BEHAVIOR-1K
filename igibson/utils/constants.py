@@ -11,6 +11,7 @@ from igibson.utils.asset_utils import get_ig_avg_category_specs
 
 MAX_INSTANCE_COUNT = 1024
 MAX_CLASS_COUNT = 512
+MAX_VIEWER_SIZE = 2048
 
 
 class ViewerMode(IntEnum):
@@ -37,6 +38,11 @@ class SemanticClass(IntEnum):
     WATER = 509
     HEAT_SOURCE_MARKER = 510
     TOGGLE_MARKER = 511
+
+
+# Valid omni characters for specifying strings, e.g. prim paths
+VALID_OMNI_CHARS = frozenset({'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '_', '/'})
+
 
 
 # Note that we are starting this from bit 6 since bullet seems to be giving special meaning to groups 0-5.
