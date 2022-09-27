@@ -1,83 +1,92 @@
-import itertools
 import logging
-import os
+import matplotlib.pyplot as plt
 
 import numpy as np
-
-import trimesh
-from scipy.spatial.transform import Rotation
-
-import igibson
-from igibson.objects.usd_object import URDFObject
-from igibson.scenes.empty_scene import EmptyScene
-from igibson.simulator import Simulator
-import igibson.utils.transform_utils as T
+import igibson as ig
+from igibson.objects import DatasetObject
+from omni.isaac.synthetic_utils.visualization import colorize_bboxes
 
 
 def main(random_selection=False, headless=False, short_exec=False):
     """
     Shows how to obtain the bounding box of an articulated object.
-    Draws the bounding box around the loaded object, a cabinet, while it moves.
-    Visible only in the pybullet GUI.
+    Draws the bounding box around the loaded object, a cabinet, and writes the visualized image to disk at the
+    current directory named 'bbox_2d_[loose / tight]_img.png'.
+
+    NOTE: In the GUI, bounding boxes can be natively viewed by clicking on the sensor ((*)) icon at the top,
+    and then selecting the appropriate bounding box modalities, and clicking "Show". See:
+
+    https://docs.omniverse.nvidia.com/prod_extensions/prod_extensions/ext_replicator/visualization.html#the-visualizer
     """
     logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
-    s = Simulator(mode="headless", use_pb_gui=True if not headless else False)
-    scene = EmptyScene(floor_plane_rgba=[0.6, 0.6, 0.6, 1])
-    s.import_scene(scene)
 
-    # Banana is a single-link object and Door is a multi-link object.
-    banana_dir = os.path.join(igibson.ig_dataset_path, "objects/banana/09_0")
-    banana_filename = os.path.join(banana_dir, "09_0.urdf")
-    door_dir = os.path.join(igibson.ig_dataset_path, "objects/door/8930")
-    door_filename = os.path.join(door_dir, "8930.urdf")
+    # Create the scene config to load -- empty scene
+    cfg = {
+        "scene": {
+            "type": "EmptyScene",
+        }
+    }
 
-    banana = URDFObject(
-        filename=banana_filename, category="banana", scale=np.array([3.0, 5.0, 2.0]), merge_fixed_links=False
+    # Create the environment
+    env = ig.Environment(configs=cfg, action_timestep=1/60., physics_timestep=1/60.)
+
+    # Set camera to appropriate viewing pose
+    cam = ig.sim.viewer_camera
+    cam.set_position_orientation(
+        position=np.array([-4.62785 , -0.418575,  0.933943]),
+        orientation=np.array([ 0.52196595, -0.4231939 , -0.46640436,  0.5752612 ]),
     )
-    door = URDFObject(filename=door_filename, category="door", scale=np.array([1.0, 2.0, 3.0]), merge_fixed_links=False)
-    s.import_object(banana)
-    s.import_object(door)
-    banana.set_position_orientation([2, 0, 0.75], [0, 0, 0, 1])
-    door.set_position_orientation([-2, 0, 2], Rotation.from_euler("XYZ", [0, 0, -np.pi / 4]).as_quat())
 
-    # Main simulation loop
-    try:
-        steps = 0
-        max_steps = -1 if not short_exec else 1000
+    # Add bounding boxes to camera sensor
+    bbox_modalities = ["bbox_3d", "bbox_2d_loose", "bbox_2d_tight"]
+    for bbox_modality in bbox_modalities:
+        cam.add_modality(bbox_modality)
 
-        # Main recording loop
-        while steps != max_steps:
-            # Step simulation.
-            s.step()
+    # Add banana and door objects
+    banana = DatasetObject(
+        prim_path=f"/World/banana",
+        name="banana",
+        category="banana",
+        model="09_0",
+        scale=[3.0, 5.0, 2.0],
+    )
+    ig.sim.import_object(banana)
+    banana.set_position_orientation(
+        position=np.array([-0.906661, -0.545106,  0.136824]),
+        orientation=np.array([0, 0, 0.76040583, -0.6494482 ]),
+    )
 
-            line_idx = 0
-            for obj in [banana, door]:
-                # Draw new debug lines for the bounding boxes.
-                bbox_center, bbox_orn, bbox_bf_extent, bbox_wf_extent = obj.get_base_aligned_bbox(visual=True)
-                bbox_frame_vertex_positions = np.array(list(itertools.product((1, -1), repeat=3))) * (
-                    bbox_bf_extent / 2
-                )
-                bbox_transform = T.pose2mat((bbox_center, bbox_orn))
-                world_frame_vertex_positions = trimesh.transformations.transform_points(
-                    bbox_frame_vertex_positions, bbox_transform
-                )
-                for i, from_vertex in enumerate(world_frame_vertex_positions):
-                    for j, to_vertex in enumerate(world_frame_vertex_positions):
-                        if j <= i:
-                            ret_val = p.addUserDebugLine(
-                                from_vertex,
-                                to_vertex,
-                                lineColorRGB=[1.0, 0.0, 0.0],
-                                lineWidth=1,
-                                lifeTime=0,
-                                replaceItemUniqueId=-1 if steps == 0 else line_idx,
-                            )
-                            if not headless:
-                                assert ret_val == line_idx
-                            line_idx += 1
-            steps += 1
-    finally:
-        s.disconnect()
+    door = DatasetObject(
+        prim_path=f"/World/door",
+        name="door",
+        category="door",
+        model="8930",
+    )
+    ig.sim.import_object(door)
+    door.set_position_orientation(
+        position=np.array([-2.0, 0, 0.70000001]),
+        orientation=np.array([0, 0, -0.38268343,  0.92387953]),
+    )
+
+    # Take a few steps to let objects settle
+    for i in range(100):
+        env.step(np.array([]))
+
+    # Grab observations from viewer camera and write them to disk
+    obs = cam.get_obs()
+
+    for bbox_modality in bbox_modalities:
+        # Print out each of the modalities
+        print(f"Observation modality {bbox_modality}:")
+        print(obs[bbox_modality])
+
+        # Also write the 2d loose bounding box to disk
+        if "3d" not in bbox_modality:
+            colorized_img = colorize_bboxes(bboxes_2d_data=obs[bbox_modality], bboxes_2d_rgb=obs["rgb"], num_channels=4)
+            plt.imsave(f"{bbox_modality}_img.png", colorized_img)
+
+    # Always close environment down at end
+    env.close()
 
 
 if __name__ == "__main__":
