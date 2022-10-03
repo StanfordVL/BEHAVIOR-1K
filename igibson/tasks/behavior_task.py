@@ -179,7 +179,7 @@ class BehaviorTask(BaseTask):
             for obj_name, obj in self.object_scope.items():
                 if isinstance(obj, BaseRobot) or isinstance(obj, RoomFloor):
                     continue
-                obj.highlight()
+                obj.highlighted = True
 
     def _load_non_low_dim_observation_space(self):
         # No non-low dim observations so we return an empty dict

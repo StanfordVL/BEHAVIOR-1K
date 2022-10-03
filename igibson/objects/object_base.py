@@ -2,10 +2,7 @@ from abc import ABCMeta, abstractmethod
 from collections import Iterable, OrderedDict
 import logging
 
-import numpy as np
-
-from future.utils import with_metaclass
-
+from igibson.macros import create_module_macros
 from igibson.utils.constants import (
     ALL_COLLISION_GROUPS_MASK,
     DEFAULT_COLLISION_GROUP,
@@ -17,6 +14,16 @@ from igibson.utils.usd_utils import get_prim_nested_children, create_joint, Coll
 from igibson.prims.entity_prim import EntityPrim
 from igibson.prims.xform_prim import XFormPrim
 from igibson.utils.constants import PrimType, CLASS_NAME_TO_CLASS_ID
+
+from omni.isaac.core.utils.semantics import add_update_semantics
+from pxr import Gf
+
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
+
+# Settings for highlighting objects
+m.HIGHLIGHT_RGB = [1.0, 0.1, 0.92]          # Default highlighting (R,G,B) color when highlighting objects
+m.HIGHLIGHT_INTENSITY = 10000.0             # Highlight intensity to apply, range [0, 10000)
 
 
 class BaseObject(EntityPrim, metaclass=ABCMeta):
@@ -96,13 +103,14 @@ class BaseObject(EntityPrim, metaclass=ABCMeta):
             class_id = CLASS_NAME_TO_CLASS_ID.get(category, SemanticClass.USER_ADDED_OBJS)
 
         self.class_id = class_id
-        self.renderer_instances = []
         self.rendering_params = rendering_params
         # self._rendering_params = dict(self.DEFAULT_RENDERING_PARAMS)
         # self._rendering_params.update(category_based_rendering_params)
 
         # Values to be created at runtime
         self._simulator = None
+        self._highlight_cached_values = None
+        self._highlighted = None
 
         # Create load config from inputs
         load_config = dict() if load_config is None else load_config
@@ -180,6 +188,31 @@ class BaseObject(EntityPrim, metaclass=ABCMeta):
             create_if_not_exist=True,
         )
 
+        # Update semantics
+        add_update_semantics(
+            prim=self._prim,
+            semantic_label=self.category,
+            type_label="class",
+        )
+
+        # Iterate over all links and grab their relevant shader info for highlighting (i.e.: emissivity info)
+        self._highlighted = False
+        self._highlight_cached_values = OrderedDict()
+        materials = set()
+        for link in self._links.values():
+            xforms = [link] + list(link.visual_meshes.values())
+            for xform in xforms:
+                if xform.has_material():
+                    # Only keep non-redundant materials
+                    mat_path = xform.material.prim_path
+                    if mat_path not in materials:
+                        materials.add(mat_path)
+                        self._highlight_cached_values[mat_path] = {
+                            "enable_emission": xform.material.enable_emission,
+                            "emissive_color": xform.material.emissive_color,
+                            "emissive_intensity": xform.material.emissive_intensity,
+                        }
+
     @property
     def articulation_root_path(self):
         # We override this because omniverse is buggy ):
@@ -227,6 +260,50 @@ class BaseObject(EntityPrim, metaclass=ABCMeta):
     def link_prim_paths(self):
         return [link.prim_path for link in self._links.values()]
 
+    @property
+    def highlighted(self):
+        """
+        Returns:
+            bool: Whether the object is highlighted or not
+        """
+        return self._highlighted
+
+    @highlighted.setter
+    def highlighted(self, enabled):
+        """
+        Iterates over all owned links, and modifies their shaders with emissive colors so that the object is
+        highlighted (magenta by default)
+
+        Args:
+            enabled (bool): whether the object should be highlighted or not
+        """
+        # Return early if the set value matches the internal value
+        if enabled == self._highlighted:
+            return
+
+        materials = set()
+        for link_name, link in self._links.items():
+            xforms = [link] + list(link.visual_meshes.values())
+            for xform in xforms:
+                if xform.has_material():
+                    # Only save / modify non-redundant materials
+                    mat_path = xform.material.prim_path
+                    if mat_path not in materials:
+                        materials.add(mat_path)
+                        if enabled:
+                            # Store values before swapping
+                            self._highlight_cached_values[mat_path] = {
+                                "enable_emission": xform.material.enable_emission,
+                                "emissive_color": xform.material.emissive_color,
+                                "emissive_intensity": xform.material.emissive_intensity,
+                            }
+                        xform.material.enable_emission = True if enabled else self._highlight_cached_values[mat_path]["enable_emission"]
+                        xform.material.emissive_color = m.HIGHLIGHT_RGB if enabled else self._highlight_cached_values[mat_path]["emissive_color"]
+                        xform.material.emissive_intensity = m.HIGHLIGHT_INTENSITY if enabled else self._highlight_cached_values[mat_path]["emissive_intensity"]
+
+        # Update internal value
+        self._highlighted = enabled
+
     def get_velocities(self):
         """Get this object's root body velocity in the format of Tuple[Array[vx, vy, vz], Array[wx, wy, wz]]"""
         return self.get_linear_velocity(), self.get_angular_velocity()
@@ -237,40 +314,6 @@ class BaseObject(EntityPrim, metaclass=ABCMeta):
 
         self.set_linear_velocity(velocity=lin_vel)
         self.set_angular_velocity(velocity=ang_vel)
-
-    # def set_joint_states(self, joint_states):
-    #     """Set object joint states in the format of Dict[String: (q, q_dot)]]"""
-    #     # Make sure this object is articulated
-    #     assert self._n_dof > 0, "Can only set joint states for objects that have > 0 DOF!"
-    #     pos = np.zeros(self._n_dof)
-    #     vel = np.zeros(self._n_dof)
-    #     for i, joint_name in enumerate(self._dofs_infos.keys()):
-    #         pos[i], vel[i] = joint_states[joint_name]
-    #
-    #     # Set the joint positions and velocities
-    #     self.set_joint_positions(positions=pos)
-    #     self.set_joint_velocities(velocities=vel)
-    #
-    # def get_joint_states(self):
-    #     """Get object joint states in the format of Dict[String: (q, q_dot)]]"""
-    #     # Make sure this object is articulated
-    #     assert self._n_dof > 0, "Can only get joint states for objects that have > 0 DOF!"
-    #     pos = self.get_joint_positions()
-    #     vel = self.get_joint_velocities()
-    #     joint_states = dict()
-    #     for i, joint_name in enumerate(self._dofs_infos.keys()):
-    #         joint_states[joint_name] = (pos[i], vel[i])
-    #
-    #     return joint_states
-
-    # TODO
-    def highlight(self):
-        for instance in self.renderer_instances:
-            instance.set_highlight(True)
-
-    def unhighlight(self):
-        for instance in self.renderer_instances:
-            instance.set_highlight(False)
 
     def dump_config(self):
         """
