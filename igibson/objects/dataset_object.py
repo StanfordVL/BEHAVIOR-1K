@@ -738,7 +738,7 @@ class DatasetObject(USDObject):
 
         return scales
 
-    def get_base_aligned_bbox(self, link_name=None, visual=False, xy_aligned=False, fallback_to_aabb=False):
+    def get_base_aligned_bbox(self, link_name=None, visual=False, xy_aligned=False, fallback_to_aabb=True):
         """
         Get a bounding box for this object that's axis-aligned in the object's base frame.
 
