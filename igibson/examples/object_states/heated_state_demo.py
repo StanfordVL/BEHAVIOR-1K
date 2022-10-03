@@ -13,7 +13,6 @@ def main():
     cfg = {
         "scene": {
             "type": "EmptyScene",
-            "floor_plane_visible": True,
         }
     }
 
