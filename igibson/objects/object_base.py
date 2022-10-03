@@ -156,7 +156,7 @@ class BaseObject(EntityPrim, metaclass=ABCMeta):
             create_joint(
                 prim_path=f"{self._prim_path}/rootJoint",
                 joint_type="FixedJoint",
-                body1=f"{self._prim_path}/base_link",
+                body1=f"{self._prim_path}/{self._root_link_name}",
             )
         else:
             if self._prim.HasAPI(UsdPhysics.ArticulationRootAPI):
