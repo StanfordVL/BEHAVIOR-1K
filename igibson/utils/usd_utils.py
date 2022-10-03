@@ -518,7 +518,7 @@ def update_shader_asset_paths(shader):
     # Update the material paths so that it's correct wrt to the local machine / directory setup that
     # this prim and USD is being loaded on
     for inp in shader.GetInputs():
-        if inp.GetTypeName().cppTypeName == "SdfAssetPath":
+        if inp.GetTypeName().cppTypeName == "SdfAssetPath" and inp.Get() is not None:
             original_path = inp.Get().path if inp.Get().resolvedPath == "" else inp.Get().resolvedPath
             # Only update the path if it's not the same root path
             if ig_dataset_path not in original_path and assets_path not in original_path:
