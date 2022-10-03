@@ -111,6 +111,8 @@ def sample_kinematics(
         # original position might be blocking rays (use_ray_casting_method=True)
         old_pos = np.array([200, 200, 200])
         objA.set_position_orientation(old_pos, orientation)
+        # We also need to step physics to make sure the pose propagates downstream (e.g.: to Bounding Box computations)
+        ig.sim.step_physics()
 
         if sample_on_floor:
             # Run import here to avoid circular imports
