@@ -407,8 +407,8 @@ class VisionSensor(BaseSensor):
 
         obs_space_mapping = OrderedDict(
             rgb=((self.image_height, self.image_width, 4), 0, 255, np.uint8),
-            depth=((self.image_height, self.image_width, 1), 0.0, 1.0, np.float32),
-            depth_linear=((self.image_height, self.image_width, 1), 0.0, np.inf, np.float32),
+            depth=((self.image_height, self.image_width), 0.0, 1.0, np.float32),
+            depth_linear=((self.image_height, self.image_width), 0.0, np.inf, np.float32),
             normal=((self.image_height, self.image_width, 3), -1.0, 1.0, np.float32),
             seg_semantic=((self.image_height, self.image_width), 0.0, np.inf, np.float32),
             seg_instance=((self.image_height, self.image_width), 0.0, np.inf, np.float32),
