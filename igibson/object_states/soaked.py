@@ -9,10 +9,7 @@ from igibson.utils.python_utils import assert_valid_key
 from igibson.utils.constants import PrimType
 from omni.usd import get_shader_from_material
 from pxr import Sdf
-
-
-if gm.ENABLE_OMNI_PARTICLES:
-    from igibson.systems import SYSTEMS_REGISTRY
+from igibson.systems import SYSTEMS_REGISTRY
 
 
 # Create settings for this module

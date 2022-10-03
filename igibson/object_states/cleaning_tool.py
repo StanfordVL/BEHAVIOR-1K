@@ -8,8 +8,7 @@ from igibson.object_states.soaked import Soaked
 from igibson.object_states.toggle import ToggledOn
 from igibson.utils.usd_utils import BoundingBoxAPI
 from igibson.systems.macro_particle_system import MacroParticleSystem, StainSystem
-if gm.ENABLE_OMNI_PARTICLES:
-    from igibson.systems.micro_particle_system import WaterSystem
+from igibson.systems.micro_particle_system import WaterSystem
 
 
 # Create settings for this module

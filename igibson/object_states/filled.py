@@ -5,10 +5,7 @@ from igibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from igibson.object_states.object_state_base import RelativeObjectState, BooleanState
 import igibson.utils.transform_utils as T
 from igibson.utils.usd_utils import mesh_prim_to_trimesh_mesh
-
-
-if gm.ENABLE_OMNI_PARTICLES:
-    from igibson.systems import get_fluid_systems, get_system_from_element_name, get_element_name_from_system
+from igibson.systems import get_fluid_systems, get_system_from_element_name, get_element_name_from_system
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
