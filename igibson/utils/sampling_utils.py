@@ -340,6 +340,9 @@ def sample_cuboid_on_object(
     half_extent_with_offset = (bbox_bf_extent / 2) + aabb_offset
 
     cuboid_dimensions = np.array(cuboid_dimensions)
+    if np.any(cuboid_dimensions > 50.0):
+        print("WARNING: Trying to sample for a very large cuboid (at least one dimensions > 50)."
+              "This will take a prohibitively large amount of time!")
     assert cuboid_dimensions.ndim <= 2
     assert cuboid_dimensions.shape[-1] == 3, "Cuboid dimensions need to contain all three dimensions."
     if cuboid_dimensions.ndim == 2:
