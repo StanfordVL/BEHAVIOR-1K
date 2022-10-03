@@ -7,6 +7,8 @@ from pxr import Gf, Usd, Sdf, Vt, UsdGeom, UsdPhysics, PhysxSchema, UsdShade
 from omni.isaac.core.utils.prims import get_prim_at_path
 from igibson.utils.constants import PrimType, PRIMITIVE_MESH_TYPES
 from igibson.utils.usd_utils import create_primitive_mesh
+from igibson.utils.render_utils import create_pbr_material
+from igibson.utils.physx_utils import bind_material
 import omni
 import carb
 
@@ -155,6 +157,12 @@ class PrimitiveObject(StatefulObject):
         # Set extents at default value of 1 (this value may be modified if size, radius, or height are changed)
         self._extents = np.ones(3)
 
+        # Create a material for this object for the base link
+        stage.DefinePrim(f"{self._prim_path}/Looks", "Scope")
+        mat_path = f"{self._prim_path}/Looks/default"
+        mat = create_pbr_material(prim_path=mat_path)
+        bind_material(prim_path=self._vis_geom.GetPrim().GetPrimPath().pathString, material_path=mat_path)
+
         return prim
 
     def _post_load(self):
@@ -165,6 +173,8 @@ class PrimitiveObject(StatefulObject):
             visual_geom_prim = list(self.links["base_link"].visual_meshes.values())[0]
         elif self._prim_type == PrimType.CLOTH:
             visual_geom_prim = self.links["base_link"]
+        else:
+            raise ValueError("Prim type must either be PrimType.RIGID or PrimType.CLOTH for loading a primitive object")
 
         visual_geom_prim.color = self._load_config["color"]
         visual_geom_prim.opacity = self._load_config["opacity"]
