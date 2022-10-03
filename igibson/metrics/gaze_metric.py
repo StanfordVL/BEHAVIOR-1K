@@ -43,7 +43,7 @@ class GazeMetric(MetricBase):
         eye_data = log_reader.get_vr_data().query("eye_data")
         if eye_data[0]:
             if self.target_obj in s.scene.objects_by_id:
-                s.scene.objects_by_id[self.target_obj].unhighlight()
+                s.scene.objects_by_id[self.target_obj].highlighted = False
 
             origin = eye_data[1]
             direction = eye_data[2]
@@ -53,7 +53,7 @@ class GazeMetric(MetricBase):
             if self.target_obj in s.scene.objects_by_id:
                 obj = s.scene.objects_by_id[self.target_obj]
                 if obj.category not in self.disallowed_categories:
-                    obj.highlight()
+                    obj.highlighted = True
                     self.gaze_marker.set_pos(intersection[0][3])
                     self.object_gaze_time_map[obj.name] += 1
 
