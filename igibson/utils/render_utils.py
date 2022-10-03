@@ -2,8 +2,10 @@
 
 import omni
 from omni.isaac.core.utils.prims import get_prim_at_path
+import igibson as ig
 from igibson.prims import EntityPrim, RigidPrim, VisualGeomPrim
 from igibson.utils.physx_utils import bind_material
+from pxr import UsdShade
 
 
 def make_glass(prim):
@@ -42,3 +44,30 @@ def make_glass(prim):
     # Iterate over all meshes and bind the glass material to the mesh
     for vm in visual_meshes:
         bind_material(vm.prim_path, material_path=glass_prim_path)
+
+
+def create_pbr_material(prim_path):
+    """
+    Creates an omni pbr material prim at the specified @prim_path
+
+    Args:
+        prim_path (str): Prim path where the PBR material should be generated
+
+    Returns:
+        Usd.Prim: Generated PBR material prim
+    """
+    # Use DeepWater omni present for rendering water
+    mtl_created = []
+    omni.kit.commands.execute(
+        "CreateAndBindMdlMaterialFromLibrary",
+        mdl_name="OmniPBR.mdl",
+        mtl_name="OmniPBR",
+        mtl_created_list=mtl_created,
+    )
+    material_path = mtl_created[0]
+
+    # Move prim to desired location
+    omni.kit.commands.execute("MovePrim", path_from=material_path, path_to=prim_path)
+
+    # Return generated material
+    return get_prim_at_path(material_path)

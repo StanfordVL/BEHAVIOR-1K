@@ -447,7 +447,7 @@ class MicroParticleSystem(BaseParticleSystem):
             cls.prim = get_prim_at_path(cls.prim_path)
             mat = get_prim_at_path(mat_path)
             prototype_dir_prim = get_prim_at_path(prototype_path)
-            cls.particle_material = UsdShade.Material(mat) if mat else None
+            cls.particle_material = mat if mat else None
             cls.particle_prototypes = [prototype_prim for prototype_prim in prototype_dir_prim.GetChildren()]
 
             # Also need to synchronize any instancers we have
@@ -467,11 +467,11 @@ class MicroParticleSystem(BaseParticleSystem):
             cls.particle_material = cls._create_particle_material() if gm.ENABLE_HQ_RENDERING else None
             if cls.particle_material is not None:
                 # Move this material and standardize its naming scheme
-                path_from = cls.particle_material.GetPrim().GetPrimPath().pathString
+                path_from = cls.particle_material.GetPrimPath().pathString
                 mat_path = f"{cls.prim_path}/{cls.name}_material"
                 omni.kit.commands.execute("MovePrim", path_from=path_from, path_to=mat_path)
                 # Get updated reference to this material
-                cls.particle_material = UsdShade.Material(get_prim_at_path(mat_path))
+                cls.particle_material = get_prim_at_path(mat_path)
 
                 # Bind this material to our particle system
                 particleUtils.add_pbd_particle_material(simulator.stage, mat_path)
@@ -1120,7 +1120,7 @@ class WaterSystem(FluidSystem):
         particleUtils.add_pbd_particle_material(cls.simulator.stage, material_path)
 
         # Return generated material
-        return UsdShade.Material(get_prim_at_path(material_path))
+        return get_prim_at_path(material_path)
 
 
 class ClothSystem(MicroParticleSystem):

@@ -8,6 +8,8 @@ from enum import IntEnum, Enum
 
 import igibson
 from igibson.utils.asset_utils import get_ig_avg_category_specs
+from pxr import Gf
+from pxr.Sdf import ValueTypeNames as VT
 
 MAX_INSTANCE_COUNT = 1024
 MAX_CLASS_COUNT = 512
@@ -43,6 +45,55 @@ class SemanticClass(IntEnum):
 # Valid omni characters for specifying strings, e.g. prim paths
 VALID_OMNI_CHARS = frozenset({'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '_', '/'})
 
+
+# Omni shader inputs, mapped to their type and default value
+# None implies no value is set initially (e.g: for assets)
+OMNI_SHADER_INPUTS = {
+    'diffuse_color_constant': (VT.Color3f, Gf.Vec3f(0.2, 0.2, 0.2)),
+    'diffuse_texture': (VT.Asset, None),
+    'albedo_desaturation': (VT.Float, 0.0),
+    'albedo_add': (VT.Float, 0.0),
+    'albedo_brightness': (VT.Float, 1.0),
+    'diffuse_tint': (VT.Color3f, Gf.Vec3f(1.0, 1.0, 1.0)),
+    'reflection_roughness_constant': (VT.Float, 0.5),
+    'reflection_roughness_texture_influence': (VT.Float, 0.0),
+    'reflectionroughness_texture': (VT.Asset, None),
+    'metallic_constant': (VT.Float, 0.0),
+    'metallic_texture_influence': (VT.Float, 0.0),
+    'metallic_texture': (VT.Asset, None),
+    'specular_level': (VT.Float, 0.5),
+    'enable_ORM_texture': (VT.Bool, False),
+    'ORM_texture': (VT.Asset, None),
+    'ao_to_diffuse': (VT.Float, 0.0),
+    'ao_texture': (VT.Asset, None),
+    'enable_emission': (VT.Bool, False),
+    'emissive_color': (VT.Color3f, Gf.Vec3f(1.0, 0.1, 0.1)),
+    'emissive_color_texture': (VT.Asset, None),
+    'emissive_mask_texture': (VT.Asset, None),
+    'emissive_intensity': (VT.Float, 40.0),
+    'enable_opacity': (VT.Bool, False),
+    'enable_opacity_texture': (VT.Bool, False),
+    'opacity_constant': (VT.Float, 1.0),
+    'opacity_texture': (VT.Asset, None),
+    'opacity_mode': (VT.Int, 1),
+    'opacity_threshold': (VT.Float, 0.0),
+    'bump_factor': (VT.Float, 1.0),
+    'normalmap_texture': (VT.Asset, None),
+    'detail_bump_factor': (VT.Float, 0.3),
+    'detail_normalmap_texture': (VT.Asset, None),
+    'flip_tangent_u': (VT.Bool, False),
+    'flip_tangent_v': (VT.Bool, True),
+    'project_uvw': (VT.Bool, False),
+    'world_or_object': (VT.Bool, False),
+    'uv_space_index': (VT.Int, 0),
+    'texture_translate': (VT.Float2, Gf.Vec2f(0.0, 0.0)),
+    'texture_rotate': (VT.Float, 0.0),
+    'texture_scale': (VT.Float2, Gf.Vec2f(1.0, 1.0)),
+    'detail_texture_translate': (VT.Float2, Gf.Vec2f(0.0, 0.0)),
+    'detail_texture_rotate': (VT.Float, 0.0),
+    'detail_texture_scale': (VT.Float2, Gf.Vec2f(1.0, 1.0)),
+    'excludeFromWhiteMode': (VT.Bool, False),
+}
 
 
 # Note that we are starting this from bit 6 since bullet seems to be giving special meaning to groups 0-5.

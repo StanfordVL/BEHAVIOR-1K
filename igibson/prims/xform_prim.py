@@ -10,7 +10,6 @@ from collections import Iterable, OrderedDict
 from typing import Optional, Tuple
 from pxr import Gf, Usd, UsdGeom, UsdShade, UsdPhysics
 from omni.isaac.core.utils.types import XFormPrimState
-from omni.isaac.core.materials import PreviewSurface, OmniGlass, OmniPBR, VisualMaterial
 from omni.isaac.core.utils.rotations import gf_quat_to_np_array
 from omni.isaac.core.utils.prims import (
     get_prim_at_path,
@@ -21,6 +20,7 @@ import numpy as np
 import carb
 from omni.isaac.core.utils.stage import get_current_stage
 from igibson.prims.prim_base import BasePrim
+from igibson.prims.material_prim import MaterialPrim
 from igibson.utils.transform_utils import quat2mat, mat2euler
 from igibson.utils.usd_utils import BoundingBoxAPI
 from scipy.spatial.transform import Rotation as R
@@ -53,8 +53,8 @@ class XFormPrim(BasePrim):
     ):
         # Other values that will be filled in at runtime
         self._default_state = None
-        self._applied_visual_material = None
         self._binding_api = None
+        self._material = None
         self._collision_filter_api = None
 
         # Run super method
@@ -88,6 +88,17 @@ class XFormPrim(BasePrim):
         # Create collision filter API
         self._collision_filter_api = UsdPhysics.FilteredPairsAPI(self._prim) if \
             self._prim.HasAPI(UsdPhysics.FilteredPairsAPI) else UsdPhysics.FilteredPairsAPI.Apply(self._prim)
+
+        # Create binding API
+        self._binding_api = UsdShade.MaterialBindingAPI(self.prim) if \
+            self._prim.HasAPI(UsdShade.MaterialBindingAPI) else UsdShade.MaterialBindingAPI.Apply(self.prim)
+
+        # Grab the attached material if it exists
+        if self.has_material():
+            self._material = MaterialPrim(
+                prim_path=self._binding_api.GetDirectBinding().GetMaterialPath().pathString,
+                name=f"{self.name}:material",
+            )
 
         # Optionally set the scale and visibility
         if "scale" in self._load_config and self._load_config["scale"] is not None:
@@ -173,7 +184,6 @@ class XFormPrim(BasePrim):
                                                           quaternion is scalar-first (w, x, y, z). shape is (4, ).
                                                           Defaults to None, which means left unchanged.
         """
-
         if position is not None:
             self._default_state.position = position
         if orientation is not None:
@@ -183,94 +193,13 @@ class XFormPrim(BasePrim):
     def update_default_state(self):
         self.set_default_state(*self.get_position_orientation())
 
-    def apply_visual_material(self, visual_material, weaker_than_descendants=False):
-        """Used to apply visual material to the held prim and optionally its descendants.
-
-        Args:
-            visual_material (VisualMaterial): visual material to be applied to the held prim. Currently supports
-                                              PreviewSurface, OmniPBR and OmniGlass.
-            weaker_than_descendants (bool, optional): True if the material shouldn't override the descendants
-                                                      materials, otherwise False. Defaults to False.
-        """
-        if self._binding_api is None:
-            if self._prim.HasAPI(UsdShade.MaterialBindingAPI):
-                self._binding_api = UsdShade.MaterialBindingAPI(self.prim)
-            else:
-                self._binding_api = UsdShade.MaterialBindingAPI.Apply(self.prim)
-        if weaker_than_descendants:
-            self._binding_api.Bind(visual_material.material, bindingStrength=UsdShade.Tokens.weakerThanDescendants)
-        else:
-            self._binding_api.Bind(visual_material.material, bindingStrength=UsdShade.Tokens.strongerThanDescendants)
-        self._applied_visual_material = visual_material
-        return
-
-    def get_applied_visual_material(self):
-        """Returns the current applied visual material in case it was applied using apply_visual_material OR
-           it's one of the following materials that was already applied before: PreviewSurface, OmniPBR and OmniGlass.
-
-        Returns:
-            VisualMaterial: the current applied visual material if its type is currently supported.
-        """
-        if self._binding_api is None:
-            if self._prim.HasAPI(UsdShade.MaterialBindingAPI):
-                self._binding_api = UsdShade.MaterialBindingAPI(self.prim)
-            else:
-                self._binding_api = UsdShade.MaterialBindingAPI.Apply(self.prim)
-        if self._applied_visual_material is not None:
-            return self._applied_visual_material
-        else:
-            visual_binding = self._binding_api.GetDirectBinding()
-            material_path = str(visual_binding.GetMaterialPath())
-            if material_path == "":
-                return None
-            else:
-                stage = get_current_stage()
-                material = UsdShade.Material(stage.GetPrimAtPath(material_path))
-                # getting the shader
-                shader_info = material.ComputeSurfaceSource()
-                if shader_info[0].GetPath() != "":
-                    shader = shader_info[0]
-                elif is_prim_path_valid(material_path + "/shader"):
-                    shader_path = material_path + "/shader"
-                    shader = UsdShade.Shader(get_prim_at_path(shader_path))
-                elif is_prim_path_valid(material_path + "/Shader"):
-                    shader_path = material_path + "/Shader"
-                    shader = UsdShade.Shader(get_prim_at_path(shader_path))
-                else:
-                    carb.log_warn("the shader on xform prim {} is not supported".format(self.prim_path))
-                    return None
-                implementation_source = shader.GetImplementationSource()
-                asset_sub_identifier = shader.GetPrim().GetAttribute("info:mdl:sourceAsset:subIdentifier").Get()
-                shader_id = shader.GetShaderId()
-                if implementation_source == "id" and shader_id == "UsdPreviewSurface":
-                    self._applied_visual_material = PreviewSurface(prim_path=material_path, shader=shader)
-                    return self._applied_visual_material
-                elif asset_sub_identifier == "OmniGlass":
-                    self._applied_visual_material = OmniGlass(prim_path=material_path, shader=shader)
-                    return self._applied_visual_material
-                elif asset_sub_identifier == "OmniPBR":
-                    self._applied_visual_material = OmniPBR(prim_path=material_path, shader=shader)
-                    return self._applied_visual_material
-                else:
-                    carb.log_warn("the shader on xform prim {} is not supported".format(self.prim_path))
-                    return None
-
-    def is_visual_material_applied(self):
+    def has_material(self):
         """
         Returns:
-            bool: True if there is a visual material applied. False otherwise.
+            bool: True if there is a visual material bound to this prim. False otherwise
         """
-        if self._binding_api is None:
-            if self._prim.HasAPI(UsdShade.MaterialBindingAPI):
-                self._binding_api = UsdShade.MaterialBindingAPI(self.prim)
-            else:
-                self._binding_api = UsdShade.MaterialBindingAPI.Apply(self.prim)
-        visual_binding = self._binding_api.GetDirectBinding()
-        material_path = str(visual_binding.GetMaterialPath())
-        if material_path == "":
-            return False
-        else:
-            return True
+        material_path = self._binding_api.GetDirectBinding().GetMaterialPath().pathString
+        return False if material_path == "" else True
 
     def set_position_orientation(self, position=None, orientation=None):
         """
@@ -483,6 +412,25 @@ class XFormPrim(BasePrim):
         """
         min_corner, max_corner = self.aabb
         return (max_corner + min_corner) / 2.0
+
+    @property
+    def material(self):
+        """
+        Returns:
+            None or MaterialPrim: The bound material to this prim, if there is one
+        """
+        return self._material
+
+    @material.setter
+    def material(self, material):
+        """
+        Set the material @material for this prim. This will also bind the material to this prim
+
+        Args:
+            material (MaterialPrim): Material to bind to this prim
+        """
+        self._binding_api.Bind(material.prim, bindingStrength=UsdShade.Tokens.weakerThanDescendants)
+        self._material = material
 
     def add_filtered_collision_pair(self, prim):
         """

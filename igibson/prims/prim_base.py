@@ -55,7 +55,6 @@ class BasePrim(Serializable, UniquelyNamed, Recreatable, ABC):
 
         # Other values that will be filled in at runtime
         self._applied_visual_material = None
-        self._binding_api = None
         self._loaded = False                                # Whether this prim exists in the stage or not
         self._initialized = False                           # Whether this prim has its internal handles / info initialized or not (occurs AFTER and INDEPENDENTLY from loading!)
         self._prim = None
