@@ -2,10 +2,8 @@
     Generate example top-down segmentation map via renderer
 """
 import logging
-
-from igibson.render.mesh_renderer.mesh_renderer_settings import MeshRendererSettings
-from igibson.scenes.interactive_traversable_scene import InteractiveIndoorScene
-from igibson.simulator import Simulator
+import numpy as np
+import igibson as ig
 
 
 def main(random_selection=False, headless=False, short_exec=False):
@@ -15,33 +13,37 @@ def main(random_selection=False, headless=False, short_exec=False):
     ONLY WORKS WITH OPTIMIZED RENDERING (not on Mac)
     """
     logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
-    settings = MeshRendererSettings(optimized=True, enable_shadow=True, blend_highlight=True)
-    s = Simulator(
-        mode="gui_interactive" if not headless else "headless",
-        image_width=512,
-        image_height=512,
-        rendering_settings=settings,
-    )
-    scene = InteractiveIndoorScene(
-        "Rs_int", texture_randomization=False, load_object_categories=["window"], object_randomization=False
-    )
-    s.import_scene(scene)
 
+    # Create the scene config to load -- empty scene
+    cfg = {
+        "scene": {
+            "type": "InteractiveTraversableScene",
+            "scene_model": "Rs_int",
+        }
+    }
+
+    # Create the environment
+    env = ig.Environment(configs=cfg, action_timestep=1 / 60., physics_timestep=1 / 60.)
+
+    # Grab all window objects
+    windows = ig.sim.scene.object_registry("category", "window")
+
+    # Step environment while toggling window highlighting
     i = 0
+    highlighted = False
     max_steps = -1 if not short_exec else 1000
     while i != max_steps:
-        s.step()
-        if i % 100 == 0:
-            logging.info("Highlighting windows")
-            for obj in scene.objects_by_category["window"]:
-                obj.highlight()
-
-        if i % 100 == 50:
-            logging.info("Deactivating the highlight on windows")
-            for obj in scene.objects_by_category["window"]:
-                obj.unhighlight()
-
+        env.step(np.array([]))
+        if i % 50 == 0:
+            highlighted = not highlighted
+            logging.info(f"Toggling window highlight to: {highlighted}")
+            for window in windows:
+                # Note that this property is R/W!
+                window.highlighted = highlighted
         i += 1
+
+    # Always close the environment at the end
+    env.close()
 
 
 if __name__ == "__main__":

@@ -1,96 +1,39 @@
 import logging
-import os
-from sys import platform
-from collections import OrderedDict
-
-import yaml
-
-import igibson
-from igibson.envs.igibson_env import iGibsonEnv
-from igibson.objects.usd_object import URDFObject
-from igibson.render.mesh_renderer.mesh_renderer_cpu import MeshRendererSettings
-from igibson.render.profiler import Profiler
-from igibson.robots.turtlebot import Turtlebot
-from igibson.scenes.empty_scene import EmptyScene
-from igibson.scenes.gibson_indoor_scene import StaticIndoorScene
-from igibson.simulator import Simulator
+import numpy as np
+import igibson as ig
+from igibson.objects import DatasetObject
 from igibson.utils.asset_utils import (
     get_all_object_categories,
     get_ig_avg_category_specs,
-    get_ig_model_path,
     get_object_models_of_category,
 )
-from igibson.utils.config_utils import parse_config
 from igibson.utils.ui_utils import choose_from_options
 
 
 def main(random_selection=False, headless=False, short_exec=False):
     """
-    This demo shows how to load any scaled objects from the iG object model dataset and
-    additional objects from the YCB dataset in predefined locations
+    This demo shows how to load any scaled objects from the iG object model dataset
     The user selects an object model to load
     The objects can be loaded into an empty scene, an interactive scene (iG) or a static scene (Gibson)
     The example also shows how to use the Environment API or directly the Simulator API, loading objects and robots
     and executing actions
     """
     logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
-    scene_options = OrderedDict((i, scene_type) for i, scene_type in enumerate(["Empty scene", "Interactive scene (iG)", "Static scene (Gibson)"]))
-    type_of_scene = choose_from_options(options=scene_options, name="scene type", random_selection=random_selection)
+    scene_options = ["EmptyScene", "InteractiveTraversableScene", "StaticTraversableScene"]
+    scene_type = choose_from_options(options=scene_options, name="scene type", random_selection=random_selection)
 
-    if type_of_scene == 0:  # Empty
-        config = parse_config(os.path.join(igibson.example_config_path, "turtlebot_static_nav.yaml"))
-        settings = MeshRendererSettings(enable_shadow=False, msaa=False, texture_scale=0.5)
-        s = Simulator(
-            mode="gui_interactive" if not headless else "headless",
-            image_width=512,
-            image_height=512,
-            rendering_settings=settings,
-        )
-        scene = EmptyScene(floor_plane_color=[0.6, 0.6, 0.6])
-        # scene.load_object_categories(benchmark_names)
-        s.import_scene(scene)
-        robot_config = config["robot"]
-        robot_config.pop("name")
-        turtlebot = Turtlebot(**robot_config)
-        s.import_object(turtlebot)
+    cfg = {
+        "scene": {
+            "type": scene_type,
+        }
+    }
+    if scene_type == "InteractiveTraversableScene":
+        cfg["scene"]["scene_model"] = "Rs_int"
+    elif scene_type == "StaticTraversableScene":
+        cfg["scene"]["scene_model"] = "Adrian"
 
-    elif type_of_scene == 1:  # iG
-        config_filename = os.path.join(igibson.example_config_path, "turtlebot_nav.yaml")
-        config_data = yaml.load(open(config_filename, "r"), Loader=yaml.FullLoader)
-        config_data["load_object_categories"] = []  # Uncomment this line to accelerate loading with only the building
-        config_data["visible_target"] = False
-        config_data["visible_path"] = False
-        # Reduce texture scale for Mac.
-        if platform == "darwin":
-            config_data["texture_scale"] = 0.5
-        env = iGibsonEnv(config_file=config_data, mode="gui_interactive" if not headless else "headless")
-        s = env.simulator
-
-    elif type_of_scene == 2:  # Gibson
-        config = parse_config(os.path.join(igibson.example_config_path, "turtlebot_static_nav.yaml"))
-        settings = MeshRendererSettings(enable_shadow=False, msaa=False)
-        # Reduce texture scale for Mac.
-        if platform == "darwin":
-            settings.texture_scale = 0.5
-        s = Simulator(
-            mode="gui_interactive" if not headless else "headless",
-            image_width=512,
-            image_height=512,
-            rendering_settings=settings,
-        )
-
-        scene = StaticIndoorScene("Rs", build_graph=True, pybullet_load_texture=False)
-        s.import_scene(scene)
-        robot_config = config["robot"]
-        robot_config.pop("name")
-        turtlebot = Turtlebot(**robot_config)
-        s.import_object(turtlebot)
-
-    if not headless:
-        # Set a better viewing direction
-        s.viewer.initial_pos = [-1.7, -0.9, 0.9]
-        s.viewer.initial_view_direction = [0.9, 0, -0.3]
-        s.viewer.reset_viewer()
+    # Create the environment
+    env = ig.Environment(configs=cfg, action_timestep=1 / 60., physics_timestep=1 / 60.)
 
     # Select a category to load
     available_obj_categories = get_all_object_categories()
@@ -103,53 +46,25 @@ def main(random_selection=False, headless=False, short_exec=False):
     # Load the specs of the object categories, e.g., common scaling factor
     avg_category_spec = get_ig_avg_category_specs()
 
-    try:
-        # Create the full path combining the path for all models and the name of the model
-        model_path = get_ig_model_path(obj_category, obj_model)
-        filename = os.path.join(model_path, obj_model + ".urdf")
+    # Create and load this object into the simulator
+    obj = DatasetObject(
+        prim_path="/World/obj",
+        name="obj",
+        category=obj_category,
+        model=obj_model,
+        bounding_box=avg_category_spec.get(obj_category),
+        fit_avg_dim_volume=True,
+    )
+    ig.sim.import_object(obj)
+    obj.set_position(np.array([0.5, -0.5, 1.01]))
 
-        # Create a unique name for the object instance
-        obj_name = "{}_{}".format(obj_category, 0)
+    # Step through the environment
+    max_steps = 100 if short_exec else 10000
+    for i in range(max_steps):
+        env.step(np.array([]))
 
-        # Create and import the object
-        simulator_obj = URDFObject(
-            filename,
-            name=obj_name,
-            category=obj_category,
-            model_path=model_path,
-            avg_obj_dims=avg_category_spec.get(obj_category),
-            fit_avg_dim_volume=True,
-            texture_randomization=False,
-            overwrite_inertial=True,
-        )
-        s.import_object(simulator_obj)
-        simulator_obj.set_position([0.5, -0.5, 1.01])
-
-        if type_of_scene == 1:
-            max_iterations = 1 if short_exec else 10
-            for j in range(max_iterations):
-                logging.info("Resetting environment")
-                env.reset()
-                for i in range(100):
-                    with Profiler("Environment action step"):
-                        # action = env.action_space.sample()
-                        state, reward, done, info = env.step([0.1, 0.1])
-                        if done:
-                            logging.info("Episode finished after {} timesteps".format(i + 1))
-                            break
-        else:
-            max_steps = 100 if short_exec else 10000
-            for i in range(max_steps):
-                with Profiler("Simulator step"):
-                    turtlebot.apply_action([0.1, 0.1])
-                    s.step()
-                    rgb = s.renderer.render_robot_cameras(modes=("rgb"))
-
-    finally:
-        if type_of_scene == 1:
-            env.close()
-        else:
-            s.disconnect()
+    # Always close the environment at the end
+    env.close()
 
 
 if __name__ == "__main__":
