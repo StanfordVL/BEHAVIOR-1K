@@ -16,7 +16,13 @@ import re
 import carb
 import omni.kit.app
 import builtins
+from igibson.macros import gm, create_module_macros
 
+
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
+
+m.DEFAULT_HIDE_WINDOWS = ["Flow", "Semantics Schema Editor"]
 
 class OmniApp:
     """Helper class to launch Omniverse Toolkit.
@@ -360,6 +366,7 @@ class OmniApp:
         self._app.update()
 
         # If we're in debug mode, we keep all the extension windows and dock them appropriately
+        hide_window_names = None
         if self.debug:
             console = dock_window(view, "Console", omni.ui.DockPosition.BOTTOM, 0.3)
             dock_window(view, "Main ToolBar", omni.ui.DockPosition.LEFT)
@@ -372,12 +379,17 @@ class OmniApp:
             self._app.update()
             dock_window(render, "Property", omni.ui.DockPosition.BOTTOM)
             self._app.update()
+            hide_window_names = m.DEFAULT_HIDE_WINDOWS
+
         # Otherwise, we remove all components that aren't the viewer
         else:
-            for name in ["Console", "Main ToolBar", "Stage", "Layer", "Property", "Render Settings", "Content", "Flow"]:
-                window = omni.ui.Workspace.get_window(name)
-                window.visible = False
-                self._app.update()
+            hide_window_names = ["Console", "Main ToolBar", "Stage", "Layer", "Property", "Render Settings", "Content", "Flow", "Semantics Schema Editor"]
+
+        # Hide all requested windows
+        for name in hide_window_names:
+            window = omni.ui.Workspace.get_window(name)
+            window.visible = False
+            self._app.update()
 
     """
     Public methods
