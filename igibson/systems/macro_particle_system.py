@@ -698,7 +698,7 @@ class VisualParticleSystem(MacroParticleSystem):
                 [group_dict["particle_attached_obj_uuid"]],
                 [group_dict["n_particles"]],
                 group_dict["particle_idns"],
-                [group_obj_link2id[link_name] for link_name in group_dict["particle_attached_links"]],
+                [group_obj_link2id[link_name] for link_name in group_dict["particle_attached_link_names"]],
             ]
 
         return np.concatenate([*state_group_flat, state_flat])
