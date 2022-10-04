@@ -44,7 +44,7 @@ task:
   goal_in_polar: false
   path_range: [1.0, 10.0]
   visualize_goal: true
-  visualize_path: false
+  visualize_path: true
   n_vis_waypoints: 25
   reward_type: geodesic
   termination_config:
