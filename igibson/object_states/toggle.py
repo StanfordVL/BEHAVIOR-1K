@@ -85,6 +85,10 @@ class ToggledOn(AbsoluteObjectState, BooleanState, LinkBasedStateMixin):
     def settable(self):
         return True
 
+    @property
+    def state_size(self):
+        return 2
+
     # For this state, we simply store its value and the robot_can_toggle steps.
     def _dump_state(self):
         return OrderedDict(value=self.value, hand_in_marker_steps=self.robot_can_toggle_steps)
