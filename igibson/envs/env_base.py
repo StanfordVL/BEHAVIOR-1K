@@ -1,4 +1,5 @@
 import gym
+import logging
 from collections import OrderedDict
 
 import igibson as ig
@@ -271,7 +272,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 if "name" not in robot_config:
                     robot_config["name"] = f"robot{i}"
                 # Set prim path
-                robot_config["prim_path"] = f"/World/{robot_config['name']}"
+                robot_config["prim_path"] = f"/World/{robot_config["name"]}"
                 # Make sure robot exists, grab its corresponding kwargs, and create / import the robot
                 robot = create_class_from_registry_and_config(
                     cls_name=robot_config["type"],
@@ -538,15 +539,15 @@ class Environment(gym.Env, GymObservable, Recreatable):
         obs = self.get_obs()
 
         if self.observation_space is not None and not self.observation_space.contains(obs):
-            print("Error: Observation space does not match returned observations!")
             # Print out all observations for all robots and task
             for robot in self.robots:
                 for key, value in self.observation_space[robot.name].items():
-                    print(key, value.dtype, value.shape)
-                    print('obs', obs[robot.name][key].dtype, obs[robot.name][key].shape)
-            for key, value in self.observation_space['task'].items():
-                print(key, value.dtype, value.shape)
-                print('obs', obs['task'][key].dtype, obs['task'][key].shape)
+                    logging.error(("obs_space", key, value.dtype, value.shape))
+                    logging.error(("obs", key, obs[robot.name][key].dtype, obs[robot.name][key].shape))
+            for key, value in self.observation_space["task"].items():
+                logging.error(("obs_space", key, value.dtype, value.shape))
+                logging.error(("obs", key, obs["task"][key].dtype, obs["task"][key].shape))
+            raise ValueError("Observation space does not match returned observations!")
 
         return obs
 
