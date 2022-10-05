@@ -32,8 +32,8 @@ def main(random_selection=False, headless=False, short_exec=False):
     env = ig.Environment(configs=cfg, action_timestep=1/60., physics_timestep=1/60.)
 
     # Sample microwave and boxes
-    sample_microwave_plates_apples(env)
     sample_boxes_on_shelf(env)
+    sample_microwave_plates_apples(env)
 
     max_steps = 100 if short_exec else -1
     step = 0
