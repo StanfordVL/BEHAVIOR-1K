@@ -513,7 +513,14 @@ class VisualParticleSystem(MacroParticleSystem):
 
         # Sample scales of the particles to generate
         n_particles = cls._N_PARTICLES_PER_GROUP if n_particles is None else n_particles
-        scales = np.random.uniform(cls.min_scale, cls.max_scale, (n_particles, 3)) / obj.scale
+
+        # Since the particles will be placed under the object, it will be affected/stretched by obj.scale. In order to
+        # preserve the absolute size of the particles, we need to scale the particle by obj.scale in some way. However,
+        # since the particles have a relative rotation w.r.t the object, the scale between the two don't align. As a
+        # heuristics, we divide it by the avg_scale, which is the cubic root of the product of the scales along 3 axes.
+        avg_scale = np.cbrt(np.product(obj.scale))
+        scales = np.random.uniform(cls.min_scale, cls.max_scale, (n_particles, 3)) / avg_scale
+
         bbox_extents = [(cls.particle_object.aabb_extent * scale).tolist() for scale in scales]
 
         # Sample locations for all particles
