@@ -191,7 +191,7 @@ class VisionSensor(BaseSensor):
             mod_kwargs = dict()
             mod_kwargs["viewport"] = self._viewport
             if modality == "seg_instance":
-                mod_kwargs.update({"parsed": True, "return_mapping": True})
+                mod_kwargs.update({"parsed": True, "return_mapping": False})
             elif modality == "bbox_3d":
                 mod_kwargs.update({"parsed": True, "return_corners": True})
             obs[modality] = self._SENSOR_HELPERS[modality](**mod_kwargs)
@@ -410,8 +410,8 @@ class VisionSensor(BaseSensor):
             depth=((self.image_height, self.image_width), 0.0, 1.0, np.float32),
             depth_linear=((self.image_height, self.image_width), 0.0, np.inf, np.float32),
             normal=((self.image_height, self.image_width, 3), -1.0, 1.0, np.float32),
-            seg_semantic=((self.image_height, self.image_width), 0.0, np.inf, np.float32),
-            seg_instance=((self.image_height, self.image_width), 0.0, np.inf, np.float32),
+            seg_semantic=((self.image_height, self.image_width), 0, MAX_CLASS_COUNT, np.uint),
+            seg_instance=((self.image_height, self.image_width), 0, MAX_INSTANCE_COUNT, np.uint),
             flow=((self.image_height, self.image_width, 3), -np.inf, np.inf, np.float32),
             bbox_2d_tight=bbox_2d_space,
             bbox_2d_loose=bbox_2d_space,

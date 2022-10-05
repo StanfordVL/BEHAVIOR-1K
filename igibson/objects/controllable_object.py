@@ -228,6 +228,10 @@ class ControllableObject(BaseObject):
         # (Re-)load controllers
         self._load_controllers()
 
+        # (Re-)create the action space
+        self._action_space = self._create_discrete_action_space() if self._action_type == "discrete" \
+            else self._create_continuous_action_space()
+
     def reset(self):
         # Make sure simulation is playing, otherwise, we cannot reset because DC requires active running
         # simulation in order to set joints
