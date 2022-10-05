@@ -13,6 +13,7 @@ from pxr import UsdPhysics, PhysxSchema
 from igibson.utils.usd_utils import get_prim_nested_children, create_joint, CollisionAPI
 from igibson.prims.entity_prim import EntityPrim
 from igibson.prims.xform_prim import XFormPrim
+from igibson.prims.rigid_prim import RigidPrim
 from igibson.utils.constants import PrimType, CLASS_NAME_TO_CLASS_ID
 
 from omni.isaac.core.utils.semantics import add_update_semantics
@@ -200,7 +201,7 @@ class BaseObject(EntityPrim, metaclass=ABCMeta):
         self._highlight_cached_values = OrderedDict()
         materials = set()
         for link in self._links.values():
-            xforms = [link] + list(link.visual_meshes.values())
+            xforms = [link] + list(link.visual_meshes.values()) if self.prim_type == PrimType.RIGID else [link]
             for xform in xforms:
                 if xform.has_material():
                     # Only keep non-redundant materials

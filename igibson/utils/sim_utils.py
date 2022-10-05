@@ -6,6 +6,22 @@ import igibson as ig
 import igibson.utils.transform_utils as T
 
 
+def prims_to_rigid_prim_set(inp_prims):
+    # Avoid circular imports
+    from igibson.prims.entity_prim import EntityPrim
+    from igibson.prims.rigid_prim import RigidPrim
+
+    out = set()
+    for prim in inp_prims:
+        if isinstance(prim, EntityPrim):
+            out.update({link for link in prim.links.values()})
+        elif isinstance(prim, RigidPrim):
+            out.add(prim)
+        else:
+            raise ValueError(f"Inputted prims must be either EntityPrim or RigidPrim instances "
+                             f"when getting collisions! Type: {type(prim)}")
+    return out
+
 def get_collisions(prims=None, prims_check=None, prims_exclude=None, step_physics=False):
     """
     Grab collisions that occurred during the most recent physics timestep associated with prims @prims
@@ -23,10 +39,6 @@ def get_collisions(prims=None, prims_check=None, prims_exclude=None, step_physic
         set of 2-tuple: Unique collision pairs occurring in the simulation at the current timestep between the
         specified prim(s), represented by their prim_paths
     """
-    # Avoid circular imports
-    from igibson.prims.entity_prim import EntityPrim
-    from igibson.prims.rigid_prim import RigidPrim
-
     # Make sure sim is playing
     assert ig.sim.is_playing(), "Cannot get collisions while sim is not playing!"
 
@@ -38,18 +50,6 @@ def get_collisions(prims=None, prims_check=None, prims_exclude=None, step_physic
     prims = ig.sim.scene.objects if prims is None else prims if isinstance(prims, Iterable) else [prims]
     prims_check = [] if prims_check is None else prims_check if isinstance(prims_check, Iterable) else [prims_check]
     prims_exclude = [] if prims_exclude is None else prims_exclude if isinstance(prims_exclude, Iterable) else [prims_exclude]
-
-    def prims_to_rigid_prim_set(inp_prims):
-        out = set()
-        for prim in inp_prims:
-            if isinstance(prim, EntityPrim):
-                out.update({link for link in prim.links.values()})
-            elif isinstance(prim, RigidPrim):
-                out.add(prim)
-            else:
-                raise ValueError(f"Inputted prims must be either EntityPrim or RigidPrim instances "
-                                 f"when getting collisions! Type: {type(prim)}")
-        return out
 
     # Convert into prim paths to check for collision
     def get_paths_from_rigid_prims(inp_prims):
@@ -166,18 +166,7 @@ def filter_collisions(collisions, filter_prims):
     Returns:
         set of 2-tuple: Filtered collision pairs
     """
-    # Avoid circular imports
-    from igibson.prims.entity_prim import EntityPrim
-    from igibson.prims.rigid_prim import RigidPrim
-
-    paths = set()
-    for prim in filter_prims:
-        if isinstance(prim, EntityPrim):
-            paths.update({link for link in prim.links.values()})
-        elif isinstance(prim, RigidPrim):
-            paths.add(prim)
-        else:
-            raise ValueError("Inputted prims must be either EntityPrim or RigidPrim instances when getting collisions!")
+    paths = prims_to_rigid_prim_set(filter_prims)
 
     filtered_collisions = set()
     for pair in collisions:

@@ -193,25 +193,6 @@ class BaseRobot(USDObject, ControllableObject, GymObservable, Registerable):
         """
         pass
 
-    def get_state(self):
-        """
-        Calculate proprioceptive states for the robot. By default, this is:
-            [pos, quat, lin_vel, ang_vel, joint_states]
-
-        :return Array[float]: Flat array of proprioceptive states (e.g.: [position, orientation, ...])
-        """
-        # Grab relevant states
-        pos, quat = self.get_position_orientation()
-        joints_state = self.get_joints_state(normalized=False).flatten()
-
-        # rotate linear and angular velocities to local frame
-        lin_vel = T.quat2mat(quat).T @ self.get_linear_velocity()
-        ang_vel = T.quat2mat(quat).T @ self.get_angular_velocity()
-
-        # Compile and return state
-        state = np.concatenate([pos, quat, lin_vel, ang_vel, joints_state])
-        return state
-
     def can_toggle(self, toggle_position, toggle_distance_threshold):
         """
         Returns True if the part of the robot that can toggle a toggleable is within the given range of a

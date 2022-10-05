@@ -877,6 +877,7 @@ class Simulator(SimulationContext, Serializable):
         # Run super first
         super().load_state(state=state, serialized=serialized)
 
+        # TODO: verify if this is still needed
         # # We also need to manually update the simulator app
         # self._simulator.app.update()
 

@@ -366,7 +366,6 @@ class OmniApp:
         self._app.update()
 
         # If we're in debug mode, we keep all the extension windows and dock them appropriately
-        hide_window_names = None
         if self.debug:
             console = dock_window(view, "Console", omni.ui.DockPosition.BOTTOM, 0.3)
             dock_window(view, "Main ToolBar", omni.ui.DockPosition.LEFT)
@@ -388,8 +387,9 @@ class OmniApp:
         # Hide all requested windows
         for name in hide_window_names:
             window = omni.ui.Workspace.get_window(name)
-            window.visible = False
-            self._app.update()
+            if window is not None:
+                window.visible = False
+                self._app.update()
 
     """
     Public methods

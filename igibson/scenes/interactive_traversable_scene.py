@@ -26,6 +26,7 @@ from igibson.utils.asset_utils import (
 )
 from igibson.utils.python_utils import create_object_from_init_info
 from igibson.utils.constants import JointType
+from igibson.utils.sim_utils import check_collision
 
 SCENE_SOURCE_PATHS = {
     "IG": get_ig_scene_path,
@@ -328,9 +329,7 @@ class InteractiveTraversableScene(TraversableScene):
                     for j_pos in (j_default, j_low_perc, j_high_perc):
                         self.restore_state(state)
                         joint.set_pos(pos=j_pos)
-                        simulator.step()
-                        # TODO: I don't think this is working properly -- we currently don't check for self collision between fixed_obj and joint
-                        has_collision = fixed_obj.in_contact(prims=[self.fixed_objects] + [joint])
+                        has_collision = check_collision(prims=fixed_obj.links[joint.child_name], prims_check=self.fixed_objects)
                         joint_quality = joint_quality and (not has_collision)
 
                 if not joint_quality:
@@ -713,14 +712,14 @@ class InteractiveTraversableScene(TraversableScene):
             self._world_prim.CreateAttribute("ig:isTemplate", VT.Bool)
             is_template = True
 
-        # Set this to be False -- we are no longer a template after we load
-        self._world_prim.GetAttribute("ig:isTemplate").Set(False)
-
         # Load objects using logic based on whether the current USD is a template or not
         if is_template:
             self._load_objects_from_template(simulator=simulator)
         else:
             self._load_objects_from_scene_info(simulator=simulator)
+
+        # Set this to be False -- we are no longer a template after we load
+        self._world_prim.GetAttribute("ig:isTemplate").Set(False)
 
         # disable collision between the fixed links of the fixed objects
         fixed_objs = self.object_registry("fixed_base", True, default_val=[])

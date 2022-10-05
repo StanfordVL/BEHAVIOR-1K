@@ -44,31 +44,6 @@ def get_center_extent(obj_states):
     return center, extent
 
 
-def too_close_to_contact(obj, distance=0.01):
-    # We check via a heuristic; grabbing object's 1/2 aabb as effective radius, and then adding @distance to it as the
-    # buffer space. Then we run overlap_box call to physx to see if we hit anything that's not ourselves
-    too_close = False
-
-    def hit_callback(hit):
-        nonlocal too_close
-        # If the hit includes a rigid body that's NOT the object, then we've hit something else, and we're too close
-        if obj.prim_path not in hit.rigid_body:
-            too_close = True
-
-        # True will continue iterating through the hits; once we've already hit something else, we can terminate early
-        return not too_close
-
-    psqi = acquire_physx_scene_query_interface()
-    psqi.overlap_box(
-        halfExtent=obj.aabb_extent / 2.0 + distance,
-        pos=obj.aabb_center,
-        rot=np.array([0, 0, 0, 1.0]),
-        reportFn=hit_callback,
-        anyHit=False,
-    )
-    return too_close
-
-
 def sample_kinematics(
     predicate,
     objA,
