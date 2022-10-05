@@ -108,7 +108,7 @@ class ControllableObject(BaseObject):
         self._dof_to_joints = OrderedDict()
         idx = 0
         for joint in self._joints.values():
-            for i in range(joint.n_dof):
+            for _ in range(joint.n_dof):
                 self._dof_to_joints[idx] = joint
                 idx += 1
 
@@ -173,7 +173,11 @@ class ControllableObject(BaseObject):
             # Create the controller
             self._controllers[name] = create_controller(**cfg)
 
-            # Update the control modes of each joint based on the outputted control from the controllers
+        self._update_controller_mode()
+
+    def _update_controller_mode(self):
+        # Update the control modes of each joint based on the outputted control from the controllers
+        for name in self._controllers:
             for dof in self._controllers[name].dof_idx:
                 control_type = self._controllers[name].control_type
                 self._joints[self.dof_names_ordered[dof]].set_control_type(
@@ -234,18 +238,11 @@ class ControllableObject(BaseObject):
 
         # Additionally set the joint states based on the reset values
         self.set_joint_positions(positions=self._reset_joint_pos, target=False)
-        self.set_joint_velocities(velocities=np.zeros(self._n_physical_dof), target=False)
+        self.set_joint_velocities(velocities=np.zeros(self.n_dof), target=False)
 
         # Update the control modes of each joint based on the outputted control from the controllers
         # Omni resets them after every reset
-        for controller in self._controllers.values():
-            for dof in controller.dof_idx:
-                control_type = controller.control_type
-                self._joints[self.dof_names_ordered[dof]].set_control_type(
-                    control_type=control_type,
-                    kp=self.default_kp if control_type == ControlType.POSITION else None,
-                    kd=self.default_kd if control_type == ControlType.VELOCITY else None,
-                )
+        self._update_controller_mode()
 
         # Reset all controllers
         for controller in self._controllers.values():
@@ -335,7 +332,8 @@ class ControllableObject(BaseObject):
 
         # Compose controls
         u_vec = np.zeros(self.n_dof)
-        u_type_vec = np.array([ControlType.POSITION] * self.n_dof)
+        # By default, the control type is effort and the control value is 0 (np.zeros) - 0 effort means no control.
+        u_type_vec = np.array([ControlType.EFFORT] * self.n_dof)
         for group, ctrl in control.items():
             idx = self._controllers[group].dof_idx
             u_vec[idx] = ctrl["value"]
@@ -630,7 +628,7 @@ class ControllableObject(BaseObject):
             float: Default kp gain to apply to any DOF when switching control modes (e.g.: switching from a
                 velocity control mode to a position control mode)
         """
-        return 4000.0 #400.0
+        return 1e7
 
     @property
     def default_kd(self):
@@ -639,7 +637,7 @@ class ControllableObject(BaseObject):
             float: Default kd gain to apply to any DOF when switching control modes (e.g.: switching from a
                 position control mode to a velocity control mode)
         """
-        return 4000.0
+        return 1e5
 
     @property
     @abstractmethod

@@ -861,8 +861,8 @@ class ManipulationRobot(BaseRobot):
         arm = self.default_arm if arm == "default" else arm
         for joint_name, j_val in self._ag_freeze_joint_pos[arm].items():
             joint = self._joints[joint_name]
-            joint.set_pos(pos=j_val, normalized=False, target=False)
-            joint.set_vel(vel=0.0, normalized=False, target=False)
+            joint.set_pos(pos=j_val)
+            joint.set_vel(vel=0.0)
 
     @property
     def robot_arm_descriptor_yamls(self):

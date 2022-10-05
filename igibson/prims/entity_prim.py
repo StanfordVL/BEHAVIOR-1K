@@ -63,8 +63,7 @@ class EntityPrim(XFormPrim):
         self._root_handle = None                # Handle to the root rigid body of this articulation
         self._root_link_name = None             # Name of the root link
         self._dofs_infos = None
-        self._n_physical_dof = None             # physical dof with dynamic control
-        self._n_virtual_dof = None              # virtual dof, default is 0 (if there is no virtual joint)
+        self._n_dof = None                      # dof with dynamic control
         self._default_joints_state = None
         self._links = None
         self._joints = None
@@ -97,8 +96,6 @@ class EntityPrim(XFormPrim):
         # Get dynamic control info
         self._dc = _dynamic_control.acquire_dynamic_control_interface()
         self.update_handles()
-
-        n_virtual_dof = 0
 
         # Handle case separately based on whether the handle is valid (i.e.: whether we are actually articulated or not)
         if self._handle != _dynamic_control.INVALID_HANDLE:
@@ -140,22 +137,13 @@ class EntityPrim(XFormPrim):
             root_prim = get_prim_at_path(body_path)
             n_dof = 0
 
-        # Set up any virtual joints for any non-base bodies.
-        virtual_joints = self._setup_virtual_joints()
-        assert self._joints.keys().isdisjoint(virtual_joints.keys())
-        for joint in virtual_joints.values():
-            n_virtual_dof += joint.n_dof
-            joint.initialize()
-        self._joints.update(virtual_joints)
-
         # Make sure root prim stored is the same as the one found during initialization
         assert self.root_prim == root_prim, \
             f"Mismatch in root prims! Original was {self.root_prim.GetPrimPath()}, " \
             f"initialized is {root_prim.GetPrimPath()}!"
 
         # Store values internally
-        self._n_physical_dof = n_dof
-        self._n_virtual_dof = n_virtual_dof
+        self._n_dof = n_dof
 
     def _load(self, simulator=None):
         # By default, this prim cannot be instantiated from scratch!
@@ -305,12 +293,12 @@ class EntityPrim(XFormPrim):
 
     @property
     def n_dof(self):
-        """[summary]
-
-        Returns:
-            int: [description]
         """
-        return self._n_physical_dof + self._n_virtual_dof
+        Return the number of DoFs of the object
+        Returns:
+            int: dofs
+        """
+        return self._n_dof
 
     @property
     def n_joints(self):
@@ -375,10 +363,6 @@ class EntityPrim(XFormPrim):
 
         # Also set the internal value
         self._visual_only = val
-
-    def _setup_virtual_joints(self):
-        """Create and return any virtual joints an object might need. Subclasses can implement this as necessary."""
-        return OrderedDict()
 
     def contact_list(self):
         """
@@ -498,7 +482,9 @@ class EntityPrim(XFormPrim):
 
         # Possibly set specific values in the array if indies are specified
         if indices is None:
-            new_positions = positions[:self._n_physical_dof]
+            assert len(positions) == self._n_dof, \
+                "set_joint_positions called without specifying indices, but the desired positions do not match n_dof."
+            new_positions = positions
         else:
             new_positions = dof_states["pos"]
             new_positions[indices] = positions
@@ -865,31 +851,31 @@ class EntityPrim(XFormPrim):
         """Sets the linear velocity of the root prim in stage.
 
         Args:
-            velocity (np.ndarray):linear velocity to set the rigid prim to. Shape (3,).
+            velocity (np.ndarray): linear velocity to set the rigid prim to, in the world frame. Shape (3,).
         """
         self.root_link.set_linear_velocity(velocity)
 
     def get_linear_velocity(self) -> np.ndarray:
-        """[summary]
+        """Gets the linear velocity of the root prim in stage.
 
         Returns:
-            np.ndarray: [description]
+            velocity (np.ndarray): linear velocity to set the rigid prim to, in the world frame. Shape (3,).
         """
         return self.root_link.get_linear_velocity()
 
     def set_angular_velocity(self, velocity: np.ndarray) -> None:
-        """[summary]
+        """Sets the angular velocity of the root prim in stage.
 
         Args:
-            velocity (np.ndarray): [description]
+            velocity (np.ndarray): angular velocity to set the rigid prim to, in the world frame. Shape (3,).
         """
         self.root_link.set_angular_velocity(velocity)
 
     def get_angular_velocity(self) -> np.ndarray:
-        """[summary]
+        """Gets the angular velocity of the root prim in stage.
 
         Returns:
-            np.ndarray: [description]
+            velocity (np.ndarray): angular velocity to set the rigid prim to, in the world frame. Shape (3,).
         """
         return self.root_link.get_angular_velocity()
 

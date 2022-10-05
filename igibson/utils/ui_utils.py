@@ -175,7 +175,7 @@ class KeyboardRobotController:
             idx += controller.command_dim
 
         # Other persistent variables we need to keep track of
-        self.joint_names = [name for name in robot.joints.keys()]   # Ordered list of joint names belonging to the robot
+        self.joint_names = [name for name in robot.joints.keys()]  # Ordered list of joint names belonging to the robot
         self.joint_command_idx = None   # Indices of joints being directly controlled in the action array
         self.joint_control_idx = None  # Indices of joints being directly controlled in the actual joint array
         self.active_joint_command_idx_idx = 0   # Which index within the joint_command_idx variable is being controlled by the user
