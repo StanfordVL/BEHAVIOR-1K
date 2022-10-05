@@ -738,7 +738,7 @@ class DatasetObject(USDObject):
 
         return scales
 
-    def get_base_aligned_bbox(self, link_name=None, visual=False, xy_aligned=False, fallback_to_aabb=True):
+    def get_base_aligned_bbox(self, link_name=None, visual=False, xy_aligned=False, fallback_to_aabb=False):
         """
         Get a bounding box for this object that's axis-aligned in the object's base frame.
 
@@ -762,6 +762,11 @@ class DatasetObject(USDObject):
 
         links = {link_name: self._links[link_name]} if link_name is not None else self._links
         for link_name, link in links.items():
+            # If the link has no visual or collision meshes, we skip over it (based on the @visual flag)
+            meshes = link.visual_meshes if visual else link.collision_meshes
+            if len(meshes) == 0:
+                continue
+
             # If the link has a bounding box annotation.
             if self.native_link_bboxes is not None and link_name in self.native_link_bboxes:
                 # If a visual bounding box does not exist in the dictionary, try switching to collision.
