@@ -543,7 +543,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
             for robot in self.robots:
                 for key, value in self.observation_space[robot.name].items():
                     print(key, value.dtype, value.shape)
-                    print('obs', obs['robot0'][key].dtype, obs[robot.name][key].shape)
+                    print('obs', obs[robot.name][key].dtype, obs[robot.name][key].shape)
             for key, value in self.observation_space['task'].items():
                 print(key, value.dtype, value.shape)
                 print('obs', obs['task'][key].dtype, obs['task'][key].shape)
