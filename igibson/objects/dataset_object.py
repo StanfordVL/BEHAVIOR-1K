@@ -15,15 +15,17 @@ import trimesh
 from scipy.spatial.transform import Rotation
 
 from omni.isaac.core.utils.prims import get_prim_at_path
+from omni.isaac.core.utils.rotations import gf_quat_to_np_array
+
 from omni.usd import get_shader_from_material
 
-import igibson
+import igibson as ig
 from igibson.objects.usd_object import USDObject
 from igibson.utils.constants import AVERAGE_CATEGORY_SPECS, DEFAULT_JOINT_FRICTION, SPECIAL_JOINT_FRICTIONS, JointType
 import igibson.utils.transform_utils as T
-from igibson.utils.utils import rotate_vector_3d
 from igibson.utils.usd_utils import BoundingBoxAPI
 from igibson.utils.constants import PrimType
+
 
 class DatasetObject(USDObject):
     """
@@ -38,6 +40,7 @@ class DatasetObject(USDObject):
         usd_path=None,
         name=None,
         category="object",
+        model=None,
         class_id=None,
         uuid=None,
         scale=None,
@@ -66,10 +69,17 @@ class DatasetObject(USDObject):
     ):
         """
         @param prim_path: str, global path in the stage to this object
-        @param usd_path: str, global path to the USD file to load
+        @param usd_path: str, global path to the USD file to load. Either this or a combination of @category + @model
+            will be used to infer the raw USD file location from which to load.
         @param name: Name for the object. Names need to be unique per scene. If no name is set, a name will be generated
             at the time the object is added to the scene, using the object's category.
         @param category: Category for the object. Defaults to "object".
+        @param model: str or None, if @usd_path is not specified and @model is specified in conjunction with @category,
+            the usd filepath will be inferred based on the set ig_dataset_path global variable, from the following
+            location:
+
+                {ig_dataset_path}/objects/{category}/{model}/usd/{model}.usd
+
         @param class_id: What class ID the object should be assigned in semantic segmentation rendering mode.
         @param uuid: Unique unsigned-integer identifier to assign to this object (max 8-numbers).
             If None is specified, then it will be auto-generated
@@ -171,6 +181,13 @@ class DatasetObject(USDObject):
         #
         # self.prepare_visual_mesh_to_material()
 
+        # Infer the correct usd path to use
+        if usd_path is None:
+            assert model is not None, f"Either usd_path or model and category must be specified in order to create a" \
+                                      f"DatasetObject!"
+            usd_path = f"{ig.ig_dataset_path}/objects/{category}/{model}/usd/{model}.usd"
+
+        # Post-process the usd path if we're generating a cloth object
         if prim_type == PrimType.CLOTH:
             assert usd_path.endswith(".usd"), f"usd_path [{usd_path}] is invalid."
             usd_path = usd_path[:-4] + "_cloth.usd"
@@ -210,14 +227,13 @@ class DatasetObject(USDObject):
         for predicate, links in heights_info.items():
             height_maps = {}
             for link_name, heights in links.items():
-                link_path = self._links[link_name].prim_path
-                height_maps[link_path] = []
+                height_maps[link_name] = []
                 for i, z_value in enumerate(heights):
                     # Get boolean birds-eye view xy-mask image for this surface
                     img_fname = os.path.join(usd_dir, "height_maps_per_link", predicate, link_name, f"{i}.png")
                     xy_map = cv2.imread(img_fname, 0)
                     # Add this map to the supporting surfaces for this link and predicate combination
-                    height_maps[link_path].append((z_value, xy_map))
+                    height_maps[link_name].append((z_value, xy_map))
             # Add this heights map to the overall supporting surfaces
             self.supporting_surfaces[predicate] = height_maps
 
@@ -230,12 +246,13 @@ class DatasetObject(USDObject):
         """
         if self.orientations is None:
             raise ValueError("No orientation probabilities set")
-        indices = list(range(len(self.orientations)))
-        orientations = [np.array(o["rotation"]) for o in self.orientations]
-        probabilities = [o["prob"] for o in self.orientations]
-        probabilities = np.array(probabilities) / np.sum(probabilities)
-        chosen_orientation_idx = np.random.choice(indices, p=probabilities)
-        chosen_orientation = orientations[chosen_orientation_idx]
+        if len(self.orientations) == 0:
+            # Set default value
+            chosen_orientation = np.array([0, 0, 0, 1.0])
+        else:
+            probabilities = [o["prob"] for o in self.orientations.values()]
+            probabilities = np.array(probabilities) / np.sum(probabilities)
+            chosen_orientation = np.array(np.random.choice(list(self.orientations.values()), p=probabilities)["rotation"])
 
         # Randomize yaw from -pi to pi
         rot_num = np.random.uniform(-1, 1)
@@ -246,7 +263,7 @@ class DatasetObject(USDObject):
                 [0.0, 0.0, 1.0],
             ]
         )
-        rotated_quat = T.mat2quat(np.dot(rot_matrix, T.quat2mat(chosen_orientation)))
+        rotated_quat = T.mat2quat(rot_matrix @ T.quat2mat(chosen_orientation))
         return rotated_quat
 
     # def prepare_visual_mesh_to_material(self):
@@ -504,7 +521,7 @@ class DatasetObject(USDObject):
         #
         #     body_ids.append(body_id)
 
-        # self.load_supporting_surfaces()
+        self.load_supporting_surfaces()
 
         # Run super last
         super()._post_load()
@@ -698,15 +715,26 @@ class DatasetObject(USDObject):
         """
         scales = {self.root_link.body_name: self.scale}
 
-        for joint_name, joint in self._joints.items():
-            parent_name = joint.parent_name
-            child_name = joint.child_name
-            if parent_name in scales and child_name not in scales:
-                scale_in_parent_lf = scales[parent_name]
-                # The location of the joint frame is scaled using the scale in the parent frame
-                jnt_frame_rot = T.mat2euler(T.quat2mat(joint.local_orientation))
-                scale_in_child_lf = np.absolute(rotate_vector_3d(scale_in_parent_lf, *jnt_frame_rot, cck=True))
-                scales[child_name] = scale_in_child_lf
+        # We iterate through all links in this object, and check for any joint prims that exist
+        # We traverse manually this way instead of accessing the self._joints dictionary, because
+        # the dictionary only includes articulated joints and not fixed joints!
+        for link in self._links.values():
+            for prim in link.prim.GetChildren():
+                if "joint" in prim.GetTypeName().lower():
+                    # Grab relevant joint information
+                    parent_name = prim.GetProperty("physics:body0").GetTargets()[0].pathString.split("/")[-1]
+                    child_name = prim.GetProperty("physics:body1").GetTargets()[0].pathString.split("/")[-1]
+                    if parent_name in scales and child_name not in scales:
+                        scale_in_parent_lf = scales[parent_name]
+                        # The location of the joint frame is scaled using the scale in the parent frame
+                        quat0 = gf_quat_to_np_array(prim.GetAttribute("physics:localRot0").Get())[[1, 2, 3, 0]]
+                        quat1 = gf_quat_to_np_array(prim.GetAttribute("physics:localRot1").Get())[[1, 2, 3, 0]]
+
+                        # Invert the child link relationship, and multiply the two rotations together to get the final rotation
+                        local_ori = T.quat_multiply(quaternion1=T.quat_inverse(quat1), quaternion0=quat0)
+                        jnt_frame_rot = T.quat2mat(local_ori)
+                        scale_in_child_lf = np.absolute(jnt_frame_rot.T @ np.array(scale_in_parent_lf))
+                        scales[child_name] = scale_in_child_lf
 
         return scales
 
@@ -734,6 +762,11 @@ class DatasetObject(USDObject):
 
         links = {link_name: self._links[link_name]} if link_name is not None else self._links
         for link_name, link in links.items():
+            # If the link has no visual or collision meshes, we skip over it (based on the @visual flag)
+            meshes = link.visual_meshes if visual else link.collision_meshes
+            if len(meshes) == 0:
+                continue
+
             # If the link has a bounding box annotation.
             if self.native_link_bboxes is not None and link_name in self.native_link_bboxes:
                 # If a visual bounding box does not exist in the dictionary, try switching to collision.

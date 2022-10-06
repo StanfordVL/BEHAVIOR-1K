@@ -1,18 +1,23 @@
 import numpy as np
 
-from igibson.object_states.object_state_base import AbsoluteObjectState, BooleanState, NONE
+from igibson.macros import create_module_macros
+from igibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
 from igibson.object_states.temperature import Temperature
 
-_DEFAULT_HEAT_TEMPERATURE = 40
+
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
+
+m.DEFAULT_HEAT_TEMPERATURE = 40
 
 # When an object is set as heated, we will sample it between
 # the heat temperature and these offsets.
-_HEATED_SAMPLING_RANGE_MIN = 10.0
-_HEATED_SAMPLING_RANGE_MAX = 20.0
+m.HEATED_SAMPLING_RANGE_MIN = 10.0
+m.HEATED_SAMPLING_RANGE_MAX = 20.0
 
 
 class Heated(AbsoluteObjectState, BooleanState):
-    def __init__(self, obj, heat_temperature=_DEFAULT_HEAT_TEMPERATURE):
+    def __init__(self, obj, heat_temperature=m.DEFAULT_HEAT_TEMPERATURE):
         super(Heated, self).__init__(obj)
         self.heat_temperature = heat_temperature
 
@@ -23,8 +28,8 @@ class Heated(AbsoluteObjectState, BooleanState):
     def _set_value(self, new_value):
         if new_value:
             temperature = np.random.uniform(
-                self.heat_temperature + _HEATED_SAMPLING_RANGE_MIN,
-                self.heat_temperature + _HEATED_SAMPLING_RANGE_MAX,
+                self.heat_temperature + m.HEATED_SAMPLING_RANGE_MIN,
+                self.heat_temperature + m.HEATED_SAMPLING_RANGE_MAX,
             )
             return self.obj.states[Temperature].set_value(temperature)
         else:

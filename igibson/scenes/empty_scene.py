@@ -4,7 +4,7 @@ import os
 import numpy as np
 
 from igibson.scenes.scene_base import Scene
-from igibson.utils.utils import l2_distance
+import igibson.utils.transform_utils as T
 
 
 class EmptyScene(Scene):
@@ -14,7 +14,7 @@ class EmptyScene(Scene):
 
     def __init__(
             self,
-            floor_plane_visible=False,
+            floor_plane_visible=True,
             floor_plane_color=(1.0, 1.0, 1.0),
     ):
         super(EmptyScene, self).__init__()
@@ -44,5 +44,5 @@ class EmptyScene(Scene):
         """
         logging.warning("WARNING: trying to compute the shortest path in EmptyScene (assuming empty space)")
         shortest_path = np.stack((source_world, target_world))
-        geodesic_distance = l2_distance(source_world, target_world)
+        geodesic_distance = T.l2_distance(source_world, target_world)
         return shortest_path, geodesic_distance

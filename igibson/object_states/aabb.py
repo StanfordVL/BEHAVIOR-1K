@@ -9,24 +9,27 @@ class AABB(AbsoluteObjectState):
     def _get_value(self):
         aabb_low, aabb_hi = BoundingBoxAPI.union(self.obj.link_prim_paths)
 
-        if not hasattr(self.obj, "category") or self.obj.category != "floors" or self.obj.room_floor is None:
-            return np.array(aabb_low), np.array(aabb_hi)
+        if hasattr(self.obj, "category") and self.obj.category == "floors" and self.obj.room_floor is not None:
+            # TODO: remove after split floors
+            # room_floor will be set to the correct RoomFloor beforehand
+            room_instance = self.obj.room_floor.room_instance
 
-        # TODO: remove after split floors
-        # room_floor will be set to the correct RoomFloor beforehand
-        room_instance = self.obj.room_floor.room_instance
+            # Get the x-y values from the room segmentation map
+            room_aabb_low, room_aabb_hi = self.obj.room_floor.scene.get_aabb_by_room_instance(room_instance)
 
-        # Get the x-y values from the room segmentation map
-        room_aabb_low, room_aabb_hi = self.obj.room_floor.scene.get_aabb_by_room_instance(room_instance)
+            if room_aabb_low is None:
+                low, high = np.array(aabb_low), np.array(aabb_hi)
 
-        if room_aabb_low is None:
-            return np.array(aabb_low), np.array(aabb_hi)
+            # Otherwise use the z values from omni
+            else:
+                room_aabb_low[2] = aabb_low[2]
+                room_aabb_hi[2] = aabb_hi[2]
+                low, high = np.array(room_aabb_low), np.array(room_aabb_hi)
 
-        # Use the z values from pybullet
-        room_aabb_low[2] = aabb_low[2]
-        room_aabb_hi[2] = aabb_hi[2]
+        else:
+            low, high = np.array(aabb_low), np.array(aabb_hi)
 
-        return np.array(room_aabb_low), np.array(room_aabb_hi)
+        return low, high
 
     def _set_value(self, new_value):
         raise NotImplementedError("AABB state currently does not support setting.")

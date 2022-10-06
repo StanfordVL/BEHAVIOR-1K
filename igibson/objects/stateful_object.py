@@ -10,6 +10,7 @@ from omni.usd import get_shader_from_material
 from pxr.Sdf import ValueTypeNames as VT
 from pxr import Sdf, Gf
 
+from igibson.macros import create_module_macros
 from igibson.object_states.factory import (
     get_default_states,
     get_object_state_instance,
@@ -22,6 +23,7 @@ from igibson.object_states.factory import (
 )
 from igibson.object_states.object_state_base import REGISTERED_OBJECT_STATES, CachingEnabledObjectState
 from igibson.object_states.heat_source_or_sink import HeatSourceOrSink
+from igibson.object_states.heated import Heated
 from igibson.objects.object_base import BaseObject
 from igibson.systems import get_system_from_element_name, get_element_name_from_system
 from igibson.renderer_settings.renderer_settings import RendererSettings
@@ -37,6 +39,14 @@ try:
 except ImportError:
     print("BDDL could not be imported - object taxonomy / abilities will be unavailable.", file=sys.stderr)
     OBJECT_TAXONOMY = None
+
+
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
+
+m.STEAM_EMITTER_SIZE_RATIO = [0.8, 0.8, 0.4]    # (x,y,z) scale of generated steam relative to its object, range [0, inf)
+m.STEAM_EMITTER_DENSITY_CELL_RATIO = 0.1        # scale of steam density relative to its object, range [0, inf)
+m.STEAM_EMITTER_HEIGHT_RATIO = 0.6              # z-height of generated steam relative to its object's native height, range [0, inf)
 
 
 class StatefulObject(BaseObject):
@@ -232,9 +242,12 @@ class StatefulObject(BaseObject):
 
         # Specify emitter config.
         emitter_config = {}
+        link_name = self.root_link_name
         if emitter_type == EmitterType.FIRE:
+            link_name = self.states[HeatSourceOrSink].get_state_link_name()
             emitter_config["name"] = "flowEmitterSphere"
             emitter_config["type"] = "FlowEmitterSphere"
+            emitter_config["position"] = (0.0, 0.0, 0.0)
             emitter_config["fuel"] = 0.6
             emitter_config["coupleRateFuel"] = 1.2
             emitter_config["buoyancyPerTemp"] = 0.04
@@ -243,8 +256,10 @@ class StatefulObject(BaseObject):
             emitter_config["constantMask"] = 5.0
             emitter_config["attenuation"] = 0.5
         elif emitter_type == EmitterType.STEAM:
+            bbox_extent_local = self.native_bbox if hasattr(self, "native_bbox") else self.aabb_extent / self.scale
             emitter_config["name"] = "flowEmitterBox"
             emitter_config["type"] = "FlowEmitterBox"
+            emitter_config["position"] = (0.0, 0.0, bbox_extent_local[2] * m.STEAM_EMITTER_HEIGHT_RATIO)
             emitter_config["fuel"] = 1.0
             emitter_config["coupleRateFuel"] = 0.5
             emitter_config["buoyancyPerTemp"] = 0.05
@@ -252,13 +267,15 @@ class StatefulObject(BaseObject):
             emitter_config["gravity"] = (0, 0, -50.0)
             emitter_config["constantMask"] = 10.0
             emitter_config["attenuation"] = 1.5
+        else:
+            raise ValueError("Currently, only EmitterTypes FIRE and STEAM are supported!")
 
         # Define prim paths.
         # The flow system is created under the root link so that it automatically updates its pose as the object moves
-        flowEmitter_prim_path = f"{self._prim_path}/{self.root_link_name}/{emitter_config['name']}"
-        flowSimulate_prim_path = f"{self._prim_path}/{self.root_link_name}/flowSimulate"
-        flowOffscreen_prim_path = f"{self._prim_path}/{self.root_link_name}/flowOffscreen"
-        flowRender_prim_path = f"{self._prim_path}/{self.root_link_name}/flowRender"
+        flowEmitter_prim_path = f"{self._prim_path}/{link_name}/{emitter_config['name']}"
+        flowSimulate_prim_path = f"{self._prim_path}/{link_name}/flowSimulate"
+        flowOffscreen_prim_path = f"{self._prim_path}/{link_name}/flowOffscreen"
+        flowRender_prim_path = f"{self._prim_path}/{link_name}/flowRender"
 
         # Define prims.
         stage = self._simulator.stage
@@ -273,10 +290,10 @@ class StatefulObject(BaseObject):
         colormap = stage.DefinePrim(flowOffscreen_prim_path + "/colormap", "FlowRayMarchColormapParams")
 
         self._emitters[emitter_type] = emitter
-        self.update_emitter_position(emitter_type)
 
         # Update emitter general settings.
         emitter.CreateAttribute("enabled", VT.Bool, False).Set(False)
+        emitter.CreateAttribute("position", VT.Float3, False).Set(emitter_config["position"])
         emitter.CreateAttribute("fuel", VT.Float, False).Set(emitter_config["fuel"])
         emitter.CreateAttribute("coupleRateFuel", VT.Float, False).Set(emitter_config["coupleRateFuel"])
         emitter.CreateAttribute("coupleRateVelocity", VT.Float, False).Set(2.0)
@@ -304,12 +321,9 @@ class StatefulObject(BaseObject):
             rgbaPoints.append(Gf.Vec4f(78, 39, 6.1, 0.7))
             colormap.CreateAttribute("rgbaPoints", Sdf.ValueTypeNames.Float4Array, False).Set(rgbaPoints)
         elif emitter_type == EmitterType.STEAM:
-            MIN_HALF_HEIGHT = 0.03
-            bbox_extent = self.aabb_extent
             emitter.CreateAttribute("halfSize", VT.Float3, False).Set(
-                (bbox_extent[0] * 0.4, bbox_extent[1] * 0.4, max(MIN_HALF_HEIGHT, bbox_extent[2] * 0.15)))
-            simulate.CreateAttribute("densityCellSize", VT.Float, False).Set(bbox_extent[2] * 0.1)
-
+                tuple(bbox_extent_local * np.array(m.STEAM_EMITTER_SIZE_RATIO) / 2.0))
+            simulate.CreateAttribute("densityCellSize", VT.Float, False).Set(bbox_extent_local[2] * m.STEAM_EMITTER_DENSITY_CELL_RATIO)
 
     def set_emitter_enabled(self, emitter_type, value):
         """
@@ -323,26 +337,6 @@ class StatefulObject(BaseObject):
             return
         if value != self._emitters[emitter_type].GetAttribute("enabled").Get():
             self._emitters[emitter_type].GetAttribute("enabled").Set(value)
-
-    def update_emitter_position(self, emitter_type):
-        """
-        Update the position of the emitter prim for fire/steam effect.
-
-        Args:
-            emitter_type (EmitterType): Emitter to update
-        """
-        if emitter_type == EmitterType.FIRE and self.states[HeatSourceOrSink].get_state_link_name() in self._links:
-            # Assume the heat_source_link is a direct child of the base_link
-            heat_link = self.links[self.states[HeatSourceOrSink].get_state_link_name()]
-            heat_link_pos = heat_link.get_local_pose()[0]
-            # local position w.r.t to the base link frame
-            self._emitters[emitter_type].CreateAttribute("position", VT.Float3, False).Set(
-                (heat_link_pos[0], heat_link_pos[1], heat_link_pos[2]))
-        elif emitter_type == EmitterType.STEAM:
-            bbox_extent = self.aabb_extent
-            # local position w.r.t to the base link frame
-            self._emitters[emitter_type].CreateAttribute("position", VT.Float3, False).Set(
-                (0, 0, bbox_extent[2] * 0.5))
 
     def get_textures(self):
         """Gets prim's texture files.
@@ -382,7 +376,6 @@ class StatefulObject(BaseObject):
                 emitter_enabled[EmitterType.FIRE] |= state.get_value()[0]
 
             for emitter_type in emitter_enabled:
-                self.update_emitter_position(emitter_type)
                 self.set_emitter_enabled(emitter_type, emitter_enabled[emitter_type])
 
         texture_change_states.sort(key=lambda s: get_texture_change_priority()[s.__class__])

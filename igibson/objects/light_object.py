@@ -89,7 +89,7 @@ class LightObject(StatefulObject):
         load_config = dict() if load_config is None else load_config
         load_config["scale"] = scale
         load_config["intensity"] = intensity
-        load_config["radius"] = radius
+        load_config["radius"] = radius if light_type in {"Cylinder", "Disk", "Sphere"} else None
 
         # Make sure primitive type is valid
         assert_valid_key(key=light_type, valid_keys=self.LIGHT_TYPES, name="light_type")

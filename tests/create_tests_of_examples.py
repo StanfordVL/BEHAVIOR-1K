@@ -6,7 +6,7 @@ from string import Template
 
 import igibson
 from igibson import examples
-from igibson.utils.assets_utils import download_assets
+from igibson.utils.asset_utils import download_assets
 
 download_assets()
 

@@ -1,5 +1,5 @@
 from igibson.termination_conditions.termination_condition_base import SuccessCondition
-from igibson.utils.utils import l2_distance
+import igibson.utils.transform_utils as T
 
 
 class PointGoal(SuccessCondition):
@@ -30,5 +30,5 @@ class PointGoal(SuccessCondition):
         assert isinstance(task, PointNavigationTask), \
             f"Cannot use {self.__class__.__name__} with a non-PointNavigationTask task instance!"
         # Terminate if point goal is reached (distance below threshold)
-        return l2_distance(task.get_current_pos(env)[self._distance_axes], task.get_goal_pos()[self._distance_axes]) \
+        return T.l2_distance(task.get_current_pos(env)[self._distance_axes], task.get_goal_pos()[self._distance_axes]) \
             < self._distance_tol

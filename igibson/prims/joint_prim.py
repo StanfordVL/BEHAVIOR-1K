@@ -25,19 +25,24 @@ from omni.isaac.core.utils.prims import (
 import numpy as np
 import carb
 from omni.isaac.core.utils.stage import get_current_stage
+from igibson.macros import create_module_macros
 from igibson.prims.prim_base import BasePrim
 from igibson.utils.usd_utils import create_joint
-from igibson.utils.types import JointsState
-from igibson.utils.transform_utils import quat_inverse, quat_multiply
+from igibson.utils.omni_types import JointsState
 from igibson.utils.constants import JointType
 from igibson.utils.python_utils import assert_valid_key
 import igibson.utils.transform_utils as T
 from igibson.controllers.controller_base import ControlType
 
-DEFAULT_MAX_POS = 1000.0
-DEFAULT_MAX_PRISMATIC_VEL = 1.0
-DEFAULT_MAX_REVOLUTE_VEL = 15.0
-DEFAULT_MAX_EFFORT = 100.0
+
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
+
+m.DEFAULT_MAX_POS = 1000.0
+m.DEFAULT_MAX_PRISMATIC_VEL = 1.0
+m.DEFAULT_MAX_REVOLUTE_VEL = 15.0
+m.DEFAULT_MAX_EFFORT = 100.0
+m.COMPONENT_SUFFIXES = ["x", "y", "z", "rx", "ry", "rz"]
 
 # TODO: Split into non-articulated / articulated Joint Prim classes?
 
@@ -191,7 +196,14 @@ class JointPrim(BasePrim):
         """
         Updates all internal handles for this prim, in case they change since initialization
         """
-        self._handle = self._dc.get_joint(self._prim_path)
+        # TODO: A bit hacky way to get the joint handle, ideally we'd simply do dc.get_joint(), but this doesn't seem to work as expected?
+        self._handle = None
+        for i in range(self._dc.get_articulation_joint_count(self._art)):
+            joint_handle = self._dc.get_articulation_joint(self._art, i)
+            joint_path = self._dc.get_joint_path(joint_handle)
+            if joint_path == self._prim_path:
+                self._handle = joint_handle
+                break
 
     def get_default_state(self):
         """
@@ -246,7 +258,6 @@ class JointPrim(BasePrim):
             assert kp is not None, "kp gain must be specified for setting POSITION control!"
             assert kd is None, "kd gain must not be specified for setting POSITION control!"
             kd = 0.0
-
         elif control_type == ControlType.VELOCITY:
             assert kp is None, "kp gain must not be specified for setting VELOCITY control!"
             assert kd is not None, "kd gain must be specified for setting VELOCITY control!"
@@ -257,10 +268,11 @@ class JointPrim(BasePrim):
             kp, kd = 0.0, 0.0
 
         # Set values
-        for dof_handle, dof_property in zip(self._dof_handles, self._dof_properties):
-            dof_property.stiffness = kp
-            dof_property.damping = kd
-            self._dc.set_dof_properties(dof_handle, dof_property)
+        if self._dc:
+            for dof_handle, dof_property in zip(self._dof_handles, self._dof_properties):
+                dof_property.stiffness = kp
+                dof_property.damping = kd
+                self._dc.set_dof_properties(dof_handle, dof_property)
 
         # Update control type
         self._control_type = control_type
@@ -344,7 +356,7 @@ class JointPrim(BasePrim):
         quat1 = gf_quat_to_np_array(self.get_attribute("physics:localRot1"))[[1, 2, 3, 0]]
 
         # Invert the child link relationship, and multiply the two rotations together to get the final rotation
-        return quat_multiply(quaternion1=quat_inverse(quat1), quaternion0=quat0)
+        return T.quat_multiply(quaternion1=T.quat_inverse(quat1), quaternion0=quat0)
 
     @property
     def joint_name(self):
@@ -398,7 +410,7 @@ class JointPrim(BasePrim):
         assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
         # We either return the raw value or a default value if there is no max specified
         raw_vel = self._dof_properties[0].max_velocity
-        default_max_vel = DEFAULT_MAX_REVOLUTE_VEL if self.joint_type == "RevoluteJoint" else DEFAULT_MAX_PRISMATIC_VEL
+        default_max_vel = m.DEFAULT_MAX_REVOLUTE_VEL if self.joint_type == "RevoluteJoint" else m.DEFAULT_MAX_PRISMATIC_VEL
         return default_max_vel if raw_vel in {None, np.inf} else raw_vel
 
     @max_velocity.setter
@@ -426,7 +438,7 @@ class JointPrim(BasePrim):
         assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
         # We either return the raw value or a default value if there is no max specified
         raw_force = self._dof_properties[0].max_effort
-        return DEFAULT_MAX_EFFORT if raw_force in {None, np.inf} else raw_force
+        return m.DEFAULT_MAX_EFFORT if raw_force in {None, np.inf} else raw_force
 
     @max_force.setter
     def max_force(self, force):
@@ -488,7 +500,7 @@ class JointPrim(BasePrim):
         """
         # Only support revolute and prismatic joints for now
         assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
-        self._dof_properties[0].stiffness = damping
+        self._dof_properties[0].damping = damping
         self._dc.set_dof_properties(self._dof_handles[0], self._dof_properties[0])
 
     @property
@@ -524,7 +536,7 @@ class JointPrim(BasePrim):
         assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
         # We either return the raw value or a default value if there is no max specified
         raw_pos = self._dof_properties[0].lower
-        return -DEFAULT_MAX_POS if raw_pos in {None, -np.inf} else raw_pos
+        return -m.DEFAULT_MAX_POS if raw_pos in {None, -np.inf} else raw_pos
 
     @lower_limit.setter
     def lower_limit(self, lower_limit):
@@ -550,7 +562,7 @@ class JointPrim(BasePrim):
         assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
         # We either return the raw value or a default value if there is no max specified
         raw_pos = self._dof_properties[0].upper
-        return DEFAULT_MAX_POS if raw_pos in {None, np.inf} else raw_pos
+        return m.DEFAULT_MAX_POS if raw_pos in {None, np.inf} else raw_pos
 
     @upper_limit.setter
     def upper_limit(self, upper_limit):
@@ -644,6 +656,33 @@ class JointPrim(BasePrim):
             pos, vel, effort = self._normalize_pos(pos), self._normalize_vel(vel), self._normalize_effort(effort)
 
         return pos, vel, effort
+
+    def get_target(self, normalized=False):
+        """
+        (pos, vel) target of this joint
+
+        Args:
+            normalized (bool): If True, will return normalized target of this joint
+
+        Returns:
+            Tuple:
+                - n-array: target position of this joint, where n = number of DOF for this joint
+                - n-array: target velocity of this joint, where n = number of DOF for this joint
+        """
+        # Make sure we only call this if we're an articulated joint
+        self.assert_articulated()
+
+        # Grab raw states
+        pos, vel = np.zeros(self.n_dof), np.zeros(self.n_dof)
+        for i, dof_handle in enumerate(self._dof_handles):
+            pos[i] = self._dc.get_dof_position_target(dof_handle)
+            vel[i] = self._dc.get_dof_velocity_target(dof_handle)
+
+        # Potentially normalize if requested
+        if normalized:
+            pos, vel = self._normalize_pos(pos), self._normalize_vel(vel)
+
+        return pos, vel
 
     def _normalize_pos(self, pos):
         """
@@ -810,7 +849,7 @@ class JointPrim(BasePrim):
 
         # Potentially de-normalize if the input is normalized
         if normalized:
-            effort = self._denormalize_vel(effort)
+            effort = self._denormalize_effort(effort)
 
         # Set the DOF(s) in this joint
         for dof_handle, e in zip(self._dof_handles, effort):
@@ -824,10 +863,13 @@ class JointPrim(BasePrim):
 
     def _dump_state(self):
         pos, vel, effort = self.get_state() if self.articulated else (np.array([]), np.array([]), np.array([]))
+        target_pos, target_vel = self.get_target() if self.articulated else (np.array([]), np.array([]))
         return OrderedDict(
             pos=pos,
             vel=vel,
             effort=effort,
+            target_pos=target_pos,
+            target_vel=target_vel,
         )
 
     def _load_state(self, state):
@@ -835,6 +877,10 @@ class JointPrim(BasePrim):
             self.set_pos(state["pos"], target=False)
             self.set_vel(state["vel"], target=False)
             self.set_effort(state["effort"])
+            if self._control_type == ControlType.POSITION:
+                self.set_pos(state["target_pos"], target=True)
+            elif self._control_type == ControlType.VELOCITY:
+                self.set_vel(state["target_vel"], target=True)
 
     def _serialize(self, state):
         # We serialize by iterating over the keys and adding them to a list that's concatenated at the end
@@ -847,7 +893,9 @@ class JointPrim(BasePrim):
             pos=state[0:self.n_dof],
             vel=state[self.n_dof:2*self.n_dof],
             effort=state[2*self.n_dof:3*self.n_dof],
-        ), 3*self.n_dof
+            target_pos=state[3*self.n_dof:4*self.n_dof],
+            target_vel=state[4*self.n_dof:5*self.n_dof],
+        ), 5*self.n_dof
 
     def duplicate(self, simulator, prim_path):
         # Cannot directly duplicate a joint prim

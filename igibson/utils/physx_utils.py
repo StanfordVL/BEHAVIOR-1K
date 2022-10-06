@@ -92,6 +92,20 @@ def bind_material(prim_path, material_path):
     )
 
 
+def get_prototype_path_from_particle_system_path(particle_system_path):
+    """
+    Grabs the particle prototype directory prim path from the particle system path. This is different from before
+    because Omni no longer allows for meshes to be nested within each other.
+
+    Args:
+        particle_system_path (str): Prim path to the particle system of interest
+
+    Returns:
+        str: Corresponding directory to the particle system's prototypes
+    """
+    return f"{particle_system_path}Prototypes"
+
+
 def create_physx_particleset_pointinstancer(
     name,
     particle_system_path,
@@ -146,6 +160,7 @@ def create_physx_particleset_pointinstancer(
     """
     stage = get_current_stage()
     n_particles = len(positions)
+    particle_system = get_prim_at_path(particle_system_path)
 
     # Make sure no prototype doesn't already exist at this point
     prim_path = f"{particle_system_path}/{name}"
@@ -156,8 +171,10 @@ def create_physx_particleset_pointinstancer(
     instancer = UsdGeom.PointInstancer.Define(stage, prim_path)
 
     # Create particle instance prototypes if none are specified
+    prototype_root_path = f"{get_prototype_path_from_particle_system_path(particle_system_path=particle_system_path)}/{name}"
+    stage.DefinePrim(prototype_root_path, "Scope")
     if prototype_prim_paths is None:
-        prototype_path = f"{prim_path}/particlePrototype"
+        prototype_path = f"{prototype_root_path}/particlePrototype"
         UsdGeom.Sphere.Define(stage, prototype_path)
         prototype_prim_paths = [prototype_path]
     else:
@@ -166,17 +183,23 @@ def create_physx_particleset_pointinstancer(
         # if multiple instancers share the same prototype prim for some reason
         new_prototype_prim_paths = []
         for i, p_path in enumerate(prototype_prim_paths):
-            new_path = f"{prim_path}/particlePrototype{i}"
+            new_path = f"{prototype_root_path}/particlePrototype{i}"
             omni.kit.commands.execute("CopyPrim", path_from=p_path, path_to=new_path)
             new_prototype_prim_paths.append(new_path)
         prototype_prim_paths = new_prototype_prim_paths
 
-
     # Add prototype mesh prim paths to the prototypes relationship attribute for this point set
+    # We also hide the prototype if we're using an isosurface
     mesh_list = instancer.GetPrototypesRel()
+    is_isosurface = particle_system.HasAPI(PhysxSchema.PhysxParticleIsosurfaceAPI) and \
+                    particle_system.GetAttribute("physxParticleIsosurface:isosurfaceEnabled").Get()
+
     for prototype_prim_path in prototype_prim_paths:
         # Make sure this prim is visible first
-        UsdGeom.Imageable(get_prim_at_path(prototype_prim_path)).MakeVisible()
+        if is_isosurface:
+            UsdGeom.Imageable(get_prim_at_path(prototype_prim_path)).MakeInvisible()
+        else:
+            UsdGeom.Imageable(get_prim_at_path(prototype_prim_path)).MakeVisible()
         # Add target
         mesh_list.AddTarget(Sdf.Path(prototype_prim_path))
 
@@ -221,4 +244,3 @@ def create_physx_particleset_pointinstancer(
     physicsUtils.set_or_add_translate_op(instancer, Gf.Vec3f(0, 0, 0))
 
     return instancer_prim
-

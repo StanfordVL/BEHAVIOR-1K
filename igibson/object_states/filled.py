@@ -1,19 +1,17 @@
 import numpy as np
 from collections import OrderedDict
-import igibson.macros as m
+from igibson.macros import gm, create_module_macros
 from igibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from igibson.object_states.object_state_base import RelativeObjectState, BooleanState
 import igibson.utils.transform_utils as T
-from igibson.utils.python_utils import assert_valid_key
 from igibson.utils.usd_utils import mesh_prim_to_trimesh_mesh
+from igibson.systems import get_fluid_systems, get_system_from_element_name, get_element_name_from_system
 
-
-if m.ENABLE_OMNI_PARTICLES:
-    from igibson.systems import SYSTEMS_REGISTRY, get_fluid_systems, get_system_from_element_name, get_element_name_from_system
-
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
 
 # Proportion of object's volume that must be filled for object to be considered filled
-VOLUME_FILL_PROPORTION = 0.3
+m.VOLUME_FILL_PROPORTION = 0.3
 
 
 def get_particle_positions_in_frame(pos, quat, scale, particle_positions):
@@ -322,7 +320,7 @@ class Filled(RelativeObjectState, BooleanState, LinkBasedStateMixin):
             # If greater than threshold, then the volume is filled
             # Explicit bool cast needed here because the type is bool_ instead of bool which is not JSON-Serializable
             # This has to do with numpy, see https://stackoverflow.com/questions/58408054/typeerror-object-of-type-bool-is-not-json-serializable
-            value = bool(prop_filled > VOLUME_FILL_PROPORTION)
+            value = bool(prop_filled > m.VOLUME_FILL_PROPORTION)
         else:
             # No fluid exists, so we're obviously empty
             value = False

@@ -1,6 +1,6 @@
 import igibson
 from igibson import app, ig_dataset_path
-from igibson.simulator_omni import Simulator
+from igibson.simulator import Simulator
 import omni
 import omni.kit.commands
 from pxr import UsdLux, Sdf, Gf, UsdPhysics, PhysicsSchemaTools, Usd

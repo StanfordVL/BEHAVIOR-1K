@@ -4,7 +4,7 @@ import numpy as np
 from igibson.robots import REGISTERED_ROBOTS
 from igibson.scenes.stadium_scene import StadiumScene
 from igibson.simulator import Simulator
-from igibson.utils.assets_utils import download_assets
+from igibson.utils.asset_utils import download_assets
 
 download_assets()
 

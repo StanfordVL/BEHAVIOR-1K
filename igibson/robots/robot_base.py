@@ -1,23 +1,18 @@
 import inspect
 import logging
-from abc import ABCMeta, abstractmethod
-from collections import OrderedDict
+from abc import abstractmethod
 from copy import deepcopy
-
-import gym
+from collections import OrderedDict
 import numpy as np
-
-from future.utils import with_metaclass
-
-from igibson.controllers import ControlType, create_controller
-# # from igibson.external.pybullet_tools.utils import get_joint_info
-import igibson.macros as m
-from igibson.sensors import create_sensor, SENSOR_PRIMS_TO_SENSOR_CLS, ALL_SENSOR_MODALITIES
+import matplotlib.pyplot as plt
+from igibson.macros import gm
+from igibson.sensors import create_sensor, SENSOR_PRIMS_TO_SENSOR_CLS, ALL_SENSOR_MODALITIES, VisionSensor, ScanSensor
 from igibson.objects.usd_object import USDObject
 from igibson.objects.controllable_object import ControllableObject
 from igibson.utils.gym_utils import GymObservable
 from igibson.utils.python_utils import Registerable, classproperty
-from igibson.utils.utils import rotate_vector_3d
+from igibson.utils.vision_utils import segmentation_to_rgb
+import igibson.utils.transform_utils as T
 from pxr import PhysxSchema
 
 # Global dicts that will contain mappings
@@ -146,7 +141,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable, Registerable):
         # Possibly force enabling of contact sensing for this robot if we set the global flag
         # TODO: Remove this once we have a more optimized solution
         # Only create contact report api if we're not visual only
-        if (not self._visual_only) and m.ENABLE_ROBOT_CONTACT_REPORTING:
+        if (not self._visual_only) and gm.ENABLE_ROBOT_CONTACT_REPORTING:
             for link in self._links.values():
                 PhysxSchema.PhysxContactReportAPI(link.prim) if \
                     link.prim.HasAPI(PhysxSchema.PhysxContactReportAPI) else \
@@ -197,26 +192,6 @@ class BaseRobot(USDObject, ControllableObject, GymObservable, Registerable):
         Run any needed sanity checks to make sure this robot was created correctly.
         """
         pass
-
-    def get_state(self):
-        """
-        Calculate proprioceptive states for the robot. By default, this is:
-            [pos, rpy, lin_vel, ang_vel, joint_states]
-
-        :return Array[float]: Flat array of proprioceptive states (e.g.: [position, orientation, ...])
-        """
-        # Grab relevant states
-        pos = self.get_position()
-        rpy = self.get_rpy()
-        joints_state = self.get_joints_state(normalized=False).flatten()
-
-        # rotate linear and angular velocities to local frame
-        lin_vel = rotate_vector_3d(self.get_linear_velocity(), *rpy)
-        ang_vel = rotate_vector_3d(self.get_angular_velocity(), *rpy)
-
-        # Compile and return state
-        state = np.concatenate([pos, rpy, lin_vel, ang_vel, joints_state])
-        return state
 
     def can_toggle(self, toggle_position, toggle_distance_threshold):
         """
@@ -277,7 +252,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable, Registerable):
         :return dict: keyword-mapped proprioception observations available for this robot. Can be extended by subclasses
         """
         joints_state = self.get_joints_state(normalized=False)
-        pos, ori = self.get_position_orientation()
+        pos, ori = self.get_position(), self.get_rpy()
         return {
             "joint_qpos": joints_state.positions,
             "joint_qpos_sin": np.sin(joints_state.positions),
@@ -285,8 +260,8 @@ class BaseRobot(USDObject, ControllableObject, GymObservable, Registerable):
             "joint_qvel": joints_state.velocities,
             "joint_qeffort": joints_state.efforts,
             "robot_pos": pos,
-            "robot_rpy": self.get_rpy(),
-            "robot_quat": ori,
+            "robot_ori_cos": np.cos(ori),
+            "robot_ori_sin": np.sin(ori),
             "robot_lin_vel": self.get_linear_velocity(),
             "robot_ang_vel": self.get_angular_velocity(),
         }
@@ -333,6 +308,71 @@ class BaseRobot(USDObject, ControllableObject, GymObservable, Registerable):
         for sensor in self._sensors.values():
             if modality in sensor.all_modalities:
                 sensor.remove_modality(modality=modality)
+
+    def visualize_sensors(self):
+        """
+        Renders this robot's key sensors, visualizing them via matplotlib plots
+        """
+        frames = OrderedDict()
+        remaining_obs_modalities = deepcopy(self.obs_modalities)
+        for sensor in self.sensors.values():
+            obs = sensor.get_obs()
+            sensor_frames = []
+            if isinstance(sensor, VisionSensor):
+                # We check for rgb, depth, normal, seg_instance
+                for modality in ["rgb", "depth", "normal", "seg_instance"]:
+                    if modality in sensor.modalities:
+                        ob = obs[modality]
+                        if modality == "rgb":
+                            # Ignore alpha channel, map to floats
+                            ob = ob[:, :, :3] / 255.0
+                        elif modality == "seg_instance":
+                            # Map IDs to rgb
+                            ob = segmentation_to_rgb(ob, N=256) / 255.0
+                        elif modality == "normal":
+                            # Re-map to 0 - 1 range
+                            ob = (ob + 1.0) / 2.0
+                        else:
+                            # Depth, nothing to do here
+                            pass
+                        # Add this observation to our frames and remove the modality
+                        sensor_frames.append((modality, ob))
+                        remaining_obs_modalities -= {modality}
+                    else:
+                        # Warn user that we didn't find this modality
+                        print(f"Modality {modality} is not active in sensor {sensor.name}, skipping...")
+            elif isinstance(sensor, ScanSensor):
+                # We check for occupancy_grid
+                occupancy_grid = obs.get("occupancy_grid", None)
+                if occupancy_grid is not None:
+                    sensor_frames.append(("occupancy_grid", occupancy_grid))
+                    remaining_obs_modalities -= {"occupancy_grid"}
+
+            # Map the sensor name to the frames for that sensor
+            frames[sensor.name] = sensor_frames
+
+        # Warn user that any remaining modalities are not able to be visualized
+        if len(remaining_obs_modalities) > 0:
+            print(f"Modalities: {remaining_obs_modalities} cannot be visualized, skipping...")
+
+        # Write all the frames to a plot
+        for sensor_name, sensor_frames in frames.items():
+            n_sensor_frames = len(sensor_frames)
+            if n_sensor_frames > 0:
+                fig, axes = plt.subplots(nrows=1, ncols=n_sensor_frames)
+                if n_sensor_frames == 1:
+                    axes = [axes]
+                # Dump frames and set each subtitle
+                for i, (modality, frame) in enumerate(sensor_frames):
+                    axes[i].imshow(frame)
+                    axes[i].set_title(modality)
+                    axes[i].set_axis_off()
+                # Set title
+                fig.suptitle(sensor_name)
+                plt.show(block=False)
+
+        # One final plot show so all the figures get rendered
+        plt.show()
 
     @property
     def sensors(self):

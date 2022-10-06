@@ -10,9 +10,9 @@ import igibson
 from igibson import app, ig_dataset_path
 from igibson.robots.turtlebot import Turtlebot
 from igibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
-from igibson.simulator_omni import Simulator
-from igibson.utils.assets_utils import get_ig_assets_version
-from igibson.utils.utils import parse_config
+from igibson.simulator import Simulator
+from igibson.utils.asset_utils import get_ig_assets_version
+from igibson.utils.config_utils import parse_config
 
 
 # Params to be set as needed.
@@ -102,7 +102,7 @@ def benchmark_scene(sim, scene_name, optimized=False, import_robot=True):
     plt.plot(physics_fps)
     ax.set_xlabel("Physics fps with time, converge to {}".format(np.mean(physics_fps[-100:])))
     ax.set_ylabel("fps")
-    # TODO! Objs awake not implemented yet in simulator_omni.py
+    # TODO! Objs awake not implemented yet in simulator.py
     # ax = plt.subplot(6, 1, 6)
     # plt.plot(obj_awake)
     # ax.set_xlabel("Num object links awake, converge to {}".format(np.mean(obj_awake[-100:])))

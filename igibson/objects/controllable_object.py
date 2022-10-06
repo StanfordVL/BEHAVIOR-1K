@@ -8,7 +8,6 @@ from igibson.objects.object_base import BaseObject
 from igibson.controllers import create_controller
 from igibson.controllers.controller_base import ControlType
 from igibson.utils.python_utils import assert_valid_key, merge_nested_dicts
-from igibson.utils.types import JointsState
 
 
 class ControllableObject(BaseObject):
@@ -24,7 +23,7 @@ class ControllableObject(BaseObject):
         category="object",
         class_id=None,
         uuid=None,
-        scale=1.0,
+        scale=None,
         rendering_params=None,
         visible=True,
         fixed_base=False,
@@ -71,7 +70,7 @@ class ControllableObject(BaseObject):
         """
         # Store inputs
         self._control_freq = control_freq
-        self._controller_config = {} if controller_config is None else controller_config
+        self._controller_config = controller_config
         self._reset_joint_pos = reset_joint_pos if reset_joint_pos is None else np.array(reset_joint_pos)
 
         # Make sure action type is valid, and also save
@@ -83,6 +82,7 @@ class ControllableObject(BaseObject):
         self._dof_to_joints = None          # OrderedDict that will map DOF indices to JointPrims
         self._last_action = None
         self._controllers = None
+        self.dof_names_ordered = None
 
         # Run super init
         super().__init__(
@@ -104,32 +104,13 @@ class ControllableObject(BaseObject):
     def _initialize(self):
         # Run super first
         super()._initialize()
-
-        # TODO! For BehaviorRobot
-        # # Set up any virtual joints for any non-base bodies.
-        # virtual_joints = {joint.joint_name: joint for joint in self._setup_virtual_joints()}
-        # assert self._joints.keys().isdisjoint(virtual_joints.keys())
-        # self._joints.update(virtual_joints)
-
         # Fill in the DOF to joint mapping
         self._dof_to_joints = OrderedDict()
         idx = 0
         for joint in self._joints.values():
-            for i in range(joint.n_dof):
+            for _ in range(joint.n_dof):
                 self._dof_to_joints[idx] = joint
                 idx += 1
-
-        # Update the configs
-        for group in self.controller_order:
-            group_controller_name = (
-                self._controller_config[group]["name"]
-                if group in self._controller_config and "name" in self._controller_config[group]
-                else self._default_controllers[group]
-            )
-            self._controller_config[group] = merge_nested_dicts(
-                base_dict=self._default_controller_config[group][group_controller_name],
-                extra_dict=self._controller_config.get(group, {}),
-            )
 
         # Update the reset joint pos
         if self._reset_joint_pos is None:
@@ -170,9 +151,16 @@ class ControllableObject(BaseObject):
         Stores created controllers as dictionary mapping controller names to specific controller
         instances used by this object.
         """
+        # Generate the controller config
+        self._controller_config = self._generate_controller_config(custom_config=self._controller_config)
+
         # Store dof idx mapping to dof name
-        dof_names_ordered = [self._dc.get_dof_name(self._dc.get_articulation_dof(self._handle, i))
-                             for i in range(self.n_dof)]
+
+        # TODO: Verify that this modification has no side effects
+        # dof_names_ordered = [self._dc.get_dof_name(self._dc.get_articulation_dof(self._handle, i))
+        #                      for i in range(self.n_dof)]
+        self.dof_names_ordered = list(self._joints.keys())
+
         # Initialize controllers to create
         self._controllers = OrderedDict()
         # Loop over all controllers, in the order corresponding to @action dim
@@ -185,14 +173,64 @@ class ControllableObject(BaseObject):
             # Create the controller
             self._controllers[name] = create_controller(**cfg)
 
-            # Update the control modes of each joint based on the outputted control from the controllers
+        self._update_controller_mode()
+
+    def _update_controller_mode(self):
+        # Update the control modes of each joint based on the outputted control from the controllers
+        for name in self._controllers:
             for dof in self._controllers[name].dof_idx:
                 control_type = self._controllers[name].control_type
-                self._joints[dof_names_ordered[dof]].set_control_type(
+                self._joints[self.dof_names_ordered[dof]].set_control_type(
                     control_type=control_type,
                     kp=self.default_kp if control_type == ControlType.POSITION else None,
                     kd=self.default_kd if control_type == ControlType.VELOCITY else None,
                 )
+
+    def _generate_controller_config(self, custom_config=None):
+        """
+        Generates a fully-populated controller config, overriding any default values with the corresponding values
+        specified in @custom_config
+
+        Args:
+            custom_config (None or Dict[str, ...]): nested dictionary mapping controller name(s) to specific custom
+                controller configurations for this object. This will override any default values specified by this class
+
+        Returns:
+            dict: Fully-populated nested dictionary mapping controller name(s) to specific controller configurations for
+                this object
+        """
+        controller_config = {} if custom_config is None else deepcopy(custom_config)
+
+        # Update the configs
+        for group in self.controller_order:
+            group_controller_name = (
+                controller_config[group]["name"]
+                if group in controller_config and "name" in controller_config[group]
+                else self._default_controllers[group]
+            )
+            controller_config[group] = merge_nested_dicts(
+                base_dict=self._default_controller_config[group][group_controller_name],
+                extra_dict=controller_config.get(group, {}),
+            )
+
+        return controller_config
+
+    def reload_controllers(self, controller_config=None):
+        """
+        Reloads controllers based on the specified new @controller_config
+
+        Args:
+            controller_config (None or Dict[str, ...]): nested dictionary mapping controller name(s) to specific
+                controller configurations for this object. This will override any default values specified by this class.
+        """
+        self._controller_config = {} if controller_config is None else controller_config
+
+        # (Re-)load controllers
+        self._load_controllers()
+
+        # (Re-)create the action space
+        self._action_space = self._create_discrete_action_space() if self._action_type == "discrete" \
+            else self._create_continuous_action_space()
 
     def reset(self):
         # Make sure simulation is playing, otherwise, we cannot reset because DC requires active running
@@ -204,30 +242,15 @@ class ControllableObject(BaseObject):
 
         # Additionally set the joint states based on the reset values
         self.set_joint_positions(positions=self._reset_joint_pos, target=False)
-        self.set_joint_velocities(velocities=np.zeros(self._n_dof), target=False)
-
-        # Store dof idx mapping to dof name
-        dof_names_ordered = [self._dc.get_dof_name(self._dc.get_articulation_dof(self._handle, i))
-                             for i in range(self.n_dof)]
+        self.set_joint_velocities(velocities=np.zeros(self.n_dof), target=False)
 
         # Update the control modes of each joint based on the outputted control from the controllers
         # Omni resets them after every reset
-        for controller in self._controllers.values():
-            for dof in controller.dof_idx:
-                control_type = controller.control_type
-                self._joints[dof_names_ordered[dof]].set_control_type(
-                    control_type=control_type,
-                    kp=self.default_kp if control_type == ControlType.POSITION else None,
-                    kd=self.default_kd if control_type == ControlType.VELOCITY else None,
-                )
+        self._update_controller_mode()
 
         # Reset all controllers
         for controller in self._controllers.values():
             controller.reset()
-
-    def _setup_virtual_joints(self):
-        """Create and return any virtual joints an object might need. Subclasses can implement this as necessary."""
-        return []
 
     @abstractmethod
     def _create_discrete_action_space(self):
@@ -312,8 +335,9 @@ class ControllableObject(BaseObject):
             idx += controller.command_dim
 
         # Compose controls
-        u_vec = np.zeros(self._n_dof)
-        u_type_vec = np.array([ControlType.POSITION] * self._n_dof)
+        u_vec = np.zeros(self.n_dof)
+        # By default, the control type is effort and the control value is 0 (np.zeros) - 0 effort means no control.
+        u_type_vec = np.array([ControlType.EFFORT] * self.n_dof)
         for group, ctrl in control.items():
             idx = self._controllers[group].dof_idx
             u_vec[idx] = ctrl["value"]
@@ -351,12 +375,12 @@ class ControllableObject(BaseObject):
         """
         # Run sanity check
         if indices is None:
-            assert len(control) == len(control_type) == self._n_dof, (
+            assert len(control) == len(control_type) == self.n_dof, (
                 "Control signals, control types, and number of DOF should all be the same!"
-                "Got {}, {}, and {} respectively.".format(len(control), len(control_type), self._n_dof)
+                "Got {}, {}, and {} respectively.".format(len(control), len(control_type), self.n_dof)
             )
             # Set indices manually so that we're standardized
-            indices = np.arange(self._n_dof)
+            indices = np.arange(self.n_dof)
         else:
             assert len(control) == len(control_type) == len(indices), (
                 "Control signals, control types, and indices should all be the same!"
@@ -608,7 +632,7 @@ class ControllableObject(BaseObject):
             float: Default kp gain to apply to any DOF when switching control modes (e.g.: switching from a
                 velocity control mode to a position control mode)
         """
-        return 4000.0 #400.0
+        return 1e7
 
     @property
     def default_kd(self):
@@ -617,7 +641,7 @@ class ControllableObject(BaseObject):
             float: Default kd gain to apply to any DOF when switching control modes (e.g.: switching from a
                 position control mode to a velocity control mode)
         """
-        return 4000.0
+        return 1e5
 
     @property
     @abstractmethod

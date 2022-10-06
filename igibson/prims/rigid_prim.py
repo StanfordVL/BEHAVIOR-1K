@@ -16,17 +16,15 @@ import numpy as np
 from omni.isaac.dynamic_control import _dynamic_control
 import carb
 
-import igibson.macros as m
+from igibson.macros import gm
 from igibson.prims.xform_prim import XFormPrim
 from igibson.prims.geom_prim import CollisionGeomPrim, VisualGeomPrim
-from igibson.utils.types import DynamicState, CsRawData, GEOM_TYPES
+from igibson.utils.constants import GEOM_TYPES
+from igibson.utils.omni_types import DynamicState, CsRawData
 from igibson.utils.usd_utils import mesh_prim_to_trimesh_mesh
 
 # Import omni sensor based on type
-if m.IS_PUBLIC_ISAACSIM:
-    from omni.isaac.contact_sensor import _contact_sensor as _s
-else:
-    from omni.isaac.isaac_sensor import _isaac_sensor as _s
+from omni.isaac.isaac_sensor import _isaac_sensor as _s
 
 
 class RigidPrim(XFormPrim):
@@ -95,7 +93,7 @@ class RigidPrim(XFormPrim):
             UsdPhysics.MassAPI.Apply(self._prim)
 
         # Only create contact report api if we're not visual only
-        if (not self._visual_only) and m.ENABLE_GLOBAL_CONTACT_REPORTING:
+        if (not self._visual_only) and gm.ENABLE_GLOBAL_CONTACT_REPORTING:
             self._physx_rigid_api = PhysxSchema.PhysxContactReportAPI(self._prim) if \
                 self._prim.HasAPI(PhysxSchema.PhysxContactReportAPI) else \
                 PhysxSchema.PhysxContactReportAPI.Apply(self._prim)
@@ -165,13 +163,11 @@ class RigidPrim(XFormPrim):
 
         # We grab contact info for the first time before setting our internal handle, because this changes the dc handle
         if self.contact_reporting_enabled:
-            self._cs.get_body_contact_raw_data(self._prim_path) if m.IS_PUBLIC_ISAACSIM else \
-                self._cs.get_rigid_body_raw_data(self._prim_path)
+            self._cs.get_rigid_body_raw_data(self._prim_path)
 
         # Grab handle to this rigid body and get name
         self.update_handles()
         self._body_name = self._dc.get_rigid_body_name(self._handle)
-        print(f"handle: {self._handle}, body name: {self._body_name}")
 
         # Set the default state
         pos, ori = self.get_position_orientation()
@@ -240,8 +236,7 @@ class RigidPrim(XFormPrim):
         #     "Cannot grab contacts for this rigid prim without Physx's contact report API being added!"
         contacts = []
         if self.contact_reporting_enabled:
-            raw_data = self._cs.get_body_contact_raw_data(self._prim_path) if m.IS_PUBLIC_ISAACSIM else \
-                self._cs.get_rigid_body_raw_data(self._prim_path)
+            raw_data = self._cs.get_rigid_body_raw_data(self._prim_path)
             for c in raw_data:
                 # contact sensor handles and dynamic articulation handles are not comparable
                 # every prim has a cs to convert (cs) handle to prim path (decode_body_name)
@@ -551,6 +546,22 @@ class RigidPrim(XFormPrim):
             density (float): density of the rigid body in kg / m^3.
         """
         self._mass_api.GetDensityAttr().Set(density)
+
+    @property
+    def ccd_enabled(self):
+        """
+        Returns:
+            bool: whether CCD is enabled or not for this link
+        """
+        return self.get_attribute("physxRigidBody:enableCCD")
+
+    @ccd_enabled.setter
+    def ccd_enabled(self, enabled):
+        """
+        Args:
+            enabled (bool): whether CCD should be enabled or not for this link
+        """
+        self.set_attribute("physxRigidBody:enableCCD", enabled)
 
     @property
     def contact_reporting_enabled(self):

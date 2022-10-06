@@ -392,13 +392,30 @@ def mat2quat(rmat):
     return R.from_matrix(M).as_quat()
 
 
-def euler2mat(euler, seq="xyz"):
+def vec2quat(vec, up=(0, 0, 1.0)):
+    """
+    Converts given 3d-direction vector @vec to quaternion orientation with respect to another direction vector @up
+
+    Args:
+        vec (3-array): (x,y,z) direction vector (possible non-normalized)
+        up (3-array): (x,y,z) direction vector representing the canonical up direction (possible non-normalized)
+    """
+    # See https://stackoverflow.com/questions/15873996/converting-a-direction-vector-to-a-quaternion-rotation
+    # Take cross product of @up and @vec to get @s_n, and then cross @vec and @s_n to get @u_n
+    # Then compose 3x3 rotation matrix and convert into quaternion
+    vec_n = vec / np.linalg.norm(vec)       # x
+    up_n = up / np.linalg.norm(up)
+    s_n = np.cross(up_n, vec_n)             # y
+    u_n = np.cross(vec_n, s_n)              # z
+    return mat2quat(np.array([vec_n, s_n, u_n]).T)
+
+
+def euler2mat(euler):
     """
     Converts euler angles into rotation matrix form
 
     Args:
         euler (np.array): (r,p,y) angles
-        seq (str): Order sequence of the euler angle rotation. Default is "xyz"
 
     Returns:
         np.array: 3x3 rotation matrix
@@ -410,22 +427,21 @@ def euler2mat(euler, seq="xyz"):
     euler = np.asarray(euler, dtype=np.float64)
     assert euler.shape[-1] == 3, "Invalid shaped euler {}".format(euler)
 
-    return R.from_euler(seq, euler).as_matrix()
+    return R.from_euler("xyz", euler).as_matrix()
 
 
-def mat2euler(rmat, seq="xyz"):
+def mat2euler(rmat):
     """
     Converts given rotation matrix to euler angles in radian.
 
     Args:
         rmat (np.array): 3x3 rotation matrix
-        seq (str): Order sequence of the euler angle rotation. Default is "xyz"
 
     Returns:
         np.array: (r,p,y) converted euler angles in radian vec3 float
     """
     M = np.array(rmat, dtype=np.float32, copy=False)[:3, :3]
-    return R.from_matrix(M).as_euler(seq)
+    return R.from_matrix(M).as_euler("xyz")
 
 
 def pose2mat(pose):
@@ -494,13 +510,12 @@ def axisangle2quat(vec):
     return R.from_rotvec(vec).as_quat()
 
 
-def euler2quat(euler, seq="xyz"):
+def euler2quat(euler):
     """
     Converts euler angles into quaternion form
 
     Args:
         euler (np.array): (r,p,y) angles
-        seq (str): Order sequence of the euler angle rotation. Default is "xyz"
 
     Returns:
         np.array: (x,y,z,w) float quaternion angles
@@ -508,16 +523,15 @@ def euler2quat(euler, seq="xyz"):
     Raises:
         AssertionError: [Invalid input shape]
     """
-    return R.from_euler(seq, euler).as_quat()
+    return R.from_euler("xyz", euler).as_quat()
 
 
-def quat2euler(quat, seq="xyz"):
+def quat2euler(quat):
     """
     Converts euler angles into quaternion form
 
     Args:
         quat (np.array): (x,y,z,w) float quaternion angles
-        seq (str): Order sequence of the euler angle rotation. Default is "xyz"
 
     Returns:
         np.array: (r,p,y) angles
@@ -525,7 +539,7 @@ def quat2euler(quat, seq="xyz"):
     Raises:
         AssertionError: [Invalid input shape]
     """
-    return R.from_quat(quat).as_euler(seq)
+    return R.from_quat(quat).as_euler("xyz")
 
 
 def pose_in_A_to_pose_in_B(pose_A, pose_A_in_B):
@@ -958,8 +972,76 @@ def matrix_inverse(matrix):
     return np.linalg.inv(matrix)
 
 
+def l2_distance(v1, v2):
+    """Returns the L2 distance between vector v1 and v2."""
+    return np.linalg.norm(np.array(v1) - np.array(v2))
+
+
+def frustum(left, right, bottom, top, znear, zfar):
+    """Create view frustum matrix."""
+    assert right != left
+    assert bottom != top
+    assert znear != zfar
+
+    M = np.zeros((4, 4), dtype=np.float32)
+    M[0, 0] = +2.0 * znear / (right - left)
+    M[2, 0] = (right + left) / (right - left)
+    M[1, 1] = +2.0 * znear / (top - bottom)
+    # TODO: Put this back to 3,1
+    # M[3, 1] = (top + bottom) / (top - bottom)
+    M[2, 1] = (top + bottom) / (top - bottom)
+    M[2, 2] = -(zfar + znear) / (zfar - znear)
+    M[3, 2] = -2.0 * znear * zfar / (zfar - znear)
+    M[2, 3] = -1.0
+    return M
+
+
+def ortho(left, right, bottom, top, znear, zfar):
+    """Create orthonormal projection matrix."""
+    assert right != left
+    assert bottom != top
+    assert znear != zfar
+
+    M = np.zeros((4, 4), dtype=np.float32)
+    M[0, 0] = 2.0 / (right - left)
+    M[1, 1] = 2.0 / (top - bottom)
+    M[2, 2] = -2.0 / (zfar - znear)
+    M[3, 0] = -(right + left) / (right - left)
+    M[3, 1] = -(top + bottom) / (top - bottom)
+    M[3, 2] = -(zfar + znear) / (zfar - znear)
+    M[3, 3] = 1.0
+    return M
+
+
+def perspective(fovy, aspect, znear, zfar):
+    """Create perspective projection matrix."""
+    # fovy is in degree
+    assert znear != zfar
+    h = np.tan(fovy / 360.0 * np.pi) * znear
+    w = h * aspect
+    return frustum(-w, w, -h, h, znear, zfar)
+
+
+def anorm(x, axis=None, keepdims=False):
+    """Compute L2 norms alogn specified axes."""
+    return np.linalg.norm(x, axis=axis, keepdims=keepdims)
+
+
+def normalize(v, axis=None, eps=1e-10):
+    """L2 Normalize along specified axes."""
+    return v / max(anorm(v, axis=axis, keepdims=True), eps)
+
+
+def cartesian_to_polar(x, y):
+    """Convert cartesian coordinate to polar coordinate"""
+    rho = np.sqrt(x ** 2 + y ** 2)
+    phi = np.arctan2(y, x)
+    return rho, phi
+
+
 def deg2rad(deg):
     return deg * np.pi / 180.
+
 
 def rad2deg(rad):
     return rad * 180. / np.pi

@@ -5,20 +5,19 @@ import numpy as np
 
 
 import igibson
-import igibson.macros as m
+from igibson.macros import gm
 from igibson import object_states, app, ig_dataset_path
 # from igibson.external.pybullet_tools.utils import Euler, quat_from_euler
 from igibson.object_states.factory import get_state_dependency_graph, get_states_by_dependency_order
 from igibson.objects.dataset_object import DatasetObject
-from igibson.objects.ycb_object import YCBObject
 from igibson.objects.primitive_object import PrimitiveObject
 from igibson.scenes.empty_scene import EmptyScene
 from igibson.sensors.vision_sensor import VisionSensor
-from igibson.simulator_omni import Simulator
-from igibson.utils.assets_utils import download_assets, get_ig_model_path
+from igibson.simulator import Simulator
+from igibson.utils.asset_utils import download_assets, get_ig_model_path
 from igibson.utils.usd_utils import create_joint
 
-if m.ENABLE_OMNI_PARTICLES:
+if gm.ENABLE_OMNI_PARTICLES:
     from igibson.systems.micro_particle_system import WaterSystem
 
 from pxr import Gf

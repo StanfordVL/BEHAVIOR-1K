@@ -1,5 +1,6 @@
 import os
-from igibson import assets_path, app
+import time
+from igibson.macros import gm, create_module_macros
 from igibson.prims.prim_base import BasePrim
 from igibson.systems.system_base import SYSTEMS_REGISTRY
 from igibson.systems.particle_system_base import BaseParticleSystem
@@ -8,7 +9,7 @@ from igibson.utils.python_utils import classproperty, Serializable, assert_valid
 from igibson.utils.sampling_utils import sample_cuboid_on_object
 from igibson.utils.usd_utils import create_joint, array_to_vtarray
 from igibson.utils.physx_utils import create_physx_particle_system, create_physx_particleset_pointinstancer, \
-    bind_material
+    bind_material, get_prototype_path_from_particle_system_path
 import omni
 from omni.isaac.core.utils.prims import get_prim_at_path
 from omni.physx.scripts import particleUtils
@@ -29,8 +30,12 @@ from omni.physx.bindings._physx import (
 )
 import carb
 
+
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
+
 # Garbage collect particle instancers where less than 25 percent of the particle are visible
-GC_THRESHOLD = 0.25
+m.GC_THRESHOLD = 0.25
 
 def set_carb_settings_for_fluid_isosurface():
     """
@@ -424,10 +429,6 @@ class MicroParticleSystem(BaseParticleSystem):
         # Run super first
         super().initialize(simulator=simulator)
 
-        # Set custom rendering settings if we're using a fluid isosurface
-        if cls.is_fluid and cls.use_isosurface:
-            set_carb_settings_for_fluid_isosurface()
-
         # Initialize class variables that are mutable so they don't get overridden by children classes
         cls.particle_instancers = OrderedDict()
 
@@ -440,13 +441,13 @@ class MicroParticleSystem(BaseParticleSystem):
 
         # Create the particle system if it doesn't already exist, otherwise sync with the pre-existing system
         mat_path = f"{cls.prim_path}/{cls.name}_material"
-        prototype_path = f"{cls.prim_path}/prototypes"
+        prototype_path = get_prototype_path_from_particle_system_path(particle_system_path=cls.prim_path)
 
         if cls.particle_system_exists:
             cls.prim = get_prim_at_path(cls.prim_path)
             mat = get_prim_at_path(mat_path)
             prototype_dir_prim = get_prim_at_path(prototype_path)
-            cls.particle_material = UsdShade.Material(mat) if mat else None
+            cls.particle_material = mat if mat else None
             cls.particle_prototypes = [prototype_prim for prototype_prim in prototype_dir_prim.GetChildren()]
 
             # Also need to synchronize any instancers we have
@@ -462,15 +463,15 @@ class MicroParticleSystem(BaseParticleSystem):
         else:
             cls.prim = cls._create_particle_system()
 
-            # Create the particle material
-            cls.particle_material = cls._create_particle_material()
+            # Create the particle material (only if we're using high-quality rendering since this takes time)
+            cls.particle_material = cls._create_particle_material() if gm.ENABLE_HQ_RENDERING else None
             if cls.particle_material is not None:
                 # Move this material and standardize its naming scheme
-                path_from = cls.particle_material.GetPrim().GetPrimPath().pathString
+                path_from = cls.particle_material.GetPrimPath().pathString
                 mat_path = f"{cls.prim_path}/{cls.name}_material"
                 omni.kit.commands.execute("MovePrim", path_from=path_from, path_to=mat_path)
                 # Get updated reference to this material
-                cls.particle_material = UsdShade.Material(get_prim_at_path(mat_path))
+                cls.particle_material = get_prim_at_path(mat_path)
 
                 # Bind this material to our particle system
                 particleUtils.add_pbd_particle_material(simulator.stage, mat_path)
@@ -480,15 +481,23 @@ class MicroParticleSystem(BaseParticleSystem):
             prototypes = cls._create_particle_prototypes()
             cls.particle_prototypes = []
             cls.simulator.stage.DefinePrim(prototype_path, "Scope")
+            cls.simulator.stage.DefinePrim(f"{prototype_path}/{cls.name}", "Scope")
             for i, prototype_prim in enumerate(prototypes):
                 # TODO: Omni no longer likes prototypes being created in nested locations. Where to place now?
-                # path_from = prototype_prim.GetPrimPath().pathString
-                # path_to = f"{prototype_path}/{cls.name}ParticlePrototype{i}"
-                # omni.kit.commands.execute("MovePrim", path_from=path_from, path_to=path_to)
-                path_to = prototype_prim.GetPrimPath().pathString
+                path_from = prototype_prim.GetPrimPath().pathString
+                path_to = f"{prototype_path}/{cls.name}/ParticlePrototype{i}"
+                omni.kit.commands.execute("MovePrim", path_from=path_from, path_to=path_to)
+                # path_to = prototype_prim.GetPrimPath().pathString
                 prototype_prim_new = get_prim_at_path(path_to)
                 UsdGeom.Imageable(prototype_prim_new).MakeInvisible()
                 cls.particle_prototypes.append(prototype_prim_new)
+
+        # Set custom rendering settings if we're using a fluid isosurface
+        if cls.is_fluid and cls.use_isosurface and gm.ENABLE_HQ_RENDERING:
+            set_carb_settings_for_fluid_isosurface()
+
+            # We also modify the grid smoothing radius to avoid "blobby" appearances
+            cls.prim.GetAttribute("physxParticleIsosurface:gridSmoothingRadius").Set(0.0001)
 
         # # Create dummy
         # create_physx_particleset_pointinstancer(
@@ -626,9 +635,9 @@ class MicroParticleSystem(BaseParticleSystem):
             physics_scene_path=cls.simulator.get_physics_context().get_current_physics_scene_prim().GetPrimPath().pathString,
             particle_contact_offset=cls.particle_contact_offset,
             visual_only=cls.visual_only,
-            smoothing=cls.use_smoothing,
-            anisotropy=cls.use_anisotropy,
-            isosurface=cls.use_isosurface,
+            smoothing=cls.use_smoothing and gm.ENABLE_HQ_RENDERING,
+            anisotropy=cls.use_anisotropy and gm.ENABLE_HQ_RENDERING,
+            isosurface=cls.use_isosurface and gm.ENABLE_HQ_RENDERING,
         ).GetPrim()
 
     @classmethod
@@ -781,6 +790,8 @@ class MicroParticleSystem(BaseParticleSystem):
             cls.simulator.stop()
         elif sim_is_playing:
             cls.simulator.play()
+        time.sleep(0.1)                         # Empirically validated for ~2500 samples (0.02 time doesn't work)
+        cls.simulator.render()                  # Rendering is needed after an initial, nontrivial amount of time for the particles to actually be sampled
 
         # Grab the actual positions, we will write this to a new instancer that's not tied to the sampler
         # The points / instancer tied to the sampled mesh seems to operate a bit weirdly, which is why we do it this way
@@ -788,7 +799,7 @@ class MicroParticleSystem(BaseParticleSystem):
         pos = points.GetAttribute(attr).Get()
 
         # Make sure sampling was successful
-        assert len(pos) > 0, "Failed to sample particle points from mesh prim!"
+        assert pos is not None and len(pos) > 0, "Failed to sample particle points from mesh prim!"
 
         # Delete the points prim and sampling API, we don't need it anymore, and make the mesh prim invisible again
         cls.simulator.stage.RemovePrim(points_prim_path)
@@ -830,6 +841,7 @@ class MicroParticleSystem(BaseParticleSystem):
         # Remove instancer from our tracking and delete its prim
         instancer = cls.particle_instancers.pop(name)
         cls.simulator.stage.RemovePrim(instancer.prim_path)
+        cls.simulator.stage.RemovePrim(f"{get_prototype_path_from_particle_system_path(particle_system_path=cls.prim_path)}/{name}")
 
     @classmethod
     def particle_instancer_name_to_idn(cls, name):
@@ -1017,7 +1029,6 @@ class FluidSystem(MicroParticleSystem):
 
     @classproperty
     def use_isosurface(cls):
-        # TODO: Make true once omni bugs are fixed
         return True
 
     @classproperty
@@ -1043,7 +1054,7 @@ class FluidSystem(MicroParticleSystem):
         Cache the collision hits for all particle systems, to be used by the object state system to determine
         if a particle is in contact with a given object.
         """
-        particle_contacts = defaultdict(lambda: defaultdict(list))
+        particle_contacts = defaultdict(lambda: defaultdict(set))
 
         particle_instancer = None
         particle_idx = 0
@@ -1051,14 +1062,14 @@ class FluidSystem(MicroParticleSystem):
         def report_hit(hit):
             base = "/".join(hit.rigid_body.split("/")[:-1])
             body = cls.simulator.scene.object_registry("prim_path", base)
-            particle_contacts[body][particle_instancer].append(particle_idx)
+            particle_contacts[body][particle_instancer].add(particle_idx)
             return True
 
         for system, value in cls.particle_instancers.items():
             for idx, pos in enumerate(value.particle_positions):
                 particle_idx = idx
                 particle_instancer = system
-                get_physx_scene_query_interface().overlap_sphere(cls.particle_radius, pos, report_hit, False)
+                get_physx_scene_query_interface().overlap_sphere(cls.particle_contact_offset, pos, report_hit, False)
 
         cls.state_cache = {
             'particle_contacts': particle_contacts,
@@ -1067,9 +1078,9 @@ class FluidSystem(MicroParticleSystem):
     @classmethod
     def update(cls):
         # For each particle instance, garbage collect particles if the number of visible particles
-        # is below the garbage collection threshold (GC_THRESHOLD)
+        # is below the garbage collection threshold (m.GC_THRESHOLD)
         for instancer, value in cls.particle_instancers.items(): # type: ignore
-            if np.mean(value.particle_visibilities) <= GC_THRESHOLD:
+            if np.mean(value.particle_visibilities) <= m.GC_THRESHOLD:
                 cls.remove_particle_instancer(instancer)
 
 
@@ -1091,7 +1102,7 @@ class WaterSystem(FluidSystem):
         # TODO: Water density seems to be unstable, debug later?
         # Water is 1000 kg/m^3
         # return 1000.0
-        return 1.0
+        return 500.0
 
     @classmethod
     def _create_particle_material(cls):
@@ -1109,7 +1120,7 @@ class WaterSystem(FluidSystem):
         particleUtils.add_pbd_particle_material(cls.simulator.stage, material_path)
 
         # Return generated material
-        return UsdShade.Material(get_prim_at_path(material_path))
+        return get_prim_at_path(material_path)
 
 
 class ClothSystem(MicroParticleSystem):
@@ -1124,7 +1135,7 @@ class ClothSystem(MicroParticleSystem):
     @classproperty
     def particle_contact_offset(cls):
         # TODO (eric): figure out whether one offset can fit all
-        return 0.025
+        return 0.005
 
     @classproperty
     def is_fluid(cls):

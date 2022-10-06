@@ -5,7 +5,7 @@ import numpy as np
 from igibson import ig_dataset_path
 from igibson.robots.turtlebot import Turtlebot
 from igibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
-from igibson.simulator_omni import Simulator
+from igibson.simulator import Simulator
 
 SCENE_ID = "Rs_int"
 USD_TEMPLATE_FILE = f"{ig_dataset_path}/scenes/{SCENE_ID}/urdf/{SCENE_ID}_best_template.usd"

@@ -1,13 +1,17 @@
 import numpy as np
 
-from igibson.object_states.object_state_base import BooleanState, CachingEnabledObjectState, NONE
+from igibson.macros import create_module_macros
+from igibson.object_states.object_state_base import BooleanState, CachingEnabledObjectState
 from igibson.object_states.pose import Pose
 from igibson.object_states.room_states import InsideRoomTypes
 from igibson.utils.constants import MAX_INSTANCE_COUNT
 
-_IN_REACH_DISTANCE_THRESHOLD = 2.0
 
-_IN_FOV_PIXEL_FRACTION_THRESHOLD = 0.05
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
+
+m.IN_REACH_DISTANCE_THRESHOLD = 2.0
+m.IN_FOV_PIXEL_FRACTION_THRESHOLD = 0.05
 
 
 def _get_robot(simulator):
@@ -33,7 +37,7 @@ class InReachOfRobot(CachingEnabledObjectState, BooleanState):
 
         robot_pos = robot.get_position()
         object_pos, _ = self.obj.states[Pose].get_value()
-        return np.linalg.norm(object_pos - np.array(robot_pos)) < _IN_REACH_DISTANCE_THRESHOLD
+        return np.linalg.norm(object_pos - np.array(robot_pos)) < m.IN_REACH_DISTANCE_THRESHOLD
 
     def _set_value(self, new_value):
         raise NotImplementedError("InReachOfRobot state currently does not support setting.")

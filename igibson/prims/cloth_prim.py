@@ -19,6 +19,7 @@ from igibson.prims.geom_prim import GeomPrim
 from igibson.utils.usd_utils import update_shader_asset_paths
 import numpy as np
 
+
 class ClothPrim(GeomPrim):
     """
     Provides high level functions to deal with a cloth prim and its attributes/ properties.

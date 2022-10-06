@@ -13,7 +13,6 @@ render:
 scene:
   type: InteractiveTraversableScene
   scene_model: Rs_int
-  usd_path: /cvgl2/u/jdwong/PAIR/iGibson3/igibson/data/ig_dataset/scenes/Rs_int/urdf/Rs_int_best_template.usd
   trav_map_resolution: 0.1
   trav_map_erosion: 2
   trav_map_with_objects: true
@@ -47,7 +46,7 @@ robots:
         name: DifferentialDriveController
 
 task:
-  type: DummyTask #PointNavigationTask
+  type: PointNavigationTask
   robot_idn: 0
   floor: 0
   initial_pos: null
@@ -57,14 +56,14 @@ task:
   goal_in_polar: false
   path_range: [1.0, 10.0]
   visualize_goal: true
-  visualize_path: false
+  visualize_path: true
   n_vis_waypoints: 25
   reward_type: geodesic
-#  termination_config:
-#    max_collisions: 500
-#    max_steps: 500
-#    fall_height: 0.03
-#  reward_config:
-#    r_potential: 1.0
-#    r_collision: 0.1
-#    r_pointgoal: 10.0
+  termination_config:
+    max_collisions: 500
+    max_steps: 500
+    fall_height: 0.03
+  reward_config:
+    r_potential: 1.0
+    r_collision: 0.1
+    r_pointgoal: 10.0

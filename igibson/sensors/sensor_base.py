@@ -3,6 +3,7 @@ from collections import OrderedDict
 from igibson.prims.xform_prim import XFormPrim
 from igibson.utils.python_utils import classproperty, assert_valid_key, Registerable
 from igibson.utils.gym_utils import GymObservable
+from gym.spaces import Space
 
 
 # Registered sensors
@@ -95,9 +96,15 @@ class BaseSensor(XFormPrim, GymObservable, Registerable, metaclass=ABCMeta):
     def _load_observation_space(self):
         # Fill in observation space based on mapping and active modalities
         obs_space = OrderedDict()
-        for modality, (shape, low, high, dtype) in self._obs_space_mapping.items():
+        for modality, space in self._obs_space_mapping.items():
             if modality in self._modalities:
-                obs_space[modality] = self._build_obs_box_space(shape=shape, low=low, high=high, dtype=dtype)
+                if isinstance(space, Space):
+                    # Directly add this space
+                    obs_space[modality] = space
+                else:
+                    # Assume we are procedurally generating a box space
+                    shape, low, high, dtype = space
+                    obs_space[modality] = self._build_obs_box_space(shape=shape, low=low, high=high, dtype=dtype)
 
         return obs_space
 
@@ -141,8 +148,9 @@ class BaseSensor(XFormPrim, GymObservable, Registerable, metaclass=ABCMeta):
         """
         Returns:
             OrderedDict: Keyword-mapped observation space settings for each modality. For each modality in
-                cls.all_modalities, its name should map to a 3-tuple entry (shape, low, high) for setting
-                the observation space for that modality
+                cls.all_modalities, its name should map directly to the corresponding gym space Space for that modality
+                or a 4-tuple entry (shape, low, high, dtype) for procedurally generating the appropriate Box Space
+                for that modality
         """
         raise NotImplementedError()
 

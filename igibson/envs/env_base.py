@@ -1,51 +1,74 @@
 import gym
+import logging
 from collections import OrderedDict
 
-# from igibson.render.mesh_renderer.mesh_renderer_settings import MeshRendererSettings
-# from igibson.render.mesh_renderer.mesh_renderer_vr import VrSettings
+import igibson as ig
+from igibson.macros import gm, create_module_macros
 from igibson.robots import REGISTERED_ROBOTS
+from igibson.tasks import REGISTERED_TASKS
 from igibson.scenes import REGISTERED_SCENES
-from igibson.simulator_omni import Simulator
-# from igibson.simulator_vr import SimulatorVR
 from igibson.utils.gym_utils import GymObservable
-from igibson.utils.utils import parse_config
-from igibson.utils.python_utils import merge_nested_dicts, create_class_from_registry_and_config, Serializable, Recreatable
+from igibson.utils.sim_utils import get_collisions
+from igibson.utils.config_utils import parse_config
+from igibson.utils.python_utils import assert_valid_key, merge_nested_dicts, create_class_from_registry_and_config,\
+    Serializable, Recreatable
 
 
-class BaseEnv(gym.Env, GymObservable, Serializable, Recreatable):
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
+
+# How many predefined randomized scene object configurations we have per scene
+m.N_PREDEFINED_OBJ_RANDOMIZATIONS = 10
+
+
+class Environment(gym.Env, GymObservable, Recreatable):
     """
-    Base Env class that handles loading scene and robot, following OpenAI Gym interface.
-    Functions like reset and step are not implemented.
+    Core environment class that handles loading scene, robot(s), and task, following OpenAI Gym interface.
     """
-
     def __init__(
         self,
         configs,
-        scene_model=None,
         action_timestep=1 / 10.0,
         physics_timestep=1 / 240.0,
-        rendering_settings=None,
-        vr=False,
-        vr_settings=None,
-        device_idx=0,
+        device=None,
+        automatic_reset=False,
     ):
         """
-        :param configs (str or list of str): config_file path(s). If multiple configs are specified, they will
-            be merged sequentially in the order specified. This allows procedural generation of a "full" config from
-            small sub-configs.
-        :param scene_model: override scene_model in config file
+        :param configs (str or dict or list of str or dict): config_file path(s) or raw config dictionaries.
+            If multiple configs are specified, they will be merged sequentially in the order specified.
+            This allows procedural generation of a "full" config from small sub-configs.
         :param action_timestep: environment executes action per action_timestep second
         :param physics_timestep: physics timestep for pybullet
-        :param rendering_settings: rendering_settings to override the default one
-        vr (bool): Whether we're using VR or not
-        :param vr_settings: vr_settings to override the default one
-        :param device_idx: device_idx: which GPU to run the simulation and rendering on
+        :param device: None or str, specifies the device to be used if running on the gpu with torch backend
+        :param automatic_reset: whether to automatic reset after an episode finishes
         """
         # Call super first
         super().__init__()
 
+        # Store settings and other initialized values
+        self._automatic_reset = automatic_reset
+        self._predefined_object_randomization_idx = 0
+        self._n_predefined_object_randomizations = m.N_PREDEFINED_OBJ_RANDOMIZATIONS
+        self.action_timestep = action_timestep
+
+        # Initialize other placeholders that will be filled in later
+        self._ignore_robot_object_collisions = None         # This will be a list of len(scene.robots) containing sets of objects to ignore collisions for
+        self._ignore_robot_self_collisions = None           # This will be a list of len(scene.robots) containing sets of RigidPrims (robot's links) to ignore collisions for
+        self._initial_pos_z_offset = None                   # how high to offset object placement to account for one action step of dropping
+        self._texture_randomization_freq = None
+        self._object_randomization_freq = None
+        self._task = None
+        self._scene = None
+        self._loaded = None
+        self._current_episode = 0
+
+        # Variables reset at the beginning of each episode
+        self._current_collisions = None
+        self._current_step = 0
+        self._collision_step = 0
+
         # Convert config file(s) into a single parsed dict
-        configs = [configs] if isinstance(configs, str) else configs
+        configs = configs if isinstance(configs, list) or isinstance(configs, tuple) else [configs]
 
         # Initial default config
         self.config = self.default_config
@@ -54,60 +77,67 @@ class BaseEnv(gym.Env, GymObservable, Serializable, Recreatable):
         for config in configs:
             merge_nested_dicts(base_dict=self.config, extra_dict=parse_config(config), inplace=True)
 
-        # Possibly override scene_id
-        if scene_model is not None:
-            self.scene_config["model"] = scene_model
-
-        # Store other settings
-        self.action_timestep = action_timestep
-
-        # TODO! Update
-        self.rendering_settings = None #MeshRendererSettings()
-        # TODO!
-        # # TODO: We currently only support the optimized renderer due to some issues with obj highlighting.
-        # self.rendering_settings = rendering_settings if rendering_settings is not None else \
-        #      MeshRendererSettings(
-        #         enable_shadow=enable_shadow,
-        #         enable_pbr=enable_pbr,
-        #         msaa=False,
-        #         texture_scale=texture_scale,
-        #         optimized=self.config["optimized_renderer"],
-        #         load_textures=self.config["load_texture"],
-        #         hide_robot=self.config["hide_robot"],
-        #     )
-
-        # Create other placeholders that will be filled in later
-        self._scene = None
-        self._loaded = None
-
-        # Create simulator
-        if vr:
-            raise NotImplementedError("VR must still be implemented")
-            if vr_settings is None:
-                vr_settings = VrSettings(use_vr=True)
-            self._simulator = SimulatorVR(
-                physics_timestep=physics_timestep,
-                render_timestep=action_timestep,
-                image_width=self.config["image_width"],
-                image_height=self.config["image_height"],
-                vertical_fov=self.config["vertical_fov"],
-                device_idx=device_idx,
-                rendering_settings=self.rendering_settings,
-                vr_settings=vr_settings,
-                use_pb_gui=use_pb_gui,
-            )
-        else:
-            self._simulator = Simulator(
-                physics_dt=physics_timestep,
-                rendering_dt=action_timestep,
-                viewer_width=self.render_config["viewer_width"],
-                viewer_height=self.render_config["viewer_height"],
-                vertical_fov=self.render_config["vertical_fov"],
-                device_idx=device_idx,
-            )
+        # Set the simulator settings
+        ig.sim.set_simulation_dt(physics_dt=physics_timestep, rendering_dt=action_timestep)
+        ig.sim.viewer_width = self.render_config["viewer_width"]
+        ig.sim.viewer_height = self.render_config["viewer_height"]
+        ig.sim.vertical_fov = self.render_config["vertical_fov"]
+        ig.sim.device = device
 
         # Load this environment
         self.load()
+
+    def add_ignore_robot_object_collision(self, robot_idn, obj):
+        """
+        Add a new robot-object pair to ignore collisions for
+
+        NOTE: This ignores collisions for the purpose of COUNTING collisions, NOT for the purpose of disabling
+            the actual, physical, collision
+
+        Args:
+            robot_idn (int): Which robot to ignore a collision for
+            obj (BaseObject): Which object to ignore a collision for
+        """
+        self._ignore_robot_object_collisions[robot_idn].add(obj)
+
+    def add_ignore_robot_self_collision(self, robot_idn, link):
+        """
+        Add a new robot-link self pair to ignore collisions for
+
+        NOTE: This ignores collisions for the purpose of COUNTING collisions, NOT for the purpose of disabling
+            the actual, physical, collision
+
+        Args:
+            robot_idn (int): Which robot to ignore a collision for
+            link (RigidPrim): Which robot link to ignore a collision for
+        """
+        self._ignore_robot_self_collisions[robot_idn].add(link)
+
+    def remove_ignore_robot_object_collision(self, robot_idn, obj):
+        """
+        Remove a robot-object pair to ignore collisions for
+
+        NOTE: This ignores collisions for the purpose of COUNTING collisions, NOT for the purpose of disabling
+            the actual, physical, collision
+
+        Args:
+            robot_idn (int): Which robot to ignore a collision for
+            obj (BaseObject): Which object to no longer ignore a collision for
+        """
+        self._ignore_robot_object_collisions[robot_idn].remove(obj)
+
+    def remove_ignore_robot_self_collision(self, robot_idn, link):
+        """
+        Remove a robot-link self pair to ignore collisions for
+
+        NOTE: This ignores collisions for the purpose of COUNTING collisions, NOT for the purpose of disabling
+            the actual, physical, collision
+
+        Args:
+            robot_idn (int): Which robot to ignore a collision for
+            link (RigidPrim): Which robot link to no longer ignore a collision for
+        """
+        self._ignore_robot_self_collisions[robot_idn].remove(link)
 
     def reload(self, configs, overwrite_old=True):
         """
@@ -155,8 +185,64 @@ class BaseEnv(gym.Env, GymObservable, Serializable, Recreatable):
         """
         Load variables from config
         """
-        # Default is no-op
-        pass
+        # Store additional variables after config has been loaded fully
+        self._initial_pos_z_offset = self.env_config["initial_pos_z_offset"]
+        self._texture_randomization_freq = self.env_config["texture_randomization_freq"]
+        self._object_randomization_freq = self.env_config["object_randomization_freq"]
+
+        # Set other values
+        self._ignore_robot_object_collisions = [set() for _ in self.robots_config]
+        self._ignore_robot_self_collisions = [set() for _ in self.robots_config]
+
+        # Reset bookkeeping variables
+        self._reset_variables()
+        self._current_episode = 0           # Manually set this to 0 since resetting actually increments this
+
+        # - Potentially overwrite the USD entry for the scene if none is specified and we're online sampling -
+
+        # Make sure the requested scene is valid
+        scene_type = self.scene_config["type"]
+        assert_valid_key(key=scene_type, valid_keys=REGISTERED_SCENES, name="scene type")
+
+        # If we're using a BehaviorTask, we may load a pre-cached scene configuration
+        if self.task_config["type"] == "BehaviorTask":
+            usd_file = self.scene_config["usd_file"]
+            if usd_file is None and not self.task_config["online_object_sampling"]:
+                usd_file = "{}_task_{}_{}_{}_fixed_furniture_template".format(
+                    self.scene_config["scene_model"],
+                    self.task_config["activity_name"],
+                    self.task_config["activity_definition_id"],
+                    self.task_config["activity_instance_id"],
+                )
+            # Update the value in the scene config
+            self.scene_config["usd_file"] = usd_file
+
+        # - Additionally run some sanity checks on these values -
+
+        # Check to make sure our z offset is valid -- check that the distance travelled over 1 action timestep is
+        # less than the offset we set (dist = 0.5 * gravity * (t^2))
+        drop_distance = 0.5 * 9.8 * (self.action_timestep ** 2)
+        assert drop_distance < self._initial_pos_z_offset, "initial_pos_z_offset is too small for collision checking"
+
+    def _load_task(self):
+        """
+        Load task
+        """
+        # Sanity check task to make sure it's valid
+        task_type = self.task_config["type"]
+        assert_valid_key(key=task_type, valid_keys=REGISTERED_TASKS, name="task type")
+
+        # Grab the kwargs relevant for the specific task and create the task
+        self._task = create_class_from_registry_and_config(
+            cls_name=self.task_config["type"],
+            cls_registry=REGISTERED_TASKS,
+            cfg=self.task_config,
+            cls_type_descriptor="task",
+        )
+
+        # Load task
+        # TODO: Does this need to occur somewhere else?
+        self._task.load(env=self)
 
     def _load_scene(self):
         """
@@ -169,7 +255,7 @@ class BaseEnv(gym.Env, GymObservable, Serializable, Recreatable):
             cfg=self.scene_config,
             cls_type_descriptor="scene",
         )
-        self._simulator.import_scene(scene)
+        ig.sim.import_scene(scene)
 
         # Save scene internally
         self._scene = scene
@@ -195,18 +281,25 @@ class BaseEnv(gym.Env, GymObservable, Serializable, Recreatable):
                     cls_type_descriptor="robot",
                 )
                 # Import the robot into the simulator
-                self._simulator.import_object(robot)
+                ig.sim.import_object(robot)
 
-    def _load(self):
-        """
-        Loads this environment. Can be extended by subclass
-        """
-        # Load config variables
-        self._load_variables()
+    def _load_observation_space(self):
+        # Grab robot(s) and task obs spaces
+        obs_space = OrderedDict()
 
-        # Load the scene and robots
-        self._load_scene()
-        self._load_robots()
+        for robot in self.robots:
+            # Load the observation space for the robot
+            obs_space[robot.name] = robot.load_observation_space()
+
+        # Also load the task obs space
+        obs_space["task"] = self._task.load_observation_space()
+        return obs_space
+
+    def _load_action_space(self):
+        """
+        Load action space for each robot
+        """
+        self.action_space = gym.spaces.Dict({robot.name: robot.action_space for robot in self.robots})
 
     def load(self):
         """
@@ -215,18 +308,48 @@ class BaseEnv(gym.Env, GymObservable, Serializable, Recreatable):
         # This environment is not loaded
         self._loaded = False
 
-        # Run internal loading
-        self._load()
+        # Load config variables
+        self._load_variables()
+
+        # Load the scene, robots, and task
+        self._load_scene()
+        self._load_robots()
+        self._load_task()
+
+        # Start the simulation, then reset the environment
+        ig.sim.play()
+        self.reset()
+
+        # Update the initial scene state
+        self.scene.update_initial_state()
+
+        # Load the obs / action spaces
+        self.load_observation_space()
+        self._load_action_space()
 
         # Denote that the scene is loaded
         self._loaded = True
 
-    def clean(self):
+    def reload_model_object_randomization(self, predefined_object_randomization_idx=None):
         """
-        Clean up the environment.
+        Reload the same model, with either @object_randomization_idx seed or the next object randomization random seed.
+
+        Args:
+            predefined_object_randomization_idx (None or int): If set, specifies the specific pre-defined object
+                randomization instance to use. Otherwise, the current seed will be incremented by 1 and used.
         """
-        if self._simulator is not None:
-            self._simulator.close()
+        assert self._object_randomization_freq is not None, \
+            "object randomization must be active to reload environment with object randomization!"
+        self._predefined_object_randomization_idx = predefined_object_randomization_idx if \
+            predefined_object_randomization_idx is not None else \
+            (self._predefined_object_randomization_idx + 1) % self._n_predefined_object_randomizations
+        self.load()
+
+    def close(self):
+        """
+        Clean up the environment and shut down the simulation.
+        """
+        ig.sim.close()
 
     def get_obs(self):
         """
@@ -235,51 +358,230 @@ class BaseEnv(gym.Env, GymObservable, Serializable, Recreatable):
         Returns:
             OrderedDict: Keyword-mapped observations, which are possibly nested
         """
-        # Grab all observations from each robot
         obs = OrderedDict()
 
+        # Grab all observations from each robot
         for robot in self.robots:
             obs[robot.name] = robot.get_obs()
 
+        # Add task observations
+        obs["task"] = self._task.get_obs(env=self)
+
         return obs
 
-    def close(self):
+    def _filter_collisions(self, collisions):
         """
-        Synonymous function with clean.
-        """
-        self.clean()
+        Filter out collisions that should be ignored, based on self._ignore_robot_[object/self]_collisions
 
-    def _simulator_step(self):
+        Args:
+            collisions (set of 2-tuple): Unique collision pairs occurring in the simulation at the current timestep,
+                represented by their prim_paths
+
+        Returns:
+            set of 2-tuple: Filtered collision pairs occurring in the simulation at the current timestep,
+                represented by their prim_paths
         """
-        Step the simulation.
-        This is different from environment step that returns the next
-        observation, reward, done, info. This should exclusively run internal simulator stepping and related
-        functionality
+        # Iterate over all robots
+        new_collisions = set()
+        for robot, filtered_links, filtered_objs in zip(
+                self.robots, self._ignore_robot_self_collisions, self._ignore_robot_object_collisions
+        ):
+            # Grab all link prim paths owned by the robot
+            robot_prims = {link.prim_path for link in robot.links.values()}
+            # Loop over all filtered links and compose them
+            filtered_link_prims = {link.prim_path for link in filtered_links}
+            # Loop over all filtered objects and compose them
+            filtered_obj_prims = {link.prim_path for obj in filtered_objs for link in obj.links.values()}
+            # Iterate over all collision pairs
+            for col_pair in collisions:
+                # First check for self_collision -- we check by first subtracting all filtered links from the col_pair
+                # set and making sure the length is < 2, and then subtracting all robot_prims and making sure that the
+                # length is 0. If both conditions are met, then we know this is a filtered collision!
+                col_pair_set = set(col_pair)
+                if len(col_pair_set - filtered_link_prims) < 2 and len(col_pair_set - robot_prims) == 0:
+                    # Filter this collision
+                    continue
+                # Check for object filtering -- we check by first subtracting all robot links from the col_pair
+                # set and making sure the length is < 2, and then subtracting all filtered_obj_prims and making sure
+                # that the length is < 2. If both conditions are met, this means that this was a collision between
+                # the robot and a filtered object, so we know this is a filtered collision!
+                elif len(col_pair_set - robot_prims) < 2 and len(col_pair_set - filtered_obj_prims) < 2:
+                    # Filter this collision
+                    continue
+                else:
+                    # Add this collision
+                    new_collisions.add(col_pair)
+
+        return new_collisions
+
+    def _populate_info(self, info):
         """
-        self._simulator.step()
+        Populate info dictionary with any useful information.
+
+        Args:
+            info (dict): Information dictionary to populate
+
+        Returns:
+            dict: Information dictionary with added info
+        """
+        info["episode_length"] = self._current_step
+        info["collision_step"] = self._collision_step
 
     def step(self, action):
         """
-        Overwritten by subclasses.
-        """
-        return NotImplementedError()
+        Apply robot's action and return the next state, reward, done and info,
+        following OpenAI Gym's convention
 
+        :param action: gym.spaces.Dict, dict, np.array, robot actions
+        :return: state: next observation
+        :return: reward: reward of this time step
+        :return: done: whether the episode is terminated
+        :return: info: info dictionary with any useful information
+        """
+        # If the action is not a dictionary, convert into a dictionary
+        if not isinstance(action, dict) and not isinstance(action, gym.spaces.Dict):
+            action_dict = OrderedDict()
+            idx = 0
+            for robot in self.robots:
+                action_dim = robot.action_dim
+                action_dict[robot.name] = action[idx: idx + action_dim]
+                idx += action_dim
+        else:
+            # Our inputted action is the action dictionary
+            action_dict = action
+
+        # Iterate over all robots and apply actions
+        for robot in self.robots:
+            robot.apply_action(action_dict[robot.name])
+
+        # Run simulation step
+        ig.sim.step()
+
+        # Grab collisions and store internally
+        if gm.ENABLE_GLOBAL_CONTACT_REPORTING:
+            collision_objects = self.scene.objects + self.robots
+        elif gm.ENABLE_ROBOT_CONTACT_REPORTING:
+            collision_objects = self.robots
+        else:
+            collision_objects = []
+
+        # Update current collisions and corresponding count
+        self._current_collisions = self._filter_collisions(collisions=get_collisions(prims=collision_objects))
+
+        # Update the collision count
+        self._collision_step += int(len(self._current_collisions) > 0)
+
+        # Grab observations
+        obs = self.get_obs()
+
+        # Grab reward, done, and info, and populate with internal info
+        reward, done, info = self.task.step(self, action)
+        self._populate_info(info)
+
+        if done and self._automatic_reset:
+            # Add lost observation to our information dict, and reset
+            info["last_observation"] = obs
+            obs = self.reset()
+
+        # Increment step
+        self._current_step += 1
+
+        return obs, reward, done, info
+
+    def randomize_domain(self):
+        """
+        Randomize domain.
+        Object randomization loads new object models with the same poses.
+        Texture randomization loads new materials and textures for the same object models.
+        """
+        if self._object_randomization_freq is not None:
+            if self._current_episode % self._object_randomization_freq == 0:
+                self.reload_model_object_randomization()
+        if self._texture_randomization_freq is not None:
+            if self._current_episode % self._texture_randomization_freq == 0:
+                ig.sim.scene.randomize_texture()
+
+    def _reset_variables(self):
+        """
+        Reset bookkeeping variables for the next new episode.
+        """
+        self._current_episode += 1
+        self._current_collisions = None
+        self._current_step = 0
+        self._collision_step = 0
+
+    # TODO: Match super class signature?
     def reset(self):
         """
-        Overwritten by subclasses.
-
-        Returns:
-            OrderedDict: Observations after resetting
+        Reset episode.
         """
-        return NotImplementedError()
+        # Stop and restart the simulation
+        ig.sim.stop()
+        ig.sim.play()
+
+        # Do any domain randomization
+        self.randomize_domain()
+
+        # # Move all robots away from the scene since the task will place the robots anyways
+        # for robot in self.robots:
+        #     robot.set_position(np.array([100.0, 100.0, 100.0]))
+
+        # Reset the task
+        self.task.reset(self)
+
+        # Reset internal variables
+        self._reset_variables()
+
+        # Run a single simulator step to make sure we can grab updated observations
+        ig.sim.step()
+
+        # Grab and return observations
+        obs = self.get_obs()
+
+        if self.observation_space is not None and not self.observation_space.contains(obs):
+            # Print out all observations for all robots and task
+            for robot in self.robots:
+                for key, value in self.observation_space[robot.name].items():
+                    logging.error(("obs_space", key, value.dtype, value.shape))
+                    logging.error(("obs", key, obs[robot.name][key].dtype, obs[robot.name][key].shape))
+            for key, value in self.observation_space["task"].items():
+                logging.error(("obs_space", key, value.dtype, value.shape))
+                logging.error(("obs", key, obs["task"][key].dtype, obs["task"][key].shape))
+            raise ValueError("Observation space does not match returned observations!")
+
+        return obs
 
     @property
-    def simulator(self):
+    def episode_steps(self):
         """
         Returns:
-            Simulator: Active simulator instance
+            int: Current number of steps in episode
         """
-        return self._simulator
+        return self._current_step
+
+    @property
+    def episode_collisions(self):
+        """
+        Returns:
+            int: Total number of collisions in current episode
+        """
+        return self._collision_step
+
+    @property
+    def current_collisions(self):
+        """
+        Returns:
+            set of 2-tuple: Cached collision pairs from the last time self.update_collisions() was called
+        """
+        return self._current_collisions
+
+    @property
+    def task(self):
+        """
+        Returns:
+            BaseTask: Active task instance
+        """
+        return self._task
 
     @property
     def scene(self):
@@ -331,6 +633,14 @@ class BaseEnv(gym.Env, GymObservable, Serializable, Recreatable):
         return self.config["robots"]
 
     @property
+    def task_config(self):
+        """
+        Returns:
+            dict: Task-specific configuration kwargs
+        """
+        return self.config["task"]
+
+    @property
     def default_config(self):
         """
         Returns:
@@ -340,13 +650,16 @@ class BaseEnv(gym.Env, GymObservable, Serializable, Recreatable):
         return {
             # Environment kwargs
             "env": {
-                # none by default
+                "initial_pos_z_offset": 0.1,
+                "texture_randomization_freq": None,
+                "object_randomization_freq": None,
+                "usd_file": None,
             },
 
             # Rendering kwargs
             "render": {
-                "viewer_width": 128,
-                "viewer_height": 128,
+                "viewer_width": 1280,
+                "viewer_height": 720,
                 "vertical_fov": 90,
                 # "optimized_renderer": True,
             },
@@ -364,33 +677,13 @@ class BaseEnv(gym.Env, GymObservable, Serializable, Recreatable):
 
             # Robot kwargs
             "robots": [], # no robots by default
+
+            # Task kwargs
+            "task": {
+                "type": "DummyTask",
+
+                # If we're using a BehaviorTask
+                "activity_definition_id": 0,
+                "activity_instance_id": 0,
+            }
         }
-
-    @property
-    def state_size(self):
-        # Total state size is the state size of our scene
-        return self._scene.state_size
-
-    def _dump_state(self):
-        # Default state is from the scene
-        return self._scene.dump_state(serialized=False)
-
-    def _load_state(self, state):
-        # Default state is from the scene
-        self._scene.load_state(state=state, serialized=False)
-
-    def load_state(self, state, serialized=False):
-        # Run super first
-        super().load_state(state=state, serialized=serialized)
-
-        # # We also need to manually update the simulator app
-        # self._simulator.app.update()
-
-    def _serialize(self, state):
-        # Default state is from the scene
-        return self._scene.serialize(state=state)
-
-    def _deserialize(self, state):
-        # Default state is from the scene
-        end_idx = self._scene.state_size
-        return self._scene.deserialize(state=state[:end_idx]), end_idx

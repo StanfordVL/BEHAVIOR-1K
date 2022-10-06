@@ -4,7 +4,8 @@ from collections import namedtuple
 import numpy as np
 
 from igibson import app
-from igibson.utils.assets_utils import get_assisted_grasping_categories
+from igibson.macros import gm, create_module_macros
+from igibson.utils.asset_utils import get_assisted_grasping_categories
 import igibson.utils.transform_utils as T
 from igibson.controllers import (
     IsGraspingState,
@@ -27,29 +28,31 @@ from igibson.utils.python_utils import classproperty, assert_valid_key
 from igibson.object_states.filled import generate_points_in_volume_checker_function
 from igibson.utils.constants import JointType, PrimType
 from igibson.utils.usd_utils import create_joint
-import igibson.macros as m
 
 from pxr import Gf, PhysxSchema
 import omni
 
+
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
+
+# Assisted grasping parameters
+m.VISUALIZE_RAYS = False
+m.ASSIST_FRACTION = 1.0
+m.ASSIST_GRASP_OBJ_CATEGORIES = get_assisted_grasping_categories()
+m.ASSIST_GRASP_MASS_THRESHOLD = 10.0
+m.ARTICULATED_ASSIST_FRACTION = 0.7
+m.MIN_ASSIST_FORCE = 0
+m.MAX_ASSIST_FORCE = 500
+m.ASSIST_FORCE = m.MIN_ASSIST_FORCE + (m.MAX_ASSIST_FORCE - m.MIN_ASSIST_FORCE) * m.ASSIST_FRACTION
+m.CONSTRAINT_VIOLATION_THRESHOLD = 0.1
+m.RELEASE_WINDOW = 1 / 30.0  # release window in seconds
 
 AG_MODES = {
     "physical",
     "assisted",
     "sticky",
 }
-
-# Assisted grasping parameters
-VISUALIZE_RAYS = False
-ASSIST_FRACTION = 1.0
-ASSIST_GRASP_OBJ_CATEGORIES = get_assisted_grasping_categories()
-ASSIST_GRASP_MASS_THRESHOLD = 10.0
-ARTICULATED_ASSIST_FRACTION = 0.7
-MIN_ASSIST_FORCE = 0
-MAX_ASSIST_FORCE = 500
-ASSIST_FORCE = MIN_ASSIST_FORCE + (MAX_ASSIST_FORCE - MIN_ASSIST_FORCE) * ASSIST_FRACTION
-CONSTRAINT_VIOLATION_THRESHOLD = 0.1
-RELEASE_WINDOW = 1 / 30.0  # release window in seconds
 GraspingPoint = namedtuple("GraspingPoint", ["link_name", "position"])  # link_name (str), position (x,y,z tuple)
 
 
@@ -66,12 +69,12 @@ def can_assisted_grasp(obj):
 
     if isinstance(obj, DatasetObject) and obj.category != "object":
         # Use manually defined allowlist
-        return obj.category in ASSIST_GRASP_OBJ_CATEGORIES
+        return obj.category in m.ASSIST_GRASP_OBJ_CATEGORIES
     else:
         # Use fallback based on mass
         mass = obj.mass
-        print(f"Mass for AG: obj: {mass}, max mass: {ASSIST_GRASP_MASS_THRESHOLD}, obj: {obj.name}")
-        return mass <= ASSIST_GRASP_MASS_THRESHOLD
+        print(f"Mass for AG: obj: {mass}, max mass: {m.ASSIST_GRASP_MASS_THRESHOLD}, obj: {obj.name}")
+        return mass <= m.ASSIST_GRASP_MASS_THRESHOLD
 
 # # TODO
 # def set_coll_filter(target_body_id, source_links, enable):
@@ -249,7 +252,7 @@ class ManipulationRobot(BaseRobot):
 
     def _initialize(self):
         super()._initialize()
-        if m.AG_CLOTH:
+        if gm.AG_CLOTH:
             for arm in self.arm_names:
                 self._ag_check_in_volume[arm], self._ag_calculate_volume[arm] = \
                     generate_points_in_volume_checker_function(obj=self, volume_link=self.eef_links[arm])
@@ -348,7 +351,7 @@ class ManipulationRobot(BaseRobot):
             raycast_endpoints += [endpoint] * n_startpoints
 
         # Potentially visualize rays for debugging
-        if VISUALIZE_RAYS:
+        if m.VISUALIZE_RAYS:
             for f, t in zip(raycast_startpoints, raycast_endpoints):
                 p.addUserDebugLine(f, t, [1, 0, 0], 0.01, lifeTime=0.5)
 
@@ -841,7 +844,7 @@ class ManipulationRobot(BaseRobot):
         arm = self.default_arm if arm == "default" else arm
         self._ag_release_counter[arm] += 1
         time_since_release = self._ag_release_counter[arm] * self._simulator.get_rendering_dt()
-        if time_since_release >= RELEASE_WINDOW:
+        if time_since_release >= m.RELEASE_WINDOW:
             # Remove filtered collision restraints
             for finger_link in self.finger_links[arm]:
                 finger_link.remove_filtered_collision_pair(prim=self._ag_obj_in_hand[arm])
@@ -858,8 +861,8 @@ class ManipulationRobot(BaseRobot):
         arm = self.default_arm if arm == "default" else arm
         for joint_name, j_val in self._ag_freeze_joint_pos[arm].items():
             joint = self._joints[joint_name]
-            joint.set_pos(pos=j_val, normalized=False, target=False)
-            joint.set_vel(vel=0.0, normalized=False, target=False)
+            joint.set_pos(pos=j_val)
+            joint.set_vel(vel=0.0)
 
     @property
     def robot_arm_descriptor_yamls(self):
@@ -1108,7 +1111,7 @@ class ManipulationRobot(BaseRobot):
 
         # Modify max force based on user-determined assist parameters
         # TODO
-        max_force = ASSIST_FORCE if joint_type == "FixedJoint" else ASSIST_FORCE * ARTICULATED_ASSIST_FRACTION
+        max_force = m.ASSIST_FORCE if joint_type == "FixedJoint" else m.ASSIST_FORCE * m.ARTICULATED_ASSIST_FRACTION
         # joint_prim.GetAttribute("physics:breakForce").Set(max_force)
 
         self._ag_obj_constraint_params[arm] = {
@@ -1154,10 +1157,10 @@ class ManipulationRobot(BaseRobot):
                     self._handle_release_window(arm=arm)
                 else:
                     # constraint_violated = (
-                    #     get_constraint_violation(self._ag_obj_cid[arm]) > CONSTRAINT_VIOLATION_THRESHOLD
+                    #     get_constraint_violation(self._ag_obj_cid[arm]) > m.CONSTRAINT_VIOLATION_THRESHOLD
                     # )
                     # if constraint_violated or releasing_grasp:
-                    if m.AG_CLOTH:
+                    if gm.AG_CLOTH:
                         self._update_constraint_cloth(arm=arm)
 
                     if releasing_grasp:
@@ -1181,13 +1184,13 @@ class ManipulationRobot(BaseRobot):
         joint_prim.GetAttribute("physics:localPos1").Set(Gf.Vec3f(*attachment_point_pos.astype(float)))
 
     def _calculate_in_hand_object(self, arm="default"):
-        if m.AG_CLOTH:
+        if gm.AG_CLOTH:
             return self._calculate_in_hand_object_cloth(arm)
         else:
             return self._calculate_in_hand_object_rigid(arm)
 
     def _establish_grasp(self, arm="default", ag_data=None):
-        if m.AG_CLOTH:
+        if gm.AG_CLOTH:
             return self._establish_grasp_cloth(arm, ag_data)
         else:
             return self._establish_grasp_rigid(arm, ag_data)
@@ -1290,7 +1293,7 @@ class ManipulationRobot(BaseRobot):
 
         # Modify max force based on user-determined assist parameters
         # TODO
-        max_force = ASSIST_FORCE
+        max_force = m.ASSIST_FORCE
         # joint_prim.GetAttribute("physics:breakForce").Set(max_force)
 
         self._ag_obj_constraint_params[arm] = {

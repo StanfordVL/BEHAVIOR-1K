@@ -1,38 +1,99 @@
 """
-Set of macros to use globally for iGibson
+Set of macros to use globally for iGibson. These are generally magic numbers that were tuned heuristically.
+
+NOTE: This is generally decentralized -- the monolithic @settings variable is created here with some global values,
+but submodules within iGibson may import this dictionary and add to it dynamically
 """
+from addict import Dict
+
+
+# Initialize settings
+macros = Dict()
+gm = macros.globals
 
 # Whether to generate a headless or non-headless application upon iGibson startup
-HEADLESS = False
+gm.HEADLESS = False
 
 # Whether to use extra settings (verboseness, extra GUI features) for debugging
-DEBUG = True
+gm.DEBUG = True
 
 # Whether to enable (a) [global / robot] contact checking or not
 # Note: You can enable the robot contact checking, even if global checking is disabled
 # If global checking is enabled but robot checking disabled, global checking will take
 # precedence (i.e.: robot will still have contact checking)
 # TODO: Remove this once we have an optimized solution
-ENABLE_GLOBAL_CONTACT_REPORTING = False
-ENABLE_ROBOT_CONTACT_REPORTING = True
+gm.ENABLE_GLOBAL_CONTACT_REPORTING = False
+gm.ENABLE_ROBOT_CONTACT_REPORTING = True
 
 # Whether to use omni's particles feature (e.g. for fluids) or not
 # This also dictates whether we need to use GPU dynamics or not
-ENABLE_OMNI_PARTICLES = False
+gm.ENABLE_OMNI_PARTICLES = True
+
+# Whether to use high-fidelity rendering (this includes, e.g., isosurfaces)
+gm.ENABLE_HQ_RENDERING = False
 
 # Whether to use omni's flatcache feature or not (can speed up simulation)
-ENABLE_FLATCACHE = False
+gm.ENABLE_FLATCACHE = False
 
 # Whether to use continuous collision detection or not (slower simulation, but can prevent
 # objects from tunneling through each other)
-ENABLE_CCD = False
+gm.ENABLE_CCD = False
 
 # Aggregate pairs setting -- default is 1024, but is often insufficient for large scenes
-GPU_PAIRS_CAPACITY = 32 * 1024
+gm.GPU_PAIRS_CAPACITY = 32 * 1024
+
+# Maximum particle contacts allowed
+gm.GPU_MAX_PARTICLE_CONTACTS = 1024 * 1024
+
+# Whether to enable object state logic or not
+gm.ENABLE_OBJECT_STATES = True
+
+# Default settings for the omni UI viewer
+gm.DEFAULT_VIEWER_WIDTH = 1280
+gm.DEFAULT_VIEWER_HEIGHT = 720
+
 
 # Whether the public version of IsaacSim is being used
 # TODO: Remove this once we unify omni version being used
-IS_PUBLIC_ISAACSIM = True
+gm.IS_PUBLIC_ISAACSIM = True
 
 # (Demo-purpose) Whether to activate Assistive Grasping mode for Cloth (it's handled differently from RigidBody)
-AG_CLOTH = False
+gm.AG_CLOTH = False
+
+
+# Create helper function for generating sub-dictionaries
+def create_module_macros(module_path):
+    """
+    Creates a dictionary that can be populated with module macros based on the module's @module_path
+
+    Args:
+        module_path (str): Relative path from the package root directory pointing to the module. This will be parsed
+            to generate the appropriate sub-macros dictionary, e.g., for module "dirty" in
+            igibson/object_states_dirty.py, this would generate a dictionary existing at macros.object_states.dirty
+
+    Returns:
+        Dict: addict dictionary which can be populated with values
+    """
+    # Sanity check module path, make sure igibson/ is in the path
+    assert "igibson/" in module_path, \
+        f"module_path is expected to be a filepath including the igibson root directory, got: {module_path}!"
+
+    # Trim the .py, and anything before and including igibson/, and split into its appropriate parts
+    subsections = module_path[:-3].split("igibson/")[-1].split("/")
+
+    # Create and return the generated sub-dictionary
+    def _recursively_get_or_create_dict(dic, keys):
+        # If no entry is in @keys, it returns @dic
+        # Otherwise, checks whether the dictionary contains the first entry in @keys, if so, it grabs the
+        # corresponding nested dictionary, otherwise, generates a new Dict() as the value
+        # It then recurisvely calls this function with the new dic and the remaining keys
+        if len(keys) == 0:
+            return dic
+        else:
+            key = keys[0]
+            if key not in dic:
+                dic[key] = Dict()
+            return _recursively_get_or_create_dict(dic=dic[key], keys=keys[1:])
+
+    return _recursively_get_or_create_dict(dic=macros, keys=subsections)
+

@@ -1,94 +1,107 @@
 import numpy as np
-from igibson import object_states, ig_dataset_path
-from igibson.objects.dataset_object import DatasetObject
-from igibson.scenes.empty_scene import EmptyScene
-from igibson.simulator_omni import Simulator
-
-# Import scene.
-sim = Simulator()
-scene = EmptyScene()
-sim.import_scene(scene)
-
-# Import object.
-obj_category = "bowl"
-obj_model = "68_0"
-name1 = "bowl1"
-name2 = "bowl2"
-name3 = "bowl3"
-
-model_root_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}"
-usd_path = f"{model_root_path}/usd/{obj_model}.usd"
-
-obj1 = DatasetObject(
-    prim_path=f"/World/{name1}",
-    usd_path=usd_path,
-    category=obj_category,
-    name=name1,
-    scale=0.5,
-    abilities={"heatable": {}},
-)
-obj2 = DatasetObject(
-    prim_path=f"/World/{name2}", usd_path=usd_path, category=obj_category, name=name2, abilities={"heatable": {}},
-)
-obj3 = DatasetObject(
-    prim_path=f"/World/{name3}",
-    usd_path=usd_path,
-    category=obj_category,
-    name=name3,
-    scale=2.0,
-    abilities={"heatable": {}},
-)
-
-assert object_states.Heated in obj1.states
-assert object_states.Heated in obj2.states
-assert object_states.Heated in obj3.states
-
-sim.import_object(obj1, auto_initialize=True)
-sim.import_object(obj2, auto_initialize=True)
-sim.import_object(obj3, auto_initialize=True)
-
-sim.stop()
-obj1.set_position(np.array([-0.6, 0, 0]))
-obj2.set_position(np.array([0, 0, 0]))
-obj3.set_position(np.array([0.8, 0, 0]))
-sim.play()
-sim.step()
+import igibson as ig
+from igibson import object_states
+from igibson.macros import gm
+from igibson.objects import DatasetObject, LightObject
 
 
-def report_states(obj):
-    # Make sure the state is updated.
-    for _ in range(5):
-        sim.step()
-    print("=" * 20)
-    print("object:", obj.name)
-    print("temperature:", obj.states[object_states.Temperature].get_value())
-    print("obj is heated:", obj.states[object_states.Heated].get_value())
+def main():
+    # Make sure object states are enabled
+    assert gm.ENABLE_OBJECT_STATES, f"Object states must be enabled in macros.py in order to use this demo!"
+
+    # Create the scene config to load -- empty scene
+    cfg = {
+        "scene": {
+            "type": "EmptyScene",
+        }
+    }
+
+    # Create the environment
+    env = ig.Environment(configs=cfg, action_timestep=1/60., physics_timestep=1/60.)
+
+    # Set camera to appropriate viewing pose
+    ig.sim.viewer_camera.set_position_orientation(
+        position=np.array([ 0.182103, -2.07295 ,  0.14017 ]),
+        orientation=np.array([0.77787037, 0.00267566, 0.00216149, 0.62841535]),
+    )
+
+    # Create a light object
+    light = LightObject(
+        prim_path="/World/sphere_light",
+        light_type="Sphere",
+        name="sphere_light",
+        radius=0.01,
+        intensity=1e5,
+    )
+    ig.sim.import_object(light)
+    light.set_position(np.array([-2.0, -2.0, 1.0]))
+    env.step(np.array([]))
+
+    # Import bowls of varying sizes
+    obj_category = "bowl"
+    obj_model = "68_0"
+    scales = [0.5, 1.0, 2.0]
+    xs = [-0.6, 0, 0.8]
+    objs = []
+
+    for i, (scale, x) in enumerate(zip(scales, xs)):
+        name = f"{obj_category}{i}"
+        obj = DatasetObject(
+            prim_path=f"/World/{name}",
+            name=name,
+            category=obj_category,
+            model=obj_model,
+            scale=scale,
+            abilities={"heatable": {}},
+        )
+        # Make sure the bowls can be heated
+        assert object_states.Heated in obj.states
+        ig.sim.import_object(obj)
+        obj.set_position(np.array([x, 0, 0]))
+        objs.append(obj)
+
+    # Take a step to make sure all objects are fully initialized
+    env.step(np.array([]))
+
+    def report_states(objs):
+        for obj in objs:
+            print("=" * 20)
+            print("object:", obj.name)
+            print("temperature:", obj.states[object_states.Temperature].get_value())
+            print("obj is heated:", obj.states[object_states.Heated].get_value())
+
+    # Report default states
+    print("==== Initial state ====")
+    report_states(objs)
+
+    # Notify user that we're about to heat the object
+    input("Objects will be heated, and steam will slowly rise. Press ENTER to continue.")
+
+    # Heated.
+    for obj in objs:
+        obj.states[object_states.Temperature].set_value(50)
+    env.step(np.array([]))
+    report_states(objs)
+
+    # Take a look at the steam effect.
+    # After a while, objects will be below the Steam temperature threshold.
+    print("==== Objects are now heated... ====")
+    print()
+    for _ in range(2000):
+        env.step(np.array([]))
+        # Also print temperatures
+        temps = [f"{obj.states[object_states.Temperature].get_value():>7.2f}" for obj in objs]
+        print(f"obj temps:", *temps, end="\r")
+    print()
+
+    # Objects are not heated anymore.
+    print("==== Objects are no longer heated... ====")
+    report_states(objs)
+
+    # Close environment at the end
+    input("Demo completed. Press ENTER to shutdown environment.")
+    env.close()
 
 
-# Default.
-report_states(obj1)
-report_states(obj2)
-report_states(obj3)
-
-for _ in range(2000):
-    sim.step()
-
-# Heated.
-obj1.states[object_states.Temperature].set_value(50)
-obj2.states[object_states.Temperature].set_value(50)
-obj3.states[object_states.Temperature].set_value(50)
-report_states(obj1)
-report_states(obj2)
-report_states(obj3)
-
-# Take a look at the steam effect.
-# After a while, objects will be below the Steam temperature threshold.
-for _ in range(2000):
-    sim.step()
-
-# Objects are not heated anymore.
-report_states(obj1)
-report_states(obj2)
-report_states(obj3)
-
-sim.close()
+if __name__ == "__main__":
+    main()

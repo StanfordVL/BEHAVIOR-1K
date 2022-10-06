@@ -7,8 +7,8 @@ from igibson.render.mesh_renderer.mesh_renderer_settings import MeshRendererSett
 from igibson.render.profiler import Profiler
 from igibson.scenes.gibson_indoor_scene import StaticIndoorScene
 from igibson.simulator import Simulator
-from igibson.utils.assets_utils import get_available_g_scenes
-from igibson.utils.utils import let_user_pick
+from igibson.utils.asset_utils import get_available_g_scenes
+from igibson.utils.ui_utils import choose_from_options
 
 
 def main(random_selection=False, headless=False, short_exec=False):
@@ -19,7 +19,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     """
     logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
     available_g_scenes = get_available_g_scenes()
-    scene_id = available_g_scenes[let_user_pick(available_g_scenes, random_selection=random_selection) - 1]
+    scene_id = choose_from_options(options=available_g_scenes, name="g scene", random_selection=random_selection)
     settings = MeshRendererSettings(enable_shadow=True, msaa=False)
     # Reduce texture scale for Mac.
     if platform == "darwin":

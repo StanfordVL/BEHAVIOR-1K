@@ -6,24 +6,10 @@
 # distribution of this software and related documentation without an express
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 #
-from collections import Iterable, OrderedDict
-from typing import Optional, Tuple
-from pxr import Gf, Usd, Sdf, UsdGeom, UsdShade, UsdPhysics, PhysxSchema
-from omni.isaac.core.materials import PreviewSurface, OmniGlass, OmniPBR, VisualMaterial
-from omni.isaac.core.utils.rotations import gf_quat_to_np_array
-from omni.isaac.core.utils.transformations import tf_matrix_from_pose
-from omni.isaac.core.utils.prims import (
-    get_prim_at_path,
-    move_prim,
-    query_parent_path,
-    is_prim_path_valid,
-    define_prim,
-    get_prim_parent,
-    get_prim_object_type,
-)
+from collections import OrderedDict
+from pxr import UsdShade, UsdPhysics, PhysxSchema
+from omni.isaac.core.utils.prims import get_prim_at_path
 import numpy as np
-import carb
-from omni.isaac.core.utils.stage import get_current_stage
 from omni.isaac.core.materials import PhysicsMaterial
 from omni.usd import get_shader_from_material
 from igibson.prims.xform_prim import XFormPrim
@@ -112,8 +98,11 @@ class GeomPrim(XFormPrim):
         Returns:
             None or 3-array: If set, the default RGB color used for this visual geom
         """
-        color = self.get_attribute("primvars:displayColor")
-        return None if color is None else np.array(color)[0]
+        if self.has_material():
+            return self.material.diffuse_color_constant
+        else:
+            color = self.get_attribute("primvars:displayColor")
+            return None if color is None else np.array(color)[0]
 
     @color.setter
     def color(self, rgb):
@@ -123,7 +112,10 @@ class GeomPrim(XFormPrim):
         Args:
             3-array: The default RGB color used for this visual geom
         """
-        self.set_attribute("primvars:displayColor", np.array(rgb))
+        if self.has_material():
+            self.material.diffuse_color_constant = rgb
+        else:
+            self.set_attribute("primvars:displayColor", np.array(rgb))
 
     @property
     def opacity(self):
@@ -131,8 +123,11 @@ class GeomPrim(XFormPrim):
         Returns:
             None or float: If set, the default opacity used for this visual geom
         """
-        opacity = self.get_attribute("primvars:displayOpacity")
-        return None if opacity is None else np.array(opacity)[0]
+        if self.has_material():
+            return self.material.opacity_constant
+        else:
+            opacity = self.get_attribute("primvars:displayOpacity")
+            return None if opacity is None else np.array(opacity)[0]
 
     @opacity.setter
     def opacity(self, opacity):
@@ -142,7 +137,10 @@ class GeomPrim(XFormPrim):
         Args:
             opacity: The default opacity used for this visual geom
         """
-        self.set_attribute("primvars:displayOpacity", np.array([opacity]))
+        if self.has_material():
+            self.material.opacity_constant = opacity
+        else:
+            self.set_attribute("primvars:displayOpacity", np.array([opacity]))
 
 
 class CollisionGeomPrim(GeomPrim):
@@ -352,3 +350,14 @@ class VisualGeomPrim(GeomPrim):
                     print(f"Warning: No shader found for prim {self._prim_path}! Not updating shader asset paths.")
                 else:
                     update_shader_asset_paths(shader=shader)
+
+
+class CollisionVisualGeomPrim(CollisionGeomPrim, VisualGeomPrim):
+
+    def _post_load(self):
+        # run super first
+        super()._post_load()
+
+        # The purpose should be default, not guide as set by CollisionGeomPrim
+        # this is to make sure the geom is visualized, even though it's also collidable
+        self.purpose = "default"

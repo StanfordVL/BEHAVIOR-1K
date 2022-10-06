@@ -9,7 +9,7 @@ import numpy as np
 from igibson import app, Simulator
 from igibson.objects.primitive_object import PrimitiveObject
 from igibson.scenes.empty_scene import EmptyScene
-from igibson.utils.assets_utils import get_ig_assets_version
+from igibson.utils.asset_utils import get_ig_assets_version
 
 
 # Params to be set as needed.

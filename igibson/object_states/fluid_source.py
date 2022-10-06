@@ -1,6 +1,5 @@
 import numpy as np
 
-from igibson.object_states.contact_bodies import ContactBodies
 from igibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from igibson.object_states.object_state_base import AbsoluteObjectState
 from igibson.object_states.toggle import ToggledOn

@@ -1,13 +1,11 @@
 import logging
-import os
 
 import numpy as np
 
-import igibson
+import igibson as ig
 from igibson import object_states
-from igibson.objects.usd_object import URDFObject
-from igibson.scenes.empty_scene import EmptyScene
-from igibson.simulator import Simulator
+from igibson.macros import gm
+from igibson.objects import DatasetObject, LightObject
 
 
 def main(random_selection=False, headless=False, short_exec=False):
@@ -18,102 +16,141 @@ def main(random_selection=False, headless=False, short_exec=False):
     This demo also shows how to load objects ToggledOn and how to set the initial temperature of an object
     """
     logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
-    s = Simulator(mode="gui_interactive" if not headless else "headless", image_width=1280, image_height=720)
 
-    if not headless:
-        # Set a better viewing direction
-        s.viewer.initial_pos = [0.0, -0.7, 2.1]
-        s.viewer.initial_view_direction = [0.0, 0.8, -0.7]
-        s.viewer.reset_viewer()
+    # Make sure object states are enabled
+    assert gm.ENABLE_OBJECT_STATES, f"Object states must be enabled in macros.py in order to use this demo!"
 
-    try:
-        scene = EmptyScene(floor_plane_rgba=[0.6, 0.6, 0.6, 1])
-        s.import_scene(scene)
+    # Create the scene config to load -- empty scene
+    cfg = {
+        "scene": {
+            "type": "EmptyScene",
+            "floor_plane_visible": True,
+        }
+    }
 
-        # Load stove ON
-        stove_dir = os.path.join(igibson.ig_dataset_path, "objects/stove/101930/")
-        stove_urdf = os.path.join(stove_dir, "101930.urdf")
-        stove = URDFObject(stove_urdf, name="stove", category="stove", model_path=stove_dir)
-        s.import_object(stove)
-        stove.set_position([0, 0, 0.782])
-        stove.states[object_states.ToggledOn].set_value(True)
+    # Create the environment
+    env = ig.Environment(configs=cfg, action_timestep=1 / 60., physics_timestep=1 / 60.)
 
-        # Load microwave ON
-        microwave_dir = os.path.join(igibson.ig_dataset_path, "objects/microwave/7128/")
-        microwave_urdf = os.path.join(microwave_dir, "7128.urdf")
-        microwave = URDFObject(microwave_urdf, name="microwave", category="microwave", model_path=microwave_dir)
-        s.import_object(microwave)
-        microwave.set_position([2, 0, 0.401])
-        microwave.states[object_states.ToggledOn].set_value(True)
+    # Set camera to appropriate viewing pose
+    ig.sim.viewer_camera.set_position_orientation(
+        position=np.array([ 0.46938863, -3.97887141,  1.64106008]),
+        orientation=np.array([0.63311689, 0.00127259, 0.00155577, 0.77405359]),
+    )
 
-        # Load oven ON
-        oven_dir = os.path.join(igibson.ig_dataset_path, "objects/oven/7120/")
-        oven_urdf = os.path.join(oven_dir, "7120.urdf")
-        oven = URDFObject(oven_urdf, name="oven", category="oven", model_path=oven_dir)
-        s.import_object(oven)
-        oven.set_position([-2, 0, 0.816])
-        oven.states[object_states.ToggledOn].set_value(True)
+    # Create a light object
+    light = LightObject(
+        prim_path="/World/sphere_light",
+        light_type="Sphere",
+        name="sphere_light",
+        radius=0.01,
+        intensity=1e5,
+    )
+    ig.sim.import_object(light)
+    light.set_position(np.array([-2.0, -2.0, 1.0]))
 
-        # Load tray
-        tray_dir = os.path.join(igibson.ig_dataset_path, "objects/tray/tray_000/")
-        tray_urdf = os.path.join(tray_dir, "tray_000.urdf")
-        tray = URDFObject(tray_urdf, name="tray", category="tray", model_path=tray_dir, scale=np.array([0.1, 0.1, 0.1]))
-        s.import_object(tray)
-        tray.set_position([0, 0, 1.55])
+    # Load stove ON
+    stove = DatasetObject(
+        prim_path="/World/stove",
+        name="stove",
+        category="stove",
+        model="101943",
+    )
+    ig.sim.import_object(stove)
+    stove.set_position([0, 0, 0.65])
 
-        # Load fridge
-        fridge_dir = os.path.join(igibson.ig_dataset_path, "objects/fridge/12252/")
-        fridge_urdf = os.path.join(fridge_dir, "12252.urdf")
-        fridge = URDFObject(
-            fridge_urdf,
-            name="fridge",
-            category="fridge",
-            model_path=fridge_dir,
-            abilities={
-                "coldSource": {
-                    "temperature": -100.0,
-                    "requires_inside": True,
-                }
-            },
+    # Load microwave ON
+    microwave = DatasetObject(
+        prim_path="/World/microwave",
+        name="microwave",
+        category="microwave",
+        model="7128",
+        scale=0.25,
+    )
+    ig.sim.import_object(microwave)
+    microwave.set_position([2.5, 0, 0.094])
+
+    # Load oven ON
+    oven = DatasetObject(
+        prim_path="/World/oven",
+        name="oven",
+        category="oven",
+        model="7120",
+    )
+    ig.sim.import_object(oven)
+    oven.set_position([-1.25, 0, 0.80])
+
+    # Load tray
+    tray = DatasetObject(
+        prim_path="/World/tray",
+        name="tray",
+        category="tray",
+        model="tray_000",
+        scale=0.15,
+    )
+    ig.sim.import_object(tray)
+    tray.set_position([0, 0, 1.24])
+
+    # Load fridge
+    fridge = DatasetObject(
+        prim_path="/World/fridge",
+        name="fridge",
+        category="fridge",
+        model="12252",
+        abilities={
+            "coldSource": {
+                "temperature": -100.0,
+                "requires_inside": True,
+            }
+        },
+    )
+    ig.sim.import_object(fridge)
+    fridge.set_position([1.25, 0, 0.80])
+
+    # Load 5 apples
+    apples = []
+    for i in range(5):
+        apple = DatasetObject(
+            prim_path=f"/World/apple{i}",
+            name=f"apple{i}",
+            category="apple",
+            model="00_0",
         )
-        s.import_object(fridge)
-        fridge.set_position_orientation([-1, -3, 0.75], [1, 0, 0, 0])
+        ig.sim.import_object(apple)
+        apple.set_position([0, i * 0.05, 1.65])
+        apples.append(apple)
 
-        # Load 5 apples
-        apple_dir = os.path.join(igibson.ig_dataset_path, "objects/apple/00_0/")
-        apple_urdf = os.path.join(apple_dir, "00_0.urdf")
-        apples = []
-        for i in range(5):
-            apple = URDFObject(apple_urdf, name="apple", category="apple", model_path=apple_dir)
-            s.import_object(apple)
-            apple.set_position([0, i * 0.05, 1.65])
-            apples.append(apple)
-        s.step()
-        # Set initial temperature of the apples to -50 degrees Celsius
-        for apple in apples:
-            apple.states[object_states.Temperature].set_value(-50)
+    # Take an environment step so that all objects are initialized properly
+    env.step(np.array([]))
 
-        steps = 0
-        max_steps = -1 if not short_exec else 1000
+    # Turn on all scene objects
+    stove.states[object_states.ToggledOn].set_value(True)
+    microwave.states[object_states.ToggledOn].set_value(True)
+    oven.states[object_states.ToggledOn].set_value(True)
 
-        # Main recording loop
-        while steps != max_steps:
-            s.step()
-            for idx, apple in enumerate(apples):
-                logging.info(
-                    "Apple %d Temperature: %.2f. Frozen: %r. Cooked: %r. Burnt: %r."
-                    % (
-                        idx + 1,
-                        apple.states[object_states.Temperature].get_value(),
-                        apple.states[object_states.Frozen].get_value(),
-                        apple.states[object_states.Cooked].get_value(),
-                        apple.states[object_states.Burnt].get_value(),
-                    )
-                )
-            print()
-            steps += 1
-    finally:
-        s.disconnect()
+    # Set initial temperature of the apples to -50 degrees Celsius, and move the apples to different objects
+    for apple in apples:
+        apple.states[object_states.Temperature].set_value(-50)
+    apples[0].states[object_states.Inside].set_value(oven, True, use_ray_casting_method=True)
+    apples[1].set_position(stove.links["heat_source_link"].get_position() + np.array([0, 0, 0.1]))
+    apples[2].states[object_states.OnTop].set_value(tray, True, use_ray_casting_method=True)
+    apples[3].states[object_states.Inside].set_value(fridge, True, use_ray_casting_method=True)
+    apples[4].states[object_states.Inside].set_value(microwave, True, use_ray_casting_method=True)
+
+    steps = 0
+    max_steps = -1 if not short_exec else 1000
+
+    # Main recording loop
+    locations = [f'{loc:>20}' for loc in ["Inside oven", "On stove", "On tray", "Inside fridge", "Inside microwave"]]
+    print()
+    print(f"{'Apple location:':<20}", *locations)
+    while steps != max_steps:
+        env.step(np.array([]))
+        temps = [f"{apple.states[object_states.Temperature].get_value():>20.2f}" for apple in apples]
+        print(f"{'Apple temperature:':<20}", *temps, end="\r")
+        steps += 1
+
+    # Always close env at the end
+    env.close()
 
 
 if __name__ == "__main__":

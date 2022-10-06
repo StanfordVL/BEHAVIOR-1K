@@ -5,7 +5,7 @@ import yaml
 import builtins
 
 # TODO: Need to fix somehow -- igibson gets imported first BEFORE we can actually modify the macros
-import igibson.macros as m
+from igibson.macros import gm
 
 builtins.ISAAC_LAUNCHED_FROM_JUPYTER = (
     os.getenv("ISAAC_JUPYTER_KERNEL") is not None
@@ -104,26 +104,32 @@ logging.info("Example config path: {}".format(example_config_path))
 # whether to enable debugging mode for object sampling
 debug_sampling = False
 
-# whether to ignore visual shape when importing to pybullet
-ignore_visual_shape = True
-
-# Finally, we must create the igibson application (choose based on whether we're public version or not)
-if m.IS_PUBLIC_ISAACSIM:
-    from igibson.app_omni_public import OmniApp
-else:
-    from igibson.app_omni import OmniApp
+# Finally, we must create the igibson application
+from igibson.app_omni import OmniApp
 
 # Create app as a global reference so any submodule can access it
 app = OmniApp(
     {
-        "headless": m.HEADLESS,
+        "headless": gm.HEADLESS,
     },
-    debug=m.DEBUG,
+    debug=gm.DEBUG,
 )
 
-from igibson.simulator_omni import Simulator
+# Next import must be simulator
+sim = None
+from igibson.simulator import Simulator
 
+# Create simulator (this is a singleton so it's okay that it's global)
+sim = Simulator()
 
-# from omni.isaac.kit import SimulationApp
-# app = SimulationApp({"headless": False})
-# from omni.isaac.core import World as Simulator
+# Import any remaining items we want to access directly from the main igibson import
+from igibson.envs import Environment
+from igibson.scenes import REGISTERED_SCENES
+from igibson.robots import REGISTERED_ROBOTS
+from igibson.controllers import REGISTERED_CONTROLLERS
+from igibson.tasks import REGISTERED_TASKS
+
+# Define convenience function for shutting down iGibson cleanly
+def shutdown():
+    app.close()
+    exit(0)

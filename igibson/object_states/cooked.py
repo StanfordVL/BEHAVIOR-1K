@@ -1,12 +1,17 @@
+from igibson.macros import create_module_macros
 from igibson.object_states.max_temperature import MaxTemperature
-from igibson.object_states.object_state_base import AbsoluteObjectState, BooleanState, NONE
+from igibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
 import numpy as np
 
-_DEFAULT_COOK_TEMPERATURE = 70
+
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
+
+m.DEFAULT_COOK_TEMPERATURE = 70
 
 
 class Cooked(AbsoluteObjectState, BooleanState):
-    def __init__(self, obj, cook_temperature=_DEFAULT_COOK_TEMPERATURE):
+    def __init__(self, obj, cook_temperature=m.DEFAULT_COOK_TEMPERATURE):
         super(Cooked, self).__init__(obj)
         self.cook_temperature = cook_temperature
 

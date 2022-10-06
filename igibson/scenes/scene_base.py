@@ -1,36 +1,17 @@
 import json
 from abc import ABC, abstractmethod
 from collections import OrderedDict
-from future.utils import with_metaclass
-
-import carb
-from omni.isaac.core.prims.geometry_prim import GeometryPrim
-from omni.isaac.core.prims.rigid_prim import RigidPrim
-from omni.isaac.core.prims.xform_prim import XFormPrim
-from omni.isaac.core.scenes.scene_registry import SceneRegistry
 from omni.isaac.core.objects.ground_plane import GroundPlane
-from omni.isaac.core.articulations.articulation import Articulation
-from omni.isaac.core.robots.robot import Robot
-from omni.isaac.core.utils.prims import get_prim_parent, get_prim_path, is_prim_root_path, is_prim_ancestral
-import omni.usd.commands
 from pxr import Usd, UsdGeom
 import numpy as np
-import builtins
-from omni.isaac.core.utils.stage import get_current_stage, update_stage
-from omni.isaac.core.utils.nucleus import find_nucleus_server
-from omni.isaac.core.utils.stage import add_reference_to_stage
-from typing import Optional, Tuple
-import gc
+from omni.isaac.core.utils.stage import get_current_stage
 from igibson import app
+from igibson.prims.xform_prim import XFormPrim
 from igibson.utils.python_utils import classproperty, Serializable, Registerable, Recreatable
 from igibson.utils.registry_utils import SerializableRegistry
-from igibson.utils.utils import NumpyEncoder
+from igibson.utils.config_utils import NumpyEncoder
 from igibson.objects.object_base import BaseObject
-from igibson.objects.dataset_object import DatasetObject
 from igibson.systems import SYSTEMS_REGISTRY
-
-# from igibson.objects.particles import Particle
-# from igibson.objects.visual_marker import VisualMarker
 from igibson.robots.robot_base import BaseRobot
 
 # Global dicts that will contain mappings
@@ -49,8 +30,8 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         self._initialized = False               # Whether this scene has its internal handles / info initialized or not (occurs AFTER and INDEPENDENTLY from loading!)
         self._registry = None
         self._world_prim = None
-        self.floor_body_ids = []  # List of ids of the floor_heights
         self._initial_state = None
+        self._floor_plane = None
 
         # Call super init
         super().__init__()
@@ -145,7 +126,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 prims that we can use as grouping IDs to reference prims, e.g., prim.in_rooms
         """
         # None by default
-        return ["prim_type"]
+        return ["prim_type", "states"]
 
     @property
     def loaded(self):
@@ -266,12 +247,13 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             name="robot_registry",
             class_types=BaseRobot,
             default_key="name",
-            unique_keys=None,
-            group_keys=["model_name"],
+            unique_keys=self.object_registry_unique_keys,
+            group_keys=["model_name"] + self.object_registry_group_keys,
         ))
 
         return registry
 
+    # TODO: Refactor
     def object_exists(self, name: str) -> bool:
         """[summary]
 
@@ -291,9 +273,9 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Get the objects with a given state in the scene.
 
         :param state: state of the objects to get
-        :return: a list of objects with the given state
+        :return: a set of objects with the given state
         """
-        return [item for item in self.objects if hasattr(item, "states") and state in item.states]
+        return self.object_registry("states", state, set()).union(self.robot_registry("states", state, set()))
 
     def _add_object(self, obj):
         """
@@ -350,15 +332,15 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
     #     """
     #     # Remove all object, robot, system info
 
-
-    def remove_object(self, obj):
+    def remove_object(self, obj, simulator):
         # Remove from the appropriate registry
         if isinstance(obj, BaseRobot):
             self.robot_registry.remove(obj)
         else:
             self.object_registry.remove(obj)
+
         # Remove from omni stage
-        obj.remove(self)
+        obj.remove(simulator=simulator)
 
     # TODO: Integrate good features of this
     #
@@ -473,7 +455,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         restitution: float = 0.8,
         color=None,
         visible=True,
-    ) -> None:
+    ):
         """[summary]
 
         Args:
@@ -486,22 +468,24 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             restitution (float, optional): [description]. Defaults to 0.8.
             color (Optional[np.ndarray], optional): [description]. Defaults to None.
             visible (bool): Whether the plane should be visible or not
-
-        Returns:
-            [type]: [description]
         """
         plane = GroundPlane(
             prim_path=prim_path,
             name=name,
             z_position=z_position,
             size=size,
-            color=np.array(color),
+            color=None if color is None else np.array(color),
             visible=visible,
 
             # TODO: update with new PhysicsMaterial API
             # static_friction=static_friction,
             # dynamic_friction=dynamic_friction,
             # restitution=restitution,
+        )
+
+        self._floor_plane = XFormPrim(
+            prim_path=plane.prim_path,
+            name=plane.name,
         )
 
     def update_initial_state(self):

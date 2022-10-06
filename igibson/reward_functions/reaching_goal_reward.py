@@ -1,5 +1,5 @@
 from igibson.reward_functions.reward_function_base import BaseRewardFunction
-from igibson.utils.utils import l2_distance
+import igibson.utils.transform_utils as T
 
 
 class ReachingGoalReward(BaseRewardFunction):
@@ -26,7 +26,7 @@ class ReachingGoalReward(BaseRewardFunction):
 
     def _step(self, task, env, action):
         # Sparse reward is received if distance between robot_idn robot's eef and goal is below the distance threshold
-        success = l2_distance(env.robots[self._robot_idn].get_end_effector_position(), task.goal_pos) < \
+        success = T.l2_distance(env.robots[self._robot_idn].get_end_effector_position(), task.goal_pos) < \
             self._distance_tol
         reward = self._r_reach if success else 0.0
 

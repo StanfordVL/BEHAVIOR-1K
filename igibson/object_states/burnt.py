@@ -1,12 +1,17 @@
+from igibson.macros import create_module_macros
 from igibson.object_states.max_temperature import MaxTemperature
-from igibson.object_states.object_state_base import AbsoluteObjectState, BooleanState, NONE
+from igibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
 import numpy as np
 
-_DEFAULT_BURN_TEMPERATURE = 200
+
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
+
+m.DEFAULT_BURN_TEMPERATURE = 200
 
 
 class Burnt(AbsoluteObjectState, BooleanState):
-    def __init__(self, obj, burn_temperature=_DEFAULT_BURN_TEMPERATURE):
+    def __init__(self, obj, burn_temperature=m.DEFAULT_BURN_TEMPERATURE):
         super(Burnt, self).__init__(obj)
         self.burn_temperature = burn_temperature
 

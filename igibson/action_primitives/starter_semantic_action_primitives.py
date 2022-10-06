@@ -20,7 +20,7 @@ from igibson import object_states
 from igibson.action_primitives.action_primitive_set_base import ActionPrimitiveError, BaseActionPrimitiveSet
 # from igibson.external.pybullet_tools.utils import set_joint_position
 from igibson.object_states.on_floor import RoomFloor
-from igibson.object_states.utils import get_center_extent, sample_kinematics
+from igibson.utils.object_state_utils import get_center_extent, sample_kinematics
 # from igibson.objects.articulated_object import URDFObject
 # from igibson.objects.object_base import BaseObject
 # from igibson.robots import BaseRobot, behavior_robot
@@ -32,7 +32,7 @@ from igibson.object_states.utils import get_center_extent, sample_kinematics
 #     plan_hand_motion_br,
 # )
 # from igibson.utils.grasp_planning_utils import get_grasp_poses_for_object, get_grasp_position_for_open
-from igibson.utils.utils import restoreState
+# from igibson.utils.utils import restoreState
 
 MAX_STEPS_FOR_HAND_MOVE = 100
 MAX_STEPS_FOR_HAND_MOVE_WHEN_OPENING = 30

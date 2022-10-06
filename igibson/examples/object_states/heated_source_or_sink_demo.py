@@ -1,82 +1,94 @@
 import numpy as np
-from igibson import object_states, ig_dataset_path
-from igibson.objects.dataset_object import DatasetObject
-from igibson.scenes.empty_scene import EmptyScene
-from igibson.simulator_omni import Simulator
-from omni.isaac.core.utils.viewports import set_camera_view
+import igibson as ig
+from igibson import object_states
+from igibson.macros import gm
+from igibson.objects import DatasetObject
 
-# Import scene.
-sim = Simulator()
-scene = EmptyScene(floor_plane_visible=True)
-sim.import_scene(scene)
 
-sim._set_viewer_camera("/OmniverseKit_Persp")
-set_camera_view(eye=[3, -4, 4], target=[0, 1, 0])
+def main():
+    # Make sure object states are enabled
+    assert gm.ENABLE_OBJECT_STATES, f"Object states must be enabled in macros.py in order to use this demo!"
 
-# Import object.
-obj_category = "stove"
-obj_model = "101908"
-name = "stove"
+    # Create the scene config to load -- empty scene
+    cfg = {
+        "scene": {
+            "type": "EmptyScene",
+        }
+    }
 
-model_root_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}"
-usd_path = f"{model_root_path}/usd/{obj_model}.usd"
+    # Create the environment
+    env = ig.Environment(configs=cfg, action_timestep=1/60., physics_timestep=1/60.)
 
-stove = DatasetObject(
-    prim_path=f"/World/{name}",
-    usd_path=usd_path,
-    category=obj_category,
-    name=f"{name}",
-    abilities={"heatSource": {"requires_toggled_on": True}, "toggleable": {},},
-)
+    # Set camera to appropriate viewing pose
+    ig.sim.viewer_camera.set_position_orientation(
+        position=np.array([-0.0792399, -1.30104, 1.51981]),
+        orientation=np.array([0.54897692, 0.00110359, 0.00168013, 0.83583509]),
+    )
 
-assert object_states.HeatSourceOrSink in stove.states
-assert object_states.ToggledOn in stove.states
+    # Load a stove model
+    stove = DatasetObject(
+        prim_path=f"/World/stove",
+        name="stove",
+        category="stove",
+        model="101908",
+        abilities={"heatSource": {"requires_toggled_on": True}, "toggleable": {},},
+    )
 
-sim.import_object(stove, auto_initialize=True)
+    # Make sure necessary object states are included with the stove
+    assert object_states.HeatSourceOrSink in stove.states
+    assert object_states.ToggledOn in stove.states
 
-sim.stop()
-stove.set_position(np.array([0, 0, 0.4]))
-sim.play()
+    # Import this object into the simulator, and take a step to initialize the object
+    ig.sim.import_object(stove)
+    stove.set_position(np.array([0, 0, 0.4]))
+    env.step(np.array([]))
 
-# Hide visibility of all toggle markers.
-for link in stove.states[object_states.ToggledOn].visual_marker_on.links.values():
-    link.visible = False
-for link in stove.states[object_states.ToggledOn].visual_marker_off.links.values():
-    link.visible = False
+    # Take a few steps so that visibility propagates
+    for _ in range(5):
+        env.step(np.array([]))
 
-for _ in range(200):
-    sim.step()
+    # Heat source is off.
+    print("Heat source is OFF.")
+    heat_source_state, heat_source_position = stove.states[object_states.HeatSourceOrSink].get_value()
+    assert not heat_source_state
 
-# Heat source is off.
-heat_source_state, heat_source_position = stove.states[object_states.HeatSourceOrSink].get_value()
-assert not heat_source_state
+    # Toggle on stove, notify user
+    input("Heat source will now turn ON: Press ENTER to continue.")
+    stove.states[object_states.ToggledOn].set_value(True)
+    assert stove.states[object_states.ToggledOn].get_value()
 
-# Toggle on stove.
-stove.states[object_states.ToggledOn].set_value(True)
-assert stove.states[object_states.ToggledOn].get_value()
+    # Need to take a step to update the state.
+    env.step(np.array([]))
 
-# Need to take a step to update the state.
-sim.step()
+    # Heat source is on
+    heat_source_state, heat_source_position = stove.states[object_states.HeatSourceOrSink].get_value()
+    assert heat_source_state
+    for _ in range(500):
+        env.step(np.array([]))
 
-# Heat source is on.
-heat_source_state, heat_source_position = stove.states[object_states.HeatSourceOrSink].get_value()
-assert heat_source_state
-for _ in range(500):
-    sim.step()
+    # Toggle off stove, notify user
+    input("Heat source will now turn OFF: Press ENTER to continue.")
+    stove.states[object_states.ToggledOn].set_value(False)
+    assert not stove.states[object_states.ToggledOn].get_value()
+    for _ in range(200):
+        env.step(np.array([]))
 
-# Toggle off stove.
-stove.states[object_states.ToggledOn].set_value(False)
-assert not stove.states[object_states.ToggledOn].get_value()
-for _ in range(200):
-    sim.step()
+    # Move stove, notify user
+    input("Heat source is now moving: Press ENTER to continue.")
+    stove.set_position(np.array([0, 1.0, 0.4]))
+    for i in range(100):
+        env.step(np.array([]))
 
-# Move stove.
-stove.set_linear_velocity(velocity=np.array([-5.0, 0, 0.0]))
-for i in range(200):
-    sim.step()
+    # Toggle on stove again, notify user
+    input("Heat source will now turn ON: Press ENTER to continue.")
+    stove.states[object_states.ToggledOn].set_value(True)
+    assert stove.states[object_states.ToggledOn].get_value()
+    for i in range(500):
+        env.step(np.array([]))
 
-# Toggle on stove again.
-stove.states[object_states.ToggledOn].set_value(True)
-assert stove.states[object_states.ToggledOn].get_value()
-for i in range(500):
-    sim.step()
+    # Shutdown environment at end
+    env.close()
+
+
+if __name__ == "__main__":
+    main()

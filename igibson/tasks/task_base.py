@@ -2,6 +2,7 @@ from abc import ABCMeta, abstractmethod
 from collections import OrderedDict
 from copy import deepcopy
 import numpy as np
+import igibson as ig
 from igibson.utils.python_utils import classproperty, Registerable
 from igibson.utils.gym_utils import GymObservable
 
@@ -99,7 +100,7 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
         self._load(env=env)
 
         # Make sure we're playing and simultaneously take a sim step
-        env.simulator.play()
+        ig.sim.play()
 
         # We're now initialized
         self._loaded = True

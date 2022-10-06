@@ -27,10 +27,10 @@ from igibson.prims.cloth_prim import ClothPrim
 from igibson.prims.joint_prim import JointPrim
 from igibson.prims.rigid_prim import RigidPrim
 from igibson.prims.xform_prim import XFormPrim
-from igibson.utils.types import JointsState
-from igibson.utils.constants import PrimType
-from igibson.utils.types import GEOM_TYPES
-import igibson.macros as m
+from igibson.utils.omni_types import JointsState
+from igibson.utils.sim_utils import check_collision
+from igibson.utils.constants import PrimType, GEOM_TYPES
+from igibson.macros import gm
 
 
 class EntityPrim(XFormPrim):
@@ -63,7 +63,7 @@ class EntityPrim(XFormPrim):
         self._root_handle = None                # Handle to the root rigid body of this articulation
         self._root_link_name = None             # Name of the root link
         self._dofs_infos = None
-        self._n_dof = None
+        self._n_dof = None                      # dof with dynamic control
         self._default_joints_state = None
         self._links = None
         self._joints = None
@@ -99,7 +99,6 @@ class EntityPrim(XFormPrim):
 
         # Handle case separately based on whether the handle is valid (i.e.: whether we are actually articulated or not)
         if self._handle != _dynamic_control.INVALID_HANDLE:
-            print(f"initializing obj: {self.name}, articulation root path: {self.articulation_root_path}, handle: {self._handle}, new handle: {self._dc.get_articulation(self.articulation_root_path)}, root handle: {self._root_handle}")
             root_prim = get_prim_at_path(self._dc.get_rigid_body_path(self._root_handle))
             n_dof = self._dc.get_articulation_dof_count(self._handle)
 
@@ -145,8 +144,6 @@ class EntityPrim(XFormPrim):
 
         # Store values internally
         self._n_dof = n_dof
-
-        print(f"root handle: {self._root_handle}, root prim path: {self._dc.get_rigid_body_path(self._root_handle)}")
 
     def _load(self, simulator=None):
         # By default, this prim cannot be instantiated from scratch!
@@ -203,8 +200,8 @@ class EntityPrim(XFormPrim):
 
         if self._prim_type == PrimType.CLOTH:
             assert not self._visual_only, "Cloth cannot be visual-only."
-            assert len(self._links) == 1, "Cloth entity prim can only have one link."
-            if m.AG_CLOTH:
+            assert len(self._links) == 1, f"Cloth entity prim can only have one link; got: {len(self._links)}"
+            if gm.AG_CLOTH:
                 self.create_attachment_point_link()
 
         # Disable any requested collision pairs
@@ -296,10 +293,10 @@ class EntityPrim(XFormPrim):
 
     @property
     def n_dof(self):
-        """[summary]
-
+        """
+        Return the number of DoFs of the object
         Returns:
-            int: [description]
+            int: dofs
         """
         return self._n_dof
 
@@ -392,38 +389,21 @@ class EntityPrim(XFormPrim):
         body1_contacts = {c.body1 for c in contact_list if c.body1 not in link_paths}
         return body0_contacts.union(body1_contacts)
 
-    def in_contact(self, objects=None, links=None):
+    def in_contact(self, prims=None):
         """
-        Returns whether this object is in contact with any object in @objects or link in @links. Note that at least
-        one should be specified (both can be specified, in which case this will check for any contacts amongst the
-        specified objects OR the specified links
+        Returns whether this entity is in contact with any prim(s) @prims. If no @prims is specified,
+        then this will check for any contact.
+
+        NOTE: If checking for self-collisions, set prims=self
 
         Args:
-            objects (None or EntityPrim or list of EntityPrim): Object(s) to check for collision with
-            links (None or RigidPrim or list of RigidPrim): Link(s) to check for collision with
+            prims (None or EntityPrim or RigidPrim or tuple of EntityPrim or RigidPrim): Prim(s) to check for collision.
+            If None, will check against all objects currently in the scene.
 
         Returns:
-            bool: Whether this object is in contact with the specified object(s) and / or link(s)
+            bool: Whether this object is in contact with the specified prim(s)
         """
-        # Make sure at least one of objects or links are specified
-        assert objects is not None or links is not None, "At least one of objects or links must be specified to check" \
-                                                         "for contact!"
-
-        # Standardize inputs
-        objects = [] if objects is None else (objects if isinstance(objects, Iterable) else [objects])
-        links = [] if links is None else (links if isinstance(objects, Iterable) else [links])
-
-        # Get list of link prim paths to check for contact with
-        link_paths = {link.prim_path for link in links}
-        for obj in objects:
-            link_paths = link_paths.union({link.prim_path for link in obj.links.values()})
-
-        # Grab all contacts for this object prim
-        in_contact_paths = self.in_contact_links()
-        valid_contacts = link_paths.intersection(in_contact_paths)
-
-        # We're in contact if any of our current contacts are the requested contact
-        return len(valid_contacts) > 0
+        return check_collision(prims=self, prims_check=prims, step_physics=False)
 
     def get_dof_index(self, dof_name: str) -> int:
         """[summary]
@@ -489,7 +469,6 @@ class EntityPrim(XFormPrim):
             target (bool): Whether the positions being set are target values or manual values to immediately set.
                 Default is False, corresponding to an instantaneous setting of the positions
         """
-        print(f"name: {self.name}, handle: {self._handle}, num dof: {self.n_dof}")
         # Run sanity checks -- make sure our handle is initialized and that we are articulated
         assert self._handle is not None, "handles are not initialized yet!"
         self.assert_articulated()
@@ -503,6 +482,8 @@ class EntityPrim(XFormPrim):
 
         # Possibly set specific values in the array if indies are specified
         if indices is None:
+            assert len(positions) == self._n_dof, \
+                "set_joint_positions called without specifying indices, but the desired positions do not match n_dof."
             new_positions = positions
         else:
             new_positions = dof_states["pos"]
@@ -870,31 +851,31 @@ class EntityPrim(XFormPrim):
         """Sets the linear velocity of the root prim in stage.
 
         Args:
-            velocity (np.ndarray):linear velocity to set the rigid prim to. Shape (3,).
+            velocity (np.ndarray): linear velocity to set the rigid prim to, in the world frame. Shape (3,).
         """
         self.root_link.set_linear_velocity(velocity)
 
     def get_linear_velocity(self) -> np.ndarray:
-        """[summary]
+        """Gets the linear velocity of the root prim in stage.
 
         Returns:
-            np.ndarray: [description]
+            velocity (np.ndarray): linear velocity to set the rigid prim to, in the world frame. Shape (3,).
         """
         return self.root_link.get_linear_velocity()
 
     def set_angular_velocity(self, velocity: np.ndarray) -> None:
-        """[summary]
+        """Sets the angular velocity of the root prim in stage.
 
         Args:
-            velocity (np.ndarray): [description]
+            velocity (np.ndarray): angular velocity to set the rigid prim to, in the world frame. Shape (3,).
         """
         self.root_link.set_angular_velocity(velocity)
 
     def get_angular_velocity(self) -> np.ndarray:
-        """[summary]
+        """Gets the angular velocity of the root prim in stage.
 
         Returns:
-            np.ndarray: [description]
+            velocity (np.ndarray): angular velocity to set the rigid prim to, in the world frame. Shape (3,).
         """
         return self.root_link.get_angular_velocity()
 
@@ -1063,7 +1044,6 @@ class EntityPrim(XFormPrim):
         :return: Array[float], minimum values for this robot's joints. If joint does not have a range, returns -1000
             for that joint
         """
-        print(f"{[joint.lower_limit for joint in self._joints.values()]}")
         return np.array([joint.lower_limit for joint in self._joints.values()])
 
     @property

@@ -1,6 +1,6 @@
 from igibson.renderer_settings.renderer_settings import RendererSettings
 from igibson.scenes.empty_scene import EmptyScene
-from igibson.simulator_omni import Simulator
+from igibson.simulator import Simulator
 
 # Create simulator and import scene.
 sim = Simulator()

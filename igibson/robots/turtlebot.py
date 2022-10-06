@@ -26,7 +26,7 @@ class Turtlebot(TwoWheelRobot):
         """
         :return Array[int]: Indices in low-level control vector corresponding to [Left, Right] wheel joints.
         """
-        return np.array([1, 0])
+        return np.array([0, 1])
 
     @property
     def default_joint_pos(self):

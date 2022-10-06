@@ -1,8 +1,6 @@
-import igibson.macros as m
+from igibson.macros import gm
 from igibson.object_states.fluid_source import FluidSource
-
-if m.ENABLE_OMNI_PARTICLES:
-    from igibson.systems.micro_particle_system import WaterSystem
+from igibson.systems.micro_particle_system import WaterSystem
 
 
 class WaterSource(FluidSource):

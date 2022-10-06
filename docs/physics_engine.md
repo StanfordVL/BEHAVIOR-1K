@@ -12,7 +12,7 @@ In this example, we import a scene, a robot and an object into PyBullet and step
 
 ```python
 
-from igibson.utils.assets_utils import get_scene_path, get_texture_file
+from igibson.utils.asset_utils import get_scene_path, get_texture_file
 import igibson
 
 import os
@@ -27,8 +27,8 @@ def main():
         model_path = os.path.join(get_scene_path('Rs'), 'mesh_z_up.obj')
 
     p.connect(p.GUI)
-    p.setGravity(0,0,-9.8)
-    p.setTimeStep(1./240.)
+    p.setGravity(0, 0, -9.8)
+    p.setTimeStep(1. / 240.)
 
     # Load scenes
     collision_id = p.createCollisionShape(p.GEOM_MESH,
@@ -50,7 +50,8 @@ def main():
 
     # Load objects
     obj_visual_filename = os.path.join(igibson.assets_path, 'models/ycb/002_master_chef_can/textured_simple.obj')
-    obj_collision_filename = os.path.join(igibson.assets_path, 'models/ycb/002_master_chef_can/textured_simple_vhacd.obj')
+    obj_collision_filename = os.path.join(igibson.assets_path,
+                                          'models/ycb/002_master_chef_can/textured_simple_vhacd.obj')
     collision_id = p.createCollisionShape(p.GEOM_MESH,
                                           fileName=obj_collision_filename,
                                           meshScale=1.0)

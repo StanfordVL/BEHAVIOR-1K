@@ -13,11 +13,10 @@ import numpy as np
 from pxr.Sdf import ValueTypeNames as VT
 from omni.isaac.core.utils.rotations import gf_quat_to_np_array
 
-from igibson import ig_dataset_path
 from igibson.objects.dataset_object import DatasetObject
 from igibson.scenes.traversable_scene import TraversableScene
 from igibson.maps.segmentation_map import SegmentationMap
-from igibson.utils.assets_utils import (
+from igibson.utils.asset_utils import (
     get_3dfront_scene_path,
     get_cubicasa_scene_path,
     get_ig_category_ids,
@@ -26,10 +25,8 @@ from igibson.utils.assets_utils import (
     get_ig_scene_path,
 )
 from igibson.utils.python_utils import create_object_from_init_info
-from igibson.utils.utils import NumpyEncoder, rotate_vector_3d
-from igibson.utils.registry_utils import SerializableRegistry
 from igibson.utils.constants import JointType
-from igibson.utils.utils import NumpyEncoder, rotate_vector_3d
+from igibson.utils.sim_utils import check_collision
 
 SCENE_SOURCE_PATHS = {
     "IG": get_ig_scene_path,
@@ -185,7 +182,7 @@ class InteractiveTraversableScene(TraversableScene):
                 fname = usd_file
             else:
                 if not self.object_randomization:
-                    fname = "{}_best".format(self.scene_model)
+                    fname = "{}_best_template".format(self.scene_model)
                 else:
                     fname = self.scene_model if self.predefined_object_randomization_idx is None else \
                         "{}_random_{}".format(self.scene_model, self.predefined_object_randomization_idx)
@@ -193,10 +190,6 @@ class InteractiveTraversableScene(TraversableScene):
 
         # Store values internally
         self.scene_file = scene_file
-
-    def get_objects_with_state(self, state):
-        # We overload this method to provide a faster implementation.
-        return self.object_registry("states", state, [])
 
     def filter_rooms_and_object_categories(
         self, load_object_categories, not_load_object_categories, load_room_types, load_room_instances
@@ -261,27 +254,6 @@ class InteractiveTraversableScene(TraversableScene):
             obj.randomize_texture()
 
     # TODO
-    def check_collision(self, body_a, body_b=None, link_a=None, fixed_body_ids=None):
-        """
-        Helper function to check for collision for scene quality
-        """
-        if body_b is None:
-            assert link_a is not None
-            pts = p.getContactPoints(bodyA=body_a, linkIndexA=link_a)
-        else:
-            assert body_b is not None
-            pts = p.getContactPoints(bodyA=body_a, bodyB=body_b)
-
-        # contactDistance < 0 means actual penetration
-        pts = [elem for elem in pts if elem[8] < 0.0]
-
-        # only count collision with fixed body ids if provided
-        if fixed_body_ids is not None:
-            pts = [elem for elem in pts if elem[2] in fixed_body_ids]
-
-        return len(pts) > 0
-
-    # TODO
     def check_scene_quality(self, simulator):
         """
         Helper function to check for scene quality.
@@ -321,7 +293,7 @@ class InteractiveTraversableScene(TraversableScene):
         # check if these overlapping bboxes have collision
         simulator.step()
         for obj_a, obj_b in overlapped_objs:
-            has_collision = obj_a.in_contact(objects=obj_b)
+            has_collision = obj_a.in_contact(prims=obj_b)
             quality_check = quality_check and (not has_collision)
             if has_collision:
                 body_body_collision.append((obj_a, obj_b))
@@ -357,9 +329,7 @@ class InteractiveTraversableScene(TraversableScene):
                     for j_pos in (j_default, j_low_perc, j_high_perc):
                         self.restore_state(state)
                         joint.set_pos(pos=j_pos)
-                        simulator.step()
-                        # TODO: I don't think this is working properly -- we currently don't check for self collision between fixed_obj and joint
-                        has_collision = fixed_obj.in_contact(objects=self.fixed_objects, links=joint)
+                        has_collision = check_collision(prims=fixed_obj.links[joint.child_name], prims_check=self.fixed_objects)
                         joint_quality = joint_quality and (not has_collision)
 
                 if not joint_quality:
@@ -646,7 +616,7 @@ class InteractiveTraversableScene(TraversableScene):
                 #     non_kinematic_states = json.loads(link.attrib["states"])
                 # else:
                 #     non_kinematic_states = None
-                print(f"obj: {name}, bbox center pos: {bbox_center_pos}, bbox center ori: {bbox_center_ori}")
+                # print(f"obj: {name}, bbox center pos: {bbox_center_pos}, bbox center ori: {bbox_center_ori}")
 
             # self.object_states.add_object(
             #     obj_name=name,
@@ -735,22 +705,21 @@ class InteractiveTraversableScene(TraversableScene):
         self._world_prim = simulator.world_prim
 
         # Check if current stage is a template based on ig:isTemplate value, and set the value to False if it does not exist
-        is_template = False
-        # TODO: Need to set template to false by default after loading everything
         if "ig:isTemplate" in self._world_prim.GetPropertyNames():
             is_template = self._world_prim.GetAttribute("ig:isTemplate").Get()
         else:
             # Create the property
             self._world_prim.CreateAttribute("ig:isTemplate", VT.Bool)
-
-        # Set this to be False -- we are no longer a template after we load
-        self._world_prim.GetAttribute("ig:isTemplate").Set(False)
+            is_template = True
 
         # Load objects using logic based on whether the current USD is a template or not
         if is_template:
             self._load_objects_from_template(simulator=simulator)
         else:
             self._load_objects_from_scene_info(simulator=simulator)
+
+        # Set this to be False -- we are no longer a template after we load
+        self._world_prim.GetAttribute("ig:isTemplate").Set(False)
 
         # disable collision between the fixed links of the fixed objects
         fixed_objs = self.object_registry("fixed_base", True, default_val=[])

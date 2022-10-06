@@ -1,25 +1,29 @@
 import random
 import numpy as np
 
+from igibson.macros import create_module_macros
+from igibson.object_states.object_state_base import BooleanState, CachingEnabledObjectState
 
-from igibson.object_states.object_state_base import BooleanState, CachingEnabledObjectState, NONE
+
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
 
 # Joint position threshold before a joint is considered open.
 # Should be a number in the range [0, 1] which will be transformed
 # to a position in the joint's min-max range.
-_JOINT_THRESHOLD_BY_TYPE = {
+m.JOINT_THRESHOLD_BY_TYPE = {
     "RevoluteJoint": 0.05,#p.JOINT_REVOLUTE: 0.05,
     "PrismaticJoint": 0.05,#p.JOINT_PRISMATIC: 0.05,
 }
-_OPEN_SAMPLING_ATTEMPTS = 5
+m.OPEN_SAMPLING_ATTEMPTS = 5
 
-_METADATA_FIELD = "openable_joint_ids"
-_BOTH_SIDES_METADATA_FIELD = "openable_both_sides"
+m.METADATA_FIELD = "openable_joint_ids"
+m.BOTH_SIDES_METADATA_FIELD = "openable_both_sides"
 
 
 def _compute_joint_threshold(joint, joint_direction):
     # Convert fractional threshold to actual joint position.
-    f = _JOINT_THRESHOLD_BY_TYPE[joint.joint_type]
+    f = m.JOINT_THRESHOLD_BY_TYPE[joint.joint_type]
     closed_end = joint.lower_limit if joint_direction == 1 else joint.upper_limit
     open_end = joint.upper_limit if joint_direction == 1 else joint.lower_limit
     threshold = (1 - f) * closed_end + f * open_end
@@ -39,15 +43,15 @@ def _get_relevant_joints(obj):
     if not hasattr(obj, "metadata"):
         return None, None, None
 
-    both_sides = obj.metadata[_BOTH_SIDES_METADATA_FIELD] if _BOTH_SIDES_METADATA_FIELD in obj.metadata else False
+    both_sides = obj.metadata[m.BOTH_SIDES_METADATA_FIELD] if m.BOTH_SIDES_METADATA_FIELD in obj.metadata else False
 
     # Get joint IDs and names from metadata annotation. If object doesn't have the openable metadata,
     # we stop here and return Open=False.
-    if _METADATA_FIELD not in obj.metadata:
+    if m.METADATA_FIELD not in obj.metadata:
         print("No openable joint metadata found for object %s" % obj.name)
         return None, None, None
 
-    joint_metadata = obj.metadata[_METADATA_FIELD].items()
+    joint_metadata = obj.metadata[m.METADATA_FIELD].items()
 
     # The joint metadata is in the format of [(joint_id, joint_name), ...] for legacy annotations and
     # [(joint_id, joint_name, joint_direction), ...] for direction-annotated objects.
@@ -67,7 +71,7 @@ def _get_relevant_joints(obj):
         joint_names,
         relevant_joints,
     )
-    assert all(joint.joint_type in _JOINT_THRESHOLD_BY_TYPE.keys() for joint in relevant_joints)
+    assert all(joint.joint_type in m.JOINT_THRESHOLD_BY_TYPE.keys() for joint in relevant_joints)
 
     return both_sides, relevant_joints, joint_directions
 
@@ -124,7 +128,7 @@ class Open(CachingEnabledObjectState, BooleanState):
         # TODO: Implement a sampling method that's guaranteed to be correct, ditch the rejection method.
         sides = [1, -1] if both_sides else [1]
 
-        for _ in range(_OPEN_SAMPLING_ATTEMPTS):
+        for _ in range(m.OPEN_SAMPLING_ATTEMPTS):
             side = random.choice(sides)
 
             # All joints are relevant if we are closing, but if we are opening let's sample a subset.

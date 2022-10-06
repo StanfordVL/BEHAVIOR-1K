@@ -1,14 +1,11 @@
 import logging
 import os
-from sys import platform
 
 import yaml
 
-import igibson
-from igibson.envs.igibson_env import iGibsonEnv
-from igibson.render.profiler import Profiler
-from igibson.utils.assets_utils import folder_is_hidden
-from igibson.utils.utils import let_user_pick
+import igibson as ig
+from igibson.utils.asset_utils import folder_is_hidden
+from igibson.utils.ui_utils import choose_from_options
 
 
 def main(random_selection=False, headless=False, short_exec=False):
@@ -19,7 +16,8 @@ def main(random_selection=False, headless=False, short_exec=False):
     """
     logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
 
-    ig_config_path = igibson.example_config_path
+    # Grab all configs and choose one to load
+    ig_config_path = ig.example_config_path
     available_configs = sorted(
         [
             f
@@ -27,29 +25,31 @@ def main(random_selection=False, headless=False, short_exec=False):
             if (not folder_is_hidden(f) and os.path.isfile(os.path.join(ig_config_path, f)))
         ]
     )
-    config_id = available_configs[let_user_pick(available_configs, random_selection=random_selection) - 1]
+    config_id = choose_from_options(options=available_configs, name="config file", random_selection=random_selection)
     logging.info("Using config file " + config_id)
-    config_filename = os.path.join(igibson.example_config_path, config_id)
-    config_data = yaml.load(open(config_filename, "r"), Loader=yaml.FullLoader)
-    # Reduce texture scale for Mac.
-    if platform == "darwin":
-        config_data["texture_scale"] = 0.5
-    config_data["image_width"] = 512
-    config_data["image_height"] = 512
-    config_data["vertical_fov"] = 60
-    # config_data["load_object_categories"] = []  # Uncomment this line to accelerate loading with only the building
-    env = iGibsonEnv(config_file=config_data, mode="gui_interactive" if not headless else "headless")
+    config_filename = os.path.join(ig.example_config_path, config_id)
+    config = yaml.load(open(config_filename, "r"), Loader=yaml.FullLoader)
+
+    # Uncomment the following line to accelerate loading with only the building
+    # config["scene"]["load_object_categories"] = ["floors", "walls", "ceilings"]
+
+    # Load the environment
+    env = ig.Environment(configs=config)
+
     max_iterations = 10 if not short_exec else 1
     for j in range(max_iterations):
         logging.info("Resetting environment")
         env.reset()
         for i in range(100):
-            with Profiler("Environment action step"):
-                action = env.action_space.sample() * 0.05
-                state, reward, done, info = env.step(action)
-                if done:
-                    logging.info("Episode finished after {} timesteps".format(i + 1))
-                    break
+            action = env.action_space.sample()
+            for robot_name in action.keys():
+                action[robot_name] = action[robot_name] * 0.05
+            state, reward, done, info = env.step(action)
+            if done:
+                logging.info("Episode finished after {} timesteps".format(i + 1))
+                break
+
+    # Always close the environment at the end
     env.close()
 
 

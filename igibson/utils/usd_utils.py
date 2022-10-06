@@ -23,9 +23,9 @@ import carb
 import numpy as np
 import trimesh
 
+import igibson as ig
 from igibson import assets_path, ig_dataset_path
-from igibson.utils.constants import JointType
-from igibson.utils.types import PRIMITIVE_MESH_TYPES
+from igibson.utils.constants import JointType, PRIMITIVE_MESH_TYPES
 from igibson.utils.python_utils import assert_valid_key
 
 GF_TO_VT_MAPPING = {
@@ -330,6 +330,7 @@ class BoundingBoxAPI:
         lower, upper = container
         return np.less_equal(lower, point).all() and np.less_equal(point, upper).all()
 
+
 def clear():
     """
     Clear state tied to singleton classes
@@ -340,7 +341,7 @@ def clear():
 
 def create_mesh_prim_with_default_xform(primitive_type, prim_path, stage=None, u_patches=None, v_patches=None):
     """
-    Computes the union of AABBs (world-frame oriented) for the prims specified at @prim_paths
+    Creates a mesh prim of the specified @primitive_type at the specified @prim_path
 
     Args:
         primitive_type (str): Primitive mesh type, should be one of PRIMITIVE_MESH_TYPES to be valid
@@ -403,29 +404,65 @@ def mesh_prim_to_trimesh_mesh(mesh_prim):
     return trimesh.Trimesh(vertices=vertices, faces=faces)
 
 
-def add_usd_to_stage(usd_path, prim_path):
+def create_primitive_mesh(prim_path, primitive_type, extents=1.0, u_patches=None, v_patches=None):
     """
-    Adds USD file at @usd_path at the location @prim_path
+    Helper function that generates a UsdGeom.Mesh prim at specified @prim_path of type @primitive_type.
+
+    NOTE: Generated mesh prim will, by default, have extents equaling [1, 1, 1]
 
     Args:
-        usd_path (str): Absolute or relative path to the usd file to load
-        prim_path (str): Where loaded USD should exist on the stage
+        prim_path (str): Where the loaded mesh should exist on the stage
+        primitive_type (str): Type of primitive mesh to create. Should be one of:
+            {"Cone", "Cube", "Cylinder", "Disk", "Plane", "Sphere", "Torus"}
+        extents (float or 3-array): Specifies the extents of the generated mesh. Default is 1.0, i.e.:
+            generated mesh will be in be contained in a [1,1,1] sized bounding box
+        u_patches (int or None): If specified, should be an integer that represents how many segments to create in the
+            u-direction. E.g. 10 means 10 segments (and therefore 11 vertices) will be created.
+        v_patches (int or None): If specified, should be an integer that represents how many segments to create in the
+            v-direction. E.g. 10 means 10 segments (and therefore 11 vertices) will be created.
+            Both u_patches and v_patches need to be specified for them to be effective.
 
     Returns:
-        Usd.Prim: Loaded USD prim
+        UsdGeom.Mesh: Generated primitive mesh as a prim on the active stage
     """
-    # Make sure this is actually a USD object
-    assert usd_path[-4:] == ".usd", f"Cannot load a non-USD file as a USD object!"
+    assert_valid_key(key=primitive_type, valid_keys=PRIMITIVE_MESH_TYPES, name="primitive mesh type")
+    create_mesh_prim_with_default_xform(primitive_type, prim_path, stage=ig.sim.stage, u_patches=u_patches, v_patches=v_patches)
+    mesh = UsdGeom.Mesh.Define(ig.sim.stage, prim_path)
+
+    # Modify the points and normals attributes so that total extents is the desired
+    # This means multiplying omni's default by extents / 2.0
+    extents = np.ones(3) * extents if isinstance(extents, float) else np.array(extents)
+    for attr in (mesh.GetPointsAttr(), mesh.GetNormalsAttr()):
+        vals = np.array(attr.Get()).astype(np.float64)
+        attr.Set(Vt.Vec3fArray([Gf.Vec3f(*(val * extents / 2.0)) for val in vals]))
+
+    return mesh
+
+
+def add_asset_to_stage(asset_path, prim_path):
+    """
+    Adds asset file (either USD or OBJ) at @asset_path at the location @prim_path
+
+    Args:
+        asset_path (str): Absolute or relative path to the asset file to load
+        prim_path (str): Where loaded asset should exist on the stage
+
+    Returns:
+        Usd.Prim: Loaded prim as a USD prim
+    """
+    # Make sure this is actually a supported asset type
+    assert asset_path[-4:].lower() in {".usd", ".obj"}, f"Cannot load a non-USD or non-OBJ file as a USD prim!"
+    asset_type = asset_path[-3:]
 
     # Make sure the path exists
-    assert os.path.exists(usd_path), f"USD file {usd_path} does not exist!"
+    assert os.path.exists(asset_path), f"{asset_type.upper()} file {asset_path} does not exist!"
 
     # Add reference to stage and grab prim
-    add_reference_to_stage(usd_path=usd_path, prim_path=prim_path)
+    add_reference_to_stage(usd_path=asset_path, prim_path=prim_path)
     prim = get_prim_at_path(prim_path)
 
     # Make sure prim was loaded correctly
-    assert prim, f"Failed to load USD object from path: {usd_path}"
+    assert prim, f"Failed to load {asset_type.upper()} object from path: {asset_path}"
 
     return prim
 
@@ -481,7 +518,7 @@ def update_shader_asset_paths(shader):
     # Update the material paths so that it's correct wrt to the local machine / directory setup that
     # this prim and USD is being loaded on
     for inp in shader.GetInputs():
-        if inp.GetTypeName().cppTypeName == "SdfAssetPath":
+        if inp.GetTypeName().cppTypeName == "SdfAssetPath" and inp.Get() is not None:
             original_path = inp.Get().path if inp.Get().resolvedPath == "" else inp.Get().resolvedPath
             # Only update the path if it's not the same root path
             if ig_dataset_path not in original_path and assets_path not in original_path:

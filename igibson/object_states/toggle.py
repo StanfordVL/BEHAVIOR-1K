@@ -1,14 +1,20 @@
 import numpy as np
 from collections import OrderedDict
 
+from igibson.macros import create_module_macros
+from igibson.prims.geom_prim import VisualGeomPrim
 from igibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from igibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
-from igibson.utils.constants import SemanticClass, SimulatorMode
+from igibson.utils.usd_utils import create_primitive_mesh
 
-_TOGGLE_DISTANCE_THRESHOLD = 0.1
-_TOGGLE_LINK_NAME = "toggle_button_link"
-_TOGGLE_BUTTON_SCALE = 0.05
-_CAN_TOGGLE_STEPS = 5
+
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
+
+m.TOGGLE_DISTANCE_THRESHOLD = 0.1
+m.TOGGLE_LINK_NAME = "toggle_button_link"
+m.TOGGLE_BUTTON_SCALE = 0.05
+m.CAN_TOGGLE_STEPS = 5
 
 
 class ToggledOn(AbsoluteObjectState, BooleanState, LinkBasedStateMixin):
@@ -26,39 +32,24 @@ class ToggledOn(AbsoluteObjectState, BooleanState, LinkBasedStateMixin):
 
     @staticmethod
     def get_state_link_name():
-        return _TOGGLE_LINK_NAME
+        return m.TOGGLE_LINK_NAME
 
     def _initialize(self):
         super(ToggledOn, self)._initialize()
         if self.initialize_link_mixin():
-            # Import at runtime to prevent circular imports
-            from igibson.objects.primitive_object import PrimitiveObject
-            self.visual_marker_on = PrimitiveObject(
-                prim_path=f"{self.obj.prim_path}/visual_marker_on",
+            mesh_prim_path = f"{self.link.prim_path}/visual_marker"
+            mesh = create_primitive_mesh(
+                prim_path=mesh_prim_path,
                 primitive_type="Sphere",
-                name=f"{self.obj.name}_visual_marker_on",
-                class_id=SemanticClass.TOGGLE_MARKER,
-                scale=_TOGGLE_BUTTON_SCALE,
-                visible=True,
-                fixed_base=False,
-                visual_only=True,
-                rgba=[0, 1, 0, 0.5],
+                extents=m.TOGGLE_BUTTON_SCALE,
             )
-            self.visual_marker_off = PrimitiveObject(
-                prim_path=f"{self.obj.prim_path}/visual_marker_off",
-                primitive_type="Sphere",
-                name=f"{self.obj.name}_visual_marker_off",
-                class_id=SemanticClass.TOGGLE_MARKER,
-                scale=_TOGGLE_BUTTON_SCALE,
-                visible=True,
-                fixed_base=False,
-                visual_only=True,
-                rgba=[1, 0, 0, 0.5],
-            )
-            self._simulator.import_object(self.visual_marker_on, register=False, auto_initialize=True)
-            self.visual_marker_on.visible = False
-            self._simulator.import_object(self.visual_marker_off, register=False, auto_initialize=True)
-            self.visual_marker_off.visible = False
+
+            # Create the visual geom instance referencing the generated mesh prim
+            self.visual_marker = VisualGeomPrim(prim_path=mesh_prim_path, name=f"{self.obj.name}_visual_marker")
+            self.visual_marker.initialize()
+
+            # Make sure the marker isn't translated at all
+            self.visual_marker.set_local_pose(translation=np.zeros(3), orientation=np.array([0, 0, 0, 1.0]))
 
     def _update(self):
         button_position_on_object = self.get_link_position()
@@ -68,7 +59,7 @@ class ToggledOn(AbsoluteObjectState, BooleanState, LinkBasedStateMixin):
         robot_can_toggle = False
         # detect marker and hand interaction
         for robot in self._simulator.scene.robots:
-            robot_can_toggle = robot.can_toggle(button_position_on_object, _TOGGLE_DISTANCE_THRESHOLD)
+            robot_can_toggle = robot.can_toggle(button_position_on_object, m.TOGGLE_DISTANCE_THRESHOLD)
             if robot_can_toggle:
                 break
 
@@ -77,16 +68,11 @@ class ToggledOn(AbsoluteObjectState, BooleanState, LinkBasedStateMixin):
         else:
             self.robot_can_toggle_steps = 0
 
-        if self.robot_can_toggle_steps == _CAN_TOGGLE_STEPS:
+        if self.robot_can_toggle_steps == m.CAN_TOGGLE_STEPS:
             self.value = not self.value
 
-        # Choose which marker to put on object vs which to put away
-        show_marker = self.visual_marker_on if self.get_value() else self.visual_marker_off
-        hidden_marker = self.visual_marker_off if self.get_value() else self.visual_marker_on
-
-        # update toggle button position
-        show_marker.visible = True
-        hidden_marker.visible = False
+        # Choose which color to apply to the toggle marker
+        self.visual_marker.color = np.array([0, 1.0, 0]) if self.get_value() else np.array([1.0, 0, 0])
 
     @staticmethod
     def get_texture_change_params():
@@ -98,6 +84,10 @@ class ToggledOn(AbsoluteObjectState, BooleanState, LinkBasedStateMixin):
     @property
     def settable(self):
         return True
+
+    @property
+    def state_size(self):
+        return 2
 
     # For this state, we simply store its value and the robot_can_toggle steps.
     def _dump_state(self):

@@ -1,18 +1,23 @@
 import numpy as np
 
-from igibson.object_states.object_state_base import AbsoluteObjectState, BooleanState, NONE
+from igibson.macros import create_module_macros
+from igibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
 from igibson.object_states.temperature import Temperature
 
-_DEFAULT_FREEZE_TEMPERATURE = 0.0
+
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
+
+m.DEFAULT_FREEZE_TEMPERATURE = 0.0
 
 # When an object is set as frozen, we will sample it between
 # the freeze temperature and these offsets.
-_FROZEN_SAMPLING_RANGE_MAX = -10.0
-_FROZEN_SAMPLING_RANGE_MIN = -50.0
+m.FROZEN_SAMPLING_RANGE_MAX = -10.0
+m.FROZEN_SAMPLING_RANGE_MIN = -50.0
 
 
 class Frozen(AbsoluteObjectState, BooleanState):
-    def __init__(self, obj, freeze_temperature=_DEFAULT_FREEZE_TEMPERATURE):
+    def __init__(self, obj, freeze_temperature=m.DEFAULT_FREEZE_TEMPERATURE):
         super(Frozen, self).__init__(obj)
         self.freeze_temperature = freeze_temperature
 
@@ -23,8 +28,8 @@ class Frozen(AbsoluteObjectState, BooleanState):
     def _set_value(self, new_value):
         if new_value:
             temperature = np.random.uniform(
-                self.freeze_temperature + _FROZEN_SAMPLING_RANGE_MIN,
-                self.freeze_temperature + _FROZEN_SAMPLING_RANGE_MAX,
+                self.freeze_temperature + m.FROZEN_SAMPLING_RANGE_MIN,
+                self.freeze_temperature + m.FROZEN_SAMPLING_RANGE_MAX,
             )
             return self.obj.states[Temperature].set_value(temperature)
         else:

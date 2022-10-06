@@ -3,9 +3,10 @@ import pkgutil
 import signal
 import sys
 from multiprocessing import Process
+from collections import OrderedDict
 
 import igibson.examples as examples
-from igibson.utils.utils import let_user_pick
+from igibson.utils.ui_utils import choose_from_options
 
 TIMEOUT = 4
 
@@ -54,7 +55,8 @@ def main():
             "Select a demo/example, 'help' for information about a specific demo, 'all' to run all demos, or 'test' "
             "to toggle on the test-only mode:"
         )
-        selected_demo = let_user_pick(examples_list, print_intro=False) - 1
+        examples_name2id = {ex: i for i, ex in enumerate(examples_list)}
+        selected_demo = examples_name2id[choose_from_options(options=examples_list, name="Example", random_selection=False)]
         if selected_demo == 0:
             user_input = input("\nProvide the number of the example you need information for: ")
             if not user_input.isdigit():

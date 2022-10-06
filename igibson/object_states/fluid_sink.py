@@ -1,20 +1,25 @@
 import numpy as np
 
+from igibson.macros import create_module_macros
 from igibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from igibson.object_states.object_state_base import AbsoluteObjectState
 
-# Fraction of a single particle group required to be within @MAX_SINK_DISTANCE in order to be deleted
-MIN_GROUP_FRACTION = 0.6
+
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
+
+# Fraction of a single particle group required to be within @m.MAX_SINK_DISTANCE in order to be deleted
+m.MIN_GROUP_FRACTION = 0.6
 # Maximum distance (m) away from a sink a particle can be in order to be considered ready for deletion
-MAX_SINK_DISTANCE = 0.05
+m.MAX_SINK_DISTANCE = 0.05
 
 
 class FluidSink(AbsoluteObjectState, LinkBasedStateMixin):
-    def __init__(self, obj, max_distance=MAX_SINK_DISTANCE):
+    def __init__(self, obj, max_distance=m.MAX_SINK_DISTANCE):
         super().__init__(obj)
 
         # Store internal values
-        self.max_sink_distance = MAX_SINK_DISTANCE
+        self.max_sink_distance = m.MAX_SINK_DISTANCE
 
     @property
     def fluid_system(self):
@@ -48,7 +53,7 @@ class FluidSink(AbsoluteObjectState, LinkBasedStateMixin):
             particle_pos = inst.particle_positions
             # Get distances and check fraction simultaneously
             frac_in_sink = (np.linalg.norm(particle_pos - fluid_sink_position.reshape(1, 3), axis=-1) < self.max_sink_distance).mean()
-            if frac_in_sink >= MIN_GROUP_FRACTION:
+            if frac_in_sink >= m.MIN_GROUP_FRACTION:
                 names_to_remove.append(name)
 
         # Delete all recorded groups

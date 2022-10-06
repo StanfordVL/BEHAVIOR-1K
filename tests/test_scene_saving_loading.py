@@ -10,7 +10,7 @@ from igibson.objects.multi_object_wrappers import ObjectGrouper, ObjectMultiplex
 from igibson.robots.fetch import Fetch
 from igibson.scenes.interactive_traversable_scene import InteractiveIndoorScene
 from igibson.simulator import Simulator
-from igibson.utils.assets_utils import get_ig_model_path
+from igibson.utils.asset_utils import get_ig_model_path
 
 CABINET_POS = np.array([100, 100, 100])
 CABINET_JOINT = {

@@ -1,36 +1,16 @@
-import json
 import logging
 import os
-import random
-import time
-import xml.etree.ElementTree as ET
-from collections import defaultdict
-from xml.dom import minidom
 
 import numpy as np
 
-from IPython import embed
 from PIL import Image
 
 import igibson
-# from igibson.object_states.factory import get_state_from_name, get_state_name
-# from igibson.object_states.object_state_base import AbsoluteObjectState
-# from igibson.objects.articulated_object import URDFObject
-# from igibson.objects.multi_object_wrappers import ObjectGrouper, ObjectMultiplexer
-# from igibson.robots import REGISTERED_ROBOTS
-# from igibson.robots.behavior_robot import BehaviorRobot
-# from igibson.robots.robot_base import BaseRobot
-from igibson.scenes.traversable_scene import TraversableScene
-from igibson.utils.assets_utils import (
+from igibson.utils.asset_utils import (
     get_3dfront_scene_path,
     get_cubicasa_scene_path,
-    get_ig_avg_category_specs,
-    get_ig_category_ids,
-    get_ig_category_path,
-    get_ig_model_path,
     get_ig_scene_path,
 )
-from igibson.utils.utils import NumpyEncoder, restoreState, rotate_vector_3d
 
 SCENE_SOURCE_PATHS = {
     "IG": get_ig_scene_path,

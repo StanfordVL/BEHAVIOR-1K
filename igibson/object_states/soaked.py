@@ -2,26 +2,26 @@ import numpy as np
 from collections import OrderedDict
 from igibson.systems.micro_particle_system import get_fluid_systems
 from igibson.systems.system_base import get_system_from_element_name, get_element_name_from_system
-import igibson.macros as m
+from igibson.macros import gm, create_module_macros
 from igibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
 from igibson.object_states.water_source import WaterSource
 from igibson.utils.python_utils import assert_valid_key
 from igibson.utils.constants import PrimType
 from omni.usd import get_shader_from_material
 from pxr import Sdf
+from igibson.systems import SYSTEMS_REGISTRY
 
 
-if m.ENABLE_OMNI_PARTICLES:
-    from igibson.systems import SYSTEMS_REGISTRY
-
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
 
 # Proportion of fluid particles per group required to intersect with this object for them all to be absorbed
 # by a soakable object
-PARTICLE_GROUP_PROPORTION = 0.7
+m.PARTICLE_GROUP_PROPORTION = 0.7
 
 # Soak threshold -- number of fluid particle required to be "absorbed" in order for the object to be
 # considered soaked
-SOAK_PARTICLE_THRESHOLD = 40
+m.SOAK_PARTICLE_THRESHOLD = 40
 
 # TODO: SOOOOOOOOOOOO Hacky for cloth objects, because we can't use the normal way to detect particle collisions
 # Update this once we have a better way!!
@@ -38,7 +38,7 @@ class Soaked(AbsoluteObjectState, BooleanState):
         for system in get_fluid_systems().values():
             self.absorbed_particle_system_count[system] = 0
 
-        self.absorbed_particle_threshold = SOAK_PARTICLE_THRESHOLD
+        self.absorbed_particle_threshold = m.SOAK_PARTICLE_THRESHOLD
         self.cloth_heuristic_update_fcn = lambda soaked_state, fluid_system: None              # Should update the absorbed particle count appropriately
 
     def _get_value(self, fluid_system):
@@ -69,7 +69,7 @@ class Soaked(AbsoluteObjectState, BooleanState):
                 assert self.absorbed_particle_threshold >= self.absorbed_particle_system_count[fluid_system]
 
                 particles_to_absorb = min(len(particle_idxs), self.absorbed_particle_threshold - self.absorbed_particle_system_count[fluid_system])
-                particle_idxs_to_absorb = particle_idxs[:particles_to_absorb]
+                particle_idxs_to_absorb = list(particle_idxs)[:particles_to_absorb]
 
                 # Hide particles in contact with the object
                 particle_visibilities = fluid_system.particle_instancers[instancer].particle_visibilities

@@ -3,14 +3,17 @@ Constant Definitions
 """
 
 import os
+from collections import namedtuple
 from enum import IntEnum, Enum
 
 import igibson
-from igibson.utils.assets_utils import get_ig_avg_category_specs
+from igibson.utils.asset_utils import get_ig_avg_category_specs
+from pxr import Gf
+from pxr.Sdf import ValueTypeNames as VT
 
-AVAILABLE_MODALITIES = ("rgb", "normal", "3d", "seg", "optical_flow", "scene_flow", "ins_seg")
 MAX_INSTANCE_COUNT = 1024
 MAX_CLASS_COUNT = 512
+MAX_VIEWER_SIZE = 2048
 
 
 class ViewerMode(IntEnum):
@@ -20,11 +23,9 @@ class ViewerMode(IntEnum):
 
 
 class SimulatorMode(IntEnum):
-    GUI_INTERACTIVE = 1
-    GUI_NON_INTERACTIVE = 2
-    HEADLESS = 3
-    HEADLESS_TENSOR = 4
-    VR = 5
+    GUI = 1
+    HEADLESS = 2
+    VR = 3
 
 
 class SemanticClass(IntEnum):
@@ -39,6 +40,60 @@ class SemanticClass(IntEnum):
     WATER = 509
     HEAT_SOURCE_MARKER = 510
     TOGGLE_MARKER = 511
+
+
+# Valid omni characters for specifying strings, e.g. prim paths
+VALID_OMNI_CHARS = frozenset({'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '_', '/'})
+
+
+# Omni shader inputs, mapped to their type and default value
+# None implies no value is set initially (e.g: for assets)
+OMNI_SHADER_INPUTS = {
+    'diffuse_color_constant': (VT.Color3f, Gf.Vec3f(0.2, 0.2, 0.2)),
+    'diffuse_texture': (VT.Asset, None),
+    'albedo_desaturation': (VT.Float, 0.0),
+    'albedo_add': (VT.Float, 0.0),
+    'albedo_brightness': (VT.Float, 1.0),
+    'diffuse_tint': (VT.Color3f, Gf.Vec3f(1.0, 1.0, 1.0)),
+    'reflection_roughness_constant': (VT.Float, 0.5),
+    'reflection_roughness_texture_influence': (VT.Float, 0.0),
+    'reflectionroughness_texture': (VT.Asset, None),
+    'metallic_constant': (VT.Float, 0.0),
+    'metallic_texture_influence': (VT.Float, 0.0),
+    'metallic_texture': (VT.Asset, None),
+    'specular_level': (VT.Float, 0.5),
+    'enable_ORM_texture': (VT.Bool, False),
+    'ORM_texture': (VT.Asset, None),
+    'ao_to_diffuse': (VT.Float, 0.0),
+    'ao_texture': (VT.Asset, None),
+    'enable_emission': (VT.Bool, False),
+    'emissive_color': (VT.Color3f, Gf.Vec3f(1.0, 0.1, 0.1)),
+    'emissive_color_texture': (VT.Asset, None),
+    'emissive_mask_texture': (VT.Asset, None),
+    'emissive_intensity': (VT.Float, 40.0),
+    'enable_opacity': (VT.Bool, False),
+    'enable_opacity_texture': (VT.Bool, False),
+    'opacity_constant': (VT.Float, 1.0),
+    'opacity_texture': (VT.Asset, None),
+    'opacity_mode': (VT.Int, 1),
+    'opacity_threshold': (VT.Float, 0.0),
+    'bump_factor': (VT.Float, 1.0),
+    'normalmap_texture': (VT.Asset, None),
+    'detail_bump_factor': (VT.Float, 0.3),
+    'detail_normalmap_texture': (VT.Asset, None),
+    'flip_tangent_u': (VT.Bool, False),
+    'flip_tangent_v': (VT.Bool, True),
+    'project_uvw': (VT.Bool, False),
+    'world_or_object': (VT.Bool, False),
+    'uv_space_index': (VT.Int, 0),
+    'texture_translate': (VT.Float2, Gf.Vec2f(0.0, 0.0)),
+    'texture_rotate': (VT.Float, 0.0),
+    'texture_scale': (VT.Float2, Gf.Vec2f(1.0, 1.0)),
+    'detail_texture_translate': (VT.Float2, Gf.Vec2f(0.0, 0.0)),
+    'detail_texture_rotate': (VT.Float, 0.0),
+    'detail_texture_scale': (VT.Float2, Gf.Vec2f(1.0, 1.0)),
+    'excludeFromWhiteMode': (VT.Bool, False),
+}
 
 
 # Note that we are starting this from bit 6 since bullet seems to be giving special meaning to groups 0-5.
@@ -68,6 +123,21 @@ class PrimType(IntEnum):
 class EmitterType(IntEnum):
     FIRE = 0
     STEAM = 1
+
+
+# Valid primitive mesh types
+PRIMITIVE_MESH_TYPES = {
+    "Cone",
+    "Cube",
+    "Cylinder",
+    "Disk",
+    "Plane",
+    "Sphere",
+    "Torus",
+}
+
+# Valid geom types
+GEOM_TYPES = {"Sphere", "Cube", "Capsule", "Cone", "Cylinder", "Mesh"}
 
 
 # TODO: Clean up this class to be better enum with sanity checks
@@ -123,32 +193,10 @@ def get_collision_group_mask(groups_to_exclude=[]):
     return collision_mask
 
 
-class ShadowPass(IntEnum):
-    NO_SHADOW = 0
-    HAS_SHADOW_RENDER_SHADOW = 1
-    HAS_SHADOW_RENDER_SCENE = 2
-
-
-class CoordinateSystem(IntEnum):
-    OPENCV = 0
-    OPENGL = 1
-    PYBULLET = 2
-    SUNRGBD = 3
-
-
-class OccupancyGridState(object):
+class OccupancyGridState:
     OBSTACLES = 0.0
     UNKNOWN = 0.5
     FREESPACE = 1.0
-
-
-# PyBullet-related
-class PyBulletSleepState(IntEnum):
-    AWAKE = 1
-    ISLAND_AWAKE = 3
-
-
-PYBULLET_BASE_LINK_INDEX = -1
 
 
 # BEHAVIOR-related
@@ -163,6 +211,7 @@ MAX_TASK_RELEVANT_OBJS = 50
 TASK_RELEVANT_OBJS_OBS_DIM = 9
 AGENT_POSE_DIM = 6
 
+# TODO: What the hell is this magic list?? It's not used anywhere
 UNDER_OBJECTS = [
     "breakfast_table",
     "coffee_table",
@@ -189,199 +238,29 @@ light_modulation_map_filename = os.path.join(
 )
 background_texture = os.path.join(igibson.ig_dataset_path, "scenes", "background", "urban_street_01.jpg")
 
-# NamedRenderingPresets = {
-#     "NO_PBR": MeshRendererSettings(enable_pbr=False, enable_shadow=False),
-#     "PBR_NOSHADOW": MeshRendererSettings(enable_pbr=True, enable_shadow=True),
-#     "PBR_SHADOW_MSAA": MeshRendererSettings(enable_pbr=True, enable_shadow=True, msaa=True),
-#     "NO_PBR_OPT": MeshRendererSettings(enable_pbr=False, enable_shadow=False, optimized=True),
-#     "PBR_NOSHADOW_OPT": MeshRendererSettings(enable_pbr=True, enable_shadow=True, optimized=True),
-#     "PBR_SHADOW_MSAA_OPT": MeshRendererSettings(enable_pbr=True, enable_shadow=True, msaa=True, optimized=True),
-#     "HQ_WITH_BG_OPT": MeshRendererSettings(
-#         env_texture_filename=hdr_texture,
-#         env_texture_filename2=hdr_texture2,
-#         env_texture_filename3=background_texture,
-#         light_modulation_map_filename=light_modulation_map_filename,
-#         enable_shadow=True,
-#         msaa=True,
-#         light_dimming_factor=1.0,
-#         optimized=True,
-#     ),
-#     "VISUAL_RL": MeshRendererSettings(enable_pbr=True, enable_shadow=False, msaa=False, optimized=True),
-#     "PERCEPTION": MeshRendererSettings(
-#         env_texture_filename=hdr_texture,
-#         env_texture_filename2=hdr_texture2,
-#         env_texture_filename3=background_texture,
-#         light_modulation_map_filename=light_modulation_map_filename,
-#         enable_shadow=True,
-#         msaa=True,
-#         light_dimming_factor=1.0,
-#         optimized=True,
-#     ),
-# }
 
-# Encodings
-RAW_ENCODING = 0
-COPY_RECTANGLE_ENCODING = 1
-RRE_ENCODING = 2
-CORRE_ENCODING = 4
-HEXTILE_ENCODING = 5
-ZLIB_ENCODING = 6
-TIGHT_ENCODING = 7
-ZLIBHEX_ENCODING = 8
-ZRLE_ENCODING = 16
-# 0xffffff00 to 0xffffffff tight options
-PSEUDO_CURSOR_ENCODING = -239
+def get_class_name_to_class_id():
+    """
+    Get mapping from semantic class name to class id
 
-# Keycodes
-KEY_BackSpace = 0xFF08
-KEY_Tab = 0xFF09
-KEY_Return = 0xFF0D
-KEY_Escape = 0xFF1B
-KEY_Insert = 0xFF63
-KEY_Delete = 0xFFFF
-KEY_Home = 0xFF50
-KEY_End = 0xFF57
-KEY_PageUp = 0xFF55
-KEY_PageDown = 0xFF56
-KEY_Left = 0xFF51
-KEY_Up = 0xFF52
-KEY_Right = 0xFF53
-KEY_Down = 0xFF54
-KEY_F1 = 0xFFBE
-KEY_F2 = 0xFFBF
-KEY_F3 = 0xFFC0
-KEY_F4 = 0xFFC1
-KEY_F5 = 0xFFC2
-KEY_F6 = 0xFFC3
-KEY_F7 = 0xFFC4
-KEY_F8 = 0xFFC5
-KEY_F9 = 0xFFC6
-KEY_F10 = 0xFFC7
-KEY_F11 = 0xFFC8
-KEY_F12 = 0xFFC9
-KEY_F13 = 0xFFCA
-KEY_F14 = 0xFFCB
-KEY_F15 = 0xFFCC
-KEY_F16 = 0xFFCD
-KEY_F17 = 0xFFCE
-KEY_F18 = 0xFFCF
-KEY_F19 = 0xFFD0
-KEY_F20 = 0xFFD1
-KEY_ShiftLeft = 0xFFE1
-KEY_ShiftRight = 0xFFE2
-KEY_ControlLeft = 0xFFE3
-KEY_ControlRight = 0xFFE4
-KEY_MetaLeft = 0xFFE7
-KEY_MetaRight = 0xFFE8
-KEY_AltLeft = 0xFFE9
-KEY_AltRight = 0xFFEA
+    :param starting_class_id: starting class id for scene objects
+    """
+    existing_classes = {item.value for item in SemanticClass}
+    category_txt = os.path.join(igibson.ig_dataset_path, "metadata/categories.txt")
+    class_name_to_class_id = {"agent": SemanticClass.ROBOTS}  # Agents should have the robot semantic class.
+    starting_class_id = 0
+    if os.path.isfile(category_txt):
+        with open(category_txt) as f:
+            for line in f.readlines():
+                while starting_class_id in existing_classes:
+                    starting_class_id += 1
+                assert starting_class_id < MAX_CLASS_COUNT, "Class ID overflow: MAX_CLASS_COUNT is {}.".format(
+                    MAX_CLASS_COUNT
+                )
+                class_name_to_class_id[line.strip()] = starting_class_id
+                starting_class_id += 1
 
-KEY_Scroll_Lock = 0xFF14
-KEY_Sys_Req = 0xFF15
-KEY_Num_Lock = 0xFF7F
-KEY_Caps_Lock = 0xFFE5
-KEY_Pause = 0xFF13
-KEY_Super_L = 0xFFEB
-KEY_Super_R = 0xFFEC
-KEY_Hyper_L = 0xFFED
-KEY_Hyper_R = 0xFFEE
+    return class_name_to_class_id
 
-KEY_KP_0 = 0xFFB0
-KEY_KP_1 = 0xFFB1
-KEY_KP_2 = 0xFFB2
-KEY_KP_3 = 0xFFB3
-KEY_KP_4 = 0xFFB4
-KEY_KP_5 = 0xFFB5
-KEY_KP_6 = 0xFFB6
-KEY_KP_7 = 0xFFB7
-KEY_KP_8 = 0xFFB8
-KEY_KP_9 = 0xFFB9
-KEY_KP_Enter = 0xFF8D
 
-KEY_ForwardSlash = 0x002F
-KEY_BackSlash = 0x005C
-KEY_SpaceBar = 0x0020
-
-# TODO: build this programmatically?
-KEYMAP = {
-    "bsp": KEY_BackSpace,
-    "tab": KEY_Tab,
-    "return": KEY_Return,
-    "enter": KEY_Return,
-    "esc": KEY_Escape,
-    "ins": KEY_Insert,
-    "delete": KEY_Delete,
-    "del": KEY_Delete,
-    "home": KEY_Home,
-    "end": KEY_End,
-    "pgup": KEY_PageUp,
-    "pgdn": KEY_PageDown,
-    "ArrowLeft": KEY_Left,
-    "left": KEY_Left,
-    "ArrowUp": KEY_Up,
-    "up": KEY_Up,
-    "ArrowRight": KEY_Right,
-    "right": KEY_Right,
-    "ArrowDown": KEY_Down,
-    "down": KEY_Down,
-    "slash": KEY_BackSlash,
-    "bslash": KEY_BackSlash,
-    "fslash": KEY_ForwardSlash,
-    "spacebar": KEY_SpaceBar,
-    "space": KEY_SpaceBar,
-    "sb": KEY_SpaceBar,
-    "f1": KEY_F1,
-    "f2": KEY_F2,
-    "f3": KEY_F3,
-    "f4": KEY_F4,
-    "f5": KEY_F5,
-    "f6": KEY_F6,
-    "f7": KEY_F7,
-    "f8": KEY_F8,
-    "f9": KEY_F9,
-    "f10": KEY_F10,
-    "f11": KEY_F11,
-    "f12": KEY_F12,
-    "f13": KEY_F13,
-    "f14": KEY_F14,
-    "f15": KEY_F15,
-    "f16": KEY_F16,
-    "f17": KEY_F17,
-    "f18": KEY_F18,
-    "f19": KEY_F19,
-    "f20": KEY_F20,
-    "lshift": KEY_ShiftLeft,
-    "shift": KEY_ShiftLeft,
-    "rshift": KEY_ShiftRight,
-    "lctrl": KEY_ControlLeft,
-    "ctrl": KEY_ControlLeft,
-    "rctrl": KEY_ControlRight,
-    "lmeta": KEY_MetaLeft,
-    "meta": KEY_MetaLeft,
-    "rmeta": KEY_MetaRight,
-    "lalt": KEY_AltLeft,
-    "alt": KEY_AltLeft,
-    "ralt": KEY_AltRight,
-    "scrlk": KEY_Scroll_Lock,
-    "sysrq": KEY_Sys_Req,
-    "numlk": KEY_Num_Lock,
-    "caplk": KEY_Caps_Lock,
-    "pause": KEY_Pause,
-    "lsuper": KEY_Super_L,
-    "super": KEY_Super_L,
-    "rsuper": KEY_Super_R,
-    "lhyper": KEY_Hyper_L,
-    "hyper": KEY_Hyper_L,
-    "rhyper": KEY_Hyper_R,
-    "kp0": KEY_KP_0,
-    "kp1": KEY_KP_1,
-    "kp2": KEY_KP_2,
-    "kp3": KEY_KP_3,
-    "kp4": KEY_KP_4,
-    "kp5": KEY_KP_5,
-    "kp6": KEY_KP_6,
-    "kp7": KEY_KP_7,
-    "kp8": KEY_KP_8,
-    "kp9": KEY_KP_9,
-    "kpenter": KEY_KP_Enter,
-}
+CLASS_NAME_TO_CLASS_ID = get_class_name_to_class_id()
