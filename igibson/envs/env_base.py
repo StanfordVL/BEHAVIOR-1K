@@ -272,7 +272,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 if "name" not in robot_config:
                     robot_config["name"] = f"robot{i}"
                 # Set prim path
-                robot_config["prim_path"] = f"/World/{robot_config["name"]}"
+                robot_config["prim_path"] = f"/World/{robot_config['name']}"
                 # Make sure robot exists, grab its corresponding kwargs, and create / import the robot
                 robot = create_class_from_registry_and_config(
                     cls_name=robot_config["type"],
