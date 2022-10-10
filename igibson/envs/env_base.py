@@ -314,14 +314,14 @@ class Environment(gym.Env, GymObservable, Recreatable):
         # Load the scene, robots, and task
         self._load_scene()
         self._load_robots()
-        self._load_task()
 
-        # Start the simulation, then reset the environment
+        # Start the simulation, then load the task and reset the environment
         ig.sim.play()
-        self.reset()
+        self._load_task()
 
         # Update the initial scene state
         self.scene.update_initial_state()
+        self.reset()
 
         # Load the obs / action spaces
         self.load_observation_space()
@@ -653,7 +653,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 "initial_pos_z_offset": 0.1,
                 "texture_randomization_freq": None,
                 "object_randomization_freq": None,
-                "usd_file": None,
             },
 
             # Rendering kwargs
@@ -673,6 +672,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 "trav_map_resolution": 0.1,
                 "trav_map_erosion": 2,
                 "trav_map_with_objects": True,
+                "usd_file": None,
             },
 
             # Robot kwargs
