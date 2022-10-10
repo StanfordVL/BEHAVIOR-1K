@@ -230,7 +230,7 @@ class DatasetObject(USDObject):
                 height_maps[link_name] = []
                 for i, z_value in enumerate(heights):
                     # Get boolean birds-eye view xy-mask image for this surface
-                    img_fname = os.path.join(usd_dir, "height_maps_per_link", predicate, link_name, f"{i}.png")
+                    img_fname = os.path.join(usd_dir, "../misc", "height_maps_per_link", predicate, link_name, f"{i}.png")
                     xy_map = cv2.imread(img_fname, 0)
                     # Add this map to the supporting surfaces for this link and predicate combination
                     height_maps[link_name].append((z_value, xy_map))
