@@ -24,6 +24,7 @@ import numpy as np
 import trimesh
 
 import igibson as ig
+from igibson.macros import gm
 from igibson import assets_path, ig_dataset_path
 from igibson.utils.constants import JointType, PRIMITIVE_MESH_TYPES
 from igibson.utils.python_utils import assert_valid_key
@@ -257,6 +258,7 @@ class BoundingBoxAPI:
                 - 3-array: start (x,y,z) corner of world-coordinate frame aligned bounding box
                 - 3-array: end (x,y,z) corner of world-coordinate frame aligned bounding box
         """
+        assert not gm.ENABLE_FLATCACHE, f"Cannot compute aabb bounding boxes with flatcache enabled!"
         # Create cache if it doesn't already exist
         if cls.CACHE is None:
             cls.CACHE = create_bbox_cache(use_extents_hint=False)
@@ -280,6 +282,7 @@ class BoundingBoxAPI:
                 - 3-array: center position (x,y,z) of world-coordinate frame aligned bounding box
                 - 3-array: end-to-end extent size (x,y,z) of world-coordinate frame aligned bounding box
         """
+        assert not gm.ENABLE_FLATCACHE, f"Cannot compute aabb bounding boxes with flatcache enabled!"
         low, high = cls.compute_aabb(prim_path=prim_path)
 
         return (low + high) / 2.0, high - low
