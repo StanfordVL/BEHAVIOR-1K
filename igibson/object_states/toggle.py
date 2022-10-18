@@ -6,6 +6,7 @@ from igibson.prims.geom_prim import VisualGeomPrim
 from igibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from igibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
 from igibson.utils.usd_utils import create_primitive_mesh
+from omni.isaac.core.utils.prims import get_prim_at_path
 
 
 # Create settings for this module
@@ -38,11 +39,13 @@ class ToggledOn(AbsoluteObjectState, BooleanState, LinkBasedStateMixin):
         super(ToggledOn, self)._initialize()
         if self.initialize_link_mixin():
             mesh_prim_path = f"{self.link.prim_path}/visual_marker"
-            mesh = create_primitive_mesh(
-                prim_path=mesh_prim_path,
-                primitive_type="Sphere",
-                extents=m.TOGGLE_BUTTON_SCALE,
-            )
+            # Create a primitive mesh if it doesn't already exist
+            if not get_prim_at_path(mesh_prim_path):
+                mesh = create_primitive_mesh(
+                    prim_path=mesh_prim_path,
+                    primitive_type="Sphere",
+                    extents=m.TOGGLE_BUTTON_SCALE,
+                )
 
             # Create the visual geom instance referencing the generated mesh prim
             self.visual_marker = VisualGeomPrim(prim_path=mesh_prim_path, name=f"{self.obj.name}_visual_marker")
