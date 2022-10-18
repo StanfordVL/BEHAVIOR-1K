@@ -3,6 +3,7 @@ import logging
 from collections import OrderedDict
 import os
 import numpy as np
+import json
 
 import networkx as nx
 
@@ -39,12 +40,11 @@ from igibson.utils.constants import (
     MAX_TASK_RELEVANT_OBJS,
     NON_SAMPLEABLE_OBJECTS,
     TASK_RELEVANT_OBJS_OBS_DIM,
+    KINEMATICS_STATES,
 )
 from igibson.utils.log_utils import IGLogWriter
 from igibson.utils.python_utils import classproperty, assert_valid_key
 import igibson.utils.transform_utils as T
-
-KINEMATICS_STATES = frozenset({"inside", "ontop", "under", "onfloor"})
 
 
 # TODO! WIP
@@ -131,17 +131,15 @@ class BehaviorTask(BaseTask):
         self.sampled_objects = None
         self.sampleable_object_conditions = None
 
+        # We infer where to reset the agent based on the cached value
+        self.agent_init_poses = json.loads(ig.sim.world_prim.GetCustomDataByKey("agent_poses")) if not self.online_object_sampling else None
+
         # Logic-tracking info
         self.currently_viewed_index = None
         self.currently_viewed_instruction = None
 
         # Load the initial behavior configuration
         self.update_activity(activity_name=activity_name, activity_definition_id=activity_definition_id, predefined_problem=predefined_problem)
-
-        # TODO
-        # self.task_obs_dim = MAX_TASK_RELEVANT_OBJS * TASK_RELEVANT_OBJS_OBS_DIM + AGENT_POSE_DIM
-        # if self.config.get("should_highlight_task_relevant_objs", True):
-        #     self.highlight_task_relevant_objs(env)
 
         # Run super init
         super().__init__(termination_config=termination_config, reward_config=reward_config)
@@ -167,12 +165,15 @@ class BehaviorTask(BaseTask):
         return rewards
 
     def _load(self, env):
+        # Get the name of the scene
+        self.scene_model = ig.sim.scene.scene_model
+
         # Initialize the current activity
         success, self.feedback = self.initialize_activity(env=env)
         assert success, f"Failed to initialize Behavior Activity. Feedback:\n{self.feedback}"
 
-        # Get the name of the scene
-        self.scene_model = ig.sim.scene.scene_model
+        # Also reset the agent
+        self._reset_agent(env=env)
 
         # Highlight any task relevant objects if requested
         if self.highlight_task_relevant_objs:
@@ -184,6 +185,14 @@ class BehaviorTask(BaseTask):
     def _load_non_low_dim_observation_space(self):
         # No non-low dim observations so we return an empty dict
         return OrderedDict()
+
+    def _reset_agent(self, env):
+        # TODO: Add option for online sampling
+        for i, robot in enumerate(env.robots):
+            if not self.online_object_sampling:
+                robot.set_position_orientation(**self.agent_init_poses[i])
+            robot.reset()
+            robot.keep_still()
 
     def update_activity(self, activity_name, activity_definition_id, predefined_problem=None):
         """
@@ -278,6 +287,11 @@ class BehaviorTask(BaseTask):
         return accept_scene, feedback
 
     def parse_non_sampleable_object_room_assignment(self, env):
+        """
+
+        :param env:
+        :return:
+        """
         self.room_type_to_object_instance = OrderedDict()
         self.non_sampleable_object_instances = set()
         for cond in self.activity_conditions.parsed_initial_conditions:
@@ -289,7 +303,7 @@ class BehaviorTask(BaseTask):
                     return "You have assigned room type for [{}], but [{}] is sampleable. Only non-sampleable objects can have room assignment.".format(
                         obj_cat, obj_cat
                     )
-                if room_type not in ig.sim.scene.room_sem_name_to_ins_name:
+                if room_type not in ig.sim.scene.seg_map.room_sem_name_to_ins_name:
                     # Missing room type
                     return "Room type [{}] missing in scene [{}].".format(room_type, ig.sim.scene.scene_id)
                 if room_type not in self.room_type_to_object_instance:
@@ -342,18 +356,20 @@ class BehaviorTask(BaseTask):
         """
         Store simulator object options for non-sampleable objects in self.non_sampleable_object_scope
         {
-            "table1": {
-                "living_room_0": [URDFObject, URDFObject, URDFObject],
-                "living_room_1": [URDFObject]
-            },
-            "table2": {
-                "living_room_0": [URDFObject, URDFObject],
-                "living_room_1": [URDFObject, URDFObject]
-            },
-            "chair1": {
-                "living_room_0": [URDFObject],
-                "living_room_1": [URDFObject]
-            },
+            "living_room": {
+                "table1": {
+                    "living_room_0": [URDFObject, URDFObject, URDFObject],
+                    "living_room_1": [URDFObject]
+                },
+                "table2": {
+                    "living_room_0": [URDFObject, URDFObject],
+                    "living_room_1": [URDFObject, URDFObject]
+                },
+                "chair1": {
+                    "living_room_0": [URDFObject],
+                    "living_room_1": [URDFObject]
+                },
+            }
         }
         """
         room_type_to_scene_objs = {}
@@ -368,7 +384,7 @@ class BehaviorTask(BaseTask):
                 if obj_cat == "stove.n.01":
                     categories += self.object_taxonomy.get_subtree_igibson_categories("burner.n.02")
 
-                for room_inst in ig.sim.scene.room_sem_name_to_ins_name[room_type]:
+                for room_inst in ig.sim.scene.seg_map.room_sem_name_to_ins_name[room_type]:
                     if obj_cat == FLOOR_SYNSET:
                         # TODO: remove after split floors
                         # Create a RoomFloor for each room instance
@@ -468,6 +484,9 @@ class BehaviorTask(BaseTask):
                 self.sampled_objects.add(simulator_obj)
                 self.object_scope[obj_inst] = simulator_obj
 
+        # Take a single simulation step so all newly imported objects are initialized
+        ig.sim.step()
+
     def check_scene(self, env):
         error_msg = self.parse_non_sampleable_object_room_assignment(env)
         if error_msg:
@@ -542,25 +561,44 @@ class BehaviorTask(BaseTask):
         return condition, positive
 
     def group_initial_conditions(self):
+        """
+        We group initial conditions by first splitting the desired task-relevant objects into non-sampleable objects
+        and sampleable objects.
+
+        Non-sampleable objects are objects that should ALREADY be in the scene, and should NOT be generated / sampled
+        on the fly
+
+        Sampleable objects are objects that TODO
+
+        :return:
+        """
         self.non_sampleable_object_conditions = []
         self.sampleable_object_conditions = []
 
         # TODO: currently we assume self.initial_conditions is a list of
         # bddl.condition_evaluation.HEAD, each with one child.
-        # This chid is either a ObjectStateUnaryPredicate/ObjectStateBinaryPredicate or
+        # This child is either a ObjectStateUnaryPredicate/ObjectStateBinaryPredicate or
         # a Negation of a ObjectStateUnaryPredicate/ObjectStateBinaryPredicate
         for condition in self.activity_initial_conditions:
             condition, positive = self.process_single_condition(condition)
             if condition is None:
                 continue
 
+            # Sampled conditions must always be positive
+            # Non-positive (e.g.: NOT onTop) is not restrictive enough for sampling
             if condition.STATE_NAME in KINEMATICS_STATES and not positive:
                 return "Initial condition has negative kinematic conditions: {}".format(condition.body)
 
             condition_body = set(condition.body)
+
+            # If the condition involves any non-sampleable object (e.g.: furniture), it's a non-sampleable condition
+            # This means that there's no ordering constraint in terms of sampling, because we know the, e.g., furniture
+            # object already exists in the scene and is placed, so these specific conditions can be sampled without
+            # any dependencies
             if len(self.non_sampleable_object_instances.intersection(condition_body)) > 0:
                 self.non_sampleable_object_conditions.append((condition, positive))
             else:
+                # There are dependencies that must be taken into account
                 self.sampleable_object_conditions.append((condition, positive))
 
     def filter_object_scope(self, input_object_scope, conditions, condition_type):
@@ -787,6 +825,7 @@ class BehaviorTask(BaseTask):
     def sample(self, env, validate_goal=True):
         # Before sampling, set robot to be far away
         env.robots[0].set_position_orientation([300, 300, 300], [0, 0, 0, 1])
+        ig.sim.step_physics()
         error_msg = self.group_initial_conditions()
         if error_msg:
             logging.warning(error_msg)
@@ -825,7 +864,7 @@ class BehaviorTask(BaseTask):
 
         for obj_name, obj in clutter_scene.objects_by_name.items():
             # Do not allow duplicate object categories
-            if obj.category in ig.sim.scene.objects_by_category:
+            if obj.category in ig.sim.scene.object_registry.get_ids(key="category"):
                 continue
 
             bbox_center_pos, bbox_center_orn = clutter_scene.object_states[obj_name]["bbox_center_pose"]
