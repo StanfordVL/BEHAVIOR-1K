@@ -206,8 +206,8 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
         # If we're using a BehaviorTask, we may load a pre-cached scene configuration
         if self.task_config["type"] == "BehaviorTask":
-            usd_file = self.scene_config["usd_file"]
-            if usd_file is None and not self.task_config["online_object_sampling"]:
+            usd_file, usd_path = self.scene_config["usd_file"], self.scene_config["usd_path"]
+            if usd_path is None and usd_file is None and not self.task_config["online_object_sampling"]:
                 usd_file = "{}_task_{}_{}_{}_fixed_furniture_template".format(
                     self.scene_config["scene_model"],
                     self.task_config["activity_name"],
@@ -673,6 +673,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 "trav_map_erosion": 2,
                 "trav_map_with_objects": True,
                 "usd_file": None,
+                "usd_path": None,
             },
 
             # Robot kwargs
