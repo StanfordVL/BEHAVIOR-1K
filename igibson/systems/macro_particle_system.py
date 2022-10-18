@@ -250,7 +250,7 @@ class MacroParticleSystem(BaseParticleSystem):
         assert name in cls.particles, f"Got invalid name for particle to remove {name}"
 
         particle = cls.particles.pop(name)
-        cls.simulator.stage.RemovePrim(particle.prim_path)
+        particle.remove(simulator=cls.simulator)
 
     @classmethod
     def _load_new_particle(cls, prim_path, name):
@@ -676,6 +676,9 @@ class VisualParticleSystem(MacroParticleSystem):
         Args:
             state (OrderedDict): Keyword-mapped states of this object to set
         """
+        # Make sure max particle index is updated
+        cls.max_particle_idn = state["max_particle_idn"]
+
         # Synchronize particle groups
         cls._sync_particle_groups(
             group_objects=[cls.simulator.scene.object_registry("uuid", info["particle_attached_obj_uuid"])
