@@ -83,6 +83,9 @@ class VisionSensor(BaseSensor):
         bbox_3d=sensor_types.BoundingBox3D,
     )
 
+    # Persistent dictionary of sensors, mapped from prim_path to sensor
+    SENSORS = OrderedDict()
+
     def __init__(
         self,
         prim_path,
@@ -125,6 +128,9 @@ class VisionSensor(BaseSensor):
         # run super first
         super()._post_load()
 
+        # Add this sensor to the list of global sensors
+        self.SENSORS[self._prim_path] = self
+
         # Get synthetic data interface
         self._sd = sd.acquire_syntheticdata_interface()
 
@@ -154,9 +160,9 @@ class VisionSensor(BaseSensor):
         super()._initialize()
 
         # Initialize sensors
-        self._initialize_sensors(names=self._modalities)
+        self.initialize_sensors(names=self._modalities)
 
-    def _initialize_sensors(self, names, timeout=10.0):
+    def initialize_sensors(self, names, timeout=10.0):
         """Initializes a raw sensor in the simulation.
 
         Args:
@@ -207,7 +213,7 @@ class VisionSensor(BaseSensor):
 
         # We also need to initialize this new modality
         if should_initialize:
-            self._initialize_sensors(names=modality)
+            self.initialize_sensors(names=modality)
 
     def get_local_pose(self):
         # We have to overwrite this because camera prims can't set their quat for some reason ):
@@ -252,6 +258,13 @@ class VisionSensor(BaseSensor):
             set rotate=False to move the camera to look at the target
         """
         self._viewport.set_camera_target(self._prim_path, x, y, z, rotate)
+
+    def remove(self, simulator=None):
+        # Run super first
+        super().remove(simulator=simulator)
+
+        # Also remove this from the global sensors dict
+        self.SENSORS.pop(self._prim_path)
 
     @property
     def viewer_visibility(self):

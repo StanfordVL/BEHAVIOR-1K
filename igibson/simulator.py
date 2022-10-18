@@ -42,6 +42,7 @@ from igibson.object_states.factory import get_states_by_dependency_order
 from igibson.sensors.vision_sensor import VisionSensor
 from igibson.transition_rules import DEFAULT_RULES, TransitionResults
 from omni.kit.viewport_legacy import acquire_viewport_interface
+from omni.syntheticdata import SyntheticData
 
 
 # Create settings for this module
@@ -761,8 +762,16 @@ class Simulator(SimulationContext, Serializable):
         update_usd_metadata()
 
         # Save stage. This needs to happen at the end since some objects may get reset after sim.stop().
+        # We also need to reset the Synthetic Data Utilities, so that we can re-initialize it when we reload the USD
         self.stop()
+        SyntheticData.Reset()
+
         self.stage.Export(usd_path)
+
+        # Re-initialize the synthetic data and re-initialize all sensors
+        SyntheticData.Initialize()
+        for sensor in VisionSensor.SENSORS.values():
+            sensor.initialize_sensors(names=sensor.modalities)
 
         logging.info("The current simulation environment saved.")
 
