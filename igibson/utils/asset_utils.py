@@ -4,6 +4,7 @@ import logging
 import os
 import subprocess
 import tempfile
+from cryptography.fernet import Fernet
 from collections import defaultdict
 
 import yaml
@@ -401,6 +402,40 @@ def change_data_path():
     if response == "y":
         with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "global_config.yaml"), "w") as f:
             yaml.dump(global_config, f)
+
+
+def decrypt_file(encrypted_filename, decrypted_filename=None, decrypted_file=None):
+    with open(igibson.key_path, "rb") as filekey:
+        key = filekey.read()
+    fernet = Fernet(key)
+
+    with open(encrypted_filename, "rb") as enc_f:
+        encrypted = enc_f.read()
+
+    decrypted = fernet.decrypt(encrypted)
+
+    if decrypted_file is not None:
+        decrypted_file.write(decrypted)
+    else:
+        with open(decrypted_filename, "wb") as decrypted_file:
+            decrypted_file.write(decrypted)
+
+
+def encrypt_file(original_filename, encrypted_filename=None, encrypted_file=None):
+    with open(igibson.key_path, "rb") as filekey:
+        key = filekey.read()
+    fernet = Fernet(key)
+
+    with open(original_filename, "rb") as org_f:
+        original = org_f.read()
+
+    encrypted = fernet.encrypt(original)
+
+    if encrypted_file is not None:
+        encrypted_file.write(encrypted)
+    else:
+        with open(encrypted_filename, "wb") as encrypted_file:
+            encrypted_file.write(encrypted)
 
 
 if __name__ == "__main__":

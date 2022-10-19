@@ -5,6 +5,7 @@ import math
 import os
 import random
 import time
+import tempfile
 import xml.etree.ElementTree as ET
 
 import cv2
@@ -22,7 +23,9 @@ from igibson.objects.usd_object import USDObject
 from igibson.utils.constants import AVERAGE_CATEGORY_SPECS, DEFAULT_JOINT_FRICTION, SPECIAL_JOINT_FRICTIONS, JointType
 import igibson.utils.transform_utils as T
 from igibson.utils.usd_utils import BoundingBoxAPI
+from igibson.utils.asset_utils import decrypt_file
 from igibson.utils.constants import PrimType
+from igibson.macros import gm
 
 
 class DatasetObject(USDObject):
@@ -463,6 +466,20 @@ class DatasetObject(USDObject):
             if joint.joint_type != JointType.JOINT_FIXED:
                 joint.friction = friction
 
+    def _load(self, simulator=None):
+        if gm.USE_ENCRYPTED_ASSETS:
+            # Create a temporary file to store the decrytped asset, load it, and then delete it.
+            with tempfile.NamedTemporaryFile(suffix=".usd") as fp:
+                original_usd_path = self._usd_path
+                encrypted_filename = original_usd_path.replace(".usd", ".encrypted.usd")
+                decrypt_file(encrypted_filename, decrypted_file=fp)
+                self._usd_path = fp.name
+                prim = super()._load(simulator=simulator)
+                self._usd_path = original_usd_path
+                return prim
+        else:
+            return super()._load(simulator=simulator)
+
     def _post_load(self):
         # We run this post loading first before any others because we're modifying the load config that will be used
         # downstream
@@ -523,6 +540,14 @@ class DatasetObject(USDObject):
 
         # Run super last
         super()._post_load()
+
+        if gm.USE_ENCRYPTED_ASSETS:
+            # The loaded USD is from an already-deleted temporary file, so the asset paths for texture maps are wrong.
+            # We explicitly provide the root_path to update all the asset paths: the asset paths are relative to the
+            # original USD folder, i.e. <category>/<model>/usd.
+            root_path = os.path.dirname(self._usd_path)
+            for material in self.materials:
+                material.shader_update_asset_paths_with_root_path(root_path)
 
         # Assign realistic density and mass based on average object category spec
         if self.avg_obj_dims is not None:

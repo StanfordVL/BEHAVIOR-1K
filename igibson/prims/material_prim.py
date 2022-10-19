@@ -1,6 +1,7 @@
 from pxr import Gf, Usd, Sdf, UsdGeom, UsdShade
 import numpy as np
 import asyncio
+import os
 
 import omni
 from omni.isaac.core.utils.prims import get_prim_at_path
@@ -96,27 +97,60 @@ class MaterialPrim(BasePrim):
         Omni does NOT export materials when saving a USD, so if a USD is saved on one machine and ported to another one,
         it will break unless we update the material paths to point to the new correct paths on the new machine.
         """
-        # Update the material paths so that it's correct wrt to the local machine / directory setup that
+        # Update the material paths so that it's correct w.r.t. to the local machine / directory setup that
         # this prim and USD is being loaded on
         for inp_name in self.shader_input_names_by_type("SdfAssetPath"):
             inp = self.get_input(inp_name)
+            # If the input doesn't have any path, skip
             if inp is None:
                 continue
+
             original_path = inp.path if inp.resolvedPath == "" else inp.resolvedPath
+            # If the input has an empty path, skip
             if original_path == "":
                 continue
-            # Only update the path if it's not the same root path
-            if ig_dataset_path not in original_path and assets_path not in original_path:
-                usd_metadata = get_usd_metadata()
-                source_asset_path = usd_metadata["source_ig_asset_path"]
-                source_ig_dataset_path = usd_metadata["source_ig_dataset_path"]
-                if source_asset_path in original_path:
-                    new_path = f"{assets_path}{original_path.split(source_asset_path)[-1]}"
-                elif source_ig_dataset_path in original_path:
-                    new_path = f"{ig_dataset_path}{original_path.split(source_ig_dataset_path)[-1]}"
-                else:
-                    raise ValueError(f"Could not find appropriate remapping for material asset path: {original_path}!")
-                self.set_input(inp_name, new_path)
+
+            # If the input already has the correct, current machine's root path, skip
+            if ig_dataset_path in original_path or assets_path in original_path:
+                continue
+
+            usd_metadata = get_usd_metadata()
+            source_asset_path = usd_metadata["source_ig_asset_path"]
+            source_ig_dataset_path = usd_metadata["source_ig_dataset_path"]
+
+            # If the input doesn't contain the source root path, skip. We fail to update the asset paths automatically
+            # External user needs to call @shader_update_asset_paths_with_root_path with an explicit root path
+            if source_asset_path not in original_path and source_ig_dataset_path not in original_path:
+                continue
+
+            if source_asset_path in original_path:
+                new_path = f"{assets_path}{original_path.split(source_asset_path)[-1]}"
+            else:
+                new_path = f"{ig_dataset_path}{original_path.split(source_ig_dataset_path)[-1]}"
+
+            self.set_input(inp_name, new_path)
+
+    def shader_update_asset_paths_with_root_path(self, root_path):
+        """
+        Similar to @shader_update_asset_paths, except in this case, root_path is explicitly provided by the caller.
+
+        Args:
+            root_path (str): root to be pre-appended to the original asset paths
+        """
+
+        for inp_name in self.shader_input_names_by_type("SdfAssetPath"):
+            inp = self.get_input(inp_name)
+            # If the input doesn't have any path, skip
+            if inp is None:
+                continue
+
+            original_path = inp.path if inp.resolvedPath == "" else inp.resolvedPath
+            # If the input has an empty path, skip
+            if original_path == "":
+                continue
+
+            new_path = os.path.join(root_path, original_path)
+            self.set_input(inp_name, new_path)
 
     def get_input(self, inp):
         """

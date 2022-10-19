@@ -15,6 +15,8 @@ from import_metadata import import_obj_metadata
 from omni.isaac.core.utils.stage import open_stage, get_current_stage
 from omni.isaac.core.utils.prims import get_prim_at_path, is_prim_path_valid
 from omni.kit.commands import execute
+from igibson.utils.asset_utils import encrypt_file
+from igibson.macros import gm
 
 
 CLOTH_CATEGORIES = ["carpet"]
@@ -124,5 +126,11 @@ for category in CLOTH_CATEGORIES:
         stage.Save()
 
         print(f"Done: {cloth_usd_file}")
+
+        if gm.USE_ENCRYPTED_ASSETS:
+            usd_path = cloth_usd_file
+            encrypted_usd_path = usd_path.replace(".usd", ".encrypted.usd")
+            encrypt_file(usd_path, encrypted_filename=encrypted_usd_path)
+            os.remove(usd_path)
 
 app.close()

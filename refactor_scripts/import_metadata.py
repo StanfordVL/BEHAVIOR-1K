@@ -20,6 +20,8 @@ from omni.isaac.core.prims.xform_prim import XFormPrim
 import igibson.utils.transform_utils as T
 import trimesh
 from igibson.utils.usd_utils import BoundingBoxAPI
+from igibson.utils.asset_utils import encrypt_file
+from igibson.macros import gm
 from collections import OrderedDict
 from pathlib import Path
 
@@ -620,6 +622,11 @@ def import_obj_metadata(obj_category, obj_model, import_render_channels=False):
 
     # Delete stage reference
     del stage
+
+    if gm.USE_ENCRYPTED_ASSETS:
+        encrypted_usd_path = usd_path.replace(".usd", ".encrypted.usd")
+        encrypt_file(usd_path, encrypted_filename=encrypted_usd_path)
+        os.remove(usd_path)
 
 
 def recursively_replace_list_of_dict(dic):
