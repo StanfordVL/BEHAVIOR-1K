@@ -1,10 +1,15 @@
 from pxr import Gf, Usd, Sdf, UsdGeom, UsdShade
 import numpy as np
+import asyncio
+
 import omni
 from omni.isaac.core.utils.prims import get_prim_at_path
 from omni.usd import get_shader_from_material
+
+from igibson import app, assets_path, ig_dataset_path
+from igibson.utils.physx_utils import bind_material
 from igibson.prims.prim_base import BasePrim
-from igibson.utils.constants import OMNI_SHADER_INPUTS
+from igibson.utils.usd_utils import get_usd_metadata
 
 
 class MaterialPrim(BasePrim):
@@ -58,28 +63,60 @@ class MaterialPrim(BasePrim):
         omni.kit.commands.execute("MovePrim", path_from=material_path, path_to=self._prim_path)
 
         # Return generated material
-        return get_prim_at_path(material_path)
+        return get_prim_at_path(self._prim_path)
 
     def _post_load(self):
         # run super first
         super()._post_load()
 
-        # Generate shader reference, and then standardize the inputs
+        # Generate shader reference
         self._shader = get_shader_from_material(self._prim)
-        self._standardize_shader_inputs()
 
-    def _standardize_shader_inputs(self):
+    def bind(self, target_prim_path):
         """
-        Internal helper function to guarantee that any attached shader has all "expected" PBR core inputs, to avoid
-        downstream segfaults resulting from accessing "invalid null prim"
+        Bind this material to an arbitrary prim (usually a visual mesh prim)
+
+        Args:
+            target_prim_path (str): prim path of the Prim to bind to
         """
-        # Add all missing inputs that this material's shader doesn't currently have
-        inputs_to_add = set(OMNI_SHADER_INPUTS.keys()) - self.shader_input_names
-        for inp in inputs_to_add:
-            inp_type, inp_val = OMNI_SHADER_INPUTS[inp]
-            self._shader.CreateInput(inp, inp_type)
-            if inp_val is not None:
-                self.set_input(inp=inp, val=inp_val)
+        bind_material(prim_path=target_prim_path, material_path=self.prim_path)
+
+    def shader_force_populate(self):
+        """
+        Force populate inputs and outputs of the shader
+        """
+        assert self._shader is not None
+        asyncio.ensure_future(omni.usd.get_context().load_mdl_parameters_for_prim_async(self._shader))
+        app.update()
+
+    def shader_update_asset_paths(self):
+        """
+        Updates material shader paths appropriately so that a material can verifiably be used given the current machine setup.
+
+        Omni does NOT export materials when saving a USD, so if a USD is saved on one machine and ported to another one,
+        it will break unless we update the material paths to point to the new correct paths on the new machine.
+        """
+        # Update the material paths so that it's correct wrt to the local machine / directory setup that
+        # this prim and USD is being loaded on
+        for inp_name in self.shader_input_names_by_type("SdfAssetPath"):
+            inp = self.get_input(inp_name)
+            if inp is None:
+                continue
+            original_path = inp.path if inp.resolvedPath == "" else inp.resolvedPath
+            if original_path == "":
+                continue
+            # Only update the path if it's not the same root path
+            if ig_dataset_path not in original_path and assets_path not in original_path:
+                usd_metadata = get_usd_metadata()
+                source_asset_path = usd_metadata["source_ig_asset_path"]
+                source_ig_dataset_path = usd_metadata["source_ig_dataset_path"]
+                if source_asset_path in original_path:
+                    new_path = f"{assets_path}{original_path.split(source_asset_path)[-1]}"
+                elif source_ig_dataset_path in original_path:
+                    new_path = f"{ig_dataset_path}{original_path.split(source_ig_dataset_path)[-1]}"
+                else:
+                    raise ValueError(f"Could not find appropriate remapping for material asset path: {original_path}!")
+                self.set_input(inp_name, new_path)
 
     def get_input(self, inp):
         """
@@ -121,6 +158,16 @@ class MaterialPrim(BasePrim):
             set: All the shader input names associated with this material
         """
         return {inp.GetBaseName() for inp in self._shader.GetInputs()}
+
+    def shader_input_names_by_type(self, input_type):
+        """
+        Args:
+            input_type (str): input type
+
+        Returns:
+            set: All the shader input names associated with this material that match the given input type
+        """
+        return {inp.GetBaseName() for inp in self._shader.GetInputs() if inp.GetTypeName().cppTypeName == input_type}
 
     @property
     def diffuse_color_constant(self):
@@ -844,22 +891,98 @@ class MaterialPrim(BasePrim):
         """
         self.set_input(inp="excludeFromWhiteMode", val=exclude)
 
+    @property
+    def diffuse_reflection_weight(self):
+        """
+        Returns:
+            float: this material's applied diffuse_reflection_weight
+        """
+        return self.get_input(inp="diffuse_reflection_weight")
 
-def generate_str():
-    for name, (_, default_val) in OMNI_SHADER_INPUTS.items():
-        print()
-        print(f"@property")
-        print(f"def {name}(self)")
-        print(f'    """')
-        print(f'    Returns:')
-        print(f"        {type(default_val)}: this material's applied {name}")
-        print(f'    """')
-        print(f'    return self.get_input(inp="{name}")')
-        print()
-        print(f"@{name}.setter")
-        print(f"def {name}(self, )")
-        print(f'    """')
-        print(f'    Args:')
-        print(f"         ({type(default_val)}): this material's applied {name}")
-        print(f'    """')
-        print(f'    self.set_input(inp="{name}", val=)')
+    @diffuse_reflection_weight.setter
+    def diffuse_reflection_weight(self, weight):
+        """
+        Args:
+             weight (float): this material's applied diffuse_reflection_weight
+        """
+        self.set_input(inp="diffuse_reflection_weight", val=weight)
+
+    @property
+    def enable_specular_transmission(self):
+        """
+        Returns:
+            bool: this material's applied enable_specular_transmission
+        """
+        return self.get_input(inp="enable_specular_transmission")
+
+    @enable_specular_transmission.setter
+    def enable_specular_transmission(self, enabled):
+        """
+        Args:
+             enabled (bool): this material's applied enable_specular_transmission
+        """
+        self.set_input(inp="enable_specular_transmission", val=enabled)
+
+    @property
+    def specular_transmission_weight(self):
+        """
+        Returns:
+            float: this material's applied specular_transmission_weight
+        """
+        return self.get_input(inp="specular_transmission_weight")
+
+    @specular_transmission_weight.setter
+    def specular_transmission_weight(self, weight):
+        """
+        Args:
+             weight (float): this material's applied specular_transmission_weight
+        """
+        self.set_input(inp="specular_transmission_weight", val=weight)
+
+    @property
+    def diffuse_reflection_color(self):
+        """
+        Returns:
+            3-array: this material's diffuse_reflection_color in (R,G,B)
+        """
+        return np.array(self.get_input(inp="diffuse_reflection_color"))
+
+    @diffuse_reflection_color.setter
+    def diffuse_reflection_color(self, color):
+        """
+        Args:
+             color (3-array): this material's diffuse_reflection_color in (R,G,B)
+        """
+        self.set_input(inp="diffuse_reflection_color", val=Gf.Vec3f(*np.array(color, dtype=float)))
+
+    @property
+    def specular_transmission_color(self):
+        """
+        Returns:
+            3-array: this material's specular_transmission_color in (R,G,B)
+        """
+        return np.array(self.get_input(inp="specular_transmission_color"))
+
+    @specular_transmission_color.setter
+    def specular_transmission_color(self, color):
+        """
+        Args:
+             color (3-array): this material's specular_transmission_color in (R,G,B)
+        """
+        self.set_input(inp="specular_transmission_color", val=Gf.Vec3f(*np.array(color, dtype=float)))
+
+    @property
+    def specular_transmission_scattering_color(self):
+        """
+        Returns:
+            3-array: this material's specular_transmission_scattering_color in (R,G,B)
+        """
+        return np.array(self.get_input(inp="specular_transmission_scattering_color"))
+
+    @specular_transmission_scattering_color.setter
+    def specular_transmission_scattering_color(self, color):
+        """
+        Args:
+             color (3-array): this material's specular_transmission_scattering_color in (R,G,B)
+        """
+        self.set_input(inp="specular_transmission_scattering_color", val=Gf.Vec3f(*np.array(color, dtype=float)))

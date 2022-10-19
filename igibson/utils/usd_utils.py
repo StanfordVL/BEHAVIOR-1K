@@ -503,32 +503,3 @@ def update_usd_metadata():
         "source_ig_dataset_path": ig_dataset_path,
     }
     get_world_prim().SetCustomDataByKey("usd_metadata", usd_metadata)
-
-
-def update_shader_asset_paths(shader):
-    """
-    Updates material shader paths appropriately so that a material can verifiably be used given the current machine setup.
-
-    Omni does NOT export materials when saving a USD, so if a USD is saved on one machine and ported to another one,
-    it will break unless we update the material paths to point to the new correct paths on the new machine.
-
-    Args:
-        shader (Usd.Shader): Shader prim whose input channels should be updated
-    """
-    # Update the material paths so that it's correct wrt to the local machine / directory setup that
-    # this prim and USD is being loaded on
-    for inp in shader.GetInputs():
-        if inp.GetTypeName().cppTypeName == "SdfAssetPath" and inp.Get() is not None:
-            original_path = inp.Get().path if inp.Get().resolvedPath == "" else inp.Get().resolvedPath
-            # Only update the path if it's not the same root path
-            if ig_dataset_path not in original_path and assets_path not in original_path:
-                usd_metadata = get_usd_metadata()
-                source_asset_path = usd_metadata["source_ig_asset_path"]
-                source_ig_dataset_path = usd_metadata["source_ig_dataset_path"]
-                if source_asset_path in original_path:
-                    new_path = f"{assets_path}{original_path.split(source_asset_path)[-1]}"
-                elif source_ig_dataset_path in original_path:
-                    new_path = f"{ig_dataset_path}{original_path.split(source_ig_dataset_path)[-1]}"
-                else:
-                    raise ValueError(f"Could not find appropriate remapping for material asset path: {original_path}!")
-                inp.Set(new_path)

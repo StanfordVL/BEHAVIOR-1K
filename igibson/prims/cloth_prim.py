@@ -16,7 +16,6 @@ from omni.usd import get_shader_from_material
 from omni.physx.scripts import particleUtils
 
 from igibson.prims.geom_prim import GeomPrim
-from igibson.utils.usd_utils import update_shader_asset_paths
 import numpy as np
 
 
@@ -83,17 +82,6 @@ class ClothPrim(GeomPrim):
             self_collision=True,
             self_collision_filter=True,
         )
-
-        # Possibly update the shader associated with this geom if specified
-        # This may need to happen if we're initializing a geom on a machine that was NOT the original
-        # machine that loaded the USD
-        # This is an omni limitation that we need to work around
-        if "material:binding" in self._prim.GetPropertyNames():
-            for target in self._prim.GetProperty("material:binding").GetTargets():
-                shader = get_shader_from_material(prim=get_prim_at_path(target))
-                update_shader_asset_paths(shader=shader)
-
-
 
     def _initialize(self):
         super()._initialize()

@@ -17,8 +17,6 @@ from scipy.spatial.transform import Rotation
 from omni.isaac.core.utils.prims import get_prim_at_path
 from omni.isaac.core.utils.rotations import gf_quat_to_np_array
 
-from omni.usd import get_shader_from_material
-
 import igibson as ig
 from igibson.objects.usd_object import USDObject
 from igibson.utils.constants import AVERAGE_CATEGORY_SPECS, DEFAULT_JOINT_FRICTION, SPECIAL_JOINT_FRICTIONS, JointType
@@ -562,15 +560,15 @@ class DatasetObject(USDObject):
         """
         DEFAULT_ALBEDO_MAP_SUFFIX = frozenset({"DIFFUSE", "COMBINED", "albedo"})
         state_name = object_state.__class__.__name__ if object_state is not None else None
-        for shader in self._shaders:
-            texture_path = shader.GetInput("diffuse_texture").Get()
+        for material in self.materials:
+            texture_path = material.diffuse_texture
             assert texture_path is not None, f"DatasetObject [{self.prim_path}] has invalid diffuse texture map."
 
             # Get updated texture file path for state.
-            texture_absolute_path = texture_path.resolvedPath
-            texture_path_split = texture_absolute_path.split("/")
+            texture_path_split = texture_path.split("/")
             filedir, filename = "/".join(texture_path_split[:-1]), texture_path_split[-1]
             assert filename[-4:] == ".png", f"Texture file {filename} does not end with .png"
+
             filename_split = filename[:-4].split("_")
             # Check all three file names for backward compatibility.
             if len(filename_split) > 0 and filename_split[-1] not in DEFAULT_ALBEDO_MAP_SUFFIX:
@@ -580,16 +578,13 @@ class DatasetObject(USDObject):
 
             if os.path.exists(target_texture_path):
                 # Since we are loading a pre-cached texture map, we need to reset the albedo value to the default
-                self._update_albedo_value(None, shader)
-                # Set the relative path to the directory of the current stage
-                root_stage_path = os.path.dirname(self._simulator.stage.GetRootLayer().realPath)
-                target_texture_relative_path = os.path.relpath(target_texture_path, root_stage_path)
-                if shader.GetInput("diffuse_texture").Get().path != target_texture_relative_path:
-                    shader.GetInput("diffuse_texture").Set(target_texture_relative_path)
+                self._update_albedo_value(None, material)
+                if material.diffuse_texture != target_texture_path:
+                    material.diffuse_texture = target_texture_path
             else:
                 print(f"Warning: DatasetObject [{self.prim_path}] does not have texture map: "
                       f"[{target_texture_path}]. Falling back to directly updating albedo value.")
-                self._update_albedo_value(object_state, shader)
+                self._update_albedo_value(object_state, material)
 
     def set_bbox_center_position_orientation(self, pos, orn):
         # TODO - check to make sure works

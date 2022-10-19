@@ -6,7 +6,6 @@ from collections import OrderedDict, defaultdict
 import numpy as np
 import omni
 from omni.isaac.core.utils.prims import get_prim_at_path
-from omni.usd import get_shader_from_material
 from pxr.Sdf import ValueTypeNames as VT
 from pxr import Sdf, Gf
 
@@ -98,7 +97,6 @@ class StatefulObject(BaseObject):
         # Values that will be filled later
         self._states = None
         self._emitters = OrderedDict()
-        self._shaders = []
 
         # Load abilities from taxonomy if needed & possible
         if abilities is None:
@@ -204,29 +202,11 @@ class StatefulObject(BaseObject):
     def _post_load(self):
         super()._post_load()
 
-        if len(set(self.states) & set(get_texture_change_states())) > 0:
-            self._create_texture_change_apis()
-
         if len(set(self.states) & set(get_steam_states())) > 0:
             self._create_emitter_apis(EmitterType.STEAM)
 
         if len(set(self.states) & set(get_fire_states())) > 0 and self.states[HeatSourceOrSink].get_state_link_name() in self._links:
             self._create_emitter_apis(EmitterType.FIRE)
-
-    def _create_texture_change_apis(self):
-        """
-        Create necessary apis for texture changes.
-        """
-        looks_prim_path = f"{str(self._prim_path)}/Looks"
-        looks_prim = get_prim_at_path(looks_prim_path)
-        if not looks_prim:
-            return
-        for subprim in looks_prim.GetChildren():
-            if subprim.GetPrimTypeInfo().GetTypeName() == "Material":
-                shader = get_shader_from_material(subprim)
-                shader.CreateInput("albedo_add", Sdf.ValueTypeNames.Float).Set(0.0)
-                shader.CreateInput("diffuse_tint", Sdf.ValueTypeNames.Color3f).Set(Gf.Vec3f([1.0, 1.0, 1.0]))
-                self._shaders.append(shader)
 
 
     def _create_emitter_apis(self, emitter_type):
@@ -344,12 +324,7 @@ class StatefulObject(BaseObject):
         Returns:
             list of (str): List of texture file paths
         """
-        textures = []
-        for shader in self._shaders:
-            texture_path = shader.GetInput("diffuse_texture").Get()
-            if texture_path:
-                textures.append(texture_path.path)
-        return textures
+        return [material.diffuse_texture for material in self.materials if material.diffuse_texture is not None]
 
     def update_visuals(self):
         """
@@ -360,7 +335,7 @@ class StatefulObject(BaseObject):
         emitter_enabled = defaultdict(bool)
         for state_type, state in self.states.items():
             if state_type in get_texture_change_states():
-                if state_type in [Soaked]:
+                if state_type == Soaked:
                     for fluid_system in state.absorbed_particle_system_count.keys():
                         if state.get_value(fluid_system):
                             texture_change_states.append(state)
@@ -391,18 +366,18 @@ class StatefulObject(BaseObject):
         Args:
             object_state (BooleanState or None): the object state that the diffuse color should match to
         """
-        for shader in self._shaders:
-            self._update_albedo_value(object_state, shader)
+        for material in self.materials:
+            self._update_albedo_value(object_state, material)
 
     @staticmethod
-    def _update_albedo_value(object_state, shader):
+    def _update_albedo_value(object_state, material):
         """
         Update the albedo value based on the given object_state. The final albedo value is
         albedo_value = diffuse_tint * (albedo_value + albedo_add)
 
         Args:
             object_state (BooleanState or None): the object state that the diffuse color should match to
-            shader (UsdShade.Shader): the shader to use to update the albedo value
+            material (MaterialPrim): the material to use to update the albedo value
         """
         if object_state is None:
             # This restore the albedo map to its original value
@@ -412,11 +387,11 @@ class StatefulObject(BaseObject):
             # Query the object state for the parameters
             albedo_add, diffuse_tint = object_state.get_texture_change_params()
 
-        if shader.GetInput("albedo_add").Get() != albedo_add:
-            shader.GetInput("albedo_add").Set(albedo_add)
+        if material.albedo_add != albedo_add:
+            material.albedo_add = albedo_add
 
-        if not np.allclose(shader.GetInput("diffuse_tint").Get(), diffuse_tint):
-            shader.GetInput("diffuse_tint").Set(Gf.Vec3f(diffuse_tint))
+        if not np.allclose(material.diffuse_tint, diffuse_tint):
+            material.diffuse_tint = diffuse_tint
 
     def _dump_state(self):
         # Grab state from super class

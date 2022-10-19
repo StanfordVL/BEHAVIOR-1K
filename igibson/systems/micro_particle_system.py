@@ -1,7 +1,9 @@
 import os
 import time
+
 from igibson.macros import gm, create_module_macros
 from igibson.prims.prim_base import BasePrim
+from igibson.prims.material_prim import MaterialPrim
 from igibson.systems.system_base import SYSTEMS_REGISTRY
 from igibson.systems.particle_system_base import BaseParticleSystem
 from igibson.utils.constants import SemanticClass
@@ -398,8 +400,8 @@ class MicroParticleSystem(BaseParticleSystem):
     # Particle instancers -- maps name to particle instancer prims (OrderedDict)
     particle_instancers = None
 
-    # Particle material -- either a UsdShade.Material or None if no material is used for this particle system
-    particle_material = None
+    # Material -- either a MaterialPrim or None if no material is used for this particle system
+    _material = None
 
     # Scaling factor to sample from when generating a new particle
     min_scale = None                # (x,y,z) scaling
@@ -424,6 +426,30 @@ class MicroParticleSystem(BaseParticleSystem):
         """
         return f"/World/{cls.name}"
 
+    @classproperty
+    def mat_path(cls):
+        """
+        Returns:
+            str: Path to this system's material in the scene stage
+        """
+        return f"{cls.prim_path}/{cls.name}_material"
+
+    @classproperty
+    def mat_name(cls):
+        """
+        Returns:
+            str: Name of this system's material
+        """
+        return f"{cls.name}:material"
+
+    @classproperty
+    def material(cls):
+        """
+        Returns:
+            None or MaterialPrim: The bound material to this prim, if there is one
+        """
+        return cls._material
+
     @classmethod
     def initialize(cls, simulator):
         # Run super first
@@ -440,14 +466,16 @@ class MicroParticleSystem(BaseParticleSystem):
         cls.max_instancer_idn = -1
 
         # Create the particle system if it doesn't already exist, otherwise sync with the pre-existing system
-        mat_path = f"{cls.prim_path}/{cls.name}_material"
         prototype_path = get_prototype_path_from_particle_system_path(particle_system_path=cls.prim_path)
 
         if cls.particle_system_exists:
             cls.prim = get_prim_at_path(cls.prim_path)
-            mat = get_prim_at_path(mat_path)
+            material_prim = get_prim_at_path(cls.mat_path)
+            # Material already exists on stage, just create a MaterialPrim wrapper around it (run its post_load())
+            if material_prim is not None:
+                cls._material = cls._create_particle_material()
+                cls._material.shader_force_populate()
             prototype_dir_prim = get_prim_at_path(prototype_path)
-            cls.particle_material = mat if mat else None
             cls.particle_prototypes = [prototype_prim for prototype_prim in prototype_dir_prim.GetChildren()]
 
             # Also need to synchronize any instancers we have
@@ -459,24 +487,19 @@ class MicroParticleSystem(BaseParticleSystem):
                         name=name,
                         idn=cls.particle_instancer_name_to_idn(name=name),
                     )
-
         else:
             cls.prim = cls._create_particle_system()
-
             # Create the particle material (only if we're using high-quality rendering since this takes time)
-            cls.particle_material = cls._create_particle_material() if gm.ENABLE_HQ_RENDERING else None
-            if cls.particle_material is not None:
-                # Move this material and standardize its naming scheme
-                path_from = cls.particle_material.GetPrimPath().pathString
-                mat_path = f"{cls.prim_path}/{cls.name}_material"
-                omni.kit.commands.execute("MovePrim", path_from=path_from, path_to=mat_path)
-                # Get updated reference to this material
-                cls.particle_material = get_prim_at_path(mat_path)
-
-                # Bind this material to our particle system
-                particleUtils.add_pbd_particle_material(simulator.stage, mat_path)
-                bind_material(prim_path=cls.prim_path, material_path=mat_path)
-
+            cls._material = cls._create_particle_material() if gm.ENABLE_HQ_RENDERING else None
+            if cls._material is not None:
+                # Load the material
+                cls._material.load()
+                # Bind the material to the particle system
+                cls._material.bind(cls.prim_path)
+                # Also apply physics to this material
+                particleUtils.add_pbd_particle_material(cls.simulator.stage, cls.mat_path)
+                # Force populate inputs and outputs of the shader
+                cls._material.shader_force_populate()
             # Create the particle prototypes, move them to the appropriate directory, and make them all invisible
             prototypes = cls._create_particle_prototypes()
             cls.particle_prototypes = []
@@ -1107,21 +1130,14 @@ class WaterSystem(FluidSystem):
     @classmethod
     def _create_particle_material(cls):
         # Use DeepWater omni present for rendering water
-        mtl_created = []
-        omni.kit.commands.execute(
-            "CreateAndBindMdlMaterialFromLibrary",
-            mdl_name="OmniSurfacePresets.mdl",
-            mtl_name="OmniSurface_DeepWater",
-            mtl_created_list=mtl_created,
+        return MaterialPrim(
+            prim_path=cls.mat_path,
+            name=cls.mat_name,
+            load_config={
+                "mdl_name": "OmniSurfacePresets.mdl",
+                "mtl_name": "OmniSurface_DeepWater",
+            },
         )
-        material_path = mtl_created[0]
-
-        # Also apply physics to this material
-        particleUtils.add_pbd_particle_material(cls.simulator.stage, material_path)
-
-        # Return generated material
-        return get_prim_at_path(material_path)
-
 
 class ClothSystem(MicroParticleSystem):
     """

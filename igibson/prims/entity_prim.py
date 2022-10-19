@@ -333,6 +333,24 @@ class EntityPrim(XFormPrim):
         return self._links
 
     @property
+    def materials(self):
+        """
+        Loop through each link and their visual meshes to gather all the materials that belong to this object
+        Returns:
+            materials: a list of MaterialPrim that belongs to this object
+        """
+        materials = set()
+        material_paths = set()
+        for link in self._links.values():
+            xforms = [link] + list(link.visual_meshes.values()) if self.prim_type == PrimType.RIGID else [link]
+            for xform in xforms:
+                if xform.has_material():
+                    mat_path = xform.material.prim_path
+                    if mat_path not in material_paths:
+                        materials.add(xform.material)
+        return materials
+
+    @property
     def dof_properties(self):
         """[summary]
 

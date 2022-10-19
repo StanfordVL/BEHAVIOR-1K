@@ -3,11 +3,11 @@ from collections import OrderedDict
 from igibson.systems.micro_particle_system import get_fluid_systems
 from igibson.systems.system_base import get_system_from_element_name, get_element_name_from_system
 from igibson.macros import gm, create_module_macros
-from igibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
+from igibson.object_states.object_state_base import RelativeObjectState, BooleanState
+from igibson.object_states.aabb import AABB
 from igibson.object_states.water_source import WaterSource
 from igibson.utils.python_utils import assert_valid_key
 from igibson.utils.constants import PrimType
-from omni.usd import get_shader_from_material
 from pxr import Sdf
 from igibson.systems import SYSTEMS_REGISTRY
 
@@ -15,19 +15,14 @@ from igibson.systems import SYSTEMS_REGISTRY
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
-# Proportion of fluid particles per group required to intersect with this object for them all to be absorbed
-# by a soakable object
+# Proportion of fluid particles per group required to collide with this object for them all to be absorbed
 m.PARTICLE_GROUP_PROPORTION = 0.7
 
-# Soak threshold -- number of fluid particle required to be "absorbed" in order for the object to be
-# considered soaked
+# Soak threshold -- number of fluid particle required to be "absorbed" in order for the object to be considered soaked
 m.SOAK_PARTICLE_THRESHOLD = 40
 
-# TODO: SOOOOOOOOOOOO Hacky for cloth objects, because we can't use the normal way to detect particle collisions
-# Update this once we have a better way!!
 
-
-class Soaked(AbsoluteObjectState, BooleanState):
+class Soaked(RelativeObjectState, BooleanState):
     def __init__(self, obj):
         super(Soaked, self).__init__(obj)
 
@@ -38,54 +33,60 @@ class Soaked(AbsoluteObjectState, BooleanState):
         for system in get_fluid_systems().values():
             self.absorbed_particle_system_count[system] = 0
 
-        self.absorbed_particle_threshold = m.SOAK_PARTICLE_THRESHOLD
-        self.cloth_heuristic_update_fcn = lambda soaked_state, fluid_system: None              # Should update the absorbed particle count appropriately
 
     def _get_value(self, fluid_system):
-        assert self.absorbed_particle_system_count[fluid_system] <= self.absorbed_particle_threshold
-        return self.absorbed_particle_system_count[fluid_system] == self.absorbed_particle_threshold
+        assert self.absorbed_particle_system_count[fluid_system] <= m.SOAK_PARTICLE_THRESHOLD
+        return self.absorbed_particle_system_count[fluid_system] == m.SOAK_PARTICLE_THRESHOLD
 
     def _set_value(self, fluid_system, new_value):
         assert_valid_key(key=fluid_system, valid_keys=self.absorbed_particle_system_count, name="fluid element name")
-        self.absorbed_particle_system_count[fluid_system] = self.absorbed_particle_threshold if new_value else 0
+        self.absorbed_particle_system_count[fluid_system] = m.SOAK_PARTICLE_THRESHOLD if new_value else 0
         return True
 
     def _update(self):
-        # Handle cloth in a special way
-        if self.obj._prim_type == PrimType.CLOTH:
-            for fluid_system in self.absorbed_particle_system_count.keys():
-                self.cloth_heuristic_update_fcn(self, fluid_system)
-
-            return
-
         # Iterate over all fluid systems
         for fluid_system in self.absorbed_particle_system_count.keys():
-            # fluid_name = get_element_name_from_system(fluid_system)
-            # Map of obj_id -> (system, system_particle_id)
-            particle_contacts = fluid_system.state_cache['particle_contacts']
+            # We should never "over-absorb" particles from any fluid system above the threshold
+            assert self.absorbed_particle_system_count[fluid_system] <= m.SOAK_PARTICLE_THRESHOLD, \
+                f"over-absorb particles from {fluid_system.name}"
+
+            # If we already reach the absorption limit, continue
+            if self.absorbed_particle_system_count[fluid_system] == m.SOAK_PARTICLE_THRESHOLD:
+                continue
+
+            # Dict[Object, Dict[instancer_name, List[particle_idxs]]
+            instancer_name_to_particle_idxs = {}
+            if self.obj.prim_type == PrimType.RIGID:
+                # The fluid system caches contact information for each of its particles with rigid bodies
+                particle_contacts = fluid_system.state_cache['particle_contacts']
+                instancer_name_to_particle_idxs = particle_contacts.get(self.obj, {})
+            elif self.obj.prim_type == PrimType.CLOTH:
+                # Scene query interface overlap sphere API doesn't work for cloth objects, so no contact will be cached.
+                # A reasonable heuristics is to detect if the fluid particles lie within the AABB of the object
+                aabb_low, aabb_high = self.obj.states[AABB].get_value()
+                for instancer_name, instancer in fluid_system.particle_instancers.items():
+                    inbound = ((aabb_low < instancer.particle_positions) & (instancer.particle_positions < aabb_high))
+                    inbound_idxs = inbound.all(axis=1).nonzero()[0]
+                    instancer_name_to_particle_idxs[instancer_name] = inbound_idxs
+            else:
+                raise ValueError(f"Unknown prim type {self.obj.prim_type} when handling Soaked state.")
 
             # For each particle hit, hide then add to total particle count of soaked object
-            for instancer, particle_idxs in particle_contacts.get(self.obj, {}).items():
-                assert self.absorbed_particle_threshold >= self.absorbed_particle_system_count[fluid_system]
-
-                particles_to_absorb = min(len(particle_idxs), self.absorbed_particle_threshold - self.absorbed_particle_system_count[fluid_system])
+            for instancer, particle_idxs in instancer_name_to_particle_idxs.items():
+                max_particle_absorbed = m.SOAK_PARTICLE_THRESHOLD - self.absorbed_particle_system_count[fluid_system]
+                particles_to_absorb = min(len(particle_idxs), max_particle_absorbed)
                 particle_idxs_to_absorb = list(particle_idxs)[:particles_to_absorb]
 
-                # Hide particles in contact with the object
+                # Hide particles that have been absorbed
                 particle_visibilities = fluid_system.particle_instancers[instancer].particle_visibilities
                 particle_visibilities[particle_idxs_to_absorb] = 0
 
-                # Absorb the particles
+                # Keep track of the particles that have been absorbed
                 self.absorbed_particle_system_count[fluid_system] += particles_to_absorb
 
                 # If above threshold, soak the object and stop absorbing
-                if self.absorbed_particle_system_count[fluid_system] >= self.absorbed_particle_threshold:
+                if self.absorbed_particle_system_count[fluid_system] == m.SOAK_PARTICLE_THRESHOLD:
                     break
-
-        # TODO: remove this
-        for system, count in self.absorbed_particle_system_count.items():
-            assert count <= self.absorbed_particle_threshold, \
-                f"{system.name} contains {count} particles violating threshold: {self.absorbed_particle_threshold}"
 
     def get_texture_change_params(self):
         albedo_add = 0.1
@@ -93,22 +94,22 @@ class Soaked(AbsoluteObjectState, BooleanState):
 
         for fluid_system in self.absorbed_particle_system_count.keys():
             if self.get_value(fluid_system):
-                color = [0.0, 0.0, 1.0]
+                # Figure out the color for this particular fluid
+                mat = fluid_system.material
+                base_color_weight = mat.diffuse_reflection_weight
+                transmission_weight = mat.enable_specular_transmission * mat.specular_transmission_weight
+                total_weight = base_color_weight + transmission_weight
+                if total_weight == 0.0:
+                    # If the fluid doesn't have any color, we add a "blue" tint by default
+                    color = np.array([0.0, 0.0, 1.0])
+                else:
+                    base_color_weight /= total_weight
+                    transmission_weight /= total_weight
+                    # Weighted sum of base color and transmission color
+                    color = base_color_weight * mat.diffuse_reflection_color + \
+                            transmission_weight * (0.5 * mat.specular_transmission_color + \
+                                                   0.5 * mat.specular_transmission_scattering_color)
                 colors.append(color)
-            # TODO: Figure out how to read shader type
-            # shader = get_shader_from_material(fluid_system.particle_material)
-            # transmission_weight = shader.GetInput("enable_specular_transmission") * shader.GetInput("specular_transmission_weight")
-            # total_weight = base_color_weight + transmission_weight
-            # if total_weight == 0.0:
-            #     # If the fluid doesn't have any color, we add a "blue" tint by default 
-            #     color = np.array([0.0, 0.0, 1.0])
-            # else:
-            #     base_color_weight /= total_weight
-            #     transmission_weight /= total_weight
-            #     # Weighted sum of base color and transmission color
-            #     color = base_color_weight * shader.GetInput("diffuse_reflection_color") + transmission_weight * (0.5 * shader.GetInput("specular_transmission_color") + 0.5 * shader.GetInput("specular_transmission_scattering_color"))
-
-            # We want diffuse_tint to sum to 2.5 to keep the final sum of RGB to 1.5 on average: (0.5 (original average RGB) + 0.5 (albedo_add)) * 2.5 = 1.5 (original sum RGB)
 
         if len(colors) == 0:
             # If no fluid system has Soaked=True, keep the default albedo value
@@ -118,9 +119,11 @@ class Soaked(AbsoluteObjectState, BooleanState):
             albedo_add = 0.1
             avg_color = np.mean(colors, axis=0)
             # Add a tint of avg_color
+            # We want diffuse_tint to sum to 2.5 to result in the final RGB to sum to 1.5 on average
+            # This is because an average RGB color sum to 1.5 (i.e. [0.5, 0.5, 0.5])
+            # (0.5 [original avg RGB per channel] + 0.1 [albedo_add]) * 2.5 = 1.5
             diffuse_tint = np.array([0.5, 0.5, 0.5]) + avg_color / np.sum(avg_color)
             diffuse_tint = diffuse_tint.tolist()
-
 
         return albedo_add, diffuse_tint
 
