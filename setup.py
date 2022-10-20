@@ -42,6 +42,7 @@ setup(
         "future",
         "trimesh",
         "h5py",
+        "cryptography",
         # "gitpython",
         # "py360convert",
         # "six",
