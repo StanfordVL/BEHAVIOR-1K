@@ -4,7 +4,6 @@ import os
 import yaml
 
 import igibson as ig
-from igibson.utils.ui_utils import choose_from_options
 
 
 def main(random_selection=False, headless=False, short_exec=False):

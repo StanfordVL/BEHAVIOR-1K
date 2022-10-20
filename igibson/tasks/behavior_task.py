@@ -568,7 +568,7 @@ class BehaviorTask(BaseTask):
         Non-sampleable objects are objects that should ALREADY be in the scene, and should NOT be generated / sampled
         on the fly
 
-        Sampleable objects are objects that TODO
+        Sampleable objects are objects that need to be additionally imported into the scene.
 
         :return:
         """
@@ -825,6 +825,7 @@ class BehaviorTask(BaseTask):
     def sample(self, env, validate_goal=True):
         # Before sampling, set robot to be far away
         env.robots[0].set_position_orientation([300, 300, 300], [0, 0, 0, 1])
+        # We need to step physics once to make sure the bounding boxes get updated correctly
         ig.sim.step_physics()
         error_msg = self.group_initial_conditions()
         if error_msg:
