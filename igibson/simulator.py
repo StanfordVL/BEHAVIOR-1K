@@ -763,12 +763,16 @@ class Simulator(SimulationContext, Serializable):
 
         # Save stage. This needs to happen at the end since some objects may get reset after sim.stop().
         # We also need to reset the Synthetic Data Utilities, so that we can re-initialize it when we reload the USD
+        # Otherwise when we try to reload the USD and init Synthetic Data again we will run into an error since the
+        # Synthetic Data interface had already existed when we had saved the USD beforehand
         self.stop()
         SyntheticData.Reset()
 
         self.stage.Export(usd_path)
 
         # Re-initialize the synthetic data and re-initialize all sensors
+        # This is needed because we destroyed and recreated the synthetic data interface, and so the specific sensor
+        # modalities need to be initialized again within the Synthetic Data interface
         SyntheticData.Initialize()
         for sensor in VisionSensor.SENSORS.values():
             sensor.initialize_sensors(names=sensor.modalities)
