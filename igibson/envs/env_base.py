@@ -240,9 +240,16 @@ class Environment(gym.Env, GymObservable, Recreatable):
             cls_type_descriptor="task",
         )
 
-        # Load task
-        # TODO: Does this need to occur somewhere else?
+        assert ig.sim.is_stopped(), "sim should be stopped when load_task starts"
+        ig.sim.play()
+
+        # Load task. Should load additinal task-relevant objects and configure the scene into its default initial state
         self._task.load(env=self)
+
+        # Update the initial scene state
+        self._scene.update_initial_state()
+
+        ig.sim.stop()
 
     def _load_scene(self):
         """
@@ -314,13 +321,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
         # Load the scene, robots, and task
         self._load_scene()
         self._load_robots()
-
-        # Start the simulation, then load the task and reset the environment
-        ig.sim.play()
         self._load_task()
 
-        # Update the initial scene state
-        self.scene.update_initial_state()
+        ig.sim.play()
         self.reset()
 
         # Load the obs / action spaces
