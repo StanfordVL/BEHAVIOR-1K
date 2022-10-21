@@ -82,13 +82,16 @@ class MaterialPrim(BasePrim):
         """
         bind_material(prim_path=target_prim_path, material_path=self.prim_path)
 
+    async def _load_mdl_parameters(self):
+        app.update()
+        await omni.usd.get_context().load_mdl_parameters_for_prim_async(self._shader)
+
     def shader_force_populate(self):
         """
         Force populate inputs and outputs of the shader
         """
         assert self._shader is not None
-        asyncio.ensure_future(omni.usd.get_context().load_mdl_parameters_for_prim_async(self._shader))
-        app.update()
+        asyncio.run(self._load_mdl_parameters())
 
     def shader_update_asset_paths(self):
         """
