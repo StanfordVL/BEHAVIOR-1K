@@ -243,9 +243,9 @@ class Simulator(SimulationContext, Serializable):
             self._physics_context.set_broadphase_type("MBP")
 
         # Set GPU Pairs capacity and other GPU settings
-        self._physics_context.set_gpu_found_lost_aggregate_pairs_capacity(gm.GPU_PAIRS_CAPACITY)
         self._physics_context.set_gpu_found_lost_pairs_capacity(gm.GPU_PAIRS_CAPACITY)
-        self._physics_context.set_gpu_total_aggregate_pairs_capacity(gm.GPU_PAIRS_CAPACITY)
+        self._physics_context.set_gpu_found_lost_aggregate_pairs_capacity(gm.GPU_AGGR_PAIRS_CAPACITY)
+        self._physics_context.set_gpu_total_aggregate_pairs_capacity(gm.GPU_AGGR_PAIRS_CAPACITY)
         self._physics_context.set_gpu_max_particle_contacts(gm.GPU_MAX_PARTICLE_CONTACTS)
 
     @property
