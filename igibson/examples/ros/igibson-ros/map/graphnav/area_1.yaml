@@ -1,6 +1,0 @@
-image: area_1.png
-resolution: 0.050000
-origin: [-22.600000, -2.150000, 0.000000]
-negate: 0
-occupied_thresh: 0.65
-free_thresh: 0.196
