@@ -246,7 +246,6 @@ class Registry(UniquelyNamed):
             val = getattr(obj, attr)
 
         except:
-            print(f"dir: {dir(obj)}")
             val = self.default_value
 
         return val
@@ -327,7 +326,6 @@ class SerializableRegistry(Registry, Serializable):
 
     def _load_state(self, state):
         # Iterate over all objects and load their states
-        print(f"registry: {self.name}")
         for obj in self.objects:
             if obj.name not in state:
                 logging.warning(f"Object '{obj.name}' is not in the state dict to load from. Skip loading its state.")

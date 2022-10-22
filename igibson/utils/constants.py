@@ -133,6 +133,8 @@ class JointType:
 AVERAGE_OBJ_DENSITY = 67.0
 AVERAGE_CATEGORY_SPECS = get_ig_avg_category_specs()
 
+KINEMATICS_STATES = frozenset({"inside", "ontop", "under", "onfloor"})
+
 
 def get_collision_group_mask(groups_to_exclude=[]):
     """Get a collision group mask that has collisions enabled for every group except those in groups_to_exclude."""

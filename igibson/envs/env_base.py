@@ -206,8 +206,8 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
         # If we're using a BehaviorTask, we may load a pre-cached scene configuration
         if self.task_config["type"] == "BehaviorTask":
-            usd_file = self.scene_config["usd_file"]
-            if usd_file is None and not self.task_config["online_object_sampling"]:
+            usd_file, usd_path = self.scene_config["usd_file"], self.scene_config["usd_path"]
+            if usd_path is None and usd_file is None and not self.task_config["online_object_sampling"]:
                 usd_file = "{}_task_{}_{}_{}_fixed_furniture_template".format(
                     self.scene_config["scene_model"],
                     self.task_config["activity_name"],
@@ -240,9 +240,16 @@ class Environment(gym.Env, GymObservable, Recreatable):
             cls_type_descriptor="task",
         )
 
-        # Load task
-        # TODO: Does this need to occur somewhere else?
+        assert ig.sim.is_stopped(), "sim should be stopped when load_task starts"
+        ig.sim.play()
+
+        # Load task. Should load additinal task-relevant objects and configure the scene into its default initial state
         self._task.load(env=self)
+
+        # Update the initial scene state
+        self._scene.update_initial_state()
+
+        ig.sim.stop()
 
     def _load_scene(self):
         """
@@ -316,12 +323,8 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self._load_robots()
         self._load_task()
 
-        # Start the simulation, then reset the environment
         ig.sim.play()
         self.reset()
-
-        # Update the initial scene state
-        self.scene.update_initial_state()
 
         # Load the obs / action spaces
         self.load_observation_space()
@@ -653,7 +656,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 "initial_pos_z_offset": 0.1,
                 "texture_randomization_freq": None,
                 "object_randomization_freq": None,
-                "usd_file": None,
             },
 
             # Rendering kwargs
@@ -673,6 +675,8 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 "trav_map_resolution": 0.1,
                 "trav_map_erosion": 2,
                 "trav_map_with_objects": True,
+                "usd_file": None,
+                "usd_path": None,
             },
 
             # Robot kwargs

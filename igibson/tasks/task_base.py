@@ -99,9 +99,6 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
         # Run internal method
         self._load(env=env)
 
-        # Make sure we're playing and simultaneously take a sim step
-        ig.sim.play()
-
         # We're now initialized
         self._loaded = True
 

@@ -42,6 +42,7 @@ from igibson.object_states.factory import get_states_by_dependency_order
 from igibson.sensors.vision_sensor import VisionSensor
 from igibson.transition_rules import DEFAULT_RULES, TransitionResults
 from omni.kit.viewport_legacy import acquire_viewport_interface
+from omni.syntheticdata import SyntheticData
 
 
 # Create settings for this module
@@ -242,9 +243,9 @@ class Simulator(SimulationContext, Serializable):
             self._physics_context.set_broadphase_type("MBP")
 
         # Set GPU Pairs capacity and other GPU settings
-        self._physics_context.set_gpu_found_lost_aggregate_pairs_capacity(gm.GPU_PAIRS_CAPACITY)
         self._physics_context.set_gpu_found_lost_pairs_capacity(gm.GPU_PAIRS_CAPACITY)
-        self._physics_context.set_gpu_total_aggregate_pairs_capacity(gm.GPU_PAIRS_CAPACITY)
+        self._physics_context.set_gpu_found_lost_aggregate_pairs_capacity(gm.GPU_AGGR_PAIRS_CAPACITY)
+        self._physics_context.set_gpu_total_aggregate_pairs_capacity(gm.GPU_AGGR_PAIRS_CAPACITY)
         self._physics_context.set_gpu_max_particle_contacts(gm.GPU_MAX_PARTICLE_CONTACTS)
 
     @property
@@ -761,8 +762,20 @@ class Simulator(SimulationContext, Serializable):
         update_usd_metadata()
 
         # Save stage. This needs to happen at the end since some objects may get reset after sim.stop().
+        # We also need to reset the Synthetic Data Utilities, so that we can re-initialize it when we reload the USD
+        # Otherwise when we try to reload the USD and init Synthetic Data again we will run into an error since the
+        # Synthetic Data interface had already existed when we had saved the USD beforehand
         self.stop()
+        SyntheticData.Reset()
+
         self.stage.Export(usd_path)
+
+        # Re-initialize the synthetic data and re-initialize all sensors
+        # This is needed because we destroyed and recreated the synthetic data interface, and so the specific sensor
+        # modalities need to be initialized again within the Synthetic Data interface
+        SyntheticData.Initialize()
+        for sensor in VisionSensor.SENSORS.values():
+            sensor.initialize_sensors(names=sensor.modalities)
 
         logging.info("The current simulation environment saved.")
 

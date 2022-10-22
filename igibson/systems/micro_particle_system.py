@@ -911,7 +911,7 @@ class MicroParticleSystem(BaseParticleSystem):
         common_instancers = current_instancer_names.intersection(desired_instancer_names)
 
         # Sanity check the common instancers, we will recreate any where there is a mismatch
-        print(f"common: {common_instancers}")
+        # print(f"common: {common_instancers}")
         for name in common_instancers:
             idn = cls.particle_instancer_name_to_idn(name=name)
             info = idn_to_info_mapping[idn]
@@ -923,13 +923,13 @@ class MicroParticleSystem(BaseParticleSystem):
                 instancers_to_create.add(name)
 
         # Delete any instancers we no longer want
-        print(f"del: {instancers_to_delete}")
+        # print(f"del: {instancers_to_delete}")
         for name in instancers_to_delete:
             instancer = cls.particle_instancers.pop(name)
             cls.simulator.stage.RemovePrim(instancer.prim_path)
 
         # Create any instancers we don't already have
-        print(f"create: {instancers_to_create}")
+        # print(f"create: {instancers_to_create}")
         for name in instancers_to_create:
             idn = cls.particle_instancer_name_to_idn(name=name)
             info = idn_to_info_mapping[idn]

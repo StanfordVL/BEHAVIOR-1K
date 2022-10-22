@@ -56,6 +56,7 @@ class USDObject(StatefulObject):
         kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
             for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
         """
+        self._usd_path = usd_path
         super().__init__(
             prim_path=prim_path,
             name=name,
@@ -73,7 +74,6 @@ class USDObject(StatefulObject):
             abilities=abilities,
             **kwargs,
         )
-        self._usd_path = usd_path
 
     def _load(self, simulator=None):
         """

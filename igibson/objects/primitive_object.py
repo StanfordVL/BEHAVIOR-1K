@@ -98,7 +98,7 @@ class PrimitiveObject(StatefulObject):
         # Initialize other internal variables
         self._vis_geom = None
         self._col_geom = None
-        self._extents = None            # (x,y,z extents)
+        self._extents = np.ones(3)            # (x,y,z extents)
 
         # Make sure primitive type is valid
         assert_valid_key(key=primitive_type, valid_keys=PRIMITIVE_MESH_TYPES, name="primitive mesh type")
@@ -153,9 +153,6 @@ class PrimitiveObject(StatefulObject):
                 v_patches=None,
             )
             self._col_geom = None
-
-        # Set extents at default value of 1 (this value may be modified if size, radius, or height are changed)
-        self._extents = np.ones(3)
 
         # Create a material for this object for the base link
         stage.DefinePrim(f"{self._prim_path}/Looks", "Scope")
@@ -333,3 +330,29 @@ class PrimitiveObject(StatefulObject):
             abilities=self._abilities,
             visual_only=self._visual_only,
         )
+
+    def _dump_state(self):
+        state = super()._dump_state()
+        # state["extents"] = self._extents
+        state["radius"] = self.radius if self._primitive_type in VALID_RADIUS_OBJECTS else -1
+        state["height"] = self.height if self._primitive_type in VALID_HEIGHT_OBJECTS else -1
+        state["size"] = self.size if self._primitive_type in VALID_SIZE_OBJECTS else -1
+        return state
+
+    def _load_state(self, state):
+        super()._load_state(state=state)
+        # self._extents = np.array(state["extents"])
+        if self._primitive_type in VALID_RADIUS_OBJECTS:
+            self.radius = state["radius"]
+        if self._primitive_type in VALID_HEIGHT_OBJECTS:
+            self.height = state["height"]
+        if self._primitive_type in VALID_SIZE_OBJECTS:
+            self.size = state["size"]
+
+    def _deserialize(self, state):
+        state_dict, idx = super()._deserialize(state=state)
+        # state_dict["extents"] = state[idx: idx + 3]
+        state_dict["radius"] = state[idx]
+        state_dict["height"] = state[idx + 1]
+        state_dict["size"] = state[idx + 2]
+        return state_dict, idx + 3

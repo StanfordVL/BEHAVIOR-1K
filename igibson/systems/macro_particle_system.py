@@ -250,7 +250,7 @@ class MacroParticleSystem(BaseParticleSystem):
         assert name in cls.particles, f"Got invalid name for particle to remove {name}"
 
         particle = cls.particles.pop(name)
-        cls.simulator.stage.RemovePrim(particle.prim_path)
+        particle.remove(simulator=cls.simulator)
 
     @classmethod
     def _load_new_particle(cls, prim_path, name):
@@ -619,7 +619,7 @@ class VisualParticleSystem(MacroParticleSystem):
         common_groups = current_group_names.intersection(desired_group_names)
 
         # Sanity check the common groups, we will recreate any where there is a mismatch
-        print(f"common: {common_groups}")
+        # print(f"common: {common_groups}")
         for name in common_groups:
             info = name_to_info_mapping[name]
             if cls.num_group_particles(group=name) != info["n_particles"]:
@@ -629,12 +629,12 @@ class VisualParticleSystem(MacroParticleSystem):
                 groups_to_create.add(name)
 
         # Delete any groups we no longer want
-        print(f"del: {groups_to_delete}")
+        # print(f"del: {groups_to_delete}")
         for name in groups_to_delete:
             cls.remove_attachment_group(group=name)
 
         # Create any groups we don't already have
-        print(f"create: {groups_to_create}")
+        # print(f"create: {groups_to_create}")
         for name in groups_to_create:
             obj = cls.simulator.scene.object_registry("name", name)
             info = name_to_info_mapping[name]
@@ -676,6 +676,9 @@ class VisualParticleSystem(MacroParticleSystem):
         Args:
             state (OrderedDict): Keyword-mapped states of this object to set
         """
+        # Make sure max particle index is updated
+        cls.max_particle_idn = state["max_particle_idn"]
+
         # Synchronize particle groups
         cls._sync_particle_groups(
             group_objects=[cls.simulator.scene.object_registry("uuid", info["particle_attached_obj_uuid"])

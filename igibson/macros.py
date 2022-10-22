@@ -39,8 +39,10 @@ gm.ENABLE_FLATCACHE = False
 # objects from tunneling through each other)
 gm.ENABLE_CCD = False
 
+# Pairs setting -- USD default is 256 * 1024, physx default apparently is 32 * 1024.
+gm.GPU_PAIRS_CAPACITY = 256 * 1024
 # Aggregate pairs setting -- default is 1024, but is often insufficient for large scenes
-gm.GPU_PAIRS_CAPACITY = 32 * 1024
+gm.GPU_AGGR_PAIRS_CAPACITY = 1024 * 1024
 
 # Maximum particle contacts allowed
 gm.GPU_MAX_PARTICLE_CONTACTS = 1024 * 1024
