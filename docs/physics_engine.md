@@ -12,8 +12,8 @@ In this example, we import a scene, a robot and an object into PyBullet and step
 
 ```python
 
-from igibson.utils.asset_utils import get_scene_path, get_texture_file
-import igibson
+from omnigibson.utils.asset_utils import get_scene_path, get_texture_file
+import omnigibson
 
 import os
 import sys
@@ -45,12 +45,12 @@ def main():
                                 baseVisualShapeIndex=visual_id)
 
     # Load robots
-    turtlebot_urdf = os.path.join(igibson.assets_path, 'models/turtlebot/turtlebot.urdf')
+    turtlebot_urdf = os.path.join(omnigibson.assets_path, 'models/turtlebot/turtlebot.urdf')
     robot_id = p.loadURDF(turtlebot_urdf, flags=p.URDF_USE_MATERIAL_COLORS_FROM_MTL)
 
     # Load objects
-    obj_visual_filename = os.path.join(igibson.assets_path, 'models/ycb/002_master_chef_can/textured_simple.obj')
-    obj_collision_filename = os.path.join(igibson.assets_path,
+    obj_visual_filename = os.path.join(omnigibson.assets_path, 'models/ycb/002_master_chef_can/textured_simple.obj')
+    obj_collision_filename = os.path.join(omnigibson.assets_path,
                                           'models/ycb/002_master_chef_can/textured_simple_vhacd.obj')
     collision_id = p.createCollisionShape(p.GEOM_MESH,
                                           fileName=obj_collision_filename,

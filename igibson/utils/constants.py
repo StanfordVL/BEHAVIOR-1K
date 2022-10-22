@@ -6,8 +6,8 @@ import os
 from collections import namedtuple
 from enum import IntEnum, Enum
 
-import igibson
-from igibson.utils.asset_utils import get_ig_avg_category_specs
+import omnigibson
+from omnigibson.utils.asset_utils import get_og_avg_category_specs
 from pxr import Gf
 from pxr.Sdf import ValueTypeNames as VT
 
@@ -131,7 +131,7 @@ class JointType:
 
 # Object category specs
 AVERAGE_OBJ_DENSITY = 67.0
-AVERAGE_CATEGORY_SPECS = get_ig_avg_category_specs()
+AVERAGE_CATEGORY_SPECS = get_og_avg_category_specs()
 
 KINEMATICS_STATES = frozenset({"inside", "ontop", "under", "onfloor"})
 
@@ -153,7 +153,7 @@ class OccupancyGridState:
 # BEHAVIOR-related
 FLOOR_SYNSET = "floor.n.01"
 NON_SAMPLEABLE_OBJECTS = []
-non_sampleable_category_txt = os.path.join(igibson.ig_dataset_path, "metadata/non_sampleable_categories.txt")
+non_sampleable_category_txt = os.path.join(omnigibson.og_dataset_path, "metadata/non_sampleable_categories.txt")
 if os.path.isfile(non_sampleable_category_txt):
     with open(non_sampleable_category_txt) as f:
         NON_SAMPLEABLE_OBJECTS = [FLOOR_SYNSET] + [line.strip() for line in f.readlines()]
@@ -182,12 +182,12 @@ UNDER_OBJECTS = [
     "bench",
 ]
 
-hdr_texture = os.path.join(igibson.ig_dataset_path, "scenes", "background", "probe_02.hdr")
-hdr_texture2 = os.path.join(igibson.ig_dataset_path, "scenes", "background", "probe_03.hdr")
+hdr_texture = os.path.join(omnigibson.og_dataset_path, "scenes", "background", "probe_02.hdr")
+hdr_texture2 = os.path.join(omnigibson.og_dataset_path, "scenes", "background", "probe_03.hdr")
 light_modulation_map_filename = os.path.join(
-    igibson.ig_dataset_path, "scenes", "Rs_int", "layout", "floor_lighttype_0.png"
+    omnigibson.og_dataset_path, "scenes", "Rs_int", "layout", "floor_lighttype_0.png"
 )
-background_texture = os.path.join(igibson.ig_dataset_path, "scenes", "background", "urban_street_01.jpg")
+background_texture = os.path.join(omnigibson.og_dataset_path, "scenes", "background", "urban_street_01.jpg")
 
 
 def get_class_name_to_class_id():
@@ -197,7 +197,7 @@ def get_class_name_to_class_id():
     :param starting_class_id: starting class id for scene objects
     """
     existing_classes = {item.value for item in SemanticClass}
-    category_txt = os.path.join(igibson.ig_dataset_path, "metadata/categories.txt")
+    category_txt = os.path.join(omnigibson.og_dataset_path, "metadata/categories.txt")
     class_name_to_class_id = {"agent": SemanticClass.ROBOTS}  # Agents should have the robot semantic class.
     starting_class_id = 0
     if os.path.isfile(category_txt):

@@ -3,12 +3,12 @@ from sys import platform
 
 import numpy as np
 
-from igibson.render.mesh_renderer.mesh_renderer_settings import MeshRendererSettings
-from igibson.render.profiler import Profiler
-from igibson.scenes.gibson_indoor_scene import StaticIndoorScene
-from igibson.simulator import Simulator
-from igibson.utils.asset_utils import get_available_g_scenes
-from igibson.utils.ui_utils import choose_from_options
+from omnigibson.render.mesh_renderer.mesh_renderer_settings import MeshRendererSettings
+from omnigibson.render.profiler import Profiler
+from omnigibson.scenes.gibson_indoor_scene import StaticIndoorScene
+from omnigibson.simulator import Simulator
+from omnigibson.utils.asset_utils import get_available_g_scenes
+from omnigibson.utils.ui_utils import choose_from_options
 
 
 def main(random_selection=False, headless=False, short_exec=False):

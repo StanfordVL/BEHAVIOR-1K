@@ -1,15 +1,15 @@
 """
-This file contains the base wrapper class for OmniGibson environments
+This file contains the base wrapper class for OmnOmniGibson environments
 Wrappers are useful for data collection and logging. Highly recommended.
 """
 
 
 class BaseWrapper:
     """
-    Base class for all wrappers in iGibson
+    Base class for all wrappers in OmniGibson
 
     Args:
-        env (iGibsonEnv): The environment to wrap.
+        env (OmniGibsonEnv): The environment to wrap.
     """
 
     def __init__(self, env):
@@ -69,7 +69,7 @@ class BaseWrapper:
         """
         Grabs unwrapped environment
         Returns:
-            env (iGibsonEnv): The unwrapped environment
+            env (OmniGibsonEnv): The unwrapped environment
         """
         if hasattr(self.env, "unwrapped"):
             return self.env.unwrapped
@@ -80,11 +80,11 @@ class BaseWrapper:
     def __getattr__(self, attr):
         # using getattr ensures that both __getattribute__ and __getattr__ (fallback) get called
         # (see https://stackoverflow.com/questions/3278077/difference-between-getattr-vs-getattribute)
-        orig_attr = getattr(self.env, attr)
-        if callable(orig_attr):
+        orog_attr = getattr(self.env, attr)
+        if callable(orog_attr):
 
             def hooked(*args, **kwargs):
-                result = orig_attr(*args, **kwargs)
+                result = orog_attr(*args, **kwargs)
                 # prevent wrapped_class from becoming unwrapped
                 if result == self.env:
                     return self
@@ -92,4 +92,4 @@ class BaseWrapper:
 
             return hooked
         else:
-            return orig_attr
+            return orog_attr

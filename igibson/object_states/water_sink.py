@@ -1,6 +1,6 @@
-from igibson.macros import gm
-from igibson.object_states.fluid_sink import FluidSink
-from igibson.systems.micro_particle_system import WaterSystem
+from omnigibson.macros import gm
+from omnigibson.object_states.fluid_sink import FluidSink
+from omnigibson.systems.micro_particle_system import WaterSystem
 
 
 class WaterSink(FluidSink):

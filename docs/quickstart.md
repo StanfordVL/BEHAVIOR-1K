@@ -1,13 +1,13 @@
 # Quickstart
 
-## iGibson in Action
-Assume you finished installation and assets downloading. Let's get our hands dirty and see iGibson in action.
+## OmniGibson in Action
+Assume you finished installation and assets downloading. Let's get our hands dirty and see OmniGibson in action.
 
 ```bash
-python -m igibson.examples.environments.env_nonint_example
+python -m omnigibson.examples.environments.env_nonint_example
 ```
 
-If the execution fails with segfault 11, you may need to reduce texture scaling in the config file (igibson/configs/turtlebot_static_nav.yaml) to avoid out-of-memory error.
+If the execution fails with segfault 11, you may need to reduce texture scaling in the config file (omnigibson/configs/turtlebot_static_nav.yaml) to avoid out-of-memory error.
 
 You should see something like this. If you are on Mac OS X, you will only see the two small windows. 
 ![quickstart.png](images/quickstart.png)
@@ -22,11 +22,11 @@ That's it!
 
 ## Using Docker and remote GUI access via VNC
 
-If you go the docker route, please first pull our pre-built images (see the installation guide). After downloading, run `docker images`, and you should see `igibson/igibson:latest` and `igibson/igibson-gui:latest`.
+If you go the docker route, please first pull our pre-built images (see the installation guide). After downloading, run `docker images`, and you should see `omnigibson/omnigibson:latest` and `omnigibson/omnigibson-gui:latest`.
 
 On a headless server (such as a Google Cloud or AWS instance), run 
 ```
-cd iGibson
+cd OmniGibson
 ./docker/headless-gui/run.sh
 # run a GUI example after the container command line prompt shows:
 python simulator_example.py
@@ -52,12 +52,12 @@ python benchmark.py
 ## Benchmarks
 
 
-Performance is a big designing focus for iGibson. We provide a few scripts to benchmark the rendering and physics
-simulation framerate in iGibson.
+Performance is a big designing focus for OmniGibson. We provide a few scripts to benchmark the rendering and physics
+simulation framerate in OmniGibson.
 
 ### Benchmark static scene (Gibson scenes)
 ```bash
-python -m igibson.test.benchmark.benchmark_static_scene
+python -m omnigibson.test.benchmark.benchmark_static_scene
 ```
 
 You will see output similar to:
@@ -74,10 +74,10 @@ Rendering normal, resolution 512, render_to_tensor False: 265.70666134193806 fps
 
 ```
 
-### Benchmark physics simulation in interactive scenes (iGibson scene)
+### Benchmark physics simulation in interactive scenes (OmniGibson scene)
 
 ```bash
-python -m igibson.test.benchmark.benchmark_interactive_scene
+python -m omnigibson.test.benchmark.benchmark_interactive_scene
 ```
 
 It will generate a report like below:
@@ -87,10 +87,10 @@ It will generate a report like below:
 
 ### Benchmark rendering in interactive scenes
 
-To run a comprehensive benchmark for all rendering in all iGibson scenes, you can excute the following command:
+To run a comprehensive benchmark for all rendering in all OmniGibson scenes, you can excute the following command:
 
 ```bash
-python -m igibson.test.benchmark.benchmark_interactive_scene_rendering
+python -m omnigibson.test.benchmark.benchmark_interactive_scene_rendering
 ```
 
 It benchmarks two use cases, one for training visual RL agents (low resolution, shadow mapping off), another one for

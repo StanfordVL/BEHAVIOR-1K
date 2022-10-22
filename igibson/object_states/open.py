@@ -1,8 +1,8 @@
 import random
 import numpy as np
 
-from igibson.macros import create_module_macros
-from igibson.object_states.object_state_base import BooleanState, CachingEnabledObjectState
+from omnigibson.macros import create_module_macros
+from omnigibson.object_states.object_state_base import BooleanState, CachingEnabledObjectState
 
 
 # Create settings for this module

@@ -4,13 +4,13 @@ import numpy as np
 from IPython import embed
 from scipy.spatial.transform import Rotation as R
 
-import igibson as ig
-from igibson.macros import create_module_macros, Dict
-from igibson import object_states
-from igibson.object_states.aabb import AABB
-from igibson.utils import sampling_utils
-from igibson.utils.sim_utils import check_collision
-import igibson.utils.transform_utils as T
+import omnigibson as og
+from omnigibson.macros import create_module_macros, Dict
+from omnigibson import object_states
+from omnigibson.object_states.aabb import AABB
+from omnigibson.utils import sampling_utils
+from omnigibson.utils.sim_utils import check_collision
+import omnigibson.utils.transform_utils as T
 
 from omni.physx import acquire_physx_scene_query_interface
 
@@ -71,7 +71,7 @@ def sample_kinematics(
         objB.wake()
 
     # Save the state of the simulator
-    state = ig.sim.dump_state()
+    state = og.sim.dump_state()
 
     # Attempt sampling
     for i in range(max_trials):
@@ -87,14 +87,14 @@ def sample_kinematics(
         old_pos = np.array([200, 200, 200])
         objA.set_position_orientation(old_pos, orientation)
         # We also need to step physics to make sure the pose propagates downstream (e.g.: to Bounding Box computations)
-        ig.sim.step_physics()
+        og.sim.step_physics()
 
         if sample_on_floor:
             # Run import here to avoid circular imports
-            from igibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
-            assert isinstance(ig.sim.scene, InteractiveTraversableScene), \
+            from omnigibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
+            assert isinstance(og.sim.scene, InteractiveTraversableScene), \
                 "Active scene must be an InteractiveTraversableScene in order to sample kinematics on!"
-            _, pos = ig.sim.scene.seg_map.get_random_point_by_room_instance(objB.room_instance)
+            _, pos = og.sim.scene.seg_map.get_random_point_by_room_instance(objB.room_instance)
 
             if pos is not None:
                 # Get the combined AABB.
@@ -150,7 +150,7 @@ def sample_kinematics(
             else:
                 # Object B must be a dataset object since it must have supporting surfaces metadata pre-annotated
                 # Run import here to avoid circular imports
-                from igibson.objects.dataset_object import DatasetObject
+                from omnigibson.objects.dataset_object import DatasetObject
                 assert isinstance(objB, DatasetObject), \
                     f"objB must be an instance of DatasetObject in order to use non-ray casting-based " \
                     f"kinematic sampling!"
@@ -191,28 +191,28 @@ def sample_kinematics(
             pos[2] += z_offset
             objA.set_position_orientation(pos, orientation)
             # Step physics
-            ig.sim.step_physics()
+            og.sim.step_physics()
             success = not objA.in_contact()
 
-        if ig.debug_sampling:
+        if og.debug_sampling:
             print("sample_kinematics", success)
             embed()
 
         if success:
             break
         else:
-            ig.sim.load_state(state)
+            og.sim.load_state(state)
 
     if success and not skip_falling:
         objA.set_position_orientation(pos, orientation)
 
         # Let it fall for 0.2 second
-        for _ in range(int(0.2 / ig.sim.get_physics_dt())):
-            ig.sim.step_physics()
+        for _ in range(int(0.2 / og.sim.get_physics_dt())):
+            og.sim.step_physics()
             if objA.in_contact():
                 break
 
         # Render at the end
-        ig.sim.render()
+        og.sim.render()
 
     return success

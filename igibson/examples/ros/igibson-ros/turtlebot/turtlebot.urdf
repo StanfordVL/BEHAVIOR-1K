@@ -21,7 +21,7 @@
     <visual>
       <geometry>
         <!-- new mesh -->
-        <mesh filename="package://igibson-ros/turtlebot/kobuki_description/meshes/main_body.dae"/>
+        <mesh filename="package://omnigibson-ros/turtlebot/kobuki_description/meshes/main_body.dae"/>
       </geometry>
       <origin rpy="0 0 0" xyz="0.001 0 0.05199"/>
     </visual>
@@ -68,7 +68,7 @@
   <link name="wheel_left_link">
     <visual>
       <geometry>
-        <mesh filename="package://igibson-ros/turtlebot/kobuki_description/meshes/wheel.dae"/>
+        <mesh filename="package://omnigibson-ros/turtlebot/kobuki_description/meshes/wheel.dae"/>
       </geometry>
       <origin rpy="0 0 0" xyz="0 0 0"/>
     </visual>
@@ -99,7 +99,7 @@
   <link name="wheel_right_link">
     <visual>
       <geometry>
-        <mesh filename="package://igibson-ros/turtlebot/kobuki_description/meshes/wheel.dae"/>
+        <mesh filename="package://omnigibson-ros/turtlebot/kobuki_description/meshes/wheel.dae"/>
       </geometry>
       <origin rpy="0 0 0" xyz="0 0 0"/>
     </visual>
@@ -330,7 +330,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="package://igibson-ros/turtlebot/turtlebot_description/meshes/stacks/hexagons/pole_bottom.dae"/>
+        <mesh filename="package://omnigibson-ros/turtlebot/turtlebot_description/meshes/stacks/hexagons/pole_bottom.dae"/>
       </geometry>
     </visual>
     <collision>
@@ -354,7 +354,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="package://igibson-ros/turtlebot/turtlebot_description/meshes/stacks/hexagons/pole_bottom.dae"/>
+        <mesh filename="package://omnigibson-ros/turtlebot/turtlebot_description/meshes/stacks/hexagons/pole_bottom.dae"/>
       </geometry>
     </visual>
     <collision>
@@ -378,7 +378,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="package://igibson-ros/turtlebot/turtlebot_description/meshes/stacks/hexagons/pole_bottom.dae"/>
+        <mesh filename="package://omnigibson-ros/turtlebot/turtlebot_description/meshes/stacks/hexagons/pole_bottom.dae"/>
       </geometry>
     </visual>
     <collision>
@@ -402,7 +402,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="package://igibson-ros/turtlebot/turtlebot_description/meshes/stacks/hexagons/pole_bottom.dae"/>
+        <mesh filename="package://omnigibson-ros/turtlebot/turtlebot_description/meshes/stacks/hexagons/pole_bottom.dae"/>
       </geometry>
     </visual>
     <collision>
@@ -426,7 +426,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="package://igibson-ros/turtlebot/turtlebot_description/meshes/stacks/hexagons/pole_bottom.dae"/>
+        <mesh filename="package://omnigibson-ros/turtlebot/turtlebot_description/meshes/stacks/hexagons/pole_bottom.dae"/>
       </geometry>
     </visual>
     <collision>
@@ -450,7 +450,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="package://igibson-ros/turtlebot/turtlebot_description/meshes/stacks/hexagons/pole_bottom.dae"/>
+        <mesh filename="package://omnigibson-ros/turtlebot/turtlebot_description/meshes/stacks/hexagons/pole_bottom.dae"/>
       </geometry>
     </visual>
     <collision>
@@ -474,7 +474,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="package://igibson-ros/turtlebot/turtlebot_description/meshes/stacks/hexagons/plate_bottom.dae"/>
+        <mesh filename="package://omnigibson-ros/turtlebot/turtlebot_description/meshes/stacks/hexagons/plate_bottom.dae"/>
       </geometry>
     </visual>
     <collision>
@@ -498,7 +498,7 @@
     <visual>
       <origin rpy="0 3.14159265359 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="package://igibson-ros/turtlebot/turtlebot_description/meshes/stacks/hexagons/pole_middle.dae"/>
+        <mesh filename="package://omnigibson-ros/turtlebot/turtlebot_description/meshes/stacks/hexagons/pole_middle.dae"/>
       </geometry>
     </visual>
     <collision>
@@ -522,7 +522,7 @@
     <visual>
       <origin rpy="0 3.14159265359 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="package://igibson-ros/turtlebot/turtlebot_description/meshes/stacks/hexagons/pole_middle.dae"/>
+        <mesh filename="package://omnigibson-ros/turtlebot/turtlebot_description/meshes/stacks/hexagons/pole_middle.dae"/>
       </geometry>
     </visual>
     <collision>
@@ -546,7 +546,7 @@
     <visual>
       <origin rpy="0 3.14159265359 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="package://igibson-ros/turtlebot/turtlebot_description/meshes/stacks/hexagons/pole_middle.dae"/>
+        <mesh filename="package://omnigibson-ros/turtlebot/turtlebot_description/meshes/stacks/hexagons/pole_middle.dae"/>
       </geometry>
     </visual>
     <collision>
@@ -570,7 +570,7 @@
     <visual>
       <origin rpy="0 3.14159265359 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="package://igibson-ros/turtlebot/turtlebot_description/meshes/stacks/hexagons/pole_middle.dae"/>
+        <mesh filename="package://omnigibson-ros/turtlebot/turtlebot_description/meshes/stacks/hexagons/pole_middle.dae"/>
       </geometry>
     </visual>
     <collision>
@@ -594,7 +594,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="package://igibson-ros/turtlebot/turtlebot_description/meshes/stacks/hexagons/plate_middle.dae"/>
+        <mesh filename="package://omnigibson-ros/turtlebot/turtlebot_description/meshes/stacks/hexagons/plate_middle.dae"/>
       </geometry>
     </visual>
     <collision>
@@ -618,7 +618,7 @@
     <visual>
       <origin rpy="0 0 0" xyz=" 0 0 0"/>
       <geometry>
-        <mesh filename="package://igibson-ros/turtlebot/turtlebot_description/meshes/stacks/hexagons/pole_top.dae"/>
+        <mesh filename="package://omnigibson-ros/turtlebot/turtlebot_description/meshes/stacks/hexagons/pole_top.dae"/>
       </geometry>
     </visual>
     <collision>
@@ -642,7 +642,7 @@
     <visual>
       <origin rpy="0 0 0" xyz=" 0 0 0"/>
       <geometry>
-        <mesh filename="package://igibson-ros/turtlebot/turtlebot_description/meshes/stacks/hexagons/pole_top.dae"/>
+        <mesh filename="package://omnigibson-ros/turtlebot/turtlebot_description/meshes/stacks/hexagons/pole_top.dae"/>
       </geometry>
     </visual>
     <collision>
@@ -666,7 +666,7 @@
     <visual>
       <origin rpy="0 0 0" xyz=" 0 0 0"/>
       <geometry>
-        <mesh filename="package://igibson-ros/turtlebot/turtlebot_description/meshes/stacks/hexagons/pole_top.dae"/>
+        <mesh filename="package://omnigibson-ros/turtlebot/turtlebot_description/meshes/stacks/hexagons/pole_top.dae"/>
       </geometry>
     </visual>
     <collision>
@@ -690,7 +690,7 @@
     <visual>
       <origin rpy="0 0 0" xyz=" 0 0 0"/>
       <geometry>
-        <mesh filename="package://igibson-ros/turtlebot/turtlebot_description/meshes/stacks/hexagons/pole_top.dae"/>
+        <mesh filename="package://omnigibson-ros/turtlebot/turtlebot_description/meshes/stacks/hexagons/pole_top.dae"/>
       </geometry>
     </visual>
     <collision>
@@ -715,7 +715,7 @@
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <!--         <origin xyz="0 0 0" rpy="${-M_PI/2} ${M_PI} 0"/> -->
       <geometry>
-        <mesh filename="package://igibson-ros/turtlebot/turtlebot_description/meshes/stacks/hexagons/pole_kinect.dae"/>
+        <mesh filename="package://omnigibson-ros/turtlebot/turtlebot_description/meshes/stacks/hexagons/pole_kinect.dae"/>
       </geometry>
     </visual>
     <collision>
@@ -740,7 +740,7 @@
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <!--         <origin xyz="0 0 0" rpy="${-M_PI/2} ${M_PI} 0"/> -->
       <geometry>
-        <mesh filename="package://igibson-ros/turtlebot/turtlebot_description/meshes/stacks/hexagons/pole_kinect.dae"/>
+        <mesh filename="package://omnigibson-ros/turtlebot/turtlebot_description/meshes/stacks/hexagons/pole_kinect.dae"/>
       </geometry>
     </visual>
     <collision>
@@ -764,7 +764,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="package://igibson-ros/turtlebot/turtlebot_description/meshes/stacks/hexagons/plate_top.dae"/>
+        <mesh filename="package://omnigibson-ros/turtlebot/turtlebot_description/meshes/stacks/hexagons/plate_top.dae"/>
       </geometry>
     </visual>
     <collision>
@@ -812,7 +812,7 @@
     <visual>
       <origin rpy="0 0 1.57079632679" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="package://igibson-ros/turtlebot/turtlebot_description/meshes/sensors/kinect.dae"/>
+        <mesh filename="package://omnigibson-ros/turtlebot/turtlebot_description/meshes/sensors/kinect.dae"/>
       </geometry>
     </visual>
     <collision>

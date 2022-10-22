@@ -2,9 +2,9 @@ from abc import ABCMeta, abstractmethod
 from collections import OrderedDict
 from copy import deepcopy
 import numpy as np
-import igibson as ig
-from igibson.utils.python_utils import classproperty, Registerable
-from igibson.utils.gym_utils import GymObservable
+import omnigibson as og
+from omnigibson.utils.python_utils import classproperty, Registerable
+from omnigibson.utils.gym_utils import GymObservable
 
 
 REGISTERED_TASKS = OrderedDict()

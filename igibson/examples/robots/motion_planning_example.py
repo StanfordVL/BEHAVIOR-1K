@@ -9,11 +9,11 @@
 # import numpy as np
 # import yaml
 #
-# import igibson
-# from igibson import object_states
-# from igibson.envs.igibson_env import iGibsonEnv
-# from igibson.utils.constants import ViewerMode
-# from igibson.utils.motion_planning_wrapper import MotionPlanningWrapper
+# import omnigibson
+# from omnigibson import object_states
+# from omnigibson.envs.omnigibson_env import OmniGibsonEnv
+# from omnigibson.utils.constants import ViewerMode
+# from omnigibson.utils.motion_planning_wrapper import MotionPlanningWrapper
 #
 #
 # def print_mp_info():
@@ -65,7 +65,7 @@
 #     ]  # Uncomment this line to accelerate loading with only the building
 #     config_data["load_room_types"] = ["living_room"]
 #     config_data["hide_robot"] = False
-#     env = iGibsonEnv(
+#     env = OmniGibsonEnv(
 #         config_file=config_data,
 #         mode="gui_interactive" if not headless else "headless",
 #         action_timestep=1.0 / 120.0,
@@ -185,7 +185,7 @@
 #         parser.add_argument(
 #             "--config",
 #             "-c",
-#             default=os.path.join(igibson.example_config_path, "fetch_motion_planning.yaml"),
+#             default=os.path.join(omnigibson.example_config_path, "fetch_motion_planning.yaml"),
 #             help="which config file to use [default: use yaml files in examples/configs]",
 #         )
 #         parser.add_argument(
@@ -199,7 +199,7 @@
 #         config = args.config
 #         programmatic_actions = args.programmatic_actions
 #     else:
-#         config = os.path.join(igibson.example_config_path, "fetch_motion_planning.yaml")
+#         config = os.path.join(omnigibson.example_config_path, "fetch_motion_planning.yaml")
 #         programmatic_actions = True
 #     run_example(config, programmatic_actions, headless, short_exec)
 #

@@ -1,7 +1,7 @@
-Projects using Gibson/iGibson
+Projects using Gibson/OmniGibson
 ===================================
 
-It is exciting to see people using Gibson Environment in embodied AI research. Here is a list of projects using Gibson v1 or iGibson:
+It is exciting to see people using Gibson Environment in embodied AI research. Here is a list of projects using Gibson v1 or OmniGibson:
 
 - K. Chen, J. P. de Vicente, G. Sepulveda, F. Xia, A. Soto, M. Vazquez, and S. Savarese. [A behavioral approach to visual navigation with graph localization networks](https://arxiv.org/pdf/1903.00445.pdf). In RSS, 2019.
 - Hirose, Noriaki, et al. [Deep Visual MPC-Policy Learning for Navigation.](https://arxiv.org/pdf/1903.02749.pdf) arXiv preprint arXiv:1903.02749 (2019). IROS 2019.
@@ -30,11 +30,11 @@ These papers tested policies trained in Gibson v1 on real robots in the physical
 - Hirose, Noriaki, et al. [Deep Visual MPC-Policy Learning for Navigation.](https://arxiv.org/pdf/1903.02749.pdf) arXiv preprint arXiv:1903.02749 (2019). IROS 2019.
 
 
-If you use Gibson, iGibson or their assets, please consider citing the following papers for iGibson, the Interactive Gibson Environment:
+If you use Gibson, OmniGibson or their assets, please consider citing the following papers for OmniGibson, the Interactive Gibson Environment:
 
 ```
-@article{shenigibson,
-  title={iGibson, a Simulation Environment for Interactive Tasks in Large Realistic Scenes},
+@article{shenomnigibson,
+  title={OmniGibson, a Simulation Environment for Interactive Tasks in Large Realistic Scenes},
   author={Shen*, Bokui and Xia*, Fei and Li*, Chengshu and Mart{\'i}n-Mart{\'i}n*, Roberto and Fan, Linxi and Wang, Guanzhi and Buch, Shyamal and D’Arpino, Claudia and Srivastava, Sanjana and Tchapmi, Lyne P and  Vainio, Kent and Fei-Fei, Li and Savarese, Silvio},
   journal={arXiv preprint arXiv:2012.02924},
   year={2020}

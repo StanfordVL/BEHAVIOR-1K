@@ -9,14 +9,14 @@ concurrency:
 jobs:
   test:
     runs-on: [self-hosted, linux, gpu]
-    if: github.repository == 'StanfordVL/iGibson-dev'
+    if: github.repository == 'StanfordVL/OmniGibson-dev'
 
     steps:
       - name: Checkout source
         uses: actions/checkout@v2
         with:
           submodules: true
-          path: igibson
+          path: omnigibson
 
       - name: Add CUDA to env
         run: echo "/usr/local/cuda/bin" >> $GITHUB_PATH
@@ -28,15 +28,15 @@ jobs:
           architecture: x64
 
       - name: Install dev requirements
-        working-directory: igibson
+        working-directory: omnigibson
         run: pip install -r requirements-dev.txt
 
       - name: Install
-        working-directory: igibson
+        working-directory: omnigibson
         run: pip install -e .
 
       - name: Uninstall pip bddl
-        working-directory: igibson
+        working-directory: omnigibson
         run: pip uninstall -y bddl
 
       - name: Checkout BDDL
@@ -54,33 +54,33 @@ jobs:
         run: pip install -e .
 
       - name: Link Dataset
-        working-directory: igibson
-        run: ln -s /scr/ig-data igibson/data
+        working-directory: omnigibson
+        run: ln -s /scr/ig-data omnigibson/data
 
       # The below method of checking out ig-dataset is currently unused due to poor speed.
       # - name: Create data directory
-      #   run: mkdir -p igibson/igibson/data
+      #   run: mkdir -p omnigibson/omnigibson/data
       #
-      # - name: Checkout ig_dataset
+      # - name: Checkout og_dataset
       #   uses: actions/checkout@v2
       #   with:
-      #     repository: StanfordVL/ig_dataset
+      #     repository: StanfordVL/og_dataset
       #     token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}  # PAT is required since this is a different repo
-      #     path: igibson/igibson/data/ig_dataset
+      #     path: omnigibson/omnigibson/data/og_dataset
       #     submodules: recursive
       #     lfs: true
       #
-      # - name: Checkout ig_assets
+      # - name: Checkout og_assets
       #   uses: actions/checkout@v2
       #   with:
-      #     repository: StanfordVL/ig_assets
+      #     repository: StanfordVL/og_assets
       #     token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}  # PAT is required since this is a different repo
-      #     path: igibson/igibson/data/assets
+      #     path: omnigibson/omnigibson/data/assets
       #     submodules: recursive
       #     lfs: true
 
       - name: Run tests
-        working-directory: igibson
+        working-directory: omnigibson
         run: pytest
 
       - name: Upload coverage to Codecov

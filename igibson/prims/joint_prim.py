@@ -25,14 +25,14 @@ from omni.isaac.core.utils.prims import (
 import numpy as np
 import carb
 from omni.isaac.core.utils.stage import get_current_stage
-from igibson.macros import create_module_macros
-from igibson.prims.prim_base import BasePrim
-from igibson.utils.usd_utils import create_joint
-from igibson.utils.omni_types import JointsState
-from igibson.utils.constants import JointType
-from igibson.utils.python_utils import assert_valid_key
-import igibson.utils.transform_utils as T
-from igibson.controllers.controller_base import ControlType
+from omnigibson.macros import create_module_macros
+from omnigibson.prims.prim_base import BasePrim
+from omnigibson.utils.usd_utils import create_joint
+from omnigibson.utils.omni_types import JointsState
+from omnigibson.utils.constants import JointType
+from omnigibson.utils.python_utils import assert_valid_key
+import omnigibson.utils.transform_utils as T
+from omnigibson.controllers.controller_base import ControlType
 
 
 # Create settings for this module

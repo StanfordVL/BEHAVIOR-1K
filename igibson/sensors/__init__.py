@@ -1,10 +1,10 @@
-from igibson.utils.python_utils import assert_valid_key
+from omnigibson.utils.python_utils import assert_valid_key
 
-from igibson.sensors.sensor_base import BaseSensor, REGISTERED_SENSORS, ALL_SENSOR_MODALITIES
-from igibson.sensors.scan_sensor import ScanSensor
-from igibson.sensors.vision_sensor import VisionSensor
-from igibson.sensors.sensor_noise_base import BaseSensorNoise, REGISTERED_SENSOR_NOISES
-from igibson.sensors.dropout_sensor_noise import DropoutSensorNoise
+from omnigibson.sensors.sensor_base import BaseSensor, REGISTERED_SENSORS, ALL_SENSOR_MODALITIES
+from omnigibson.sensors.scan_sensor import ScanSensor
+from omnigibson.sensors.vision_sensor import VisionSensor
+from omnigibson.sensors.sensor_noise_base import BaseSensorNoise, REGISTERED_SENSOR_NOISES
+from omnigibson.sensors.dropout_sensor_noise import DropoutSensorNoise
 
 
 # Map sensor prim names to corresponding sensor classes

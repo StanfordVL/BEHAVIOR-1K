@@ -1,12 +1,12 @@
-import igibson
-from igibson import ig_dataset_path
-from igibson.simulator import Simulator
+import omnigibson
+from omnigibson import og_dataset_path
+from omnigibson.simulator import Simulator
 from pxr import Usd, UsdGeom, Gf
 import pxr.Vt
 from pxr.Sdf import ValueTypeNames as VT
 import numpy as np
 import xml.etree.ElementTree as ET
-import igibson.utils.transform_utils as T
+import omnigibson.utils.transform_utils as T
 import json
 from os.path import exists
 from pxr.UsdGeom import Tokens
@@ -14,7 +14,7 @@ from omni.physx.scripts.utils import setCollider
 from omni.isaac.core.utils.stage import add_reference_to_stage, save_stage
 
 ##### SET THIS ######
-URDF = f"{ig_dataset_path}/scenes/Rs_int/urdf/Rs_int_best.urdf"
+URDF = f"{og_dataset_path}/scenes/Rs_int/urdf/Rs_int_best.urdf"
 #### YOU DONT NEED TO TOUCH ANYTHING BELOW HERE IDEALLY :) #####
 
 
@@ -64,7 +64,7 @@ def replace_all_nested_collision_meshes(root_prim):
 def import_obj_collision_mesh(obj_category, obj_model, name):
     # Check if filepath exists
     global sim
-    model_root_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}"
+    model_root_path = f"{og_dataset_path}/objects/{obj_category}/{obj_model}"
     usd_path = f"{model_root_path}/usd/{obj_model}.usd"
 
     # Load model
@@ -79,4 +79,4 @@ def import_obj_collision_mesh(obj_category, obj_model, name):
 
 import_models_collision_mesh_from_scene(urdf=URDF)
 
-igibson.app.close()
+omnigibson.app.close()

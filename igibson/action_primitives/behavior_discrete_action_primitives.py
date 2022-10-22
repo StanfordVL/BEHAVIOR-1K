@@ -8,12 +8,12 @@ import gym
 import numpy as np
 # import pybullet as p
 
-from igibson.action_primitives.action_primitive_set_base import ActionPrimitiveError, BaseActionPrimitiveSet
-from igibson.controllers import ControlType, JointController
-from igibson.object_states.pose import Pose
-from igibson.robots.manipulation_robot import IsGraspingState
-from igibson.utils.motion_planning_utils import MotionPlanner
-from igibson.utils.transform_utils import mat2euler, quat2mat
+from omnigibson.action_primitives.action_primitive_set_base import ActionPrimitiveError, BaseActionPrimitiveSet
+from omnigibson.controllers import ControlType, JointController
+from omnigibson.object_states.pose import Pose
+from omnigibson.robots.manipulation_robot import IsGraspingState
+from omnigibson.utils.motion_planning_utils import MotionPlanner
+from omnigibson.utils.transform_utils import mat2euler, quat2mat
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.ERROR)
@@ -285,7 +285,7 @@ action_list_putting_away_Halloween_decorations_v1 = [
 #     # [5, 'cabinet.n.01_1'],  # push
 # ] # * 4
 
-# /home/robot/Desktop/behavior/iGibson-dev-jk/igibson/examples/robots/log_dir_his/20220510-001432_putting_away_Halloween_decorations_discrete_rgb_accumReward_m0.01
+# /home/robot/Desktop/behavior/OmniGibson-dev-jk/omnigibson/examples/robots/log_dir_his/20220510-001432_putting_away_Halloween_decorations_discrete_rgb_accumReward_m0.01
 # wo vis operation
 action_list_putting_away_Halloween_decorations_v2 = [
     [0, "cabinet.n.01_1"],  # move

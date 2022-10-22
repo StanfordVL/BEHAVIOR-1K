@@ -5,9 +5,9 @@ import platform
 import numpy as np
 import torch
 
-import igibson
-from igibson.render.mesh_renderer.mesh_renderer_settings import MeshRendererSettings
-from igibson.render.mesh_renderer.mesh_renderer_tensor import MeshRendererG2G
+import omnigibson
+from omnigibson.render.mesh_renderer.mesh_renderer_settings import MeshRendererSettings
+from omnigibson.render.mesh_renderer.mesh_renderer_tensor import MeshRendererG2G
 
 
 def test_tensor_render_rendering():
@@ -18,7 +18,7 @@ def test_tensor_render_rendering():
     h = 600
     setting = MeshRendererSettings(enable_pbr=False, msaa=True, enable_shadow=False)
     renderer = MeshRendererG2G(w, h, rendering_settings=setting)
-    test_dir = os.path.join(igibson.assets_path, "test")
+    test_dir = os.path.join(omnigibson.assets_path, "test")
     renderer.load_object(os.path.join(test_dir, "mesh/bed1a77d92d64f5cbbaaae4feed64ec1_new.obj"))
     renderer.add_instance_group([0])
 

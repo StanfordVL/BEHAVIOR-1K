@@ -8,15 +8,15 @@
 # import numpy as np
 #
 #
-# from igibson import object_states
-# from igibson.envs.behavior_env import BehaviorEnv
-# # from igibson.external.pybullet_tools.utils import CIRCULAR_LIMITS
-# from igibson.object_states.on_floor import RoomFloor
-# from igibson.object_states.utils import sample_kinematics
-# from igibson.objects.usd_object import URDFObject
-# from igibson.robots.behavior_robot import BRBody, BREye, BRHand
-# from igibson.utils.behavior_robot_planning_utils import dry_run_base_plan, plan_base_motion_br, plan_hand_motion_br
-# from igibson.utils.utils import restoreState
+# from omnigibson import object_states
+# from omnigibson.envs.behavior_env import BehaviorEnv
+# # from omnigibson.external.pybullet_tools.utils import CIRCULAR_LIMITS
+# from omnigibson.object_states.on_floor import RoomFloor
+# from omnigibson.object_states.utils import sample_kinematics
+# from omnigibson.objects.usd_object import URDFObject
+# from omnigibson.robots.behavior_robot import BRBody, BREye, BRHand
+# from omnigibson.utils.behavior_robot_planning_utils import dry_run_base_plan, plan_base_motion_br, plan_hand_motion_br
+# from omnigibson.utils.utils import restoreState
 #
 #
 # class ActionPrimitives(IntEnum):
@@ -60,7 +60,7 @@
 #
 # class BehaviorMPEnv(BehaviorEnv):
 #     """
-#     iGibson Environment (OpenAI Gym interface)
+#     OmniGibson Environment (OpenAI Gym interface)
 #     """
 #
 #     def __init__(
@@ -520,7 +520,7 @@
 #     parser.add_argument(
 #         "--config",
 #         "-c",
-#         default="igibson/examples/configs/behavior.yaml",
+#         default="omnigibson/examples/configs/behavior.yaml",
 #         help="which config file to use [default: use yaml files in examples/configs]",
 #     )
 #     parser.add_argument(

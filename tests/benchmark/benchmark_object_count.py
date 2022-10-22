@@ -6,10 +6,10 @@ import time
 import matplotlib.pyplot as plt
 import numpy as np
 
-from igibson import app, Simulator
-from igibson.objects.primitive_object import PrimitiveObject
-from igibson.scenes.empty_scene import EmptyScene
-from igibson.utils.asset_utils import get_ig_assets_version
+from omnigibson import app, Simulator
+from omnigibson.objects.primitive_object import PrimitiveObject
+from omnigibson.scenes.empty_scene import EmptyScene
+from omnigibson.utils.asset_utils import get_og_assets_version
 
 
 # Params to be set as needed.
@@ -38,7 +38,7 @@ def _get_position(obj_idx, is_random=False):
 
 
 def benchmark_scene(sim):
-    assets_version = get_ig_assets_version()
+    assets_version = get_og_assets_version()
     print("assets_version", assets_version)
 
     scene = EmptyScene(floor_plane_visible=True)

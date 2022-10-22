@@ -1,8 +1,8 @@
 import numpy as np
 
-from igibson.macros import create_module_macros
-from igibson.controllers import IsGraspingState, ControlType, GripperController
-from igibson.utils.python_utils import assert_valid_key
+from omnigibson.macros import create_module_macros
+from omnigibson.controllers import IsGraspingState, ControlType, GripperController
+from omnigibson.utils.python_utils import assert_valid_key
 
 VALID_MODES = {
     "binary",

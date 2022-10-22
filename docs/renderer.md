@@ -2,13 +2,13 @@
 
 ### Overview
 
-We developed our own MeshRenderer that supports customizable camera configuration and various image modalities, and renders at a lightening speed. Specifically, you can specify image width, height and vertical field of view in the constructor of `class MeshRenderer`. Then you can call `renderer.render(modes=('rgb', 'normal', 'seg', '3d', 'optical_flow', 'scene_flow'))` to retrieve the images. Currently we support six different image modalities: RGB, surface normal, segmentation, 3D point cloud (z-channel can be extracted as depth map), optical flow, and scene flow. We also support two types of LiDAR sensors: 1-beam and 16-beam (like Velodyne VLP-16). Most of the code can be found in [igibson/render](https://github.com/StanfordVL/iGibson/tree/master/igibson/render).
+We developed our own MeshRenderer that supports customizable camera configuration and various image modalities, and renders at a lightening speed. Specifically, you can specify image width, height and vertical field of view in the constructor of `class MeshRenderer`. Then you can call `renderer.render(modes=('rgb', 'normal', 'seg', '3d', 'optical_flow', 'scene_flow'))` to retrieve the images. Currently we support six different image modalities: RGB, surface normal, segmentation, 3D point cloud (z-channel can be extracted as depth map), optical flow, and scene flow. We also support two types of LiDAR sensors: 1-beam and 16-beam (like Velodyne VLP-16). Most of the code can be found in [omnigibson/render](https://github.com/StanfordVL/OmniGibson/tree/master/omnigibson/render).
 
 ### Examples
 
 #### Simple Example
 
-In this example, we render an iGibson scene with a few lines of code. The code can be found in [igibson/examples/renderer/mesh_renderer_simple_example.py ](https://github.com/StanfordVL/iGibson/blob/master/igibson/examples/renderer/mesh_renderer_simple_example.py).
+In this example, we render an OmniGibson scene with a few lines of code. The code can be found in [omnigibson/examples/renderer/mesh_renderer_simple_example.py ](https://github.com/StanfordVL/OmniGibson/blob/master/omnigibson/examples/renderer/mesh_renderer_simple_example.py).
 
 ```
 import logging
@@ -18,8 +18,8 @@ import sys
 import cv2
 import numpy as np
 
-from igibson.render.mesh_renderer.mesh_renderer_cpu import MeshRenderer
-from igibson.utils.assets_utils import get_scene_path
+from omnigibson.render.mesh_renderer.mesh_renderer_cpu import MeshRenderer
+from omnigibson.utils.assets_utils import get_scene_path
 
 
 def main():
@@ -66,9 +66,9 @@ For `Rs` scene, the rendering results will look like this:
 In this example, we show an interactive demo of MeshRenderer.
 
 ```bash
-python -m igibson.examples.renderer.mesh_renderer_example
+python -m omnigibson.examples.renderer.mesh_renderer_example
 ```
-You may translate the camera by pressing "WASD" on your keyboard and rotate the camera by dragging your mouse. Press `Q` to exit the rendering loop. The code can be found in [igibson/examples/renderer/mesh_renderer_example.py](https://github.com/StanfordVL/iGibson/blob/master/igibson/examples/renderer/mesh_renderer_example.py).
+You may translate the camera by pressing "WASD" on your keyboard and rotate the camera by dragging your mouse. Press `Q` to exit the rendering loop. The code can be found in [omnigibson/examples/renderer/mesh_renderer_example.py](https://github.com/StanfordVL/OmniGibson/blob/master/omnigibson/examples/renderer/mesh_renderer_example.py).
 
 #### PBR (Physics-Based Rendering) Example
 
@@ -77,7 +77,7 @@ You can test the physically based renderer with the PBR demo. You can render any
   obj files in the folder.
 
 ```bash
-python -m igibson.examples.renderer.mesh_renderer_example_pbr <path to ig_dataset>/objects/sink/sink_1/shape/visual
+python -m omnigibson.examples.renderer.mesh_renderer_example_pbr <path to og_dataset>/objects/sink/sink_1/shape/visual
 ```
 ![pbr_renderer.png](images/pbr_render.png)
 
@@ -86,14 +86,14 @@ You will get a nice rendering of the sink, and should see the metal parts have s
  
 
 #### Velodyne VLP-16 Example
-In this example, we show a demo of 16-beam Velodyne VLP-16 LiDAR placed on top of a virtual Turtlebot. The code can be found in [igibson/examples/observations/generate_lidar_velodyne.py](https://github.com/StanfordVL/iGibson/blob/master/igibson/examples/observations/generate_lidar_velodyne.py).
+In this example, we show a demo of 16-beam Velodyne VLP-16 LiDAR placed on top of a virtual Turtlebot. The code can be found in [omnigibson/examples/observations/generate_lidar_velodyne.py](https://github.com/StanfordVL/OmniGibson/blob/master/omnigibson/examples/observations/generate_lidar_velodyne.py).
 
 The Velodyne VLP-16 LiDAR visualization will look like this:
 ![lidar_velodyne.png](images/lidar_velodyne.png)
 
 #### Render to PyTorch Tensors
 
-In this example, we show that MeshRenderer can directly render into a PyTorch tensor to maximize efficiency. PyTorch installation is required (otherwise, iGibson does not depend on PyTorch). The code can be found in [igibson/examples/renderer/mesh_renderer_gpu_example.py](https://github.com/StanfordVL/iGibson/blob/master/igibson/examples/renderer/mesh_renderer_gpu_example.py).
+In this example, we show that MeshRenderer can directly render into a PyTorch tensor to maximize efficiency. PyTorch installation is required (otherwise, OmniGibson does not depend on PyTorch). The code can be found in [omnigibson/examples/renderer/mesh_renderer_gpu_example.py](https://github.com/StanfordVL/OmniGibson/blob/master/omnigibson/examples/renderer/mesh_renderer_gpu_example.py).
 
 
 #### About the 3D Image
@@ -136,4 +136,4 @@ seg = (seg[:, :, 0:1] * MAX_CLASS_COUNT).astype(np.int32)
 ins_seg = (ins_seg[:, :, 0:1] * MAX_INSTANCE_COUNT).astype(np.int32)
 ```
 
-This transformation is directly performed if the segmentation is accessed through a `VisionSensor` (e.g., as part of the iGibsonEnv) using the method `get_seg` and `get_ins_seg`.
+This transformation is directly performed if the segmentation is accessed through a `VisionSensor` (e.g., as part of the OmniGibsonEnv) using the method `get_seg` and `get_ins_seg`.

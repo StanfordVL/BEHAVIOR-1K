@@ -3,16 +3,16 @@ import os
 import numpy as np
 from pxr import Gf
 
-import igibson as ig
-import igibson.utils.transform_utils as T
-from igibson.macros import create_module_macros
-from igibson.controllers import ControlType
-from igibson.robots.active_camera_robot import ActiveCameraRobot
-from igibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
-from igibson.robots.locomotion_robot import LocomotionRobot
-from igibson.utils.python_utils import assert_valid_key
-from igibson.utils.usd_utils import JointType
-from igibson.utils.transform_utils import euler2quat, quat2euler, quat2mat
+import omnigibson as og
+import omnigibson.utils.transform_utils as T
+from omnigibson.macros import create_module_macros
+from omnigibson.controllers import ControlType
+from omnigibson.robots.active_camera_robot import ActiveCameraRobot
+from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
+from omnigibson.robots.locomotion_robot import LocomotionRobot
+from omnigibson.utils.python_utils import assert_valid_key
+from omnigibson.utils.usd_utils import JointType
+from omnigibson.utils.transform_utils import euler2quat, quat2euler, quat2mat
 
 from omni.isaac.core.utils.prims import get_prim_at_path
 from omni.isaac.core.utils.rotations import gf_quat_to_np_array
@@ -112,7 +112,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
          specified by this class.
         obs_modalities (str or list of str): Observation modalities to use for this robot. Default is "all", which
             corresponds to all modalities being used.
-            Otherwise, valid options should be part of igibson.sensors.ALL_SENSOR_MODALITIES.
+            Otherwise, valid options should be part of omnigibson.sensors.ALL_SENSOR_MODALITIES.
         :param proprio_obs: str or tuple of str, proprioception observation key(s) to use for generating proprioceptive
             observations. If str, should be exactly "default" -- this results in the default proprioception observations
             being used, as defined by self.default_proprio_obs. See self._get_proprioception_dict for valid key choices
@@ -534,16 +534,16 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
     @property
     def usd_path(self):
-        return os.path.join(ig.assets_path, "models/tiago/tiago_dual_omnidirectional_stanford/tiago_dual_omnidirectional_stanford_33.usd")
+        return os.path.join(og.assets_path, "models/tiago/tiago_dual_omnidirectional_stanford/tiago_dual_omnidirectional_stanford_33.usd")
 
     @property
     def robot_arm_descriptor_yamls(self):
-        return {"left": os.path.join(ig.assets_path, "models/tiago/tiago_dual_omnidirectional_stanford_left_arm_descriptor.yaml"),
-                "right": os.path.join(ig.assets_path, "models/tiago/tiago_dual_omnidirectional_stanford_right_arm_fixed_trunk_descriptor.yaml")}
+        return {"left": os.path.join(og.assets_path, "models/tiago/tiago_dual_omnidirectional_stanford_left_arm_descriptor.yaml"),
+                "right": os.path.join(og.assets_path, "models/tiago/tiago_dual_omnidirectional_stanford_right_arm_fixed_trunk_descriptor.yaml")}
 
     @property
     def urdf_path(self):
-        return os.path.join(ig.assets_path, "models/tiago/tiago_dual_omnidirectional_stanford.urdf")
+        return os.path.join(og.assets_path, "models/tiago/tiago_dual_omnidirectional_stanford.urdf")
 
     def dump_config(self):
         cfg = super().dump_config()

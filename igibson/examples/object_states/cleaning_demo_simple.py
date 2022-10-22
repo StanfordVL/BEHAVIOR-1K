@@ -2,10 +2,10 @@ import logging
 
 import numpy as np
 
-import igibson as ig
-from igibson import object_states
-from igibson.objects import DatasetObject
-from igibson.macros import gm
+import omnigibson as og
+from omnigibson import object_states
+from omnigibson.objects import DatasetObject
+from omnigibson.macros import gm
 
 
 def main(random_selection=False, headless=False, short_exec=False):
@@ -27,7 +27,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         }
     }
 
-    env = ig.Environment(configs=cfg, action_timestep=1/60., physics_timestep=1/60.)
+    env = og.Environment(configs=cfg, action_timestep=1/60., physics_timestep=1/60.)
 
     # Load sink ON
     sink = DatasetObject(
@@ -38,7 +38,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         scale=np.array([0.8, 0.8, 0.8]),
         abilities={"toggleable": {}, "waterSource": {}, "waterSink": {}},
     )
-    ig.sim.import_object(sink)
+    og.sim.import_object(sink)
     sink.set_position([1, 1, 0.8])
 
     # Load cleaning tool
@@ -51,7 +51,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         avg_obj_dims=avg,
         fit_avg_dim_volume=True,
     )
-    ig.sim.import_object(brush)
+    og.sim.import_object(brush)
     brush.set_position([0, -2, 0.4])
 
     # Load table with dust
@@ -63,7 +63,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         scale=np.array([0.8, 0.8, 0.8]),
         abilities={"dustyable": {}},
     )
-    ig.sim.import_object(desk)
+    og.sim.import_object(desk)
     desk.set_position([1, -2, 0.4])
 
     # Load a bowl with stains
@@ -75,7 +75,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         scale=np.array([0.8, 0.8, 0.8]),
         abilities={"dustyable": {}, "stainable": {}},
     )
-    ig.sim.import_object(bowl)
+    og.sim.import_object(bowl)
 
     # Take a sim step to make sure everything is initialized properly, and then sanity check the initial state
     env.step(np.array([]))              # Empty action since no robots are in the scene
@@ -87,7 +87,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Take a step, and save the state
     env.step(np.array([]))
-    initial_state = ig.sim.dump_state()
+    initial_state = og.sim.dump_state()
 
     # Main simulation loop.
     max_steps = 1000
@@ -114,7 +114,7 @@ def main(random_selection=False, headless=False, short_exec=False):
                 logging.info("Reset because max steps")
 
             # Reset to the initial state
-            ig.sim.load_state(initial_state)
+            og.sim.load_state(initial_state)
 
             iteration += 1
 

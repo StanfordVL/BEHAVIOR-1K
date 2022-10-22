@@ -1,7 +1,7 @@
 from abc import ABCMeta, abstractmethod
 from collections import OrderedDict
 
-from igibson.utils.python_utils import classproperty, Registerable
+from omnigibson.utils.python_utils import classproperty, Registerable
 
 
 # Registered sensor noises

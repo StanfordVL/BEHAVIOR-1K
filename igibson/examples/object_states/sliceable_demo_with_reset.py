@@ -4,13 +4,13 @@ import os
 import numpy as np
 
 
-from igibson import object_states
-from igibson.objects.usd_object import URDFObject
-from igibson.objects.multi_object_wrappers import ObjectGrouper, ObjectMultiplexer
-from igibson.scenes.empty_scene import EmptyScene
-from igibson.simulator import Simulator
-from igibson.utils.asset_utils import get_ig_model_path
-# from igibson.utils.utils import restoreState
+from omnigibson import object_states
+from omnigibson.objects.usd_object import URDFObject
+from omnigibson.objects.multi_object_wrappers import ObjectGrouper, ObjectMultiplexer
+from omnigibson.scenes.empty_scene import EmptyScene
+from omnigibson.simulator import Simulator
+from omnigibson.utils.asset_utils import get_og_model_path
+# from omnigibson.utils.utils import restoreState
 
 
 def main(random_selection=False, headless=False, short_exec=False):
@@ -34,7 +34,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     s.import_scene(scene)
 
     # Load a desk
-    model_path = os.path.join(get_ig_model_path("breakfast_table", "19203"), "19203.urdf")
+    model_path = os.path.join(get_og_model_path("breakfast_table", "19203"), "19203.urdf")
     desk = URDFObject(
         filename=model_path, category="breakfast_table", name="19898", scale=np.array([0.8, 0.8, 0.8]), abilities={}
     )
@@ -42,7 +42,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     desk.set_position([0, 0, 0.4])
 
     # Create an URDF object of an apple, but doesn't load it in the simulator
-    model_path = os.path.join(get_ig_model_path("apple", "00_0"), "00_0.urdf")
+    model_path = os.path.join(get_og_model_path("apple", "00_0"), "00_0.urdf")
     whole_obj = URDFObject(model_path, name="00_0", category="apple", scale=np.array([1.0, 1.0, 1.0]))
 
     object_parts = []
@@ -53,7 +53,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         # Scale the offset accordingly
         part_pos = part["pos"] * whole_obj.scale
         part_orn = part["orn"]
-        part_model_path = get_ig_model_path(part_category, part_model)
+        part_model_path = get_og_model_path(part_category, part_model)
         part_filename = os.path.join(part_model_path, part_model + ".urdf")
         part_obj_name = whole_obj.name + "_part_{}".format(i)
         part_obj = URDFObject(

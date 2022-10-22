@@ -1,9 +1,9 @@
 import numpy as np
 
-from igibson.controllers import IsGraspingState, ControlType, LocomotionController, ManipulationController, \
+from omnigibson.controllers import IsGraspingState, ControlType, LocomotionController, ManipulationController, \
     GripperController
-from igibson.utils.python_utils import assert_valid_key
-import igibson.utils.transform_utils as T
+from omnigibson.utils.python_utils import assert_valid_key
+import omnigibson.utils.transform_utils as T
 
 
 class JointController(LocomotionController, ManipulationController, GripperController):

@@ -6,7 +6,7 @@ jobs:
   build-docs:
     name: Build and deploy documentation
     runs-on: ubuntu-latest
-    if: github.repository == 'StanfordVL/iGibson' && github.ref == 'refs/heads/master'
+    if: github.repository == 'StanfordVL/OmniGibson' && github.ref == 'refs/heads/master'
 
     steps:
     - name: Checkout code

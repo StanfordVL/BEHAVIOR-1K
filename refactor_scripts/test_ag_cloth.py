@@ -1,12 +1,12 @@
-from igibson import app, ig_dataset_path, Simulator
-from igibson.scenes.empty_scene import EmptyScene
-from igibson.objects.dataset_object import DatasetObject
-from igibson.robots.tiago import Tiago
-from igibson.utils.constants import PrimType
+from omnigibson import app, og_dataset_path, Simulator
+from omnigibson.scenes.empty_scene import EmptyScene
+from omnigibson.objects.dataset_object import DatasetObject
+from omnigibson.robots.tiago import Tiago
+from omnigibson.utils.constants import PrimType
 import numpy as np
 
 
-DISHTOWEL_FILE = f"{ig_dataset_path}/objects/dishtowel/Tag_Dishtowel_Basket_Weave_Red/usd/Tag_Dishtowel_Basket_Weave_Red.usd"
+DISHTOWEL_FILE = f"{og_dataset_path}/objects/dishtowel/Tag_Dishtowel_Basket_Weave_Red/usd/Tag_Dishtowel_Basket_Weave_Red.usd"
 DISH_TOWEL_ORN = np.array([0.5, 0., 0., 0.8660254])
 ARM = "left"
 DIST_THRESHOLD = 0.15

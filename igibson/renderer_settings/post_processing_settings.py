@@ -1,7 +1,7 @@
 import carb
 from omni.kit.widget.settings import SettingType
 
-from igibson.renderer_settings.settings_base import SettingItem, SettingsBase, SubSettingsBase
+from omnigibson.renderer_settings.settings_base import SettingItem, SettingsBase, SubSettingsBase
 
 
 class PostProcessingSettings(SettingsBase):

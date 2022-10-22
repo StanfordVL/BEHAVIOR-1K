@@ -1,7 +1,7 @@
 """
 Script to import scene's objects
 """
-from igibson import app, ig_dataset_path, assets_path
+from omnigibson import app, og_dataset_path, assets_path
 from refactor_scripts.import_urdfs_from_scene import import_objects_from_scene_urdf
 from refactor_scripts.import_metadata import import_models_metadata_from_scene
 from refactor_scripts.import_scene_template import import_models_template_from_scene
@@ -15,10 +15,10 @@ IMPORT_RENDER_CHANNELS = True
 
 
 if __name__ == "__main__":
-    for scene in os.listdir(os.path.join(ig_dataset_path, "scenes")):
+    for scene in os.listdir(os.path.join(og_dataset_path, "scenes")):
         if "background" not in scene:
-            urdf = f"{ig_dataset_path}/scenes/{scene}/urdf/{scene}_best.urdf"
-            usd_out = f"{ig_dataset_path}/scenes/{scene}/usd/{scene}_best_template.usd"
+            urdf = f"{og_dataset_path}/scenes/{scene}/urdf/{scene}_best.urdf"
+            usd_out = f"{og_dataset_path}/scenes/{scene}/usd/{scene}_best_template.usd"
 
             copy_building_assets_to_objects_folder(scene)
             import_objects_from_scene_urdf(urdf=urdf)

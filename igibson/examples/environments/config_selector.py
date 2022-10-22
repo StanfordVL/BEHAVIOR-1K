@@ -3,9 +3,9 @@ import os
 
 import yaml
 
-import igibson as ig
-from igibson.utils.asset_utils import folder_is_hidden
-from igibson.utils.ui_utils import choose_from_options
+import omnigibson as og
+from omnigibson.utils.asset_utils import folder_is_hidden
+from omnigibson.utils.ui_utils import choose_from_options
 
 
 def main(random_selection=False, headless=False, short_exec=False):
@@ -17,24 +17,24 @@ def main(random_selection=False, headless=False, short_exec=False):
     logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
 
     # Grab all configs and choose one to load
-    ig_config_path = ig.example_config_path
+    og_config_path = og.example_config_path
     available_configs = sorted(
         [
             f
-            for f in os.listdir(ig_config_path)
-            if (not folder_is_hidden(f) and os.path.isfile(os.path.join(ig_config_path, f)))
+            for f in os.listdir(og_config_path)
+            if (not folder_is_hidden(f) and os.path.isfile(os.path.join(og_config_path, f)))
         ]
     )
     config_id = choose_from_options(options=available_configs, name="config file", random_selection=random_selection)
     logging.info("Using config file " + config_id)
-    config_filename = os.path.join(ig.example_config_path, config_id)
+    config_filename = os.path.join(og.example_config_path, config_id)
     config = yaml.load(open(config_filename, "r"), Loader=yaml.FullLoader)
 
     # Uncomment the following line to accelerate loading with only the building
     # config["scene"]["load_object_categories"] = ["floors", "walls", "ceilings"]
 
     # Load the environment
-    env = ig.Environment(configs=config)
+    env = og.Environment(configs=config)
 
     max_iterations = 10 if not short_exec else 1
     for j in range(max_iterations):

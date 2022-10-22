@@ -6,7 +6,7 @@
 # distribution of this software and related documentation without an express
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 #
-from igibson.utils.usd_utils import array_to_vtarray
+from omnigibson.utils.usd_utils import array_to_vtarray
 from pxr import UsdPhysics, Gf
 from pxr.Sdf import ValueTypeNames as VT
 
@@ -15,7 +15,7 @@ from omni.isaac.core.utils.stage import get_current_stage
 from omni.usd import get_shader_from_material
 from omni.physx.scripts import particleUtils
 
-from igibson.prims.geom_prim import GeomPrim
+from omnigibson.prims.geom_prim import GeomPrim
 import numpy as np
 
 

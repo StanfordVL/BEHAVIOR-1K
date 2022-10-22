@@ -1,6 +1,6 @@
 import numpy as np
 
-from igibson.object_states.object_state_base import CachingEnabledObjectState
+from omnigibson.object_states.object_state_base import CachingEnabledObjectState
 
 
 class Pose(CachingEnabledObjectState):

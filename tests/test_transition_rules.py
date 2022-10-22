@@ -1,14 +1,14 @@
 import numpy as np
 
-from igibson import object_states, app, ig_dataset_path
-from igibson.objects.dataset_object import DatasetObject
-from igibson.scenes.empty_scene import EmptyScene
-from igibson.simulator import Simulator
-import igibson.transition_rules as transition_rules
+from omnigibson import object_states, app, og_dataset_path
+from omnigibson.objects.dataset_object import DatasetObject
+from omnigibson.scenes.empty_scene import EmptyScene
+from omnigibson.simulator import Simulator
+import omnigibson.transition_rules as transition_rules
 
 
 def create_dataset_object(category, model, name, scale, abilities=dict()):
-    model_root_path = f"{ig_dataset_path}/objects/{category}/{model}"
+    model_root_path = f"{og_dataset_path}/objects/{category}/{model}"
     usd_path = f"{model_root_path}/usd/{model}.usd"
 
     # Create a dataset object, but doesn't load it in the simulator.

@@ -2,10 +2,10 @@ from collections import namedtuple
 
 import numpy as np
 
-from igibson.macros import create_module_macros
-from igibson.object_states.object_state_base import CachingEnabledObjectState
-from igibson.object_states.pose import Pose
-from igibson.utils.sampling_utils import raytest_batch
+from omnigibson.macros import create_module_macros
+from omnigibson.object_states.object_state_base import CachingEnabledObjectState
+from omnigibson.object_states.pose import Pose
+from omnigibson.utils.sampling_utils import raytest_batch
 
 
 # Create settings for this module

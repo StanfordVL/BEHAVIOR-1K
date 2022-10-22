@@ -7,10 +7,10 @@ import omni
 from omni.isaac.core.utils.prims import get_prim_at_path
 from omni.usd import get_shader_from_material
 
-from igibson import app, assets_path, ig_dataset_path
-from igibson.utils.physx_utils import bind_material
-from igibson.prims.prim_base import BasePrim
-from igibson.utils.usd_utils import get_usd_metadata
+from omnigibson import app, assets_path, og_dataset_path
+from omnigibson.utils.physx_utils import bind_material
+from omnigibson.prims.prim_base import BasePrim
+from omnigibson.utils.usd_utils import get_usd_metadata
 
 
 class MaterialPrim(BasePrim):
@@ -114,22 +114,22 @@ class MaterialPrim(BasePrim):
                 continue
 
             # If the input already has the correct, current machine's root path, skip
-            if ig_dataset_path in original_path or assets_path in original_path:
+            if og_dataset_path in original_path or assets_path in original_path:
                 continue
 
             usd_metadata = get_usd_metadata()
-            source_asset_path = usd_metadata["source_ig_asset_path"]
-            source_ig_dataset_path = usd_metadata["source_ig_dataset_path"]
+            source_asset_path = usd_metadata["source_og_asset_path"]
+            source_og_dataset_path = usd_metadata["source_og_dataset_path"]
 
             # If the input doesn't contain the source root path, skip. We fail to update the asset paths automatically
             # External user needs to call @shader_update_asset_paths_with_root_path with an explicit root path
-            if source_asset_path not in original_path and source_ig_dataset_path not in original_path:
+            if source_asset_path not in original_path and source_og_dataset_path not in original_path:
                 continue
 
             if source_asset_path in original_path:
                 new_path = f"{assets_path}{original_path.split(source_asset_path)[-1]}"
             else:
-                new_path = f"{ig_dataset_path}{original_path.split(source_ig_dataset_path)[-1]}"
+                new_path = f"{og_dataset_path}{original_path.split(source_og_dataset_path)[-1]}"
 
             self.set_input(inp_name, new_path)
 

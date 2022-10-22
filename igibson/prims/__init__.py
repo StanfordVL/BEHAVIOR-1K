@@ -1,7 +1,7 @@
-from igibson.prims.prim_base import BasePrim
-from igibson.prims.cloth_prim import ClothPrim
-from igibson.prims.entity_prim import EntityPrim
-from igibson.prims.geom_prim import GeomPrim, VisualGeomPrim, CollisionGeomPrim, CollisionVisualGeomPrim
-from igibson.prims.joint_prim import JointPrim
-from igibson.prims.rigid_prim import RigidPrim
-from igibson.prims.xform_prim import XFormPrim
+from omnigibson.prims.prim_base import BasePrim
+from omnigibson.prims.cloth_prim import ClothPrim
+from omnigibson.prims.entity_prim import EntityPrim
+from omnigibson.prims.geom_prim import GeomPrim, VisualGeomPrim, CollisionGeomPrim, CollisionVisualGeomPrim
+from omnigibson.prims.joint_prim import JointPrim
+from omnigibson.prims.rigid_prim import RigidPrim
+from omnigibson.prims.xform_prim import XFormPrim

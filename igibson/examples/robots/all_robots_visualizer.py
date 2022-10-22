@@ -2,9 +2,9 @@ import logging
 
 import numpy as np
 
-import igibson as ig
-from igibson.robots import REGISTERED_ROBOTS
-from igibson.scenes import EmptyScene
+import omnigibson as og
+from omnigibson.robots import REGISTERED_ROBOTS
+from omnigibson.scenes import EmptyScene
 
 
 def main(random_selection=False, headless=False, short_exec=False):
@@ -20,7 +20,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         }
     }
 
-    env = ig.Environment(configs=cfg, action_timestep=1/60., physics_timestep=1/60.)
+    env = og.Environment(configs=cfg, action_timestep=1/60., physics_timestep=1/60.)
 
     # Iterate over all robots and demo their motion
     for robot_name, robot_cls in REGISTERED_ROBOTS.items():
@@ -30,11 +30,11 @@ def main(random_selection=False, headless=False, short_exec=False):
             name=robot_name,
             obs_modalities=[],              # We're just moving robots around so don't load any observation modalities
         )
-        ig.sim.import_object(robot)
+        og.sim.import_object(robot)
 
         # At least one step is always needed while sim is playing for any imported object to be fully initialized
-        ig.sim.play()
-        ig.sim.step()
+        og.sim.play()
+        og.sim.step()
 
         # Reset robot and make sure it's not moving
         robot.reset()
@@ -46,14 +46,14 @@ def main(random_selection=False, headless=False, short_exec=False):
 
         if not headless:
             # Set viewer in front facing robot
-            ig.sim.viewer_camera.set_position_orientation(
+            og.sim.viewer_camera.set_position_orientation(
                 position=np.array([4.32248, -5.74338, 6.85436]),
                 orientation=np.array([0.39592, 0.13485, 0.29286, 0.85982]),
             )
 
         # Hold still briefly so viewer can see robot
         for _ in range(100):
-            ig.sim.step()
+            og.sim.step()
 
         # Then apply random actions for a bit
         for _ in range(30):
@@ -62,8 +62,8 @@ def main(random_selection=False, headless=False, short_exec=False):
                 env.step(action)
 
         # Re-import the scene
-        ig.sim.stop()
-        ig.sim.import_scene(EmptyScene())
+        og.sim.stop()
+        og.sim.import_scene(EmptyScene())
 
     # Always shut down the environment cleanly at the end
     env.close()

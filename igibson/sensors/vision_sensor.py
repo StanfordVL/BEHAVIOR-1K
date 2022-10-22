@@ -3,12 +3,12 @@ import numpy as np
 import time
 import gym
 
-from igibson import app
-from igibson.sensors.sensor_base import BaseSensor
-from igibson.utils.constants import MAX_CLASS_COUNT, MAX_INSTANCE_COUNT, MAX_VIEWER_SIZE, VALID_OMNI_CHARS
-from igibson.utils.python_utils import assert_valid_key, classproperty
-from igibson.utils.usd_utils import get_camera_params
-from igibson.utils.transform_utils import euler2quat, quat2euler
+from omnigibson import app
+from omnigibson.sensors.sensor_base import BaseSensor
+from omnigibson.utils.constants import MAX_CLASS_COUNT, MAX_INSTANCE_COUNT, MAX_VIEWER_SIZE, VALID_OMNI_CHARS
+from omnigibson.utils.python_utils import assert_valid_key, classproperty
+from omnigibson.utils.usd_utils import get_camera_params
+from omnigibson.utils.transform_utils import euler2quat, quat2euler
 
 import carb
 from omni.isaac.core.utils.stage import get_current_stage

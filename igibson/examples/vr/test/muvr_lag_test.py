@@ -6,7 +6,7 @@ Usage: python muvr_demo.py --mode=[server or client] --host=[localhost or ip add
 import argparse
 import time
 
-from igibson.utils.muvr_utils import IGVRTestClient, IGVRTestServer
+from omnigibson.utils.muvr_utils import IGVRTestClient, IGVRTestServer
 
 # Client and server settings
 SERVER_FPS = 30.0
@@ -18,7 +18,7 @@ CLIENT_PACKET_SIZE = 100000
 
 def run_lag_test(mode="server", host="localhost", port="7500"):
     """
-    Sets up the iGibson environment that will be used by both server and client
+    Sets up the OmniGibson environment that will be used by both server and client
     """
     print("INFO: Running MUVR {} at {}:{}".format(mode, host, port))
     # This function only runs if mode is one of server or client, so setting this bool is safe

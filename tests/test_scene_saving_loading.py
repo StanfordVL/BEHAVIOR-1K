@@ -3,14 +3,14 @@ import os
 import numpy as np
 from IPython import embed
 
-import igibson
-from igibson.object_states import *
-from igibson.objects.usd_object import URDFObject
-from igibson.objects.multi_object_wrappers import ObjectGrouper, ObjectMultiplexer
-from igibson.robots.fetch import Fetch
-from igibson.scenes.interactive_traversable_scene import InteractiveIndoorScene
-from igibson.simulator import Simulator
-from igibson.utils.asset_utils import get_ig_model_path
+import omnigibson
+from omnigibson.object_states import *
+from omnigibson.objects.usd_object import URDFObject
+from omnigibson.objects.multi_object_wrappers import ObjectGrouper, ObjectMultiplexer
+from omnigibson.robots.fetch import Fetch
+from omnigibson.scenes.interactive_traversable_scene import InteractiveIndoorScene
+from omnigibson.simulator import Simulator
+from omnigibson.utils.asset_utils import get_og_model_path
 
 CABINET_POS = np.array([100, 100, 100])
 CABINET_JOINT = {
@@ -44,7 +44,7 @@ def test_saving():
     scene.save(urdf_path="changed_state.urdf", pybullet_filename="changed_state.bullet")
 
     # Add a new object
-    model_path = os.path.join(get_ig_model_path("apple", "00_0"), "00_0.urdf")
+    model_path = os.path.join(get_og_model_path("apple", "00_0"), "00_0.urdf")
     simulator_obj = URDFObject(model_path, name="00_0", category="apple", scale=np.array([1.0, 1.0, 1.0]))
     whole_object = simulator_obj
     object_parts = []
@@ -54,7 +54,7 @@ def test_saving():
         # Scale the offset accordingly
         part_pos = part["pos"] * whole_object.scale
         part_orn = part["orn"]
-        model_path = get_ig_model_path(category, model)
+        model_path = get_og_model_path(category, model)
         filename = os.path.join(model_path, model + ".urdf")
         obj_name = whole_object.name + "_part_{}".format(i)
         simulator_obj_part = URDFObject(

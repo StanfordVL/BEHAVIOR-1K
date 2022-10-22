@@ -1,1 +1,1 @@
-docker build -t omnigibson:latest .
+docker build -t omnomnigibson:latest .

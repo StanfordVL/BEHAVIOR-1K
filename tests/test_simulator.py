@@ -1,7 +1,7 @@
-from igibson.objects.ycb_object import YCBObject
-from igibson.scenes.stadium_scene import StadiumScene
-from igibson.simulator import Simulator
-from igibson.utils.asset_utils import download_assets
+from omnigibson.objects.ycb_object import YCBObject
+from omnigibson.scenes.stadium_scene import StadiumScene
+from omnigibson.simulator import Simulator
+from omnigibson.utils.asset_utils import download_assets
 
 
 def test_simulator():

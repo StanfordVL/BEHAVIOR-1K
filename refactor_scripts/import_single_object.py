@@ -1,7 +1,7 @@
 """
 Script to import scene and objects
 """
-from igibson import app, ig_dataset_path, assets_path
+from omnigibson import app, og_dataset_path, assets_path
 from refactor_scripts.import_urdfs_from_scene import import_obj_urdf
 from refactor_scripts.import_metadata import import_obj_metadata
 

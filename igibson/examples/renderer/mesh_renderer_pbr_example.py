@@ -5,10 +5,10 @@ import sys
 import cv2
 import numpy as np
 
-import igibson
-from igibson.render.mesh_renderer.mesh_renderer_cpu import MeshRenderer
-from igibson.render.mesh_renderer.mesh_renderer_settings import MeshRendererSettings
-from igibson.render.profiler import Profiler
+import omnigibson
+from omnigibson.render.mesh_renderer.mesh_renderer_cpu import MeshRenderer
+from omnigibson.render.mesh_renderer.mesh_renderer_settings import MeshRendererSettings
+from omnigibson.render.profiler import Profiler
 
 
 def load_obj_np(filename_obj, normalization=False, texture_size=4, texture_wrapping="REPEAT", use_bilinear=True):
@@ -57,7 +57,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     if len(sys.argv) > 1 and not (random_selection and headless and short_exec):
         model_path = sys.argv[1]
     else:
-        model_path = os.path.join(igibson.ig_dataset_path, "scenes", "Rs_int", "shape", "visual")
+        model_path = os.path.join(omnigibson.og_dataset_path, "scenes", "Rs_int", "shape", "visual")
     settings = MeshRendererSettings(msaa=True, enable_shadow=True)
     renderer = MeshRenderer(width=512, height=512, vertical_fov=70, rendering_settings=settings)
     renderer.set_light_position_direction([0, 0, 10], [0, 0, 0])

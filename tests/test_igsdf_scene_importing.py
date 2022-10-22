@@ -2,8 +2,8 @@
 
 import time
 
-from igibson.scenes.interactive_traversable_scene import InteractiveIndoorScene
-from igibson.simulator import Simulator
+from omnigibson.scenes.interactive_traversable_scene import InteractiveIndoorScene
+from omnigibson.simulator import Simulator
 
 
 def test_import_igsdf():

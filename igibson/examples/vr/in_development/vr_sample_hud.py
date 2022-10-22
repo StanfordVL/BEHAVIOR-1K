@@ -8,13 +8,13 @@ import time
 
 import pybullet_data
 
-import igibson
-from igibson.objects.usd_object import ArticulatedObject
-from igibson.objects.ycb_object import YCBObject
-from igibson.render.mesh_renderer.mesh_renderer_cpu import MeshRendererSettings
-from igibson.robots.behavior_robot import BehaviorRobot
-from igibson.scenes.interactive_traversable_scene import InteractiveIndoorScene
-from igibson.simulator import Simulator
+import omnigibson
+from omnigibson.objects.usd_object import ArticulatedObject
+from omnigibson.objects.ycb_object import YCBObject
+from omnigibson.render.mesh_renderer.mesh_renderer_cpu import MeshRendererSettings
+from omnigibson.robots.behavior_robot import BehaviorRobot
+from omnigibson.scenes.interactive_traversable_scene import InteractiveIndoorScene
+from omnigibson.simulator import Simulator
 
 # Objects in the benchmark - corresponds to Rs kitchen environment, for range of items and
 # transferability to the real world
@@ -44,12 +44,12 @@ PRINT_STATS = True
 USE_GRIPPER = False
 
 # HDR files for PBR rendering
-hdr_texture = os.path.join(igibson.ig_dataset_path, "scenes", "background", "probe_02.hdr")
-hdr_texture2 = os.path.join(igibson.ig_dataset_path, "scenes", "background", "probe_03.hdr")
+hdr_texture = os.path.join(omnigibson.og_dataset_path, "scenes", "background", "probe_02.hdr")
+hdr_texture2 = os.path.join(omnigibson.og_dataset_path, "scenes", "background", "probe_03.hdr")
 light_modulation_map_filename = os.path.join(
-    igibson.ig_dataset_path, "scenes", "Rs_int", "layout", "floor_lighttype_0.png"
+    omnigibson.og_dataset_path, "scenes", "Rs_int", "layout", "floor_lighttype_0.png"
 )
-background_texture = os.path.join(igibson.ig_dataset_path, "scenes", "background", "urban_street_01.jpg")
+background_texture = os.path.join(omnigibson.og_dataset_path, "scenes", "background", "urban_street_01.jpg")
 
 
 def main():
@@ -167,7 +167,7 @@ def main():
             p.changeDynamics(body_id, -1, mass=masses[i])
 
     title = s.add_vr_overlay_text(
-        text_data="Welcome to iGibson VR!", font_size=85, font_style="Bold", color=[0, 0, 0.5], pos=[150, 900]
+        text_data="Welcome to OmniGibson VR!", font_size=85, font_style="Bold", color=[0, 0, 0.5], pos=[150, 900]
     )
     sample_condition_1 = s.add_vr_overlay_text(
         text_data="for box in cupboard:\n1) find box\n2) pick up box",

@@ -3,16 +3,16 @@ from collections import OrderedDict
 
 import numpy as np
 
-import igibson as ig
-from igibson.reward_functions.potential_reward import PotentialReward
-from igibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
-from igibson.tasks.task_base import BaseTask
-from igibson.termination_conditions.max_collision import MaxCollision
-from igibson.termination_conditions.falling import Falling
-from igibson.termination_conditions.timeout import Timeout
-from igibson.utils.python_utils import classproperty
-from igibson.utils.sim_utils import land_object, test_valid_pose
-import igibson.utils.transform_utils as T
+import omnigibson as og
+from omnigibson.reward_functions.potential_reward import PotentialReward
+from omnigibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
+from omnigibson.tasks.task_base import BaseTask
+from omnigibson.termination_conditions.max_collision import MaxCollision
+from omnigibson.termination_conditions.falling import Falling
+from omnigibson.termination_conditions.timeout import Timeout
+from omnigibson.utils.python_utils import classproperty
+from omnigibson.utils.sim_utils import land_object, test_valid_pose
+import omnigibson.utils.transform_utils as T
 
 
 FURNITURE_CATEGORIES = {
@@ -129,7 +129,7 @@ class FurnitureClosingTask(BaseTask):
         success, max_trials = False, 100
 
         # Store the state of the environment now, so that we can restore it after each setting attempt
-        state = ig.sim.dump_state(serialized=True)
+        state = og.sim.dump_state(serialized=True)
 
         success, initial_pos, initial_quat = False, None, None
         for i in range(max_trials):
@@ -138,7 +138,7 @@ class FurnitureClosingTask(BaseTask):
             success = test_valid_pose(env.robots[self._robot_idn], initial_pos, initial_quat, env.initial_pos_z_offset)
 
             # Load the original state
-            ig.sim.load_state(state=state, serialized=True)
+            og.sim.load_state(state=state, serialized=True)
 
             # Don't need to continue iterating if we succeeded
             if success:

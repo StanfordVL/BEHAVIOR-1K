@@ -1,16 +1,16 @@
 import os
 import time
 
-from igibson.macros import gm, create_module_macros
-from igibson.prims.prim_base import BasePrim
-from igibson.prims.material_prim import MaterialPrim
-from igibson.systems.system_base import SYSTEMS_REGISTRY
-from igibson.systems.particle_system_base import BaseParticleSystem
-from igibson.utils.constants import SemanticClass
-from igibson.utils.python_utils import classproperty, Serializable, assert_valid_key
-from igibson.utils.sampling_utils import sample_cuboid_on_object
-from igibson.utils.usd_utils import create_joint, array_to_vtarray
-from igibson.utils.physx_utils import create_physx_particle_system, create_physx_particleset_pointinstancer, \
+from omnigibson.macros import gm, create_module_macros
+from omnigibson.prims.prim_base import BasePrim
+from omnigibson.prims.material_prim import MaterialPrim
+from omnigibson.systems.system_base import SYSTEMS_REGISTRY
+from omnigibson.systems.particle_system_base import BaseParticleSystem
+from omnigibson.utils.constants import SemanticClass
+from omnigibson.utils.python_utils import classproperty, Serializable, assert_valid_key
+from omnigibson.utils.sampling_utils import sample_cuboid_on_object
+from omnigibson.utils.usd_utils import create_joint, array_to_vtarray
+from omnigibson.utils.physx_utils import create_physx_particle_system, create_physx_particleset_pointinstancer, \
     bind_material, get_prototype_path_from_particle_system_path
 import omni
 from omni.isaac.core.utils.prims import get_prim_at_path

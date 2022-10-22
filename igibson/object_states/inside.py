@@ -1,15 +1,15 @@
 
 from IPython import embed
 
-import igibson
-from igibson.object_states.aabb import AABB
-from igibson.object_states.adjacency import HorizontalAdjacency, VerticalAdjacency, flatten_planes
-from igibson.object_states.kinematics import KinematicsMixin
-from igibson.object_states.memoization import PositionalValidationMemoizedObjectStateMixin
-from igibson.object_states.object_state_base import BooleanState, RelativeObjectState
-from igibson.object_states.pose import Pose
-from igibson.utils.object_state_utils import sample_kinematics
-from igibson.utils.usd_utils import BoundingBoxAPI
+import omnigibson
+from omnigibson.object_states.aabb import AABB
+from omnigibson.object_states.adjacency import HorizontalAdjacency, VerticalAdjacency, flatten_planes
+from omnigibson.object_states.kinematics import KinematicsMixin
+from omnigibson.object_states.memoization import PositionalValidationMemoizedObjectStateMixin
+from omnigibson.object_states.object_state_base import BooleanState, RelativeObjectState
+from omnigibson.object_states.pose import Pose
+from omnigibson.utils.object_state_utils import sample_kinematics
+from omnigibson.utils.usd_utils import BoundingBoxAPI
 
 
 class Inside(PositionalValidationMemoizedObjectStateMixin, KinematicsMixin, RelativeObjectState, BooleanState):
@@ -29,7 +29,7 @@ class Inside(PositionalValidationMemoizedObjectStateMixin, KinematicsMixin, Rela
                 other.clear_cached_states()
                 if self.get_value(other) != new_value:
                     sampling_success = False
-                if igibson.debug_sampling:
+                if omnigibson.debug_sampling:
                     print("Inside checking", sampling_success)
                     embed()
             if sampling_success:

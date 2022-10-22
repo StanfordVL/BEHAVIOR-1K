@@ -1,15 +1,15 @@
 import numpy as np
 from collections import OrderedDict
-from igibson.systems.micro_particle_system import get_fluid_systems
-from igibson.systems.system_base import get_system_from_element_name, get_element_name_from_system
-from igibson.macros import gm, create_module_macros
-from igibson.object_states.object_state_base import RelativeObjectState, BooleanState
-from igibson.object_states.aabb import AABB
-from igibson.object_states.water_source import WaterSource
-from igibson.utils.python_utils import assert_valid_key
-from igibson.utils.constants import PrimType
+from omnigibson.systems.micro_particle_system import get_fluid_systems
+from omnigibson.systems.system_base import get_system_from_element_name, get_element_name_from_system
+from omnigibson.macros import gm, create_module_macros
+from omnigibson.object_states.object_state_base import RelativeObjectState, BooleanState
+from omnigibson.object_states.aabb import AABB
+from omnigibson.object_states.water_source import WaterSource
+from omnigibson.utils.python_utils import assert_valid_key
+from omnigibson.utils.constants import PrimType
 from pxr import Sdf
-from igibson.systems import SYSTEMS_REGISTRY
+from omnigibson.systems import SYSTEMS_REGISTRY
 
 
 # Create settings for this module

@@ -5,12 +5,12 @@ import time
 import numpy as np
 from collections import OrderedDict
 
-import igibson as ig
-from igibson.objects import PrimitiveObject
-from igibson.robots import Fetch
-from igibson.scenes import EmptyScene
-from igibson.sensors import VisionSensor
-from igibson.utils.control_utils import IKSolver
+import omnigibson as og
+from omnigibson.objects import PrimitiveObject
+from omnigibson.robots import Fetch
+from omnigibson.scenes import EmptyScene
+from omnigibson.sensors import VisionSensor
+from omnigibson.utils.control_utils import IKSolver
 
 import carb
 import omni
@@ -22,7 +22,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     Minimal example of usage of inverse kinematics solver
 
     This example showcases how to construct your own IK functionality using omniverse's native lula library
-    without explicitly utilizing all of iGibson's class abstractions, and also showcases how to manipulate
+    without explicitly utilizing all of OmniGibson's class abstractions, and also showcases how to manipulate
     the simulator at a lower-level than the main Environment entry point.
     """
     logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
@@ -45,10 +45,10 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Import scene and robot (Fetch)
     scene = EmptyScene()
-    ig.sim.import_scene(scene)
+    og.sim.import_scene(scene)
 
     # Update the viewer camera's pose so that it points towards the robot
-    ig.sim.viewer_camera.set_position_orientation(
+    og.sim.viewer_camera.set_position_orientation(
         position=np.array([4.32248, -5.74338, 6.85436]),
         orientation=np.array([0.39592, 0.13485, 0.29286, 0.85982]),
     )
@@ -69,14 +69,14 @@ def main(random_selection=False, headless=False, short_exec=False):
             }
         }
     )
-    ig.sim.import_object(robot)
+    og.sim.import_object(robot)
 
     # Set robot base at the origin
     robot.set_position_orientation(np.array([0, 0, 0]), np.array([0, 0, 0, 1]))
     # At least one simulation step while the simulator is playing must occur for the robot (or in general, any object)
     # to be fully initialized after it is imported into the simulator
-    ig.sim.play()
-    ig.sim.step()
+    og.sim.play()
+    og.sim.step()
     # Make sure none of the joints are moving
     robot.keep_still()
 
@@ -104,7 +104,7 @@ def main(random_selection=False, headless=False, short_exec=False):
             robot.set_joint_positions(joint_pos, indices=control_idx, target=True)
         else:
             logging.info("EE position not reachable.")
-        ig.sim.step()
+        og.sim.step()
 
     if programmatic_pos or headless:
         # Sanity check IK using pre-defined hardcoded positions
@@ -122,12 +122,12 @@ def main(random_selection=False, headless=False, short_exec=False):
             visual_only=True,
             rgba=[1.0, 0, 0, 1.0],
         )
-        ig.sim.import_object(marker)
+        og.sim.import_object(marker)
 
         # Get initial EE position and set marker to that location
         command = robot.get_eef_position()
         marker.set_position(command)
-        ig.sim.step()
+        og.sim.step()
 
         # Setup callbacks for grabbing keyboard inputs from omni
         exit_now = False
@@ -151,7 +151,7 @@ def main(random_selection=False, headless=False, short_exec=False):
                     if delta_cmd is not None:
                         command = command + delta_cmd
                         marker.set_position(command)
-                        ig.sim.step()
+                        og.sim.step()
 
             # Callback must return True if valid
             return True
@@ -167,10 +167,10 @@ def main(random_selection=False, headless=False, short_exec=False):
 
         # Loop until the user requests an exit
         while not exit_now:
-            ig.sim.step()
+            og.sim.step()
 
     # Always shut the simulation down cleanly at the end
-    ig.app.close()
+    og.app.close()
 
 
 def input_to_xyz_delta_command(inp, delta=0.01):

@@ -1,8 +1,8 @@
 import numpy as np
-import igibson as ig
-from igibson import object_states
-from igibson.macros import gm
-from igibson.objects import DatasetObject, LightObject
+import omnigibson as og
+from omnigibson import object_states
+from omnigibson.macros import gm
+from omnigibson.objects import DatasetObject, LightObject
 
 
 def main():
@@ -17,10 +17,10 @@ def main():
     }
 
     # Create the environment
-    env = ig.Environment(configs=cfg, action_timestep=1/60., physics_timestep=1/60.)
+    env = og.Environment(configs=cfg, action_timestep=1/60., physics_timestep=1/60.)
 
     # Set camera to appropriate viewing pose
-    ig.sim.viewer_camera.set_position_orientation(
+    og.sim.viewer_camera.set_position_orientation(
         position=np.array([ 0.182103, -2.07295 ,  0.14017 ]),
         orientation=np.array([0.77787037, 0.00267566, 0.00216149, 0.62841535]),
     )
@@ -33,7 +33,7 @@ def main():
         radius=0.01,
         intensity=1e5,
     )
-    ig.sim.import_object(light)
+    og.sim.import_object(light)
     light.set_position(np.array([-2.0, -2.0, 1.0]))
     env.step(np.array([]))
 
@@ -56,7 +56,7 @@ def main():
         )
         # Make sure the bowls can be heated
         assert object_states.Heated in obj.states
-        ig.sim.import_object(obj)
+        og.sim.import_object(obj)
         obj.set_position(np.array([x, 0, 0]))
         objs.append(obj)
 

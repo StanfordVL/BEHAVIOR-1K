@@ -1,8 +1,8 @@
 from abc import ABCMeta, abstractmethod
 from collections import OrderedDict
-from igibson.prims.xform_prim import XFormPrim
-from igibson.utils.python_utils import classproperty, assert_valid_key, Registerable
-from igibson.utils.gym_utils import GymObservable
+from omnigibson.prims.xform_prim import XFormPrim
+from omnigibson.utils.python_utils import classproperty, assert_valid_key, Registerable
+from omnigibson.utils.gym_utils import GymObservable
 from gym.spaces import Space
 
 

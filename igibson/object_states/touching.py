@@ -1,6 +1,6 @@
-from igibson.object_states.contact_bodies import ContactBodies
-from igibson.object_states.kinematics import KinematicsMixin
-from igibson.object_states.object_state_base import BooleanState, RelativeObjectState
+from omnigibson.object_states.contact_bodies import ContactBodies
+from omnigibson.object_states.kinematics import KinematicsMixin
+from omnigibson.object_states.object_state_base import BooleanState, RelativeObjectState
 
 
 class Touching(KinematicsMixin, RelativeObjectState, BooleanState):

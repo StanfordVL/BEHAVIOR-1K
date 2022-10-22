@@ -5,19 +5,19 @@
   <param name="robot/type" value="turtlebot"/>
 
 
-  <param name="robot_description" command="cat $(find igibson-ros)/turtlebot/turtlebot.urdf"/>
+  <param name="robot_description" command="cat $(find omnigibson-ros)/turtlebot/turtlebot.urdf"/>
 
   <node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher">
   </node>
 
-  <node name="turtlebot_gibson_sim" pkg="igibson-ros" type="turtlebot_rgbd.py" output="screen">
+  <node name="turtlebot_gibson_sim" pkg="omnigibson-ros" type="turtlebot_rgbd.py" output="screen">
   </node>
 
   <node pkg="robot_state_publisher" type="robot_state_publisher" name="robot_state_publisher">
     <param name="publish_frequency" type="double" value="5.0" />
   </node>
 
-  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find igibson-ros)/rviz/gmapping.rviz" />
+  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find omnigibson-ros)/rviz/gmapping.rviz" />
 
   <!-- Velocity muxer -->
   <node pkg="nodelet" type="nodelet" name="mobile_base_nodelet_manager" args="manager"/>

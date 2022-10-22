@@ -1,7 +1,7 @@
 include LICENSE
 
-graft igibson
-prune igibson/data
-prune igibson/render/openvr/samples
+graft omnigibson
+prune omnigibson/data
+prune omnigibson/render/openvr/samples
 
 global-exclude *.py[co]

@@ -22,7 +22,7 @@ from omni.isaac.core.utils.prims import (
 )
 from omni.isaac.core.utils.stage import get_current_stage
 from omni.isaac.core.utils.prims import delete_prim
-from igibson.utils.python_utils import Serializable, UniquelyNamed, Recreatable
+from omnigibson.utils.python_utils import Serializable, UniquelyNamed, Recreatable
 
 
 class BasePrim(Serializable, UniquelyNamed, Recreatable, ABC):

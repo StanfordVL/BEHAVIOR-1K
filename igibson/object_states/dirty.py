@@ -1,7 +1,7 @@
-from igibson.macros import create_module_macros
-from igibson.object_states import AABB
-from igibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
-from igibson.systems.macro_particle_system import DustSystem, StainSystem
+from omnigibson.macros import create_module_macros
+from omnigibson.object_states import AABB
+from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
+from omnigibson.systems.macro_particle_system import DustSystem, StainSystem
 from collections import OrderedDict
 import numpy as np
 

@@ -8,11 +8,11 @@
 #
 # import numpy as np
 #
-# import igibson
-# from igibson.envs.igibson_env import iGibsonEnv
+# import omnigibson
+# from omnigibson.envs.omnigibson_env import OmniGibsonEnv
 #
 #
-# class ParallelNavEnv(iGibsonEnv):
+# class ParallelNavEnv(OmniGibsonEnv):
 #     """Batch together environments and simulate them in external processes.
 #     The environments are created in external processes by calling the provided
 #     callables. This can be an environment class, or a function creating the
@@ -245,10 +245,10 @@
 #
 #
 # if __name__ == "__main__":
-#     config_filename = os.path.join(os.path.dirname(igibson.__file__), "..", "tests", "test.yaml")
+#     config_filename = os.path.join(os.path.dirname(omnigibson.__file__), "..", "tests", "test.yaml")
 #
 #     def load_env():
-#         return iGibsonEnv(config_file=config_filename, mode="headless")
+#         return OmniGibsonEnv(config_file=config_filename, mode="headless")
 #
 #     parallel_env = ParallelNavEnv([load_env] * 2, blocking=False)
 #

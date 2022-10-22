@@ -3,8 +3,8 @@ import tempfile
 
 import pytest
 
-from igibson.examples.learning.demo_collection_example import collect_demo
-from igibson.examples.learning.demo_replaying_example import safe_replay_demo
+from omnigibson.examples.learning.demo_collection_example import collect_demo
+from omnigibson.examples.learning.demo_replaying_example import safe_replay_demo
 
 
 @pytest.mark.skip(reason="need to re-cache scene instances and refactor BehaviorRobot first")

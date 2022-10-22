@@ -1,6 +1,6 @@
-import igibson
-from igibson import app, ig_dataset_path
-from igibson.simulator import Simulator
+import omnigibson
+from omnigibson import app, og_dataset_path
+from omnigibson.simulator import Simulator
 import omni
 import omni.kit.commands
 from pxr import UsdLux, Sdf, Gf, UsdPhysics, PhysicsSchemaTools, Usd
@@ -17,7 +17,7 @@ from refactor_scripts.expand_collision_obj_and_urdf import split_objs_in_urdf
 from refactor_scripts.preprocess_urdf_for_metalinks import update_obj_urdf_with_metalinks
 
 ##### SET THIS ######
-URDF = f"{ig_dataset_path}/scenes/Rs_int/urdf/Rs_int_best.urdf"
+URDF = f"{og_dataset_path}/scenes/Rs_int/urdf/Rs_int_best.urdf"
 #### YOU DONT NEED TO TOUCH ANYTHING BELOW HERE IDEALLY :) #####
 
 
@@ -102,9 +102,9 @@ def import_obj_urdf(obj_category, obj_model, skip_if_exist=False):
     # Import URDF
     cfg = create_import_config()
     # Check if filepath exists
-    usd_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}/usd/{obj_model}.usd"
+    usd_path = f"{og_dataset_path}/objects/{obj_category}/{obj_model}/usd/{obj_model}.usd"
     if not (skip_if_exist and exists(usd_path)):
-        urdf_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}/{obj_model}.urdf"
+        urdf_path = f"{og_dataset_path}/objects/{obj_category}/{obj_model}/{obj_model}.urdf"
         print(f"Converting collision meshes from {obj_category}, {obj_model}...")
         urdf_path = split_objs_in_urdf(urdf_fpath=urdf_path, name_suffix="split")
         print(f"Importing {obj_category}, {obj_model}...")
@@ -125,9 +125,9 @@ def import_ig2_building_urdf(scene_id, category, skip_if_exist=False):
     # Check if filepath exists
     obj_category = f"{category}"
     obj_model = f"{scene_id}"
-    usd_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}/usd/{obj_model}.usd"
+    usd_path = f"{og_dataset_path}/objects/{obj_category}/{obj_model}/usd/{obj_model}.usd"
     if not (skip_if_exist and exists(usd_path)):
-        urdf_path = f"{ig_dataset_path}/scenes/{scene_id}/urdf/{obj_model}.urdf"
+        urdf_path = f"{og_dataset_path}/scenes/{scene_id}/urdf/{obj_model}.urdf"
         print(f"Converting IG2 building collision meshes from {scene_id}, {category}...")
         urdf_path = split_objs_in_urdf(urdf_fpath=urdf_path, name_suffix="split", mesh_fpath_offset="..")
         print(f"Importing IG2 building {scene_id}, {category}...")

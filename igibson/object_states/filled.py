@@ -1,11 +1,11 @@
 import numpy as np
 from collections import OrderedDict
-from igibson.macros import gm, create_module_macros
-from igibson.object_states.link_based_state_mixin import LinkBasedStateMixin
-from igibson.object_states.object_state_base import RelativeObjectState, BooleanState
-import igibson.utils.transform_utils as T
-from igibson.utils.usd_utils import mesh_prim_to_trimesh_mesh
-from igibson.systems import get_fluid_systems, get_system_from_element_name, get_element_name_from_system
+from omnigibson.macros import gm, create_module_macros
+from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
+from omnigibson.object_states.object_state_base import RelativeObjectState, BooleanState
+import omnigibson.utils.transform_utils as T
+from omnigibson.utils.usd_utils import mesh_prim_to_trimesh_mesh
+from omnigibson.systems import get_fluid_systems, get_system_from_element_name, get_element_name_from_system
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)

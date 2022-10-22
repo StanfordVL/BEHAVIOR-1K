@@ -1,4 +1,4 @@
-name: Sync iGibson-dev/master to iGibson/master
+name: Sync OmniGibson-dev/master to OmniGibson/master
 
 on:
   workflow_dispatch:
@@ -12,7 +12,7 @@ jobs:
     if: github.ref == 'refs/heads/master'
     steps:
       - uses: actions/checkout@v2
-      - name: Sync iGibson-dev/master to iGibson/master
-        if: github.repository == 'StanfordVL/iGibson-dev' && startsWith(github.ref, 'refs/tags')
+      - name: Sync OmniGibson-dev/master to OmniGibson/master
+        if: github.repository == 'StanfordVL/OmniGibson-dev' && startsWith(github.ref, 'refs/tags')
         run:
-          git push https://$PERSONAL_ACCESS_TOKEN:x-oauth-basic@github.com/StanfordVL/iGibson.git master:master
+          git push https://$PERSONAL_ACCESS_TOKEN:x-oauth-basic@github.com/StanfordVL/OmniGibson.git master:master

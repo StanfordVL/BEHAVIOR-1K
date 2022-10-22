@@ -5,8 +5,8 @@ import logging
 from inspect import isclass
 import numpy as np
 from collections import OrderedDict, Iterable
-from igibson.macros import create_module_macros
-from igibson.utils.python_utils import Serializable, SerializableNonInstance, UniquelyNamed
+from omnigibson.macros import create_module_macros
+from omnigibson.utils.python_utils import Serializable, SerializableNonInstance, UniquelyNamed
 
 
 # Create settings for this module

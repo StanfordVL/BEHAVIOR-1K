@@ -2,10 +2,10 @@
 
 ## Introduction
 
-Assets includes necessary files for constructing a scene in iGibson simulator. The files include robot models, interactive objects, articulated objects and mesh files for tests. These files are too large to include in a version control system so we distribute them separately. The assets file can be downloaded to the path set in `your_installation_path/igibson/global_config.yaml` (default to `your_installation_path/igibson/data/assets`) with running 
+Assets includes necessary files for constructing a scene in OmniGibson simulator. The files include robot models, interactive objects, articulated objects and mesh files for tests. These files are too large to include in a version control system so we distribute them separately. The assets file can be downloaded to the path set in `your_installation_path/omnigibson/global_config.yaml` (default to `your_installation_path/omnigibson/data/assets`) with running 
 
 ```bash 
-python -m igibson.utils.assets_utils --download_assets
+python -m omnigibson.utils.assets_utils --download_assets
 ```
 
 The folder structure will look like below (in the future we might add more models):

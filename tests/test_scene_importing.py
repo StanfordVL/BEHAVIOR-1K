@@ -2,13 +2,13 @@ import os
 
 
 
-import igibson
-from igibson.render.mesh_renderer.mesh_renderer_settings import MeshRendererSettings
-from igibson.robots.turtlebot import Turtlebot
-from igibson.scenes.gibson_indoor_scene import StaticIndoorScene
-from igibson.scenes.stadium_scene import StadiumScene
-from igibson.simulator import Simulator
-from igibson.utils.asset_utils import download_assets, download_demo_data
+import omnigibson
+from omnigibson.render.mesh_renderer.mesh_renderer_settings import MeshRendererSettings
+from omnigibson.robots.turtlebot import Turtlebot
+from omnigibson.scenes.gibson_indoor_scene import StaticIndoorScene
+from omnigibson.scenes.stadium_scene import StadiumScene
+from omnigibson.simulator import Simulator
+from omnigibson.utils.asset_utils import download_assets, download_demo_data
 
 
 def test_import_building():

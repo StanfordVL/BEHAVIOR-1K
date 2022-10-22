@@ -4,15 +4,15 @@ import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
 
-import igibson
-from igibson.render.mesh_renderer.mesh_renderer_cpu import MeshRenderer
-from igibson.render.mesh_renderer.mesh_renderer_settings import MeshRendererSettings
-from igibson.utils.asset_utils import get_ig_model_path
+import omnigibson
+from omnigibson.render.mesh_renderer.mesh_renderer_cpu import MeshRenderer
+from omnigibson.render.mesh_renderer.mesh_renderer_settings import MeshRendererSettings
+from omnigibson.utils.asset_utils import get_og_model_path
 
 
 def test_render_pbr():
-    hdr_texture = os.path.join(igibson.ig_dataset_path, "scenes", "background", "quattro_canti_4k.hdr")
-    model_path = os.path.join(get_ig_model_path("sink", "sink_1"), "shape", "visual")
+    hdr_texture = os.path.join(omnigibson.og_dataset_path, "scenes", "background", "quattro_canti_4k.hdr")
+    model_path = os.path.join(get_og_model_path("sink", "sink_1"), "shape", "visual")
     settings = MeshRendererSettings(
         msaa=True, enable_shadow=True, env_texture_filename=hdr_texture, env_texture_filename3=hdr_texture
     )
@@ -46,8 +46,8 @@ def test_render_pbr():
 
 
 def test_render_pbr_optimized():
-    hdr_texture = os.path.join(igibson.ig_dataset_path, "scenes", "background", "quattro_canti_4k.hdr")
-    model_path = os.path.join(get_ig_model_path("sink", "sink_1"), "shape", "visual")
+    hdr_texture = os.path.join(omnigibson.og_dataset_path, "scenes", "background", "quattro_canti_4k.hdr")
+    model_path = os.path.join(get_og_model_path("sink", "sink_1"), "shape", "visual")
     settings = MeshRendererSettings(
         msaa=True,
         enable_shadow=True,

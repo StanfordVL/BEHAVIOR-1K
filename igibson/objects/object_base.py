@@ -2,19 +2,19 @@ from abc import ABCMeta, abstractmethod
 from collections import Iterable, OrderedDict
 import logging
 
-from igibson.macros import create_module_macros
-from igibson.utils.constants import (
+from omnigibson.macros import create_module_macros
+from omnigibson.utils.constants import (
     ALL_COLLISION_GROUPS_MASK,
     DEFAULT_COLLISION_GROUP,
     SPECIAL_COLLISION_GROUPS,
     SemanticClass,
 )
 from pxr import UsdPhysics, PhysxSchema
-from igibson.utils.usd_utils import get_prim_nested_children, create_joint, CollisionAPI
-from igibson.prims.entity_prim import EntityPrim
-from igibson.prims.xform_prim import XFormPrim
-from igibson.prims.rigid_prim import RigidPrim
-from igibson.utils.constants import PrimType, CLASS_NAME_TO_CLASS_ID
+from omnigibson.utils.usd_utils import get_prim_nested_children, create_joint, CollisionAPI
+from omnigibson.prims.entity_prim import EntityPrim
+from omnigibson.prims.xform_prim import XFormPrim
+from omnigibson.prims.rigid_prim import RigidPrim
+from omnigibson.utils.constants import PrimType, CLASS_NAME_TO_CLASS_ID
 
 from omni.isaac.core.utils.semantics import add_update_semantics
 from pxr import Gf
@@ -28,7 +28,7 @@ m.HIGHLIGHT_INTENSITY = 10000.0             # Highlight intensity to apply, rang
 
 
 class BaseObject(EntityPrim, metaclass=ABCMeta):
-    """This is the interface that all iGibson objects must implement."""
+    """This is the interface that all OmniGibson objects must implement."""
 
     def __init__(
             self,
@@ -86,7 +86,7 @@ class BaseObject(EntityPrim, metaclass=ABCMeta):
         logging.info(f"Category: {self.category}")
 
         # TODO
-        # This sets the collision group of the object. In igibson, objects are only permitted to be part of a single
+        # This sets the collision group of the object. In omnigibson, objects are only permitted to be part of a single
         # collision group, e.g. collisions are only enabled within a single group
         self.collision_group = SPECIAL_COLLISION_GROUPS.get(self.category, DEFAULT_COLLISION_GROUP)
 

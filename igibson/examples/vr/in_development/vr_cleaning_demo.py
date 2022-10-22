@@ -3,14 +3,14 @@ that can be used to benchmark the dexterity of the VR hand.
 """
 import os
 
-import igibson
-from igibson import object_states
-from igibson.objects.ycb_object import YCBObject
-from igibson.render.mesh_renderer.mesh_renderer_settings import MeshRendererSettings
-from igibson.render.mesh_renderer.mesh_renderer_vr import VrSettings
-from igibson.robots.behavior_robot import BehaviorRobot
-from igibson.scenes.interactive_traversable_scene import InteractiveIndoorScene
-from igibson.simulator import Simulator
+import omnigibson
+from omnigibson import object_states
+from omnigibson.objects.ycb_object import YCBObject
+from omnigibson.render.mesh_renderer.mesh_renderer_settings import MeshRendererSettings
+from omnigibson.render.mesh_renderer.mesh_renderer_vr import VrSettings
+from omnigibson.robots.behavior_robot import BehaviorRobot
+from omnigibson.scenes.interactive_traversable_scene import InteractiveIndoorScene
+from omnigibson.simulator import Simulator
 
 # Set to true to use viewer manipulation instead of VR
 # Set to false by default so this benchmark task can be performed in VR
@@ -21,12 +21,12 @@ PRINT_FPS = True
 USE_GRIPPER = False
 
 # HDR files for PBR rendering
-hdr_texture = os.path.join(igibson.ig_dataset_path, "scenes", "background", "probe_02.hdr")
-hdr_texture2 = os.path.join(igibson.ig_dataset_path, "scenes", "background", "probe_03.hdr")
+hdr_texture = os.path.join(omnigibson.og_dataset_path, "scenes", "background", "probe_02.hdr")
+hdr_texture2 = os.path.join(omnigibson.og_dataset_path, "scenes", "background", "probe_03.hdr")
 light_modulation_map_filename = os.path.join(
-    igibson.ig_dataset_path, "scenes", "Rs_int", "layout", "floor_lighttype_0.png"
+    omnigibson.og_dataset_path, "scenes", "Rs_int", "layout", "floor_lighttype_0.png"
 )
-background_texture = os.path.join(igibson.ig_dataset_path, "scenes", "background", "urban_street_01.jpg")
+background_texture = os.path.join(omnigibson.og_dataset_path, "scenes", "background", "urban_street_01.jpg")
 
 # VR rendering settings
 vr_rendering_settings = MeshRendererSettings(

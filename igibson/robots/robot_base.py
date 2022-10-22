@@ -5,14 +5,14 @@ from copy import deepcopy
 from collections import OrderedDict
 import numpy as np
 import matplotlib.pyplot as plt
-from igibson.macros import gm
-from igibson.sensors import create_sensor, SENSOR_PRIMS_TO_SENSOR_CLS, ALL_SENSOR_MODALITIES, VisionSensor, ScanSensor
-from igibson.objects.usd_object import USDObject
-from igibson.objects.controllable_object import ControllableObject
-from igibson.utils.gym_utils import GymObservable
-from igibson.utils.python_utils import Registerable, classproperty
-from igibson.utils.vision_utils import segmentation_to_rgb
-import igibson.utils.transform_utils as T
+from omnigibson.macros import gm
+from omnigibson.sensors import create_sensor, SENSOR_PRIMS_TO_SENSOR_CLS, ALL_SENSOR_MODALITIES, VisionSensor, ScanSensor
+from omnigibson.objects.usd_object import USDObject
+from omnigibson.objects.controllable_object import ControllableObject
+from omnigibson.utils.gym_utils import GymObservable
+from omnigibson.utils.python_utils import Registerable, classproperty
+from omnigibson.utils.vision_utils import segmentation_to_rgb
+import omnigibson.utils.transform_utils as T
 from pxr import PhysxSchema
 
 # Global dicts that will contain mappings
@@ -89,7 +89,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable, Registerable):
          specified by this class.
         obs_modalities (str or list of str): Observation modalities to use for this robot. Default is "all", which
             corresponds to all modalities being used.
-            Otherwise, valid options should be part of igibson.sensors.ALL_SENSOR_MODALITIES.
+            Otherwise, valid options should be part of omnigibson.sensors.ALL_SENSOR_MODALITIES.
         :param proprio_obs: str or tuple of str, proprioception observation key(s) to use for generating proprioceptive
             observations. If str, should be exactly "default" -- this results in the default proprioception observations
             being used, as defined by self.default_proprio_obs. See self._get_proprioception_dict for valid key choices
@@ -284,7 +284,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable, Registerable):
 
     def add_obs_modality(self, modality):
         """
-        Adds observation modality @modality to this robot. Note: Should be one of igibson.sensors.ALL_SENSOR_MODALITIES
+        Adds observation modality @modality to this robot. Note: Should be one of omnigibson.sensors.ALL_SENSOR_MODALITIES
 
         Args:
             modality (str): Observation modality to add to this robot
@@ -298,7 +298,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable, Registerable):
     def remove_obs_modality(self, modality):
         """
         Remove observation modality @modality from this robot. Note: Should be one of
-        igibson.sensors.ALL_SENSOR_MODALITIES
+        omnigibson.sensors.ALL_SENSOR_MODALITIES
 
         Args:
             modality (str): Observation modality to remove from this robot
@@ -368,7 +368,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable, Registerable):
                     axes[i].set_title(modality)
                     axes[i].set_axis_off()
                 # Set title
-                fig.suptitle(sensor_name)
+                fog.suptitle(sensor_name)
                 plt.show(block=False)
 
         # One final plot show so all the figures get rendered

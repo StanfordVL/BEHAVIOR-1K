@@ -1,6 +1,6 @@
-from igibson.macros import gm
-from igibson.object_states.fluid_source import FluidSource
-from igibson.systems.micro_particle_system import WaterSystem
+from omnigibson.macros import gm
+from omnigibson.object_states.fluid_source import FluidSource
+from omnigibson.systems.micro_particle_system import WaterSystem
 
 
 class WaterSource(FluidSource):

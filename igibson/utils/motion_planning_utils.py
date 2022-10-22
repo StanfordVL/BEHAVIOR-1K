@@ -3,8 +3,8 @@ import random
 
 from transforms3d import euler
 
-from igibson.robots.manipulation_robot import IsGraspingState
-from igibson.utils.sim_utils import check_collision
+from omnigibson.robots.manipulation_robot import IsGraspingState
+from omnigibson.utils.sim_utils import check_collision
 from omni.isaac.core.utils.prims import get_prim_at_path
 
 log = logging.getLogger(__name__)
@@ -15,8 +15,8 @@ import time
 import numpy as np
 from collections import OrderedDict
 
-# from igibson.external.motion.motion_planners.rrt_connect import birrt
-# from igibson.external.pybullet_tools.utils import (
+# from omnigibson.external.motion.motion_planners.rrt_connect import birrt
+# from omnigibson.external.pybullet_tools.utils import (
 #     PI,
 #     circular_difference,
 #     direct_path,
@@ -41,7 +41,7 @@ from collections import OrderedDict
 #     set_pose,
 # )
 
-# from igibson.external.pybullet_tools.utils import (
+# from omnigibson.external.pybullet_tools.utils import (
 #     control_joints,
 #     get_base_values,
 #     get_joint_positions,
@@ -58,15 +58,15 @@ from collections import OrderedDict
 #     set_pose,
 # )
 
-from igibson.macros import gm, create_module_macros
-from igibson import app, assets_path
-from igibson.objects.primitive_object import PrimitiveObject
-from igibson.robots.manipulation_robot import ManipulationRobot
-from igibson.sensors.scan_sensor import ScanSensor
-from igibson.scenes.static_traversable_scene import StaticTraversableScene
-from igibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
-import igibson.utils.transform_utils as T
-from igibson.utils.control_utils import IKSolver
+from omnigibson.macros import gm, create_module_macros
+from omnigibson import app, assets_path
+from omnigibson.objects.primitive_object import PrimitiveObject
+from omnigibson.robots.manipulation_robot import ManipulationRobot
+from omnigibson.sensors.scan_sensor import ScanSensor
+from omnigibson.scenes.static_traversable_scene import StaticTraversableScene
+from omnigibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
+import omnigibson.utils.transform_utils as T
+from omnigibson.utils.control_utils import IKSolver
 
 
 SEARCHED = []
@@ -268,7 +268,7 @@ class MotionPlanner:
         log.debug("Motion planning base goal: {}".format(goal))
 
         # Save state to reload
-        state = ig.sim.dump_state(serialized=False)
+        state = og.sim.dump_state(serialized=False)
         x, y, theta = goal
         print(f"goal: {x},{y},{theta}")
 
@@ -359,7 +359,7 @@ class MotionPlanner:
             log.debug("Path NOT found!")
 
         # Restore original state
-        ig.sim.load_state(state=state, serialized=False)
+        og.sim.load_state(state=state, serialized=False)
         # app.update()
 
         return path
@@ -374,7 +374,7 @@ class MotionPlanner:
         if path is not None:
             # If we are not keeping the last location, se save the state to reload it after the visualization
             if not keep_last_location:
-                initial_state = ig.sim.dump_state(serialized=False)
+                initial_state = og.sim.dump_state(serialized=False)
 
             grasping_object = self.robot.is_grasping() == IsGraspingState.TRUE
             grasped_obj = self.robot._ag_obj_in_hand[self.robot.default_arm]
@@ -412,7 +412,7 @@ class MotionPlanner:
 
             if not keep_last_location:
                 log.info("Not keeping the last state, only visualizing the path and restoring at the end")
-                ig.sim.load_state(state=initial_state, serialized=False)
+                og.sim.load_state(state=initial_state, serialized=False)
                 # app.update()
 
     def get_ik_parameters(self, arm="default"):
@@ -502,10 +502,10 @@ class MotionPlanner:
 
         # jnt_state = self.robot.get_joints_state()
 
-        state = ig.sim.dump_state(serialized=False)
+        state = og.sim.dump_state(serialized=False)
         # self.simulator_step()
         # self.simulator_step()
-        # ig.sim.load_state(state=state, serialized=False)
+        # og.sim.load_state(state=state, serialized=False)
         # self.simulator_step()
         # self.simulator_step()
         # for i in range(100):
@@ -588,13 +588,13 @@ class MotionPlanner:
             # p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, True)
 
             # Restore state
-            ig.sim.load_state(state=state, serialized=False)
+            og.sim.load_state(state=state, serialized=False)
             # app.update()
             log.debug("IK Solver found a valid configuration")
             return control_joint_pos
 
         # p.configureDebugVisualizer(p.COV_ENABLE_RENDERING, True)
-        ig.sim.load_state(state=state, serialized=False)
+        og.sim.load_state(state=state, serialized=False)
         # app.update()
         # self.episode_metrics['arm_ik_time'] += time() - ik_start
         log.debug("IK Solver failed to find a configuration")
@@ -750,7 +750,7 @@ class MotionPlanner:
             log.warning("Requested line of length 0. Returning a path with only one configuration: initial_arm_pose")
             return [initial_arm_pose]
 
-        state = ig.sim.dump_state(serialized=False)
+        state = og.sim.dump_state(serialized=False)
 
         # Start planning from the given pose
         if self.robot_type != "BehaviorRobot":
@@ -784,7 +784,7 @@ class MotionPlanner:
             start_restore = time.time()
             # print('start restore {}'.format(start_restore-start_joint_pose))
             if joint_pose is None:
-                ig.sim.load_state(state=state, serialized=False)
+                og.sim.load_state(state=state, serialized=False)
                 # app.update()
                 log.warning("Failed to retrieve IK solution for EE line path. Failure.")
                 return None
@@ -792,7 +792,7 @@ class MotionPlanner:
             line_path.append(joint_pose)
             end_restore = time.time()
             # print('end restore {}'.format(end_restore - start_restore))
-        ig.sim.load_state(state=state, serialized=False)
+        og.sim.load_state(state=state, serialized=False)
         # app.update()
         return line_path
 
@@ -1381,7 +1381,7 @@ class MotionPlanner:
             log.warn("Visualizing arm path for the default arm: {}".format(arm))
 
         if not keep_last_location:
-            state = ig.sim.dump_state(serialized=False)
+            state = og.sim.dump_state(serialized=False)
 
         if grasped_obj is not None:
             if self.robot_type != "BehaviorRobot":
@@ -1443,7 +1443,7 @@ class MotionPlanner:
                     self.simulator_sync()
 
         if not keep_last_location:
-            ig.sim.load_state(state=state, serialized=False)
+            og.sim.load_state(state=state, serialized=False)
 
     def set_marker_position(self, pos):
         """

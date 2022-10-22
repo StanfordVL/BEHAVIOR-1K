@@ -1,7 +1,7 @@
 # TODO: Refactor!
 
 ## scene
-#scene: igibson
+#scene: omnigibson
 #scene_id: Rs_int
 #build_graph: true
 #load_texture: true

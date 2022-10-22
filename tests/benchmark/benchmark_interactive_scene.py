@@ -6,13 +6,13 @@ import time
 import matplotlib.pyplot as plt
 import numpy as np
 
-import igibson
-from igibson import app, ig_dataset_path
-from igibson.robots.turtlebot import Turtlebot
-from igibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
-from igibson.simulator import Simulator
-from igibson.utils.asset_utils import get_ig_assets_version
-from igibson.utils.config_utils import parse_config
+import omnigibson
+from omnigibson import app, og_dataset_path
+from omnigibson.robots.turtlebot import Turtlebot
+from omnigibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
+from omnigibson.simulator import Simulator
+from omnigibson.utils.asset_utils import get_og_assets_version
+from omnigibson.utils.config_utils import parse_config
 
 
 # Params to be set as needed.
@@ -37,9 +37,9 @@ NUM_STEPS = 2000
 
 
 def benchmark_scene(sim, scene_name, optimized=False, import_robot=True):
-    assets_version = get_ig_assets_version()
+    assets_version = get_og_assets_version()
     print("assets_version", assets_version)
-    scene_path = f"{ig_dataset_path}/scenes/{scene_name}/urdf/{scene_name}_best_template.usd"
+    scene_path = f"{og_dataset_path}/scenes/{scene_name}/urdf/{scene_name}_best_template.usd"
     scene = InteractiveTraversableScene(
         scene_name, usd_path=scene_path, texture_randomization=False, object_randomization=False)
     start = time.time()

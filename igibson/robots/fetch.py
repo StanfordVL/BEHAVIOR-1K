@@ -3,14 +3,14 @@ import os
 import numpy as np
 
 
-import igibson
-from igibson.controllers import ControlType
-from igibson.robots.active_camera_robot import ActiveCameraRobot
-from igibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
-from igibson.robots.two_wheel_robot import TwoWheelRobot
-from igibson.utils.constants import SemanticClass
-from igibson.utils.python_utils import assert_valid_key
-from igibson.utils.usd_utils import JointType
+import omnigibson
+from omnigibson.controllers import ControlType
+from omnigibson.robots.active_camera_robot import ActiveCameraRobot
+from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
+from omnigibson.robots.two_wheel_robot import TwoWheelRobot
+from omnigibson.utils.constants import SemanticClass
+from omnigibson.utils.python_utils import assert_valid_key
+from omnigibson.utils.usd_utils import JointType
 
 DEFAULT_ARM_POSES = {
     "vertical",
@@ -100,7 +100,7 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
          specified by this class.
         obs_modalities (str or list of str): Observation modalities to use for this robot. Default is "all", which
             corresponds to all modalities being used.
-            Otherwise, valid options should be part of igibson.sensors.ALL_SENSOR_MODALITIES.
+            Otherwise, valid options should be part of omnigibson.sensors.ALL_SENSOR_MODALITIES.
         :param proprio_obs: str or tuple of str, proprioception observation key(s) to use for generating proprioceptive
             observations. If str, should be exactly "default" -- this results in the default proprioception observations
             being used, as defined by self.default_proprio_obs. See self._get_proprioception_dict for valid key choices
@@ -425,15 +425,15 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
 
     @property
     def usd_path(self):
-        return os.path.join(igibson.assets_path, "models/fetch/fetch/fetch.usd")
+        return os.path.join(omnigibson.assets_path, "models/fetch/fetch/fetch.usd")
 
     @property
     def robot_arm_descriptor_yamls(self):
-        return {self.default_arm: os.path.join(igibson.assets_path, "models/fetch/fetch_descriptor.yaml")}
+        return {self.default_arm: os.path.join(omnigibson.assets_path, "models/fetch/fetch_descriptor.yaml")}
 
     @property
     def urdf_path(self):
-        return os.path.join(igibson.assets_path, "models/fetch/fetch.urdf")
+        return os.path.join(omnigibson.assets_path, "models/fetch/fetch.urdf")
 
     def dump_config(self):
         cfg = super().dump_config()

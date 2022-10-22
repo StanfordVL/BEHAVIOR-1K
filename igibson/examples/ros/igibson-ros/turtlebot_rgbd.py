@@ -14,14 +14,14 @@ from sensor_msgs.msg import Image as ImageMsg
 from sensor_msgs.msg import PointCloud2
 from std_msgs.msg import Header
 
-from igibson.envs.igibson_env import iGibsonEnv
+from omnigibson.envs.omnigibson_env import OmniGibsonEnv
 
 
 class SimNode:
     def __init__(self):
-        rospy.init_node("igibson_sim")
+        rospy.init_node("omnigibson_sim")
         rospack = rospkg.RosPack()
-        path = rospack.get_path("igibson-ros")
+        path = rospack.get_path("omnigibson-ros")
         config_filename = os.path.join(path, "turtlebot_rgbd.yaml")
 
         self.cmdx = 0.0
@@ -41,7 +41,7 @@ class SimNode:
         self.bridge = CvBridge()
         self.br = tf.TransformBroadcaster()
 
-        self.env = iGibsonEnv(
+        self.env = OmniGibsonEnv(
             config_file=config_filename, mode="headless", action_timestep=1 / 30.0
         )  # assume a 30Hz simulation
         self.env.reset()

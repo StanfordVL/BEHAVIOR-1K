@@ -1,10 +1,10 @@
 import numpy as np
 
-from igibson.object_states.aabb import AABB
-from igibson.object_states.adjacency import HorizontalAdjacency, flatten_planes
-from igibson.object_states.kinematics import KinematicsMixin
-from igibson.object_states.memoization import PositionalValidationMemoizedObjectStateMixin
-from igibson.object_states.object_state_base import BooleanState, RelativeObjectState
+from omnigibson.object_states.aabb import AABB
+from omnigibson.object_states.adjacency import HorizontalAdjacency, flatten_planes
+from omnigibson.object_states.kinematics import KinematicsMixin
+from omnigibson.object_states.memoization import PositionalValidationMemoizedObjectStateMixin
+from omnigibson.object_states.object_state_base import BooleanState, RelativeObjectState
 
 
 class NextTo(PositionalValidationMemoizedObjectStateMixin, KinematicsMixin, RelativeObjectState, BooleanState):

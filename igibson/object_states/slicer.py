@@ -1,8 +1,8 @@
 import numpy as np
-from igibson.macros import create_module_macros
-from igibson.object_states import ContactBodies, Sliced
-from igibson.object_states.link_based_state_mixin import LinkBasedStateMixin
-from igibson.object_states.object_state_base import AbsoluteObjectState
+from omnigibson.macros import create_module_macros
+from omnigibson.object_states import ContactBodies, Sliced
+from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
+from omnigibson.object_states.object_state_base import AbsoluteObjectState
 from omni.isaac.utils._isaac_utils import math as math_utils
 
 

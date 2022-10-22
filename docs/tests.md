@@ -1,6 +1,6 @@
 # Tests and Examples
 ### Tests
-We provide tests in [this directory](https://github.com/StanfordVL/iGibson/tree/master/tests) in our repository. 
+We provide tests in [this directory](https://github.com/StanfordVL/OmniGibson/tree/master/tests) in our repository. 
 You can run them executing:
 ```bash
 pytest --ignore disabled --ignore benchmark

@@ -27,20 +27,20 @@ from omni.isaac.core.utils.viewports import set_camera_view
 from omni.isaac.core.loggers import DataLogger
 from typing import Optional, List
 
-import igibson as ig
-from igibson.macros import gm, create_module_macros
-from igibson.robots.robot_base import BaseRobot
-from igibson.utils.config_utils import NumpyEncoder
-from igibson.utils.python_utils import clear as clear_pu, create_object_from_init_info, Serializable
-from igibson.utils.usd_utils import clear as clear_uu, BoundingBoxAPI, get_usd_metadata, update_usd_metadata
-from igibson.utils.asset_utils import get_ig_avg_category_specs
-from igibson.utils.ui_utils import CameraMover
-from igibson.scenes import Scene
-from igibson.objects.object_base import BaseObject
-from igibson.objects.stateful_object import StatefulObject
-from igibson.object_states.factory import get_states_by_dependency_order
-from igibson.sensors.vision_sensor import VisionSensor
-from igibson.transition_rules import DEFAULT_RULES, TransitionResults
+import omnigibson as og
+from omnigibson.macros import gm, create_module_macros
+from omnigibson.robots.robot_base import BaseRobot
+from omnigibson.utils.config_utils import NumpyEncoder
+from omnigibson.utils.python_utils import clear as clear_pu, create_object_from_init_info, Serializable
+from omnigibson.utils.usd_utils import clear as clear_uu, BoundingBoxAPI, get_usd_metadata, update_usd_metadata
+from omnigibson.utils.asset_utils import get_og_avg_category_specs
+from omnigibson.utils.ui_utils import CameraMover
+from omnigibson.scenes import Scene
+from omnigibson.objects.object_base import BaseObject
+from omnigibson.objects.stateful_object import StatefulObject
+from omnigibson.object_states.factory import get_states_by_dependency_order
+from omnigibson.sensors.vision_sensor import VisionSensor
+from omnigibson.transition_rules import DEFAULT_RULES, TransitionResults
 from omni.kit.viewport_legacy import acquire_viewport_interface
 from omni.syntheticdata import SyntheticData
 
@@ -688,7 +688,7 @@ class Simulator(SimulationContext, Serializable):
         # clear_stage(predicate=check_deletable_prim)
 
         # Load dummy stage, but don't clear sim to prevent circular loops
-        self.load_stage(usd_path=f"{ig.assets_path}/models/misc/clear_stage.usd")
+        self.load_stage(usd_path=f"{og.assets_path}/models/misc/clear_stage.usd")
 
     def restore(self, usd_path):
         """
@@ -841,14 +841,14 @@ class Simulator(SimulationContext, Serializable):
 
         # Set the viewer camera, and then set its default pose
         self._set_viewer_camera()
-        ig.sim.viewer_camera.set_position_orientation(
+        og.sim.viewer_camera.set_position_orientation(
             position=np.array(m.DEFAULT_VIEWER_CAMERA_POS),
             orientation=np.array(m.DEFAULT_VIEWER_CAMERA_QUAT),
         )
 
     def close(self):
         """
-        Shuts down the iGibson application
+        Shuts down the OmniGibson application
         """
         self._app.shutdown()
 

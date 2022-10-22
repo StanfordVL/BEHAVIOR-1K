@@ -1,10 +1,10 @@
 import logging
 import numpy as np
 
-import igibson as ig
-from igibson import object_states
-from igibson.macros import gm
-from igibson.objects import PrimitiveObject
+import omnigibson as og
+from omnigibson import object_states
+from omnigibson.macros import gm
+from omnigibson.objects import PrimitiveObject
 
 
 def main(random_selection=False, headless=False, short_exec=False):
@@ -27,7 +27,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         }
     }
 
-    env = ig.Environment(configs=cfg, action_timestep=1/60., physics_timestep=1/60.)
+    env = og.Environment(configs=cfg, action_timestep=1/60., physics_timestep=1/60.)
 
     # Load a cleaning tool (a block with the ability to be soaked and is a cleaning tool)
     block = PrimitiveObject(
@@ -38,7 +38,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         rgba=[0.5, 1.0, 1.0, 1.0],
         abilities={"soakable": {}, "cleaningTool": {}},
     )
-    ig.sim.import_object(block)
+    og.sim.import_object(block)
     block.set_position([-1.4, 3.0, 1.5])
 
     # Set everything that can go dirty and activate the water sources
@@ -60,7 +60,7 @@ def main(random_selection=False, headless=False, short_exec=False):
             obj.states[object_states.ToggledOn].set_value(True)
 
     # Set the camera to be in a good position
-    ig.sim.viewer_camera.set_position_orientation(
+    og.sim.viewer_camera.set_position_orientation(
         position=np.array([-0.825556,  2.42499 ,  1.04104 ]),
         orientation=np.array([0.56919735, 0.09896035, 0.13981109, 0.80416049]),
     )

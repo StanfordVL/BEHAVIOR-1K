@@ -2,12 +2,12 @@ import copy
 
 import numpy as np
 
-from igibson.metrics.metric_base import MetricBase
-from igibson.object_states import Inside, NextTo, OnFloor, OnTop, Pose, Touching, Under
-from igibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
-from igibson.object_states.on_floor import RoomFloor
-from igibson.objects.multi_object_wrappers import ObjectMultiplexer
-from igibson.robots.robot_base import BaseRobot
+from omnigibson.metrics.metric_base import MetricBase
+from omnigibson.object_states import Inside, NextTo, OnFloor, OnTop, Pose, Touching, Under
+from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
+from omnigibson.object_states.on_floor import RoomFloor
+from omnigibson.objects.multi_object_wrappers import ObjectMultiplexer
+from omnigibson.robots.robot_base import BaseRobot
 
 SIMULATOR_SETTLE_TIME = 150
 

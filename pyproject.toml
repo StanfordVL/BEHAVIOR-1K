@@ -1,7 +1,7 @@
 [tool.black]
 line-length = 120
 target-version = ['py27', 'py36', 'py37']
-force-exclude = 'igibson/(data|external|render/(cpp|cryptopp|glad|glfw|glm|openvr|pybind11|sranipal))'
+force-exclude = 'omnigibson/(data|external|render/(cpp|cryptopp|glad|glfw|glm|openvr|pybind11|sranipal))'
 
 [tool.isort]
 profile = "black"
@@ -9,38 +9,38 @@ line_length = 120
 py_version = 'all'
 filter_files = true
 extend_skip_glob = [
-    'igibson/data/*',
-    'igibson/external/*',
-    'igibson/render/cpp/*',
-    'igibson/render/cryptopp/*',
-    'igibson/render/glad/*',
-    'igibson/render/glfw/*',
-    'igibson/render/glm/*',
-    'igibson/render/openvr/*',
-    'igibson/render/pybind11/*',
-    'igibson/render/sranipal/*',
+    'omnigibson/data/*',
+    'omnigibson/external/*',
+    'omnigibson/render/cpp/*',
+    'omnigibson/render/cryptopp/*',
+    'omnigibson/render/glad/*',
+    'omnigibson/render/glfw/*',
+    'omnigibson/render/glm/*',
+    'omnigibson/render/openvr/*',
+    'omnigibson/render/pybind11/*',
+    'omnigibson/render/sranipal/*',
 ]
 
 [tool.pyright]
 exclude = [
-  'igibson/data',
-  'igibson/docs',
-  'igibson/docker',
-  'igibson/render/cryptopp',
-  'igibson/render/cpp',
-  'igibson/render/openvr',
-  'igibson/render/glfw',
-  'igibson/render/glad',
-  'igibson/render/glm',
-  'igibson/render/pybind11',
-  'igibson/render/sranipal'
+  'omnigibson/data',
+  'omnigibson/docs',
+  'omnigibson/docker',
+  'omnigibson/render/cryptopp',
+  'omnigibson/render/cpp',
+  'omnigibson/render/openvr',
+  'omnigibson/render/glfw',
+  'omnigibson/render/glad',
+  'omnigibson/render/glm',
+  'omnigibson/render/pybind11',
+  'omnigibson/render/sranipal'
 ]
 
 [tool.pytest.ini_options]
 testpaths = [
     "tests",
 ]
-addopts = '--cov=igibson --cov-report=xml'
+addopts = '--cov=omnigibson --cov-report=xml'
 
 [tool.coverage.run]
-omit = ["igibson/external/*"]
+omit = ["omnigibson/external/*"]

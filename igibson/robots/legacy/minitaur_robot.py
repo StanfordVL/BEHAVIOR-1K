@@ -8,8 +8,8 @@ import gym
 import numpy as np
 
 
-from igibson.physics import motor
-from igibson.robots.locomotion_robot import LocomotionRobot
+from omnigibson.physics import motor
+from omnigibson.robots.locomotion_robot import LocomotionRobot
 
 tracking_camera = {"yaw": 20, "z_offset": 0.3, "distance": 2, "pitch": -20}
 

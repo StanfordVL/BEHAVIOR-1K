@@ -1,4 +1,4 @@
-from igibson.termination_conditions.termination_condition_base import FailureCondition
+from omnigibson.termination_conditions.termination_condition_base import FailureCondition
 
 
 class MaxCollision(FailureCondition):

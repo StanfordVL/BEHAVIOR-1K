@@ -9,7 +9,7 @@ jobs:
   build:
     runs-on: "ubuntu-latest"
     steps:
-    - name: Checkout iGibson source
+    - name: Checkout OmniGibson source
       uses: actions/checkout@master
       with:
         submodules: true
@@ -24,7 +24,7 @@ jobs:
         build
         --user
     - name: Remove unnecessary files to reduce file size
-      run: rm -r igibson/render/openvr/samples
+      run: rm -r omnigibson/render/openvr/samples
     - name: Build a binary wheel and a source tarball
       run: >-
         python -m
@@ -33,7 +33,7 @@ jobs:
         --outdir dist/
         .
     - name: Publish a Python distribution to PyPI
-      if: github.repository == 'StanfordVL/iGibson' && startsWith(github.ref, 'refs/tags')
+      if: github.repository == 'StanfordVL/OmniGibson' && startsWith(github.ref, 'refs/tags')
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
         user: __token__

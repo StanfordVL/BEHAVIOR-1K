@@ -7,13 +7,13 @@ import pprint
 import h5py
 import numpy as np
 
-import igibson
-from igibson.envs.igibson_env import iGibsonEnv
-from igibson.render.mesh_renderer.mesh_renderer_cpu import MeshRendererSettings
-from igibson.render.mesh_renderer.mesh_renderer_vr import VrSettings
-from igibson.utils.git_utils import project_git_info
-from igibson.utils.log_utils import IGLogReader, IGLogWriter
-from igibson.utils.config_utils import parse_config, parse_str_config
+import omnigibson
+from omnigibson.envs.omnigibson_env import OmniGibsonEnv
+from omnigibson.render.mesh_renderer.mesh_renderer_cpu import MeshRendererSettings
+from omnigibson.render.mesh_renderer.mesh_renderer_vr import VrSettings
+from omnigibson.utils.git_utils import project_git_info
+from omnigibson.utils.log_utils import IGLogReader, IGLogWriter
+from omnigibson.utils.config_utils import parse_config, parse_str_config
 
 
 def main(random_selection=False, headless=False, short_exec=False):
@@ -86,7 +86,7 @@ def parse_args():
     parser.add_argument(
         "--config",
         help="which config file to use [default: use yaml files in examples/configs]",
-        default=os.path.join(igibson.example_config_path, "behavior_vr.yaml"),
+        default=os.path.join(omnigibson.example_config_path, "behavior_vr.yaml"),
     )
     return parser.parse_args()
 
@@ -98,7 +98,7 @@ def replay_demo(
     frame_save_path=None,
     verbose=True,
     mode="headless",
-    config_file=os.path.join(igibson.example_config_path, "behavior_vr.yaml"),
+    config_file=os.path.join(omnigibson.example_config_path, "behavior_vr.yaml"),
     start_callbacks=[],
     step_callbacks=[],
     end_callbacks=[],
@@ -121,23 +121,23 @@ def replay_demo(
         mode, the demo will be replayed with simple robot view.
     @param config_file: environment config file
     @param start_callback: A callback function that will be called immediately before starting to replay steps. Should
-        take two arguments: iGibsonEnv and IGLogReader
+        take two arguments: OmniGibsonEnv and IGLogReader
     @param step_callback: A callback function that will be called immediately following each replayed step. Should
-        take two arguments: iGibsonEnv and IGLogReader
+        take two arguments: OmniGibsonEnv and IGLogReader
     @param end_callback: A callback function that will be called when replay has finished. Should
-        take two arguments: iGibsonEnv and IGLogReader
+        take two arguments: OmniGibsonEnv and IGLogReader
     @param profile: Whether the replay should be profiled, with profiler output to stdout.
     @param image_size: The image size that should be used by the renderer.
     @param use_pb_gui: display the interactive pybullet gui (for debugging)
     @return if disable_save is True, returns None. Otherwise, returns a boolean indicating if replay was deterministic.
     """
     # HDR files for PBR rendering
-    hdr_texture = os.path.join(igibson.ig_dataset_path, "scenes", "background", "probe_02.hdr")
-    hdr_texture2 = os.path.join(igibson.ig_dataset_path, "scenes", "background", "probe_03.hdr")
+    hdr_texture = os.path.join(omnigibson.og_dataset_path, "scenes", "background", "probe_02.hdr")
+    hdr_texture2 = os.path.join(omnigibson.og_dataset_path, "scenes", "background", "probe_03.hdr")
     light_modulation_map_filename = os.path.join(
-        igibson.ig_dataset_path, "scenes", "Rs_int", "layout", "floor_lighttype_0.png"
+        omnigibson.og_dataset_path, "scenes", "Rs_int", "layout", "floor_lighttype_0.png"
     )
-    background_texture = os.path.join(igibson.ig_dataset_path, "scenes", "background", "urban_street_01.jpg")
+    background_texture = os.path.join(omnigibson.og_dataset_path, "scenes", "background", "urban_street_01.jpg")
 
     # VR rendering settings
     rendering_setting = MeshRendererSettings(
@@ -207,7 +207,7 @@ def replay_demo(
     config["image_height"] = image_size[1]
     config["online_sampling"] = False
 
-    env = iGibsonEnv(
+    env = OmniGibsonEnv(
         config_file=config,
         mode=mode,
         action_timestep=render_timestep,

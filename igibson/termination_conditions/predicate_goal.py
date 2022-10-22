@@ -1,6 +1,6 @@
 from bddl.activity import evaluate_goal_conditions
 
-from igibson.termination_conditions.termination_condition_base import SuccessCondition
+from omnigibson.termination_conditions.termination_condition_base import SuccessCondition
 
 
 class PredicateGoal(SuccessCondition):

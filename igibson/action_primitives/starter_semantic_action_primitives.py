@@ -16,23 +16,23 @@ import numpy as np
 # import pybullet as p
 from scipy.spatial.transform import Rotation
 
-from igibson import object_states
-from igibson.action_primitives.action_primitive_set_base import ActionPrimitiveError, BaseActionPrimitiveSet
-# from igibson.external.pybullet_tools.utils import set_joint_position
-from igibson.object_states.on_floor import RoomFloor
-from igibson.utils.object_state_utils import get_center_extent, sample_kinematics
-# from igibson.objects.articulated_object import URDFObject
-# from igibson.objects.object_base import BaseObject
-# from igibson.robots import BaseRobot, behavior_robot
-# from igibson.robots.behavior_robot import DEFAULT_BODY_OFFSET_FROM_FLOOR, BehaviorRobot
-# from igibson.tasks.behavior_task import BehaviorTask
-# from igibson.utils.behavior_robot_motion_planning_utils import (
+from omnigibson import object_states
+from omnigibson.action_primitives.action_primitive_set_base import ActionPrimitiveError, BaseActionPrimitiveSet
+# from omnigibson.external.pybullet_tools.utils import set_joint_position
+from omnigibson.object_states.on_floor import RoomFloor
+from omnigibson.utils.object_state_utils import get_center_extent, sample_kinematics
+# from omnigibson.objects.articulated_object import URDFObject
+# from omnigibson.objects.object_base import BaseObject
+# from omnigibson.robots import BaseRobot, behavior_robot
+# from omnigibson.robots.behavior_robot import DEFAULT_BODY_OFFSET_FROM_FLOOR, BehaviorRobot
+# from omnigibson.tasks.behavior_task import BehaviorTask
+# from omnigibson.utils.behavior_robot_motion_planning_utils import (
 #     get_pose3d_hand_collision_fn,
 #     plan_base_motion_br,
 #     plan_hand_motion_br,
 # )
-# from igibson.utils.grasp_planning_utils import get_grasp_poses_for_object, get_grasp_position_for_open
-# from igibson.utils.utils import restoreState
+# from omnigibson.utils.grasp_planning_utils import get_grasp_poses_for_object, get_grasp_position_for_open
+# from omnigibson.utils.utils import restoreState
 
 MAX_STEPS_FOR_HAND_MOVE = 100
 MAX_STEPS_FOR_HAND_MOVE_WHEN_OPENING = 30

@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from collections import OrderedDict
 import numpy as np
-from igibson.utils.python_utils import classproperty, Serializable, Registerable, Recreatable
+from omnigibson.utils.python_utils import classproperty, Serializable, Registerable, Recreatable
 
 
 # Global dicts that will contain mappings

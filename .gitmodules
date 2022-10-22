@@ -1,15 +1,15 @@
-[submodule "igibson/render/pybind11"]
-	path = igibson/render/pybind11
+[submodule "omnigibson/render/pybind11"]
+	path = omnigibson/render/pybind11
 	url = https://github.com/pybind/pybind11.git
-[submodule "igibson/render/glfw"]
-	path = igibson/render/glfw
+[submodule "omnigibson/render/glfw"]
+	path = omnigibson/render/glfw
 	url = https://github.com/glfw/glfw
-[submodule "igibson/render/glm"]
-	path = igibson/render/glm
+[submodule "omnigibson/render/glm"]
+	path = omnigibson/render/glm
 	url = https://github.com/g-truc/glm
-[submodule "igibson/render/openvr"]
-	path = igibson/render/openvr
+[submodule "omnigibson/render/openvr"]
+	path = omnigibson/render/openvr
 	url = https://github.com/ValveSoftware/openvr
-[submodule "igibson/render/cryptopp"]
-	path = igibson/render/cryptopp
+[submodule "omnigibson/render/cryptopp"]
+	path = omnigibson/render/cryptopp
 	url = https://github.com/fxia22/cryptopp

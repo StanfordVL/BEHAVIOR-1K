@@ -3,10 +3,10 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 
-import igibson
-from igibson.envs.igibson_env import iGibsonEnv
-from igibson.utils.asset_utils import download_assets, download_demo_data
-from igibson.utils.motion_planning_wrapper import MotionPlanningWrapper
+import omnigibson
+from omnigibson.envs.omnigibson_env import OmniGibsonEnv
+from omnigibson.utils.asset_utils import download_assets, download_demo_data
+from omnigibson.utils.motion_planning_wrapper import MotionPlanningWrapper
 
 
 def test_occupancy_grid():
@@ -15,7 +15,7 @@ def test_occupancy_grid():
     download_demo_data()
     config_filename = os.path.join(os.path.dirname(__file__), "test_house_occupancy_grid.yaml")
 
-    nav_env = iGibsonEnv(config_file=config_filename, mode="headless")
+    nav_env = OmniGibsonEnv(config_file=config_filename, mode="headless")
     nav_env.reset()
     nav_env.robots[0].set_position_orientation([0, 0, 0], [0, 0, 0, 1])
     nav_env.simulator.step()
@@ -36,7 +36,7 @@ def test_base_planning():
     download_demo_data()
     config_filename = os.path.join(os.path.dirname(__file__), "test_house_occupancy_grid.yaml")
 
-    nav_env = iGibsonEnv(config_file=config_filename, mode="headless")
+    nav_env = OmniGibsonEnv(config_file=config_filename, mode="headless")
     motion_planner = MotionPlanningWrapper(nav_env)
     nav_env.reset()
     nav_env.robots[0].set_position_orientation([0, 0, 0], [0, 0, 0, 1])

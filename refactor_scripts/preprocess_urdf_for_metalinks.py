@@ -1,5 +1,5 @@
-from igibson import ig_dataset_path
-import igibson.utils.transform_utils as T
+from omnigibson import og_dataset_path
+import omnigibson.utils.transform_utils as T
 import xml.etree.ElementTree as ET
 import numpy as np
 import os
@@ -186,7 +186,7 @@ def generate_urdf_from_xmltree(root_element, name, dirpath, unique_urdf=False):
 
 def update_obj_urdf_with_metalinks(obj_category, obj_model):
     # Check if filepath exists
-    model_root_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}"
+    model_root_path = f"{og_dataset_path}/objects/{obj_category}/{obj_model}"
     urdf_path = f"{model_root_path}/{obj_model}.urdf"
 
     # Load urdf

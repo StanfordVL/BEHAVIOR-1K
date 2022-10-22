@@ -1,14 +1,14 @@
-from igibson.macros import gm, create_module_macros
-from igibson.object_states.aabb import AABB
-from igibson.object_states.contact_bodies import ContactBodies
-from igibson.object_states.dirty import Dusty, Stained
-from igibson.object_states.link_based_state_mixin import LinkBasedStateMixin
-from igibson.object_states.object_state_base import AbsoluteObjectState
-from igibson.object_states.soaked import Soaked
-from igibson.object_states.toggle import ToggledOn
-from igibson.utils.usd_utils import BoundingBoxAPI
-from igibson.systems.macro_particle_system import MacroParticleSystem, StainSystem
-from igibson.systems.micro_particle_system import WaterSystem
+from omnigibson.macros import gm, create_module_macros
+from omnigibson.object_states.aabb import AABB
+from omnigibson.object_states.contact_bodies import ContactBodies
+from omnigibson.object_states.dirty import Dusty, Stained
+from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
+from omnigibson.object_states.object_state_base import AbsoluteObjectState
+from omnigibson.object_states.soaked import Soaked
+from omnigibson.object_states.toggle import ToggledOn
+from omnigibson.utils.usd_utils import BoundingBoxAPI
+from omnigibson.systems.macro_particle_system import MacroParticleSystem, StainSystem
+from omnigibson.systems.micro_particle_system import WaterSystem
 
 
 # Create settings for this module

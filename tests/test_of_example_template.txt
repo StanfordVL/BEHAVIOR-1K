@@ -1,4 +1,4 @@
-import igibson.examples.$module as example_module
+import omnigibson.examples.$module as example_module
 
 def test_$name():
     example_module.main(random_selection=True, headless=True, short_exec=True)

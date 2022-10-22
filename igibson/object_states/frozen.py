@@ -1,8 +1,8 @@
 import numpy as np
 
-from igibson.macros import create_module_macros
-from igibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
-from igibson.object_states.temperature import Temperature
+from omnigibson.macros import create_module_macros
+from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
+from omnigibson.object_states.temperature import Temperature
 
 
 # Create settings for this module

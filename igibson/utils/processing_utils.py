@@ -1,5 +1,5 @@
 import numpy as np
-from igibson.utils.python_utils import Serializable
+from omnigibson.utils.python_utils import Serializable
 from collections import OrderedDict
 
 

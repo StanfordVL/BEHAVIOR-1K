@@ -19,10 +19,10 @@ from omni.isaac.core.utils.prims import (
 import numpy as np
 import carb
 from omni.isaac.core.utils.stage import get_current_stage
-from igibson.prims.prim_base import BasePrim
-from igibson.prims.material_prim import MaterialPrim
-from igibson.utils.transform_utils import quat2mat, mat2euler
-from igibson.utils.usd_utils import BoundingBoxAPI
+from omnigibson.prims.prim_base import BasePrim
+from omnigibson.prims.material_prim import MaterialPrim
+from omnigibson.utils.transform_utils import quat2mat, mat2euler
+from omnigibson.utils.usd_utils import BoundingBoxAPI
 from scipy.spatial.transform import Rotation as R
 
 

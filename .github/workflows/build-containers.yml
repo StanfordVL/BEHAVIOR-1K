@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 env:
-  REGISTRY_USER: igibson
+  REGISTRY_USER: omnigibson
   IMAGE_REGISTRY: docker.io
   REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
 

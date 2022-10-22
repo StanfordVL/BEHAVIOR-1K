@@ -4,13 +4,13 @@
 
 We provide **Environments** that follow the [OpenAI gym](https://github.com/openai/gym) interface for applications such as reinforcement learning algorithms. Generally speaking, an **Environment** instantiates **Scene**, **Object** and **Robot** and import them into its **Simulator**. An **Environment** also instantiates a list of **Sensors** (usually as part of the observation space) and a **Task**, which further includes a list of **Reward Functions** and **Termination Conditions**.
 
-Most of the code can be found here: [igibson/envs/igibson_env.py](https://github.com/StanfordVL/iGibson/blob/master/igibson/envs/igibson_env.py).
+Most of the code can be found here: [omnigibson/envs/omnigibson_env.py](https://github.com/StanfordVL/OmniGibson/blob/master/omnigibson/envs/omnigibson_env.py).
 
 #### Sensors
 
 We provide different types of sensors as lightweight wrappers around the renderer. Currently we support RGB, surface normal, segmentation, 3D point cloud, depth map, optical flow, and scene flow, and also 1-beam and 16-beam LiDAR signals. Additionally, we provide a sensor noise model with random dropout (currently only for depth map and 1-beam LiDAR) to simulate real-world sensor noise. The amount of noise can be controlled by `depth_noise_rate` and `scan_noise_rate` in the config files. Contribution of more noise models is most welcome.
 
-Most of the code can be found in [igibson/sensors](https://github.com/StanfordVL/iGibson/tree/master/igibson/sensors).
+Most of the code can be found in [omnigibson/sensors](https://github.com/StanfordVL/OmniGibson/tree/master/omnigibson/sensors).
 
 #### Tasks
 
@@ -27,7 +27,7 @@ We provide a few Embodied AI tasks.
 - ReachingRandomTask
 - RoomRearrangementTask
 
-Most of the code can be found in [igibson/tasks](https://github.com/StanfordVL/iGibson/tree/master/igibson/tasks).
+Most of the code can be found in [omnigibson/tasks](https://github.com/StanfordVL/OmniGibson/tree/master/omnigibson/tasks).
 
 #### Reward Functions
 
@@ -38,7 +38,7 @@ We provide a few common reward functions for robotics tasks.
 - PotentialReward
 - CollisionReward
 
-Most of the code can be found in [igibson/reward_functions](https://github.com/StanfordVL/iGibson/tree/master/igibson/reward_functions).
+Most of the code can be found in [omnigibson/reward_functions](https://github.com/StanfordVL/OmniGibson/tree/master/omnigibson/reward_functions).
 
 #### Termination Conditions
 
@@ -49,16 +49,16 @@ We provide a few common termination conditions for robotics tasks.
 - MaxCollision
 - Timeout
 - OutOfBound
-Most of the code can be found in [igibson/termination_conditions](https://github.com/StanfordVL/iGibson/tree/master/igibson/termination_conditions).
+Most of the code can be found in [omnigibson/termination_conditions](https://github.com/StanfordVL/OmniGibson/tree/master/omnigibson/termination_conditions).
 
 #### Configs
-To instantiate an **Environment**, we first need to create a YAML config file. It will specify parameters for the **Environment** (e.g. robot type, action frequency, etc), the **Sensors** (e.g. sensor types, image resolution, noise rate, etc), the **Task** (e.g. task type, goal distance range, etc), the **Reward Functions** (e.g. reward types, reward scale, etc) and the **Termination Conditions** (e.g. goal convergence threshold, time limit, etc). Exapmles of config files can be found here: [configs](https://github.com/StanfordVL/iGibson/tree/master/igibson/configs).
+To instantiate an **Environment**, we first need to create a YAML config file. It will specify parameters for the **Environment** (e.g. robot type, action frequency, etc), the **Sensors** (e.g. sensor types, image resolution, noise rate, etc), the **Task** (e.g. task type, goal distance range, etc), the **Reward Functions** (e.g. reward types, reward scale, etc) and the **Termination Conditions** (e.g. goal convergence threshold, time limit, etc). Exapmles of config files can be found here: [configs](https://github.com/StanfordVL/OmniGibson/tree/master/omnigibson/configs).
 
-Here is one example: [configs/turtlebot_nav.yaml](https://github.com/StanfordVL/iGibson/blob/master/igibson/configs/turtlebot_nav.yaml)
+Here is one example: [configs/turtlebot_nav.yaml](https://github.com/StanfordVL/OmniGibson/blob/master/omnigibson/configs/turtlebot_nav.yaml)
 
 ```yaml
 # scene
-scene: igibson
+scene: omnigibson
 scene_id: Rs_int
 build_graph: true
 load_texture: true
@@ -138,8 +138,8 @@ Parameters of this config file are explained below:
 
 | Attribute | Example Value | Expalanation |
 | ----------| ------------- | ------------ |
-| scene | igibson | which type of scene: [empty, stadium, gibson, igibson] |
-| scene_id | Rs_int | scene_id for the gibson or igibson scene |
+| scene | omnigibson | which type of scene: [empty, stadium, gibson, omnigibson] |
+| scene_id | Rs_int | scene_id for the gibson or omnigibson scene |
 | build_graph | true | whether to build traversability graph for the building scene |
 | load_texture | true | whether to load texture into MeshRenderer. Can be set to false if RGB is not needed |
 | pybullet_load_texture | true | whether to load texture into PyBullet, for debugging purpose only |
@@ -175,7 +175,7 @@ Parameters of this config file are explained below:
 | depth_low | 0.8 | lower bound of the valid range of the depth camera |
 | depth_high | 3.5 | upper bound of the valid range of the depth camera |
 | n_horizontal_rays | 228 | number of horizontal rays to simulate for the LiDAR |
-| n_vertical_beams | 1 | number of vertical beams to simulate for the LiDAR. Currently iGibson only supports n_vertical_beams == 1 |
+| n_vertical_beams | 1 | number of vertical beams to simulate for the LiDAR. Currently OmniGibson only supports n_vertical_beams == 1 |
 | laser_linear_range | 5.6 | upper bound of the valid range of the LiDAR |
 | laser_angular_range | 240.0 | angular range of the LiDAR (in degrees) |
 | min_laser_dist | 0.05 | lower bound of the valid range of the LiDAR |
@@ -188,14 +188,14 @@ Parameters of this config file are explained below:
 ### Examples
 
 #### Static Environments
-In this example, we show how to instantiate `iGibsonEnv` and how to step through the environment. At the beginning of each episode, we need to call `env.reset()`. Then we need to call `env.step(action)` to step through the environment and retrieve `(state, reward, done, info)`.
+In this example, we show how to instantiate `OmniGibsonEnv` and how to step through the environment. At the beginning of each episode, we need to call `env.reset()`. Then we need to call `env.step(action)` to step through the environment and retrieve `(state, reward, done, info)`.
 - `state`: a python dictionary of observations, e.g. `state['rgb']` will be a H x W x 3 numpy array that represents the current image
 - `reward`: a scalar that represents the current reward
 - `done`: a boolean that indicates whether the episode should terminate
 - `info`: a python dictionary for bookkeeping purpose
-The code can be found here: [igibson/examples/environments/env_nonint_example.py](https://github.com/StanfordVL/iGibson/blob/master/igibson/examples/environments/env_nonint_example.py).
+The code can be found here: [omnigibson/examples/environments/env_nonint_example.py](https://github.com/StanfordVL/OmniGibson/blob/master/omnigibson/examples/environments/env_nonint_example.py).
 
-If the execution fails with segfault 11, you may need to reduce texture scaling in the config file (igibson/configs/turtlebot_static_nav.yaml) to avoid out-of-memory error.
+If the execution fails with segfault 11, you may need to reduce texture scaling in the config file (omnigibson/configs/turtlebot_static_nav.yaml) to avoid out-of-memory error.
 
 ```python
 import logging
@@ -204,15 +204,15 @@ from sys import platform
 
 import yaml
 
-import igibson
-from igibson.envs.igibson_env import iGibsonEnv
-from igibson.render.profiler import Profiler
-from igibson.utils.asset_utils import download_assets, download_demo_data
+import omnigibson
+from omnigibson.envs.omnigibson_env import OmniGibsonEnv
+from omnigibson.render.profiler import Profiler
+from omnigibson.utils.asset_utils import download_assets, download_demo_data
 
 
 def main():
     """
-    Creates an iGibson environment from a config file with a turtlebot in Rs (not interactive).
+    Creates an OmniGibson environment from a config file with a turtlebot in Rs (not interactive).
     It steps the environment 100 times with random actions sampled from the action space,
     using the Gym interface, resetting it 10 times.
     """
@@ -220,12 +220,12 @@ def main():
     # If they have not been downloaded before, download assets and Rs Gibson (non-interactive) models
     download_assets()
     download_demo_data()
-    config_filename = os.path.join(igibson.example_config_path, "turtlebot_static_nav.yaml")
+    config_filename = os.path.join(omnigibson.example_config_path, "turtlebot_static_nav.yaml")
     config_data = yaml.load(open(config_filename, "r"), Loader=yaml.FullLoader)
     # Reduce texture scale for Mac.
     if platform == "darwin":
         config_data["texture_scale"] = 0.5
-    env = iGibsonEnv(config_file=config_data, mode="gui_interactive")
+    env = OmniGibsonEnv(config_file=config_data, mode="gui_interactive")
     for j in range(10):
         logging.info("Resetting environment")
         env.reset()
@@ -244,4 +244,4 @@ if __name__ == "__main__":
 ```
 
 #### Interactive Environments
-In this example, we show how to instantiate `iGibsobEnv` with a fully interactive scene `Rs_int`. In this scene, the robot can interact with all the objects in the scene (chairs, tables, couches, etc). The code can be found here: [igibson/examples/environments/env_int_example.py](https://github.com/StanfordVL/iGibson/blob/master/igibson/examples/env_int_example.py).
+In this example, we show how to instantiate `iGibsobEnv` with a fully interactive scene `Rs_int`. In this scene, the robot can interact with all the objects in the scene (chairs, tables, couches, etc). The code can be found here: [omnigibson/examples/environments/env_int_example.py](https://github.com/StanfordVL/OmniGibson/blob/master/omnigibson/examples/env_int_example.py).

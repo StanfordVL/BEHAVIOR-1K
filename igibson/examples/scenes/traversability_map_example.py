@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
 
-from igibson.utils.asset_utils import get_scene_path
+from omnigibson.utils.asset_utils import get_scene_path
 
 
 def main(random_selection=False, headless=False, short_exec=False):

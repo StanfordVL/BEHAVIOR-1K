@@ -18,14 +18,14 @@ from scipy.spatial.transform import Rotation
 from omni.isaac.core.utils.prims import get_prim_at_path
 from omni.isaac.core.utils.rotations import gf_quat_to_np_array
 
-import igibson as ig
-from igibson.objects.usd_object import USDObject
-from igibson.utils.constants import AVERAGE_CATEGORY_SPECS, DEFAULT_JOINT_FRICTION, SPECIAL_JOINT_FRICTIONS, JointType
-import igibson.utils.transform_utils as T
-from igibson.utils.usd_utils import BoundingBoxAPI
-from igibson.utils.asset_utils import decrypt_file
-from igibson.utils.constants import PrimType
-from igibson.macros import gm
+import omnigibson as og
+from omnigibson.objects.usd_object import USDObject
+from omnigibson.utils.constants import AVERAGE_CATEGORY_SPECS, DEFAULT_JOINT_FRICTION, SPECIAL_JOINT_FRICTIONS, JointType
+import omnigibson.utils.transform_utils as T
+from omnigibson.utils.usd_utils import BoundingBoxAPI
+from omnigibson.utils.asset_utils import decrypt_file
+from omnigibson.utils.constants import PrimType
+from omnigibson.macros import gm
 
 
 class DatasetObject(USDObject):
@@ -76,10 +76,10 @@ class DatasetObject(USDObject):
             at the time the object is added to the scene, using the object's category.
         @param category: Category for the object. Defaults to "object".
         @param model: str or None, if @usd_path is not specified and @model is specified in conjunction with @category,
-            the usd filepath will be inferred based on the set ig_dataset_path global variable, from the following
+            the usd filepath will be inferred based on the set og_dataset_path global variable, from the following
             location:
 
-                {ig_dataset_path}/objects/{category}/{model}/usd/{model}.usd
+                {og_dataset_path}/objects/{category}/{model}/usd/{model}.usd
 
         @param class_id: What class ID the object should be assigned in semantic segmentation rendering mode.
         @param uuid: Unique unsigned-integer identifier to assign to this object (max 8-numbers).
@@ -186,7 +186,7 @@ class DatasetObject(USDObject):
         if usd_path is None:
             assert model is not None, f"Either usd_path or model and category must be specified in order to create a" \
                                       f"DatasetObject!"
-            usd_path = f"{ig.ig_dataset_path}/objects/{category}/{model}/usd/{model}.usd"
+            usd_path = f"{og.og_dataset_path}/objects/{category}/{model}/usd/{model}.usd"
 
         # Post-process the usd path if we're generating a cloth object
         if prim_type == PrimType.CLOTH:
@@ -431,7 +431,7 @@ class DatasetObject(USDObject):
     #
     #     self.randomized_materials = list(all_materials.values())
     #
-    #     friction_json = os.path.join(igibson.ig_dataset_path, "materials", "material_friction.json")
+    #     friction_json = os.path.join(omnigibson.og_dataset_path, "materials", "material_friction.json")
     #     if os.path.isfile(friction_json):
     #         with open(friction_json) as f:
     #             self.material_to_friction = json.load(f)
@@ -507,7 +507,7 @@ class DatasetObject(USDObject):
         # if self.merge_fixed_links:
         #     flags |= p.URDF_MERGE_FIXED_LINKS
         #
-        # if igibson.ignore_visual_shape:
+        # if omnigibson.ignore_visual_shape:
         #     flags |= p.URDF_IGNORE_VISUAL_SHAPES
 
         # for idx in range(len(self.urdf_paths)):

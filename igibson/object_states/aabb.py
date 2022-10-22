@@ -1,8 +1,8 @@
 import numpy as np
 from collections import OrderedDict
 
-from igibson.utils.usd_utils import BoundingBoxAPI
-from igibson.object_states.object_state_base import AbsoluteObjectState
+from omnigibson.utils.usd_utils import BoundingBoxAPI
+from omnigibson.object_states.object_state_base import AbsoluteObjectState
 
 
 class AABB(AbsoluteObjectState):

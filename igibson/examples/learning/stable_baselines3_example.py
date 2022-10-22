@@ -2,8 +2,8 @@ import logging
 import os
 from typing import Callable
 
-import igibson
-from igibson.envs.igibson_env import iGibsonEnv
+import omnigibson
+from omnigibson.envs.omnigibson_env import OmniGibsonEnv
 
 try:
     import gym
@@ -108,9 +108,9 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Function callback to create environments
     def make_env(rank: int, seed: int = 0) -> Callable:
-        def _init() -> iGibsonEnv:
-            env = iGibsonEnv(
-                config_file=os.path.join(igibson.example_config_path, config_file),
+        def _init() -> OmniGibsonEnv:
+            env = OmniGibsonEnv(
+                config_file=os.path.join(omnigibson.example_config_path, config_file),
                 mode="headless",
                 action_timestep=1 / 10.0,
                 physics_timestep=1 / 120.0,
@@ -126,8 +126,8 @@ def main(random_selection=False, headless=False, short_exec=False):
     env = VecMonitor(env)
 
     # Create a new environment for evaluation
-    eval_env = iGibsonEnv(
-        config_file=os.path.join(igibson.example_config_path, config_file),
+    eval_env = OmniGibsonEnv(
+        config_file=os.path.join(omnigibson.example_config_path, config_file),
         mode="headless",
         action_timestep=1 / 10.0,
         physics_timestep=1 / 120.0,

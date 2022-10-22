@@ -9,8 +9,8 @@ from omni.isaac.core.utils.prims import get_prim_at_path
 from pxr.Sdf import ValueTypeNames as VT
 from pxr import Sdf, Gf
 
-from igibson.macros import create_module_macros
-from igibson.object_states.factory import (
+from omnigibson.macros import create_module_macros
+from omnigibson.object_states.factory import (
     get_default_states,
     get_object_state_instance,
     get_state_name,
@@ -20,14 +20,14 @@ from igibson.object_states.factory import (
     get_steam_states,
     get_texture_change_priority,
 )
-from igibson.object_states.object_state_base import REGISTERED_OBJECT_STATES, CachingEnabledObjectState
-from igibson.object_states.heat_source_or_sink import HeatSourceOrSink
-from igibson.object_states.heated import Heated
-from igibson.objects.object_base import BaseObject
-from igibson.systems import get_system_from_element_name, get_element_name_from_system
-from igibson.renderer_settings.renderer_settings import RendererSettings
-from igibson.utils.constants import PrimType, EmitterType
-from igibson.object_states import Soaked
+from omnigibson.object_states.object_state_base import REGISTERED_OBJECT_STATES, CachingEnabledObjectState
+from omnigibson.object_states.heat_source_or_sink import HeatSourceOrSink
+from omnigibson.object_states.heated import Heated
+from omnigibson.objects.object_base import BaseObject
+from omnigibson.systems import get_system_from_element_name, get_element_name_from_system
+from omnigibson.renderer_settings.renderer_settings import RendererSettings
+from omnigibson.utils.constants import PrimType, EmitterType
+from omnigibson.object_states import Soaked
 
 
 # Optionally import bddl for object taxonomy.
@@ -101,7 +101,7 @@ class StatefulObject(BaseObject):
         # Load abilities from taxonomy if needed & possible
         if abilities is None:
             if OBJECT_TAXONOMY is not None:
-                taxonomy_class = OBJECT_TAXONOMY.get_class_name_from_igibson_category(category)
+                taxonomy_class = OBJECT_TAXONOMY.get_class_name_from_omnigibson_category(category)
                 if taxonomy_class is not None:
                     abilities = OBJECT_TAXONOMY.get_abilities(taxonomy_class)
                 else:

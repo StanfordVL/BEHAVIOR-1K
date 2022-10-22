@@ -1,10 +1,10 @@
 import numpy as np
 from collections import OrderedDict
 
-from igibson.tasks.task_base import BaseTask
-from igibson.scenes.scene_base import Scene
-from igibson.utils.python_utils import classproperty
-from igibson.utils.sim_utils import land_object
+from omnigibson.tasks.task_base import BaseTask
+from omnigibson.scenes.scene_base import Scene
+from omnigibson.utils.python_utils import classproperty
+from omnigibson.utils.sim_utils import land_object
 
 
 class DummyTask(BaseTask):

@@ -3,10 +3,10 @@ import os
 
 import numpy as np
 
-import igibson as ig
-from igibson import object_states
-from igibson.macros import gm
-from igibson.objects import DatasetObject
+import omnigibson as og
+from omnigibson import object_states
+from omnigibson.macros import gm
+from omnigibson.objects import DatasetObject
 
 
 def main(random_selection=False, headless=False, short_exec=False):
@@ -29,7 +29,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     }
 
     # Create the environment
-    env = ig.Environment(configs=cfg, action_timestep=1/60., physics_timestep=1/60.)
+    env = og.Environment(configs=cfg, action_timestep=1/60., physics_timestep=1/60.)
 
     # Sample microwave and boxes
     sample_boxes_on_shelf(env)
@@ -55,7 +55,7 @@ def sample_microwave_plates_apples(env):
         model="46380",
         # scale=2.0,
     )
-    ig.sim.import_object(cabinet)
+    og.sim.import_object(cabinet)
     z_offset = -cabinet.aabb_center[2] + cabinet.aabb_extent[2] / 2
     cabinet.set_position(np.array([1.0, 0, z_offset]))
     env.step(np.array([]))              # One step is needed for the object to be fully initialized
@@ -71,7 +71,7 @@ def sample_microwave_plates_apples(env):
         model="7128",
         scale=0.5,
     )
-    ig.sim.import_object(microwave)
+    og.sim.import_object(microwave)
     env.step(np.array([]))              # One step is needed for the object to be fully initialized
     assert microwave.states[object_states.OnTop].set_value(cabinet, True, use_ray_casting_method=True)
     assert microwave.states[object_states.Open].set_value(True)
@@ -89,7 +89,7 @@ def sample_microwave_plates_apples(env):
             model="plate_000",
             bounding_box=np.array([0.25, 0.25, 0.05]),
         )
-        ig.sim.import_object(plate)
+        og.sim.import_object(plate)
         env.step(np.array([]))              # One step is needed for the object to be fully initialized
 
         # Put the 1st plate in the microwave
@@ -112,7 +112,7 @@ def sample_microwave_plates_apples(env):
                 category="apple",
                 model="00_0",
             )
-            ig.sim.import_object(apple)
+            og.sim.import_object(apple)
             env.step(np.array([]))  # One step is needed for the object to be fully initialized
             assert apple.states[object_states.OnTop].set_value(plate, True, use_ray_casting_method=True)
             logging.info("Apple %d loaded and placed." % j)
@@ -128,7 +128,7 @@ def sample_boxes_on_shelf(env):
         model="1170df5b9512c1d92f6bce2b7e6c12b7",
         bounding_box=np.array([1.0, 0.4, 2.0]),
     )
-    ig.sim.import_object(shelf)
+    og.sim.import_object(shelf)
     z_offset = -shelf.aabb_center[2] + shelf.aabb_extent[2] / 2
     shelf.set_position(np.array([-1.0, 0, z_offset]))
     env.step(np.array([]))  # One step is needed for the object to be fully initialized
@@ -145,7 +145,7 @@ def sample_boxes_on_shelf(env):
             model="cracker_box_000",
             bounding_box=np.array([0.2, 0.05, 0.3]),
         )
-        ig.sim.import_object(box)
+        og.sim.import_object(box)
         env.step(np.array([]))  # One step is needed for the object to be fully initialized
         box.states[object_states.Inside].set_value(shelf, True, use_ray_casting_method=True)
         logging.info(f"Box {i} placed.")

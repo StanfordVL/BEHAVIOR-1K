@@ -1,10 +1,10 @@
-from igibson import app, ig_dataset_path, Simulator
-from igibson.scenes.empty_scene import EmptyScene
+from omnigibson import app, og_dataset_path, Simulator
+from omnigibson.scenes.empty_scene import EmptyScene
 import omni
 from omni.isaac.core.utils.stage import add_reference_to_stage
 import xml.etree.ElementTree as ET
 import numpy as np
-import igibson.utils.transform_utils as T
+import omnigibson.utils.transform_utils as T
 import json
 from omni.isaac.core.articulations import Articulation
 from omni.isaac.core.utils.prims import create_prim, set_prim_property
@@ -17,7 +17,7 @@ from omni.isaac.core.utils.prims import get_prim_at_path, get_prim_path, is_prim
 from omni.isaac.core.utils.carb import set_carb_setting
 from omni.isaac.core.utils.stage import get_current_stage, get_stage_units, traverse_stage
 
-from igibson.prims.entity_prim import EntityPrim
+from omnigibson.prims.entity_prim import EntityPrim
 
 
 ##### SET THIS ######
@@ -35,7 +35,7 @@ sim.import_scene(scene)
 
 prims = []
 for obj_category, obj_model, name in zip(obj_categories, obj_models, names):
-    model_root_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}"
+    model_root_path = f"{og_dataset_path}/objects/{obj_category}/{obj_model}"
     usd_path = f"{model_root_path}/usd/{obj_model}.usd"
     metadata_path = f"{model_root_path}/misc/metadata.json"
 

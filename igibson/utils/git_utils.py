@@ -3,7 +3,7 @@ from pathlib import Path
 # import bddl
 import git
 
-import igibson
+import omnigibson
 
 
 def git_info(directory):
@@ -23,9 +23,9 @@ def git_info(directory):
 
 def project_git_info():
     return {
-        "iGibson": git_info(Path(igibson.root_path).parent),
-        # TODO: add version to bddl, assets, ig_dataset
+        "OmniGibson": git_info(Path(omnigibson.root_path).parent),
+        # TODO: add version to bddl, assets, og_dataset
         # "bddl": git_info(Path(bddl.__file__).parent.parent),
-        # "ig_assets": git_info(igibson.assets_path),
-        # "ig_dataset": git_info(igibson.ig_dataset_path),
+        # "og_assets": git_info(omnigibson.assets_path),
+        # "og_dataset": git_info(omnigibson.og_dataset_path),
     }

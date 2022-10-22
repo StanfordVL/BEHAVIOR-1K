@@ -1,11 +1,11 @@
 import numpy as np
 from collections import OrderedDict
 
-from igibson.macros import create_module_macros
-from igibson.prims.geom_prim import VisualGeomPrim
-from igibson.object_states.link_based_state_mixin import LinkBasedStateMixin
-from igibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
-from igibson.utils.usd_utils import create_primitive_mesh
+from omnigibson.macros import create_module_macros
+from omnigibson.prims.geom_prim import VisualGeomPrim
+from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
+from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
+from omnigibson.utils.usd_utils import create_primitive_mesh
 from omni.isaac.core.utils.prims import get_prim_at_path
 
 

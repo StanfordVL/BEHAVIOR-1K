@@ -23,14 +23,14 @@ import omni
 from omni.isaac.core.utils.prims import get_prim_property, set_prim_property, \
     get_prim_parent, get_prim_at_path
 
-from igibson.prims.cloth_prim import ClothPrim
-from igibson.prims.joint_prim import JointPrim
-from igibson.prims.rigid_prim import RigidPrim
-from igibson.prims.xform_prim import XFormPrim
-from igibson.utils.omni_types import JointsState
-from igibson.utils.sim_utils import check_collision
-from igibson.utils.constants import PrimType, GEOM_TYPES
-from igibson.macros import gm
+from omnigibson.prims.cloth_prim import ClothPrim
+from omnigibson.prims.joint_prim import JointPrim
+from omnigibson.prims.rigid_prim import RigidPrim
+from omnigibson.prims.xform_prim import XFormPrim
+from omnigibson.utils.omni_types import JointsState
+from omnigibson.utils.sim_utils import check_collision
+from omnigibson.utils.constants import PrimType, GEOM_TYPES
+from omnigibson.macros import gm
 
 
 class EntityPrim(XFormPrim):
@@ -216,7 +216,7 @@ class EntityPrim(XFormPrim):
     def prim_type(self):
         """
         Returns:
-            str: Type of this entity prim, one of igibson.utils.constants.PrimType
+            str: Type of this entity prim, one of omnigibson.utils.constants.PrimType
         """
         return self._prim_type
 

@@ -1,12 +1,12 @@
 import numpy as np
 
-import igibson as ig
-from igibson.objects.dataset_object import DatasetObject
-from igibson.robots.turtlebot import Turtlebot
-from igibson.tasks.point_navigation_task import PointNavigationTask
-from igibson.utils.python_utils import classproperty
-from igibson.utils.sim_utils import land_object, test_valid_pose
-import igibson.utils.transform_utils as T
+import omnigibson as og
+from omnigibson.objects.dataset_object import DatasetObject
+from omnigibson.robots.turtlebot import Turtlebot
+from omnigibson.tasks.point_navigation_task import PointNavigationTask
+from omnigibson.utils.python_utils import classproperty
+from omnigibson.utils.sim_utils import land_object, test_valid_pose
+import omnigibson.utils.transform_utils as T
 
 
 class PointNavigationObstacleTask(PointNavigationTask):
@@ -100,7 +100,7 @@ class PointNavigationObstacleTask(PointNavigationTask):
         Load obstacles. Must be implemented by subclass.
 
         Args:
-            env (iGibsonEnv): Environment instance
+            env (OmniGibsonEnv): Environment instance
 
         Returns:
             list of BaseObject: Obstacle(s) generated for this task
@@ -112,18 +112,18 @@ class PointNavigationObstacleTask(PointNavigationTask):
         Reset the poses of obstacles to have no collisions with the scene or the robot
 
         Args:
-            env (iGibsonEnv): Environment instance
+            env (OmniGibsonEnv): Environment instance
         """
         success, max_trials, pos, ori = False, 100, None, None
 
         for obj in self._obstacles:
             # Save the state of this environment so we can restore it immediately after
-            state = ig.sim.dump_state(serialized=True)
+            state = og.sim.dump_state(serialized=True)
             for _ in range(max_trials):
                 _, pos = env.scene.get_random_point(floor=self._floor)
                 quat = T.euler2quat(np.array([0, 0, np.random.uniform(0, np.pi * 2)]))
                 success = test_valid_pose(obj, pos, quat, env.initial_pos_z_offset)
-                ig.sim.load_state(state=state, serialized=True)
+                og.sim.load_state(state=state, serialized=True)
                 if success:
                     break
 
@@ -148,7 +148,7 @@ class PointNavigationObstacleTask(PointNavigationTask):
 
 
 class PointNavigationStaticObstacleTask(PointNavigationObstacleTask):
-    # TODO: Update YCB object locations in iGibson
+    # TODO: Update YCB object locations in OmniGibson
     # Define the obstacles for this class -- tuples are (category, model)
     STATIC_OBSTACLES = {
         ("canned_food", "002_master_chef_can"),
@@ -169,11 +169,11 @@ class PointNavigationStaticObstacleTask(PointNavigationObstacleTask):
             o_category, o_model = obstacle_choices[obstacle_id]
             obstacle = DatasetObject(
                 prim_path=f"/World/task_obstacle{i}",
-                usd_path=f"{ig.ig_dataset_path}/objects/{o_category}/{o_model}/{o_model}.usd",
+                usd_path=f"{og.og_dataset_path}/objects/{o_category}/{o_model}/{o_model}.usd",
                 name=f"task_obstacle{i}",
             )
             # Import into the simulator, add to the ignore collisions, and store internally
-            ig.sim.import_object(obj=obstacle)
+            og.sim.import_object(obj=obstacle)
             env.add_ignore_robot_object_collision(robot_idn=self._robot_idn, obj=obstacle)
             obstacles.append(obstacle)
 
@@ -274,7 +274,7 @@ class PointNavigationDynamicObstacleTask(PointNavigationObstacleTask):
                 prim_path=f"/World/task_obstacle{i}",
                 name=f"task_obscale{i}",
             )
-            ig.sim.import_object(obstacle)
+            og.sim.import_object(obstacle)
             obstacles.append(obstacle)
 
         return obstacles

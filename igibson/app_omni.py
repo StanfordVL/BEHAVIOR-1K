@@ -16,7 +16,7 @@ import re
 import carb
 import omni.kit.app
 import builtins
-from igibson.macros import gm, create_module_macros
+from omnigibson.macros import gm, create_module_macros
 
 
 # Create settings for this module
@@ -176,8 +176,8 @@ class OmniApp:
         :param launch_config: dict, settings for generating this app
         :param experience: str, path to extension settings file for this app
         """
-        # Load igibson module now to prevent circular imports
-        import igibson
+        # Load omnigibson module now to prevent circular imports
+        import omnigibson
 
         # Sanity check to see if any extra omniverse modules are loaded
         # Warn users if so because this will usually cause issues.
@@ -221,7 +221,7 @@ class OmniApp:
         # Override settings from input config
         self.config = self.DEFAULT_LAUNCHER_CONFIG
         if experience == "":
-            experience = f'{igibson.root_path}/configs/apps/omni.isaac.sim.python.kit'
+            experience = f'{omnigibson.root_path}/configs/apps/omni.isaac.sim.python.kit'
         self.config.update({"experience": experience})
         if launch_config is not None:
             self.config.update(launch_config)

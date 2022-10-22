@@ -2,13 +2,13 @@ import os
 
 import numpy as np
 
-from igibson import ig_dataset_path
-from igibson.robots.turtlebot import Turtlebot
-from igibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
-from igibson.simulator import Simulator
+from omnigibson import og_dataset_path
+from omnigibson.robots.turtlebot import Turtlebot
+from omnigibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
+from omnigibson.simulator import Simulator
 
 SCENE_ID = "Rs_int"
-USD_TEMPLATE_FILE = f"{ig_dataset_path}/scenes/{SCENE_ID}/urdf/{SCENE_ID}_best_template.usd"
+USD_TEMPLATE_FILE = f"{og_dataset_path}/scenes/{SCENE_ID}/urdf/{SCENE_ID}_best_template.usd"
 TEST_OUT_PATH = ""  # Define output directory here.
 
 #### SAVE SIMULATION ENV #####

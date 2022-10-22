@@ -4,21 +4,21 @@ import networkx as nx
 import numpy as np
 
 
-import igibson
-from igibson.macros import gm
-from igibson import object_states, app, ig_dataset_path
-# from igibson.external.pybullet_tools.utils import Euler, quat_from_euler
-from igibson.object_states.factory import get_state_dependency_graph, get_states_by_dependency_order
-from igibson.objects.dataset_object import DatasetObject
-from igibson.objects.primitive_object import PrimitiveObject
-from igibson.scenes.empty_scene import EmptyScene
-from igibson.sensors.vision_sensor import VisionSensor
-from igibson.simulator import Simulator
-from igibson.utils.asset_utils import download_assets, get_ig_model_path
-from igibson.utils.usd_utils import create_joint
+import omnigibson
+from omnigibson.macros import gm
+from omnigibson import object_states, app, og_dataset_path
+# from omnigibson.external.pybullet_tools.utils import Euler, quat_from_euler
+from omnigibson.object_states.factory import get_state_dependency_graph, get_states_by_dependency_order
+from omnigibson.objects.dataset_object import DatasetObject
+from omnigibson.objects.primitive_object import PrimitiveObject
+from omnigibson.scenes.empty_scene import EmptyScene
+from omnigibson.sensors.vision_sensor import VisionSensor
+from omnigibson.simulator import Simulator
+from omnigibson.utils.asset_utils import download_assets, get_og_model_path
+from omnigibson.utils.usd_utils import create_joint
 
 if gm.ENABLE_OMNI_PARTICLES:
-    from igibson.systems.micro_particle_system import WaterSystem
+    from omnigibson.systems.micro_particle_system import WaterSystem
 
 from pxr import Gf
 
@@ -32,8 +32,8 @@ def test_on_top():
         scene = EmptyScene()
         s.import_scene(scene)
 
-        cabinet_0007 = os.path.join(igibson.assets_path, "models/cabinet2/usd/cabinet_0007.usd")
-        cabinet_0004 = os.path.join(igibson.assets_path, "models/cabinet/usd/cabinet_0004.usd")
+        cabinet_0007 = os.path.join(omnigibson.assets_path, "models/cabinet2/usd/cabinet_0007.usd")
+        cabinet_0004 = os.path.join(omnigibson.assets_path, "models/cabinet/usd/cabinet_0004.usd")
 
         obj1 = DatasetObject(usd_path=cabinet_0007)
         s.import_object(obj1)
@@ -71,8 +71,8 @@ def test_inside():
         scene = EmptyScene()
         s.import_scene(scene)
 
-        cabinet_0007 = os.path.join(igibson.assets_path, "models/cabinet2/usd/cabinet_0007.usd")
-        cabinet_0004 = os.path.join(igibson.assets_path, "models/cabinet/usd/cabinet_0004.usd")
+        cabinet_0007 = os.path.join(omnigibson.assets_path, "models/cabinet2/usd/cabinet_0007.usd")
+        cabinet_0004 = os.path.join(omnigibson.assets_path, "models/cabinet/usd/cabinet_0004.usd")
 
         obj1 = DatasetObject(usd_path=cabinet_0007)
         s.import_object(obj1)
@@ -125,7 +125,7 @@ def test_open():
         scene = EmptyScene()
         s.import_scene(scene)
 
-        model_path = os.path.join(igibson.ig_dataset_path, "objects/microwave/7128/usd/7128.usd")
+        model_path = os.path.join(omnigibson.og_dataset_path, "objects/microwave/7128/usd/7128.usd")
         obj = DatasetObject(
             usd_path=model_path,
             category="microwave",
@@ -211,7 +211,7 @@ def test_toggle():
         scene = EmptyScene()
         sim.import_scene(scene)
 
-        model_root_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}"
+        model_root_path = f"{og_dataset_path}/objects/{obj_category}/{obj_model}"
         usd_path = f"{model_root_path}/usd/{obj_model}.usd"
 
         sink = DatasetObject(
@@ -255,7 +255,7 @@ def test_dirty():
         scene = EmptyScene()
         sim.import_scene(scene)
 
-        model_root_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}"
+        model_root_path = f"{og_dataset_path}/objects/{obj_category}/{obj_model}"
         usd_path = f"{model_root_path}/usd/{obj_model}.usd"
 
         sink = DatasetObject(
@@ -288,7 +288,7 @@ def test_burnt():
         scene = EmptyScene()
         sim.import_scene(scene)
 
-        model_root_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}"
+        model_root_path = f"{og_dataset_path}/objects/{obj_category}/{obj_model}"
         usd_path = f"{model_root_path}/usd/{obj_model}.usd"
 
         sink = DatasetObject(
@@ -320,7 +320,7 @@ def test_cooked():
         scene = EmptyScene()
         sim.import_scene(scene)
 
-        model_root_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}"
+        model_root_path = f"{og_dataset_path}/objects/{obj_category}/{obj_model}"
         usd_path = f"{model_root_path}/usd/{obj_model}.usd"
 
         sink = DatasetObject(
@@ -353,7 +353,7 @@ def test_frozen():
         scene = EmptyScene()
         sim.import_scene(scene)
 
-        model_root_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}"
+        model_root_path = f"{og_dataset_path}/objects/{obj_category}/{obj_model}"
         usd_path = f"{model_root_path}/usd/{obj_model}.usd"
 
         sink = DatasetObject(
@@ -386,7 +386,7 @@ def test_vertical_adjacency():
         scene = EmptyScene()
         sim.import_scene(scene)
 
-        model_root_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}"
+        model_root_path = f"{og_dataset_path}/objects/{obj_category}/{obj_model}"
         usd_path = f"{model_root_path}/usd/{obj_model}.usd"
 
         sink_1 = DatasetObject(
@@ -464,7 +464,7 @@ def test_horizontal_adjacency():
         scene = EmptyScene()
         sim.import_scene(scene)
 
-        model_root_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}"
+        model_root_path = f"{og_dataset_path}/objects/{obj_category}/{obj_model}"
         usd_path = f"{model_root_path}/usd/{obj_model}.usd"
 
         sink_1 = DatasetObject(
@@ -542,7 +542,7 @@ def test_inside():
         scene = EmptyScene()
         sim.import_scene(scene)
 
-        model_root_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}"
+        model_root_path = f"{og_dataset_path}/objects/{obj_category}/{obj_model}"
         usd_path = f"{model_root_path}/usd/{obj_model}.usd"
 
         sink_1 = DatasetObject(
@@ -598,7 +598,7 @@ def test_heat_source():
         scene = EmptyScene()
         sim.import_scene(scene)
 
-        model_root_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}"
+        model_root_path = f"{og_dataset_path}/objects/{obj_category}/{obj_model}"
         usd_path = f"{model_root_path}/usd/{obj_model}.usd"
 
         stove = DatasetObject(
@@ -641,7 +641,7 @@ def test_temperature():
         scene = EmptyScene()
         sim.import_scene(scene)
 
-        model_root_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}"
+        model_root_path = f"{og_dataset_path}/objects/{obj_category}/{obj_model}"
         usd_path = f"{model_root_path}/usd/{obj_model}.usd"
 
         apple = DatasetObject(
@@ -681,7 +681,7 @@ def test_touching():
         scene = EmptyScene()
         sim.import_scene(scene)
 
-        model_root_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}"
+        model_root_path = f"{og_dataset_path}/objects/{obj_category}/{obj_model}"
         usd_path = f"{model_root_path}/usd/{obj_model}.usd"
 
         apple_1 = DatasetObject(
@@ -746,7 +746,7 @@ def test_open():
         scene = EmptyScene()
         sim.import_scene(scene)
 
-        model_root_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}"
+        model_root_path = f"{og_dataset_path}/objects/{obj_category}/{obj_model}"
         usd_path = f"{model_root_path}/usd/{obj_model}.usd"
 
         microwave = DatasetObject(
@@ -793,7 +793,7 @@ def test_demo():
         obj_model = "00_0"
         name = "apple"
 
-        model_root_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}"
+        model_root_path = f"{og_dataset_path}/objects/{obj_category}/{obj_model}"
         usd_path = f"{model_root_path}/usd/{obj_model}.usd"
 
         apple = DatasetObject(
@@ -809,7 +809,7 @@ def test_demo():
         obj_model = "101908"
         name = "stove"
 
-        model_root_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}"
+        model_root_path = f"{og_dataset_path}/objects/{obj_category}/{obj_model}"
         usd_path = f"{model_root_path}/usd/{obj_model}.usd"
 
         stove = DatasetObject(
@@ -876,7 +876,7 @@ def test_sliced():
         scene = EmptyScene()
         sim.import_scene(scene)
 
-        model_root_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}"
+        model_root_path = f"{og_dataset_path}/objects/{obj_category}/{obj_model}"
         usd_path = f"{model_root_path}/usd/{obj_model}.usd"
 
         # Create an dataset object of an apple, but doesn't load it in the simulator
@@ -935,7 +935,7 @@ def test_slicer():
         scene = EmptyScene()
         sim.import_scene(scene)
 
-        model_root_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}"
+        model_root_path = f"{og_dataset_path}/objects/{obj_category}/{obj_model}"
         usd_path = f"{model_root_path}/usd/{obj_model}.usd"
 
         # Create an dataset object of an apple, but doesn't load it in the simulator
@@ -952,7 +952,7 @@ def test_slicer():
         obj_model = "1"
         name = "knife"
 
-        model_root_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}"
+        model_root_path = f"{og_dataset_path}/objects/{obj_category}/{obj_model}"
         usd_path = f"{model_root_path}/usd/{obj_model}.usd"
 
         # Create an dataset object of an apple, but doesn't load it in the simulator
@@ -1001,7 +1001,7 @@ def test_water_source_sink():
         sim.play()
         sim.stop()
 
-        model_root_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}"
+        model_root_path = f"{og_dataset_path}/objects/{obj_category}/{obj_model}"
         usd_path = f"{model_root_path}/usd/{obj_model}.usd"
 
         # Create object
@@ -1071,7 +1071,7 @@ def test_water_filled():
         sim.play()
         sim.stop()
 
-        model_root_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}"
+        model_root_path = f"{og_dataset_path}/objects/{obj_category}/{obj_model}"
         usd_path = f"{model_root_path}/usd/{obj_model}.usd"
 
         # Create water source
@@ -1200,7 +1200,7 @@ def test_attachment():
         scene = EmptyScene()
         sim.import_scene(scene)
 
-        model_root_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}"
+        model_root_path = f"{og_dataset_path}/objects/{obj_category}/{obj_model}"
         usd_path = f"{model_root_path}/usd/{obj_model}.usd"
 
         apple_1 = DatasetObject(

@@ -7,7 +7,7 @@ import time
 
 
 
-from igibson import assets_path
+from omnigibson import assets_path
 
 p.connect(p.GUI)
 

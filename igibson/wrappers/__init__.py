@@ -1,3 +1,3 @@
-from igibson.wrappers.wrapper_base import BaseWrapper
-from igibson.wrappers.log_wrapper import LogWrapper
-from igibson.wrappers.action_primitive_wrapper import ActionPrimitiveWrapper
+from omnigibson.wrappers.wrapper_base import BaseWrapper
+from omnigibson.wrappers.log_wrapper import LogWrapper
+from omnigibson.wrappers.action_primitive_wrapper import ActionPrimitiveWrapper

@@ -8,10 +8,10 @@ from omni.kit.commands import execute
 from omni.isaac.core.utils.stage import get_current_stage
 from omni.isaac.range_sensor import _range_sensor
 
-from igibson.sensors.dropout_sensor_noise import DropoutSensorNoise
-from igibson.sensors.sensor_base import BaseSensor
-from igibson.utils.constants import OccupancyGridState
-from igibson.utils.python_utils import classproperty
+from omnigibson.sensors.dropout_sensor_noise import DropoutSensorNoise
+from omnigibson.sensors.sensor_base import BaseSensor
+from omnigibson.utils.constants import OccupancyGridState
+from omnigibson.utils.python_utils import classproperty
 
 
 class ScanSensor(BaseSensor):

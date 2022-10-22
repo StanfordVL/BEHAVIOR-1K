@@ -15,14 +15,14 @@ concurrency:
 jobs:
   test:
     runs-on: [self-hosted, linux, gpu]
-    if: github.repository == 'StanfordVL/iGibson-dev'
+    if: github.repository == 'StanfordVL/OmniGibson-dev'
 
     steps:
       - name: Checkout source
         uses: actions/checkout@v2
         with:
           submodules: true
-          path: igibson
+          path: omnigibson
 
       - name: Add CUDA to env
         run: echo "/usr/local/cuda/bin" >> $GITHUB_PATH
@@ -34,19 +34,19 @@ jobs:
           architecture: x64
 
       - name: Install dev requirements
-        working-directory: igibson
+        working-directory: omnigibson
         run: pip install -r requirements-dev.txt
 
       - name: Install additional dev requirements
-        working-directory: igibson
+        working-directory: omnigibson
         run: pip install -r tests/requirements-tests.txt
 
       - name: Install
-        working-directory: igibson
+        working-directory: omnigibson
         run: pip install -e .
 
       - name: Uninstall pip bddl
-        working-directory: igibson
+        working-directory: omnigibson
         run: pip uninstall -y bddl
 
       - name: Checkout BDDL
@@ -64,15 +64,15 @@ jobs:
         run: pip install -e .
 
       - name: Link Dataset
-        working-directory: igibson
-        run: ln -s /scr/ig-data igibson/data
+        working-directory: omnigibson
+        run: ln -s /scr/ig-data omnigibson/data
 
       - name: Create tests of examples
-        working-directory: igibson
+        working-directory: omnigibson
         run: python tests/create_tests_of_examples.py
 
       - name: Run tests
-        working-directory: igibson
+        working-directory: omnigibson
         run: pytest /tmp/tests_of_examples
 
       - name: Remove Files

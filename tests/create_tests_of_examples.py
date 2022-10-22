@@ -4,9 +4,9 @@ import pkgutil
 import shutil
 from string import Template
 
-import igibson
-from igibson import examples
-from igibson.utils.asset_utils import download_assets
+import omnigibson
+from omnigibson import examples
+from omnigibson.utils.asset_utils import download_assets
 
 download_assets()
 
@@ -28,7 +28,7 @@ def main():
     os.makedirs(temp_folder_of_test, exist_ok=True)
 
     for example in examples_list:
-        template_file_name = os.path.join(igibson.__path__[0], "..", "tests", "test_of_example_template.txt")
+        template_file_name = os.path.join(omnigibson.__path__[0], "..", "tests", "test_of_example_template.txt")
         with open(template_file_name, "r") as f:
             substitutes = dict()
             substitutes["module"] = example

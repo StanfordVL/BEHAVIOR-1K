@@ -5,15 +5,15 @@ import numpy as np
 
 from PIL import Image
 
-import igibson
-from igibson.utils.asset_utils import (
+import omnigibson
+from omnigibson.utils.asset_utils import (
     get_3dfront_scene_path,
     get_cubicasa_scene_path,
-    get_ig_scene_path,
+    get_og_scene_path,
 )
 
 SCENE_SOURCE_PATHS = {
-    "IG": get_ig_scene_path,
+    "IG": get_og_scene_path,
     "CUBICASA": get_cubicasa_scene_path,
     "THREEDFRONT": get_3dfront_scene_path,
 }
@@ -70,7 +70,7 @@ class SegmentationMap:
         img_ins = np.array(img_ins.resize((self.seg_map_size, self.seg_map_size), Image.NEAREST))
         img_sem = np.array(img_sem.resize((self.seg_map_size, self.seg_map_size), Image.NEAREST))
 
-        room_categories = os.path.join(igibson.ig_dataset_path, "metadata", "room_categories.txt")
+        room_categories = os.path.join(omnigibson.og_dataset_path, "metadata", "room_categories.txt")
         with open(room_categories, "r") as fp:
             room_cats = [line.rstrip() for line in fp.readlines()]
 

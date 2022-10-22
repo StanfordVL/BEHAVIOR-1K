@@ -3,13 +3,13 @@ import os
 import numpy as np
 
 
-from igibson.macros import create_module_macros
-from igibson.object_states.aabb import AABB
-from igibson.object_states.inside import Inside
-from igibson.object_states.link_based_state_mixin import LinkBasedStateMixin
-from igibson.object_states.object_state_base import AbsoluteObjectState
-from igibson.object_states.open import Open
-from igibson.object_states.toggle import ToggledOn
+from omnigibson.macros import create_module_macros
+from omnigibson.object_states.aabb import AABB
+from omnigibson.object_states.inside import Inside
+from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
+from omnigibson.object_states.object_state_base import AbsoluteObjectState
+from omnigibson.object_states.open import Open
+from omnigibson.object_states.toggle import ToggledOn
 
 
 # Create settings for this module
@@ -18,7 +18,7 @@ m = create_module_macros(module_path=__file__)
 m.HEATING_ELEMENT_LINK_NAME = "heat_source_link"
 
 m.HEATING_ELEMENT_MARKER_SCALE = [1.0] * 3
-# m.HEATING_ELEMENT_MARKER_FILENAME = os.path.join(igibson.assets_path, "models/fire/fire.obj")
+# m.HEATING_ELEMENT_MARKER_FILENAME = os.path.join(omnigibson.assets_path, "models/fire/fire.obj")
 
 # TODO: Delete default values for this and make them required.
 m.DEFAULT_TEMPERATURE = 200
@@ -130,7 +130,7 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin):
 
         # TODO: Make fire effect from omni flow instead of loading in an explicit asset
         # # Import at runtime to prevent circular imports
-        # from igibson.objects.usd_object import USDObject
+        # from omnigibson.objects.usd_object import USDObject
         # self.marker = USDObject(
         #     prim_path=f"{self.obj.prim_path}/heat_source_marker",
         #     usd_path=m.HEATING_ELEMENT_MARKER_FILENAME,

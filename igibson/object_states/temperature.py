@@ -1,11 +1,11 @@
 import numpy as np
 from collections import OrderedDict
-from igibson.macros import create_module_macros
-from igibson.object_states.heat_source_or_sink import HeatSourceOrSink
-from igibson.object_states.inside import Inside
-from igibson.object_states.object_state_base import AbsoluteObjectState
-from igibson.object_states.pose import Pose
-import igibson.utils.transform_utils as T
+from omnigibson.macros import create_module_macros
+from omnigibson.object_states.heat_source_or_sink import HeatSourceOrSink
+from omnigibson.object_states.inside import Inside
+from omnigibson.object_states.object_state_base import AbsoluteObjectState
+from omnigibson.object_states.pose import Pose
+import omnigibson.utils.transform_utils as T
 
 
 # Create settings for this module

@@ -4,8 +4,8 @@ import os
 import yaml
 import builtins
 
-# TODO: Need to fix somehow -- igibson gets imported first BEFORE we can actually modify the macros
-from igibson.macros import gm
+# TODO: Need to fix somehow -- omnigibson gets imported first BEFORE we can actually modify the macros
+from omnigibson.macros import gm
 
 builtins.ISAAC_LAUNCHED_FROM_JUPYTER = (
     os.getenv("ISAAC_JUPYTER_KERNEL") is not None
@@ -36,10 +36,10 @@ else:
 g_dataset_path = os.path.expanduser(g_dataset_path)
 
 if "IGIBSON_DATASET_PATH" in os.environ:
-    ig_dataset_path = os.environ["IGIBSON_DATASET_PATH"]
+    og_dataset_path = os.environ["IGIBSON_DATASET_PATH"]
 else:
-    ig_dataset_path = global_config["ig_dataset_path"]
-ig_dataset_path = os.path.expanduser(ig_dataset_path)
+    og_dataset_path = global_config["og_dataset_path"]
+og_dataset_path = os.path.expanduser(og_dataset_path)
 
 if "3DFRONT_DATASET_PATH" in os.environ:
     threedfront_dataset_path = os.environ["3DFRONT_DATASET_PATH"]
@@ -65,8 +65,8 @@ if not os.path.isabs(assets_path):
     assets_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), assets_path)
 if not os.path.isabs(g_dataset_path):
     g_dataset_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), g_dataset_path)
-if not os.path.isabs(ig_dataset_path):
-    ig_dataset_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), ig_dataset_path)
+if not os.path.isabs(og_dataset_path):
+    og_dataset_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), og_dataset_path)
 if not os.path.isabs(threedfront_dataset_path):
     threedfront_dataset_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), threedfront_dataset_path)
 if not os.path.isabs(cubicasa_dataset_path):
@@ -74,13 +74,13 @@ if not os.path.isabs(cubicasa_dataset_path):
 if not os.path.isabs(key_path):
     key_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), key_path)
 
-logging.info("Importing iGibson (igibson module)")
+logging.info("Importing OmniGibson (omnigibson module)")
 logging.info("Assets path: {}".format(assets_path))
 logging.info("Gibson Dataset path: {}".format(g_dataset_path))
-logging.info("iG Dataset path: {}".format(ig_dataset_path))
+logging.info("iG Dataset path: {}".format(og_dataset_path))
 logging.info("3D-FRONT Dataset path: {}".format(threedfront_dataset_path))
 logging.info("CubiCasa5K Dataset path: {}".format(cubicasa_dataset_path))
-logging.info("iGibson Key path: {}".format(key_path))
+logging.info("OmniGibson Key path: {}".format(key_path))
 
 example_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "examples")
 example_config_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "configs")
@@ -91,8 +91,8 @@ logging.info("Example config path: {}".format(example_config_path))
 # whether to enable debugging mode for object sampling
 debug_sampling = False
 
-# Finally, we must create the igibson application
-from igibson.app_omni import OmniApp
+# Finally, we must create the omnigibson application
+from omnigibson.app_omni import OmniApp
 
 # Create app as a global reference so any submodule can access it
 app = OmniApp(
@@ -104,19 +104,19 @@ app = OmniApp(
 
 # Next import must be simulator
 sim = None
-from igibson.simulator import Simulator
+from omnigibson.simulator import Simulator
 
 # Create simulator (this is a singleton so it's okay that it's global)
 sim = Simulator()
 
-# Import any remaining items we want to access directly from the main igibson import
-from igibson.envs import Environment
-from igibson.scenes import REGISTERED_SCENES
-from igibson.robots import REGISTERED_ROBOTS
-from igibson.controllers import REGISTERED_CONTROLLERS
-from igibson.tasks import REGISTERED_TASKS
+# Import any remaining items we want to access directly from the main omnigibson import
+from omnigibson.envs import Environment
+from omnigibson.scenes import REGISTERED_SCENES
+from omnigibson.robots import REGISTERED_ROBOTS
+from omnigibson.controllers import REGISTERED_CONTROLLERS
+from omnigibson.tasks import REGISTERED_TASKS
 
-# Define convenience function for shutting down iGibson cleanly
+# Define convenience function for shutting down OmniGibson cleanly
 def shutdown():
     app.close()
     exit(0)

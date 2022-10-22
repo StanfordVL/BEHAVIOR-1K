@@ -5,7 +5,7 @@ import omni
 from omni.isaac.core.utils.prims import get_prim_at_path
 from omni.isaac.core.utils.stage import get_current_stage
 from omni.physx.scripts import physicsUtils, particleUtils
-from igibson.utils.usd_utils import array_to_vtarray
+from omnigibson.utils.usd_utils import array_to_vtarray
 
 
 def create_physx_particle_system(

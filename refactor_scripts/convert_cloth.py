@@ -6,7 +6,7 @@
 
 import os
 
-from igibson import app, ig_dataset_path
+from omnigibson import app, og_dataset_path
 import trimesh
 import numpy as np
 import shutil
@@ -15,15 +15,15 @@ from import_metadata import import_obj_metadata
 from omni.isaac.core.utils.stage import open_stage, get_current_stage
 from omni.isaac.core.utils.prims import get_prim_at_path, is_prim_path_valid
 from omni.kit.commands import execute
-from igibson.utils.asset_utils import encrypt_file
-from igibson.macros import gm
+from omnigibson.utils.asset_utils import encrypt_file
+from omnigibson.macros import gm
 
 
 CLOTH_CATEGORIES = ["carpet"]
 THRESH = 0.05
 
 for category in CLOTH_CATEGORIES:
-    category_dir = os.path.join(ig_dataset_path, "objects", category)
+    category_dir = os.path.join(og_dataset_path, "objects", category)
     for model in os.listdir(category_dir):
 
         model_dir = os.path.join(category_dir, model)

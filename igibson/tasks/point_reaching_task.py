@@ -1,8 +1,8 @@
 import numpy as np
 
-from igibson.tasks.point_navigation_task import PointNavigationTask
-from igibson.termination_conditions.point_goal import PointGoal
-import igibson.utils.transform_utils as T
+from omnigibson.tasks.point_navigation_task import PointNavigationTask
+from omnigibson.termination_conditions.point_goal import PointGoal
+import omnigibson.utils.transform_utils as T
 
 
 # Valid point navigation reward types

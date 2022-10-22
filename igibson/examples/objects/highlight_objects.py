@@ -3,7 +3,7 @@
 """
 import logging
 import numpy as np
-import igibson as ig
+import omnigibson as og
 
 
 def main(random_selection=False, headless=False, short_exec=False):
@@ -23,10 +23,10 @@ def main(random_selection=False, headless=False, short_exec=False):
     }
 
     # Create the environment
-    env = ig.Environment(configs=cfg, action_timestep=1 / 60., physics_timestep=1 / 60.)
+    env = og.Environment(configs=cfg, action_timestep=1 / 60., physics_timestep=1 / 60.)
 
     # Grab all window objects
-    windows = ig.sim.scene.object_registry("category", "window")
+    windows = og.sim.scene.object_registry("category", "window")
 
     # Step environment while toggling window highlighting
     i = 0

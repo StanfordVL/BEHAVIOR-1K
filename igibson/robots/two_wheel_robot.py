@@ -3,8 +3,8 @@ from abc import abstractmethod
 import gym
 import numpy as np
 
-from igibson.robots.locomotion_robot import LocomotionRobot
-from igibson.utils.python_utils import classproperty
+from omnigibson.robots.locomotion_robot import LocomotionRobot
+from omnigibson.utils.python_utils import classproperty
 
 
 class TwoWheelRobot(LocomotionRobot):

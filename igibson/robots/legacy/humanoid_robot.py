@@ -4,7 +4,7 @@ import gym
 import numpy as np
 
 
-from igibson.robots.locomotion_robot import LocomotionRobot
+from omnigibson.robots.locomotion_robot import LocomotionRobot
 
 
 class Humanoid(LocomotionRobot):

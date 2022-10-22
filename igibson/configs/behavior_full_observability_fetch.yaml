@@ -1,7 +1,7 @@
 # TODO: Verify works!
 
 ## scene
-#scene: igibson
+#scene: omnigibson
 #scene_id: Beechwood_1_int
 #clutter: false
 #build_graph: true

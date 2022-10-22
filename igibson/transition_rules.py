@@ -4,11 +4,11 @@ from collections import namedtuple
 import numpy as np
 from omni.isaac.utils._isaac_utils import math as math_utils
 
-from igibson import ig_dataset_path
-from igibson.objects.dataset_object import DatasetObject
-from igibson.object_states import *
-import igibson.utils.transform_utils as T
-from igibson.utils.usd_utils import BoundingBoxAPI
+from omnigibson import og_dataset_path
+from omnigibson.objects.dataset_object import DatasetObject
+from omnigibson.object_states import *
+import omnigibson.utils.transform_utils as T
+from omnigibson.utils.usd_utils import BoundingBoxAPI
 
 
 # Tuple of attributes of objects created in transitions.
@@ -173,7 +173,7 @@ class SlicingRule(BaseTransitionRule):
             part_pos = part["pos"] * sliced_obj.scale
             part_orn = part["orn"]
             part_obj_name = f"{sliced_obj.name}_part_{part_idx}"
-            model_root_path = f"{ig_dataset_path}/objects/{part_category}/{part_model}"
+            model_root_path = f"{og_dataset_path}/objects/{part_category}/{part_model}"
             usd_path = f"{model_root_path}/usd/{part_model}.usd"
 
             # Calculate global part pose.
@@ -181,7 +181,7 @@ class SlicingRule(BaseTransitionRule):
             part_orn = T.quat_multiply(np.array(part_orn), orn)
 
             # Circular import.
-            from igibson.objects.dataset_object import DatasetObject
+            from omnigibson.objects.dataset_object import DatasetObject
 
             part_obj = DatasetObject(
                 prim_path=f"/World/{part_obj_name}",
@@ -262,7 +262,7 @@ class ContainerRule(BaseTransitionRule):
         self._counter += 1
         scale = self.obj_attrs.scale
 
-        model_root_path = f"{ig_dataset_path}/objects/{category}/{model}"
+        model_root_path = f"{og_dataset_path}/objects/{category}/{model}"
         usd_path = f"{model_root_path}/usd/{model}.usd"
 
         final_obj = DatasetObject(
@@ -339,7 +339,7 @@ class ContainerGarbageRule(BaseTransitionRule):
         self._counter += 1
         scale = self.obj_attrs.scale
 
-        model_root_path = f"{ig_dataset_path}/objects/{category}/{model}"
+        model_root_path = f"{og_dataset_path}/objects/{category}/{model}"
         usd_path = f"{model_root_path}/usd/{model}.usd"
 
         garbage_obj = DatasetObject(

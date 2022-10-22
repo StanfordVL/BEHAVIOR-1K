@@ -1,10 +1,10 @@
-from igibson import app, assets_path, ig_dataset_path, Simulator
-from igibson.scenes.empty_scene import EmptyScene
+from omnigibson import app, assets_path, og_dataset_path, Simulator
+from omnigibson.scenes.empty_scene import EmptyScene
 import omni
 from omni.isaac.core.utils.stage import add_reference_to_stage
 import xml.etree.ElementTree as ET
 import numpy as np
-import igibson.utils.transform_utils as T
+import omnigibson.utils.transform_utils as T
 import json
 from omni.isaac.core.utils.prims import create_prim, set_prim_property
 from omni.kit.viewport import get_viewport_interface
@@ -16,9 +16,9 @@ from omni.isaac.core.utils.prims import get_prim_at_path, get_prim_path, is_prim
 from omni.isaac.core.utils.carb import set_carb_setting
 from omni.isaac.core.utils.stage import get_current_stage, get_stage_units, traverse_stage
 
-from igibson.prims.entity_prim import EntityPrim
-from igibson.objects.dataset_object import DatasetObject
-from igibson.systems.particle_system import DustSystem, StainSystem
+from omnigibson.prims.entity_prim import EntityPrim
+from omnigibson.objects.dataset_object import DatasetObject
+from omnigibson.systems.particle_system import DustSystem, StainSystem
 
 
 # Macros
@@ -41,7 +41,7 @@ def steps(n_steps):
 # Add milk carton object
 milk = DatasetObject(
     prim_path=f"/World/{name}",
-    usd_path=f"{ig_dataset_path}/objects/{obj_category}/{obj_model}/usd/{obj_model}.usd",
+    usd_path=f"{og_dataset_path}/objects/{obj_category}/{obj_model}/usd/{obj_model}.usd",
     name=name,
 )
 

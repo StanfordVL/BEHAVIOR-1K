@@ -5,14 +5,14 @@ from omni.isaac.core.objects.ground_plane import GroundPlane
 from pxr import Usd, UsdGeom
 import numpy as np
 from omni.isaac.core.utils.stage import get_current_stage
-from igibson import app
-from igibson.prims.xform_prim import XFormPrim
-from igibson.utils.python_utils import classproperty, Serializable, Registerable, Recreatable
-from igibson.utils.registry_utils import SerializableRegistry
-from igibson.utils.config_utils import NumpyEncoder
-from igibson.objects.object_base import BaseObject
-from igibson.systems import SYSTEMS_REGISTRY
-from igibson.robots.robot_base import BaseRobot
+from omnigibson import app
+from omnigibson.prims.xform_prim import XFormPrim
+from omnigibson.utils.python_utils import classproperty, Serializable, Registerable, Recreatable
+from omnigibson.utils.registry_utils import SerializableRegistry
+from omnigibson.utils.config_utils import NumpyEncoder
+from omnigibson.objects.object_base import BaseObject
+from omnigibson.systems import SYSTEMS_REGISTRY
+from omnigibson.robots.robot_base import BaseRobot
 
 # Global dicts that will contain mappings
 REGISTERED_SCENES = OrderedDict()
@@ -407,7 +407,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
     def get_random_floor(self):
         """
         Sample a random floor among all existing floor_heights in the scene.
-        While Gibson v1 scenes can have several floor_heights, the EmptyScene, StadiumScene and scenes from iGibson
+        While Gibson v1 scenes can have several floor_heights, the EmptyScene, StadiumScene and scenes from OmniGibson
         have only a single floor.
 
         :return: an integer between 0 and NumberOfFloors-1

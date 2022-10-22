@@ -1,10 +1,10 @@
 import logging
 import numpy as np
-from igibson.objects.stateful_object import StatefulObject
+from omnigibson.objects.stateful_object import StatefulObject
 
 from omni.isaac.core.utils.prims import get_prim_at_path
-from igibson.utils.constants import PrimType
-from igibson.utils.usd_utils import add_asset_to_stage
+from omnigibson.utils.constants import PrimType
+from omnigibson.utils.usd_utils import add_asset_to_stage
 
 
 class USDObject(StatefulObject):

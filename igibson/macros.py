@@ -1,8 +1,8 @@
 """
-Set of macros to use globally for iGibson. These are generally magic numbers that were tuned heuristically.
+Set of macros to use globally for OmniGibson. These are generally magic numbers that were tuned heuristically.
 
 NOTE: This is generally decentralized -- the monolithic @settings variable is created here with some global values,
-but submodules within iGibson may import this dictionary and add to it dynamically
+but submodules within OmniGibson may import this dictionary and add to it dynamically
 """
 from addict import Dict
 
@@ -11,7 +11,7 @@ from addict import Dict
 macros = Dict()
 gm = macros.globals
 
-# Whether to generate a headless or non-headless application upon iGibson startup
+# Whether to generate a headless or non-headless application upon OmniGibson startup
 gm.HEADLESS = False
 
 # Whether to use extra settings (verboseness, extra GUI features) for debugging
@@ -73,17 +73,17 @@ def create_module_macros(module_path):
     Args:
         module_path (str): Relative path from the package root directory pointing to the module. This will be parsed
             to generate the appropriate sub-macros dictionary, e.g., for module "dirty" in
-            igibson/object_states_dirty.py, this would generate a dictionary existing at macros.object_states.dirty
+            omnigibson/object_states_dirty.py, this would generate a dictionary existing at macros.object_states.dirty
 
     Returns:
         Dict: addict dictionary which can be populated with values
     """
-    # Sanity check module path, make sure igibson/ is in the path
-    assert "igibson/" in module_path, \
-        f"module_path is expected to be a filepath including the igibson root directory, got: {module_path}!"
+    # Sanity check module path, make sure omnigibson/ is in the path
+    assert "omnigibson/" in module_path, \
+        f"module_path is expected to be a filepath including the omnigibson root directory, got: {module_path}!"
 
-    # Trim the .py, and anything before and including igibson/, and split into its appropriate parts
-    subsections = module_path[:-3].split("igibson/")[-1].split("/")
+    # Trim the .py, and anything before and including omnigibson/, and split into its appropriate parts
+    subsections = module_path[:-3].split("omnigibson/")[-1].split("/")
 
     # Create and return the generated sub-dictionary
     def _recursively_get_or_create_dict(dic, keys):

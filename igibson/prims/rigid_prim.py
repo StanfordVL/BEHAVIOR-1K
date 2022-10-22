@@ -16,12 +16,12 @@ import numpy as np
 from omni.isaac.dynamic_control import _dynamic_control
 import carb
 
-from igibson.macros import gm
-from igibson.prims.xform_prim import XFormPrim
-from igibson.prims.geom_prim import CollisionGeomPrim, VisualGeomPrim
-from igibson.utils.constants import GEOM_TYPES
-from igibson.utils.omni_types import DynamicState, CsRawData
-from igibson.utils.usd_utils import mesh_prim_to_trimesh_mesh
+from omnigibson.macros import gm
+from omnigibson.prims.xform_prim import XFormPrim
+from omnigibson.prims.geom_prim import CollisionGeomPrim, VisualGeomPrim
+from omnigibson.utils.constants import GEOM_TYPES
+from omnigibson.utils.omni_types import DynamicState, CsRawData
+from omnigibson.utils.usd_utils import mesh_prim_to_trimesh_mesh
 
 # Import omni sensor based on type
 from omni.isaac.isaac_sensor import _isaac_sensor as _s

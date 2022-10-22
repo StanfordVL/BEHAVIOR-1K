@@ -21,20 +21,20 @@ from bddl.condition_evaluation import Negation
 from bddl.logic_base import AtomicFormula
 from bddl.object_taxonomy import ObjectTaxonomy
 
-import igibson as ig
-from igibson.object_states.on_floor import RoomFloor
-from igibson.objects.dataset_object import DatasetObject
-# from igibson.objects.multi_object_wrappers import ObjectGrouper, ObjectMultiplexer
-from igibson.reward_functions.potential_reward import PotentialReward
-from igibson.robots.robot_base import BaseRobot
-from igibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
-from igibson.tasks.bddl_backend import IGibsonBDDLBackend
-from igibson.tasks.task_base import BaseTask
-from igibson.termination_conditions.predicate_goal import PredicateGoal
-from igibson.termination_conditions.timeout import Timeout
-from igibson.utils.asset_utils import get_ig_avg_category_specs, get_ig_model_path, get_object_models_of_category
-# from igibson.utils.checkpoint_utils import load_checkpoint
-from igibson.utils.constants import (
+import omnigibson as og
+from omnigibson.object_states.on_floor import RoomFloor
+from omnigibson.objects.dataset_object import DatasetObject
+# from omnigibson.objects.multi_object_wrappers import ObjectGrouper, ObjectMultiplexer
+from omnigibson.reward_functions.potential_reward import PotentialReward
+from omnigibson.robots.robot_base import BaseRobot
+from omnigibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
+from omnigibson.tasks.bddl_backend import IGibsonBDDLBackend
+from omnigibson.tasks.task_base import BaseTask
+from omnigibson.termination_conditions.predicate_goal import PredicateGoal
+from omnigibson.termination_conditions.timeout import Timeout
+from omnigibson.utils.asset_utils import get_og_avg_category_specs, get_og_model_path, get_object_models_of_category
+# from omnigibson.utils.checkpoint_utils import load_checkpoint
+from omnigibson.utils.constants import (
     AGENT_POSE_DIM,
     FLOOR_SYNSET,
     MAX_TASK_RELEVANT_OBJS,
@@ -42,9 +42,9 @@ from igibson.utils.constants import (
     TASK_RELEVANT_OBJS_OBS_DIM,
     KINEMATICS_STATES,
 )
-from igibson.utils.log_utils import IGLogWriter
-from igibson.utils.python_utils import classproperty, assert_valid_key
-import igibson.utils.transform_utils as T
+from omnigibson.utils.log_utils import IGLogWriter
+from omnigibson.utils.python_utils import classproperty, assert_valid_key
+import omnigibson.utils.transform_utils as T
 
 
 # TODO! WIP
@@ -132,7 +132,7 @@ class BehaviorTask(BaseTask):
         self.sampleable_object_conditions = None
 
         # We infer where to reset the agent based on the cached value
-        self.agent_init_poses = json.loads(ig.sim.world_prim.GetCustomDataByKey("agent_poses")) if not self.online_object_sampling else None
+        self.agent_init_poses = json.loads(og.sim.world_prim.GetCustomDataByKey("agent_poses")) if not self.online_object_sampling else None
 
         # Logic-tracking info
         self.currently_viewed_index = None
@@ -166,7 +166,7 @@ class BehaviorTask(BaseTask):
 
     def _load(self, env):
         # Get the name of the scene
-        self.scene_model = ig.sim.scene.scene_model
+        self.scene_model = og.sim.scene.scene_model
 
         # Initialize the current activity
         success, self.feedback = self.initialize_activity(env=env)
@@ -214,7 +214,7 @@ class BehaviorTask(BaseTask):
         self.activity_conditions = Conditions(
             activity_name,
             activity_definition_id,
-            simulator_name="igibson",
+            simulator_name="omnigibson",
             predefined_problem=predefined_problem,
         )
 
@@ -303,9 +303,9 @@ class BehaviorTask(BaseTask):
                     return "You have assigned room type for [{}], but [{}] is sampleable. Only non-sampleable objects can have room assignment.".format(
                         obj_cat, obj_cat
                     )
-                if room_type not in ig.sim.scene.seg_map.room_sem_name_to_ins_name:
+                if room_type not in og.sim.scene.seg_map.room_sem_name_to_ins_name:
                     # Missing room type
-                    return "Room type [{}] missing in scene [{}].".format(room_type, ig.sim.scene.scene_id)
+                    return "Room type [{}] missing in scene [{}].".format(room_type, og.sim.scene.scene_id)
                 if room_type not in self.room_type_to_object_instance:
                     self.room_type_to_object_instance[room_type] = []
                 self.room_type_to_object_instance[room_type].append(obj_inst)
@@ -380,11 +380,11 @@ class BehaviorTask(BaseTask):
                 obj_cat = self.object_instance_to_category[obj_inst]
 
                 # We allow burners to be used as if they are stoves
-                categories = self.object_taxonomy.get_subtree_igibson_categories(obj_cat)
+                categories = self.object_taxonomy.get_subtree_omnigibson_categories(obj_cat)
                 if obj_cat == "stove.n.01":
-                    categories += self.object_taxonomy.get_subtree_igibson_categories("burner.n.02")
+                    categories += self.object_taxonomy.get_subtree_omnigibson_categories("burner.n.02")
 
-                for room_inst in ig.sim.scene.seg_map.room_sem_name_to_ins_name[room_type]:
+                for room_inst in og.sim.scene.seg_map.room_sem_name_to_ins_name[room_type]:
                     if obj_cat == FLOOR_SYNSET:
                         # TODO: remove after split floors
                         # Create a RoomFloor for each room instance
@@ -392,14 +392,14 @@ class BehaviorTask(BaseTask):
                         room_floor = RoomFloor(
                             category="room_floor",
                             name="room_floor_{}".format(room_inst),
-                            scene=ig.sim.scene,
+                            scene=og.sim.scene,
                             room_instance=room_inst,
-                            floor_obj=ig.sim.scene.object_registry("name", "floors"),
+                            floor_obj=og.sim.scene.object_registry("name", "floors"),
                         )
                         scene_objs = [room_floor]
                     else:
                         # A list of scene objects that satisfy the requested categories
-                        room_objs = ig.sim.scene.object_registry("in_rooms", room_inst, default_val=[])
+                        room_objs = og.sim.scene.object_registry("in_rooms", room_inst, default_val=[])
                         scene_objs = [obj for obj in room_objs if obj.category in categories]
 
                     if len(scene_objs) != 0:
@@ -414,14 +414,14 @@ class BehaviorTask(BaseTask):
         self.sampled_objects = set()
         num_new_obj = 0
         # Only populate self.object_scope for sampleable objects
-        avg_category_spec = get_ig_avg_category_specs()
+        avg_category_spec = get_og_avg_category_specs()
         for obj_cat in self.activity_conditions.parsed_objects:
             if obj_cat == "agent.n.01":
                 continue
             if obj_cat in NON_SAMPLEABLE_OBJECTS:
                 continue
             is_sliceable = self.object_taxonomy.has_ability(obj_cat, "sliceable")
-            categories = self.object_taxonomy.get_subtree_igibson_categories(obj_cat)
+            categories = self.object_taxonomy.get_subtree_omnigibson_categories(obj_cat)
 
             # TODO: temporary hack
             remove_categories = [
@@ -441,7 +441,7 @@ class BehaviorTask(BaseTask):
                 )
 
                 # Filter object models if the object category is openable
-                synset = self.object_taxonomy.get_class_name_from_igibson_category(category)
+                synset = self.object_taxonomy.get_class_name_from_omnigibson_category(category)
                 if self.object_taxonomy.has_ability(synset, "openable"):
                     # Always use the articulated version of a certain object if its category is openable
                     # E.g. backpack, jar, etc
@@ -459,9 +459,9 @@ class BehaviorTask(BaseTask):
                 if category == "spoon" and self.activity_name in ["polishing_silver"]:
                     model = np.random.choice([str(i) for i in [2, 5, 6]])
 
-                model_path = get_ig_model_path(category, model)
+                model_path = get_og_model_path(category, model)
                 usd_path = os.path.join(model_path, "usd", f"{model}.usd")
-                obj_name = "{}_{}".format(category, len(ig.sim.scene.objects))
+                obj_name = "{}_{}".format(category, len(og.sim.scene.objects))
 
                 # create the object
                 simulator_obj = DatasetObject(
@@ -475,8 +475,8 @@ class BehaviorTask(BaseTask):
                 num_new_obj += 1
 
                 # Load the object into the simulator
-                assert ig.sim.scene.loaded, "Scene is not loaded"
-                ig.sim.import_object(simulator_obj)
+                assert og.sim.scene.loaded, "Scene is not loaded"
+                og.sim.import_object(simulator_obj)
 
                 # Set these objects to be far-away locations
                 simulator_obj.set_position(np.array([100.0 + num_new_obj - 1, 100.0, -100.0]))
@@ -485,7 +485,7 @@ class BehaviorTask(BaseTask):
                 self.object_scope[obj_inst] = simulator_obj
 
         # Take a single simulation step so all newly imported objects are initialized
-        ig.sim.step()
+        og.sim.step()
 
     def check_scene(self, env):
         error_msg = self.parse_non_sampleable_object_room_assignment(env)
@@ -522,7 +522,7 @@ class BehaviorTask(BaseTask):
             matched_sim_obj = None
             # TODO: remove after split floors
             if "floor.n.01" in obj_inst:
-                floor_obj = ig.sim.scene.object_registry("name", "floors")
+                floor_obj = og.sim.scene.object_registry("name", "floors")
                 bddl_object_scope = floor_obj.bddl_object_scope.split(",")
                 bddl_object_scope = {item.split(":")[0]: item.split(":")[1] for item in bddl_object_scope}
                 assert obj_inst in bddl_object_scope
@@ -530,7 +530,7 @@ class BehaviorTask(BaseTask):
                 matched_sim_obj = RoomFloor(
                     category="room_floor",
                     name=bddl_object_scope[obj_inst],
-                    scene=ig.sim.scene,
+                    scene=og.sim.scene,
                     room_instance=room_inst,
                     floor_obj=floor_obj,
                 )
@@ -538,7 +538,7 @@ class BehaviorTask(BaseTask):
                 matched_sim_obj = self.get_agent(env)
             else:
                 print(f"checking objects...")
-                for sim_obj in ig.sim.scene.objects:
+                for sim_obj in og.sim.scene.objects:
                     print(f"checking bddl obj scope for obj: {sim_obj.name}")
                     if hasattr(sim_obj, "bddl_object_scope") and sim_obj.bddl_object_scope == obj_inst:
                         matched_sim_obj = sim_obj
@@ -621,7 +621,7 @@ class BehaviorTask(BaseTask):
                             if condition.STATE_NAME in KINEMATICS_STATES and positive and scene_obj in condition.body:
                                 # Use pybullet GUI for debugging
                                 if self.debug_object_sampling is not None and self.debug_object_sampling == condition.body[0]:
-                                    ig.debug_sampling = True
+                                    og.debug_sampling = True
                                     obj_pos = obj.get_position()
 
                                     # TODO - set viewer camera
@@ -826,7 +826,7 @@ class BehaviorTask(BaseTask):
         # Before sampling, set robot to be far away
         env.robots[0].set_position_orientation([300, 300, 300], [0, 0, 0, 1])
         # We need to step physics once to make sure the bounding boxes get updated correctly
-        ig.sim.step_physics()
+        og.sim.step_physics()
         error_msg = self.group_initial_conditions()
         if error_msg:
             logging.warning(error_msg)
@@ -855,17 +855,17 @@ class BehaviorTask(BaseTask):
         """
         Loads objects into the scene such that they don't collide with existing objects.
 
-        :param env: iGibsonEnv
+        :param env: OmniGibsonEnv
         :param clutter_scene: A clutter scene to load new clutter objects from
         :param existing_objects: A list of objects that needs to be kept min_distance away when loading the new objects
         :param min_distance: A minimum distance to require for objects to load
         """
-        state = ig.sim.dump_state(serialized=True)
+        state = og.sim.dump_state(serialized=True)
         objects_to_add = []
 
         for obj_name, obj in clutter_scene.objects_by_name.items():
             # Do not allow duplicate object categories
-            if obj.category in ig.sim.scene.object_registry.get_ids(key="category"):
+            if obj.category in og.sim.scene.object_registry.get_ids(key="category"):
                 continue
 
             bbox_center_pos, bbox_center_orn = clutter_scene.object_states[obj_name]["bbox_center_pose"]
@@ -930,7 +930,7 @@ class BehaviorTask(BaseTask):
 
         # Actually load the object into the simulator
         for obj in objects_to_add:
-            ig.sim.import_object(obj)
+            og.sim.import_object(obj)
 
         # Restore clutter objects to their correct poses
         clutter_scene.restore_object_states(clutter_scene.object_states)

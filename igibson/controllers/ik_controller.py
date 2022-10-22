@@ -1,10 +1,10 @@
 import numpy as np
 
-import igibson.utils.transform_utils as T
-from igibson.controllers import ControlType, ManipulationController
-from igibson.utils.processing_utils import MovingAverageFilter
-from igibson.utils.control_utils import IKSolver
-from igibson.utils.python_utils import assert_valid_key
+import omnigibson.utils.transform_utils as T
+from omnigibson.controllers import ControlType, ManipulationController
+from omnigibson.utils.processing_utils import MovingAverageFilter
+from omnigibson.utils.control_utils import IKSolver
+from omnigibson.utils.python_utils import assert_valid_key
 
 # Different modes
 IK_MODE_COMMAND_DIMS = {

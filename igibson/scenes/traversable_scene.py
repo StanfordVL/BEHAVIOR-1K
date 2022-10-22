@@ -1,9 +1,9 @@
 import logging
 from abc import ABC
 
-from igibson.scenes.scene_base import Scene
-from igibson.maps.traversable_map import TraversableMap
-from igibson.utils.python_utils import classproperty
+from omnigibson.scenes.scene_base import Scene
+from omnigibson.maps.traversable_map import TraversableMap
+from omnigibson.utils.python_utils import classproperty
 
 
 class TraversableScene(Scene):

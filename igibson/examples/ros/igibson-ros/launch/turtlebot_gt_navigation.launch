@@ -5,25 +5,25 @@
   <param name="robot/type" value="turtlebot"/>
 
 
-  <param name="robot_description" command="cat $(find igibson-ros)/turtlebot/turtlebot.urdf"/>
+  <param name="robot_description" command="cat $(find omnigibson-ros)/turtlebot/turtlebot.urdf"/>
 
   <node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher">
   </node>
 
-  <node name="turtlebot_gibson_sim" pkg="igibson-ros" type="turtlebot_rgbd.py" output="screen">
+  <node name="turtlebot_gibson_sim" pkg="omnigibson-ros" type="turtlebot_rgbd.py" output="screen">
   </node>
   
   <node pkg="robot_state_publisher" type="robot_state_publisher" name="robot_state_publisher">
     <param name="publish_frequency" type="double" value="5.0" />
   </node>
 
-  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find igibson-ros)/rviz/navigation.rviz" />
+  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find omnigibson-ros)/rviz/navigation.rviz" />
 
   <node pkg="tf" type="static_transform_publisher" name="gibson_world_transform" args="0 0 0 0 0 0 /world /map 100"/>
-  <node pkg="igibson-ros" type="publish_true_map_to_odom_tf.py" name="map_odom_tf"/>
+  <node pkg="omnigibson-ros" type="publish_true_map_to_odom_tf.py" name="map_odom_tf"/>
 
   <!--
-  <node name="gibson_sim_noise" pkg="igibson-ros" type="noise_injection.py">
+  <node name="gibson_sim_noise" pkg="omnigibson-ros" type="noise_injection.py">
   </node>
   -->
 
@@ -39,7 +39,7 @@
  <include file="$(find turtlebot_teleop)/launch/ps3_teleop.launch">
  </include>
 
-  <arg name="map_file" default="$(find igibson-ros)/map/graphnav/area_1.yaml"/>
+  <arg name="map_file" default="$(find omnigibson-ros)/map/graphnav/area_1.yaml"/>
   <rosparam param="map_file" subst_value="True">$(arg map_file)</rosparam>
   <node pkg="map_server" type="map_server"  name="map_server" args="$(arg map_file)" />
 
@@ -48,17 +48,17 @@
   <arg name="global_frame_id" default="map"/>
   <arg name="odom_topic" default="odom" />
   <arg name="laser_topic" default="gibson_ros/laserscan" />
-  <arg name="custom_param_file" default="$(find igibson-ros)/param/dummy.yaml"/>
+  <arg name="custom_param_file" default="$(find omnigibson-ros)/param/dummy.yaml"/>
 
   <node pkg="move_base" type="move_base" respawn="false" name="move_base" output="screen">
-    <rosparam file="$(find igibson-ros)/param/costmap_common_params.yaml" command="load" ns="global_costmap" />
-    <rosparam file="$(find igibson-ros)/param/costmap_common_params.yaml" command="load" ns="local_costmap" />
-    <rosparam file="$(find igibson-ros)/param/local_costmap_params.yaml" command="load" />
-    <rosparam file="$(find igibson-ros)/param/global_costmap_params.yaml" command="load" />
-    <rosparam file="$(find igibson-ros)/param/gt_navigation/dwa_local_planner_params.yaml" command="load" />
-    <rosparam file="$(find igibson-ros)/param/move_base_params.yaml" command="load" />
-    <rosparam file="$(find igibson-ros)/param/global_planner_params.yaml" command="load" />
-    <rosparam file="$(find igibson-ros)/param/navfn_global_planner_params.yaml" command="load" />
+    <rosparam file="$(find omnigibson-ros)/param/costmap_common_params.yaml" command="load" ns="global_costmap" />
+    <rosparam file="$(find omnigibson-ros)/param/costmap_common_params.yaml" command="load" ns="local_costmap" />
+    <rosparam file="$(find omnigibson-ros)/param/local_costmap_params.yaml" command="load" />
+    <rosparam file="$(find omnigibson-ros)/param/global_costmap_params.yaml" command="load" />
+    <rosparam file="$(find omnigibson-ros)/param/gt_navigation/dwa_local_planner_params.yaml" command="load" />
+    <rosparam file="$(find omnigibson-ros)/param/move_base_params.yaml" command="load" />
+    <rosparam file="$(find omnigibson-ros)/param/global_planner_params.yaml" command="load" />
+    <rosparam file="$(find omnigibson-ros)/param/navfn_global_planner_params.yaml" command="load" />
     <!-- external params file that could be loaded into the move_base namespace -->
     <rosparam file="$(arg custom_param_file)" command="load" />
 

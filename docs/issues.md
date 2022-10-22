@@ -7,7 +7,7 @@
 2. Is libegl1 installed? You can determine this by `apt list --installed | grep libegl1`
 3. Are openGL libraries visible? You can do so by
 `export LD_LIBRARY_PATH=/usr/lib/nvidia-<vvv>:$LD_LIBRARY_PATH`
-4. There are two ways of setting up openGL library, if the current installation doesn't work, you can try to install with USE_GLAD set to FALSE in [here](https://github.com/StanfordVL/iGibson/blob/master/igibson/render/CMakeLists.txt)
+4. There are two ways of setting up openGL library, if the current installation doesn't work, you can try to install with USE_GLAD set to FALSE in [here](https://github.com/StanfordVL/OmniGibson/blob/master/omnigibson/render/CMakeLists.txt)
 5. If you want to render in headless mode, make sure `$DISPLAY` environment variable is unset, otherwise you might have error `Failed to EGL with glad`, because EGL is sensitive to `$DISPLAY` environment variable.
 
 It is a good idea to run `ldconfig -p | grep EGL` and you should be able to see `libEGL_nvidia` installed.
@@ -27,4 +27,4 @@ Make sure EGL is not linked to mesa, because in order for gibson to work, linkin
 The EGL setup part is borrowed from Erwin Coumans [egl_example](https://github.com/erwincoumans/egl_example). It would be informative to see if that repository can run on your machine.
 
 ### Other issues
-For other issues, please submit an issue in our [github repository](https://github.com/StanfordVL/iGibson/issues). 
+For other issues, please submit an issue in our [github repository](https://github.com/StanfordVL/OmniGibson/issues). 

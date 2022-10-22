@@ -1,8 +1,8 @@
 import numpy as np
-import igibson as ig
-from igibson import object_states
-from igibson.macros import gm
-from igibson.objects import DatasetObject
+import omnigibson as og
+from omnigibson import object_states
+from omnigibson.macros import gm
+from omnigibson.objects import DatasetObject
 
 
 def main():
@@ -17,10 +17,10 @@ def main():
     }
 
     # Create the environment
-    env = ig.Environment(configs=cfg, action_timestep=1/60., physics_timestep=1/60.)
+    env = og.Environment(configs=cfg, action_timestep=1/60., physics_timestep=1/60.)
 
     # Set camera to appropriate viewing pose
-    ig.sim.viewer_camera.set_position_orientation(
+    og.sim.viewer_camera.set_position_orientation(
         position=np.array([-0.0792399, -1.30104, 1.51981]),
         orientation=np.array([0.54897692, 0.00110359, 0.00168013, 0.83583509]),
     )
@@ -39,7 +39,7 @@ def main():
     assert object_states.ToggledOn in stove.states
 
     # Import this object into the simulator, and take a step to initialize the object
-    ig.sim.import_object(stove)
+    og.sim.import_object(stove)
     stove.set_position(np.array([0, 0, 0.4]))
     env.step(np.array([]))
 

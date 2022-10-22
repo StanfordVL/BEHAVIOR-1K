@@ -4,9 +4,9 @@ from enum import IntEnum
 
 from future.utils import with_metaclass
 
-from igibson.robots import BaseRobot
-from igibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
-from igibson.tasks.task_base import BaseTask
+from omnigibson.robots import BaseRobot
+from omnigibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
+from omnigibson.tasks.task_base import BaseTask
 
 REGISTERED_PRIMITIVE_SETS = {}
 

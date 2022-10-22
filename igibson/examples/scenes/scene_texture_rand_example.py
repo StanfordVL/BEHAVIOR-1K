@@ -1,9 +1,9 @@
 import logging
 from sys import platform
 
-from igibson.render.mesh_renderer.mesh_renderer_settings import MeshRendererSettings
-from igibson.scenes.interactive_traversable_scene import InteractiveIndoorScene
-from igibson.simulator import Simulator
+from omnigibson.render.mesh_renderer.mesh_renderer_settings import MeshRendererSettings
+from omnigibson.scenes.interactive_traversable_scene import InteractiveIndoorScene
+from omnigibson.simulator import Simulator
 
 
 def main(random_selection=False, headless=False, short_exec=False):

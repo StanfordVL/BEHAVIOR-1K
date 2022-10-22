@@ -3,8 +3,8 @@ import os
 
 import yaml
 
-import igibson as ig
-from igibson.utils.ui_utils import choose_from_options
+import omnigibson as og
+from omnigibson.utils.ui_utils import choose_from_options
 
 
 def main(random_selection=False, headless=False, short_exec=False):
@@ -24,7 +24,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     }
     scene_type = choose_from_options(options=scene_options, name="scene type", random_selection=random_selection)
     config_name = "turtlebot_nav" if scene_type == "InteractiveTraversableScene" else "turtlebot_static_nav"
-    config_filename = os.path.join(ig.example_config_path, f"{config_name}.yaml")
+    config_filename = os.path.join(og.example_config_path, f"{config_name}.yaml")
     config = yaml.load(open(config_filename, "r"), Loader=yaml.FullLoader)
 
     # If the scene type is interactive, also check if we want to quick load or full load the scene
@@ -38,10 +38,10 @@ def main(random_selection=False, headless=False, short_exec=False):
             config["scene"]["load_object_categories"] = ["floors", "walls", "ceilings"]
 
     # Load the environment
-    env = ig.Environment(configs=config)
+    env = og.Environment(configs=config)
 
     # Allow user to move camera more easily
-    ig.sim.enable_viewer_camera_teleoperation()
+    og.sim.enable_viewer_camera_teleoperation()
 
     # Run a simple loop and reset periodically
     max_iterations = 10 if not short_exec else 1

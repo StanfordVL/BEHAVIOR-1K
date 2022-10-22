@@ -1,5 +1,5 @@
 # Example Differential Drive control config (shown for base control)
-# See igibson/controllers/dd_controller for docstring of arguments
+# See omnigibson/controllers/dd_controller for docstring of arguments
 # Arguments below are the arguments that should be specified by external user (other kwargs
 # used in constructor are generated automatically at runtime)
 robot:

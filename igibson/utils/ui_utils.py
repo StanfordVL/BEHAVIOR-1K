@@ -5,8 +5,8 @@ Helper classes and functions for streamlining user interactions
 import numpy as np
 import sys
 from collections import OrderedDict
-import igibson as ig
-import igibson.utils.transform_utils as T
+import omnigibson as og
+import omnigibson.utils.transform_utils as T
 import omni
 import carb
 import random
@@ -153,7 +153,7 @@ class CameraMover:
 
 class KeyboardRobotController:
     """
-    Simple class for controlling iGibson robots using keyboard commands
+    Simple class for controlling OmniGibson robots using keyboard commands
     """
 
     def __init__(self, robot):
@@ -320,7 +320,7 @@ class KeyboardRobotController:
 
             elif event.input == carb.input.KeyboardInput.ESCAPE:
                 # Terminate immediately
-                ig.shutdown()
+                og.shutdown()
 
             else:
                 # Handle all other actions and update accordingly

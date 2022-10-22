@@ -1,6 +1,6 @@
 import numpy as np
 
-from igibson.controllers import ControlType, LocomotionController
+from omnigibson.controllers import ControlType, LocomotionController
 
 
 class DifferentialDriveController(LocomotionController):

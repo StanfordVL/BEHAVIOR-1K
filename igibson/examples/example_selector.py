@@ -5,8 +5,8 @@ import sys
 from multiprocessing import Process
 from collections import OrderedDict
 
-import igibson.examples as examples
-from igibson.utils.ui_utils import choose_from_options
+import omnigibson.examples as examples
+from omnigibson.utils.ui_utils import choose_from_options
 
 TIMEOUT = 4
 
@@ -72,7 +72,7 @@ def main():
             elif help_demo == 3:
                 print("Toggle the test mode to execute examples (short, headless versions)")
             else:
-                module_help = importlib.import_module("igibson.examples." + examples_list[help_demo])
+                module_help = importlib.import_module("omnigibson.examples." + examples_list[help_demo])
                 print(module_help.main.__doc__)
             input("Press enter")
         elif selected_demo == 1:
@@ -92,7 +92,7 @@ def main():
                         continue
                     print("Executing " + examples_list[idx])
 
-                    i = importlib.import_module("igibson.examples." + examples_list[idx])
+                    i = importlib.import_module("omnigibson.examples." + examples_list[idx])
                     if test_mode:
                         p = Process(
                             target=i.main,
@@ -137,7 +137,7 @@ def main():
             print(
                 "Executing " + examples_list[selected_demo] + " " + ["in interactive mode", "in test mode"][test_mode]
             )
-            i = importlib.import_module("igibson.examples." + examples_list[selected_demo])
+            i = importlib.import_module("omnigibson.examples." + examples_list[selected_demo])
             i.main(random_selection=test_mode, headless=test_mode, short_exec=test_mode)
 
 

@@ -7,11 +7,11 @@ from collections import OrderedDict
 
 import numpy as np
 
-import igibson
-from igibson.envs.igibson_env import iGibsonEnv
-from igibson.render.mesh_renderer.mesh_renderer_cpu import MeshRendererSettings
-from igibson.utils.log_utils import IGLogWriter
-from igibson.utils.config_utils import parse_config
+import omnigibson
+from omnigibson.envs.omnigibson_env import OmniGibsonEnv
+from omnigibson.render.mesh_renderer.mesh_renderer_cpu import MeshRendererSettings
+from omnigibson.utils.log_utils import IGLogWriter
+from omnigibson.utils.config_utils import parse_config
 
 
 def main(random_selection=False, headless=False, short_exec=False):
@@ -73,7 +73,7 @@ def parse_args():
         choices=scene_choices,
         default="Rs_int",
         nargs="?",
-        help="Scene name/ID matching iGibson interactive scenes.",
+        help="Scene name/ID matching OmniGibson interactive scenes.",
     )
     parser.add_argument(
         "--task",
@@ -114,7 +114,7 @@ def parse_args():
     parser.add_argument(
         "--config",
         help="which config file to use [default: use yaml files in examples/configs]",
-        default=os.path.join(igibson.example_config_path, "behavior_vr.yaml"),
+        default=os.path.join(omnigibson.example_config_path, "behavior_vr.yaml"),
         required=False,
     )
     return parser.parse_args()
@@ -129,17 +129,17 @@ def collect_demo(
     disable_save=False,
     disable_scene_cache=False,
     profile=False,
-    config_file=os.path.join(igibson.example_config_path, "behavior_vr.yaml"),
+    config_file=os.path.join(omnigibson.example_config_path, "behavior_vr.yaml"),
     short_exec=False,
 ):
     """ """
     # HDR files for PBR rendering
-    hdr_texture = os.path.join(igibson.ig_dataset_path, "scenes", "background", "probe_02.hdr")
-    hdr_texture2 = os.path.join(igibson.ig_dataset_path, "scenes", "background", "probe_03.hdr")
+    hdr_texture = os.path.join(omnigibson.og_dataset_path, "scenes", "background", "probe_02.hdr")
+    hdr_texture2 = os.path.join(omnigibson.og_dataset_path, "scenes", "background", "probe_03.hdr")
     light_modulation_map_filename = os.path.join(
-        igibson.ig_dataset_path, "scenes", "Rs_int", "layout", "floor_lighttype_0.png"
+        omnigibson.og_dataset_path, "scenes", "Rs_int", "layout", "floor_lighttype_0.png"
     )
-    background_texture = os.path.join(igibson.ig_dataset_path, "scenes", "background", "urban_street_01.jpg")
+    background_texture = os.path.join(omnigibson.og_dataset_path, "scenes", "background", "urban_street_01.jpg")
 
     # Rendering settings
     rendering_settings = MeshRendererSettings(
@@ -162,7 +162,7 @@ def collect_demo(
     config["instance_id"] = instance_id
     config["online_sampling"] = disable_scene_cache
     config["load_clutter"] = True
-    env = iGibsonEnv(
+    env = OmniGibsonEnv(
         config_file=config,
         mode="headless",
         action_timestep=1 / 30.0,

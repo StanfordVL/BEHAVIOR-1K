@@ -1,5 +1,5 @@
-from igibson import app, ig_dataset_path
-import igibson.utils.transform_utils as T
+from omnigibson import app, og_dataset_path
+import omnigibson.utils.transform_utils as T
 import pxr.Vt
 from pxr import Usd
 from pxr import Gf, UsdShade, UsdLux, UsdPhysics, PhysxSchema, UsdGeom
@@ -17,17 +17,17 @@ import omni
 from copy import deepcopy
 from omni.isaac.core.utils.stage import open_stage, get_current_stage, close_stage
 from omni.isaac.core.prims.xform_prim import XFormPrim
-import igibson.utils.transform_utils as T
+import omnigibson.utils.transform_utils as T
 import trimesh
-from igibson.utils.usd_utils import BoundingBoxAPI
-from igibson.utils.asset_utils import encrypt_file
-from igibson.macros import gm
+from omnigibson.utils.usd_utils import BoundingBoxAPI
+from omnigibson.utils.asset_utils import encrypt_file
+from omnigibson.macros import gm
 from collections import OrderedDict
 from pathlib import Path
 
 
 ##### SET THIS ######
-URDF = f"{ig_dataset_path}/scenes/Rs_int/urdf/Rs_int_best.urdf"
+URDF = f"{og_dataset_path}/scenes/Rs_int/urdf/Rs_int_best.urdf"
 #### YOU DONT NEED TO TOUCH ANYTHING BELOW HERE IDEALLY :) #####
 
 
@@ -257,7 +257,7 @@ def import_rendering_channels(obj_prim, obj_category, obj_model, model_root_path
     # default_mat_is_used = False
 
     # Grab all visual objs for this object
-    urdf_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}/{obj_model}_split.urdf"
+    urdf_path = f"{og_dataset_path}/objects/{obj_category}/{obj_model}/{obj_model}_split.urdf"
     visual_objs = get_visual_objs_from_urdf(urdf_path)
 
     # Extract absolute paths to mtl files for each link
@@ -271,7 +271,7 @@ def import_rendering_channels(obj_prim, obj_category, obj_model, model_root_path
         for mesh_name, obj_file in link_meshes.items():
             # Get absolute path and open the obj file if it exists:
             if obj_file is not None:
-                obj_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}/{obj_file}"
+                obj_path = f"{og_dataset_path}/objects/{obj_category}/{obj_model}/{obj_file}"
                 with open(obj_path, "r") as f:
                     mtls = []
                     for line in f.readlines():
@@ -485,7 +485,7 @@ def add_xform_properties(prim):
 # TODO: Import heights per link folder into USD folder
 def import_obj_metadata(obj_category, obj_model, import_render_channels=False):
     # Check if filepath exists
-    model_root_path = f"{ig_dataset_path}/objects/{obj_category}/{obj_model}"
+    model_root_path = f"{og_dataset_path}/objects/{obj_category}/{obj_model}"
     usd_path = f"{model_root_path}/usd/{obj_model}.usd"
 
     # Load model
@@ -699,7 +699,7 @@ def recursively_replace_list_of_dict(dic):
 
 def import_building_metadata(obj_category, obj_model, name, import_render_channels=False):
     # Check if filepath exists
-    model_root_path = f"{ig_dataset_path}/scenes/{obj_model}"
+    model_root_path = f"{og_dataset_path}/scenes/{obj_model}"
     usd_path = f"{model_root_path}/usd/{obj_category}/{obj_model}_{obj_category}.usd"
 
     # Load model

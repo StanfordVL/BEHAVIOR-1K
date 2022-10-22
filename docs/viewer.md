@@ -2,16 +2,16 @@
 
 ### Overview
 
-We developed an easy-to-use iGibson-human interface called **Viewer** for users to inspect and interact with our scenes and objects. The Viewer will automatically pop up if you use `gui_non_interactive` or `gui_interactive` mode in `Simulator`.
+We developed an easy-to-use OmniGibson-human interface called **Viewer** for users to inspect and interact with our scenes and objects. The Viewer will automatically pop up if you use `gui_non_interactive` or `gui_interactive` mode in `Simulator`.
 
 To play with an example of viewer, you can run the following command:
 
 ```bash
-python -m igibson.examples.environments.env_int_example
+python -m omnigibson.examples.environments.env_int_example
 ```
 or 
 ```bash
-python -m igibson.examples.environments.env_nonint_example
+python -m omnigibson.examples.environments.env_nonint_example
 ```
 after downloading the Rs_int or Rs scenes (interactive or non-interactive, see [the installation instructions](installation.md))
 ![viewer.png](images/viewer.png)
@@ -45,4 +45,4 @@ Mouse control in planning mode
 
 In manipulation and planning modes, a visual indicator will be visualized in the `Viewer` to assist control (e.g. the blue sphere at the bottom in the image above).
 
-The code can be found in [igibson/render/viewer.py](https://github.com/StanfordVL/iGibson/tree/master/igibson/render/viewer.py).
+The code can be found in [omnigibson/render/viewer.py](https://github.com/StanfordVL/OmniGibson/tree/master/omnigibson/render/viewer.py).

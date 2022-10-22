@@ -1,11 +1,11 @@
 
 from IPython import embed
 
-import igibson
-from igibson.object_states.kinematics import KinematicsMixin
-from igibson.object_states.object_state_base import BooleanState, RelativeObjectState
-from igibson.object_states.touching import Touching
-from igibson.utils.object_state_utils import get_center_extent, sample_kinematics
+import omnigibson
+from omnigibson.object_states.kinematics import KinematicsMixin
+from omnigibson.object_states.object_state_base import BooleanState, RelativeObjectState
+from omnigibson.object_states.touching import Touching
+from omnigibson.utils.object_state_utils import get_center_extent, sample_kinematics
 
 
 # TODO: remove after split floors
@@ -40,7 +40,7 @@ class OnFloor(RelativeObjectState, KinematicsMixin, BooleanState):
                 self.obj.clear_cached_states()
                 if self.get_value(other) != new_value:
                     sampling_success = False
-                if igibson.debug_sampling:
+                if omnigibson.debug_sampling:
                     print("OnFloor checking", sampling_success)
                     embed()
             if sampling_success:
@@ -65,7 +65,7 @@ class OnFloor(RelativeObjectState, KinematicsMixin, BooleanState):
         # Special case: the BehaviorRobot does not need to actually touch the floor of a room to be considered
         # OnFloor in that room. As a hovering robot, BehaviorRobot won't actually touch the floor during operation.
         # TODO: Same
-        # from igibson.robots import BehaviorRobot
+        # from omnigibson.robots import BehaviorRobot
         #
         # if isinstance(self.obj, BehaviorRobot):
         #     return is_in_room

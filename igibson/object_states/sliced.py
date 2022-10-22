@@ -1,10 +1,10 @@
 import numpy as np
 from collections import OrderedDict
-from igibson import ig_dataset_path
-from igibson.macros import create_module_macros
-import igibson.utils.transform_utils as T
-from igibson.object_states import *
-from igibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
+from omnigibson import og_dataset_path
+from omnigibson.macros import create_module_macros
+import omnigibson.utils.transform_utils as T
+from omnigibson.object_states import *
+from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
 
 
 # Create settings for this module
@@ -46,14 +46,14 @@ class Sliced(AbsoluteObjectState, BooleanState):
             part_pos = part["pos"] * self.obj.scale
             part_orn = part["orn"]
             part_obj_name = f"{self.obj.name}_part_{part_idx}"
-            model_root_path = f"{ig_dataset_path}/objects/{part_category}/{part_model}"
+            model_root_path = f"{og_dataset_path}/objects/{part_category}/{part_model}"
             usd_path = f"{model_root_path}/usd/{part_model}.usd"
 
             # calculate global part pose
             part_pos, part_orn = T.pose_transform(pos, orn, np.array(part_pos), np.array(part_orn))
 
             # circular import
-            from igibson.objects.dataset_object import DatasetObject
+            from omnigibson.objects.dataset_object import DatasetObject
 
             part_obj = DatasetObject(
                 prim_path=f"/World/{part_obj_name}",

@@ -11,7 +11,7 @@ from PIL import Image
 from scipy.spatial.transform import Rotation as R
 from transforms3d import quaternions
 
-from igibson import example_config_path
+from omnigibson import example_config_path
 
 # File I/O related
 
@@ -19,7 +19,7 @@ from igibson import example_config_path
 def parse_config(config):
 
     """
-    Parse iGibson config file / object
+    Parse OmniGibson config file / object
     """
     if isinstance(config, collections.Mapping):
         return config
@@ -53,7 +53,7 @@ def dump_config(config):
 
 def load_default_config():
     """
-    Loads a default configuration to use for iGibson
+    Loads a default configuration to use for OmniGibson
 
     Returns:
         dict: Loaded default configuration file

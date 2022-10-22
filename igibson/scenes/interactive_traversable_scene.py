@@ -13,23 +13,23 @@ import numpy as np
 from pxr.Sdf import ValueTypeNames as VT
 from omni.isaac.core.utils.rotations import gf_quat_to_np_array
 
-from igibson.objects.dataset_object import DatasetObject
-from igibson.scenes.traversable_scene import TraversableScene
-from igibson.maps.segmentation_map import SegmentationMap
-from igibson.utils.asset_utils import (
+from omnigibson.objects.dataset_object import DatasetObject
+from omnigibson.scenes.traversable_scene import TraversableScene
+from omnigibson.maps.segmentation_map import SegmentationMap
+from omnigibson.utils.asset_utils import (
     get_3dfront_scene_path,
     get_cubicasa_scene_path,
-    get_ig_category_ids,
-    get_ig_category_path,
-    get_ig_model_path,
-    get_ig_scene_path,
+    get_og_category_ids,
+    get_og_category_path,
+    get_og_model_path,
+    get_og_scene_path,
 )
-from igibson.utils.python_utils import create_object_from_init_info
-from igibson.utils.constants import JointType
-from igibson.utils.sim_utils import check_collision
+from omnigibson.utils.python_utils import create_object_from_init_info
+from omnigibson.utils.constants import JointType
+from omnigibson.utils.sim_utils import check_collision
 
 SCENE_SOURCE_PATHS = {
-    "IG": get_ig_scene_path,
+    "IG": get_og_scene_path,
     "CUBICASA": get_cubicasa_scene_path,
     "THREEDFRONT": get_3dfront_scene_path,
 }
@@ -37,7 +37,7 @@ SCENE_SOURCE_PATHS = {
 
 class InteractiveTraversableScene(TraversableScene):
     """
-    Create an interactive scene defined with iGibson Scene Description Format (iGSDF).
+    Create an interactive scene defined with OmniGibson Scene Description Format (iGSDF).
     iGSDF is an extension of URDF that we use to define an interactive scene.
     It has support for URDF scaling, URDF nesting and randomization.
     InteractiveIndoorScene inherits from TraversableScene the functionalities to compute shortest path and other
@@ -74,7 +74,7 @@ class InteractiveTraversableScene(TraversableScene):
         # TODO: Update
         :param scene_model: Scene model, e.g.: Rs_int
         # TODO: Update doc -- usd_file / usd_path naming convention is too ambiguous / similar
-        :param usd_file: name of usd file to load (without .urdf), default to ig_dataset/scenes/<scene_model>/urdf/<urdf_file>.urdf
+        :param usd_file: name of usd file to load (without .urdf), default to og_dataset/scenes/<scene_model>/urdf/<urdf_file>.urdf
         :param usd_path: full path of URDF file to load (with .urdf)
         # :param pybullet_filename: optional specification of which pybullet file to restore after initialization
         :param trav_map_resolution: traversability map resolution
@@ -129,7 +129,7 @@ class InteractiveTraversableScene(TraversableScene):
         # self.scene_tree = ET.parse(self.scene_file)
         # self.pybullet_filename = pybullet_filename
         self.random_groups = {}
-        self.category_ids = get_ig_category_ids()
+        self.category_ids = get_og_category_ids()
         # self.merge_fixed_links = merge_fixed_links
         self.include_robots = include_robots
 
@@ -168,7 +168,7 @@ class InteractiveTraversableScene(TraversableScene):
 
         Args:
             usd_file (None or str): If specified, should be name of usd file to load. (without .usd), default to
-                ig_dataset/scenes/<scene_model>/usd/<usd_file>.usd
+                og_dataset/scenes/<scene_model>/usd/<usd_file>.usd
             usd_path (None or str): If specified, should be absolute filepath to the USD file to load (with .usd)
         """
         # Grab scene source path
@@ -481,7 +481,7 @@ class InteractiveTraversableScene(TraversableScene):
             prim: Usd.Prim: Object template Xform prim
 
         Returns:
-            None or DatasetObject: Created iGibson object if a valid objet is found at @prim
+            None or DatasetObject: Created OmniGibson object if a valid objet is found at @prim
         """
         obj = None
         info = {}
@@ -541,7 +541,7 @@ class InteractiveTraversableScene(TraversableScene):
             if not_blacklisted and whitelisted and valid_room:
 
                 # Make sure objects exist in the actual requested category
-                category_path = get_ig_category_path(category)
+                category_path = get_og_category_path(category)
                 assert len(os.listdir(category_path)) != 0, "No models in category folder {}".format(category_path)
 
                 # Potentially grab random object
@@ -561,7 +561,7 @@ class InteractiveTraversableScene(TraversableScene):
                             model = random.choice(os.listdir(category_path))
                             self.random_groups[random_group_key] = model
 
-                model_path = get_ig_model_path(category, model)
+                model_path = get_og_model_path(category, model)
                 # TODO: Remove "usd" in the middle when we simply have the model directory directly contain the USD
                 usd_path = os.path.join(model_path, "usd", model + ".usd")
 
@@ -654,7 +654,7 @@ class InteractiveTraversableScene(TraversableScene):
 
     def _extract_obj_info_from_template_xform(self, prim):
         """
-        Extracts relevant iGibson object information from a template xform, presumed to be in a template USD file
+        Extracts relevant OmniGibson object information from a template xform, presumed to be in a template USD file
 
         Args:
             prim: Usd.Prim: Object template Xform prim

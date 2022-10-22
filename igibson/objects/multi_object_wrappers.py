@@ -5,9 +5,9 @@
 #
 #
 #
-# from igibson.object_states.factory import get_state_name
-# from igibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
-# from igibson.objects.object_base import BaseObject
+# from omnigibson.object_states.factory import get_state_name
+# from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
+# from omnigibson.objects.object_base import BaseObject
 #
 #
 # class ObjectGrouper(BaseObject):

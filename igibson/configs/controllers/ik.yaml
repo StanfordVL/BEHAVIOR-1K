@@ -1,5 +1,5 @@
 # Example IK config (shown for arm control)
-# See igibson/controllers/ik_controller for docstring of arguments
+# See omnigibson/controllers/ik_controller for docstring of arguments
 # Arguments below are the arguments that should be specified by external user (other kwargs
 # used in constructor are generated automatically at runtime)
 robot:

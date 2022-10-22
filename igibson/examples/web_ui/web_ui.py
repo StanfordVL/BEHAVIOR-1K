@@ -13,15 +13,15 @@ import numpy as np
 from flask import Flask, Response, render_template, request
 from PIL import Image
 
-import igibson
-from igibson.objects.ycb_object import YCBObject
-from igibson.render.mesh_renderer.mesh_renderer_settings import MeshRendererSettings
-from igibson.robots.fetch import Fetch
-from igibson.robots.turtlebot import Turtlebot
-from igibson.scenes.gibson_indoor_scene import StaticIndoorScene
-from igibson.scenes.interactive_traversable_scene import InteractiveIndoorScene
-from igibson.simulator import Simulator
-from igibson.utils.config_utils import parse_config
+import omnigibson
+from omnigibson.objects.ycb_object import YCBObject
+from omnigibson.render.mesh_renderer.mesh_renderer_settings import MeshRendererSettings
+from omnigibson.robots.fetch import Fetch
+from omnigibson.robots.turtlebot import Turtlebot
+from omnigibson.scenes.gibson_indoor_scene import StaticIndoorScene
+from omnigibson.scenes.interactive_traversable_scene import InteractiveIndoorScene
+from omnigibson.simulator import Simulator
+from omnigibson.utils.config_utils import parse_config
 
 interactive = True
 
@@ -190,13 +190,13 @@ class ToyEnv(object):
     """
 
     def __init__(self):
-        config = parse_config(os.path.join(igibson.example_config_path, "turtlebot_demo.yaml"))
-        hdr_texture = os.path.join(igibson.ig_dataset_path, "scenes", "background", "probe_02.hdr")
-        hdr_texture2 = os.path.join(igibson.ig_dataset_path, "scenes", "background", "probe_03.hdr")
+        config = parse_config(os.path.join(omnigibson.example_config_path, "turtlebot_demo.yaml"))
+        hdr_texture = os.path.join(omnigibson.og_dataset_path, "scenes", "background", "probe_02.hdr")
+        hdr_texture2 = os.path.join(omnigibson.og_dataset_path, "scenes", "background", "probe_03.hdr")
         light_modulation_map_filename = os.path.join(
-            igibson.ig_dataset_path, "scenes", "Rs_int", "layout", "floor_lighttype_0.png"
+            omnigibson.og_dataset_path, "scenes", "Rs_int", "layout", "floor_lighttype_0.png"
         )
-        background_texture = os.path.join(igibson.ig_dataset_path, "scenes", "background", "urban_street_01.jpg")
+        background_texture = os.path.join(omnigibson.og_dataset_path, "scenes", "background", "urban_street_01.jpg")
 
         settings = MeshRendererSettings(enable_shadow=False, enable_pbr=False)
 
@@ -230,13 +230,13 @@ class ToyEnvInt(object):
     """
 
     def __init__(self, robot="turtlebot", scene="Rs_int"):
-        config = parse_config(os.path.join(igibson.example_config_path, "turtlebot_demo.yaml"))
-        hdr_texture = os.path.join(igibson.ig_dataset_path, "scenes", "background", "probe_02.hdr")
-        hdr_texture2 = os.path.join(igibson.ig_dataset_path, "scenes", "background", "probe_03.hdr")
+        config = parse_config(os.path.join(omnigibson.example_config_path, "turtlebot_demo.yaml"))
+        hdr_texture = os.path.join(omnigibson.og_dataset_path, "scenes", "background", "probe_02.hdr")
+        hdr_texture2 = os.path.join(omnigibson.og_dataset_path, "scenes", "background", "probe_03.hdr")
         light_modulation_map_filename = os.path.join(
-            igibson.ig_dataset_path, "scenes", "Rs_int", "layout", "floor_lighttype_0.png"
+            omnigibson.og_dataset_path, "scenes", "Rs_int", "layout", "floor_lighttype_0.png"
         )
-        background_texture = os.path.join(igibson.ig_dataset_path, "scenes", "background", "urban_street_01.jpg")
+        background_texture = os.path.join(omnigibson.og_dataset_path, "scenes", "background", "urban_street_01.jpg")
 
         scene = InteractiveIndoorScene(scene, texture_randomization=False, object_randomization=False)
         # scene._set_first_n_objects(5)

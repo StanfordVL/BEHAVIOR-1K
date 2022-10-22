@@ -1,19 +1,19 @@
 import numpy as np
 
-import igibson as ig
-from igibson import object_states
-from igibson.macros import gm
-from igibson.objects import DatasetObject, LightObject
-from igibson.utils.ui_utils import choose_from_options
+import omnigibson as og
+from omnigibson import object_states
+from omnigibson.macros import gm
+from omnigibson.objects import DatasetObject, LightObject
+from omnigibson.utils.ui_utils import choose_from_options
 
 
 def setup_scene_for_abilities(abilities1, abilities2):
     # Make sure simulation is stopped
-    ig.sim.stop()
+    og.sim.stop()
 
     # Recreate the environment (this will automatically override the old environment instance)
     # We load the default config, which is simply an EmptyScene with no objects loaded in by default
-    env = ig.Environment(configs=f"{ig.example_config_path}/default_cfg.yaml") #, physics_timestep=1/120., action_timestep=1/60.)
+    env = og.Environment(configs=f"{og.example_config_path}/default_cfg.yaml") #, physics_timestep=1/120., action_timestep=1/60.)
 
     objs = [None, None]
     abilities_arr = [abilities1, abilities2]
@@ -27,7 +27,7 @@ def setup_scene_for_abilities(abilities1, abilities2):
         radius=0.01,
         intensity=5000,
     )
-    ig.sim.import_object(light)
+    og.sim.import_object(light)
     light.set_position(np.array([0, 0, 1.0]))
 
     for idx, (obj_category, obj_model) in enumerate((("apple", "00_0"), ("fridge", "12252"))):
@@ -39,11 +39,11 @@ def setup_scene_for_abilities(abilities1, abilities2):
             name=f"{name}",
             abilities=abilities_arr[idx],
         )
-        ig.sim.import_object(objs[idx])
+        og.sim.import_object(objs[idx])
         objs[idx].set_position_orientation(position=position_arr[idx])
 
     # Set viewer camera pose
-    ig.sim.viewer_camera.set_position_orientation(
+    og.sim.viewer_camera.set_position_orientation(
         position=np.array([-0.972333, -2.0899  ,  1.0654  ]),
         orientation=np.array([ 0.60682517, -0.24656188, -0.28443909,  0.70004632]),
     )
@@ -66,7 +66,7 @@ def demo_sticky_attachment():
     # Obj1 moves towards obj2 and they are attached together.
     obj1.set_linear_velocity(velocity=np.array([3.0, 0, 3.0]))
     for i in range(200):
-        ig.sim.step()
+        og.sim.step()
     assert obj1.states[object_states.StickyAttachment].get_value(obj2)
 
     # Apply a large force to obj1 but the two objects cannot move much because obj2 is heavy.

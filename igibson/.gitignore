@@ -2,6 +2,6 @@
 data
 assets
 dataset
-ig_dataset
+og_dataset
 render/coord.npy
 render/model.pth

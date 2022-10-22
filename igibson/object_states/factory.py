@@ -1,8 +1,8 @@
 import networkx as nx
 
-from igibson.object_states import *
-from igibson.object_states.object_state_base import BaseObjectState
-from igibson.object_states.fluid_source import FluidSource
+from omnigibson.object_states import *
+from omnigibson.object_states.object_state_base import BaseObjectState
+from omnigibson.object_states.fluid_source import FluidSource
 
 _ALL_STATES = frozenset(
     [

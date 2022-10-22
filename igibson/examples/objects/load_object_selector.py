@@ -1,13 +1,13 @@
 import logging
 import numpy as np
-import igibson as ig
-from igibson.objects import DatasetObject
-from igibson.utils.asset_utils import (
+import omnigibson as og
+from omnigibson.objects import DatasetObject
+from omnigibson.utils.asset_utils import (
     get_all_object_categories,
-    get_ig_avg_category_specs,
+    get_og_avg_category_specs,
     get_object_models_of_category,
 )
-from igibson.utils.ui_utils import choose_from_options
+from omnigibson.utils.ui_utils import choose_from_options
 
 
 def main(random_selection=False, headless=False, short_exec=False):
@@ -33,7 +33,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         cfg["scene"]["scene_model"] = "Adrian"
 
     # Create the environment
-    env = ig.Environment(configs=cfg, action_timestep=1 / 60., physics_timestep=1 / 60.)
+    env = og.Environment(configs=cfg, action_timestep=1 / 60., physics_timestep=1 / 60.)
 
     # Select a category to load
     available_obj_categories = get_all_object_categories()
@@ -44,7 +44,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     obj_model = choose_from_options(options=available_obj_models, name="object model", random_selection=random_selection)
 
     # Load the specs of the object categories, e.g., common scaling factor
-    avg_category_spec = get_ig_avg_category_specs()
+    avg_category_spec = get_og_avg_category_specs()
 
     # Create and load this object into the simulator
     obj = DatasetObject(
@@ -55,7 +55,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         bounding_box=avg_category_spec.get(obj_category),
         fit_avg_dim_volume=True,
     )
-    ig.sim.import_object(obj)
+    og.sim.import_object(obj)
     obj.set_position(np.array([0.5, -0.5, 1.01]))
 
     # Step through the environment

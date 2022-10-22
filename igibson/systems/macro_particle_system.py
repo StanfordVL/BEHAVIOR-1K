@@ -1,13 +1,13 @@
 import os
 import omni
 from omni.isaac.core.utils.prims import get_prim_at_path
-from igibson import assets_path
-from igibson.utils.usd_utils import create_joint
-from igibson.systems.particle_system_base import BaseParticleSystem
-from igibson.utils.constants import SemanticClass
-from igibson.utils.python_utils import classproperty
-from igibson.utils.sampling_utils import sample_cuboid_on_object
-from igibson.prims.geom_prim import VisualGeomPrim
+from omnigibson import assets_path
+from omnigibson.utils.usd_utils import create_joint
+from omnigibson.systems.particle_system_base import BaseParticleSystem
+from omnigibson.utils.constants import SemanticClass
+from omnigibson.utils.python_utils import classproperty
+from omnigibson.utils.sampling_utils import sample_cuboid_on_object
+from omnigibson.prims.geom_prim import VisualGeomPrim
 from collections import OrderedDict
 import numpy as np
 from pxr import Gf
@@ -322,7 +322,7 @@ class VisualParticleSystem(MacroParticleSystem):
     _N_PARTICLES_PER_GROUP = 20
 
     # Default parameters for sampling particle locations
-    # See igibson/utils/sampling_utils.py for how they are used.
+    # See omnigibson/utils/sampling_utils.py for how they are used.
     _SAMPLING_AXIS_PROBABILITIES = (0.25, 0.25, 0.5)
     _SAMPLING_AABB_OFFSET = 0.1
     _SAMPLING_BIMODAL_MEAN_FRACTION = 0.9
@@ -763,7 +763,7 @@ class DustSystem(VisualParticleSystem):
 
         # Particle object will be overridden by default to be a small cuboid
         # We import now at runtime so prevent circular imports
-        from igibson.objects.primitive_object import PrimitiveObject
+        from omnigibson.objects.primitive_object import PrimitiveObject
         dust_object = PrimitiveObject(
             prim_path=f"/World/{cls.name}/dust_template",
             primitive_type="Cube",
@@ -811,7 +811,7 @@ class StainSystem(VisualParticleSystem):
 
         # Particle object will be overridden to by default be a specific USD file
         # We import now at runtime so prevent circular imports
-        from igibson.objects.usd_object import USDObject
+        from omnigibson.objects.usd_object import USDObject
         stain_object = USDObject(
             prim_path=f"/World/{cls.name}/stain_template",
             usd_path=os.path.join(assets_path, "models/stain/stain.usd"),

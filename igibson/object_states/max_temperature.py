@@ -1,5 +1,5 @@
-from igibson.object_states.object_state_base import AbsoluteObjectState
-from igibson.object_states.temperature import Temperature
+from omnigibson.object_states.object_state_base import AbsoluteObjectState
+from omnigibson.object_states.temperature import Temperature
 import numpy as np
 from collections import OrderedDict
 

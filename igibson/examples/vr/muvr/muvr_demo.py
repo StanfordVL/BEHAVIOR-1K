@@ -10,21 +10,21 @@ import time
 import numpy as np
 
 
-import igibson
-from igibson import assets_path
-from igibson.objects.ycb_object import YCBObject
-from igibson.render.mesh_renderer.mesh_renderer_cpu import MeshRendererSettings
-from igibson.render.mesh_renderer.mesh_renderer_vr import VrSettings
-from igibson.robots.behavior_robot import BehaviorRobot
-from igibson.scenes.interactive_traversable_scene import InteractiveIndoorScene
-from igibson.simulator import Simulator
-from igibson.utils.muvr_utils import IGVRClient, IGVRServer
+import omnigibson
+from omnigibson import assets_path
+from omnigibson.objects.ycb_object import YCBObject
+from omnigibson.render.mesh_renderer.mesh_renderer_cpu import MeshRendererSettings
+from omnigibson.render.mesh_renderer.mesh_renderer_vr import VrSettings
+from omnigibson.robots.behavior_robot import BehaviorRobot
+from omnigibson.scenes.interactive_traversable_scene import InteractiveIndoorScene
+from omnigibson.simulator import Simulator
+from omnigibson.utils.muvr_utils import IGVRClient, IGVRServer
 
 sample_urdf_folder = os.path.join(assets_path, "models", "sample_urdfs")
 
 # Only load in first few objects in Rs to decrease load times
 LOAD_PARTIAL = True
-# Whether to print iGibson + networking FPS each frame
+# Whether to print OmniGibson + networking FPS each frame
 PRINT_FPS = True
 # Whether to wait for client before simulating
 WAIT_FOR_CLIENT = False
@@ -35,7 +35,7 @@ RUN_SETTINGS = {"client": VrSettings(use_vr=False), "server": VrSettings(use_vr=
 
 def run_muvr(mode="server", host="localhost", port="8885"):
     """
-    Sets up the iGibson environment that will be used by both server and client
+    Sets up the OmniGibson environment that will be used by both server and client
     """
     print("INFO: Running MUVR {} at {}:{}".format(mode, host, port))
     # This function only runs if mode is one of server or client, so setting this bool is safe
@@ -44,12 +44,12 @@ def run_muvr(mode="server", host="localhost", port="8885"):
     vr_settings = RUN_SETTINGS[mode]
 
     # HDR files for PBR rendering
-    hdr_texture = os.path.join(igibson.ig_dataset_path, "scenes", "background", "probe_02.hdr")
-    hdr_texture2 = os.path.join(igibson.ig_dataset_path, "scenes", "background", "probe_03.hdr")
+    hdr_texture = os.path.join(omnigibson.og_dataset_path, "scenes", "background", "probe_02.hdr")
+    hdr_texture2 = os.path.join(omnigibson.og_dataset_path, "scenes", "background", "probe_03.hdr")
     light_modulation_map_filename = os.path.join(
-        igibson.ig_dataset_path, "scenes", "Rs_int", "layout", "floor_lighttype_0.png"
+        omnigibson.og_dataset_path, "scenes", "Rs_int", "layout", "floor_lighttype_0.png"
     )
-    background_texture = os.path.join(igibson.ig_dataset_path, "scenes", "background", "urban_street_01.jpg")
+    background_texture = os.path.join(omnigibson.og_dataset_path, "scenes", "background", "urban_street_01.jpg")
 
     # VR rendering settings
     vr_rendering_settings = MeshRendererSettings(
@@ -111,7 +111,7 @@ def run_muvr(mode="server", host="localhost", port="8885"):
     while True:
         frame_start = time.time()
         if is_server:
-            # Update iGibson with latest vr data from client
+            # Update OmniGibson with latest vr data from client
             vr_server.ingest_vr_data()
 
             if not WAIT_FOR_CLIENT or vr_server.client_connected():

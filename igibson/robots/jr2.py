@@ -3,11 +3,11 @@ import os
 import numpy as np
 
 
-import igibson
-# from igibson.external.pybullet_tools.utils import set_joint_positions
-from igibson.robots.manipulation_robot import ManipulationRobot
-from igibson.robots.two_wheel_robot import TwoWheelRobot
-from igibson.utils.constants import SemanticClass
+import omnigibson
+# from omnigibson.external.pybullet_tools.utils import set_joint_positions
+from omnigibson.robots.manipulation_robot import ManipulationRobot
+from omnigibson.robots.two_wheel_robot import TwoWheelRobot
+from omnigibson.utils.constants import SemanticClass
 
 RESET_JOINT_OPTIONS = {
     "tuck",
@@ -219,8 +219,8 @@ class JR2(ManipulationRobot, TwoWheelRobot):
 
     @property
     def usd_path(self):
-        return os.path.join(igibson.assets_path, "models/jr2_urdf/jr2_kinova.urdf")
+        return os.path.join(omnigibson.assets_path, "models/jr2_urdf/jr2_kinova.urdf")
 
     @property
     def urdf_path(self):
-        return os.path.join(igibson.assets_path, "models/jr2_urdf/jr2_kinova.urdf")
+        return os.path.join(omnigibson.assets_path, "models/jr2_urdf/jr2_kinova.urdf")

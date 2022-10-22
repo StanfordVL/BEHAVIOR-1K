@@ -24,18 +24,18 @@ import sphinx_rtd_theme
 from recommonmark.parser import CommonMarkParser
 
 sys.path.append(os.path.abspath("../"))
-import igibson
+import omnigibson
 
-project = "iGibson"
+project = "OmniGibson"
 copyright = "Stanford University 2018-2021"
 author = "Bokui Shen*, Fei Xia*, Chengshu Li*, Roberto Martín-Martín*, Linxi Fan, Guanzhi Wang, Shyamal Buch, Claudia DArpino, Sanjana Srivastava, Lyne P. Tchapmi, Micael E. Tchapmi, Kent Vainio, Li Fei-Fei, Silvio Savarese (*Equal Contribution)"
 
-github_doc_root = "https://github.com/StanfordVL/iGibson"
+github_doc_root = "https://github.com/StanfordVL/OmniGibson"
 
 # The short X.Y version
-version = igibson.__version__
+version = omnigibson.__version__
 # The full version, including alpha/beta/rc tags
-release = igibson.__version__
+release = omnigibson.__version__
 
 sys.path.insert(0, os.path.abspath("../"))
 sys.path.insert(0, os.path.abspath("../../"))

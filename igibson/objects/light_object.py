@@ -26,10 +26,10 @@ import numpy as np
 import carb
 import logging
 from omni.isaac.core.utils.stage import get_current_stage
-from igibson.objects.stateful_object import StatefulObject
-from igibson.prims.xform_prim import XFormPrim
-from igibson.utils.python_utils import assert_valid_key
-from igibson.utils.constants import PrimType
+from omnigibson.objects.stateful_object import StatefulObject
+from omnigibson.prims.xform_prim import XFormPrim
+from omnigibson.utils.python_utils import assert_valid_key
+from omnigibson.utils.constants import PrimType
 
 
 class LightObject(StatefulObject):

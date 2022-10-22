@@ -1,6 +1,6 @@
 import numpy as np
 
-from igibson.controllers import JointController
+from omnigibson.controllers import JointController
 
 
 class NullJointController(JointController):

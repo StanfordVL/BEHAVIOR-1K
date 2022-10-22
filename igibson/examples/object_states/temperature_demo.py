@@ -2,10 +2,10 @@ import logging
 
 import numpy as np
 
-import igibson as ig
-from igibson import object_states
-from igibson.macros import gm
-from igibson.objects import DatasetObject, LightObject
+import omnigibson as og
+from omnigibson import object_states
+from omnigibson.macros import gm
+from omnigibson.objects import DatasetObject, LightObject
 
 
 def main(random_selection=False, headless=False, short_exec=False):
@@ -29,10 +29,10 @@ def main(random_selection=False, headless=False, short_exec=False):
     }
 
     # Create the environment
-    env = ig.Environment(configs=cfg, action_timestep=1 / 60., physics_timestep=1 / 60.)
+    env = og.Environment(configs=cfg, action_timestep=1 / 60., physics_timestep=1 / 60.)
 
     # Set camera to appropriate viewing pose
-    ig.sim.viewer_camera.set_position_orientation(
+    og.sim.viewer_camera.set_position_orientation(
         position=np.array([ 0.46938863, -3.97887141,  1.64106008]),
         orientation=np.array([0.63311689, 0.00127259, 0.00155577, 0.77405359]),
     )
@@ -45,7 +45,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         radius=0.01,
         intensity=1e5,
     )
-    ig.sim.import_object(light)
+    og.sim.import_object(light)
     light.set_position(np.array([-2.0, -2.0, 1.0]))
 
     # Load stove ON
@@ -55,7 +55,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         category="stove",
         model="101943",
     )
-    ig.sim.import_object(stove)
+    og.sim.import_object(stove)
     stove.set_position([0, 0, 0.65])
 
     # Load microwave ON
@@ -66,7 +66,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         model="7128",
         scale=0.25,
     )
-    ig.sim.import_object(microwave)
+    og.sim.import_object(microwave)
     microwave.set_position([2.5, 0, 0.094])
 
     # Load oven ON
@@ -76,7 +76,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         category="oven",
         model="7120",
     )
-    ig.sim.import_object(oven)
+    og.sim.import_object(oven)
     oven.set_position([-1.25, 0, 0.80])
 
     # Load tray
@@ -87,7 +87,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         model="tray_000",
         scale=0.15,
     )
-    ig.sim.import_object(tray)
+    og.sim.import_object(tray)
     tray.set_position([0, 0, 1.24])
 
     # Load fridge
@@ -103,7 +103,7 @@ def main(random_selection=False, headless=False, short_exec=False):
             }
         },
     )
-    ig.sim.import_object(fridge)
+    og.sim.import_object(fridge)
     fridge.set_position([1.25, 0, 0.80])
 
     # Load 5 apples
@@ -115,7 +115,7 @@ def main(random_selection=False, headless=False, short_exec=False):
             category="apple",
             model="00_0",
         )
-        ig.sim.import_object(apple)
+        og.sim.import_object(apple)
         apple.set_position([0, i * 0.05, 1.65])
         apples.append(apple)
 

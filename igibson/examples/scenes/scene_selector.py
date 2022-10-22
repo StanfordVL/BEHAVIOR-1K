@@ -1,7 +1,7 @@
 import logging
-import igibson as ig
-from igibson.utils.asset_utils import get_available_g_scenes, get_available_ig_scenes
-from igibson.utils.ui_utils import choose_from_options
+import omnigibson as og
+from omnigibson.utils.asset_utils import get_available_g_scenes, get_available_og_scenes
+from omnigibson.utils.ui_utils import choose_from_options
 
 
 def main(random_selection=False, headless=False, short_exec=False):
@@ -20,7 +20,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     scene_type = choose_from_options(options=scene_options, name="scene type", random_selection=random_selection)
 
     # Choose the scene model to load
-    scenes = get_available_ig_scenes() if scene_type == "InteractiveTraversableScene" else get_available_g_scenes()
+    scenes = get_available_og_scenes() if scene_type == "InteractiveTraversableScene" else get_available_g_scenes()
     scene_model = choose_from_options(options=scenes, name="scene model", random_selection=random_selection)
     print(f"scene model: {scene_model}")
 
@@ -50,10 +50,10 @@ def main(random_selection=False, headless=False, short_exec=False):
             cfg["scene"]["load_object_categories"] = ["floors", "walls", "ceilings"]
 
     # Load the environment
-    env = ig.Environment(configs=cfg)
+    env = og.Environment(configs=cfg)
 
     # Allow user to move camera more easily
-    ig.sim.enable_viewer_camera_teleoperation()
+    og.sim.enable_viewer_camera_teleoperation()
 
     # Run a simple loop and reset periodically
     max_iterations = 10 if not short_exec else 1

@@ -1,7 +1,7 @@
 from abc import ABCMeta, abstractmethod
 from collections import OrderedDict
 from copy import deepcopy
-from igibson.utils.python_utils import classproperty, Registerable
+from omnigibson.utils.python_utils import classproperty, Registerable
 
 REGISTERED_REWARD_FUNCTIONS = OrderedDict()
 

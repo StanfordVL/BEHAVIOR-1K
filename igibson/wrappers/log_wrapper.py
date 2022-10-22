@@ -1,15 +1,15 @@
 import os
 import datetime
 
-from igibson.wrappers.wrapper_base import BaseWrapper
-from igibson.utils.log_utils import IGLogWriter
+from omnigibson.wrappers.wrapper_base import BaseWrapper
+from omnigibson.utils.log_utils import IGLogWriter
 
 
 class LogWrapper(BaseWrapper):
     """
     Base class for all wrappers in robosuite.
     Args:
-        env (iGibsonEnv): The environment to wrap.
+        env (OmniGibsonEnv): The environment to wrap.
         episode_save_dir (str): Path to the directory for where to save episodes. If the directory
             doesn't exist, it will be created. If not specified, will use the current directory
     """

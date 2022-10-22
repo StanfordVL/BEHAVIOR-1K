@@ -1,5 +1,5 @@
-from igibson import ig_dataset_path
-import igibson.utils.transform_utils as T
+from omnigibson import og_dataset_path
+import omnigibson.utils.transform_utils as T
 import xml.etree.ElementTree as ET
 import numpy as np
 import os
@@ -18,12 +18,12 @@ def copy_building_assets_to_objects_folder(scene_id):
     for category in {"floors", "ceilings", "walls"}:
         cat_nonplural = category[:-1]
         # Copy the URDF, mesh files, and material files to the object folder, so that these have the same
-        # structure as other objects in ig_dataset
-        old_dir = f"{ig_dataset_path}/scenes/{scene_id}"
+        # structure as other objects in og_dataset
+        old_dir = f"{og_dataset_path}/scenes/{scene_id}"
         old_path = f"{old_dir}/urdf/{scene_id}_{category}.urdf"
         obj_model = f"{scene_id}"
-        new_dir = f"{ig_dataset_path}/objects/{category}/{obj_model}"
-        usd_path = f"{ig_dataset_path}/objects/{category}/{obj_model}/usd/{obj_model}.usd"
+        new_dir = f"{og_dataset_path}/objects/{category}/{obj_model}"
+        usd_path = f"{og_dataset_path}/objects/{category}/{obj_model}/usd/{obj_model}.usd"
 
         # Create new directories
         Path(new_dir).mkdir(parents=True, exist_ok=True)

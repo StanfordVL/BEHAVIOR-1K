@@ -1,14 +1,14 @@
 import logging
 import numpy as np
-from igibson.objects.stateful_object import StatefulObject
-from igibson.utils.python_utils import assert_valid_key
+from omnigibson.objects.stateful_object import StatefulObject
+from omnigibson.utils.python_utils import assert_valid_key
 
 from pxr import Gf, Usd, Sdf, Vt, UsdGeom, UsdPhysics, PhysxSchema, UsdShade
 from omni.isaac.core.utils.prims import get_prim_at_path
-from igibson.utils.constants import PrimType, PRIMITIVE_MESH_TYPES
-from igibson.utils.usd_utils import create_primitive_mesh
-from igibson.utils.render_utils import create_pbr_material
-from igibson.utils.physx_utils import bind_material
+from omnigibson.utils.constants import PrimType, PRIMITIVE_MESH_TYPES
+from omnigibson.utils.usd_utils import create_primitive_mesh
+from omnigibson.utils.render_utils import create_pbr_material
+from omnigibson.utils.physx_utils import bind_material
 import omni
 import carb
 

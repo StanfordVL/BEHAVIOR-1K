@@ -8,12 +8,12 @@ from sys import platform
 import numpy as np
 from PIL import Image
 
-import igibson
-from igibson.render.mesh_renderer.mesh_renderer_settings import MeshRendererSettings
-from igibson.render.profiler import Profiler
-from igibson.scenes.interactive_traversable_scene import InteractiveIndoorScene
-from igibson.simulator import Simulator
-from igibson.utils.asset_utils import get_ig_scene_path
+import omnigibson
+from omnigibson.render.mesh_renderer.mesh_renderer_settings import MeshRendererSettings
+from omnigibson.render.profiler import Profiler
+from omnigibson.scenes.interactive_traversable_scene import InteractiveIndoorScene
+from omnigibson.simulator import Simulator
+from omnigibson.utils.asset_utils import get_og_scene_path
 
 
 def main(random_selection=False, headless=False, short_exec=False):
@@ -49,12 +49,12 @@ def main(random_selection=False, headless=False, short_exec=False):
         object_rand = False
 
     # hdr_texture1 = os.path.join(
-    # igibson.ig_dataset_path, 'scenes', 'background', 'photo_studio_01_2k.hdr')
-    hdr_texture1 = os.path.join(igibson.ig_dataset_path, "scenes", "background", "probe_03.hdr")
-    hdr_texture2 = os.path.join(igibson.ig_dataset_path, "scenes", "background", "probe_02.hdr")
-    light_map = os.path.join(get_ig_scene_path(scene_name), "layout", "floor_lighttype_0.png")
+    # omnigibson.og_dataset_path, 'scenes', 'background', 'photo_studio_01_2k.hdr')
+    hdr_texture1 = os.path.join(omnigibson.og_dataset_path, "scenes", "background", "probe_03.hdr")
+    hdr_texture2 = os.path.join(omnigibson.og_dataset_path, "scenes", "background", "probe_02.hdr")
+    light_map = os.path.join(get_og_scene_path(scene_name), "layout", "floor_lighttype_0.png")
 
-    background_texture = os.path.join(igibson.ig_dataset_path, "scenes", "background", "urban_street_01.jpg")
+    background_texture = os.path.join(omnigibson.og_dataset_path, "scenes", "background", "urban_street_01.jpg")
 
     settings = MeshRendererSettings(
         env_texture_filename=hdr_texture1,
@@ -76,8 +76,8 @@ def main(random_selection=False, headless=False, short_exec=False):
     s.import_scene(scene)
 
     # Load trajectory path
-    traj_path = os.path.join(get_ig_scene_path(scene_name), "misc", "tour_cam_trajectory.txt")
-    save_dir = os.path.join(get_ig_scene_path(scene_name), save_dir)
+    traj_path = os.path.join(get_og_scene_path(scene_name), "misc", "tour_cam_trajectory.txt")
+    save_dir = os.path.join(get_og_scene_path(scene_name), save_dir)
     os.makedirs(save_dir, exist_ok=True)
     tmp_dir = os.path.join(save_dir, "tmp")
     os.makedirs(tmp_dir, exist_ok=True)

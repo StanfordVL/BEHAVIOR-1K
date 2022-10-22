@@ -1,11 +1,11 @@
 # Robots
 
 ## Overview
-We provide a wide variety of **Robots** that can be imported in iGibson.
+We provide a wide variety of **Robots** that can be imported in OmniGibson.
 
 To quickly see all of them, you can play the example:
 ```
-python -m igibson.examples.robots.all_robots_visualizer
+python -m omnigibson.examples.robots.all_robots_visualizer
 ```
 
 Below, we list the fully-supported robots:
@@ -20,7 +20,7 @@ Below, we list the fully-supported robots:
 | JackRabbot      | `TwoWheeledRobot` <br> `ManipulationRobot`     | 2 & 7 | [Stanford Project Link](http://cvgl.stanford.edu/projects/jackrabbot/) | Base: {Torque, Velocity, Position, Differential Drive} <br> Arm: {Torque, Velocity, Position, Inverse Kinematics} |
 | LocoBot         | `TwoWheeledRobot`     | 2     | [ROS](http://wiki.ros.org/locobot), [Manufacturer](https://www.trossenrobotics.com/locobot-pyrobot-ros-rover.aspx) | Base: {Torque, Velocity, Position, Differential Drive} |
 
-Typically, these robot classes take in the URDF file or MuJoCo XML file of an robot (in `igibson.assets_path`) and provide a `load` function that be invoked externally (usually by `import_object` of `Simulator`). The `load` function imports the robot into PyBullet.
+Typically, these robot classes take in the URDF file or MuJoCo XML file of an robot (in `omnigibson.assets_path`) and provide a `load` function that be invoked externally (usually by `import_object` of `Simulator`). The `load` function imports the robot into PyBullet.
 
 ### Robot Class Hierarchy
 All robot classes inherit from `BaseRobot`, which provides the core interface for all Robot classes. From `BaseRobot`, there are additional abstract subclasses from which a robot can inherit from:
@@ -37,20 +37,20 @@ Note that because these abstract classes describe different aspects of a robot's
 
 Each abstract robot class implements useful functions for controlling and accessing robot properties. For example, `ManipulationRobot` contains functionalities to query the state of the arms, and implements multiple grasping modes, including some simplified grasping modes like "sticky mitten" that could be used for researchers less interested on grasp-control and/or focused on task planning. For creating new robot classes to import custom robots, it is highly recommended to follow our robot hierarchy, to best leverage the features designed in our abstract classes.
 
-How are robot parameters specified? Each abstract robot class expects certain kwargs, which are optionally extended for specific robot classes. While default values (seen in each respective robot class) are loaded at runtime, these can also be easily overridden by specifying these kwargs in the constructor or in the config file that you pass into the iGibson environment constructor. The set of modifiable arguments and expected robot config structure for each robot can be found in [igibson/configs/robots](https://github.com/StanfordVL/iGibson/blob/master/igibson/configs/robots). For description of what each specific keyword argument corresponds to, please see the respective robot's class docstring.
+How are robot parameters specified? Each abstract robot class expects certain kwargs, which are optionally extended for specific robot classes. While default values (seen in each respective robot class) are loaded at runtime, these can also be easily overridden by specifying these kwargs in the constructor or in the config file that you pass into the OmniGibson environment constructor. The set of modifiable arguments and expected robot config structure for each robot can be found in [omnigibson/configs/robots](https://github.com/StanfordVL/OmniGibson/blob/master/omnigibson/configs/robots). For description of what each specific keyword argument corresponds to, please see the respective robot's class docstring.
 
 Our examples contain multiple demonstrations on how to specify, create and initialize robots, either through config files and the Environment API, or manually with the constructors.
 
 ### Robot Control
-iGibson v2.0 implements modular controllers that can be assigned to specific components of the robot. The controller classes can be found in [igibson/controllers](https://github.com/StanfordVL/iGibson/blob/master/igibson/controllers). They include very generic controllers, such as `JointController`, and some more morphology-specific controllers, such as `DifferentialDriveController` (designed to control a two-wheeled robot) and `InverseKinematicsController` (designed to control a robot arm in Cartesian space using an inverse kinematics solver to find the right arm configuration).
+OmniGibson v2.0 implements modular controllers that can be assigned to specific components of the robot. The controller classes can be found in [omnigibson/controllers](https://github.com/StanfordVL/OmniGibson/blob/master/omnigibson/controllers). They include very generic controllers, such as `JointController`, and some more morphology-specific controllers, such as `DifferentialDriveController` (designed to control a two-wheeled robot) and `InverseKinematicsController` (designed to control a robot arm in Cartesian space using an inverse kinematics solver to find the right arm configuration).
 
 Robots requests controllers of specific types based on the abstract classes they derive from. For example, a robot inheriting from `TwoWheeledRobot` requires loading a controller for the robot's `base`, and must be a `JointController` or `DifferentialDriveController`. A robot inheriting from `ManipulationRobot` requires loading a controller for each of the robot's `arm`s (`JointController` or `InverseKinematicsController`), and corresponding `gripper` (`JointController`, `MultiFingerGripperController`, `NullJointController`).
 
-How are controller parameters specified? Each abstract robot class implements default controller configurations for each supported controller, which are automatically loaded at runtime (you can see the default configs directly in the abstract class source code, e.g.: the `InverseKinematicsController` defaults in [manipulation_robot.py](https://github.com/StanfordVL/iGibson/blob/master/igibson/robots/manipulation_robot.py)). However, you can easily override these defaults and set specific parameters in your config file that you pass into the iGibson environment constructor. The set of modifiable arguments and expected controller config structure for each controller can be found in [igibson/configs/controllers](https://github.com/StanfordVL/iGibson/blob/master/igibson/configs/controllers). For description of what each specific keyword argument corresponds to, please see the respective controller's class docstring.
+How are controller parameters specified? Each abstract robot class implements default controller configurations for each supported controller, which are automatically loaded at runtime (you can see the default configs directly in the abstract class source code, e.g.: the `InverseKinematicsController` defaults in [manipulation_robot.py](https://github.com/StanfordVL/OmniGibson/blob/master/omnigibson/robots/manipulation_robot.py)). However, you can easily override these defaults and set specific parameters in your config file that you pass into the OmniGibson environment constructor. The set of modifiable arguments and expected controller config structure for each controller can be found in [omnigibson/configs/controllers](https://github.com/StanfordVL/OmniGibson/blob/master/omnigibson/configs/controllers). For description of what each specific keyword argument corresponds to, please see the respective controller's class docstring.
 
 We also include an example demo script showcasing controlling different robots. Please see [Robot Control Example](robots.md#robot-control-example) or run:
 ```
-python -m igibson.examples.robots.robot_control_example
+python -m omnigibson.examples.robots.robot_control_example
 ```
 You can select the robot, the controllers, the input to the controllers (random or teleop with the keyboard) and the scene, and test them.
 
@@ -76,28 +76,28 @@ The reference frame of each body part is shown below.
 
 
 ## Examples
-We provide multiple examples showcasing our robots' functionality, described below. These examples, together with the provided config files, should help you getting started with all robots and controllers. All of these examples can be found in [igibson/examples/robots](https://github.com/StanfordVL/iGibson/blob/master/igibson/examples/robots)
+We provide multiple examples showcasing our robots' functionality, described below. These examples, together with the provided config files, should help you getting started with all robots and controllers. All of these examples can be found in [omnigibson/examples/robots](https://github.com/StanfordVL/OmniGibson/blob/master/omnigibson/examples/robots)
 
 ### Visualizing Robots Example
-In [all_robots_visualizer.py](https://github.com/StanfordVL/iGibson/blob/master/igibson/examples/robots/all_robots_visualizer.py), we iterate over all of our supported robots, loading them into a scene and applying random actions for a few seconds. This demo allows you to visualize all the robots and their corresponding DOFs in our iGibson GUI.
+In [all_robots_visualizer.py](https://github.com/StanfordVL/OmniGibson/blob/master/omnigibson/examples/robots/all_robots_visualizer.py), we iterate over all of our supported robots, loading them into a scene and applying random actions for a few seconds. This demo allows you to visualize all the robots and their corresponding DOFs in our OmniGibson GUI.
 
 ### Inverse Kinematics Example
-In [ik_example.py](https://github.com/StanfordVL/iGibson/blob/master/igibson/examples/robots/ik_example.py), we showcase using pybullet's built-in Inverse Kinematics (IK) control in an interactive way. We load Fetch and a visual marker in the pybullet GUI. You can then move a visual marker in the GUI, and apply IK to cause Fetch's arm to converge towards the marker.
+In [ik_example.py](https://github.com/StanfordVL/OmniGibson/blob/master/omnigibson/examples/robots/ik_example.py), we showcase using pybullet's built-in Inverse Kinematics (IK) control in an interactive way. We load Fetch and a visual marker in the pybullet GUI. You can then move a visual marker in the GUI, and apply IK to cause Fetch's arm to converge towards the marker.
 
 ### Motion Planning Example
-In [motion_planning_example.py](https://github.com/StanfordVL/iGibson/blob/master/igibson/examples/robots/motion_planning_example.py), we showcase using our motion planning module in an interactive way. We load Fetch into an empty building (`Rs_int` scene). You can interact with the GUI to set navigation and manipulation targets, which Fetch will converge to using our motion planner.
+In [motion_planning_example.py](https://github.com/StanfordVL/OmniGibson/blob/master/omnigibson/examples/robots/motion_planning_example.py), we showcase using our motion planning module in an interactive way. We load Fetch into an empty building (`Rs_int` scene). You can interact with the GUI to set navigation and manipulation targets, which Fetch will converge to using our motion planner.
 
 ### Robot Control Example
-In [robot_control_example.py](https://github.com/StanfordVL/iGibson/blob/master/igibson/examples/robots/robot_control_example.py), we showcase using our controllers to control our different robots. You can choose a robot, and specific set of controllers to control the robot, and then either deploy random actions or directly teleoperate the robot using your keyboard.
+In [robot_control_example.py](https://github.com/StanfordVL/OmniGibson/blob/master/omnigibson/examples/robots/robot_control_example.py), we showcase using our controllers to control our different robots. You can choose a robot, and specific set of controllers to control the robot, and then either deploy random actions or directly teleoperate the robot using your keyboard.
 
 ## Legacy Robots
-We also include robots originally supported in Gibson / iGibson v1.0, but have not been ported to iGibson v2.0.
-They are included in [igibson/robots/legacy](https://github.com/StanfordVL/iGibson/blob/master/igibson/robots/legacy)
-in their original unaltered state, and are not expected to work out of the box with the current iGibson environments.
-Interested users should consider modifying those robot class logics to be compatible with iGibson v2.0, or their own
-repositories. We are happy to accept community PR contributions standardizing these robot classes with iGibson v2.0!
+We also include robots originally supported in Gibson / OmniGibson v1.0, but have not been ported to OmniGibson v2.0.
+They are included in [omnigibson/robots/legacy](https://github.com/StanfordVL/OmniGibson/blob/master/omnigibson/robots/legacy)
+in their original unaltered state, and are not expected to work out of the box with the current OmniGibson environments.
+Interested users should consider modifying those robot class logics to be compatible with OmniGibson v2.0, or their own
+repositories. We are happy to accept community PR contributions standardizing these robot classes with OmniGibson v2.0!
 
-Below, we list the legacy robots that can be found in iGibson:
+Below, we list the legacy robots that can be found in OmniGibson:
 
 | Agent Name     | DOF | Information      | Controller |
 |:-------------: | :-------------: |:-------------: |:-------------|

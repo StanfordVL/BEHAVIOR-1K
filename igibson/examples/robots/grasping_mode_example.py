@@ -11,10 +11,10 @@ from collections import OrderedDict
 
 import numpy as np
 
-import igibson as ig
-from igibson.objects import DatasetObject, PrimitiveObject
-from igibson.utils.asset_utils import get_ig_avg_category_specs, get_ig_category_path, get_ig_model_path
-from igibson.utils.ui_utils import choose_from_options, KeyboardRobotController
+import omnigibson as og
+from omnigibson.objects import DatasetObject, PrimitiveObject
+from omnigibson.utils.asset_utils import get_og_avg_category_specs, get_og_category_path, get_og_model_path
+from omnigibson.utils.ui_utils import choose_from_options, KeyboardRobotController
 
 GRASPING_MODES = OrderedDict(
     sticky="Sticky Mitten - Objects are magnetized when they touch the fingers and a CLOSE command is given",
@@ -47,7 +47,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     cfg = OrderedDict(scene=scene_cfg, robots=[robot0_cfg])
 
     # Create the environment
-    env = ig.Environment(configs=cfg, action_timestep=1/60., physics_timestep=1/60.)
+    env = og.Environment(configs=cfg, action_timestep=1/60., physics_timestep=1/60.)
 
     # Load objects (1 table)
     objects_to_load = {
@@ -86,9 +86,9 @@ def main(random_selection=False, headless=False, short_exec=False):
             name=obj_name,
             **obj_cfg["init_kwargs"],
         )
-        ig.sim.import_object(obj)
+        og.sim.import_object(obj)
         obj.set_position_orientation(**obj_cfg["init_pose"])
-        ig.sim.step_physics()
+        og.sim.step_physics()
 
     # Now load a box on the table
     box = PrimitiveObject(
@@ -98,9 +98,9 @@ def main(random_selection=False, headless=False, short_exec=False):
         rgba=[1.0, 0, 0, 1.0],
         size=0.05,
     )
-    ig.sim.import_object(box)
+    og.sim.import_object(box)
     box.set_position(np.array([0.53, -0.1, 0.97]))
-    ig.sim.step_physics()
+    og.sim.step_physics()
 
     # Reset the robot
     robot = env.robots[0]
@@ -109,7 +109,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     robot.keep_still()
 
     # Update the simulator's viewer camera's pose so it points towards the robot
-    ig.sim.viewer_camera.set_position_orientation(
+    og.sim.viewer_camera.set_position_orientation(
         position=np.array([-2.39951,  2.26469,  2.66227]),
         orientation=np.array([-0.23898481,  0.48475231,  0.75464013, -0.37204802]),
     )

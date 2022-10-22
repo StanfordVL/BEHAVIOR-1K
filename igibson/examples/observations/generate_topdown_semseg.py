@@ -3,11 +3,11 @@ import logging
 import cv2
 import numpy as np
 
-from igibson.render.mesh_renderer.mesh_renderer_settings import MeshRendererSettings
-from igibson.scenes.interactive_traversable_scene import InteractiveIndoorScene
-from igibson.simulator import Simulator
-from igibson.utils.constants import MAX_CLASS_COUNT
-from igibson.utils.vision_utils import segmentation_to_rgb
+from omnigibson.render.mesh_renderer.mesh_renderer_settings import MeshRendererSettings
+from omnigibson.scenes.interactive_traversable_scene import InteractiveIndoorScene
+from omnigibson.simulator import Simulator
+from omnigibson.utils.constants import MAX_CLASS_COUNT
+from omnigibson.utils.vision_utils import segmentation_to_rgb
 
 
 def main(random_selection=False, headless=False, short_exec=False):

@@ -1,5 +1,5 @@
-from igibson.utils.python_utils import classproperty
-from igibson.systems.system_base import BaseSystem
+from omnigibson.utils.python_utils import classproperty
+from omnigibson.systems.system_base import BaseSystem
 
 
 class BaseParticleSystem(BaseSystem):

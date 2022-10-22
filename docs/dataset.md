@@ -2,45 +2,45 @@
 
 In this page you will find information about:
 
-- [How to download iGibson 2.0 scenes and the BEHAVIOR Dataset of Objects](#download-igibson-2-0-scenes-and-the-behavior-dataset-of-objects)
-- [How to download iGibson 1.0 scenes](#download-igibson-1-0-scenes)
+- [How to download OmniGibson 2.0 scenes and the BEHAVIOR Dataset of Objects](#download-omnigibson-2-0-scenes-and-the-behavior-dataset-of-objects)
+- [How to download OmniGibson 1.0 scenes](#download-omnigibson-1-0-scenes)
 - [How to download Gibson and Stanford 2D-3D-Semantics scenes](#download-gibson-and-stanford-2d-3d-semantics-scenes)
 - [How to download Matterport3D scenes](#download-matterport3d-scenes)
 
-## Download iGibson 2.0 Scenes and the BEHAVIOR Dataset of Objects
+## Download OmniGibson 2.0 Scenes and the BEHAVIOR Dataset of Objects
 
 What will you download?
-- **iGibson 2.0 Dataset of Scenes**: New versions of the fully interactive scenes, more densely populated with objects.
-- **BEHAVIOR Object Dataset**: Dataset of object models annotated with physical and semantic properties. The 3D models are free to use within iGibson 2.0 for BEHAVIOR (due to artists' copyright, models are encrypted and allowed only to be used with iGibson 2.0). You can download a bundle of the iGibson 2.0 dataset of scenes and the BEHAVIOR dataset of objects here.
+- **OmniGibson 2.0 Dataset of Scenes**: New versions of the fully interactive scenes, more densely populated with objects.
+- **BEHAVIOR Object Dataset**: Dataset of object models annotated with physical and semantic properties. The 3D models are free to use within OmniGibson 2.0 for BEHAVIOR (due to artists' copyright, models are encrypted and allowed only to be used with OmniGibson 2.0). You can download a bundle of the OmniGibson 2.0 dataset of scenes and the BEHAVIOR dataset of objects here.
 
 To download both in a bundle, you need to follow the following steps:
 - Fill out the license agreement in this [form](https://docs.google.com/forms/d/e/1FAIpQLScPwhlUcHu_mwBqq5kQzT2VRIRwg_rJvF0IWYBk_LxEZiJIFg/viewform)
-- You will receive a key (igibson.key). Move it into the subfolder of the iGibson repository that contains the dataset, for example, iGibson/igibson/data
-- Download the behavior data bundle (ig_dataset) from [here](https://storage.googleapis.com/gibson_scenes/behavior_data_bundle.zip)
-- Unzip ig_dataset into the folder: `unzip behavior_data_bundle.zip -d iGibson/igibson/data`
+- You will receive a key (omnigibson.key). Move it into the subfolder of the OmniGibson repository that contains the dataset, for example, OmniGibson/omnigibson/data
+- Download the behavior data bundle (og_dataset) from [here](https://storage.googleapis.com/gibson_scenes/behavior_data_bundle.zip)
+- Unzip og_dataset into the folder: `unzip behavior_data_bundle.zip -d OmniGibson/omnigibson/data`
 
-After this process, you will be able to sample and use the scenes and objects in iGibson, for example, to evaluate your embodied AI solutions in the [BEHAVIOR benchmark](https://behavior.stanford.edu/).
+After this process, you will be able to sample and use the scenes and objects in OmniGibson, for example, to evaluate your embodied AI solutions in the [BEHAVIOR benchmark](https://behavior.stanford.edu/).
 
-## Download iGibson 1.0 Scenes
+## Download OmniGibson 1.0 Scenes
 
 What will you download?
-- **iGibson 1.0 Dataset of Scenes**: We annotated fifteen 3D reconstructions of real-world scans and converted them into fully interactive scene models. In this process, we respect the original object-instance layout and object-category distribution. The object models are extended from open-source datasets ([ShapeNet Dataset](https://www.shapenet.org/), [Motion Dataset](http://motiondataset.zbuaa.com/), [SAPIEN Dataset](https://sapien.ucsd.edu/)) enriched with annotations of material and dynamic properties. 
+- **OmniGibson 1.0 Dataset of Scenes**: We annotated fifteen 3D reconstructions of real-world scans and converted them into fully interactive scene models. In this process, we respect the original object-instance layout and object-category distribution. The object models are extended from open-source datasets ([ShapeNet Dataset](https://www.shapenet.org/), [Motion Dataset](http://motiondataset.zbuaa.com/), [SAPIEN Dataset](https://sapien.ucsd.edu/)) enriched with annotations of material and dynamic properties. 
 
 The following image shows the fifteen fully interactive scenes: 
 
-![placeholder.jpg](images/ig_scene.png)
+![placeholder.jpg](images/og_scene.png)
 
-To download the dataset, you need to first configure where the dataset is to be stored. You can change it in `your_installation_path/igibson/global_config.yaml` (default and recommended: `ig_dataset: your_installation_path/igibson/data/ig_dataset`). iGibson scenes can be downloaded with one single line:
+To download the dataset, you need to first configure where the dataset is to be stored. You can change it in `your_installation_path/omnigibson/global_config.yaml` (default and recommended: `og_dataset: your_installation_path/omnigibson/data/og_dataset`). OmniGibson scenes can be downloaded with one single line:
 
 ```bash
-python -m igibson.utils.assets_utils --download_ig_dataset
+python -m omnigibson.utils.assets_utils --download_og_dataset
 ```
 
-If the script fails to work, you can download from this [direct link](https://storage.googleapis.com/gibson_scenes/ig_dataset.tar.gz) and extract to `your_installation_path/igibson/data/ig_dataset`.
+If the script fails to work, you can download from this [direct link](https://storage.googleapis.com/gibson_scenes/og_dataset.tar.gz) and extract to `your_installation_path/omnigibson/data/og_dataset`.
 
-A description of the file structure and format of the files in the dataset can be found [here](https://github.com/StanfordVL/iGibson/tree/master/igibson/utils/data_utils). 
+A description of the file structure and format of the files in the dataset can be found [here](https://github.com/StanfordVL/OmniGibson/tree/master/omnigibson/utils/data_utils). 
 
-**Cubicasa / 3D Front Dataset Support:** We provide support for Cubicasa and 3D Front Dataset providing more than 10000 additional scenes (with less furniture than our fifteen scenes). To import them into iGibson, follow the instructions [here](https://github.com/StanfordVL/iGibson/tree/master/igibson/utils/data_utils/ext_scene). 
+**Cubicasa / 3D Front Dataset Support:** We provide support for Cubicasa and 3D Front Dataset providing more than 10000 additional scenes (with less furniture than our fifteen scenes). To import them into OmniGibson, follow the instructions [here](https://github.com/StanfordVL/OmniGibson/tree/master/omnigibson/utils/data_utils/ext_scene). 
 
 ## Download Gibson and Stanford 2D-3D-Semantics scenes
 
@@ -52,15 +52,15 @@ Files included in the dataset:
 
 - All scenes, 572 scenes (108GB): gibson_v2_all.tar.gz
 - 4+ partition, 106 scenes, with textures better packed (2.6GB): gibson_v2_4+.tar.gz
-- Stanford 2D-3D-Semantics, 7 scenes (1.4GB): 2d3ds_for_igibson.zip
+- Stanford 2D-3D-Semantics, 7 scenes (1.4GB): 2d3ds_for_omnigibson.zip
 
-We have updated these datasets to be used with iGibson so that users can keep developing and studying pure navigation solutions. The following link will bring you to a license agreement and then to a downloading URL: [form](https://forms.gle/36TW9uVpjrE1Mkf9A)
+We have updated these datasets to be used with OmniGibson so that users can keep developing and studying pure navigation solutions. The following link will bring you to a license agreement and then to a downloading URL: [form](https://forms.gle/36TW9uVpjrE1Mkf9A)
 
 After filling in the agreement, you will obtain a downloading `URL`. 
-You can download the data manually and store it in the path set in `your_installation_path/igibson/global_config.yaml` (default and recommended: `g_dataset: your_installation_path/igibson/data/g_dataset`).
+You can download the data manually and store it in the path set in `your_installation_path/omnigibson/global_config.yaml` (default and recommended: `g_dataset: your_installation_path/omnigibson/data/g_dataset`).
 Alternatively, you can run a single command to download the dataset, decompress, and place it in the correct folder:
 ```bash
-python -m igibson.utils.assets_utils --download_dataset URL
+python -m omnigibson.utils.assets_utils --download_dataset URL
 ```
 
 The Gibson Environment Dataset consists of 572 models and 1440 floors. We cover a diverse set of models including households, offices, hotels, venues, museums, hospitals, construction sites, etc. A diverse set of visualization of all spaces in Gibson can be seen [here](http://gibsonenv.stanford.edu/database/).
@@ -103,8 +103,8 @@ For the maps, each pixel represents 0.01m, and the center of the image correspon
 What will you download?
 - Matterport3D Dataset: 90 scenes (3.2GB)
 
-Please fill in this [form](http://dovahkiin.stanford.edu/matterport/public/MP_TOS.pdf) and send it to [matterport3d@googlegroups.com](mailto:matterport3d@googlegroups.com). Please put "use with iGibson simulator" in your email.
+Please fill in this [form](http://dovahkiin.stanford.edu/matterport/public/MP_TOS.pdf) and send it to [matterport3d@googlegroups.com](mailto:matterport3d@googlegroups.com). Please put "use with OmniGibson simulator" in your email.
 
-You'll then recieve a python script via email in response. Run `python download_mp.py --task_data igibson -o .` with the received script to download the data (3.2GB). Afterwards, move each of the scenes to the path set in `your_installation_path/igibson/global_config.yaml` (default and recommended: `g_dataset: your_installation_path/igibson/data/g_dataset`).
+You'll then recieve a python script via email in response. Run `python download_mp.py --task_data omnigibson -o .` with the received script to download the data (3.2GB). Afterwards, move each of the scenes to the path set in `your_installation_path/omnigibson/global_config.yaml` (default and recommended: `g_dataset: your_installation_path/omnigibson/data/g_dataset`).
 
 Reference: [Matterport3D webpage](https://niessner.github.io/Matterport/).

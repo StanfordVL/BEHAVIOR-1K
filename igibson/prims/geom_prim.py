@@ -12,7 +12,7 @@ from omni.isaac.core.utils.prims import get_prim_at_path
 import numpy as np
 from omni.isaac.core.materials import PhysicsMaterial
 from omni.usd import get_shader_from_material
-from igibson.prims.xform_prim import XFormPrim
+from omnigibson.prims.xform_prim import XFormPrim
 
 
 class GeomPrim(XFormPrim):

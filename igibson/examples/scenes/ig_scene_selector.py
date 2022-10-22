@@ -3,12 +3,12 @@ from sys import platform
 
 import numpy as np
 
-from igibson.render.mesh_renderer.mesh_renderer_settings import MeshRendererSettings
-from igibson.render.profiler import Profiler
-from igibson.scenes.interactive_traversable_scene import InteractiveIndoorScene
-from igibson.simulator import Simulator
-from igibson.utils.asset_utils import get_available_ig_scenes
-from igibson.utils.ui_utils import choose_from_options
+from omnigibson.render.mesh_renderer.mesh_renderer_settings import MeshRendererSettings
+from omnigibson.render.profiler import Profiler
+from omnigibson.scenes.interactive_traversable_scene import InteractiveIndoorScene
+from omnigibson.simulator import Simulator
+from omnigibson.utils.asset_utils import get_available_og_scenes
+from omnigibson.utils.ui_utils import choose_from_options
 
 
 def main(random_selection=False, headless=False, short_exec=False):
@@ -18,8 +18,8 @@ def main(random_selection=False, headless=False, short_exec=False):
     Shows how to sample points in the scene by room type and how to compute geodesic distance and the shortest path
     """
     logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
-    available_ig_scenes = get_available_ig_scenes()
-    scene_id = choose_from_options(options=available_ig_scenes, name="ig scene", random_selection=random_selection)
+    available_og_scenes = get_available_og_scenes()
+    scene_id = choose_from_options(options=available_og_scenes, name="ig scene", random_selection=random_selection)
     settings = MeshRendererSettings(enable_shadow=True, msaa=False)
     if platform == "darwin":
         settings.texture_scale = 0.5

@@ -3,11 +3,11 @@ from collections import namedtuple
 
 import numpy as np
 
-from igibson import app
-from igibson.macros import gm, create_module_macros
-from igibson.utils.asset_utils import get_assisted_grasping_categories
-import igibson.utils.transform_utils as T
-from igibson.controllers import (
+from omnigibson import app
+from omnigibson.macros import gm, create_module_macros
+from omnigibson.utils.asset_utils import get_assisted_grasping_categories
+import omnigibson.utils.transform_utils as T
+from omnigibson.controllers import (
     IsGraspingState,
     ControlType,
     JointController,
@@ -16,18 +16,18 @@ from igibson.controllers import (
     MultiFingerGripperController,
     NullJointController,
 )
-# from igibson.external.pybullet_tools.utils import (
+# from omnigibson.external.pybullet_tools.utils import (
 #     ContactResult,
 #     get_child_frame_pose,
 #     get_constraint_violation,
 #     get_link_pose,
 # )
-from igibson.objects.dataset_object import DatasetObject
-from igibson.robots.robot_base import BaseRobot
-from igibson.utils.python_utils import classproperty, assert_valid_key
-from igibson.object_states.filled import generate_points_in_volume_checker_function
-from igibson.utils.constants import JointType, PrimType
-from igibson.utils.usd_utils import create_joint
+from omnigibson.objects.dataset_object import DatasetObject
+from omnigibson.robots.robot_base import BaseRobot
+from omnigibson.utils.python_utils import classproperty, assert_valid_key
+from omnigibson.object_states.filled import generate_points_in_volume_checker_function
+from omnigibson.utils.constants import JointType, PrimType
+from omnigibson.utils.usd_utils import create_joint
 
 from pxr import Gf, PhysxSchema
 import omni
@@ -169,7 +169,7 @@ class ManipulationRobot(BaseRobot):
          specified by this class.
         obs_modalities (str or list of str): Observation modalities to use for this robot. Default is "all", which
             corresponds to all modalities being used.
-            Otherwise, valid options should be part of igibson.sensors.ALL_SENSOR_MODALITIES.
+            Otherwise, valid options should be part of omnigibson.sensors.ALL_SENSOR_MODALITIES.
         :param proprio_obs: str or tuple of str, proprioception observation key(s) to use for generating proprioceptive
             observations. If str, should be exactly "default" -- this results in the default proprioception observations
             being used, as defined by self.default_proprio_obs. See self._get_proprioception_dict for valid key choices
@@ -787,7 +787,7 @@ class ManipulationRobot(BaseRobot):
             candidates_set, robot_contact_links = self._find_gripper_contacts(arm=arm)
             # If we're using assisted grasping, we further filter candidates via ray-casting
             if self.grasping_mode == "assisted":
-                raise NotImplementedError("Not assisted grasp avaialble yet in OmniGibson!")
+                raise NotImplementedError("Not assisted grasp avaialble yet in OmnOmniGibson!")
                 candidates_set_raycast = self._find_gripper_raycast_collisions(arm=arm)
                 candidates_set = candidates_set.intersection(candidates_set_raycast)
         else:

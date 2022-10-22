@@ -4,10 +4,10 @@ import numpy as np
 import logging
 import gym
 from collections import Iterable, OrderedDict
-from igibson.objects.object_base import BaseObject
-from igibson.controllers import create_controller
-from igibson.controllers.controller_base import ControlType
-from igibson.utils.python_utils import assert_valid_key, merge_nested_dicts
+from omnigibson.objects.object_base import BaseObject
+from omnigibson.controllers import create_controller
+from omnigibson.controllers.controller_base import ControlType
+from omnigibson.utils.python_utils import assert_valid_key, merge_nested_dicts
 
 
 class ControllableObject(BaseObject):

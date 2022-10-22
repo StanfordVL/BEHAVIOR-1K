@@ -3,11 +3,11 @@ Rs_int PBR scene.
 
 Important - VR functionality and where to find it:
 
-1) Most VR functions can be found in the igibson/simulator.py
-2) The BehaviorRobot and its associated parts can be found in igibson/robots/behavior_robot.py
-3) VR utility functions are found in igibson/utils/vr_utils.py
-4) The VR renderer can be found in igibson/render/mesh_renderer.py
-5) The underlying VR C++ code can be found in vr_mesh_render.h and .cpp in igibson/render/cpp
+1) Most VR functions can be found in the omnigibson/simulator.py
+2) The BehaviorRobot and its associated parts can be found in omnigibson/robots/behavior_robot.py
+3) VR utility functions are found in omnigibson/utils/vr_utils.py
+4) The VR renderer can be found in omnigibson/render/mesh_renderer.py
+5) The underlying VR C++ code can be found in vr_mesh_render.h and .cpp in omnigibson/render/cpp
 """
 
 import os
@@ -15,13 +15,13 @@ import os
 import numpy as np
 
 
-import igibson
-from igibson.objects.ycb_object import YCBObject
-from igibson.render.mesh_renderer.mesh_renderer_cpu import MeshRendererSettings
-from igibson.render.mesh_renderer.mesh_renderer_vr import VrSettings
-from igibson.robots.behavior_robot import BehaviorRobot
-from igibson.scenes.interactive_traversable_scene import InteractiveIndoorScene
-from igibson.simulator import Simulator
+import omnigibson
+from omnigibson.objects.ycb_object import YCBObject
+from omnigibson.render.mesh_renderer.mesh_renderer_cpu import MeshRendererSettings
+from omnigibson.render.mesh_renderer.mesh_renderer_vr import VrSettings
+from omnigibson.robots.behavior_robot import BehaviorRobot
+from omnigibson.scenes.interactive_traversable_scene import InteractiveIndoorScene
+from omnigibson.simulator import Simulator
 
 # Whether to use VR mode or not
 VR_MODE = True
@@ -33,12 +33,12 @@ PRINT_STATS = True
 USE_GRIPPER = False
 
 # HDR files for PBR rendering
-hdr_texture = os.path.join(igibson.ig_dataset_path, "scenes", "background", "probe_02.hdr")
-hdr_texture2 = os.path.join(igibson.ig_dataset_path, "scenes", "background", "probe_03.hdr")
+hdr_texture = os.path.join(omnigibson.og_dataset_path, "scenes", "background", "probe_02.hdr")
+hdr_texture2 = os.path.join(omnigibson.og_dataset_path, "scenes", "background", "probe_03.hdr")
 light_modulation_map_filename = os.path.join(
-    igibson.ig_dataset_path, "scenes", "Rs_int", "layout", "floor_lighttype_0.png"
+    omnigibson.og_dataset_path, "scenes", "Rs_int", "layout", "floor_lighttype_0.png"
 )
-background_texture = os.path.join(igibson.ig_dataset_path, "scenes", "background", "urban_street_01.jpg")
+background_texture = os.path.join(omnigibson.og_dataset_path, "scenes", "background", "urban_street_01.jpg")
 
 
 def main():

@@ -1,10 +1,10 @@
 import carb
 from omni.rtx.window.settings import RendererSettingsFactory
 
-from igibson.renderer_settings.common_settings import CommonSettings
-from igibson.renderer_settings.path_tracing_settings import PathTracingSettings
-from igibson.renderer_settings.post_processing_settings import PostProcessingSettings
-from igibson.renderer_settings.real_time_settings import RealTimeSettings
+from omnigibson.renderer_settings.common_settings import CommonSettings
+from omnigibson.renderer_settings.path_tracing_settings import PathTracingSettings
+from omnigibson.renderer_settings.post_processing_settings import PostProcessingSettings
+from omnigibson.renderer_settings.real_time_settings import RealTimeSettings
 
 
 def singleton(cls):

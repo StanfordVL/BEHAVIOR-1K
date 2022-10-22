@@ -23,11 +23,11 @@ import carb
 import numpy as np
 import trimesh
 
-import igibson as ig
-from igibson.macros import gm
-from igibson import assets_path, ig_dataset_path
-from igibson.utils.constants import JointType, PRIMITIVE_MESH_TYPES
-from igibson.utils.python_utils import assert_valid_key
+import omnigibson as og
+from omnigibson.macros import gm
+from omnigibson import assets_path, og_dataset_path
+from omnigibson.utils.constants import JointType, PRIMITIVE_MESH_TYPES
+from omnigibson.utils.python_utils import assert_valid_key
 
 GF_TO_VT_MAPPING = {
     Gf.Vec3d: Vt.Vec3dArray,
@@ -429,8 +429,8 @@ def create_primitive_mesh(prim_path, primitive_type, extents=1.0, u_patches=None
         UsdGeom.Mesh: Generated primitive mesh as a prim on the active stage
     """
     assert_valid_key(key=primitive_type, valid_keys=PRIMITIVE_MESH_TYPES, name="primitive mesh type")
-    create_mesh_prim_with_default_xform(primitive_type, prim_path, stage=ig.sim.stage, u_patches=u_patches, v_patches=v_patches)
-    mesh = UsdGeom.Mesh.Define(ig.sim.stage, prim_path)
+    create_mesh_prim_with_default_xform(primitive_type, prim_path, stage=og.sim.stage, u_patches=u_patches, v_patches=v_patches)
+    mesh = UsdGeom.Mesh.Define(og.sim.stage, prim_path)
 
     # Modify the points and normals attributes so that total extents is the desired
     # This means multiplying omni's default by extents / 2.0
@@ -484,16 +484,16 @@ def get_usd_metadata():
 
     Returns:
         dict:
-            "source_ig_asset_path": Maps to absolute path string to asset_path that the USD was ORIGINALLY generated on
-            "source_ig_dataset_path": Maps to absolute path string to the ig_dataset_path that USD was ORIGINALLY
+            "source_og_asset_path": Maps to absolute path string to asset_path that the USD was ORIGINALLY generated on
+            "source_og_dataset_path": Maps to absolute path string to the og_dataset_path that USD was ORIGINALLY
                 generated on
     """
     usd_metadata = get_world_prim().GetCustomDataByKey("usd_metadata")
     usd_metadata = dict() if usd_metadata is None else usd_metadata
 
     return OrderedDict(
-        source_ig_asset_path=usd_metadata.get("source_ig_asset_path", assets_path),
-        source_ig_dataset_path=usd_metadata.get("source_ig_dataset_path", ig_dataset_path),
+        source_og_asset_path=usd_metadata.get("source_og_asset_path", assets_path),
+        source_og_dataset_path=usd_metadata.get("source_og_dataset_path", og_dataset_path),
     )
 
 
@@ -502,7 +502,7 @@ def update_usd_metadata():
     Updates the internal USD metadata
     """
     usd_metadata = {
-        "source_ig_asset_path": assets_path,
-        "source_ig_dataset_path": ig_dataset_path,
+        "source_og_asset_path": assets_path,
+        "source_og_dataset_path": og_dataset_path,
     }
     get_world_prim().SetCustomDataByKey("usd_metadata", usd_metadata)

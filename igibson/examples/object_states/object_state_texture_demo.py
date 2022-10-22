@@ -1,9 +1,9 @@
 import numpy as np
-import igibson as ig
-from igibson import object_states
-from igibson.objects import DatasetObject, LightObject
-from igibson.macros import gm, macros
-from igibson.systems import WaterSystem
+import omnigibson as og
+from omnigibson import object_states
+from omnigibson.objects import DatasetObject, LightObject
+from omnigibson.macros import gm, macros
+from omnigibson.systems import WaterSystem
 
 
 def main():
@@ -19,10 +19,10 @@ def main():
     }
 
     # Create the environment
-    env = ig.Environment(configs=cfg, action_timestep=1/60., physics_timestep=1/60.)
+    env = og.Environment(configs=cfg, action_timestep=1/60., physics_timestep=1/60.)
 
     # Set camera to appropriate viewing pose
-    ig.sim.viewer_camera.set_position_orientation(
+    og.sim.viewer_camera.set_position_orientation(
         position=np.array([ 1.7789 , -1.68822,  1.13551]),
         orientation=np.array([0.57065614, 0.20331904, 0.267029  , 0.74947212]),
     )
@@ -35,7 +35,7 @@ def main():
         radius=0.01,
         intensity=1e5,
     )
-    ig.sim.import_object(light)
+    og.sim.import_object(light)
     light.set_position(np.array([-2.0, -2.0, 1.0]))
     env.step(np.array([]))
 
@@ -56,7 +56,7 @@ def main():
     assert object_states.ToggledOn in obj.states
 
     # Add the object and take a step to make sure the cabinet is fully initialized
-    ig.sim.import_object(obj)
+    og.sim.import_object(obj)
     obj.set_position(np.array([0, 0, 0.55]))
     env.step(np.array([]))
 

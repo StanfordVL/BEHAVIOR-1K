@@ -2,14 +2,14 @@ import os
 
 
 
-import igibson
-from igibson.objects.usd_object import ArticulatedObject, RBOObject
-from igibson.objects.cube import Cube
-from igibson.objects.ycb_object import YCBObject
-from igibson.robots.turtlebot import Turtlebot
-from igibson.scenes.stadium_scene import StadiumScene
-from igibson.simulator import Simulator
-from igibson.utils.asset_utils import download_assets
+import omnigibson
+from omnigibson.objects.usd_object import ArticulatedObject, RBOObject
+from omnigibson.objects.cube import Cube
+from omnigibson.objects.ycb_object import YCBObject
+from omnigibson.robots.turtlebot import Turtlebot
+from omnigibson.scenes.stadium_scene import StadiumScene
+from omnigibson.simulator import Simulator
+from omnigibson.utils.asset_utils import download_assets
 
 download_assets()
 
@@ -57,7 +57,7 @@ def test_import_rbo_object():
         obj.set_position([0, 0, 2])
         obj2.set_position([0, 1, 2])
 
-        obj3 = ArticulatedObject(os.path.join(igibson.assets_path, "models", "scene_components", "door.urdf"))
+        obj3 = ArticulatedObject(os.path.join(omnigibson.assets_path, "models", "scene_components", "door.urdf"))
         s.import_object(obj3)
 
         for i in range(100):

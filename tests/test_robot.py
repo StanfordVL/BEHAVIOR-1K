@@ -1,10 +1,10 @@
 import numpy as np
 
 
-from igibson.robots import REGISTERED_ROBOTS
-from igibson.scenes.stadium_scene import StadiumScene
-from igibson.simulator import Simulator
-from igibson.utils.asset_utils import download_assets
+from omnigibson.robots import REGISTERED_ROBOTS
+from omnigibson.scenes.stadium_scene import StadiumScene
+from omnigibson.simulator import Simulator
+from omnigibson.utils.asset_utils import download_assets
 
 download_assets()
 

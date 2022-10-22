@@ -2,11 +2,11 @@ from abc import abstractmethod
 
 from pxr import Gf
 
-from igibson.macros import create_module_macros
-import igibson.utils.transform_utils as T
-from igibson.object_states.contact_bodies import ContactBodies
-from igibson.object_states.object_state_base import BooleanState, RelativeObjectState
-from igibson.utils.usd_utils import BoundingBoxAPI, create_joint
+from omnigibson.macros import create_module_macros
+import omnigibson.utils.transform_utils as T
+from omnigibson.object_states.contact_bodies import ContactBodies
+from omnigibson.object_states.object_state_base import BooleanState, RelativeObjectState
+from omnigibson.utils.usd_utils import BoundingBoxAPI, create_joint
 
 
 # Create settings for this module

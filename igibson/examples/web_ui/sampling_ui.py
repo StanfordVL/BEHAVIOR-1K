@@ -16,12 +16,12 @@ from flask import Flask, Response, render_template, request
 from flask_apscheduler import APScheduler
 from flask_cors import CORS
 
-import igibson
-from igibson.envs.igibson_env import iGibsonEnv
-from igibson.render.mesh_renderer.mesh_renderer_settings import MeshRendererSettings
-from igibson.scenes.gibson_indoor_scene import StaticIndoorScene
-from igibson.simulator import Simulator
-from igibson.utils.config_utils import parse_config, restoreState
+import omnigibson
+from omnigibson.envs.omnigibson_env import OmniGibsonEnv
+from omnigibson.render.mesh_renderer.mesh_renderer_settings import MeshRendererSettings
+from omnigibson.scenes.gibson_indoor_scene import StaticIndoorScene
+from omnigibson.simulator import Simulator
+from omnigibson.utils.config_utils import parse_config, restoreState
 
 interactive = True
 NUM_REQUIRED_SUCCESSFUL_SCENES = 3
@@ -200,13 +200,13 @@ class ProcessPyEnvironment(object):
 
 class ToyEnv(object):
     def __init__(self):
-        config = parse_config(os.path.join(igibson.example_config_path, "turtlebot_demo.yaml"))
-        hdr_texture = os.path.join(igibson.ig_dataset_path, "scenes", "background", "probe_02.hdr")
-        hdr_texture2 = os.path.join(igibson.ig_dataset_path, "scenes", "background", "probe_03.hdr")
+        config = parse_config(os.path.join(omnigibson.example_config_path, "turtlebot_demo.yaml"))
+        hdr_texture = os.path.join(omnigibson.og_dataset_path, "scenes", "background", "probe_02.hdr")
+        hdr_texture2 = os.path.join(omnigibson.og_dataset_path, "scenes", "background", "probe_03.hdr")
         light_modulation_map_filename = os.path.join(
-            igibson.ig_dataset_path, "scenes", "Rs_int", "layout", "floor_lighttype_0.png"
+            omnigibson.og_dataset_path, "scenes", "Rs_int", "layout", "floor_lighttype_0.png"
         )
-        background_texture = os.path.join(igibson.ig_dataset_path, "scenes", "background", "urban_street_01.jpg")
+        background_texture = os.path.join(omnigibson.og_dataset_path, "scenes", "background", "urban_street_01.jpg")
 
         settings = MeshRendererSettings(enable_shadow=False, enable_pbr=False)
 
@@ -225,7 +225,7 @@ class ToyEnv(object):
 
 class ToyEnvInt(object):
     def __init__(self, scene="Rs_int"):
-        config_file = os.path.join(igibson.example_config_path, "behavior_vr.yaml")
+        config_file = os.path.join(omnigibson.example_config_path, "behavior_vr.yaml")
         env_config = parse_config(config_file)
         env_config["scene_id"] = scene
         env_config["task"] = "trivial"
@@ -233,7 +233,7 @@ class ToyEnvInt(object):
         env_config["online_sampling"] = True
         env_config["load_clutter"] = False
         settings = MeshRendererSettings(texture_scale=0.01)
-        self.env = iGibsonEnv(config_file=env_config, mode="headless", rendering_settings=settings)
+        self.env = OmniGibsonEnv(config_file=env_config, mode="headless", rendering_settings=settings)
         self.state_id = p.saveState()
         self.num_body_ids = p.getNumBodies()
         self.num_particle_systems = len(self.env.simulator.particle_systems)

@@ -1,7 +1,7 @@
 # TODO: Refactor!
 
 # """
-# Example showing how to wrap the iGibson class using ray for low-level environment control.
+# Example showing how to wrap the OmniGibson class using ray for low-level environment control.
 # Multiple environments are only supported on Linux. If issues arise, please ensure torch/numpy
 # are installed *without* MKL support.
 # """
@@ -10,13 +10,13 @@
 #
 # import ray
 #
-# from igibson.envs.igibson_env import iGibsonEnv
+# from omnigibson.envs.omnigibson_env import OmniGibsonEnv
 #
 # ray.init()
 #
 #
 # @ray.remote
-# class iGibsonRayEnv(iGibsonEnv):
+# class OmniGibsonRayEnv(OmniGibsonEnv):
 #     def sample_action_space(self):
 #         return self.action_space.sample()
 #
@@ -36,7 +36,7 @@
 #     )
 #     args = parser.parse_args()
 #
-#     env = iGibsonRayEnv.remote(
+#     env = OmniGibsonRayEnv.remote(
 #         config_file=args.config, mode=args.mode, action_timestep=1.0 / 10.0, physics_timestep=1.0 / 40.0
 #     )
 #

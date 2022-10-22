@@ -6,8 +6,8 @@
 # import numpy as np
 #
 #
-# import igibson
-# # from igibson.external.pybullet_tools.utils import (
+# import omnigibson
+# # from omnigibson.external.pybullet_tools.utils import (
 #     CIRCULAR_LIMITS,
 #     MAX_DISTANCE,
 #     PI,
@@ -18,11 +18,11 @@
 #     get_base_distance_fn,
 #     pairwise_collision,
 # )
-# from igibson.render.mesh_renderer.mesh_renderer_settings import MeshRendererSettings
-# from igibson.robots.behavior_robot import BehaviorRobot
-# from igibson.scenes.empty_scene import EmptyScene
-# from igibson.simulator import Simulator
-# from igibson.utils.config_utils import parse_config
+# from omnigibson.render.mesh_renderer.mesh_renderer_settings import MeshRendererSettings
+# from omnigibson.robots.behavior_robot import BehaviorRobot
+# from omnigibson.scenes.empty_scene import EmptyScene
+# from omnigibson.simulator import Simulator
+# from omnigibson.utils.config_utils import parse_config
 #
 #
 # def plan_base_motion_br(
@@ -213,7 +213,7 @@
 #
 #
 # if __name__ == "__main__":
-#     config = parse_config(os.path.join(igibson.example_config_path, "behavior.yaml"))
+#     config = parse_config(os.path.join(omnigibson.example_config_path, "behavior.yaml"))
 #     settings = MeshRendererSettings(enable_shadow=False, msaa=False)
 #     s = Simulator(
 #         mode="gui_interactive", use_pb_gui=True, image_width=256, image_height=256, rendering_settings=settings

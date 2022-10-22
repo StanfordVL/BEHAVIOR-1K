@@ -2,7 +2,7 @@ import gym
 import numpy as np
 
 
-from igibson.robots.robot_locomotor import LocomotionRobot
+from omnigibson.robots.robot_locomotor import LocomotionRobot
 
 
 class Quadrotor(LocomotionRobot):

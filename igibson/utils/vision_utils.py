@@ -5,7 +5,7 @@ import numpy as np
 from PIL import Image
 import os
 
-from igibson import app, assets_path
+from omnigibson import app, assets_path
 
 # Make sure synthetic data extension is enabled
 ext_manager = app.app.get_extension_manager()

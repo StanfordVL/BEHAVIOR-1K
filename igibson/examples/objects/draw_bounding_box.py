@@ -2,8 +2,8 @@ import logging
 import matplotlib.pyplot as plt
 
 import numpy as np
-import igibson as ig
-from igibson.objects import DatasetObject
+import omnigibson as og
+from omnigibson.objects import DatasetObject
 from omni.isaac.synthetic_utils.visualization import colorize_bboxes
 
 
@@ -28,10 +28,10 @@ def main(random_selection=False, headless=False, short_exec=False):
     }
 
     # Create the environment
-    env = ig.Environment(configs=cfg, action_timestep=1/60., physics_timestep=1/60.)
+    env = og.Environment(configs=cfg, action_timestep=1/60., physics_timestep=1/60.)
 
     # Set camera to appropriate viewing pose
-    cam = ig.sim.viewer_camera
+    cam = og.sim.viewer_camera
     cam.set_position_orientation(
         position=np.array([-4.62785 , -0.418575,  0.933943]),
         orientation=np.array([ 0.52196595, -0.4231939 , -0.46640436,  0.5752612 ]),
@@ -50,7 +50,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         model="09_0",
         scale=[3.0, 5.0, 2.0],
     )
-    ig.sim.import_object(banana)
+    og.sim.import_object(banana)
     banana.set_position_orientation(
         position=np.array([-0.906661, -0.545106,  0.136824]),
         orientation=np.array([0, 0, 0.76040583, -0.6494482 ]),
@@ -62,7 +62,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         category="door",
         model="8930",
     )
-    ig.sim.import_object(door)
+    og.sim.import_object(door)
     door.set_position_orientation(
         position=np.array([-2.0, 0, 0.70000001]),
         orientation=np.array([0, 0, -0.38268343,  0.92387953]),

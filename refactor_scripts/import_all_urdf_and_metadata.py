@@ -2,7 +2,7 @@ import os
 from refactor_scripts.import_urdfs_from_scene import import_obj_urdf
 from refactor_scripts.import_metadata import import_obj_metadata
 
-from igibson import app, ig_dataset_path
+from omnigibson import app, og_dataset_path
 
 ## For test_states.py
 # test_objects = [("sink", "sink_1"),
@@ -18,8 +18,8 @@ from igibson import app, ig_dataset_path
 #     import_obj_urdf(obj_category=category, obj_model=model, skip_if_exist=False)
 #     import_obj_metadata(obj_category=category, obj_model=model)
 
-for category in os.listdir(os.path.join(ig_dataset_path, "objects")):
-    for model in os.listdir(os.path.join(ig_dataset_path, "objects", category)):
+for category in os.listdir(os.path.join(og_dataset_path, "objects")):
+    for model in os.listdir(os.path.join(og_dataset_path, "objects", category)):
         print(category)
         print(model)
         import_obj_urdf(obj_category=category, obj_model=model, skip_if_exist=False)

@@ -6,12 +6,12 @@ import cv2
 import numpy as np
 import yaml
 
-import igibson
-from igibson.envs.igibson_env import iGibsonEnv
-from igibson.objects.ycb_object import YCBObject
-from igibson.render.profiler import Profiler
-from igibson.utils.constants import MAX_CLASS_COUNT, MAX_INSTANCE_COUNT
-from igibson.utils.vision_utils import randomize_colors, segmentation_to_rgb
+import omnigibson
+from omnigibson.envs.omnigibson_env import OmniGibsonEnv
+from omnigibson.objects.ycb_object import YCBObject
+from omnigibson.render.profiler import Profiler
+from omnigibson.utils.constants import MAX_CLASS_COUNT, MAX_INSTANCE_COUNT
+from omnigibson.utils.vision_utils import randomize_colors, segmentation_to_rgb
 
 FLOW_SCALING_FACTOR = 500
 
@@ -36,7 +36,7 @@ def main(random_selection=False, headless=True, short_exec=True):
     Loads Rs_int (interactive) with some objects and and renders depth, normals, semantic and instance segmentation
     """
     logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
-    config_filename = os.path.join(igibson.example_config_path, "turtlebot_static_nav.yaml")
+    config_filename = os.path.join(omnigibson.example_config_path, "turtlebot_static_nav.yaml")
     config_data = yaml.load(open(config_filename, "r"), Loader=yaml.FullLoader)
 
     config_data["vertical_fov"] = 90
@@ -46,7 +46,7 @@ def main(random_selection=False, headless=True, short_exec=True):
     # Reduce texture scale for Mac.
     if platform == "darwin":
         config_data["texture_scale"] = 0.5
-    env = iGibsonEnv(config_file=config_data, mode="gui_interactive" if not headless else "headless")
+    env = OmniGibsonEnv(config_file=config_data, mode="gui_interactive" if not headless else "headless")
 
     if not headless:
         # Set a better viewing direction

@@ -7,8 +7,8 @@ import numpy as np
 import yaml
 from mpl_toolkits.mplot3d import Axes3D
 
-import igibson
-from igibson.envs.igibson_env import iGibsonEnv
+import omnigibson
+from omnigibson.envs.omnigibson_env import OmniGibsonEnv
 
 
 def get_lidar_sampling_pattern():
@@ -116,12 +116,12 @@ def main(random_selection=False, headless=False, short_exec=False):
     # Create environment
     mode = "headless"
     scene_id = "Rs_int"
-    config = os.path.join(igibson.example_config_path, "fetch_rearrangement.yaml")
+    config = os.path.join(omnigibson.example_config_path, "fetch_rearrangement.yaml")
     config_data = yaml.load(open(config, "r"), Loader=yaml.FullLoader)
     # Reduce texture scale for Mac.
     if platform == "darwin":
         config_data["texture_scale"] = 0.5
-    nav_env = iGibsonEnv(
+    nav_env = OmniGibsonEnv(
         config_file=config_data, mode=mode, scene_id=scene_id, action_timestep=1.0 / 120.0, physics_timestep=1.0 / 120.0
     )
 

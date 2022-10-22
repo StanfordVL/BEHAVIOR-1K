@@ -2,14 +2,14 @@ import numpy as np
 from collections import Iterable
 import logging
 
-import igibson as ig
-import igibson.utils.transform_utils as T
+import omnigibson as og
+import omnigibson.utils.transform_utils as T
 
 
 def prims_to_rigid_prim_set(inp_prims):
     # Avoid circular imports
-    from igibson.prims.entity_prim import EntityPrim
-    from igibson.prims.rigid_prim import RigidPrim
+    from omnigibson.prims.entity_prim import EntityPrim
+    from omnigibson.prims.rigid_prim import RigidPrim
 
     out = set()
     for prim in inp_prims:
@@ -40,14 +40,14 @@ def get_collisions(prims=None, prims_check=None, prims_exclude=None, step_physic
         specified prim(s), represented by their prim_paths
     """
     # Make sure sim is playing
-    assert ig.sim.is_playing(), "Cannot get collisions while sim is not playing!"
+    assert og.sim.is_playing(), "Cannot get collisions while sim is not playing!"
 
     # Optionally step physics and then update contacts
     if step_physics:
-        ig.sim.step_physics()
+        og.sim.step_physics()
 
     # Standardize inputs
-    prims = ig.sim.scene.objects if prims is None else prims if isinstance(prims, Iterable) else [prims]
+    prims = og.sim.scene.objects if prims is None else prims if isinstance(prims, Iterable) else [prims]
     prims_check = [] if prims_check is None else prims_check if isinstance(prims_check, Iterable) else [prims_check]
     prims_exclude = [] if prims_exclude is None else prims_exclude if isinstance(prims_exclude, Iterable) else [prims_exclude]
 
@@ -188,7 +188,7 @@ def place_base_pose(obj, pos, quat=None, z_offset=None):
         z_offset (None or float): Optional additional z_offset to apply
     """
     # avoid circular dependency
-    from igibson.object_states import AABB
+    from omnigibson.object_states import AABB
 
     lower, _ = obj.states[AABB].get_value()
     cur_pos = obj.get_position()
@@ -217,17 +217,17 @@ def test_valid_pose(obj, pos, quat=None, z_offset=None):
         bool: Whether the placed object position is valid
     """
     # Make sure sim is playing
-    assert ig.sim.is_playing(), "Cannot test valid pose while sim is not playing!"
+    assert og.sim.is_playing(), "Cannot test valid pose while sim is not playing!"
 
     # Store state before checking object position
-    state = ig.sim.scene.dump_state(serialized=False)
+    state = og.sim.scene.dump_state(serialized=False)
 
     # Set the pose of the object
     place_base_pose(obj, pos, quat, z_offset)
 
     # If we're placing a robot, make sure it's reset and not moving
     # Run import here to avoid circular imports
-    from igibson.robots.robot_base import BaseRobot
+    from omnigibson.robots.robot_base import BaseRobot
     if isinstance(obj, BaseRobot):
         obj.reset()
         obj.keep_still()
@@ -236,7 +236,7 @@ def test_valid_pose(obj, pos, quat=None, z_offset=None):
     in_collision = check_collision(prims=obj, step_physics=True)
 
     # Restore state after checking the collision
-    ig.sim.scene.load_state(state, serialized=False)
+    og.sim.scene.load_state(state, serialized=False)
 
     # Valid if there are no collisions
     return not in_collision
@@ -254,7 +254,7 @@ def land_object(obj, pos, quat=None, z_offset=None):
         z_offset (None or float): Optional additional z_offset to apply
     """
     # Make sure sim is playing
-    assert ig.sim.is_playing(), "Cannot land object while sim is not playing!"
+    assert og.sim.is_playing(), "Cannot land object while sim is not playing!"
 
     # Set the object's pose
     quat = T.euler2quat([0, 0, np.random.uniform(0, np.pi * 2)]) if quat is None else quat
@@ -262,7 +262,7 @@ def land_object(obj, pos, quat=None, z_offset=None):
 
     # If we're placing a robot, make sure it's reset and not moving
     # Run import here to avoid circular imports
-    from igibson.robots.robot_base import BaseRobot
+    from omnigibson.robots.robot_base import BaseRobot
     is_robot = isinstance(obj, BaseRobot)
     if is_robot:
         obj.reset()
@@ -271,10 +271,10 @@ def land_object(obj, pos, quat=None, z_offset=None):
     # Check to make sure we landed successfully
     # land for maximum 1 second, should fall down ~5 meters
     land_success = False
-    max_simulator_step = int(1.0 / ig.sim.get_rendering_dt())
+    max_simulator_step = int(1.0 / og.sim.get_rendering_dt())
     for _ in range(max_simulator_step):
         # Run a sim step and see if we have any contacts
-        ig.sim.step()
+        og.sim.step()
         land_success = check_collision(prims=obj)
         if land_success:
             # Once we're successful, we can break immediately

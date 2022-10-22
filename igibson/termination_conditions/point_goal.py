@@ -1,5 +1,5 @@
-from igibson.termination_conditions.termination_condition_base import SuccessCondition
-import igibson.utils.transform_utils as T
+from omnigibson.termination_conditions.termination_condition_base import SuccessCondition
+import omnigibson.utils.transform_utils as T
 
 
 class PointGoal(SuccessCondition):
@@ -26,7 +26,7 @@ class PointGoal(SuccessCondition):
 
     def _step(self, task, env, action):
         # Make sure task is of type PointNavigation -- we import at runtime to avoid circular imports
-        from igibson.tasks.point_navigation_task import PointNavigationTask
+        from omnigibson.tasks.point_navigation_task import PointNavigationTask
         assert isinstance(task, PointNavigationTask), \
             f"Cannot use {self.__class__.__name__} with a non-PointNavigationTask task instance!"
         # Terminate if point goal is reached (distance below threshold)

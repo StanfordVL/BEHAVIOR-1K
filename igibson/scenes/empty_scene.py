@@ -3,8 +3,8 @@ import os
 
 import numpy as np
 
-from igibson.scenes.scene_base import Scene
-import igibson.utils.transform_utils as T
+from omnigibson.scenes.scene_base import Scene
+import omnigibson.utils.transform_utils as T
 
 
 class EmptyScene(Scene):

@@ -1,6 +1,6 @@
-from igibson.utils.python_utils import classproperty, assert_valid_key, \
+from omnigibson.utils.python_utils import classproperty, assert_valid_key, \
     SerializableNonInstance, UniquelyNamedNonInstance
-from igibson.utils.registry_utils import SerializableRegistry
+from omnigibson.utils.registry_utils import SerializableRegistry
 
 
 def get_system_from_element_name(name):

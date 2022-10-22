@@ -4,12 +4,12 @@ import os
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
-import igibson
-from igibson.render.mesh_renderer.mesh_renderer_settings import MeshRendererSettings
-from igibson.robots.turtlebot import Turtlebot
-from igibson.scenes.gibson_indoor_scene import StaticIndoorScene
-from igibson.simulator import Simulator
-from igibson.utils.config_utils import parse_config
+import omnigibson
+from omnigibson.render.mesh_renderer.mesh_renderer_settings import MeshRendererSettings
+from omnigibson.robots.turtlebot import Turtlebot
+from omnigibson.scenes.gibson_indoor_scene import StaticIndoorScene
+from omnigibson.simulator import Simulator
+from omnigibson.utils.config_utils import parse_config
 
 
 def main(random_selection=False, headless=False, short_exec=False):
@@ -19,7 +19,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     It plots the velodyne point cloud with matplotlib
     """
     logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
-    config = parse_config(os.path.join(igibson.example_config_path, "turtlebot_static_nav.yaml"))
+    config = parse_config(os.path.join(omnigibson.example_config_path, "turtlebot_static_nav.yaml"))
     settings = MeshRendererSettings(enable_shadow=False, msaa=False, texture_scale=0.01)
     s = Simulator(mode="headless", image_width=256, image_height=256, rendering_settings=settings)
 

@@ -8,7 +8,7 @@ import networkx as nx
 import numpy as np
 from PIL import Image
 
-import igibson.utils.transform_utils as T
+import omnigibson.utils.transform_utils as T
 
 
 class TraversableMap:

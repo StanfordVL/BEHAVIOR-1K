@@ -74,12 +74,12 @@ build
 dist
 
 # Directories used for QC pipeline
-igibson/utils/data_utils/mesh_decimation/collision
-igibson/utils/data_utils/mesh_decimation/visual
-igibson/utils/data_utils/mesh_decimation/final_videos
+omnigibson/utils/data_utils/mesh_decimation/collision
+omnigibson/utils/data_utils/mesh_decimation/visual
+omnigibson/utils/data_utils/mesh_decimation/final_videos
 
 # libcryptopp
-igibson/render/mesh_renderer/libcryptopp.so.8.6
+omnigibson/render/mesh_renderer/libcryptopp.so.8.6
 
 # Coverage
 .coverage

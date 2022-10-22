@@ -1,4 +1,4 @@
-from igibson.reward_functions.reward_function_base import BaseRewardFunction
+from omnigibson.reward_functions.reward_function_base import BaseRewardFunction
 
 
 class PointGoalReward(BaseRewardFunction):

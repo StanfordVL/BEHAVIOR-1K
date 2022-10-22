@@ -1,6 +1,6 @@
 from abc import ABCMeta, abstractmethod
 from collections import OrderedDict
-from igibson.utils.python_utils import classproperty, Registerable
+from omnigibson.utils.python_utils import classproperty, Registerable
 
 REGISTERED_TERMINATION_CONDITIONS = OrderedDict()
 REGISTERED_SUCCESS_CONDITIONS = OrderedDict()

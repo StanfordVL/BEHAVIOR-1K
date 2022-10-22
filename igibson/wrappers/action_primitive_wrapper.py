@@ -3,12 +3,12 @@ import time
 
 import gym
 
-from igibson.action_primitives.action_primitive_set_base import (
+from omnigibson.action_primitives.action_primitive_set_base import (
     REGISTERED_PRIMITIVE_SETS,
     ActionPrimitiveError,
     BaseActionPrimitiveSet,
 )
-from igibson.wrappers.wrapper_base import BaseWrapper
+from omnigibson.wrappers.wrapper_base import BaseWrapper
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ class ActionPrimitiveWrapper(BaseWrapper):
         Environment wrapper class for mapping action primitives to low-level environment actions
 
         Args:
-            env (iGibsonEnv): The environment to wrap.
+            env (OmniGibsonEnv): The environment to wrap.
             @param action_generator (str): The BaseActionPrimitives subclass name to use for generating actions.
             @param reward_accumulation (str): Whether rewards across lower-level env timesteps should be summed or maxed.
                 Options: {"sum"}

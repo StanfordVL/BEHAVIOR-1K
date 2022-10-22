@@ -4,9 +4,9 @@ import time
 import GPUtil
 import numpy as np
 
-import igibson
-from igibson.render.mesh_renderer.mesh_renderer_cpu import MeshRenderer
-from igibson.utils.asset_utils import download_assets
+import omnigibson
+from omnigibson.render.mesh_renderer.mesh_renderer_cpu import MeshRenderer
+from omnigibson.utils.asset_utils import download_assets
 
 
 def test_render_loading_cleaning():
@@ -80,7 +80,7 @@ def test_project_point():
 
 def test_render_rendering(record_property):
     download_assets()
-    test_dir = os.path.join(igibson.assets_path, "test")
+    test_dir = os.path.join(omnigibson.assets_path, "test")
 
     renderer = MeshRenderer(width=800, height=600)
     start = time.time()
@@ -98,7 +98,7 @@ def test_render_rendering(record_property):
 
 def test_render_rendering_cleaning():
     download_assets()
-    test_dir = os.path.join(igibson.assets_path, "test")
+    test_dir = os.path.join(omnigibson.assets_path, "test")
 
     for i in range(5):
         renderer = MeshRenderer(width=800, height=600)

@@ -26,12 +26,12 @@
 #
 # import numpy as np
 #
-# from igibson import assets_path
-# from igibson.robots.active_camera_robot import ActiveCameraRobot
-# from igibson.robots.locomotion_robot import LocomotionRobot
-# from igibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
-# from igibson.robots.robot_base import Virtual6DOFJoint, VirtualJoint
-# from igibson.utils.constants import SPECIAL_COLLISION_GROUPS, SemanticClass, SimulatorMode, get_collision_group_mask
+# from omnigibson import assets_path
+# from omnigibson.robots.active_camera_robot import ActiveCameraRobot
+# from omnigibson.robots.locomotion_robot import LocomotionRobot
+# from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
+# from omnigibson.robots.robot_base import Virtual6DOFJoint, VirtualJoint
+# from omnigibson.utils.constants import SPECIAL_COLLISION_GROUPS, SemanticClass, SimulatorMode, get_collision_group_mask
 #
 # # Part offset parameters
 # EYE_LOC_POSE_UNTRACKED = ([0.05, 0, 0], [0, 0, 0, 1])
@@ -168,7 +168,7 @@
 #         Loads this BehaviorRobot into the simulation. Should return a list of unique body IDs corresponding
 #         to this model.
 #
-#         :param simulator: Simulator, iGibson simulator reference
+#         :param simulator: Simulator, OmniGibson simulator reference
 #
 #         :return Array[int]: List of unique pybullet IDs corresponding to this robot.
 #         """

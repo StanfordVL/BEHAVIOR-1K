@@ -1,10 +1,10 @@
 import numpy as np
 
-from igibson.macros import create_module_macros
-from igibson.object_states.object_state_base import BooleanState, CachingEnabledObjectState
-from igibson.object_states.pose import Pose
-from igibson.object_states.room_states import InsideRoomTypes
-from igibson.utils.constants import MAX_INSTANCE_COUNT
+from omnigibson.macros import create_module_macros
+from omnigibson.object_states.object_state_base import BooleanState, CachingEnabledObjectState
+from omnigibson.object_states.pose import Pose
+from omnigibson.object_states.room_states import InsideRoomTypes
+from omnigibson.utils.constants import MAX_INSTANCE_COUNT
 
 
 # Create settings for this module
@@ -74,7 +74,7 @@ class InHandOfRobot(CachingEnabledObjectState, BooleanState):
             return False
 
         # We import this here to avoid cyclical dependency.
-        from igibson.robots.manipulation_robot import IsGraspingState
+        from omnigibson.robots.manipulation_robot import IsGraspingState
 
         return any(
             robot.is_grasping(arm=arm, candidate_obj=bid) == IsGraspingState.TRUE

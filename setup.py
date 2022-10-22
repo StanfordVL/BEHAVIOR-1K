@@ -12,12 +12,12 @@ lines = [x for x in lines if ".png" not in x]
 long_description = "".join(lines)
 
 setup(
-    name="igibson",
+    name="omnigibson",
     version="3.0.0",
     author="Stanford University",
     long_description_content_type="text/markdown",
     long_description=long_description,
-    url="https://github.com/StanfordVL/iGibson",        # TODO: Update
+    url="https://github.com/StanfordVL/OmniGibson",        # TODO: Update
     zip_safe=False,
     packages=find_packages(),
     install_requires=[
@@ -52,6 +52,6 @@ setup(
     ],
     tests_require=[],
     python_requires=">=3",
-    package_data={"": ["igibson/global_config.yaml"]},
+    package_data={"": ["omnigibson/global_config.yaml"]},
     include_package_data=True,
 )  # yapf: disable

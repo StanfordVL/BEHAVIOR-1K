@@ -2,19 +2,19 @@ import os
 
 import numpy as np
 
-import igibson
-from igibson.envs.igibson_env import iGibsonEnv
-from igibson.sensors.scan_sensor import ScanSensor
-from igibson.sensors.vision_sensor import VisionSensor
-from igibson.utils.asset_utils import download_assets, download_demo_data
-from igibson.utils.constants import MAX_CLASS_COUNT
+import omnigibson
+from omnigibson.envs.omnigibson_env import OmniGibsonEnv
+from omnigibson.sensors.scan_sensor import ScanSensor
+from omnigibson.sensors.vision_sensor import VisionSensor
+from omnigibson.utils.asset_utils import download_assets, download_demo_data
+from omnigibson.utils.constants import MAX_CLASS_COUNT
 
 
 def test_vision_sensor():
     download_assets()
     download_demo_data()
     config_filename = os.path.join(os.path.dirname(__file__), "test_house.yaml")
-    env = iGibsonEnv(config_file=config_filename, mode="headless")
+    env = OmniGibsonEnv(config_file=config_filename, mode="headless")
     vision_modalities = ["rgb", "depth", "pc", "normal", "seg"]
     vision_sensor = VisionSensor(env, vision_modalities)
     vision_obs = vision_sensor.get_obs(env)
@@ -39,7 +39,7 @@ def test_scan_sensor():
     download_assets()
     download_demo_data()
     config_filename = os.path.join(os.path.dirname(__file__), "test_house.yaml")
-    env = iGibsonEnv(config_file=config_filename, mode="headless")
+    env = OmniGibsonEnv(config_file=config_filename, mode="headless")
     scan_sensor = ScanSensor(env, ["scan"])
     scan_obs = scan_sensor.get_obs(env)["scan"]
 

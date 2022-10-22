@@ -3,9 +3,9 @@ Demo for testing VR trackers.
 The serial number for a tracker can be found in 
 SteamVR settings -> controllers -> manage vive trackers
 """
-from igibson.render.mesh_renderer.mesh_renderer_cpu import MeshRendererSettings
-from igibson.scenes.empty_scene import EmptyScene
-from igibson.simulator import Simulator
+from omnigibson.render.mesh_renderer.mesh_renderer_cpu import MeshRendererSettings
+from omnigibson.scenes.empty_scene import EmptyScene
+from omnigibson.simulator import Simulator
 
 # Note: replace this with another tracker serial number to test it
 TEST_TRACKER_SERIAL_NUM = "LHR-DF82C682"

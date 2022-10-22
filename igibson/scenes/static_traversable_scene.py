@@ -3,15 +3,15 @@ import os
 
 import numpy as np
 
-from igibson.scenes.traversable_scene import TraversableScene
-from igibson.prims.geom_prim import CollisionVisualGeomPrim
-from igibson.utils.asset_utils import get_scene_path
-from igibson.utils.usd_utils import add_asset_to_stage
+from omnigibson.scenes.traversable_scene import TraversableScene
+from omnigibson.prims.geom_prim import CollisionVisualGeomPrim
+from omnigibson.utils.asset_utils import get_scene_path
+from omnigibson.utils.usd_utils import add_asset_to_stage
 
 
 class StaticTraversableScene(TraversableScene):
     """
-    Static traversable scene class for iGibson, where scene is defined by a singular mesh (no intereactable objects).
+    Static traversable scene class for OmniGibson, where scene is defined by a singular mesh (no intereactable objects).
     Contains the functionalities for navigation such as shortest path computation
     """
 
@@ -91,7 +91,7 @@ class StaticTraversableScene(TraversableScene):
         # Load the traversability map
         self._trav_map.load_trav_map(get_scene_path(self.scene_model))
 
-        # Initialize igibson systems
+        # Initialize omnigibson systems
         self.initialize_systems(simulator)
 
     def move_floor_plane(self, floor=0, additional_elevation=0.02, height=None):

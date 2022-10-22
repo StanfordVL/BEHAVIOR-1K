@@ -3,9 +3,9 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 
-from igibson.macros import create_module_macros
-from igibson.object_states.pose import Pose
-import igibson.utils.transform_utils as T
+from omnigibson.macros import create_module_macros
+from omnigibson.object_states.pose import Pose
+import omnigibson.utils.transform_utils as T
 
 
 # Create settings for this module

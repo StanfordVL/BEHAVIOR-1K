@@ -3,7 +3,7 @@ from collections import defaultdict
 import numpy as np
 
 
-from igibson.metrics.metric_base import MetricBase
+from omnigibson.metrics.metric_base import MetricBase
 
 
 class GazeVizMarker(object):

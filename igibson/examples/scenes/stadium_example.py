@@ -1,15 +1,15 @@
 import logging
 
-from igibson.render.mesh_renderer.mesh_renderer_settings import MeshRendererSettings
-from igibson.render.profiler import Profiler
-from igibson.scenes.stadium_scene import StadiumScene
-from igibson.simulator import Simulator
+from omnigibson.render.mesh_renderer.mesh_renderer_settings import MeshRendererSettings
+from omnigibson.render.profiler import Profiler
+from omnigibson.scenes.stadium_scene import StadiumScene
+from omnigibson.simulator import Simulator
 
 
 def main(random_selection=False, headless=False, short_exec=False):
     """
     Loads the Stadium scene
-    This scene is default in pybullet but is not really useful in iGibson
+    This scene is default in pybullet but is not really useful in OmniGibson
     """
     logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
 

@@ -2,20 +2,20 @@ import numpy as np
 from collections import OrderedDict
 import logging
 
-import igibson as ig
-from igibson.objects.primitive_object import PrimitiveObject
-from igibson.reward_functions.collision_reward import CollisionReward
-from igibson.reward_functions.point_goal_reward import PointGoalReward
-from igibson.reward_functions.potential_reward import PotentialReward
-from igibson.scenes.traversable_scene import TraversableScene
-from igibson.tasks.task_base import BaseTask
-from igibson.termination_conditions.max_collision import MaxCollision
-from igibson.termination_conditions.falling import Falling
-from igibson.termination_conditions.point_goal import PointGoal
-from igibson.termination_conditions.timeout import Timeout
-from igibson.utils.python_utils import classproperty, assert_valid_key
-from igibson.utils.sim_utils import land_object, test_valid_pose
-import igibson.utils.transform_utils as T
+import omnigibson as og
+from omnigibson.objects.primitive_object import PrimitiveObject
+from omnigibson.reward_functions.collision_reward import CollisionReward
+from omnigibson.reward_functions.point_goal_reward import PointGoalReward
+from omnigibson.reward_functions.potential_reward import PotentialReward
+from omnigibson.scenes.traversable_scene import TraversableScene
+from omnigibson.tasks.task_base import BaseTask
+from omnigibson.termination_conditions.max_collision import MaxCollision
+from omnigibson.termination_conditions.falling import Falling
+from omnigibson.termination_conditions.point_goal import PointGoal
+from omnigibson.termination_conditions.timeout import Timeout
+from omnigibson.utils.python_utils import classproperty, assert_valid_key
+from omnigibson.utils.sim_utils import land_object, test_valid_pose
+import omnigibson.utils.transform_utils as T
 
 
 # Valid point navigation reward types
@@ -170,8 +170,8 @@ class PointNavigationTask(BaseTask):
         )
 
         # Load the objects into the simulator
-        ig.sim.import_object(self._initial_pos_marker)
-        ig.sim.import_object(self._goal_pos_marker)
+        og.sim.import_object(self._initial_pos_marker)
+        og.sim.import_object(self._goal_pos_marker)
 
         # Additionally generate waypoints along the path if we're building the map in the environment
         if env.scene.trav_map.build_graph:
@@ -187,14 +187,14 @@ class PointNavigationTask(BaseTask):
                     visual_only=True,
                     rgba=np.array([0, 1, 0, 0.3]),
                 )
-                ig.sim.import_object(waypoint)
+                og.sim.import_object(waypoint)
                 waypoints.append(waypoint)
 
             # Store waypoints
             self._waypoint_markers = waypoints
 
         # Take one sim step to initialize all the markers
-        ig.sim.step()
+        og.sim.step()
 
     def _sample_initial_pose_and_goal_pos(self, env, max_trials=100):
         """
@@ -292,7 +292,7 @@ class PointNavigationTask(BaseTask):
         success, max_trials = False, 100
 
         # Store the state of the environment now, so that we can restore it after each setting attempt
-        state = ig.sim.dump_state(serialized=True)
+        state = og.sim.dump_state(serialized=True)
 
         initial_pos, initial_quat, goal_pos = None, None, None
         for i in range(max_trials):
@@ -303,7 +303,7 @@ class PointNavigationTask(BaseTask):
             ) and test_valid_pose(env.robots[self._robot_idn], goal_pos, None, env.initial_pos_z_offset)
 
             # Load the original state
-            ig.sim.load_state(state=state, serialized=True)
+            og.sim.load_state(state=state, serialized=True)
 
             # Don't need to continue iterating if we succeeded
             if success:

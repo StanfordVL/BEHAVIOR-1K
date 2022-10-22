@@ -8,9 +8,9 @@ from collections import OrderedDict
 
 import numpy as np
 
-import igibson as ig
-from igibson.robots import REGISTERED_ROBOTS
-from igibson.utils.ui_utils import choose_from_options, KeyboardRobotController
+import omnigibson as og
+from omnigibson.robots import REGISTERED_ROBOTS
+from omnigibson.utils.ui_utils import choose_from_options, KeyboardRobotController
 
 
 CONTROL_MODES = OrderedDict(
@@ -88,7 +88,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     cfg = OrderedDict(scene=scene_cfg, robots=[robot0_cfg])
 
     # Create the environment
-    env = ig.Environment(configs=cfg, action_timestep=1/60., physics_timestep=1/60.)
+    env = og.Environment(configs=cfg, action_timestep=1/60., physics_timestep=1/60.)
 
     # Choose robot controller to use
     robot = env.robots[0]
@@ -105,7 +105,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     robot.reload_controllers(controller_config=controller_config)
 
     # Update the simulator's viewer camera's pose so it points towards the robot
-    ig.sim.viewer_camera.set_position_orientation(
+    og.sim.viewer_camera.set_position_orientation(
         position=np.array([1.46949, -3.97358, 2.21529]),
         orientation=np.array([0.56829048, 0.09569975, 0.13571846, 0.80589577]),
     )

@@ -7,23 +7,23 @@ import os
 
 import pybullet_data
 
-import igibson
-from igibson.objects.usd_object import ArticulatedObject
-from igibson.render.mesh_renderer.mesh_renderer_cpu import MeshRendererSettings
-from igibson.render.mesh_renderer.mesh_renderer_vr import VrSettings
-from igibson.robots.behavior_robot import BehaviorRobot
-from igibson.scenes.interactive_traversable_scene import InteractiveIndoorScene
-from igibson.simulator import Simulator
+import omnigibson
+from omnigibson.objects.usd_object import ArticulatedObject
+from omnigibson.render.mesh_renderer.mesh_renderer_cpu import MeshRendererSettings
+from omnigibson.render.mesh_renderer.mesh_renderer_vr import VrSettings
+from omnigibson.robots.behavior_robot import BehaviorRobot
+from omnigibson.scenes.interactive_traversable_scene import InteractiveIndoorScene
+from omnigibson.simulator import Simulator
 
 # HDR files for PBR rendering
-from igibson.simulator_vr import SimulatorVR
+from omnigibson.simulator_vr import SimulatorVR
 
-hdr_texture = os.path.join(igibson.ig_dataset_path, "scenes", "background", "probe_02.hdr")
-hdr_texture2 = os.path.join(igibson.ig_dataset_path, "scenes", "background", "probe_03.hdr")
+hdr_texture = os.path.join(omnigibson.og_dataset_path, "scenes", "background", "probe_02.hdr")
+hdr_texture2 = os.path.join(omnigibson.og_dataset_path, "scenes", "background", "probe_03.hdr")
 light_modulation_map_filename = os.path.join(
-    igibson.ig_dataset_path, "scenes", "Rs_int", "layout", "floor_lighttype_0.png"
+    omnigibson.og_dataset_path, "scenes", "Rs_int", "layout", "floor_lighttype_0.png"
 )
-background_texture = os.path.join(igibson.ig_dataset_path, "scenes", "background", "urban_street_01.jpg")
+background_texture = os.path.join(omnigibson.og_dataset_path, "scenes", "background", "urban_street_01.jpg")
 
 
 def main(random_selection=False, headless=False, short_exec=False):
@@ -73,7 +73,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     obj = ArticulatedObject(
         os.path.join(
-            igibson.ig_dataset_path,
+            omnigibson.og_dataset_path,
             "objects",
             "basket",
             "e3bae8da192ab3d4a17ae19fa77775ff",

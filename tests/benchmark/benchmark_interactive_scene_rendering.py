@@ -7,18 +7,18 @@ import time
 import matplotlib.pyplot as plt
 import numpy as np
 
-import igibson
-from igibson.robots.turtlebot import Turtlebot
-from igibson.scenes.interactive_traversable_scene import InteractiveIndoorScene
-from igibson.simulator import Simulator
-from igibson.utils.asset_utils import get_ig_assets_version
-from igibson.utils.constants import AVAILABLE_MODALITIES, NamedRenderingPresets
-from igibson.utils.config_utils import parse_config
+import omnigibson
+from omnigibson.robots.turtlebot import Turtlebot
+from omnigibson.scenes.interactive_traversable_scene import InteractiveIndoorScene
+from omnigibson.simulator import Simulator
+from omnigibson.utils.asset_utils import get_og_assets_version
+from omnigibson.utils.constants import AVAILABLE_MODALITIES, NamedRenderingPresets
+from omnigibson.utils.config_utils import parse_config
 
 
 def benchmark_rendering(scene_list, rendering_presets_list, modality_list):
     config = parse_config(os.path.join(os.path.dirname(__file__), "..", "test.yaml"))
-    assets_version = get_ig_assets_version()
+    assets_version = get_og_assets_version()
     print("assets_version", assets_version)
     result = {}
     for scene_name in scene_list:

@@ -1,24 +1,24 @@
-from igibson import app, ig_dataset_path
-from igibson.simulator import Simulator
+from omnigibson import app, og_dataset_path
+from omnigibson.simulator import Simulator
 import pxr.Vt
 from pxr import Usd
 from pxr import Gf
 from pxr.Sdf import ValueTypeNames as VT
 import numpy as np
 import xml.etree.ElementTree as ET
-import igibson.utils.transform_utils as T
+import omnigibson.utils.transform_utils as T
 import json
 from os.path import exists
 from pxr.UsdGeom import Tokens
 from omni.isaac.core.utils.stage import add_reference_to_stage, save_stage
 from omni.isaac.core.articulations import Articulation
-from igibson.utils.usd_utils import create_joint
+from omnigibson.utils.usd_utils import create_joint
 from omni.isaac.core.utils.prims import get_prim_at_path, get_prim_path, is_prim_path_valid, get_prim_children
-from igibson.utils.constants import JointType
+from omnigibson.utils.constants import JointType
 
 ##### SET THIS ######
-URDF = f"{ig_dataset_path}/scenes/Rs_int/urdf/Rs_int_best.urdf"
-USD_TEMPLATE_FILE = f"{ig_dataset_path}/scenes/Rs_int/urdf/Rs_int_best_template.usd"
+URDF = f"{og_dataset_path}/scenes/Rs_int/urdf/Rs_int_best.urdf"
+USD_TEMPLATE_FILE = f"{og_dataset_path}/scenes/Rs_int/urdf/Rs_int_best_template.usd"
 #### YOU DONT NEED TO TOUCH ANYTHING BELOW HERE IDEALLY :) #####
 
 sim = None
@@ -113,7 +113,7 @@ def import_building_usd_fixed(obj_category, obj_model, name):
     global sim
 
     # Check if filepath exists
-    usd_path = f"{ig_dataset_path}/scenes/{obj_model}/usd/{obj_category}/{obj_model}_{obj_category}.usd"
+    usd_path = f"{og_dataset_path}/scenes/{obj_model}/usd/{obj_category}/{obj_model}_{obj_category}.usd"
 
     print(f"usd path: {usd_path}")
 

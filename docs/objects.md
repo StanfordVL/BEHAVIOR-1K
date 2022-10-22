@@ -12,15 +12,15 @@ We provide a wide variety of **Objects** that can be imported into the **Simulat
 - `Cube`
 - `VisualMarker`
 
-Typically, they take in the name or the path of an object (in `igibson.assets_path`) and provide a `load` function that be invoked externally (usually by `import_object` and `import_object` of `Simulator`). The `load` function imports the object into PyBullet. Some **Objects** (e.g. `ArticulatedObject`) also provide APIs to get and set the object pose.
+Typically, they take in the name or the path of an object (in `omnigibson.assets_path`) and provide a `load` function that be invoked externally (usually by `import_object` and `import_object` of `Simulator`). The `load` function imports the object into PyBullet. Some **Objects** (e.g. `ArticulatedObject`) also provide APIs to get and set the object pose.
 
-Most of the code can be found here: [igibson/objects](https://github.com/StanfordVL/iGibson/blob/master/igibson/objects).
+Most of the code can be found here: [omnigibson/objects](https://github.com/StanfordVL/OmniGibson/blob/master/omnigibson/objects).
 
 ### BEHAVIOR Dataset of Objects
 
 We use a new dataset of everyday objects, the BEHAVIOR Dataset of Objects. In total, we curate 1217 object models across 391 object categories, to support 100 BEHAVIOR activities. The categories range from food items to tableware, from home decorations to office supplies, and from apparel to cleaning tools.
 
-To maintain high visual realism, all object models include material information (metallic, roughness) that can be rendered by iGibson 2.0 renderer. To maintain high physics realism, object models are annotated with size, mass, center of mass, moment of inertia, and also stable orientations. The collision mesh is a simplified version of the visual mesh, obtained with a convex decomposition using the VHACD algorithm. Object models with a shape close to a box are annotated with a primitive box collision mesh, much more efficient and robust for collision checking.
+To maintain high visual realism, all object models include material information (metallic, roughness) that can be rendered by OmniGibson 2.0 renderer. To maintain high physics realism, object models are annotated with size, mass, center of mass, moment of inertia, and also stable orientations. The collision mesh is a simplified version of the visual mesh, obtained with a convex decomposition using the VHACD algorithm. Object models with a shape close to a box are annotated with a primitive box collision mesh, much more efficient and robust for collision checking.
 
 All models in the BEHAVIOR Dataset are organized following the WordNet, associating them to synsets. This structure allows us to define properties for all models of the same categories, but it also facilitates more general sampling of activity instances fulfilling initial conditions such as onTop(fruit, table) that can be achieved using any model within the branch fruit of WordNet.
 
@@ -35,7 +35,7 @@ OBJECT_NAME
 │
 └───shape
 │   └───visual 
-│   │    │   # Directory containing visual meshes (vm) of the object. Used for iGibson's rendering. Encrypted
+│   │    │   # Directory containing visual meshes (vm) of the object. Used for OmniGibson's rendering. Encrypted
 │   │    │   # All objs are UV mapped onto the same texture, linked by default.mtl. All faces are triangles.
 │   │    │  vm1.encrypted.obj
 │   │    │  vm2.encrypted.obj
@@ -43,7 +43,7 @@ OBJECT_NAME
 │   │    │  default.mtl (links the geometry to the texture files)
 │   │ 
 │   └───collision
-│   │    │   # Directory containing collision meshes (cm) of the objects. Used for iGibson's physics simulation.
+│   │    │   # Directory containing collision meshes (cm) of the objects. Used for OmniGibson's physics simulation.
 │   │    │   # Each obj represents a unique link of the object.
 │   │    │   # For example, link_1_cm.obj represents the collision mesh of link_1. 
 │   │    │  cm1.obj
@@ -84,14 +84,14 @@ OBJECT_NAME
 
 
 
-### Adding other objects to iGibson
-We provide detailed instructions and scripts to import your own objects (non-articulated) into iGibson. 
+### Adding other objects to OmniGibson
+We provide detailed instructions and scripts to import your own objects (non-articulated) into OmniGibson. 
 
-Instruction can be found here: [External Objects](https://github.com/StanfordVL/iGibson/blob/master/igibson/utils/data_utils/ext_object). 
+Instruction can be found here: [External Objects](https://github.com/StanfordVL/OmniGibson/blob/master/omnigibson/utils/data_utils/ext_object). 
 
 
 ### Examples
-In this example, we import a few objects into iGibson. The code can be found here: [igibson/examples/objects/load_objects.py](https://github.com/StanfordVL/iGibson/blob/master/igibson/examples/objects/load_objects.py).
+In this example, we import a few objects into OmniGibson. The code can be found here: [omnigibson/examples/objects/load_objects.py](https://github.com/StanfordVL/OmniGibson/blob/master/omnigibson/examples/objects/load_objects.py).
 
 ```python
 import logging
@@ -101,18 +101,18 @@ from sys import platform
 import numpy as np
 import yaml
 
-import igibson
-from igibson.envs.igibson_env import iGibsonEnv
-from igibson.objects.usd_object import URDFObject
-from igibson.objects.ycb_object import YCBObject
-from igibson.render.mesh_renderer.mesh_renderer_cpu import MeshRendererSettings
-from igibson.render.profiler import Profiler
-from igibson.robots.turtlebot import Turtlebot
-from igibson.scenes.empty_scene import EmptyScene
-from igibson.scenes.gibson_indoor_scene import StaticIndoorScene
-from igibson.simulator import Simulator
-from igibson.utils.asset_utils import get_ig_avg_category_specs, get_ig_category_path, get_ig_model_path
-from igibson.utils.object_state_utils import let_user_pick, parse_config
+import omnigibson
+from omnigibson.envs.omnigibson_env import OmniGibsonEnv
+from omnigibson.objects.usd_object import URDFObject
+from omnigibson.objects.ycb_object import YCBObject
+from omnigibson.render.mesh_renderer.mesh_renderer_cpu import MeshRendererSettings
+from omnigibson.render.profiler import Profiler
+from omnigibson.robots.turtlebot import Turtlebot
+from omnigibson.scenes.empty_scene import EmptyScene
+from omnigibson.scenes.gibson_indoor_scene import StaticIndoorScene
+from omnigibson.simulator import Simulator
+from omnigibson.utils.asset_utils import get_og_avg_category_specs, get_og_category_path, get_og_model_path
+from omnigibson.utils.object_state_utils import let_user_pick, parse_config
 
 
 def main():
@@ -129,7 +129,7 @@ def main():
     type_of_scene = let_user_pick(scene_options) - 1
 
     if type_of_scene == 0:  # Empty
-        config = parse_config(os.path.join(igibson.example_config_path, "turtlebot_static_nav.yaml"))
+        config = parse_config(os.path.join(omnigibson.example_config_path, "turtlebot_static_nav.yaml"))
         settings = MeshRendererSettings(enable_shadow=False, msaa=False, texture_scale=0.5)
         s = Simulator(mode="gui_interactive", image_width=512, image_height=512, rendering_settings=settings)
         scene = EmptyScene(render_floor_plane=True, floor_plane_rgba=[0.6, 0.6, 0.6, 1])
@@ -141,7 +141,7 @@ def main():
         s.import_object(turtlebot)
 
     elif type_of_scene == 1:  # iG
-        config_filename = os.path.join(igibson.example_config_path, "turtlebot_nav.yaml")
+        config_filename = os.path.join(omnigibson.example_config_path, "turtlebot_nav.yaml")
         config_data = yaml.load(open(config_filename, "r"), Loader=yaml.FullLoader)
         config_data["load_object_categories"] = []  # Uncomment this line to accelerate loading with only the building
         config_data["visible_target"] = False
@@ -149,11 +149,11 @@ def main():
         # Reduce texture scale for Mac.
         if platform == "darwin":
             config_data["texture_scale"] = 0.5
-        env = iGibsonEnv(config_file=config_data, mode="gui_interactive")
+        env = OmniGibsonEnv(config_file=config_data, mode="gui_interactive")
         s = env.simulator
 
     elif type_of_scene == 2:  # Gibson
-        config = parse_config(os.path.join(igibson.example_config_path, "turtlebot_static_nav.yaml"))
+        config = parse_config(os.path.join(omnigibson.example_config_path, "turtlebot_static_nav.yaml"))
         settings = MeshRendererSettings(enable_shadow=False, msaa=False)
         # Reduce texture scale for Mac.
         if platform == "darwin":
@@ -188,7 +188,7 @@ def main():
     }
 
     # Load the specs of the object categories, e.g., common scaling factor
-    avg_category_spec = get_ig_avg_category_specs()
+    avg_category_spec = get_og_avg_category_specs()
 
     scene_objects = {}
     try:
@@ -200,7 +200,7 @@ def main():
                 scene_objects[category] = 1
 
             # Get the path for all models of this category
-            category_path = get_ig_category_path(category)
+            category_path = get_og_category_path(category)
 
             # If the specific model is given, we use it. If not, we select one randomly
             if "model" in obj:
@@ -209,7 +209,7 @@ def main():
                 model = np.random.choice(os.listdir(category_path))
 
             # Create the full path combining the path for all models and the name of the model
-            model_path = get_ig_model_path(category, model)
+            model_path = get_og_model_path(category, model)
             filename = os.path.join(model_path, model + ".urdf")
 
             # Create a unique name for the object instance

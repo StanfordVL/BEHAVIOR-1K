@@ -2,15 +2,15 @@ import gym
 import logging
 from collections import OrderedDict
 
-import igibson as ig
-from igibson.macros import gm, create_module_macros
-from igibson.robots import REGISTERED_ROBOTS
-from igibson.tasks import REGISTERED_TASKS
-from igibson.scenes import REGISTERED_SCENES
-from igibson.utils.gym_utils import GymObservable
-from igibson.utils.sim_utils import get_collisions
-from igibson.utils.config_utils import parse_config
-from igibson.utils.python_utils import assert_valid_key, merge_nested_dicts, create_class_from_registry_and_config,\
+import omnigibson as og
+from omnigibson.macros import gm, create_module_macros
+from omnigibson.robots import REGISTERED_ROBOTS
+from omnigibson.tasks import REGISTERED_TASKS
+from omnigibson.scenes import REGISTERED_SCENES
+from omnigibson.utils.gym_utils import GymObservable
+from omnigibson.utils.sim_utils import get_collisions
+from omnigibson.utils.config_utils import parse_config
+from omnigibson.utils.python_utils import assert_valid_key, merge_nested_dicts, create_class_from_registry_and_config,\
     Serializable, Recreatable
 
 
@@ -78,11 +78,11 @@ class Environment(gym.Env, GymObservable, Recreatable):
             merge_nested_dicts(base_dict=self.config, extra_dict=parse_config(config), inplace=True)
 
         # Set the simulator settings
-        ig.sim.set_simulation_dt(physics_dt=physics_timestep, rendering_dt=action_timestep)
-        ig.sim.viewer_width = self.render_config["viewer_width"]
-        ig.sim.viewer_height = self.render_config["viewer_height"]
-        ig.sim.vertical_fov = self.render_config["vertical_fov"]
-        ig.sim.device = device
+        og.sim.set_simulation_dt(physics_dt=physics_timestep, rendering_dt=action_timestep)
+        og.sim.viewer_width = self.render_config["viewer_width"]
+        og.sim.viewer_height = self.render_config["viewer_height"]
+        og.sim.vertical_fov = self.render_config["vertical_fov"]
+        og.sim.device = device
 
         # Load this environment
         self.load()
@@ -240,8 +240,8 @@ class Environment(gym.Env, GymObservable, Recreatable):
             cls_type_descriptor="task",
         )
 
-        assert ig.sim.is_stopped(), "sim should be stopped when load_task starts"
-        ig.sim.play()
+        assert og.sim.is_stopped(), "sim should be stopped when load_task starts"
+        og.sim.play()
 
         # Load task. Should load additinal task-relevant objects and configure the scene into its default initial state
         self._task.load(env=self)
@@ -249,7 +249,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         # Update the initial scene state
         self._scene.update_initial_state()
 
-        ig.sim.stop()
+        og.sim.stop()
 
     def _load_scene(self):
         """
@@ -262,7 +262,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
             cfg=self.scene_config,
             cls_type_descriptor="scene",
         )
-        ig.sim.import_scene(scene)
+        og.sim.import_scene(scene)
 
         # Save scene internally
         self._scene = scene
@@ -288,7 +288,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
                     cls_type_descriptor="robot",
                 )
                 # Import the robot into the simulator
-                ig.sim.import_object(robot)
+                og.sim.import_object(robot)
 
     def _load_observation_space(self):
         # Grab robot(s) and task obs spaces
@@ -323,7 +323,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self._load_robots()
         self._load_task()
 
-        ig.sim.play()
+        og.sim.play()
         self.reset()
 
         # Load the obs / action spaces
@@ -352,7 +352,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         """
         Clean up the environment and shut down the simulation.
         """
-        ig.sim.close()
+        og.sim.close()
 
     def get_obs(self):
         """
@@ -458,7 +458,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
             robot.apply_action(action_dict[robot.name])
 
         # Run simulation step
-        ig.sim.step()
+        og.sim.step()
 
         # Grab collisions and store internally
         if gm.ENABLE_GLOBAL_CONTACT_REPORTING:
@@ -502,7 +502,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 self.reload_model_object_randomization()
         if self._texture_randomization_freq is not None:
             if self._current_episode % self._texture_randomization_freq == 0:
-                ig.sim.scene.randomize_texture()
+                og.sim.scene.randomize_texture()
 
     def _reset_variables(self):
         """
@@ -519,8 +519,8 @@ class Environment(gym.Env, GymObservable, Recreatable):
         Reset episode.
         """
         # Stop and restart the simulation
-        ig.sim.stop()
-        ig.sim.play()
+        og.sim.stop()
+        og.sim.play()
 
         # Do any domain randomization
         self.randomize_domain()
@@ -536,7 +536,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self._reset_variables()
 
         # Run a single simulator step to make sure we can grab updated observations
-        ig.sim.step()
+        og.sim.step()
 
         # Grab and return observations
         obs = self.get_obs()

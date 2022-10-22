@@ -1,5 +1,5 @@
 """
-IG logging classes that write/read iGibson data to/from HDF5. These classes
+IG logging classes that write/read OmniGibson data to/from HDF5. These classes
 can be used to write regular logs, iGATUS task logs or VR logs to HDF5 for saving and replay.
 """
 
@@ -12,9 +12,9 @@ import numpy as np
 
 
 # TODO!
-# from igibson.robots.behavior_robot import HAND_BASE_ROTS
-from igibson.utils.git_utils import project_git_info
-from igibson.utils.config_utils import dump_config, parse_str_config
+# from omnigibson.robots.behavior_robot import HAND_BASE_ROTS
+from omnigibson.utils.git_utils import project_git_info
+from omnigibson.utils.config_utils import dump_config, parse_str_config
 
 
 class IGLogWriter:
