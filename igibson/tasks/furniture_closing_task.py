@@ -135,7 +135,7 @@ class FurnitureClosingTask(BaseTask):
         for i in range(max_trials):
             initial_pos, initial_quat = self._sample_initial_pose(env)
             # Make sure the sampled robot start pose and goal position are both collision-free
-            success = test_valid_pose(env.robots[self._robot_idn], initial_pos, initial_quat)
+            success = test_valid_pose(env.robots[self._robot_idn], initial_pos, initial_quat, env.initial_pos_z_offset)
 
             # Load the original state
             ig.sim.load_state(state=state, serialized=True)
@@ -149,7 +149,7 @@ class FurnitureClosingTask(BaseTask):
             logging.warning("WARNING: Failed to reset robot without collision")
 
         # Land the robot
-        land_object(env.robots[self._robot_idn], initial_pos, initial_quat)
+        land_object(env.robots[self._robot_idn], initial_pos, initial_quat, env.initial_pos_z_offset)
 
     def _get_obs(self, env):
         # No task-specific obs of any kind

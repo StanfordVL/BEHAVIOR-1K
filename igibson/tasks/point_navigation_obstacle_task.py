@@ -122,7 +122,7 @@ class PointNavigationObstacleTask(PointNavigationTask):
             for _ in range(max_trials):
                 _, pos = env.scene.get_random_point(floor=self._floor)
                 quat = T.euler2quat(np.array([0, 0, np.random.uniform(0, np.pi * 2)]))
-                success = test_valid_pose(obj, pos, quat)
+                success = test_valid_pose(obj, pos, quat, env.initial_pos_z_offset)
                 ig.sim.load_state(state=state, serialized=True)
                 if success:
                     break
@@ -130,7 +130,7 @@ class PointNavigationObstacleTask(PointNavigationTask):
             if not success:
                 print("WARNING: Failed to reset interactive obj without collision")
 
-            land_object(obj, pos, ori)
+            land_object(obj, pos, ori, env.initial_pos_z_offset)
 
     def _reset_scene(self, env):
         # Run super first

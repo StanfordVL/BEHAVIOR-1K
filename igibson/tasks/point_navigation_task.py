@@ -296,8 +296,8 @@ class PointNavigationTask(BaseTask):
             initial_pos, initial_quat, goal_pos = self._sample_initial_pose_and_goal_pos(env)
             # Make sure the sampled robot start pose and goal position are both collision-free
             success = test_valid_pose(
-                env.robots[self._robot_idn], initial_pos, initial_quat
-            ) and test_valid_pose(env.robots[self._robot_idn], goal_pos)
+                env.robots[self._robot_idn], initial_pos, initial_quat, env.initial_pos_z_offset
+            ) and test_valid_pose(env.robots[self._robot_idn], goal_pos, None, env.initial_pos_z_offset)
 
             # Load the original state
             ig.sim.load_state(state=state, serialized=True)
@@ -311,7 +311,7 @@ class PointNavigationTask(BaseTask):
             logging.warning("WARNING: Failed to reset robot without collision")
 
         # Land the robot
-        land_object(env.robots[self._robot_idn], initial_pos, initial_quat)
+        land_object(env.robots[self._robot_idn], initial_pos, initial_quat, env.initial_pos_z_offset)
 
         # Store the sampled values internally
         self._initial_pos = initial_pos

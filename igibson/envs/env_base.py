@@ -579,6 +579,14 @@ class Environment(gym.Env, GymObservable, Recreatable):
         return self._current_collisions
 
     @property
+    def initial_pos_z_offset(self):
+        """
+        Returns:
+            float: how high to offset object placement to test valid pose & account for one action step of dropping
+        """
+        return self._initial_pos_z_offset
+
+    @property
     def task(self):
         """
         Returns:

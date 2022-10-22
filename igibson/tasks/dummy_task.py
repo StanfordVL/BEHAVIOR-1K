@@ -28,7 +28,7 @@ class DummyTask(BaseTask):
         # Place agent(s) at origin by default
         for robot in env.robots:
             robot.reset()
-            land_object(robot, np.zeros(3), np.array([0, 0, 0, 1]))
+            land_object(robot, np.zeros(3), np.array([0, 0, 0, 1]), env.initial_pos_z_offset)
 
     def _get_obs(self, env):
         # No task-specific obs of any kind

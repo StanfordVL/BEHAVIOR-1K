@@ -176,7 +176,33 @@ def filter_collisions(collisions, filter_prims):
     return filtered_collisions
 
 
-def test_valid_pose(obj, pos, quat=None):
+def place_base_pose(obj, pos, quat=None, z_offset=None):
+    """
+    Place the object so that its base (z-min) rests at the location of @pos
+
+    Args:
+        obj (BaseObject): Object to place in the environment
+        pos (3-array): Global (x,y,z) location to place the base of the robot
+        quat (None or 4-array): Optional (x,y,z,w) quaternion orientation when placing the object.
+            If None, the object's current orientation will be used
+        z_offset (None or float): Optional additional z_offset to apply
+    """
+    # avoid circular dependency
+    from igibson.object_states import AABB
+
+    lower, _ = obj.states[AABB].get_value()
+    cur_pos = obj.get_position()
+
+    z_diff = cur_pos[2] - lower[2]
+
+    pos[2] += z_diff
+    if z_offset is not None:
+        pos[2] += z_offset
+
+    obj.set_position_orientation(pos, quat)
+
+
+def test_valid_pose(obj, pos, quat=None, z_offset=None):
     """
     Test if the object can be placed with no collision.
 
@@ -185,6 +211,7 @@ def test_valid_pose(obj, pos, quat=None):
         pos (3-array): Global (x,y,z) location to place the object
         quat (None or 4-array): Optional (x,y,z,w) quaternion orientation when placing the object.
             If None, the object's current orientation will be used
+        z_offset (None or float): Optional additional z_offset to apply
 
     Returns:
         bool: Whether the placed object position is valid
@@ -195,8 +222,8 @@ def test_valid_pose(obj, pos, quat=None):
     # Store state before checking object position
     state = ig.sim.scene.dump_state(serialized=False)
 
-    # Set the position of the object
-    obj.set_position_orientation(position=pos, orientation=quat)
+    # Set the pose of the object
+    place_base_pose(obj, pos, quat, z_offset)
 
     # If we're placing a robot, make sure it's reset and not moving
     # Run import here to avoid circular imports
@@ -215,7 +242,7 @@ def test_valid_pose(obj, pos, quat=None):
     return not in_collision
 
 
-def land_object(obj, pos, quat):
+def land_object(obj, pos, quat=None, z_offset=None):
     """
     Land the object at the specified position @pos, given a valid position and orientation.
 
@@ -224,13 +251,14 @@ def land_object(obj, pos, quat):
         pos (3-array): Global (x,y,z) location to place the object
         quat (None or 4-array): Optional (x,y,z,w) quaternion orientation when placing the object.
             If None, a random orientation about the z-axis will be sampled
+        z_offset (None or float): Optional additional z_offset to apply
     """
     # Make sure sim is playing
     assert ig.sim.is_playing(), "Cannot land object while sim is not playing!"
 
     # Set the object's pose
     quat = T.euler2quat([0, 0, np.random.uniform(0, np.pi * 2)]) if quat is None else quat
-    obj.set_position_orientation(position=pos, orientation=quat)
+    place_base_pose(obj, pos, quat, z_offset)
 
     # If we're placing a robot, make sure it's reset and not moving
     # Run import here to avoid circular imports
