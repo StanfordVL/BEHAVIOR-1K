@@ -193,6 +193,9 @@ class PointNavigationTask(BaseTask):
             # Store waypoints
             self._waypoint_markers = waypoints
 
+        # Take one sim step to initialize all the markers
+        ig.sim.step()
+
     def _sample_initial_pose_and_goal_pos(self, env, max_trials=100):
         """
         Potentially sample the robot initial pos / ori and target pos, based on whether we're using randomized
