@@ -70,10 +70,8 @@ class TraversableMap:
         for floor in range(len(self.floor_heights)):
             if self.trav_map_with_objects:
                 trav_map = np.array(Image.open(os.path.join(maps_path, "floor_trav_{}.png".format(floor))))
-                obstacle_map = np.array(Image.open(os.path.join(maps_path, "floor_{}.png".format(floor))))
             else:
                 trav_map = np.array(Image.open(os.path.join(maps_path, "floor_trav_no_obj_{}.png".format(floor))))
-                obstacle_map = np.array(Image.open(os.path.join(maps_path, "floor_no_obj_{}.png".format(floor))))
 
             # If we do not initialize the original size of the traversability map, we obtain it from the image
             # Then, we compute the final map size as the factor of scaling (default_resolution/resolution) times the
@@ -85,10 +83,6 @@ class TraversableMap:
                 self.trav_map_size = int(
                     self.trav_map_original_size * self.trav_map_default_resolution / self.trav_map_resolution
                 )
-
-            # Here it looks like we do not "care" about the traversability map: wherever the obstacle map is 0, we set
-            # the traversability map also to 0
-            trav_map[obstacle_map == 0] = 0
 
             # We resize the traversability map to the new size computed before
             trav_map = cv2.resize(trav_map, (self.trav_map_size, self.trav_map_size))
