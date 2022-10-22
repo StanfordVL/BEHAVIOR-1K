@@ -1,0 +1,129 @@
+<html>
+  <head>
+    <title>OmniGibson Web Interface</title>
+    <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+      <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+      <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+
+  </head>
+   <style>
+    .img {
+      width: 512px;
+      height: 512px;
+      border:2px solid #fff;
+      box-shadow: 10px 10px 5px #ccc;
+      -moz-box-shadow: 10px 10px 5px #ccc;
+      -webkit-box-shadow: 10px 10px 5px #ccc;
+      -khtml-box-shadow: 10px 10px 5px #ccc;
+    }
+    .center {
+      display: block;
+      margin-left: auto;
+      margin-right: auto;
+      
+    }
+
+    body, html {
+    height: 100%;
+    }
+
+    /* The hero image */
+    .hero-image {
+      /* Use "linear-gradient" to add a darken background effect to the image (photographer.jpg). This will make the text easier to read */
+      background-image:  url("{{url_for('static', filename='omnigibson_logo.png')}}");
+
+      /* Set a specific height */
+      height: 300px;
+      margin-left: auto;
+      margin-right: auto;
+      width: 900px;
+      /* Position and center the image to scale nicely on all screens */
+      background-position: center;
+      background-repeat: no-repeat;
+      background-size: cover;
+      position: relative;
+    }
+
+        /* Place text in the middle of the image */
+    .hero-text {
+     margin-top: 30px;
+     font-size: 20px;
+     text-align: center;
+     font-family: Arial, Helvetica, sans-serif;
+    }
+
+
+  </style>
+  <body>
+    <div class="hero-image">
+  </div>
+
+<div class="container">
+<form action="/demo">
+
+<div class="row">
+  <div class="col-sm-6"><h4>Select Robot</h4>
+
+<div class="form-check">
+  <input class="form-check-input" type="radio" name="robot" id="robot" value="fetch" checked>
+  <label class="form-check-label" for="fetch">
+    Fetch
+    <p> </p>
+    <img src="{{url_for('static', filename='fetch.jpg')}}"> </img>
+  </label>
+</div>
+
+<div class="form-check">
+  <input class="form-check-input" type="radio" name="robot" id="robot" value="turtlebot" checked>
+  <label class="form-check-label" for="turtlebot">
+    Turtlebot
+    <p> </p>
+     <img src="{{url_for('static', filename='turtlebot.jpg')}}"> </img>
+  </label>
+</div>
+
+  </div>
+  <div class="col-sm-6"><h4>Select Scene</h4>
+  <div class="form-check">
+     <input class="form-check-input" type="radio" name="scene" id="scene" value="Rs_int" checked>
+  <label class="form-check-label" for="Rs_int">
+    Rs_int (1 min to load)
+    <p> </p>
+    <img src="{{url_for('static', filename='Rs.gif')}}"> </img>
+  </label>
+</div>
+
+  <div class="form-check">
+     <input class="form-check-input" type="radio" name="scene" id="scene" value="Beechwood_0_int" checked>
+  <label class="form-check-label" for="Beechwood_0_int">
+    Beechwood_0_int (3 min to load)
+    <p> </p>
+    <img src="{{url_for('static', filename='Beechwood_0.gif')}}"> </img>
+  </label>
+</div>
+
+  <div class="form-check">
+     <input class="form-check-input" type="radio" name="scene" id="scene" value="Merom_1_int" checked>
+  <label class="form-check-label" for="Merom_1_int">
+    Merom_1_int (3 min to load)
+    <p> </p>
+    <img src="{{url_for('static', filename='Merom_1.gif')}}"> </img>
+  </label>
+</div>
+
+  </div>
+</div>
+
+<div class="row">
+<button type="submit"type="button" class="btn btn-primary btn-block">Launch Demo</button>
+</div>
+
+</form>
+</div>
+
+
+  </body>
+ 
+</html>

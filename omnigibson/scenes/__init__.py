@@ -1,0 +1,5 @@
+from omnigibson.scenes.scene_base import Scene, REGISTERED_SCENES
+from omnigibson.scenes.empty_scene import EmptyScene
+from omnigibson.scenes.traversable_scene import TraversableScene
+from omnigibson.scenes.static_traversable_scene import StaticTraversableScene
+from omnigibson.scenes.interactive_traversable_scene import InteractiveTraversableScene

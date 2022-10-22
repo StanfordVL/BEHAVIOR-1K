@@ -1,0 +1,10 @@
+# Example Differential Drive control config (shown for base control)
+# See omnigibson/controllers/dd_controller for docstring of arguments
+# Arguments below are the arguments that should be specified by external user (other kwargs
+# used in constructor are generated automatically at runtime)
+robot:
+  controller_config:
+    base:
+      name: DifferentialDriveController
+      command_input_limits: default
+      command_output_limits: default

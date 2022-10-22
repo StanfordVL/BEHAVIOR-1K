@@ -1,0 +1,244 @@
+<?xml version="1.0"?>
+
+<robot xmlns:controller="http://playerstage.sourceforge.net/gazebo/xmlschema/#controller" xmlns:interface="http://playerstage.sourceforge.net/gazebo/xmlschema/#interface" xmlns:sensor="http://playerstage.sourceforge.net/gazebo/xmlschema/#sensor" xmlns:xacro="http://ros.org/wiki/xacro" name="turtlebot_gazebo">
+
+<!-- ASUS Xtion PRO camera for simulation -->
+<!-- gazebo_ros_wge100 plugin is in kt2_gazebo_plugins package -->
+<xacro:macro name="turtlebot_sim_asus_xtion">
+  <gazebo reference="camera_link" >
+    <sensor:camera name="camera" >
+      <imageSize>640 480</imageSize>
+      <imageFormat>R8G8B8</imageFormat>
+      <hfov>62.8</hfov>
+      <nearClip>0.1</nearClip>
+      <farClip>10</farClip>
+      <updateRate>2.0</updateRate>
+      <controller:gazebo_ros_wge100 name="kinect_camera_controller" plugin="libgazebo_ros_wge100.so">
+	<alwaysOn>true</alwaysOn>
+	<updateRate>5000.0</updateRate>
+	<cameraName>camera/rgb</cameraName>
+	<frameName>camera_rgb_optical_frame</frameName>
+	<hackBaseline>0.0</hackBaseline>
+	<CxPrime>320.5</CxPrime>
+	<Cx>320.5</Cx>
+	<Cy>240.5</Cy>
+	<baseline>0.09</baseline>
+	<!-- image_width / (2*tan(hfov_radian /2)) -->
+	<!-- 320 for wide and 772.55 for narrow stereo camera -->
+	<focal_length>525</focal_length>
+	<cameraNamespace>camera/rgb</cameraNamespace>
+	<depthData>true</depthData>
+	<interface:camera name="camera_iface" />
+      </controller:gazebo_ros_wge100>
+    </sensor:camera>
+  </gazebo>
+</xacro:macro>
+
+<xacro:macro name="turtlebot_sim_kinect">
+  <gazebo reference="camera_link">
+    <sensor:camera name="camera">
+      <imageFormat>R8G8B8</imageFormat>
+      <imageSize>640 480</imageSize>
+      <hfov>60</hfov>
+      <nearClip>0.05</nearClip>
+      <farClip>3</farClip>
+      <updateRate>20</updateRate>
+      <baseline>0.1</baseline>
+      <controller:gazebo_ros_openni_kinect name="kinect_camera_controller" plugin="libgazebo_ros_openni_kinect.so">
+        <cameraName>kinect</cameraName>
+        <alwaysOn>true</alwaysOn>
+        <updateRate>20</updateRate>
+        <imageTopicName>/camera/image_raw</imageTopicName>
+        <pointCloudTopicName>/camera/depth/points</pointCloudTopicName>
+        <cameraInfoTopicName>/camera/camera_info</cameraInfoTopicName>
+        <frameName>camera_depth_optical_frame</frameName>
+        <CxPrime>0.0</CxPrime>
+        <Cx>0.0</Cx>
+        <Cy>0.0</Cy>
+        <focalLength>0.0</focalLength>
+        <hackBaseline>0.0</hackBaseline>
+        <distortionK1>0.0</distortionK1>
+        <distortionK2>0.0</distortionK2>
+        <distortionK3>0.0</distortionK3>
+        <distortionT1>0.0</distortionT1>
+        <distortionT2>0.0</distortionT2>
+      </controller:gazebo_ros_openni_kinect>
+    </sensor:camera>
+  </gazebo>
+</xacro:macro>
+
+<xacro:macro name="turtlebot_sim_imu">
+  <gazebo>
+    <controller:gazebo_ros_imu name="imu_controller" plugin="libgazebo_ros_imu.so">
+      <alwaysOn>true</alwaysOn>
+      <updateRate>30</updateRate>
+      <bodyName>gyro_link</bodyName>
+      <topicName>imu/data</topicName>
+      <serviceName>imu/service</serviceName>
+      <gaussianNoise>${0.0017*0.0017}</gaussianNoise>
+      <xyzOffset>0 0 0</xyzOffset> 
+      <rpyOffset>0 0 0</rpyOffset>
+      <interface:position name="imu_position"/>
+    </controller:gazebo_ros_imu>
+  </gazebo>
+</xacro:macro>
+
+<xacro:macro name="turtlebot_sim_laser">
+  <gazebo reference="laser">
+    <sensor:ray name="laser">
+      <rayCount>180</rayCount>
+      <rangeCount>180</rangeCount>
+      <laserCount>1</laserCount>      
+      <origin>0.0 0.0 0.0</origin>
+      <displayRays>false</displayRays>      
+      <minAngle>-130</minAngle>
+      <maxAngle>130</maxAngle>      
+      <minRange>0.08</minRange>
+      <maxRange>10.0</maxRange>
+      <resRange>0.01</resRange>
+      <updateRate>20</updateRate>
+      <controller:gazebo_ros_laser name="gazebo_ros_laser_controller" plugin="libgazebo_ros_laser.so">
+				<gaussianNoise>0.005</gaussianNoise>
+				<alwaysOn>true</alwaysOn>
+				<updateRate>20</updateRate>
+				<topicName>scan</topicName>
+				<frameName>laser</frameName>
+				<interface:laser name="gazebo_ros_laser_iface" />
+				<hokuyoMinIntensity>101.0</hokuyoMinIntensity>
+      </controller:gazebo_ros_laser>
+    </sensor:ray>
+  </gazebo>
+</xacro:macro>
+
+<xacro:macro name="turtlebot_sim_create">
+  <gazebo>
+    <controller:gazebo_ros_create name="create_controller" plugin="libgazebo_ros_create.so">
+      <alwaysOn>true</alwaysOn>
+      <node_namespace>turtlebot_node</node_namespace>
+      <left_wheel_joint>left_wheel_joint</left_wheel_joint>
+      <right_wheel_joint>right_wheel_joint</right_wheel_joint>
+      <front_castor_joint>front_castor_joint</front_castor_joint>
+      <rear_castor_joint>rear_castor_joint</rear_castor_joint>
+      <wheel_separation>.260</wheel_separation>
+      <wheel_diameter>0.066</wheel_diameter>
+      <base_geom>base_link_geom_base_link</base_geom>
+      <updateRate>40</updateRate>
+      <torque>1.0</torque>
+    </controller:gazebo_ros_create>
+  </gazebo>
+</xacro:macro>
+
+<xacro:macro name="turtlebot_sim_wall_sensors">
+  <gazebo reference="wall_sensor_link">
+    <sensor:ray name="wall_sensor">
+      <alwaysActive>true</alwaysActive>
+      <rayCount>1</rayCount>
+      <rangeCount>1</rangeCount>
+      <resRange>0.1</resRange>
+
+      <minAngle>0</minAngle>
+      <maxAngle>0</maxAngle>
+
+      <minRange>0.0160</minRange>
+      <maxRange>0.04</maxRange>
+      <displayRays>false</displayRays>
+    </sensor:ray>
+  </gazebo>
+
+  <gazebo reference="left_cliff_sensor_link">
+    <sensor:ray name="left_cliff_sensor">
+      <alwaysActive>true</alwaysActive>
+      <rayCount>1</rayCount>
+      <rangeCount>1</rangeCount>
+      <resRange>0.1</resRange>
+
+      <minAngle>0</minAngle>
+      <maxAngle>0</maxAngle>
+
+      <minRange>0.01</minRange>
+      <maxRange>0.04</maxRange>
+      <displayRays>false</displayRays>
+    </sensor:ray>
+  </gazebo>
+
+  <gazebo reference="right_cliff_sensor_link">
+    <sensor:ray name="right_cliff_sensor">
+      <alwaysActive>true</alwaysActive>
+      <rayCount>1</rayCount>
+      <rangeCount>1</rangeCount>
+      <resRange>0.1</resRange>
+
+      <minAngle>0</minAngle>
+      <maxAngle>0</maxAngle>
+
+      <minRange>0.01</minRange>
+      <maxRange>0.04</maxRange>
+      <displayRays>false</displayRays>
+    </sensor:ray>
+  </gazebo>
+
+
+  <gazebo reference="leftfront_cliff_sensor_link">
+    <sensor:ray name="leftfront_cliff_sensor">
+      <alwaysActive>true</alwaysActive>
+      <rayCount>1</rayCount>
+      <rangeCount>1</rangeCount>
+      <resRange>0.1</resRange>
+
+      <minAngle>0</minAngle>
+      <maxAngle>0</maxAngle>
+
+      <minRange>0.01</minRange>
+      <maxRange>0.04</maxRange>
+      <displayRays>false</displayRays>
+    </sensor:ray>
+  </gazebo>
+
+  <gazebo reference="rightfront_cliff_sensor_link">
+    <sensor:ray name="rightfront_cliff_sensor">
+      <alwaysActive>true</alwaysActive>
+      <rayCount>1</rayCount>
+      <rangeCount>1</rangeCount>
+      <resRange>0.1</resRange>
+
+      <minAngle>0</minAngle>
+      <maxAngle>0</maxAngle>
+
+      <minRange>0.01</minRange>
+      <maxRange>0.04</maxRange>
+      <displayRays>fan</displayRays>
+    </sensor:ray>
+  </gazebo>
+
+
+
+  <gazebo reference="left_wheel_link">
+    <mu1 value="10"/>
+    <mu2 value="10"/>
+    <kp value="100000000.0"/>
+    <kd value="10000.0"/>
+    <fdir value="1 0 0"/>
+  </gazebo>
+
+  <gazebo reference="right_wheel_link">
+    <mu1 value="10"/>
+    <mu2 value="10"/>
+    <kp value="100000000.0"/>
+    <kd value="10000.0"/>
+    <fdir value="1 0 0"/>
+  </gazebo>
+  <gazebo reference="rear_wheel_link">
+    <mu1 value="0"/>
+    <mu2 value="0"/>
+    <kp value="100000000.0"/>
+    <kd value="10000.0"/>
+  </gazebo>
+
+  <gazebo reference="front_wheel_link">
+    <mu1 value="0"/>
+    <mu2 value="0"/>
+    <kp value="100000000.0"/>
+    <kd value="10000.0"/>
+  </gazebo>
+</xacro:macro>
+</robot>

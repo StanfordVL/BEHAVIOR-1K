@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<!--
+    Turtlebot 2 with Kinect:
+    - Kobuki
+    - Turtlebot 2 stack
+    - Kinect
+-->    
+<robot name="turtlebot2"
+       xmlns:sensor="http://playerstage.sourceforge.net/gazebo/xmlschema/#sensor"
+       xmlns:controller="http://playerstage.sourceforge.net/gazebo/xmlschema/#controller"
+       xmlns:interface="http://playerstage.sourceforge.net/gazebo/xmlschema/#interface"
+       xmlns:xacro="http://ros.org/wiki/xacro">
+
+	<!-- Included URDF Files -->
+  <include filename="$(find kobuki_description)/urdf/kobuki.urdf.xacro" />
+  <include filename="$(find turtlebot_description)/urdf/turtlebot2_stack.urdf.xacro" />
+  <include filename="$(find turtlebot_description)/urdf/kinect_turtlebot2.urdf.xacro" />
+
+	<!-- Kobuki -->
+  <kobuki/>
+  
+  <!-- Turtlebot 2 stack -->
+  <turtlebot2_stack parent="base_link"/>
+
+  <!-- Kinect -->
+  <kinect_turtlebot2 parent="base_link"/>
+</robot>

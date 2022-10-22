@@ -1,0 +1,17 @@
+# Example IK config (shown for arm control)
+# See omnigibson/controllers/ik_controller for docstring of arguments
+# Arguments below are the arguments that should be specified by external user (other kwargs
+# used in constructor are generated automatically at runtime)
+robot:
+  controller_config:
+    arm:
+      name: InverseKinematicsController
+      command_input_limits: default
+      command_output_limits:
+        - [-0.2, -0.2, -0.2, -0.5, -0.5, -0.5]
+        - [0.2, 0.2, 0.2, 0.5, 0.5, 0.5]
+      kv: 2.0
+      mode: pose_delta_ori
+      smoothing_filter_size: 2
+      workspace_pose_limiter: null
+      joint_range_tolerance: 0.01

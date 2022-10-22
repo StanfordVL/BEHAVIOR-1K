@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<!--
+  The complete turtlebot library of xacros for easy reference
+ -->
+<robot>
+  <!-- General -->
+  <include filename="$(find turtlebot_description)/urdf/common_properties.urdf.xacro"/>
+  <include filename="$(find turtlebot_description)/urdf/turtlebot_properties.urdf.xacro"/>
+  <!-- Bases -->
+  <include filename="$(find create_description)/urdf/create.urdf.xacro"/>
+  <include filename="$(find kobuki_description)/urdf/kobuki.urdf.xacro" />
+  <!-- Stacks -->
+  <include filename="$(find turtlebot_description)/urdf/stacks/circles.urdf.xacro"/>
+  <include filename="$(find turtlebot_description)/urdf/stacks/hexagons.urdf.xacro"/>
+  <!-- 3D Sensors -->
+  <include filename="$(find turtlebot_description)/urdf/sensors/kinect.urdf.xacro"/>
+  <include filename="$(find turtlebot_description)/urdf/sensors/asus_xtion_pro.urdf.xacro"/>
+  <!-- Gazebo -->
+  <include filename="$(find turtlebot_description)/urdf/turtlebot_gazebo.urdf.xacro"/>
+</robot>

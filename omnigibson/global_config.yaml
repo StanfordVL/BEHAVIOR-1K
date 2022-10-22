@@ -1,0 +1,6 @@
+assets_path: data/assets # put either absolute path or relative to current directory
+g_dataset_path: data/g_dataset
+og_dataset_path: data/og_dataset
+threedfront_dataset_path: data/threedfront_dataset
+cubicasa_dataset_path: data/cubicasa_dataset
+key_path: data/omnigibson.key

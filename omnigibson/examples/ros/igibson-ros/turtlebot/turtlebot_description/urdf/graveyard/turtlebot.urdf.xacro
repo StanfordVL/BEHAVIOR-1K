@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+
+<robot name="turtlebot"  
+       xmlns:sensor="http://playerstage.sourceforge.net/gazebo/xmlschema/#sensor"
+       xmlns:controller="http://playerstage.sourceforge.net/gazebo/xmlschema/#controller"
+       xmlns:interface="http://playerstage.sourceforge.net/gazebo/xmlschema/#interface"
+       xmlns:xacro="http://ros.org/wiki/xacro">
+  <include filename="$(find turtlebot_description)/urdf/turtlebot_hardware.urdf.xacro" />
+  <include filename="$(find turtlebot_description)/urdf/turtlebot_body.urdf.xacro" />
+  <include filename="$(find turtlebot_description)/urdf/turtlebot_calibration.xacro" />
+  <include filename="$(find turtlebot_description)/urdf/turtlebot_kinect.urdf.xacro" />
+
+  <property name="M_PI" value="3.14159"/>
+  <property name="SCALE" value="0.0254"/>
+
+  <!-- Body of TurtleBot, with plates, standoffs and Create (including sim sensors) -->
+  <turtlebot_body/>
+  
+  <!-- Kinect frames and mounting (includes simulation) -->
+  <turtlebot_kinect/>
+</robot>

@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+
+<robot name="turtlebot"
+    xmlns:sensor="http://playerstage.sourceforge.net/gazebo/xmlschema/#sensor"
+    xmlns:controller="http://playerstage.sourceforge.net/gazebo/xmlschema/#controller"
+    xmlns:interface="http://playerstage.sourceforge.net/gazebo/xmlschema/#interface">
+
+<!--
+Turtlebot with ASUS Xtion PRO camera, instead of Kinect
+-->
+    
+    <!-- Included URDF Files -->
+    <include filename="$(find turtlebot_description)/urdf/turtlebot_body.urdf.xacro" />
+    <include filename="$(find turtlebot_description)/urdf/turtlebot_hardware.urdf.xacro" />
+    <include filename="$(find turtlebot_description)/urdf/turtlebot_calibration.xacro" />
+    <include filename="$(find turtlebot_description)/urdf/asus_xtion_pro.urdf.xacro" />
+
+    <!-- Body of TurtleBot, with plates, standoffs and Create (including sim sensors) -->
+    <turtlebot_body/>
+
+    <!-- ASUS Xtion PRO frames and mounting (includes simulation) -->
+    <turtlebot_xtion_pro/> 
+</robot>

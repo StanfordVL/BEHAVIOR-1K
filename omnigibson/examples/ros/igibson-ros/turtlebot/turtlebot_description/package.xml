@@ -1,0 +1,20 @@
+<package>
+  <name>turtlebot_description</name>
+  <version>2.0.0</version>
+  <description>
+     turtlebot_description provides a complete 3D model of the TurtleBot for simulation and visualization. The files in this package are parsed and used by a variety of other components. Most users will not interact directly with this package.
+  </description>
+  <author>Melonee Wise</author>
+  <author email="stonier@yujinrobot.com">Daniel Stonier</author>
+  <maintainer email="stonier@yujinrobot.com">Daniel Stonier</maintainer>
+  <license>BSD</license>
+  <url>http://ros.org/wiki/turtlebot_description</url>
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <build_depend>urdf</build_depend>
+  <build_depend>xacro</build_depend>
+
+  <run_depend>urdf</run_depend>
+  <run_depend>xacro</run_depend>
+  <run_depend>kobuki_description</run_depend>
+</package>

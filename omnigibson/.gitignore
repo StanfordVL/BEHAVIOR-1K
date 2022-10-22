@@ -1,0 +1,7 @@
+*.tar.gz'
+data
+assets
+dataset
+og_dataset
+render/coord.npy
+render/model.pth
