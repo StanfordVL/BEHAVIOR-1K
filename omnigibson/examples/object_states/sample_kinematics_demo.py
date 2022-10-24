@@ -53,7 +53,6 @@ def sample_microwave_plates_apples(env):
         name="cabinet",
         category="bottom_cabinet",
         model="46380",
-        # scale=2.0,
     )
     og.sim.import_object(cabinet)
     z_offset = -cabinet.aabb_center[2] + cabinet.aabb_extent[2] / 2
@@ -80,7 +79,8 @@ def sample_microwave_plates_apples(env):
         env.step(np.array([]))
 
     logging.info("Loading plates")
-    n_plates = 3
+    n_plates = 2
+    n_apples = 2
     for i in range(n_plates):
         plate = DatasetObject(
             prim_path=f"/World/plate{i}",
@@ -105,10 +105,10 @@ def sample_microwave_plates_apples(env):
             env.step(np.array([]))
 
         logging.info("Loading three apples OnTop of the plate")
-        for j in range(3):
+        for j in range(n_apples):
             apple = DatasetObject(
-                prim_path=f"/World/apple{i * n_plates + j}",
-                name=f"apple{i * n_plates + j}",
+                prim_path=f"/World/apple{i * n_apples + j}",
+                name=f"apple{i * n_apples + j}",
                 category="apple",
                 model="00_0",
             )
@@ -137,7 +137,7 @@ def sample_boxes_on_shelf(env):
     for _ in range(50):
         env.step(np.array([]))
 
-    for i in range(10):
+    for i in range(5):
         box = DatasetObject(
             prim_path=f"/World/box{i}",
             name=f"box{i}",
