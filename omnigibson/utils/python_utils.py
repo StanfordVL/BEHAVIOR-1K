@@ -33,7 +33,7 @@ def save_init_info(func):
 
     @wraps(func) # preserve func name, docstring, arguments list, etc.
     def wrapper(self, *args, **kwargs):
-        values = sog.bind(self, *args, **kwargs)
+        values = sig.bind(self, *args, **kwargs)
 
         # Prevent args of super init from being saved.
         if hasattr(self, "_init_info"):
@@ -47,7 +47,7 @@ def save_init_info(func):
         self._init_info["args"] = {}
 
         # Populate class's self._init_info.
-        for k, p in sog.parameters.items():
+        for k, p in sig.parameters.items():
             if k == 'self':
                 continue
             if k in values.arguments:
