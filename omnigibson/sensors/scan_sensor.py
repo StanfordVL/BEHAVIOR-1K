@@ -229,8 +229,8 @@ class ScanSensor(BaseSensor):
 
         # Add scan info (normalized to [0.0, 1.0])
         if "scan" in self._modalities:
-            obs["scan"] = (self._rs.get_linear_depth_data(self._prim_path) - self.min_range) / \
-                          (self.max_range - self.min_range)
+            obs["scan"] = ((self._rs.get_linear_depth_data(self._prim_path) - self.min_range) /
+                           (self.max_range - self.min_range)).clip(0.0, 1.0)
 
             # Optionally add occupancy grid info
             if "occupancy_grid" in self._modalities:
