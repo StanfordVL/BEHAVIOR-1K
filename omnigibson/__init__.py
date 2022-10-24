@@ -109,6 +109,12 @@ from omnigibson.simulator import Simulator
 # Create simulator (this is a singleton so it's okay that it's global)
 sim = Simulator()
 
+import omni
+def print_save_usd_warning(_):
+    logging.warning("Exporting individual USDs has been disabled in OG due to copyrights.")
+
+omni.kit.widget.stage.context_menu.ContextMenu.save_prim = print_save_usd_warning
+
 # Import any remaining items we want to access directly from the main omnigibson import
 from omnigibson.envs import Environment
 from omnigibson.scenes import REGISTERED_SCENES
