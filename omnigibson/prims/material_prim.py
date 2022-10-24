@@ -7,6 +7,7 @@ import omni
 from omni.isaac.core.utils.prims import get_prim_at_path
 from omni.usd import get_shader_from_material
 
+import omnigibson as og
 from omnigibson import app, assets_path, og_dataset_path
 from omnigibson.utils.physx_utils import bind_material
 from omnigibson.prims.prim_base import BasePrim
@@ -83,7 +84,7 @@ class MaterialPrim(BasePrim):
         bind_material(prim_path=target_prim_path, material_path=self.prim_path)
 
     async def _load_mdl_parameters(self):
-        app.update()
+        og.sim.render()
         await omni.usd.get_context().load_mdl_parameters_for_prim_async(self._shader)
 
     def shader_force_populate(self):
