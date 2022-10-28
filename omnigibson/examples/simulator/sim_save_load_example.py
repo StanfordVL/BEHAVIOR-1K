@@ -2,13 +2,11 @@ import os
 
 import numpy as np
 
-from omnigibson import og_dataset_path
 from omnigibson.robots.turtlebot import Turtlebot
 from omnigibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
 from omnigibson.simulator import Simulator
 
 SCENE_ID = "Rs_int"
-USD_TEMPLATE_FILE = f"{og_dataset_path}/scenes/{SCENE_ID}/urdf/{SCENE_ID}_best_template.usd"
 TEST_OUT_PATH = ""  # Define output directory here.
 
 #### SAVE SIMULATION ENV #####
@@ -16,7 +14,8 @@ sim = Simulator()
 
 # Create a scene.
 scene = InteractiveTraversableScene(
-    scene_model=SCENE_ID, usd_path=USD_TEMPLATE_FILE, load_object_categories=["bed", "bottom_cabinet"]
+    scene_model=SCENE_ID,
+    load_object_categories=["floors", "walls", "ceilings", "bed", "bottom_cabinet"],
 )
 
 # Import the scene.
