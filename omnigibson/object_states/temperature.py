@@ -96,3 +96,7 @@ class Temperature(AbsoluteObjectState):
 
     def _deserialize(self, state):
         return OrderedDict(temperature=state[0]), 1
+
+    @property
+    def state_size(self):
+        return 1

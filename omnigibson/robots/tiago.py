@@ -174,6 +174,15 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         )
 
     @property
+    def arm_joint_names(self):
+        names = dict()
+        for arm in self.arm_names:
+            names[arm] = ["torso_lift_joint"] + [
+                f"arm_{arm}_{i}_joint" for i in range(1, 8)
+            ]
+        return names
+
+    @property
     def model_name(self):
         """
         :return str: robot model name
@@ -192,7 +201,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
     def tucked_default_joint_pos(self):
         pos = np.zeros(self.n_dof)
         # Keep the current joint positions for the base joints
-        pos[self.base_control_idx] = self.get_joint_positions()[self.base_control_idx]
+        pos[self.base_idx] = self.get_joint_positions()[self.base_idx]
         pos[self.trunk_control_idx] = 0
         pos[self.camera_control_idx] = np.array([0.0, 0.0])
         for arm in self.arm_names:
@@ -206,7 +215,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
     def untucked_default_joint_pos(self):
         pos = np.zeros(self.n_dof)
         # Keep the current joint positions for the base joints
-        pos[self.base_control_idx] = self.get_joint_positions()[self.base_control_idx]
+        pos[self.base_idx] = self.get_joint_positions()[self.base_idx]
         pos[self.trunk_control_idx] = 0.02 + self.default_trunk_offset
         pos[self.camera_control_idx] = np.array([0.0, 0.45])
         pos[self.gripper_control_idx[self.default_arm]] = np.array([0.045, 0.045])  # open gripper
@@ -256,6 +265,15 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         Immediately set this robot's configuration to be in untucked mode
         """
         self.set_joint_positions(self.untucked_default_joint_pos)
+
+    def reset(self):
+        """
+        Reset should not change the robot base pose.
+        We need to cache and restore the base joints to the world.
+        """
+        base_joint_positions = self.get_joint_positions()[self.base_idx]
+        super().reset()
+        self.set_joint_positions(base_joint_positions, indices=self.base_idx)
 
     def _post_load(self):
         super()._post_load()

@@ -176,6 +176,7 @@ class ScanSensor(BaseSensor):
         unit_vector_laser = np.array([[np.cos(ang), np.sin(ang), 0.0] for ang in angles])
 
         # Scale unit vectors by corresponding laser scan distnaces
+        assert ((scan >= 0.0) & (scan <= 1.0)).all(), "scan out of valid range [0, 1]"
         scan_laser = unit_vector_laser * (scan * (self.max_range - self.min_range) + self.min_range)
 
         # Convert scans from laser frame to world frame
@@ -229,8 +230,10 @@ class ScanSensor(BaseSensor):
 
         # Add scan info (normalized to [0.0, 1.0])
         if "scan" in self._modalities:
-            obs["scan"] = ((self._rs.get_linear_depth_data(self._prim_path) - self.min_range) /
-                           (self.max_range - self.min_range)).clip(0.0, 1.0)
+            raw_scan = self._rs.get_linear_depth_data(self._prim_path)
+            # Sometimes get_linear_depth_data will return values that are slightly out of range, needs clipping
+            raw_scan = np.clip(raw_scan, self.min_range, self.max_range)
+            obs["scan"] = (raw_scan - self.min_range) / (self.max_range - self.min_range)
 
             # Optionally add occupancy grid info
             if "occupancy_grid" in self._modalities:

@@ -74,4 +74,3 @@ class IKSolver:
         # Compute target joint positions
         ik_results = lula.compute_ik_ccd(self.kinematics, ik_target_pose, self.eef_name, self.config)
         return np.array(ik_results.cspace_position)
-

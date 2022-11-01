@@ -412,6 +412,19 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         ]}
 
     @property
+    def arm_joint_names(self):
+        return {self.default_arm: [
+            "torso_lift_joint",
+            "shoulder_pan_joint",
+            "shoulder_lift_joint",
+            "upperarm_roll_joint",
+            "elbow_flex_joint",
+            "forearm_roll_joint",
+            "wrist_flex_joint",
+            "wrist_roll_joint",
+        ]}
+
+    @property
     def eef_link_names(self):
         return {self.default_arm: "gripper_link"}
 

@@ -16,12 +16,6 @@ from omnigibson.controllers import (
     MultiFingerGripperController,
     NullJointController,
 )
-# from omnigibson.external.pybullet_tools.utils import (
-#     ContactResult,
-#     get_child_frame_pose,
-#     get_constraint_violation,
-#     get_link_pose,
-# )
 from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.robots.robot_base import BaseRobot
 from omnigibson.utils.python_utils import classproperty, assert_valid_key
@@ -477,6 +471,19 @@ class ManipulationRobot(BaseRobot):
         self._ag_freeze_gripper[arm] = False
         self._ag_release_counter[arm] = 0
 
+    def release_grasp_immediately(self):
+        """
+        Magic action to release this robot's grasp for all arms at once.
+        As opposed to @_release_grasp, this method would byupass the release window mechanism and immediately release.
+        """
+        for arm in self.arm_names:
+            if self._ag_obj_in_hand[arm] is not None:
+                self._release_grasp(arm=arm)
+                # for finger_link in self.finger_links[arm]:
+                #     finger_link.remove_filtered_collision_pair(prim=self._ag_obj_in_hand[arm])
+                self._ag_obj_in_hand[arm] = None
+                self._ag_release_counter[arm] = None
+
     def get_control_dict(self):
         # In addition to super method, add in EEF states
         dic = super().get_control_dict()
@@ -584,6 +591,15 @@ class ManipulationRobot(BaseRobot):
         """
         :return dict[str, list[str]]: Dictionary mapping arm appendage name to corresponding arm link names,
             should correspond to specific link names in this robot's underlying model file
+        """
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
+    def arm_joint_names(self):
+        """
+        :return dict[str, list[str]]: Dictionary mapping arm appendage name to corresponding arm joint names,
+            should correspond to specific joint names in this robot's underlying model file
         """
         raise NotImplementedError
 
@@ -846,8 +862,8 @@ class ManipulationRobot(BaseRobot):
         time_since_release = self._ag_release_counter[arm] * self._simulator.get_rendering_dt()
         if time_since_release >= m.RELEASE_WINDOW:
             # Remove filtered collision restraints
-            for finger_link in self.finger_links[arm]:
-                finger_link.remove_filtered_collision_pair(prim=self._ag_obj_in_hand[arm])
+            # for finger_link in self.finger_links[arm]:
+            #     finger_link.remove_filtered_collision_pair(prim=self._ag_obj_in_hand[arm])
             self._ag_obj_in_hand[arm] = None
             self._ag_release_counter[arm] = None
 
@@ -1039,9 +1055,8 @@ class ManipulationRobot(BaseRobot):
         if ag_obj.fixed_base:
             # We search up the tree path from the ag_link until we encounter the root (joint == 0) or a non fixed
             # joint (e.g.: revolute or fixed)
-            joint_handle = -1
             link_handle = ag_link.handle
-            use_spherical = False
+            joint_handle = self._dc.get_rigid_body_parent_joint(link_handle)
             while joint_handle != 0:
                 # If this joint type is not fixed, we've encountered a valid moving joint
                 # So we create a spherical joint rather than fixed joint

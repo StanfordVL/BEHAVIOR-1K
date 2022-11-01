@@ -124,7 +124,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
             robot_idn (int): Which robot to ignore a collision for
             obj (BaseObject): Which object to no longer ignore a collision for
         """
-        self._ignore_robot_object_collisions[robot_idn].remove(obj)
+        self._ignore_robot_object_collisions[robot_idn].discard(obj)
 
     def remove_ignore_robot_self_collision(self, robot_idn, link):
         """
@@ -137,7 +137,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
             robot_idn (int): Which robot to ignore a collision for
             link (RigidPrim): Which robot link to no longer ignore a collision for
         """
-        self._ignore_robot_self_collisions[robot_idn].remove(link)
+        self._ignore_robot_self_collisions[robot_idn].discard(link)
 
     def reload(self, configs, overwrite_old=True):
         """
