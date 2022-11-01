@@ -769,7 +769,7 @@ class DustSystem(VisualParticleSystem):
             primitive_type="Cube",
             name="dust_template",
             class_id=SemanticClass.DIRT,
-            size=0.030,
+            size=0.01,
             rgba=[0.2, 0.2, 0.1, 1.0],
             visible=False,
             fixed_base=False,
