@@ -42,6 +42,10 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
     """
     Tiago Robot
     Reference: https://pal-robotics.com/robots/tiago/
+
+    NOTE: If using IK Control for both the right and left arms, note that the left arm dictates control of the trunk,
+    and the right arm passively must follow. That is, sending desired delta position commands to the right end effector
+    will be computed independently from any trunk motion occurring during that timestep.
     """
 
     def __init__(
@@ -360,6 +364,15 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         limits["velocity"][0][self.base_idx[3:]] = -m.MAX_ANGULAR_VELOCITY
         limits["velocity"][1][self.base_idx[3:]] = m.MAX_ANGULAR_VELOCITY
         return limits
+
+    def get_control_dict(self):
+        # Modify the right hand's pos_relative in the z-direction based on the trunk's value
+        # We do this so we decouple the trunk's dynamic value from influencing the IK controller solution for the right
+        # hand, which does not control the trunk
+        dic = super().get_control_dict()
+        dic["eef_right_pos_relative"][2] = dic["eef_right_pos_relative"][2] - self.get_joint_positions()[self.trunk_control_idx]
+
+        return dic
 
     @property
     def default_proprio_obs(self):
