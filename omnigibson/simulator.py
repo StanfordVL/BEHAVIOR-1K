@@ -725,7 +725,7 @@ class Simulator(SimulationContext, Serializable):
 
         # Start the simulation and restore the dynamic state of the scene and then pause again
         self.play()
-        self.scene.load_state(scene_state, serialized=False)
+        self._scene.load_state(scene_state, serialized=False)
         self.app.update()
         self.pause()
 
@@ -890,7 +890,15 @@ class Simulator(SimulationContext, Serializable):
         self._scene.load_state(state=state, serialized=False)
 
     def load_state(self, state, serialized=False):
-        # Run super first
+        # If we're using GPU, we have to do a super stupid workaround to avoid physx crashing
+        # For some reason, trying to load large states after n >= 3 steps are taken after the simulator starts playing
+        # results in a crash. So, since we are resetting the entire sim state anyways, we will stop and start the
+        # simulator to reset the frame count
+        assert self.is_playing()
+        if gm.ENABLE_OMNI_PARTICLES:
+            self.stop()
+            self.play()
+        # Run super
         super().load_state(state=state, serialized=serialized)
 
         # TODO: verify if this is still needed

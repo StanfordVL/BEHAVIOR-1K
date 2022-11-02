@@ -1329,13 +1329,6 @@ class EntityPrim(XFormPrim):
         omni.kit.commands.execute("CreatePhysicsAttachment", target_attachment_path=attachment_path,
                                   actor0_path=self.root_link.prim.GetPath(), actor1_path=link.prim.GetPath())
 
-    # TODO: Remove?
-    # def save_state(self):
-    #     # Iterate over all links and joints
-    #     link_states = [link.save_state() for link in self._links.values()]
-    #     joint_states = [joint.save_state() for joint in self._joints.values()]
-    #     return np.concatenate([*link_states, *joint_states])
-
     def _dump_state(self):
         # We don't call super, instead, this state is simply the root link state and all joint states
         state = OrderedDict(root_link=self.root_link._dump_state())
