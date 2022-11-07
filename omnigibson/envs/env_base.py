@@ -58,7 +58,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self._texture_randomization_freq = None
         self._object_randomization_freq = None
         self._task = None
-        self._scene = None
         self._loaded = None
         self._current_episode = 0
 
@@ -247,7 +246,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self._task.load(env=self)
 
         # Update the initial scene state
-        self._scene.update_initial_state()
+        self.scene.update_initial_state()
 
         og.sim.stop()
 
@@ -264,15 +263,12 @@ class Environment(gym.Env, GymObservable, Recreatable):
         )
         og.sim.import_scene(scene)
 
-        # Save scene internally
-        self._scene = scene
-
     def _load_robots(self):
         """
         Load robots into the scene
         """
         # Only actually load robots if no robot has been imported from the scene loading directly yet
-        if len(self._scene.robots) == 0:
+        if len(self.scene.robots) == 0:
             # Iterate over all robots to generate in the robot config
             for i, robot_config in enumerate(self.robots_config):
                 # Add a name for the robot if necessary
@@ -600,7 +596,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         Returns:
             Scene: Active scene in this environment
         """
-        return self._scene
+        return og.sim.scene
 
     @property
     def robots(self):
@@ -608,7 +604,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         Returns:
             list of BaseRobot: Robots in the current scene
         """
-        return self._scene.robots
+        return self.scene.robots
 
     @property
     def env_config(self):
