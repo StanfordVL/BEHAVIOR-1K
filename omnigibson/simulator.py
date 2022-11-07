@@ -123,9 +123,6 @@ class Simulator(SimulationContext, Serializable):
         self._data_logger = DataLogger()
 
         # Store other internal vars
-        n_physics_timesteps_per_render = rendering_dt / physics_dt
-        assert n_physics_timesteps_per_render.is_integer(), "render_timestep must be a multiple of physics_timestep"
-        self.n_physics_timesteps_per_render = int(n_physics_timesteps_per_render)
         self.gravity = gravity
         self.vertical_fov = vertical_fov        # TODO: This currently does nothing
 
@@ -535,6 +532,15 @@ class Simulator(SimulationContext, Serializable):
             # TODO: A better place to put this perhaps?
             self._scene.object_registry.update(keys="root_handle")
 
+    @property
+    def n_physics_timesteps_per_render(self):
+        """
+        Number of physics timesteps per rendering timestep. rendering_dt has to be a multiple of physics_dt.
+        """
+        n_physics_timesteps_per_render = self.get_rendering_dt() / self.get_physics_dt()
+        assert n_physics_timesteps_per_render.is_integer(), "render_timestep must be a multiple of physics_timestep"
+        return n_physics_timesteps_per_render
+
     def step(self, render=True, force_playing=False):
         """
         Step the simulation at self.render_timestep
@@ -548,17 +554,11 @@ class Simulator(SimulationContext, Serializable):
         if force_playing and not self.is_playing():
             self.play()
 
-        # Note that we bypass super().step() because there seems to be some issues with app.update()
-        # In theory, app.update() should be equivalent to step_physics() and then render().
-        # However, emperically, app.update() causes a bug in gpu dynamics.
-        if self.physics_sim_view is not None:
-            self.physics_sim_view.flush()
-
-        for i in range(self.n_physics_timesteps_per_render):
-            self.step_physics()
-
         if render:
-            self.render()
+            super().step(render=True)
+        else:
+            for i in range(self.n_physics_timesteps_per_render):
+                super.step(render=False)
 
         # Additionally run non physics things if we have a valid scene
         if self._scene is not None:
