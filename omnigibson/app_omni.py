@@ -9,6 +9,7 @@
 
 from __future__ import annotations  # This allows us to hint types that do not yet exist like omni.usd etc
 
+from typing import Any
 import os
 import sys
 import argparse
@@ -17,12 +18,49 @@ import carb
 import omni.kit.app
 import builtins
 from omnigibson.macros import gm, create_module_macros
+from collections import Iterable
 
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
 m.DEFAULT_HIDE_WINDOWS = ["Flow", "Semantics Schema Editor"]
+
+
+def set_carb_setting(carb_settings: carb.settings.ISettings, setting: str, value: Any) -> None:
+    """Convenience function to set settings.
+
+    Arguments:
+        setting (str): Name of setting to change.
+        value (Any): New value for the setting.
+
+    Raises:
+        TypeError: If the type of value does not match setting type.
+    """
+    if isinstance(value, str):
+        carb_settings.set_string(setting, value)
+    elif isinstance(value, bool):
+        carb_settings.set_bool(setting, value)
+    elif isinstance(value, int):
+        carb_settings.set_int(setting, value)
+    elif isinstance(value, float):
+        carb_settings.set_float(setting, value)
+    elif isinstance(value, Iterable) and not isinstance(value, dict):
+        if len(value) == 0:
+            raise TypeError(f"Array of type {type(value)} must be nonzero.")
+        if isinstance(value[0], str):
+            carb_settings.set_string_array(setting, value)
+        elif isinstance(value[0], bool):
+            carb_settings.set_bool_array(setting, value)
+        elif isinstance(value[0], int):
+            carb_settings.set_int_array(setting, value)
+        elif isinstance(value[0], float):
+            carb_settings.set_float_array(setting, value)
+        else:
+            raise TypeError(f"Value of type {type(value)} is not supported.")
+    else:
+        raise TypeError(f"Value of type {type(value)} is not supported.")
+
 
 class OmniApp:
     """Helper class to launch Omniverse Toolkit.
@@ -127,7 +165,7 @@ class OmniApp:
         #     self._app.update()
 
         # once app starts, we can set / load settings
-        from omni.isaac.kit.utils import set_carb_setting, open_stage, create_new_stage, set_livesync_stage
+        from omni.isaac.kit.utils import open_stage, create_new_stage, set_livesync_stage
         self._carb_settings = carb.settings.get_settings()
 
         # apply render settings specified in config
@@ -309,8 +347,6 @@ class OmniApp:
         Args:
             default (bool, optional): Whether to setup RTX default or non-default settings. Defaults to False.
         """
-        from omni.isaac.kit.utils import set_carb_setting
-
         # Define mode to configure settings into.
         if default:
             rtx_mode = "/rtx-defaults"
@@ -410,8 +446,6 @@ class OmniApp:
             setting (str): carb setting path
             value: value to set the setting to, type is used to properly set the setting.
         """
-        from omni.isaac.kit.utils import set_carb_setting
-
         set_carb_setting(self._carb_settings, setting, value)
 
     def reset_render_settings(self):
