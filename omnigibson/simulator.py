@@ -741,6 +741,8 @@ class Simulator(SimulationContext, Serializable):
             usd_path (str): Full path of USD file to load, which contains information
                 to recreate the current scene.
         """
+        # Make sure the sim is not stopped, since we need to grab joint states
+        assert not self.is_stopped(), "Simulator cannot be stopped when saving to USD!"
         # TODO: Make sure all objects have been initialized
 
         if not self.scene:
