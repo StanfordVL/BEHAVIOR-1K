@@ -379,7 +379,7 @@ def import_rendering_channels(obj_prim, obj_category, obj_model, model_root_path
             print(f"Binding material {mtl_name}, shader {shaders[mtl_name]}, to prim {mesh_prim_path}...")
             UsdShade.MaterialBindingAPI(visual_prim).Bind(shaders[mtl_name], UsdShade.Tokens.strongerThanDescendants)
 
-    # Lastly, we also add any additional object_state textures that weren't originally ported
+    # Lastly, we copy object_state texture maps that are state-conditioned; e.g.: cooked, soaked, etc.
     copy_object_state_textures(obj_category=obj_category, obj_model=obj_model)
 
     # ###################################
@@ -681,15 +681,8 @@ def import_obj_metadata(obj_category, obj_model, import_render_channels=False):
 
     # Delete stage reference and clear the sim stage variable, opening the dummy stage along the way
     del stage
-    # ig.sim.clear()
-    # del stage
-    # open_stage(f"{ig.assets_path}/models/misc/clear_stage.usd")
 
-    # encrypted_usd_path = usd_path.replace(".usd", ".encrypted.usd")
-    # encrypt_file(usd_path, encrypted_filename=encrypted_usd_path)
-    # os.remove(usd_path)
-
-
+    # Possibly encrypt
     if gm.USE_ENCRYPTED_ASSETS:
         encrypted_usd_path = usd_path.replace(".usd", ".encrypted.usd")
         encrypt_file(usd_path, encrypted_filename=encrypted_usd_path)

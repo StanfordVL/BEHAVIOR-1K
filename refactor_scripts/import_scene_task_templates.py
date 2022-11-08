@@ -205,7 +205,7 @@ def import_models_template_from_task_scenes(scene_id):
     usd_dir = f"{og_dataset_path}/scenes/{scene_id}/usd"
     for scene_urdf in os.listdir(urdf_dir):
         # Only parse the scenes with task
-        if f"{scene_id}_task_" in scene_urdf and "installing_a_printer_0_0" in scene_urdf:
+        if f"{scene_id}_task_" in scene_urdf:
             usd_template_filename = f"{scene_urdf.split('.urdf')[0]}_template.usd"
             urdf = f"{urdf_dir}/{scene_urdf}"
             usd = f"{usd_dir}/{usd_template_filename}"

@@ -7,8 +7,8 @@ from refactor_scripts.import_metadata import import_obj_metadata
 
 
 ##### SET THIS ######
-OBJECT_CATEGORIES = ["grass_patch"]
-OBJECT_MODELS = ["kqhokv"]
+OBJECT_CATEGORIES = ["apple", "apple", "table_knife"]
+OBJECT_MODELS = ["00_0", "00_1", "1"]
 
 IMPORT_RENDER_CHANNELS = True
 #### YOU DONT NEED TO TOUCH ANYTHING BELOW HERE IDEALLY :) #####

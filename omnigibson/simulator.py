@@ -892,11 +892,13 @@ class Simulator(SimulationContext, Serializable):
         self._scene.load_state(state=state, serialized=False)
 
     def load_state(self, state, serialized=False):
+        # We need to make sure the simulator is playing since joint states only get updated when playing
+        assert self.is_playing()
+
         # If we're using GPU, we have to do a super stupid workaround to avoid physx crashing
         # For some reason, trying to load large states after n >= 3 steps are taken after the simulator starts playing
         # results in a crash. So, since we are resetting the entire sim state anyways, we will stop and start the
         # simulator to reset the frame count
-        assert self.is_playing()
         if gm.ENABLE_OMNI_PARTICLES:
             self.stop()
             self.play()

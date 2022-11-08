@@ -8,7 +8,7 @@ from refactor_scripts.import_scene_template import import_models_template_from_s
 
 
 ##### SET THIS ######
-SCENE = "restaurant_hotel"
+SCENE = "Rs_int"
 
 IMPORT_RENDER_CHANNELS = True
 #### YOU DONT NEED TO TOUCH ANYTHING BELOW HERE IDEALLY :) #####
