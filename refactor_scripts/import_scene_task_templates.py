@@ -18,6 +18,7 @@ from omni.isaac.core.articulations import Articulation
 from omnigibson.utils.usd_utils import create_joint
 from omni.isaac.core.utils.prims import get_prim_at_path, get_prim_path, is_prim_path_valid, get_prim_children
 from omnigibson.utils.constants import JointType
+from omnigibson.utils.config_utils import NumpyEncoder
 
 ##### SET THIS ######
 SCENE_ID = "Rs_int"
@@ -95,7 +96,20 @@ def import_nested_models_template_from_element(element, model_pose_info):
                 random_group = ele.get("random_group", None)
                 scale = string_to_array(ele.get("scale")) if "scale" in ele.keys() else None
                 obj_scope = ele.get("object_scope", None)
-                import_obj_template(obj_category=category, obj_model=model, name=name, bb=bb, pos=pos, quat=quat, fixed_jnt=fixed_jnt, room=room, random_group=random_group, scale=scale, obj_scope=obj_scope)
+
+                if category == "agent_pose":
+                    # Write metadata for this
+                    pose_info = [
+                        {
+                            "position": np.array(pos),
+                            "orientation": np.array(quat)[[1, 2, 3, 0]],
+                        },
+                    ]
+                    world = get_prim_at_path("/World")
+                    world.SetCustomDataByKey("agent_poses", json.dumps(pose_info, cls=NumpyEncoder))
+                else:
+                    # Import as new XForm
+                    import_obj_template(obj_category=category, obj_model=model, name=name, bb=bb, pos=pos, quat=quat, fixed_jnt=fixed_jnt, room=room, random_group=random_group, scale=scale, obj_scope=obj_scope)
 
         # If there's children nodes, we iterate over those
         for child in ele:
@@ -191,12 +205,12 @@ def import_models_template_from_task_scenes(scene_id):
     usd_dir = f"{og_dataset_path}/scenes/{scene_id}/usd"
     for scene_urdf in os.listdir(urdf_dir):
         # Only parse the scenes with task
-        if f"{scene_id}_task_" in scene_urdf:
+        if f"{scene_id}_task_" in scene_urdf and "installing_a_printer_0_0" in scene_urdf:
             usd_template_filename = f"{scene_urdf.split('.urdf')[0]}_template.usd"
             urdf = f"{urdf_dir}/{scene_urdf}"
             usd = f"{usd_dir}/{usd_template_filename}"
             import_models_template_from_task_scene(urdf=urdf, usd_out=usd)
-            break
+            # break
 
 
 if __name__ == "__main__":
