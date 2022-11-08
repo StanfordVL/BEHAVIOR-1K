@@ -17,9 +17,6 @@ from omnigibson.simulator import Simulator
 from omnigibson.utils.asset_utils import download_assets, get_og_model_path
 from omnigibson.utils.usd_utils import create_joint
 
-if gm.ENABLE_OMNI_PARTICLES:
-    from omnigibson.systems.micro_particle_system import WaterSystem
-
 from pxr import Gf
 
 #download_assets()

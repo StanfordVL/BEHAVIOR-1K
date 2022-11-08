@@ -1,123 +1,85 @@
 import os
-
+import logging
 import numpy as np
 
-from omnigibson.robots.turtlebot import Turtlebot
-from omnigibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
-from omnigibson.simulator import Simulator
+import omnigibson as og
+from omnigibson.utils.ui_utils import KeyboardEventHandler
+import carb
 
-SCENE_ID = "Rs_int"
 TEST_OUT_PATH = ""  # Define output directory here.
 
-#### SAVE SIMULATION ENV #####
-sim = Simulator()
+def main(random_selection=False, headless=False, short_exec=False):
+    """
+    Prompts the user to select whether they are saving or loading an environment, and interactively
+    shows how an environment can be saved or restored.
+    """
+    logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
 
-# Create a scene.
-scene = InteractiveTraversableScene(
-    scene_model=SCENE_ID,
-    load_object_categories=["floors", "walls", "ceilings", "bed", "bottom_cabinet"],
-)
+    cfg = {
+        "scene": {
+            "type": "InteractiveTraversableScene",
+            "scene_model": "Rs_int",
+            "load_object_categories": ["floors", "walls", "bed", "bottom_cabinet", "chair"],
+        },
+        "robots": [
+            {
+                "type": "Turtlebot",
+                "obs_modalities": ["rgb", "depth"],
+            },
+        ],
+    }
 
-# Import the scene.
-sim.import_scene(scene=scene)
+    # Create the environment
+    env = og.Environment(configs=cfg)
 
-# Report objects loaded.
-for reg in sim.scene.registry.objects:
-    print("=====")
-    print(reg.name)
-    for obj in reg.objects:
-        print(f"Registry: {reg.name}, obj: {obj.name}")
+    # Set the camera to a good angle
+    def set_camera_pose():
+        og.sim.viewer_camera.set_position_orientation(
+            position=np.array([-0.229375, -3.40576 ,  7.26143 ]),
+            orientation=np.array([ 0.27619733, -0.00230233, -0.00801152,  0.9610648 ]),
+        )
+    set_camera_pose()
 
-# Take a look at the scene.
-for _ in range(2000):
-    sim.step()
+    # Give user instructions, and then loop until completed
+    completed = short_exec
+    if not short_exec and not random_selection:
+        # Notify user to manipulate environment until ready, then press Z to exit
+        print()
+        print("Modify the scene by SHIFT + left clicking objects and dragging them. Once finished, press Z.")
+        # Register callback so user knows to press space once they're done manipulating the scene
+        def complete_loop():
+            nonlocal completed
+            completed = True
+        KeyboardEventHandler.add_keyboard_callback(carb.input.KeyboardInput.Z, complete_loop)
+    while not completed:
+        env.step(np.random.uniform(-1, 1, env.robots[0].action_dim))
 
-# Canonical position can only be set when sim is stopped.
-sim.stop()
+    print("Completed scene modification, saving scene...")
+    save_path = os.path.join(TEST_OUT_PATH, "saved_stage.usd")
+    og.sim.save(usd_path=save_path)
 
-# Move 2 objects.
-o = sim.scene.object_registry("name", "bottom_cabinet_13")
-o.set_position(np.array([0.2, -1.49805, 0.38631]))
-cab_pos_1 = o.get_position()
-print(f"{o.name} position: {cab_pos_1}")
+    print("Re-loading scene...")
+    og.sim.restore(usd_path=save_path)
 
-o = sim.scene.object_registry("name", "bottom_cabinet_41")
-o.set_position(np.array([0, 3.13717675, 0.46447614]))
-cab_pos_2 = o.get_position()
-print(f"{o.name} position: {cab_pos_2}")
+    # Take a sim step and play
+    og.sim.step()
+    og.sim.play()
+    set_camera_pose()
 
-# Import a robot.
-robot = Turtlebot(prim_path=f"/World/robot", name="robot", obs_modalities=["proprio", "rgb", "scan", "occupancy_grid"])
-sim.import_object(obj=robot)
-sim.play()
-sim.step()
-robot.apply_action(np.array([1.0, 0]))
+    # Loop until user terminates
+    completed = short_exec
+    if not short_exec and not random_selection:
+        # Notify user to manipulate environment until ready, then press Z to exit
+        print()
+        print("View reloaded scene. Once finished, press Z.")
+        # Register callback so user knows to press space once they're done manipulating the scene
+        KeyboardEventHandler.add_keyboard_callback(carb.input.KeyboardInput.Z, complete_loop)
+    while not completed:
+        env.step(np.zeros(env.robots[0].action_dim))
 
-# Take some steps.
-for _ in range(100):
-    sim.step()
+    # Shutdown omnigibson at the end
+    og.shutdown()
 
-print(f"{robot.name} position: {robot.get_position()}")
-print(f"{robot.name} linear_velocity: {robot.get_linear_velocity()}")
-print(f"{robot.name} angular_velocity: {robot.get_angular_velocity()}")
 
-# Report loaded prims in the world.
-world_prim = sim.world_prim
-for prim in world_prim.GetChildren():
-    name = prim.GetName()
-    # Only process prims that are an Xform.
-    if prim.GetPrimTypeInfo().GetTypeName() == "Xform":
-        name = prim.GetName()
-        print(name)
-
-# Take a look at the registries.
-print([o.name for o in sim.scene.object_registry.objects])
-print([o.name for o in sim.scene.robot_registry.objects])
-
-# Save the simulation environment.
-usd_path = os.path.join(TEST_OUT_PATH, "saved_stage.usd")
-sim.save(usd_path)
-
-#### LOAD SIMULATION ENV #####
-## Optional: restart a session and skip the "SAVE SIMULATION ENV" section
-
-# NOTE: Skip this line if did not restart the session.
-sim = Simulator()
-
-# Restore the saved sim environment.
-usd_path = os.path.join(TEST_OUT_PATH, "saved_stage.usd")
-sim.restore(usd_path)
-
-# Report loaded prims in the world.
-world_prim = sim.world_prim
-for prim in world_prim.GetChildren():
-    name = prim.GetName()
-    # Only process prims that are an Xform.
-    if prim.GetPrimTypeInfo().GetTypeName() == "Xform":
-        name = prim.GetName()
-        print(name)
-
-# Take a look at the registries.
-print([o.name for o in sim.scene.object_registry.objects])
-print([o.name for o in sim.scene.robot_registry.objects])
-
-# Check object positions.
-o = sim.scene.object_registry("name", "bottom_cabinet_13")
-print(f"{o.name} position: {o.get_position()}")
-
-o = sim.scene.object_registry("name", "bottom_cabinet_41")
-print(f"{o.name} position: {o.get_position()}")
-
-# Check robot position and velocity.
-robot = sim.scene.robot_registry("name", "robot")
-print(f"{robot.name} position: {robot.get_position()}")
-print(f"{robot.name} linear_velocity: {robot.get_linear_velocity()}")
-print(f"{robot.name} angular_velocity: {robot.get_angular_velocity()}")
-
-# Take a step.
-sim.play()
-sim.step()
-
-# Take a look at the scene.
-for _ in range(2000):
-    sim.step()
+if __name__ == "__main__":
+    main()

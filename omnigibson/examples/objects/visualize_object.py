@@ -47,7 +47,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     # Set camera to appropriate viewing pose
     og.sim.viewer_camera.set_position_orientation(
         position=np.array([-0.00913503, -1.95750906,  1.36407314]),
-        orientation=np.array([0.63468727, 0.02012955, 0.02448817, 0.77211864]),
+        orientation=np.array([0.6350064 , 0.        , 0.        , 0.77250687]),
     )
 
     # Create a light object
