@@ -12,6 +12,8 @@ from omni.isaac.core.utils.prims import get_prim_at_path
 import numpy as np
 from omni.isaac.core.materials import PhysicsMaterial
 from omni.usd import get_shader_from_material
+import omnigibson as og
+from omnigibson.macros import gm
 from omnigibson.prims.xform_prim import XFormPrim
 
 
@@ -196,6 +198,10 @@ class CollisionGeomPrim(GeomPrim):
         Args:
             enabled (bool): Whether collisions should be enabled for this mesh
         """
+        # Currently, trying to toggle while simulator is playing while using GPU dynamics results in a crash, so we
+        # assert that the sim is stopped here
+        if self._initialized and gm.ENABLE_OMNI_PARTICLES:
+            assert og.sim.is_stopped(), "Cannot toggle collisions while using GPU dynamics unless simulator is stopped!"
         self.set_attribute("physics:collisionEnabled", enabled)
 
     # TODO: Maybe this should all be added to RigidPrim instead?

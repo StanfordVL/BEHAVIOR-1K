@@ -37,6 +37,14 @@ LIGHT_MAPPING = {
     4: "Disk",
 }
 
+OBJECT_STATE_TEXTURES = {
+    "burnt",
+    "cooked",
+    "frozen",
+    "soaked",
+    "toggledon",
+}
+
 
 def set_mtl_albedo(mtl_prim, texture):
     mtl = "diffuse_texture"
@@ -113,6 +121,7 @@ MTL_MAP_TYPE_MAPPINGS = {
     "map_tf": "opacity",
     "map_ke": "emission",
     "map_ks": "ao",
+    "map_": "metalness",
 }
 
 
@@ -213,6 +222,20 @@ def get_visual_objs_from_urdf(urdf_path):
                     visual_objs[name][visual_mesh_name] = obj_file
 
     return visual_objs
+
+
+def copy_object_state_textures(obj_category, obj_model):
+    obj_root_dir = f"{og_dataset_path}/objects/{obj_category}/{obj_model}"
+    old_mat_fpath = f"{obj_root_dir}/material"
+    new_mat_fpath = f"{obj_root_dir}/usd/materials"
+    for mat_file in os.listdir(old_mat_fpath):
+        should_copy = False
+        for object_state in OBJECT_STATE_TEXTURES:
+            if object_state in mat_file.lower():
+                should_copy = True
+                break
+        if should_copy:
+            shutil.copy(f"{old_mat_fpath}/{mat_file}", new_mat_fpath)
 
 
 def import_rendering_channels(obj_prim, obj_category, obj_model, model_root_path, usd_path):
@@ -355,6 +378,9 @@ def import_rendering_channels(obj_prim, obj_category, obj_model, model_root_path
             # Bind the created link material to the visual prim
             print(f"Binding material {mtl_name}, shader {shaders[mtl_name]}, to prim {mesh_prim_path}...")
             UsdShade.MaterialBindingAPI(visual_prim).Bind(shaders[mtl_name], UsdShade.Tokens.strongerThanDescendants)
+
+    # Lastly, we copy object_state texture maps that are state-conditioned; e.g.: cooked, soaked, etc.
+    copy_object_state_textures(obj_category=obj_category, obj_model=obj_model)
 
     # ###################################
     #
@@ -546,9 +572,42 @@ def import_obj_metadata(obj_category, obj_model, import_render_channels=False):
         data["metadata"]["openable_joint_ids"] = {str(pair[0]): pair[1] for pair in data["metadata"]["openable_joint_ids"]}
 
     # Grab light info if any
-    lights = data["metadata"].get("meta_links", dict()).get("lights", None)
-    if lights is not None:
-        for link_name, light_infos in lights.items():
+    meta_links = data["metadata"].get("meta_links", dict())
+
+    # OLD FORMAT
+    if "lights" in meta_links:
+        light_infos = meta_links["lights"]
+        for link_name, link_metadata in light_infos.items():
+            for light_name, light_info in link_metadata.items():
+                # Create the light in the scene
+                light_type = LIGHT_MAPPING[light_info["type"]]
+                light_prim_path = f"/{obj_model}/{link_name}/light{light_name}"
+                light_prim = UsdLux.__dict__[f"{light_type}Light"].Define(stage, light_prim_path).GetPrim()
+                UsdLux.ShapingAPI.Apply(light_prim).GetShapingConeAngleAttr().Set(180.0)
+                add_xform_properties(prim=light_prim)
+                # Make sure light_prim has XForm properties
+                light = XFormPrim(prim_path=light_prim_path)
+                # Set the values accordingly
+                light.set_local_pose(
+                    translation=np.array(light_info["position"]),
+                    orientation=T.convert_quat(np.array(light_info["orientation"]), to="wxyz")
+                )
+                light.prim.GetAttribute("color").Set(Gf.Vec3f(*np.array(light_info["color"]) / 255.0))
+                light.prim.GetAttribute("intensity").Set(light_info["intensity"])
+                if light_type == "Rect":
+                    light.prim.GetAttribute("height").Set(light_info["length"])
+                    light.prim.GetAttribute("width").Set(light_info["width"])
+                elif light_type == "Disk":
+                    light.prim.GetAttribute("radius").Set(light_info["length"])
+                elif light_type == "Sphere":
+                    light.prim.GetAttribute("radius").Set(light_info["length"])
+                else:
+                    raise ValueError(f"Invalid light type: {light_type}")
+
+    # NEW FORMAT
+    else:
+        for link_name, link_metadata in meta_links.items():
+            light_infos = link_metadata.get("lights", dict())
             for light_name, light_info in light_infos.items():
                 # Create the light in the scene
                 light_type = LIGHT_MAPPING[light_info["type"]]
@@ -620,9 +679,10 @@ def import_obj_metadata(obj_category, obj_model, import_render_channels=False):
     # Save stage
     stage.Save()
 
-    # Delete stage reference
+    # Delete stage reference and clear the sim stage variable, opening the dummy stage along the way
     del stage
 
+    # Possibly encrypt
     if gm.USE_ENCRYPTED_ASSETS:
         encrypted_usd_path = usd_path.replace(".usd", ".encrypted.usd")
         encrypt_file(usd_path, encrypted_filename=encrypted_usd_path)

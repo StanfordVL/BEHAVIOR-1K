@@ -12,6 +12,75 @@ import carb
 import random
 
 
+class KeyboardEventHandler:
+    """
+    Simple singleton class for handing keyboard events
+    """
+    # Global keyboard callbacks
+    KEYBOARD_CALLBACKS = OrderedDict()
+
+    # ID assigned to meta callback method for this class
+    _CALLBACK_ID = None
+
+    def __init__(self):
+        raise ValueError("Cannot create an instance of keyboard event handler!")
+
+    @classmethod
+    def initialize(cls):
+        """
+        Hook up a meta function callback to the omni backend
+        """
+        appwindow = omni.appwindow.get_default_app_window()
+        input_interface = carb.input.acquire_input_interface()
+        keyboard = appwindow.get_keyboard()
+        cls._CALLBACK_ID = input_interface.subscribe_to_keyboard_events(keyboard, cls._meta_callback)
+
+    @classmethod
+    def reset(cls):
+        """
+        Resets this callback interface by removing all current callback functions
+        """
+        appwindow = omni.appwindow.get_default_app_window()
+        input_interface = carb.input.acquire_input_interface()
+        keyboard = appwindow.get_keyboard()
+        input_interface.unsubscribe_to_keyboard_events(keyboard, cls._CALLBACK_ID)
+        cls.KEYBOARD_CALLBACKS = OrderedDict()
+        cls._CALLBACK_ID = None
+
+    @classmethod
+    def add_keyboard_callback(cls, key, callback_fn):
+        """
+        Registers a keyboard callback function with omni, mapping a keypress from @key to run the callback_function
+        @callback_fn
+
+        Args:
+            key (carb.input.KeyboardInput): key to associate with the callback
+            callback_fn (function): Callback function to call if the key @key is pressed or repeated. Note that this
+                function's signature should be:
+
+                callback_fn() --> None
+        """
+        # Initialize the interface if not initialized yet
+        if cls._CALLBACK_ID is None:
+            cls.initialize()
+        # Add the callback
+        cls.KEYBOARD_CALLBACKS[key] = callback_fn
+
+    @classmethod
+    def _meta_callback(cls, event, *args, **kwargs):
+        """
+        Meta callback function that is hooked up to omni's backend
+        """
+        # Check if we've received a key press or repeat
+        if event.type == carb.input.KeyboardEventType.KEY_PRESS \
+                or event.type == carb.input.KeyboardEventType.KEY_REPEAT:
+            # Run the specific callback
+            cls.KEYBOARD_CALLBACKS.get(event.input, lambda: None)()
+
+        # Always return True
+        return True
+
+
 def choose_from_options(options, name, random_selection=False):
     """
     Prints out options from a list, and returns the requested option.

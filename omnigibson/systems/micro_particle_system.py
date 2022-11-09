@@ -13,7 +13,7 @@ from omnigibson.utils.usd_utils import create_joint, array_to_vtarray
 from omnigibson.utils.physx_utils import create_physx_particle_system, create_physx_particleset_pointinstancer, \
     bind_material, get_prototype_path_from_particle_system_path
 import omni
-from omni.isaac.core.utils.prims import get_prim_at_path
+from omni.isaac.core.utils.prims import get_prim_at_path, is_prim_path_valid
 from omni.physx.scripts import particleUtils
 from omni.physx import get_physx_scene_query_interface
 from collections import OrderedDict
@@ -470,9 +470,8 @@ class MicroParticleSystem(BaseParticleSystem):
 
         if cls.particle_system_exists:
             cls.prim = get_prim_at_path(cls.prim_path)
-            material_prim = get_prim_at_path(cls.mat_path)
-            # Material already exists on stage, just create a MaterialPrim wrapper around it (run its post_load())
-            if material_prim is not None:
+            # If Material already exists on stage, just create a MaterialPrim wrapper around it (run its post_load())
+            if is_prim_path_valid(cls.mat_path):
                 cls._material = cls._create_particle_material()
                 cls._material.shader_force_populate()
             prototype_dir_prim = get_prim_at_path(prototype_path)
@@ -556,7 +555,7 @@ class MicroParticleSystem(BaseParticleSystem):
                 synchronization during, e.g., initialization, where a USD snapshot may have been loaded with a particle
                 system already on the stage
         """
-        return bool(get_prim_at_path(cls.prim_path))
+        return is_prim_path_valid(cls.prim_path)
 
     @classproperty
     def is_fluid(cls):
