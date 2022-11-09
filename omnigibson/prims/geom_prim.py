@@ -200,7 +200,7 @@ class CollisionGeomPrim(GeomPrim):
         """
         # Currently, trying to toggle while simulator is playing while using GPU dynamics results in a crash, so we
         # assert that the sim is stopped here
-        if gm.ENABLE_OMNI_PARTICLES:
+        if self._initialized and gm.ENABLE_OMNI_PARTICLES:
             assert og.sim.is_stopped(), "Cannot toggle collisions while using GPU dynamics unless simulator is stopped!"
         self.set_attribute("physics:collisionEnabled", enabled)
 

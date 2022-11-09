@@ -65,13 +65,13 @@ def demo_sticky_attachment():
 
     # Obj1 moves towards obj2 and they are attached together.
     obj1.set_linear_velocity(velocity=np.array([3.0, 0, 3.0]))
-    for i in range(200):
+    for i in range(100):
         og.sim.step()
     assert obj1.states[object_states.StickyAttachment].get_value(obj2)
 
     # Apply a large force to obj1 but the two objects cannot move much because obj2 is heavy.
     obj1.set_linear_velocity(velocity=np.array([10.0, 0, 50.0]))
-    for i in range(200):
+    for i in range(100):
         env.step(np.array([]))  # empty action array since action space is 0 (no robots in the env)
 
     # Unattach obj1 and obj2.
@@ -80,7 +80,7 @@ def demo_sticky_attachment():
 
     # Obj1 moves away from obj2.
     obj1.set_linear_velocity(velocity=np.array([-2.0, 0, 1.0]))
-    for i in range(200):
+    for i in range(100):
         env.step(np.array([]))  # empty action array since action space is 0 (no robots in the env)
 
 
@@ -95,14 +95,14 @@ def demo_magnetic_attachment():
 
     # Obj1 moves towards obj2 and they are attached together.
     obj1.set_linear_velocity(velocity=np.array([3.0, 0, 3.0]))
-    for i in range(200):
+    for i in range(100):
         env.step(np.array([]))  # empty action array since action space is 0 (no robots in the env)
     assert obj1.states[object_states.MagneticAttachment].get_value(obj2)
     assert obj2.states[object_states.MagneticAttachment].get_value(obj1)
 
     # Apply a large force to obj1 but the two objects cannot move much because obj2 is heavy.
     obj1.set_linear_velocity(velocity=np.array([10.0, 0, 50.0]))
-    for i in range(200):
+    for i in range(100):
         env.step(np.array([]))  # empty action array since action space is 0 (no robots in the env)
 
     # Unattach obj1 and obj2.
@@ -112,7 +112,7 @@ def demo_magnetic_attachment():
 
     # Obj1 moves away from obj2.
     obj1.set_linear_velocity(velocity=np.array([-2.0, 0, 1.0]))
-    for i in range(200):
+    for i in range(100):
         env.step(np.array([]))  # empty action array since action space is 0 (no robots in the env)
 
 
@@ -127,13 +127,13 @@ def demo_failed_magnetic_attachment():
 
     # Obj1 moves towards obj2 and but they are NOT attached together.
     obj1.set_linear_velocity(velocity=np.array([3.0, 0, 3.0]))
-    for i in range(200):
+    for i in range(100):
         env.step(np.array([]))  # empty action array since action space is 0 (no robots in the env)
     assert not obj1.states[object_states.MagneticAttachment].get_value(obj2)
 
     # Obj1 moves away from obj2.
     obj1.set_linear_velocity(velocity=np.array([-2.0, 0, 1.0]))
-    for i in range(200):
+    for i in range(100):
         env.step(np.array([]))  # empty action array since action space is 0 (no robots in the env)
 
 
@@ -148,14 +148,14 @@ def demo_male_female_attachment():
 
     # Obj1 moves towards obj2 and they are attached together.
     obj1.set_linear_velocity(velocity=np.array([3.0, 0, 3.0]))
-    for i in range(200):
+    for i in range(100):
         env.step(np.array([]))  # empty action array since action space is 0 (no robots in the env)
     assert obj1.states[object_states.MaleAttachment].get_value(obj2)
     assert obj2.states[object_states.FemaleAttachment].get_value(obj1)
 
     # Apply a large force to obj1 but the two objects cannot move much because obj2 is heavy.
     obj1.set_linear_velocity(velocity=np.array([10.0, 0, 50.0]))
-    for i in range(200):
+    for i in range(100):
         env.step(np.array([]))  # empty action array since action space is 0 (no robots in the env)
 
     # Unattach obj1 and obj2.
@@ -165,7 +165,7 @@ def demo_male_female_attachment():
 
     # Obj1 moves away from obj2.
     obj1.set_linear_velocity(velocity=np.array([-2.0, 0, 1.0]))
-    for i in range(200):
+    for i in range(100):
         env.step(np.array([]))  # empty action array since action space is 0 (no robots in the env)
 
 
@@ -180,13 +180,13 @@ def demo_failed_male_female_attachment():
 
     # Obj1 moves towards obj2 and but they are NOT attached together.
     obj1.set_linear_velocity(velocity=np.array([3.0, 0, 3.0]))
-    for i in range(200):
+    for i in range(100):
         env.step(np.array([]))  # empty action array since action space is 0 (no robots in the env)
     assert not obj1.states[object_states.MaleAttachment].get_value(obj2)
 
     # Obj1 moves away from obj2.
     obj1.set_linear_velocity(velocity=np.array([-2.0, 0, 1.0]))
-    for i in range(200):
+    for i in range(100):
         env.step(np.array([]))  # empty action array since action space is 0 (no robots in the env)
 
 
@@ -202,14 +202,14 @@ def demo_hung_male_female_attachment():
 
     # Obj1 moves towards obj2 and they are attached together.
     obj1.set_linear_velocity(velocity=np.array([3.0, 0, 3.0]))
-    for i in range(200):
+    for i in range(100):
         env.step(np.array([]))  # empty action array since action space is 0 (no robots in the env)
     assert obj1.states[object_states.HungMaleAttachment].get_value(obj2)
     assert obj2.states[object_states.HungFemaleAttachment].get_value(obj1)
 
     # Apply a large force to obj1 but the two objects cannot move much because obj2 is heavy.
     obj1.set_linear_velocity(velocity=np.array([10.0, 0, 50.0]))
-    for i in range(200):
+    for i in range(100):
         env.step(np.array([]))  # empty action array since action space is 0 (no robots in the env)
 
     # Unattach obj1 and obj2.
@@ -219,7 +219,7 @@ def demo_hung_male_female_attachment():
 
     # Obj1 moves away from obj2.
     obj1.set_linear_velocity(velocity=np.array([-2.0, 0, 1.0]))
-    for i in range(200):
+    for i in range(100):
         env.step(np.array([]))  # empty action array since action space is 0 (no robots in the env)
 
 
@@ -235,13 +235,13 @@ def demo_failed_hung_male_female_incompatibility_attachment():
 
     # Obj1 moves towards obj2 and but they are NOT attached together.
     obj1.set_linear_velocity(velocity=np.array([3.0, 0, 3.0]))
-    for i in range(200):
+    for i in range(100):
         env.step(np.array([]))  # empty action array since action space is 0 (no robots in the env)
     assert not obj1.states[object_states.HungMaleAttachment].get_value(obj2)
 
     # Obj1 moves away from obj2.
     obj1.set_linear_velocity(velocity=np.array([-2.0, 0, 1.0]))
-    for i in range(200):
+    for i in range(100):
         env.step(np.array([]))  # empty action array since action space is 0 (no robots in the env)
 
 
@@ -257,13 +257,13 @@ def demo_failed_hung_male_female_mislocation_attachment():
 
     # Obj1 moves towards obj2 and but they are NOT attached together.
     obj1.set_linear_velocity(velocity=np.array([5.0, 0, 5.0]))
-    for i in range(200):
+    for i in range(100):
         env.step(np.array([]))  # empty action array since action space is 0 (no robots in the env)
     assert not obj1.states[object_states.HungMaleAttachment].get_value(obj2)
 
     # Obj1 moves away from obj2.
     obj1.set_linear_velocity(velocity=np.array([-2.0, 0, 1.0]))
-    for i in range(200):
+    for i in range(100):
         env.step(np.array([]))  # empty action array since action space is 0 (no robots in the env)
 
 
@@ -280,8 +280,9 @@ demo_names_to_demos = {
 
 
 def main(random_selection=False, headless=False, short_exec=False):
-    # Make sure object states are enabled
+    # Make sure object states are enabled and global contact reporting is enabled
     assert gm.ENABLE_OBJECT_STATES, f"Object states must be enabled in macros.py in order to use this demo!"
+    assert gm.ENABLE_GLOBAL_CONTACT_REPORTING, f"Global contact reporting must be enabled in macros.py in order to use this demo!"
 
     # Loop indefinitely and choose different examples to run
     for i in range(len(demo_names_to_demos)):
