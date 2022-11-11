@@ -45,11 +45,11 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
         self._simulator = None
 
     @property
-    def settable(self):
+    def stateful(self):
         """
         Returns:
             bool: True if this object has a state that can be directly dumped / loaded via dump_state() and
-                load_state(), otherwise, returns False. Note that any sub object states that are NOT settable do
+                load_state(), otherwise, returns False. Note that any sub object states that are NOT stateful do
                 not need to implement any of _dump_state(), _load_state(), _serialize(), or _deserialize()!
         """
         # False by default
@@ -92,7 +92,7 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
 
     def dump_state(self, serialized=False):
         assert self._initialized
-        assert self.settable
+        assert self.stateful
         return super().dump_state(serialized=serialized)
 
     @classproperty

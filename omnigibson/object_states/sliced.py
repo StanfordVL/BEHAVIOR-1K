@@ -76,7 +76,7 @@ class Sliced(AbsoluteObjectState, BooleanState):
         return True
 
     @property
-    def settable(self):
+    def stateful(self):
         return True
 
     def _dump_state(self):

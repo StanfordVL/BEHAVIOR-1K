@@ -128,7 +128,7 @@ class Soaked(RelativeObjectState, BooleanState):
         return albedo_add, diffuse_tint
 
     @property
-    def settable(self):
+    def stateful(self):
         return True
 
     @property

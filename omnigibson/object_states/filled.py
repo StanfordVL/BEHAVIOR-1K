@@ -362,7 +362,7 @@ class Filled(RelativeObjectState, BooleanState, LinkBasedStateMixin):
             generate_points_in_volume_checker_function(obj=self.obj, volume_link=self.link)
 
     @property
-    def settable(self):
+    def stateful(self):
         return True
 
     @staticmethod

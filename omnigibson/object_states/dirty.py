@@ -26,7 +26,7 @@ class _Dirty(AbsoluteObjectState, BooleanState):
         return AbsoluteObjectState.get_dependencies() + [AABB]
 
     @property
-    def settable(self):
+    def stateful(self):
         return True
 
     def __init__(self, obj):
