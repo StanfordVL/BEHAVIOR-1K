@@ -1,8 +1,9 @@
 import os
 import omni
 from omni.isaac.core.utils.prims import get_prim_at_path
-from omnigibson import assets_path
+from omnigibson import og_dataset_path, assets_path
 from omnigibson.utils.usd_utils import create_joint
+from omnigibson.systems.system_base import SYSTEMS_REGISTRY
 from omnigibson.systems.particle_system_base import BaseParticleSystem
 from omnigibson.utils.constants import SemanticClass
 from omnigibson.utils.python_utils import classproperty
@@ -12,6 +13,19 @@ from collections import OrderedDict
 import numpy as np
 from pxr import Gf
 import logging
+
+
+def get_visual_particle_systems():
+    """
+    Returns:
+        OrderedDict: Mapping from fluid system name to fluid system
+    """
+    systems = OrderedDict()
+    for system in SYSTEMS_REGISTRY.objects:
+        if issubclass(system, VisualParticleSystem):
+            systems[system.name] = system
+
+    return systems
 
 
 class MacroParticleSystem(BaseParticleSystem):
@@ -79,9 +93,9 @@ class MacroParticleSystem(BaseParticleSystem):
         return OrderedDict(
             max_particle_idn=cls.max_particle_idn,
             n_particles=cls.n_particles,
-            poses=[particle.get_position_orientation() for particle in cls.particles.values()],
+            poses=[particle.get_local_pose() for particle in cls.particles.values()],
             scales=[particle.scale for particle in cls.particles.values()],
-            template_pose=cls.particle_object.get_position_orientation() if cls.particle_object is not None else None,
+            template_pose=cls.particle_object.get_local_pose() if cls.particle_object is not None else None,
             template_scale=cls.particle_object.scale if cls.particle_object is not None else None,
         )
 
@@ -101,12 +115,12 @@ class MacroParticleSystem(BaseParticleSystem):
 
         # Load the poses and scales
         for particle, pose, scale in zip(cls.particles.values(), state["poses"], state["scales"]):
-            particle.set_position_orientation(*pose)
+            particle.set_local_pose(*pose)
             particle.scale = scale
 
         # Load template pose and scale if it exists
         if state["template_pose"] is not None:
-            cls.particle_object.set_position_orientation(*state["template_pose"])
+            cls.particle_object.set_local_pose(*state["template_pose"])
             cls.particle_object.scale = state["template_scale"]
 
     @classmethod
@@ -196,10 +210,9 @@ class MacroParticleSystem(BaseParticleSystem):
         """
         Removes all particles and deletes them from the simulator
         """
-        for particle in cls.particles.values():
-            cls.simulator.stage.RemovePrim(particle.prim_path)
-
-        cls.particles = OrderedDict()
+        # Use list explicitly to prevent mid-loop mutation of dict
+        for particle_name in list(cls.particles.keys()):
+            cls.remove_particle(name=particle_name)
 
     @classmethod
     def add_particle(cls, prim_path, idn=None, scale=None, position=None, orientation=None):

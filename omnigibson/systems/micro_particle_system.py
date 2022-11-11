@@ -1,6 +1,7 @@
 import os
 import time
 
+import omnigibson as og
 from omnigibson.macros import gm, create_module_macros
 from omnigibson.prims.prim_base import BasePrim
 from omnigibson.prims.material_prim import MaterialPrim
@@ -10,6 +11,7 @@ from omnigibson.utils.constants import SemanticClass
 from omnigibson.utils.python_utils import classproperty, Serializable, assert_valid_key
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object
 from omnigibson.utils.usd_utils import create_joint, array_to_vtarray
+from omnigibson.utils.ui_utils import disclaimer
 from omnigibson.utils.physx_utils import create_physx_particle_system, create_physx_particleset_pointinstancer, \
     bind_material, get_prototype_path_from_particle_system_path
 import omni
@@ -377,7 +379,6 @@ class PhysxParticleInstancer(BasePrim):
         sizes = ((3,), (n_particles, 3), (n_particles, 3), (n_particles, 4), (n_particles, 3), (n_particles,))
 
         idx = 3
-        print(len(state))
         for key, size in zip(keys, sizes):
             length = np.product(size)
             state_dict[key] = state[idx: idx + length].reshape(size)
@@ -409,6 +410,9 @@ class MicroParticleSystem(BaseParticleSystem):
 
     # Max particle instancer identification number -- this monotonically increases until reset() is called
     max_instancer_idn = None
+
+    # State cache -- OrderedDict, anything that should be updated exactly once between simulation step calls
+    state_cache = None
 
     @classproperty
     def n_particles(cls):
@@ -464,6 +468,9 @@ class MicroParticleSystem(BaseParticleSystem):
 
         # Initialize max instancer idn
         cls.max_instancer_idn = -1
+
+        # Initialize state cache
+        cls.state_cache = OrderedDict()
 
         # Create the particle system if it doesn't already exist, otherwise sync with the pre-existing system
         prototype_path = get_prototype_path_from_particle_system_path(particle_system_path=cls.prim_path)
@@ -539,6 +546,7 @@ class MicroParticleSystem(BaseParticleSystem):
         # Reset all internal variables
         cls.remove_all_particle_instancers()
         cls.max_instancer_idn = -1
+        cls.state_cache = OrderedDict()
 
     @classproperty
     def state_size(cls):
@@ -805,13 +813,8 @@ class MicroParticleSystem(BaseParticleSystem):
 
         # We apply 1 physics step to propagate the sampling (make sure to pause the sim since particles still propagate
         # forward even if we don't explicitly call sim.step())
-        sim_is_stopped, sim_is_playing = cls.simulator.is_stopped(), cls.simulator.is_playing()
-        cls.simulator.pause()
-        cls.simulator.step_physics()
-        if sim_is_stopped:
-            cls.simulator.stop()
-        elif sim_is_playing:
-            cls.simulator.play()
+        with cls.simulator.paused():
+            cls.simulator.step_physics()
         time.sleep(0.1)                         # Empirically validated for ~2500 samples (0.02 time doesn't work)
         cls.simulator.render()                  # Rendering is needed after an initial, nontrivial amount of time for the particles to actually be sampled
 
@@ -862,7 +865,7 @@ class MicroParticleSystem(BaseParticleSystem):
         assert_valid_key(key=name, valid_keys=cls.particle_instancers, name="particle instancer")
         # Remove instancer from our tracking and delete its prim
         instancer = cls.particle_instancers.pop(name)
-        cls.simulator.stage.RemovePrim(instancer.prim_path)
+        instancer.remove(simulator=cls.simulator)
         cls.simulator.stage.RemovePrim(f"{get_prototype_path_from_particle_system_path(particle_system_path=cls.prim_path)}/{name}")
 
     @classmethod
@@ -924,8 +927,7 @@ class MicroParticleSystem(BaseParticleSystem):
         # Delete any instancers we no longer want
         # print(f"del: {instancers_to_delete}")
         for name in instancers_to_delete:
-            instancer = cls.particle_instancers.pop(name)
-            cls.simulator.stage.RemovePrim(instancer.prim_path)
+            cls.remove_particle_instancer(name=name)
 
         # Create any instancers we don't already have
         # print(f"create: {instancers_to_create}")
@@ -947,6 +949,14 @@ class MicroParticleSystem(BaseParticleSystem):
 
     @classmethod
     def _load_state(cls, state):
+        # TODO: Verify this is no longer an issue once omni's fluid writing is ready
+        if og.sim.is_playing():
+            # Post disclaimer, we cannot write to omni particle states when sim is playing currently
+            disclaimer(f"We are attempting to load the [{cls.name}], a particle system, state, which requires writing "
+                       f"to individual particle positions. Currently, Omniverse does not respect writing to these "
+                       f"states, but this should be resolved by the next public release. As a result, the fluid "
+                       f"state may not be set correctly.")
+
         # Synchronize the particle instancers
         cls._sync_particle_instancers(
             idns=state["instancer_idns"],
@@ -1026,6 +1036,31 @@ class MicroParticleSystem(BaseParticleSystem):
         """
         cls._sync_particle_instancers(idns=[], particle_groups=[], particle_counts=[])
 
+    @classmethod
+    def cache(cls):
+        """
+        Cache the collision hits for all particle systems, to be used by the object state system to determine
+        if a particle is in contact with a given object.
+        """
+        particle_contacts = defaultdict(lambda: defaultdict(set))
+
+        particle_instancer = None
+        particle_idx = 0
+
+        def report_hit(hit):
+            base = "/".join(hit.rigid_body.split("/")[:-1])
+            obj = cls.simulator.scene.object_registry("prim_path", base)
+            particle_contacts[obj][particle_instancer].add(particle_idx)
+            return True
+
+        for inst_name, inst in cls.particle_instancers.items():
+            for idx, pos in enumerate(inst.particle_positions):
+                particle_idx = idx
+                particle_instancer = inst
+                get_physx_scene_query_interface().overlap_sphere(cls.particle_contact_offset, pos, report_hit, False)
+
+        cls.state_cache["particle_contacts"] = particle_contacts
+
 
 class FluidSystem(MicroParticleSystem):
     """
@@ -1071,33 +1106,6 @@ class FluidSystem(MicroParticleSystem):
         return [prototype.GetPrim()]
 
     @classmethod
-    def cache(cls):
-        """
-        Cache the collision hits for all particle systems, to be used by the object state system to determine
-        if a particle is in contact with a given object.
-        """
-        particle_contacts = defaultdict(lambda: defaultdict(set))
-
-        particle_instancer = None
-        particle_idx = 0
-
-        def report_hit(hit):
-            base = "/".join(hit.rigid_body.split("/")[:-1])
-            body = cls.simulator.scene.object_registry("prim_path", base)
-            particle_contacts[body][particle_instancer].add(particle_idx)
-            return True
-
-        for system, value in cls.particle_instancers.items():
-            for idx, pos in enumerate(value.particle_positions):
-                particle_idx = idx
-                particle_instancer = system
-                get_physx_scene_query_interface().overlap_sphere(cls.particle_contact_offset, pos, report_hit, False)
-
-        cls.state_cache = {
-            'particle_contacts': particle_contacts,
-        }
-
-    @classmethod
     def update(cls):
         # For each particle instance, garbage collect particles if the number of visible particles
         # is below the garbage collection threshold (m.GC_THRESHOLD)
@@ -1137,6 +1145,7 @@ class WaterSystem(FluidSystem):
                 "mtl_name": "OmniSurface_DeepWater",
             },
         )
+
 
 class ClothSystem(MicroParticleSystem):
     """

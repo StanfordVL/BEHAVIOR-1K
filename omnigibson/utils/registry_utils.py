@@ -343,7 +343,7 @@ class SerializableRegistry(Registry, Serializable):
         # along the way
         idx = 0
         for obj in self.objects:
-            print(f"obj: {obj.name}, state size: {obj.state_size}, passing in state length: {len(state[idx:])}")
+            print(f"obj: {obj.name}, state size: {obj.state_size}, idx: {idx}, passing in state length: {len(state[idx:])}")
             # We pass in the entire remaining state vector, assuming the object only parses the relevant states
             # at the beginning
             state_dict[obj.name] = obj.deserialize(state[idx:])

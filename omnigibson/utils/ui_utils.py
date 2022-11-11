@@ -81,6 +81,19 @@ class KeyboardEventHandler:
         return True
 
 
+def disclaimer(msg):
+    """
+    Prints a disclaimer message, i.e.: "We know this doesn't work; it's an omni issue; we expect it to be fixed in the
+    next release!
+    """
+    print("****** DISCLAIMER ******")
+    print("Isaac Sim / Omniverse has some significant limitations and bugs in its current release.")
+    print("This message has popped up because a potential feature in OmniGibson relies upon a feature in Omniverse that"
+          "is yet to be released publically. Currently, the expected behavior may not be fully functional, but"
+          "should be resolved by the next Isaac Sim release.")
+    print(f"Exact Limitation: {msg}")
+
+
 def choose_from_options(options, name, random_selection=False):
     """
     Prints out options from a list, and returns the requested option.

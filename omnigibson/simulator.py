@@ -9,6 +9,7 @@
 from collections import defaultdict
 import itertools
 import logging
+import contextlib
 
 import numpy as np
 import json
@@ -34,7 +35,7 @@ from omnigibson.utils.config_utils import NumpyEncoder
 from omnigibson.utils.python_utils import clear as clear_pu, create_object_from_init_info, Serializable
 from omnigibson.utils.usd_utils import clear as clear_uu, BoundingBoxAPI, get_usd_metadata, update_usd_metadata
 from omnigibson.utils.asset_utils import get_og_avg_category_specs
-from omnigibson.utils.ui_utils import CameraMover
+from omnigibson.utils.ui_utils import CameraMover, disclaimer
 from omnigibson.scenes import Scene
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.objects.stateful_object import StatefulObject
@@ -597,6 +598,64 @@ class Simulator(SimulationContext, Serializable):
         """Returns: True if the simulator is paused."""
         return not (self.is_stopped() or self.is_playing())
 
+    @contextlib.contextmanager
+    def stopped(self):
+        """
+        A context scope for making sure the simulator is stopped during execution within this scope.
+        Upon leaving the scope, the prior simulator state is restored.
+        """
+        # Infer what state we're currently in, then stop, yield, and then restore the original state
+        sim_is_playing, sim_is_paused = self.is_playing(), self.is_paused()
+        if sim_is_playing or sim_is_paused:
+            og.sim.stop()
+        yield
+        if sim_is_playing: og.sim.play()
+        elif sim_is_paused: og.sim.pause()
+
+    @contextlib.contextmanager
+    def playing(self):
+        """
+        A context scope for making sure the simulator is playing during execution within this scope.
+        Upon leaving the scope, the prior simulator state is restored.
+        """
+        # Infer what state we're currently in, then stop, yield, and then restore the original state
+        sim_is_stopped, sim_is_paused = self.is_stopped(), self.is_paused()
+        if sim_is_stopped or sim_is_paused:
+            og.sim.play()
+        yield
+        if sim_is_stopped: og.sim.stop()
+        elif sim_is_paused: og.sim.pause()
+
+    @contextlib.contextmanager
+    def paused(self):
+        """
+        A context scope for making sure the simulator is paused during execution within this scope.
+        Upon leaving the scope, the prior simulator state is restored.
+        """
+        # Infer what state we're currently in, then stop, yield, and then restore the original state
+        sim_is_stopped, sim_is_playing = self.is_stopped(), self.is_playing()
+        if sim_is_stopped or sim_is_playing:
+            og.sim.pause()
+        yield
+        if sim_is_stopped: og.sim.stop()
+        elif sim_is_playing: og.sim.play()
+
+    @contextlib.contextmanager
+    def slowed(self, dt):
+        """
+        A context scope for making the simulator simulation dt slowed, e.g.: for taking micro-steps for propagating
+        instantaneous kinematics with minimal impact on physics propagation.
+
+        NOTE: This will set both the physics dt and rendering dt to the same value during this scope.
+
+        Upon leaving the scope, the prior simulator state is restored.
+        """
+        # Set dt, yield, then restore the original dt
+        physics_dt, rendering_dt = self.get_physics_dt(), self.get_rendering_dt()
+        self.set_simulation_dt(physics_dt=dt, rendering_dt=dt)
+        yield
+        self.set_simulation_dt(physics_dt=physics_dt, rendering_dt=rendering_dt)
+
     @classmethod
     def clear_instance(cls):
         SimulationContext.clear_instance()
@@ -758,6 +817,8 @@ class Simulator(SimulationContext, Serializable):
         # Dump saved current state and also scene init info
         saved_state_str = json.dumps(self.scene.dump_state(serialized=False), cls=NumpyEncoder)
         self.world_prim.SetCustomDataByKey("scene_state", saved_state_str)
+
+        # TODO: Duplicate?
         scene_init_info = self.scene.get_init_info()
         scene_init_info_str = json.dumps(scene_init_info, cls=NumpyEncoder)
         self.world_prim.SetCustomDataByKey("scene_init_info", scene_init_info_str)
@@ -905,9 +966,12 @@ class Simulator(SimulationContext, Serializable):
         # Run super
         super().load_state(state=state, serialized=serialized)
 
-        # TODO: verify if this is still needed
-        # # We also need to manually update the simulator app
-        # self._simulator.app.update()
+        # Highlight that at the current step, the non-kinematic states are potentially inaccurate because a sim
+        # step is needed to propagate specific states in physics backend
+        # TODO: This should be resolved in a future omniverse release!
+        disclaimer("Attempting to load simulator state. Currently, omniverse does not support exclusively stepping "
+                   "kinematics, so we cannot update some of our object states relying on updated kinematics until a "
+                   "simulator step is taken! This should be resolved by the next NVIDIA Isaac Sim release.")
 
     def _serialize(self, state):
         # Default state is from the scene
@@ -915,5 +979,4 @@ class Simulator(SimulationContext, Serializable):
 
     def _deserialize(self, state):
         # Default state is from the scene
-        end_idx = self._scene.state_size
-        return self._scene.deserialize(state=state[:end_idx]), end_idx
+        return self._scene.deserialize(state=state), self._scene.state_size
