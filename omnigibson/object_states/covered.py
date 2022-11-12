@@ -181,23 +181,10 @@ class Covered(RelativeObjectState, BooleanState):
         elif issubclass(system, FluidSystem):
             # We only check if we have particle instancers currently
             if len(system.particle_instancers) > 0:
-                # particle_width = system.particle_radius * 2
-                # n_near_particles = np.sum([len(idxs) for idxs in system.state_cache["particle_contacts"][self.obj].values()])
-
-                particle_positions = np.concatenate([inst.particle_positions for inst in system.particle_instancers.values()], axis=0)
-                # We already aggregate particle contact information through our system caching, so we merely grab the info from there
-
-                # Filter these values based on the object's AABB -- if they're not within the
-                # box + [0, 0, particle's radius * 2], we shouldn't bother checking these points
+                # We've already cached particle contacts, so we merely search through them to see if any particles are
+                # touching the object
                 particle_width = system.particle_radius * 2
-                lower, upper = self.obj.aabb
-                upper[2] = upper[2] + particle_width
-                particle_positions = particle_positions[np.where(np.all((lower < particle_positions) & (particle_positions < upper), axis=1))[0]]
-                n_near_particles = np.sum(check_points_z_proximity_to_object_surface(
-                    obj=self.obj,
-                    particle_positions=particle_positions,
-                    max_distance=particle_width,            # TODO: Would particle radius work or is it too small?
-                ))
+                n_near_particles = np.sum([len(idxs) for idxs in system.state_cache["particle_contacts"][self.obj].values()])
                 # Heuristic: Assuming each particle has net surface area coverage of particle_width ^ 2 (i.e.: square),
                 # We find the total area coverage proportion with respect to the bird's eye view area of the object
                 area_covered = n_near_particles * (particle_width ** 2)
@@ -264,9 +251,6 @@ class Covered(RelativeObjectState, BooleanState):
 
     @property
     def state_size(self):
-        # # We have two values for every visual particle system, and a single value for every fluid system
-        # return 2 * len(get_visual_particle_systems()) + len(get_fluid_systems())
-
         # We have a single value for every visual particle system
         return len(get_visual_particle_systems())
 
@@ -279,17 +263,8 @@ class Covered(RelativeObjectState, BooleanState):
         return list(get_visual_particle_systems().values()) + list(get_fluid_systems().values())
 
     def _dump_state(self):
-        # First, we grab all the visual particle system information -- value + n_initial_particles
-        state = OrderedDict()
-        # for system in self._supported_systems:
-        #     # name = get_element_name_from_system(system)
-        #     # state[name] = self.get_value(system)
-        #
-        #     # For every visual particle system, add the initial number of particles
-        #     if issubclass(system, VisualParticleSystem):
-        #         state[f"{name}_initial_visual_particles"] = self._n_initial_visual_particles[name]
-
         # For every visual particle system, add the initial number of particles
+        state = OrderedDict()
         for system in get_visual_particle_systems().values():
             name = get_element_name_from_system(system)
             state[f"{name}_initial_visual_particles"] = self._n_initial_visual_particles[name]
@@ -297,20 +272,6 @@ class Covered(RelativeObjectState, BooleanState):
         return state
 
     def _load_state(self, state):
-        # # Check to see if the value is different from what we currently have
-        # # This should always be the same, because our get_value() reads from the particle system, which should
-        # # hav already updated / synchronized its state
-        # for system in self._supported_systems:
-        #     name = get_element_name_from_system(system)
-        #     val = state[name]
-        #     # assert val == self.get_value(system), \
-        #     # f"Expected state {self.__class__.__name__} to have synchronized values for system {name}System, " \
-        #     # f"but got current value: {self.get_value(system)} with desired value: {val}"
-        #
-        #     # For every visual particle system, set the initial number of particles
-        #     if issubclass(system, VisualParticleSystem):
-        #         self._n_initial_visual_particles[name] = state[f"{name}_initial_visual_particles"]
-
         # For every visual particle system, set the initial number of particles
         for system in get_visual_particle_systems().values():
             name = get_element_name_from_system(system)
@@ -321,16 +282,6 @@ class Covered(RelativeObjectState, BooleanState):
 
     def _deserialize(self, state):
         state_dict = OrderedDict()
-        # offset = 0
-        # for i, system in enumerate(self._supported_systems):
-        #     name = get_element_name_from_system(system)
-        #     state_dict[name] = bool(state[i + offset])
-        #     # If the current system is a visual particle system, then we know the next state element is the initial
-        #     # visual particles, so we add that to our dictionary and also increment the offset
-        #     if issubclass(system, VisualParticleSystem):
-        #         offset += 1
-        #         state_dict[f"{name}_initial_visual_particles"] = int(state[i + offset])
-
         for i, system in enumerate(get_visual_particle_systems().values()):
             name = get_element_name_from_system(system)
             state_dict[f"{name}_initial_visual_particles"] = int(state[i])
