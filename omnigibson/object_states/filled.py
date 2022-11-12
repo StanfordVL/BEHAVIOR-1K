@@ -3,6 +3,7 @@ from collections import OrderedDict
 from omnigibson.macros import gm, create_module_macros
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from omnigibson.object_states.object_state_base import RelativeObjectState, BooleanState
+from omnigibson.systems.micro_particle_system import FluidSystem
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.usd_utils import mesh_prim_to_trimesh_mesh
 from omnigibson.systems import get_fluid_systems, get_system_from_element_name, get_element_name_from_system
@@ -311,6 +312,8 @@ class Filled(RelativeObjectState, BooleanState, LinkBasedStateMixin):
         self.calculate_volume = None       # Function to calculate the real-world volume for this container
 
     def _get_value(self, fluid_system):
+        # Sanity check to manke sure fluid system is valid
+        assert isinstance(fluid_system, FluidSystem), "Can only get Filled state with a valid FluidSystem!"
         # Check what volume is filled
         if len(fluid_system.particle_instancers) > 0:
             particle_positions = np.concatenate([inst.particle_positions for inst in fluid_system.particle_instancers.values()], axis=0)
@@ -328,6 +331,9 @@ class Filled(RelativeObjectState, BooleanState, LinkBasedStateMixin):
         return value
 
     def _set_value(self, fluid_system, new_value):
+        # Sanity check to manke sure fluid system is valid
+        assert isinstance(fluid_system, FluidSystem), "Can only set Filled state with a valid FluidSystem!"
+
         # If we found no link, directly return
         if self.link is None:
             return False
@@ -395,13 +401,13 @@ class Filled(RelativeObjectState, BooleanState, LinkBasedStateMixin):
             assert val == self.get_value(get_system_from_element_name(fluid_name)), \
             f"Expected state {self.__class__.__name__} to have synchronized values, but got current value: {self.get_value(get_system_from_element_name(fluid_name))} with desired value: {val}"
 
-    def _serialize(cls, state):
+    def _serialize(self, state):
         return np.array([val for val in state.values()], dtype=float)
 
-    def _deserialize(cls, state):
+    def _deserialize(self, state):
         state_dict = OrderedDict()
         for i, fluid_system in enumerate(get_fluid_systems().values()):
             fluid_name = get_element_name_from_system(fluid_system)
             state_dict[fluid_name] = bool(state[i])
 
-        return state_dict
+        return state_dict, len(state_dict)
