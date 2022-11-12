@@ -4,6 +4,7 @@ A set of utility functions for general python usage
 import inspect
 from abc import ABCMeta
 from copy import deepcopy
+from collections import Iterable
 from functools import wraps
 from importlib import import_module
 
@@ -21,6 +22,32 @@ class classproperty:
 
     def __get__(self, owner_self, owner_cls):
         return self.fget(owner_cls)
+
+
+def subclass_factory(name, base_classes, __init__=None, **kwargs):
+    """
+    Programmatically generates a new class type with name @name, subclassing from base classes @base_classes, with
+    corresponding __init__ call @__init__.
+
+    NOTE: If __init__ is None (default), the __init__ call from @base_classes will be used instead.
+
+    cf. https://stackoverflow.com/questions/15247075/how-can-i-dynamically-create-derived-classes-from-a-base-class
+
+    Args:
+        name (str): Generated class name
+        base_classes (type, or list of type): Base class(es) to use for generating the subclass
+        __init__ (None or function): Init call to use for the base class when it is instantiated. If None if specified,
+            the newly generated class will automatically inherit the __init__ call from @base_classes
+        **kwargs (any): keyword-mapped parameters to override / set in the child class, where the keys represent
+            the class / instance attribute to modify and the values represent the functions / value to set
+    """
+    # Standardize base_classes
+    base_classes = tuple(base_classes if isinstance(base_classes, Iterable) else [base_classes])
+
+    # Generate the new class
+    if __init__ is not None:
+        kwargs["__init__"] = __init__
+    return type(name, base_classes, kwargs)
 
 
 def save_init_info(func):

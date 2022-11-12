@@ -8,7 +8,7 @@ from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.systems.system_base import SYSTEMS_REGISTRY
 from omnigibson.systems.particle_system_base import BaseParticleSystem
 from omnigibson.utils.constants import SemanticClass
-from omnigibson.utils.python_utils import classproperty, Serializable, assert_valid_key
+from omnigibson.utils.python_utils import classproperty, assert_valid_key, subclass_factory
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object
 from omnigibson.utils.usd_utils import create_joint, array_to_vtarray
 from omnigibson.utils.ui_utils import disclaimer
@@ -1113,38 +1113,71 @@ class FluidSystem(MicroParticleSystem):
             if np.mean(value.particle_visibilities) <= m.GC_THRESHOLD:
                 cls.remove_particle_instancer(instancer)
 
-
-class WaterSystem(FluidSystem):
-    """
-    Particle system class to simulate water. Uses a transparent material and isosurface to render the water
-    """
-    @classproperty
-    def _register_system(cls):
-        # We should register this system since it's an "actual" system (not an intermediate class)
-        return True
-
-    @classproperty
-    def particle_contact_offset(cls):
-        return 0.012
-
-    @classproperty
-    def particle_density(cls):
-        # TODO: Water density seems to be unstable, debug later?
-        # Water is 1000 kg/m^3
-        # return 1000.0
-        return 500.0
-
     @classmethod
-    def _create_particle_material(cls):
-        # Use DeepWater omni present for rendering water
-        return MaterialPrim(
-            prim_path=cls.mat_path,
-            name=cls.mat_name,
-            load_config={
-                "mdl_name": "OmniSurfacePresets.mdl",
-                "mtl_name": "OmniSurface_DeepWater",
-            },
-        )
+    def create(cls, fluid_name, particle_contact_offset, particle_density, create_particle_material, **kwargs):
+        """
+        Utility function to programmatically generate monolithic fluid system classes.
+
+        Args:
+            fluid_name (str): Name of the fluid
+            particle_contact_offset (float): Contact offset for the generated fluid system
+            particle_density (float): Particle density for the generated fluid system
+            create_particle_material (function): Method for generating the particle material for the fluid.
+                Expected signature:
+
+                create_particle_material(prim_path: str, name: str) --> MaterialPrim
+
+                where @prim_path and @name are the parameters to assign to the generated MaterialPrim
+            **kwargs (any): keyword-mapped parameters to override / set in the child class, where the keys represent
+                the class attribute to modify and the values represent the functions / value to set
+                (Note: These values should have either @classproperty or @classmethod decorators!)
+
+        Returns:
+            FluidSystem: Generated fluid system class
+        """
+
+        # Override the necessary parameters
+        @classproperty
+        def cp_register_system(cls):
+            # We should register this system since it's an "actual" system (not an intermediate class)
+            return True
+
+        @classproperty
+        def cp_particle_contact_offset(cls):
+            return particle_contact_offset
+
+        @classproperty
+        def cp_particle_density(cls):
+            return particle_density
+
+        @classmethod
+        def cm_create_particle_material(cls):
+            return create_particle_material(prim_path=cls.mat_path, name=cls.mat_name)
+
+        # Add to any other params specified
+        kwargs["_register_system"] = cp_register_system
+        kwargs["particle_contact_offset"] = cp_particle_contact_offset
+        kwargs["particle_density"] = cp_particle_density
+        kwargs["_create_particle_material"] = cm_create_particle_material
+
+        # Create and return the class
+        return subclass_factory(name=f"{fluid_name}System", base_classes=FluidSystem, **kwargs)
+
+
+# Generate fluid systems
+WaterSystem = FluidSystem.create(
+    fluid_name="Water",
+    particle_contact_offset=0.012,
+    particle_density=500.0,
+    create_particle_material=lambda prim_path, name: MaterialPrim(
+        prim_path=prim_path,
+        name=name,
+        load_config={
+            "mdl_name": "OmniSurfacePresets.mdl",
+            "mtl_name": "OmniSurface_DeepWater",
+        }
+    )
+)
 
 
 class ClothSystem(MicroParticleSystem):

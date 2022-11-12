@@ -1,12 +1,14 @@
 import os
 import omni
 from omni.isaac.core.utils.prims import get_prim_at_path
+
+import omnigibson.objects
 from omnigibson import og_dataset_path, assets_path
 from omnigibson.utils.usd_utils import create_joint
 from omnigibson.systems.system_base import SYSTEMS_REGISTRY
 from omnigibson.systems.particle_system_base import BaseParticleSystem
 from omnigibson.utils.constants import SemanticClass
-from omnigibson.utils.python_utils import classproperty
+from omnigibson.utils.python_utils import classproperty, subclass_factory
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object
 from omnigibson.prims.geom_prim import VisualGeomPrim
 from collections import OrderedDict
@@ -57,6 +59,26 @@ class MacroParticleSystem(BaseParticleSystem):
         cls.min_scale = np.ones(3)
         cls.max_scale = np.ones(3)
         cls.max_particle_idn = -1
+
+        # Load the particle template
+        particle_template = cls._create_particle_template()
+        simulator.import_object(obj=particle_template, register=False, auto_initialize=True)
+
+        # Class particle objet is assumed to be the first and only visual mesh belonging to the root link
+        cls.particle_object = list(particle_template.root_link.visual_meshes.values())[0]
+
+    @classmethod
+    def _create_particle_template(cls):
+        """
+        Creates the particle template to be used for this system.
+
+        NOTE: The loaded particle template is expected to be a non-articulated, single-link object with a single
+            visual mesh attached to its root link, since this will be the actual visual mesh used
+
+        Returns:
+            EntityPrim: Particle template that will be duplicated when generating future particle groups
+        """
+        raise NotImplementedError()
 
     @classmethod
     def reset(cls):
@@ -341,7 +363,6 @@ class VisualParticleSystem(MacroParticleSystem):
     _SAMPLING_BIMODAL_MEAN_FRACTION = 0.9
     _SAMPLING_BIMODAL_STDEV_FRACTION = 0.2
     _SAMPLING_MAX_ATTEMPTS = 20
-
 
     @classmethod
     def initialize(cls, simulator):
@@ -662,6 +683,67 @@ class VisualParticleSystem(MacroParticleSystem):
                 cls._group_particles[name][particle.name] = particle
 
     @classmethod
+    def create(cls, particle_name, n_particles_per_group, create_particle_template, min_scale=None, max_scale=None, **kwargs):
+        """
+        Utility function to programmatically generate monolithic visual particle system classes.
+
+        Args:
+            particle_name (str): Name of the visual particles
+            n_particles_per_group (int): Number of particles to generate per group of these particles
+            min_scale (None or 3-array): If specified, sets the minumum bound for the visual particles' relative scale.
+                Else, defaults to 1
+            max_scale (None or 3-array): If specified, sets the maximum bound for the visual particles' relative scale.
+                Else, defaults to 1
+            create_particle_template (function): Method for generating the visual particle template that will be duplicated
+                when generating groups of particles.
+                Expected signature:
+
+                create_particle_template(prim_path: str, name: str) --> EntityPrim
+
+                where @prim_path and @name are the parameters to assign to the generated EntityPrim.
+                NOTE: The loaded particle template is expected to be a non-articulated, single-link object with a single
+                    visual mesh attached to its root link, since this will be the actual visual mesh used
+
+            **kwargs (any): keyword-mapped parameters to override / set in the child class, where the keys represent
+                the class attribute to modify and the values represent the functions / value to set
+                (Note: These values should have either @classproperty or @classmethod decorators!)
+
+        Returns:
+            VisualParticleSystem: Generated visual particle system class
+        """
+        # Override the necessary parameters
+        @classproperty
+        def cp_register_system(cls):
+            # We should register this system since it's an "actual" system (not an intermediate class)
+            return True
+
+        @classmethod
+        def cm_initialize(cls, simulator):
+            # Run super first (we have to use a bit esoteric syntax in order to accommodate this procedural method for
+            # using super calls -- cf. https://stackoverflow.com/questions/22403897/what-does-it-mean-by-the-super-object-returned-is-unbound-in-python
+            super(cls).__get__(cls).initialize(simulator=simulator)
+
+            # Potentially override the min / max scales
+            if min_scale is not None:
+                cls.min_scale = np.array(min_scale)
+            if max_scale is not None:
+                cls.max_scale = np.array(max_scale)
+
+        @classmethod
+        def cm_create_particle_template(cls):
+            name = f"{particle_name}_template"
+            return create_particle_template(prim_path=f"/World/{cls.name}/{name}", name=name)
+
+        # Add to any other params specified
+        kwargs["_register_system"] = cp_register_system
+        kwargs["_N_PARTICLES_PER_GROUP"] = n_particles_per_group
+        kwargs["initialize"] = cm_initialize
+        kwargs["_create_particle_template"] = cm_create_particle_template
+
+        # Create and return the class
+        return subclass_factory(name=f"{particle_name}System", base_classes=cls, **kwargs)
+
+    @classmethod
     def _dump_state(cls):
         state = super()._dump_state()
 
@@ -760,120 +842,104 @@ class VisualParticleSystem(MacroParticleSystem):
         return state_dict, idx + idx_super
 
 
-class DustSystem(VisualParticleSystem):
-    """
-    Particle system class to symbolize dust attached to objects
-    """
-    @classproperty
-    def _register_system(cls):
-        # We should register this system since it's an "actual" system (not an intermediate class)
-        return True
+# We need to define an overriding method for StainSystem so that the stain values are modified based on
+# the parent's native object size
+@classmethod
+def stain_generate_group_particles(cls, group, n_particles=None, min_particles_for_success=1):
+    # Make sure the group exists
+    cls._validate_group(group=group)
 
-    @classmethod
-    def initialize(cls, simulator):
-        # Run super first
-        super().initialize(simulator=simulator)
+    # First set the bbox ranges -- depends on the object's bounding box
+    obj = cls._group_objects[group]
+    median_aabb_dim = np.median(obj.aabb_extent)
 
-        # Particle object will be overridden by default to be a small cuboid
-        # We import now at runtime so prevent circular imports
-        from omnigibson.objects.primitive_object import PrimitiveObject
-        dust_object = PrimitiveObject(
-            prim_path=f"/World/{cls.name}/dust_template",
-            primitive_type="Cube",
-            name="dust_template",
-            class_id=SemanticClass.DIRT,
-            size=0.01,
-            rgba=[0.2, 0.2, 0.1, 1.0],
-            visible=False,
-            fixed_base=False,
-            visual_only=True,
-        )
+    # Compute lower and upper limits to bbox
+    bbox_lower_limit_from_aabb = cls._BOUNDING_BOX_LOWER_LIMIT_FRACTION_OF_AABB * median_aabb_dim
+    bbox_lower_limit = np.clip(
+        bbox_lower_limit_from_aabb,
+        cls._BOUNDING_BOX_LOWER_LIMIT_MIN,
+        cls._BOUNDING_BOX_LOWER_LIMIT_MAX,
+    )
 
-        # We also must load the particle object
-        simulator.import_object(obj=dust_object, register=False, auto_initialize=True)
+    bbox_upper_limit_from_aabb = cls._BOUNDING_BOX_UPPER_LIMIT_FRACTION_OF_AABB * median_aabb_dim
+    bbox_upper_limit = np.clip(
+        bbox_upper_limit_from_aabb,
+        cls._BOUNDING_BOX_UPPER_LIMIT_MIN,
+        cls._BOUNDING_BOX_UPPER_LIMIT_MAX,
+    )
 
-        # Class particle object is the visual mesh
-        cls.particle_object = dust_object.links["base_link"].visual_meshes["visual"]
+    # Convert these into scaling factors for the x and y axes for our particle object
+    particle_bbox = cls.particle_object.aabb_extent
+    cls.set_scale_limits(
+        minimum=np.array([bbox_lower_limit / particle_bbox[0], bbox_lower_limit / particle_bbox[1], 1.0]),
+        maximum=np.array([bbox_upper_limit / particle_bbox[0], bbox_upper_limit / particle_bbox[1], 1.0]),
+    )
+
+    # Run super method like normal to generate particles
+    # we have to use a bit esoteric syntax in order to accommodate this procedural method for using super calls
+    # cf. https://stackoverflow.com/questions/22403897/what-does-it-mean-by-the-super-object-returned-is-unbound-in-python
+    return super(cls).__get__(cls).generate_group_particles(
+        group=group,
+        n_particles=n_particles,
+        min_particles_for_success=min_particles_for_success
+    )
 
 
-class StainSystem(VisualParticleSystem):
-    """
-    Particle system class to symbolize stains attached to objects
-    """
-    # Default number of particles to sample per group
-    _N_PARTICLES_PER_GROUP = 20
+DustSystem = VisualParticleSystem.create(
+    particle_name="Dust",
+    n_particles_per_group=20,
+    create_particle_template=lambda prim_path, name: omnigibson.objects.PrimitiveObject(
+        prim_path=prim_path,
+        primitive_type="Cube",
+        name=name,
+        class_id=SemanticClass.DIRT,
+        size=0.01,
+        rgba=[0.2, 0.2, 0.1, 1.0],
+        visible=False,
+        fixed_base=False,
+        visual_only=True,
+    )
+)
 
+
+StainSystem = VisualParticleSystem.create(
+    particle_name="Stain",
+    n_particles_per_group=20,
+    create_particle_template=lambda prim_path, name: omnigibson.objects.USDObject(
+        prim_path=prim_path,
+        usd_path=os.path.join(assets_path, "models/stain/stain.usd"),
+        name=name,
+        class_id=SemanticClass.DIRT,
+        visible=False,
+        fixed_base=False,
+        visual_only=True,
+    ),
     # Default parameters for sampling particle sizes based on attachment group object size
-    _BOUNDING_BOX_LOWER_LIMIT_FRACTION_OF_AABB = 0.06
-    _BOUNDING_BOX_LOWER_LIMIT_MIN = 0.01
-    _BOUNDING_BOX_LOWER_LIMIT_MAX = 0.02
+    _BOUNDING_BOX_LOWER_LIMIT_FRACTION_OF_AABB=0.06,
+    _BOUNDING_BOX_LOWER_LIMIT_MIN=0.01,
+    _BOUNDING_BOX_LOWER_LIMIT_MAX=0.02,
+    _BOUNDING_BOX_UPPER_LIMIT_FRACTION_OF_AABB=0.1,
+    _BOUNDING_BOX_UPPER_LIMIT_MIN=0.02,
+    _BOUNDING_BOX_UPPER_LIMIT_MAX=0.1,
+    # Also need to override the how we generate group particles, since they get scaled according to the parent object's
+    # native size
+    generate_group_particles=stain_generate_group_particles,
+)
 
-    _BOUNDING_BOX_UPPER_LIMIT_FRACTION_OF_AABB = 0.1
-    _BOUNDING_BOX_UPPER_LIMIT_MIN = 0.02
-    _BOUNDING_BOX_UPPER_LIMIT_MAX = 0.1
 
-    @classproperty
-    def _register_system(cls):
-        # We should register this system since it's an "actual" system (not an intermediate class)
-        return True
-
-    @classmethod
-    def initialize(cls, simulator):
-        # Run super first
-        super().initialize(simulator=simulator)
-
-        # Particle object will be overridden to by default be a specific USD file
-        # We import now at runtime so prevent circular imports
-        from omnigibson.objects.usd_object import USDObject
-        stain_object = USDObject(
-            prim_path=f"/World/{cls.name}/stain_template",
-            usd_path=os.path.join(assets_path, "models/stain/stain.usd"),
-            name="stain_template",
-            class_id=SemanticClass.DIRT,
-            visible=False,
-            fixed_base=False,
-            visual_only=True,
-        )
-        # We also must load the particle object
-        simulator.import_object(obj=stain_object, register=False, auto_initialize=True)
-
-        # Class particle object is the visual mesh
-        cls.particle_object = stain_object.links["base_link"].visual_meshes["visuals"]
-
-    @classmethod
-    def generate_group_particles(cls, group, n_particles=None, min_particles_for_success=1):
-        # Make sure the group exists
-        cls._validate_group(group=group)
-
-        # First set the bbox ranges -- depends on the object's bounding box
-        obj = cls._group_objects[group]
-        median_aabb_dim = np.median(obj.aabb_extent)
-
-        # Compute lower and upper limits to bbox
-        bbox_lower_limit_from_aabb = cls._BOUNDING_BOX_LOWER_LIMIT_FRACTION_OF_AABB * median_aabb_dim
-        bbox_lower_limit = np.clip(
-            bbox_lower_limit_from_aabb,
-            cls._BOUNDING_BOX_LOWER_LIMIT_MIN,
-            cls._BOUNDING_BOX_LOWER_LIMIT_MAX,
-        )
-
-        bbox_upper_limit_from_aabb = cls._BOUNDING_BOX_UPPER_LIMIT_FRACTION_OF_AABB * median_aabb_dim
-        bbox_upper_limit = np.clip(
-            bbox_upper_limit_from_aabb,
-            cls._BOUNDING_BOX_UPPER_LIMIT_MIN,
-            cls._BOUNDING_BOX_UPPER_LIMIT_MAX,
-        )
-
-        # Convert these into scaling factors for the x and y axes for our particle object
-        particle_bbox = cls.particle_object.aabb_extent
-        cls.set_scale_limits(
-            minimum=np.array([bbox_lower_limit / particle_bbox[0], bbox_lower_limit / particle_bbox[1], 1.0]),
-            maximum=np.array([bbox_upper_limit / particle_bbox[0], bbox_upper_limit / particle_bbox[1], 1.0]),
-        )
-
-        # Run super method like normal to generate particles
-        return super().generate_group_particles(
-            group=group,
-            n_particles=n_particles,
-            min_particles_for_success=min_particles_for_success
-        )
+GrassSystem = VisualParticleSystem.create(
+    particle_name="Grass",
+    n_particles_per_group=20,
+    create_particle_template=lambda prim_path, name: omnigibson.objects.USDObject(
+        prim_path=prim_path,
+        usd_path=os.path.join(og_dataset_path, "objects/grass_patch/kqhokv/usd/kqhokv.usd"),
+        name=name,
+        class_id=SemanticClass.GRASS,
+        visible=False,
+        fixed_base=False,
+        visual_only=True,
+    ),
+    # Also need to override how we sample particles, since grass should only point upwards and placed on "top"
+    # parts of surfaces!
+    _SAMPLING_AXIS_PROBABILITIES=(0, 0, 1.0),
+)
