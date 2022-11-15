@@ -518,7 +518,7 @@ class ControllableObject(BaseObject):
         ])
 
         # Concatenate and return
-        return np.concatenate([state_flat, controller_states_flat])
+        return np.concatenate([state_flat, controller_states_flat]).astype(float)
 
     def _deserialize(self, state):
         # Run super first

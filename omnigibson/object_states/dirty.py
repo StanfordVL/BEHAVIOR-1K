@@ -88,10 +88,10 @@ class _Dirty(AbsoluteObjectState, BooleanState):
         self._max_particles_for_clean = state["max_particles_for_clean"]
 
     def _serialize(cls, state):
-        return np.array([state["value"], state["max_particles_for_clean"]])
+        return np.array([state["value"], state["max_particles_for_clean"]], dtype=float)
 
     def _deserialize(cls, state):
-        return OrderedDict(value=state[0], max_particles_for_clean=state[1]), 2
+        return OrderedDict(value=bool(state[0]), max_particles_for_clean=int(state[1])), 2
 
 
 class Dusty(_Dirty):

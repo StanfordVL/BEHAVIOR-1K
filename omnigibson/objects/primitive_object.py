@@ -367,4 +367,4 @@ class PrimitiveObject(StatefulObject):
         return np.concatenate([
             state_flat,
             np.array([state["radius"], state["height"], state["size"]]),
-        ])
+        ]).astype(float)

@@ -355,7 +355,7 @@ class PhysxParticleInstancer(BasePrim):
              state["particle_orientations"].reshape(-1),
              state["particle_scales"].reshape(-1),
              state["particle_prototype_ids"],
-         ])
+         ]).astype(float)
 
     def _deserialize(self, state):
         # Sanity check the identification number
@@ -968,7 +968,7 @@ class MicroParticleSystem(BaseParticleSystem):
             state["instancer_particle_counts"],
             *[cls.particle_instancers[name].serialize(inst_state)
               for name, inst_state in state["particle_states"].items()],
-        ])
+        ]).astype(float)
 
     @classmethod
     def _deserialize(cls, state):

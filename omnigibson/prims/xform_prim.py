@@ -464,11 +464,8 @@ class XFormPrim(BasePrim):
     def _serialize(self, state):
         # We serialize by iterating over the keys and adding them to a list that's concatenated at the end
         # This is a deterministic mapping because we assume the state is an OrderedDict
-        return np.concatenate(list(state.values()))
+        return np.concatenate(list(state.values())).astype(float)
 
     def _deserialize(self, state):
         # We deserialize deterministically by knowing the order of values -- pos, ori
-        return OrderedDict(
-            pos=state[0:3],
-            ori=state[3:7],
-        ), 7
+        return OrderedDict(pos=state[0:3], ori=state[3:7]), 7

@@ -396,7 +396,7 @@ class Filled(RelativeObjectState, BooleanState, LinkBasedStateMixin):
             f"Expected state {self.__class__.__name__} to have synchronized values, but got current value: {self.get_value(get_system_from_element_name(fluid_name))} with desired value: {val}"
 
     def _serialize(cls, state):
-        return np.array([val for val in state.values()], dtype=float)
+        return np.array(list(state.values()), dtype=float)
 
     def _deserialize(cls, state):
         state_dict = OrderedDict()

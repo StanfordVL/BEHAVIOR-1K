@@ -146,12 +146,12 @@ class Soaked(RelativeObjectState, BooleanState):
             self.absorbed_particle_system_count[get_system_from_element_name(system_name)] = val
 
     def _serialize(self, state):
-        return np.stack(list(state.values()))
+        return np.array(list(state.values()), dtype=float)
 
     def _deserialize(self, state):
         state_dict = OrderedDict()
         for i, system in enumerate(self.absorbed_particle_system_count.keys()):
-            state_dict[get_element_name_from_system(system)] = state[i]
+            state_dict[get_element_name_from_system(system)] = int(state[i])
 
         return state_dict, len(self.absorbed_particle_system_count)
 

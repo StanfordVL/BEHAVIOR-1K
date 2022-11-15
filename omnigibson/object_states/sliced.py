@@ -86,7 +86,7 @@ class Sliced(AbsoluteObjectState, BooleanState):
         self.value = state["sliced"]
 
     def _serialize(self, state):
-        return np.array([float(state["sliced"])])
+        return np.array([state["sliced"]], dtype=float)
 
     def _deserialize(self, state):
-        return OrderedDict(sliced=(state[0] == 1.0)), 1
+        return OrderedDict(sliced=bool(state[0])), 1

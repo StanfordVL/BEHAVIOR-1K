@@ -1,210 +1,192 @@
 from abc import abstractmethod
 
 from pxr import Gf
+from omni.physx.bindings._physx import ContactEventType
 
+from enum import IntEnum
+from collections import OrderedDict
+import numpy as np
+
+import omnigibson as og
 from omnigibson.macros import create_module_macros
 import omnigibson.utils.transform_utils as T
-from omnigibson.object_states.contact_bodies import ContactBodies
+from omnigibson.object_states.contact_subscribed_state_mixin import ContactSubscribedStateMixin
 from omnigibson.object_states.object_state_base import BooleanState, RelativeObjectState
-from omnigibson.utils.usd_utils import BoundingBoxAPI, create_joint
+from omnigibson.object_states.contact_bodies import ContactBodies
+from omnigibson.utils.usd_utils import create_joint
+from omnigibson.utils.sim_utils import check_collision
+
+import logging
 
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
-# After detachment, an object cannot be attached again within this number of steps.
-m.DEFAULT_ATTACH_PROTECTION_COUNTDOWN = 10
+
+class AttachmentType(IntEnum):
+    STICKY = 0
+    SYMMETRIC = 1
+    MALE = 2
+    FEMALE = 3
 
 
-class Attached(RelativeObjectState, BooleanState):
+class Attached(RelativeObjectState, BooleanState, ContactSubscribedStateMixin):
     """
-        Child (e.g. painting) attaches to parent (e.g. wall) and holds the joint attaching them
-        Whenever a new parent is set, the old joint is deleted. A child can have at most one parent.
+        Handles attachment between two rigid objects, by creating a fixed joint between self (child) and other (parent)
+        At any given moment, an object can only be attached to at most one other object.
+        There are three types of attachment:
+            STICKY: unidirectional, attach if in contact.
+            SYMMETRIC: bidirectional, attach if in contact AND the other object has SYMMETRIC type
+                with the same attachment_category (e.g. "magnet").
+            MALE/FEMALE: bidirectional, attach if in contact AND the other object has the opposite end (male / female)
+                with the same attachment_category (e.g. "usb")
+
+        Subclasses ContactSubscribedStateMixin
+        on_contact_found function attempts to attach two objects when a CONTACT_FOUND event happens
     """
-
-    @staticmethod
-    def get_dependencies():
-        return RelativeObjectState.get_dependencies()
-
-    def __init__(self, obj):
-        super(Attached, self).__init__(obj)
-
-        self.attached_obj = None
-        self.attached_joints = [None, None]
-        self.attached_joint_paths = [None, None]
-        self.attach_protection_countdown = -1
-
-    def _update(self):
-        # The object cannot be attached to anything when self.attach_protection_countdown is positive.
-        if self.attach_protection_countdown > 0:
-            self.attach_protection_countdown -= 1
-            return
-
-        contact_list = self.obj.states[ContactBodies].get_value()
-        # No need to update if this object does not touch anything or is already attached to an object.
-        if not contact_list or self.attached_obj is not None:
-            return
-        # Exclude links from this object.
-        link_paths = {link.prim_path for link in self.obj.links.values()}
-        for c in contact_list:
-            # Extract the prim path of the other body.
-            if c.body0 in link_paths and c.body1 in link_paths:
-                continue
-            path = c.body0 if c.body0 not in link_paths else c.body1
-            path_split_arr = path.split("/")
-            # Get object's prim path from /World/<obj_name>/.../<obj_link>.
-            for i in range(3, len(path_split_arr)):
-                path = "/".join(path_split_arr[:i])
-                contact_obj = self._simulator.scene.object_registry("prim_path", path)
-                if contact_obj is None:
-                    continue
-                self._set_value(contact_obj, True)
-                return
-
-    def _set_value(self, other, new_value):
-        # When _set_value is first called, trigger both sides when applicable.
-        self._set_value_helper(other, new_value, reverse_trigger=True)
-
-    def _set_value_helper(self, other, new_value, reverse_trigger):
-        # Unattach. Remove any existing joint.
-        if not new_value or self.attached_obj not in [None, other]:
-            print(f"{self.obj.name} is unattached from {self.attached_obj.name}.")
-            self._simulator.stage.RemovePrim(self.attached_joint_paths[0])
-            self._simulator.stage.RemovePrim(self.attached_joint_paths[1])
-            self.attached_obj = None
-            self.attached_joints = [None, None]
-            self.attached_joint_paths = [None, None]
-            # The object should not be able to attach again within some steps after unattaching.
-            # Otherwise the object may be attached right away.
-            self.attach_protection_countdown = m.DEFAULT_ATTACH_PROTECTION_COUNTDOWN
-            # Wake up objects so that passive forces like gravity can be applied.
-            self.obj.wake()
-            other.wake()
-
-        # Already attached. Do nothing.
-        elif self.attached_obj is other:
-            return False
-
-        # Attach.
-        elif new_value and self._can_attach(other):
-            self.attached_obj = other
-
-            # Need two fixed joints to make the attachment stable.
-            for idx, (obj1, obj2) in enumerate(((self.obj, other), (other, self.obj))):
-                self.attached_joint_paths[idx] = f"{obj1.prim_path}/attachment_joint"
-                self.attached_joints[idx] = create_joint(
-                    prim_path=self.attached_joint_paths[idx],
-                    joint_type="FixedJoint",
-                    body0=f"{obj1.prim_path}/base_link",
-                    body1=f"{obj2.prim_path}/base_link",
-                )
-
-                # Set the local pose of the attachment joint.
-                pos0, quat0 = obj1.get_position_orientation()
-                pos1, quat1 = obj2.get_position_orientation()
-
-                rel_pos, rel_quat = T.relative_pose_transform(pos1, quat1, pos0, quat0)
-                rel_pos /= obj1.scale
-                rel_quat = rel_quat[[3, 0, 1, 2]]
-
-                self.attached_joints[idx].GetAttribute("physics:localPos0").Set(Gf.Vec3f(*rel_pos))
-                self.attached_joints[idx].GetAttribute("physics:localRot0").Set(Gf.Quatf(*rel_quat))
-
-        return True
-
-    def _get_value(self, other):
-        return other == self.attached_obj
 
     @staticmethod
     def get_dependencies():
         return RelativeObjectState.get_dependencies() + [ContactBodies]
 
-    @abstractmethod
-    def _can_attach(self, other):
-        raise NotImplementedError()
+    def __init__(self, obj, attachment_type=AttachmentType.STICKY, attachment_category=None):
+        super(Attached, self).__init__(obj)
+        self.attachment_type = attachment_type
+        self.attachment_category = attachment_category
 
+        self.attached_obj = None
 
-class StickyAttachment(Attached):
+    # Attempts to attach two objects when a CONTACT_FOUND event happens
+    def on_contact(self, other, contact_header, contact_data):
+        if contact_header.type == ContactEventType.CONTACT_FOUND:
+            self.set_value(other, True)
+
+    def _set_value(self, other, new_value):
+        # Attempt to attach
+        if new_value:
+            if self.attached_obj == other:
+                # Already attached to this object. Do nothing.
+                return True
+            elif self.attached_obj is None:
+                # If the attachment type and category match, and they are in contact, they should attach
+                if self._can_attach(other) and check_collision(self.obj, other):
+                    self._attach(other)
+
+                    # Non-sticky attachment is bidirectional
+                    if self.attachment_type != AttachmentType.STICKY:
+                        other.states[Attached].attached_obj = self.obj
+
+                    return True
+                else:
+                    logging.warning(f"Trying to attach object {self.obj.name} to object {other.name}, "
+                                    f"but they have attachment type/category mismatch or they are not in contact.")
+                    return False
+            else:
+                logging.warning(f"Trying to attach object {self.obj.name} to object {other.name}, "
+                                f"but it is already attached to object {self.attached_obj.name}. Try detaching first.")
+                return False
+
+        # Attempt to detach
+        else:
+            if self.attached_obj == other:
+                self._detach()
+
+                # Non-sticky attachment is bidirectional
+                if self.attachment_type != AttachmentType.STICKY:
+                    other.states[Attached].attached_obj = None
+
+                # Wake up objects so that passive forces like gravity can be applied.
+                self.obj.wake()
+                other.wake()
+
+            return True
+
+    def _get_value(self, other):
+        return other == self.attached_obj
+
     def _can_attach(self, other):
-        """ Returns true if touching and at least one object has sticky state. """
+        """
+        Returns True if self is sticky or self and other have matching attachment type and category
+        """
+        if self.attachment_type == AttachmentType.STICKY:
+            return True
+        else:
+            if Attached not in other.states or other.states[Attached].attachment_category != self.attachment_category:
+                return False
+            elif self.attachment_type == AttachmentType.SYMMETRIC:
+                return other.states[Attached].attachment_type == AttachmentType.SYMMETRIC
+            elif self.attachment_type == AttachmentType.MALE:
+                return other.states[Attached].attachment_type == AttachmentType.FEMALE
+            else:
+                return other.states[Attached].attachment_type == AttachmentType.MALE
+
+    def _attach(self, other):
+        """
+        Creates a fixed joint between self.obj and other (where other is the parent and self.obj is the child)
+        """
+        self.attached_obj = other
+
+        attached_joint_path = f"{other.prim_path}/attachment_joint"
+        attached_joint = create_joint(
+            prim_path=attached_joint_path,
+            joint_type="FixedJoint",
+            body0=f"{other.prim_path}/base_link",
+            body1=f"{self.obj.prim_path}/base_link",
+        )
+
+        # We need to step rendering once to auto-fill the local pose before overwriting it.
+        og.sim.render()
+
+        # Set the local pose of the attachment joint.
+        parent_pos, parent_quat = other.get_position_orientation()
+        child_pos, child_quat = self.obj.get_position_orientation()
+
+        # The child frame aligns with the joint frame.
+        # Compute the transformation of the child frame in the parent frame
+        rel_pos, rel_quat = T.relative_pose_transform(child_pos, child_quat, parent_pos, parent_quat)
+        # The child frame position in the parent frame needs to be divided by the parent's scale
+        rel_pos /= other.scale
+        rel_quat = rel_quat[[3, 0, 1, 2]]
+
+        attached_joint.GetAttribute("physics:localPos0").Set(Gf.Vec3f(*rel_pos))
+        attached_joint.GetAttribute("physics:localRot0").Set(Gf.Quatf(*rel_quat))
+        attached_joint.GetAttribute("physics:localPos1").Set(Gf.Vec3f(0.0, 0.0, 0.0))
+        attached_joint.GetAttribute("physics:localRot1").Set(Gf.Quatf(1.0, 0.0, 0.0, 0.0))
+
+    def _detach(self):
+        """
+        Removes the attachment joint
+        """
+        attached_joint_path = f"{self.attached_obj.prim_path}/attachment_joint"
+        self._simulator.stage.RemovePrim(attached_joint_path)
+        self.attached_obj = None
+
+    @property
+    def settable(self):
         return True
 
+    @property
+    def state_size(self):
+        return 1
 
-class MagneticAttachment(Attached):
-    def _set_value_helper(self, other, new_value, reverse_trigger):
-        if MagneticAttachment not in other.states:
-            return
-        # Both objects need to be set to the same new_value.
-        Attached._set_value_helper(self, other, new_value, reverse_trigger=False)
-        if reverse_trigger:
-            other.states[MagneticAttachment]._set_value_helper(self.obj, new_value, reverse_trigger=False)
+    def _dump_state(self):
+        return OrderedDict(attached_obj_uuid=-1 if self.attached_obj is None else self.attached_obj.uuid)
 
-    def _can_attach(self, other):
-        """ Returns true if touching and both objects have magnetic state. """
-        return MagneticAttachment in other.states
+    def _load_state(self, state):
+        uuid = state["attached_obj_uuid"]
+        attached_obj = None if uuid == -1 else og.sim.scene.object_registry("uuid", uuid)
 
+        if self.attached_obj != attached_obj:
+            # If it's currently attached to something, detach.
+            if self.attached_obj is not None:
+                self._detach()
 
-class MaleAttachment(MagneticAttachment):
-    def _set_value_helper(self, other, new_value, reverse_trigger):
-        if FemaleAttachment not in other.states:
-            return
-        # Both objects need to be set to the same new_value.
-        Attached._set_value_helper(self, other, new_value, reverse_trigger=False)
-        if reverse_trigger:
-            other.states[FemaleAttachment]._set_value_helper(self.obj, new_value, reverse_trigger=False)
+            # If the loaded state requires new attachment, attach.
+            if attached_obj is not None:
+                self._attach(attached_obj)
 
-    def _can_attach(self, other):
-        """ Returns true if touching, self is male and the other is female. """
-        return FemaleAttachment in other.states
+    def _serialize(self, state):
+        return np.array([state["attached_obj_uuid"]], dtype=float)
 
-
-class FemaleAttachment(MagneticAttachment):
-    def _set_value_helper(self, other, new_value, reverse_trigger):
-        if MaleAttachment not in other.states:
-            return
-        # Both objects need to be set to the same new_value.
-        Attached._set_value_helper(self, other, new_value, reverse_trigger=False)
-        if reverse_trigger:
-            other.states[MaleAttachment]._set_value_helper(self.obj, new_value, reverse_trigger=False)
-
-    def _can_attach(self, other):
-        """ Returns true if touching, the other is male and self is female. """
-        return MaleAttachment in other.states
-
-
-class HungMaleAttachment(MaleAttachment):
-    def _set_value_helper(self, other, new_value, reverse_trigger):
-        if HungFemaleAttachment not in other.states:
-            return
-        # Both objects need to be set to the same new_value.
-        Attached._set_value_helper(self, other, new_value, reverse_trigger=False)
-        if reverse_trigger:
-            other.states[HungFemaleAttachment]._set_value_helper(self.obj, new_value, reverse_trigger=False)
-
-    def _can_attach(self, other):
-        """ 
-        Returns true if touching, self is male, the other is female,
-        and the male hanging object is "below" the female mounting object (center of bbox).
-        """
-        male_center_z = BoundingBoxAPI.compute_center_extent(self.obj.prim_path)[0][2]
-        female_center_z = BoundingBoxAPI.compute_center_extent(other.prim_path)[0][2]
-        return male_center_z < female_center_z and HungFemaleAttachment in other.states
-
-
-class HungFemaleAttachment(FemaleAttachment):
-    def _set_value_helper(self, other, new_value, reverse_trigger):
-        if HungMaleAttachment not in other.states:
-            return
-        # Both objects need to be set to the same new_value.
-        Attached._set_value_helper(self, other, new_value, reverse_trigger=False)
-        if reverse_trigger:
-            other.states[HungMaleAttachment]._set_value_helper(self.obj, new_value, reverse_trigger=False)
-
-    def _can_attach(self, other):
-        """ 
-        Returns true if touching, the other is male, self is female
-        and the male hanging object is "below" the female mounting object (center of bbox).
-        """
-        male_center_z = BoundingBoxAPI.compute_center_extent(other.prim_path)[0][2]
-        female_center_z = BoundingBoxAPI.compute_center_extent(self.obj.prim_path)[0][2]
-        return male_center_z < female_center_z and HungMaleAttachment in other.states
+    def _deserialize(self, state):
+        return OrderedDict(attached_obj_uuid=int(state[0])), 1
