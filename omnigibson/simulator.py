@@ -818,7 +818,6 @@ class Simulator(SimulationContext, Serializable):
         saved_state_str = json.dumps(self.scene.dump_state(serialized=False), cls=NumpyEncoder)
         self.world_prim.SetCustomDataByKey("scene_state", saved_state_str)
 
-        # TODO: Duplicate?
         scene_init_info = self.scene.get_init_info()
         scene_init_info_str = json.dumps(scene_init_info, cls=NumpyEncoder)
         self.world_prim.SetCustomDataByKey("scene_init_info", scene_init_info_str)
