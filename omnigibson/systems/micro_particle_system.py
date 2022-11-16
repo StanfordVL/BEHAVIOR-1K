@@ -8,6 +8,7 @@ from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.systems.system_base import SYSTEMS_REGISTRY
 from omnigibson.systems.particle_system_base import BaseParticleSystem
 from omnigibson.utils.constants import SemanticClass
+from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
 from omnigibson.utils.python_utils import classproperty, assert_valid_key, subclass_factory
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object
 from omnigibson.utils.usd_utils import create_joint, array_to_vtarray
@@ -479,7 +480,7 @@ class MicroParticleSystem(BaseParticleSystem):
             cls.prim = get_prim_at_path(cls.prim_path)
             # If Material already exists on stage, just create a MaterialPrim wrapper around it (run its post_load())
             if is_prim_path_valid(cls.mat_path):
-                cls._material = cls._create_particle_material()
+                cls._material = cls._create_particle_material_template()
                 cls._material.shader_force_populate()
             prototype_dir_prim = get_prim_at_path(prototype_path)
             cls.particle_prototypes = [prototype_prim for prototype_prim in prototype_dir_prim.GetChildren()]
@@ -496,7 +497,7 @@ class MicroParticleSystem(BaseParticleSystem):
         else:
             cls.prim = cls._create_particle_system()
             # Create the particle material (only if we're using high-quality rendering since this takes time)
-            cls._material = cls._create_particle_material() if gm.ENABLE_HQ_RENDERING else None
+            cls._material = cls._create_particle_material_template() if gm.ENABLE_HQ_RENDERING else None
             if cls._material is not None:
                 # Load the material
                 cls._material.load()
@@ -506,6 +507,8 @@ class MicroParticleSystem(BaseParticleSystem):
                 particleUtils.add_pbd_particle_material(cls.simulator.stage, cls.mat_path)
                 # Force populate inputs and outputs of the shader
                 cls._material.shader_force_populate()
+                # Potentially modify the material
+                cls._customize_particle_material()
             # Create the particle prototypes, move them to the appropriate directory, and make them all invisible
             prototypes = cls._create_particle_prototypes()
             cls.particle_prototypes = []
@@ -651,16 +654,26 @@ class MicroParticleSystem(BaseParticleSystem):
         raise NotImplementedError()
 
     @classmethod
-    def _create_particle_material(cls):
+    def _create_particle_material_template(cls):
         """
-        Creates the particle material to be used for this particle system. Prim path does not matter, as it will be
-        overridden internally such that it is a child prim of this particle system's prim
+        Creates the particle material template to be used for this particle system. Prim path does not matter,
+        as it will be overridden internally such that it is a child prim of this particle system's prim.
+
+        NOTE: This material is a template because it is loading an Omni material present. It can then be customized (in
+        addition to modifying its physical material properties) via @_modify_particle_material
 
         Returns:
-            None or UsdShade.Material: If specified, is the material to apply to all particles. If None, no material
+            None or MaterialPrim: If specified, is the material to apply to all particles. If None, no material
                 will be used. Default is None
         """
         return None
+
+    @classmethod
+    def _customize_particle_material(cls):
+        """
+        Modifies this particle system's particle material once it is loaded. Default is a no-op
+        """
+        pass
 
     @classmethod
     def _create_particle_system(cls):
@@ -1195,14 +1208,14 @@ class FluidSystem(MicroParticleSystem):
         return True
 
     @classproperty
-    def particle_radius(cls):
+    def _material_mtl_name(cls):
         """
         Returns:
-            float: Radius for the particles to be generated, since all fluids are composed of spheres
+            None or str: Material mdl preset name to use for generating this fluid material. NOTE: Should be an
+                entry from OmniSurfacePresets.mdl, minus the "OmniSurface_" string. If None if specified, will default
+                to the generic OmniSurface material
         """
-        # Magic number from omni tutorials
-        # See https://docs.omniverse.nvidia.com/prod_extensions/prod_extensions/ext_physics.html#offset-autocomputation
-        return 0.99 * 0.6 * cls.particle_contact_offset
+        return None
 
     @classmethod
     def _create_particle_prototypes(cls):
@@ -1220,7 +1233,27 @@ class FluidSystem(MicroParticleSystem):
                 cls.remove_particle_instancer(instancer)
 
     @classmethod
-    def create(cls, fluid_name, particle_contact_offset, particle_density, create_particle_material, **kwargs):
+    def _create_particle_material_template(cls):
+        # We use a template from OmniPresets if @_material_mtl_name is specified, else the default OmniSurface
+        return MaterialPrim(
+            prim_path=cls.mat_path,
+            name=cls.mat_name,
+            load_config={
+                "mdl_name": f"OmniSurface{'' if cls._material_mtl_name is None else 'Presets'}.mdl",
+                "mtl_name": f"OmniSurface{'' if cls._material_mtl_name is None else ('_' + cls._material_mtl_name)}"
+            }
+        )
+
+    @classmethod
+    def create(
+        cls,
+        fluid_name,
+        particle_contact_offset,
+        particle_density,
+        material_mtl_name=None,
+        customize_particle_material=None,
+        **kwargs,
+    ):
         """
         Utility function to programmatically generate monolithic fluid system classes.
 
@@ -1228,12 +1261,17 @@ class FluidSystem(MicroParticleSystem):
             fluid_name (str): Name of the fluid
             particle_contact_offset (float): Contact offset for the generated fluid system
             particle_density (float): Particle density for the generated fluid system
-            create_particle_material (function): Method for generating the particle material for the fluid.
-                Expected signature:
+            material_mtl_name (None or str): Material mdl preset name to use for generating this fluid material.
+                NOTE: Should be an entry from OmniSurfacePresets.mdl, minus the "OmniSurface_" string.
+                If None if specified, will default to the generic OmniSurface material
+            customize_particle_material (None or function): Method for customizing the particle material for the fluid
+                after it has been loaded. Default is None, which will produce a no-op.
+                If specified, expected signature:
 
-                create_particle_material(prim_path: str, name: str) --> MaterialPrim
+                _customize_particle_material(mat: MaterialPrim) --> None
 
-                where @prim_path and @name are the parameters to assign to the generated MaterialPrim
+                where @MaterialPrim is the material to modify in-place
+
             **kwargs (any): keyword-mapped parameters to override / set in the child class, where the keys represent
                 the class attribute to modify and the values represent the functions / value to set
                 (Note: These values should have either @classproperty or @classmethod decorators!)
@@ -1256,33 +1294,52 @@ class FluidSystem(MicroParticleSystem):
         def cp_particle_density(cls):
             return particle_density
 
+        @classproperty
+        def cp_material_mtl_name(cls):
+            return material_mtl_name
+
         @classmethod
-        def cm_create_particle_material(cls):
-            return create_particle_material(prim_path=cls.mat_path, name=cls.mat_name)
+        def cm_customize_particle_material(cls):
+            if customize_particle_material is not None:
+                customize_particle_material(mat=cls._material)
 
         # Add to any other params specified
         kwargs["_register_system"] = cp_register_system
         kwargs["particle_contact_offset"] = cp_particle_contact_offset
         kwargs["particle_density"] = cp_particle_density
-        kwargs["_create_particle_material"] = cm_create_particle_material
+        kwargs["_material_mtl_name"] = cp_material_mtl_name
+        kwargs["_customize_particle_material"] = cm_customize_particle_material
 
         # Create and return the class
         return subclass_factory(name=f"{fluid_name}System", base_classes=FluidSystem, **kwargs)
 
 
 # Generate fluid systems
+def customize_strawberry_smoothie_material(mat):
+    # We modify the specular reflection color
+    mat.specular_reflection_color = np.array([1.0, 0.64, 0.64])
+
+
 WaterSystem = FluidSystem.create(
     fluid_name="Water",
     particle_contact_offset=0.012,
     particle_density=500.0,
-    create_particle_material=lambda prim_path, name: MaterialPrim(
-        prim_path=prim_path,
-        name=name,
-        load_config={
-            "mdl_name": "OmniSurfacePresets.mdl",
-            "mtl_name": "OmniSurface_DeepWater",
-        }
-    )
+    material_mtl_name="DeepWater",
+)
+
+MilkSystem = FluidSystem.create(
+    fluid_name="Milk",
+    particle_contact_offset=0.008,
+    particle_density=500.0,
+    material_mtl_name="WholeMilk",
+)
+
+StrawberrySmoothieSystem = FluidSystem.create(
+    fluid_name="StrawberrySmoothie",
+    particle_contact_offset=0.008,
+    particle_density=500.0,
+    material_mtl_name="SkimMilk",
+    customize_particle_material=customize_strawberry_smoothie_material,
 )
 
 
