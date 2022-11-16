@@ -6,6 +6,7 @@ import numpy as np
 import sys
 from collections import OrderedDict
 import omnigibson as og
+from omnigibson.macros import gm
 import omnigibson.utils.transform_utils as T
 import omni
 import carb
@@ -86,12 +87,14 @@ def disclaimer(msg):
     Prints a disclaimer message, i.e.: "We know this doesn't work; it's an omni issue; we expect it to be fixed in the
     next release!
     """
-    print("****** DISCLAIMER ******")
-    print("Isaac Sim / Omniverse has some significant limitations and bugs in its current release.")
-    print("This message has popped up because a potential feature in OmniGibson relies upon a feature in Omniverse that"
-          "is yet to be released publically. Currently, the expected behavior may not be fully functional, but"
-          "should be resolved by the next Isaac Sim release.")
-    print(f"Exact Limitation: {msg}")
+    if gm.SHOW_DISCLAIMERS:
+        print("****** DISCLAIMER ******")
+        print("Isaac Sim / Omniverse has some significant limitations and bugs in its current release.")
+        print("This message has popped up because a potential feature in OmniGibson relies upon a feature in Omniverse that"
+              "is yet to be released publically. Currently, the expected behavior may not be fully functional, but"
+              "should be resolved by the next Isaac Sim release.")
+        print(f"Exact Limitation: {msg}")
+        print("************************")
 
 
 def choose_from_options(options, name, random_selection=False):
