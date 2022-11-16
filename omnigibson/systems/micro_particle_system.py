@@ -623,6 +623,16 @@ class MicroParticleSystem(BaseParticleSystem):
         raise NotImplementedError()
 
     @classproperty
+    def particle_radius(cls):
+        """
+        Returns:
+            float: Radius for the particles to be generated, since all fluids are composed of spheres
+        """
+        # Magic number from omni tutorials
+        # See https://docs.omniverse.nvidia.com/prod_extensions/prod_extensions/ext_physics.html#offset-autocomputation
+        return 0.99 * 0.6 * cls.particle_contact_offset if cls.is_fluid else 0.99 * cls.particle_contact_offset
+
+    @classproperty
     def particle_density(cls):
         """
         Returns:
@@ -753,6 +763,105 @@ class MicroParticleSystem(BaseParticleSystem):
         return instancer
 
     @classmethod
+    def generate_particle_instancer_from_link(
+            cls,
+            obj,
+            link,
+            mesh_name_prefixes=None,
+            idn=None,
+            particle_group=0,
+            sampling_distance=None,
+            max_samples=5e5,
+            sample_volume=True,
+            self_collision=True,
+            prototype_indices_choices=None,
+    ):
+        """
+        Generates a new particle instancer with unique identification number @idn, with particles sampled from the mesh
+        located at @mesh_prim_path, and registers it internally
+
+        Args:
+            obj (EntityPrim): Object whose @link's visual meshes will be converted into sampled particles
+            link (RigidPrim): @obj's link whose visual meshes will be converted into sampled particles
+            mesh_name_prefixes (None or str): If specified, specifies the substring that must exist in @link's
+            mesh names in order for that mesh to be included in the particle generator function. If None, no filtering
+            will be used.
+            idn (None or int): Unique identification number to assign to this particle instancer. This is used to
+                deterministically reproduce individual particle instancer states dynamically, even if we
+                delete / add additional ones at runtime during simulation. If None, this system will generate a unique
+                identifier automatically.
+            particle_group (int): ID for this particle set. Particles from different groups will automatically collide
+                with each other. Particles in the same group will have collision behavior dictated by @self_collision
+            sampling_distance (None or float): If specified, sets the distance between sampled particles. If None,
+                a simulator autocomputed value will be used
+            max_samples (int): Maximum number of particles to sample
+            sample_volume (bool): Whether to sample the particles at the mesh's surface or throughout its entire volume
+            self_collision (bool): Whether to enable particle-particle collision within the set
+                (as defined by @particle_group) or not
+            prototype_indices_choices (None or int or list of int): If specified, should specify which prototype(s)
+                should be used for each particle. If None, will use all 0s (i.e.: the first prototype created). If a
+                single number, will use that prototype ID for all sampled particles. If a list of int, will uniformly
+                sample from those IDs for each particle.
+
+        Returns:
+            PhysxParticleInstancer: Generated particle instancer
+        """
+        # Run sanity checks
+        assert cls.initialized, "Must initialize system before generating particle instancers!"
+        # TODO: Implement!
+        assert sample_volume, "Sampling surface of link for particles is not supported yet!"
+
+        # Generate a checker function to see if particles are within the link's volumes
+        check_in_volume, _ = generate_points_in_volume_checker_function(
+            obj=obj,
+            volume_link=link,
+            use_visual_meshes=True,
+            mesh_name_prefixes=mesh_name_prefixes,
+        )
+
+        # Grab the link's AABB (or fallback to obj AABB if link does not have a valid AABB),
+        # and generate a grid of points based on the sampling distance
+        try:
+            low, high = link.aabb
+            extent = link.aabb_extent
+        except ValueError:
+            low, high = obj.aabb
+            extent = obj.aabb_extent
+        # We sample the range of each extent minus
+        sampling_distance = 2 * cls.particle_radius if sampling_distance is None else sampling_distance
+        n_particles_per_axis = ((extent - 2 * cls.particle_radius) / sampling_distance).astype(int) + 1
+        arrs = [np.linspace(lo + cls.particle_radius, hi - cls.particle_radius, n) for lo, hi, n in zip(low, high, n_particles_per_axis)]
+        # Generate 3D-rectangular grid of points
+        particle_positions = np.stack([arr.flatten() for arr in np.meshgrid(*arrs)]).T
+        # Check which points are inside the volume and only keep those
+        particle_positions = particle_positions[np.where(check_in_volume(particle_positions))[0]]
+        # Also potentially sub-sample if we're past our limit
+        if len(particle_positions) > max_samples:
+            particle_positions = particle_positions[np.random.choice(len(particle_positions), size=(max_samples,), replace=False)]
+
+        # Get information about our sampled points
+        n_particles = len(particle_positions)
+        if prototype_indices_choices is not None:
+            prototype_indices = np.ones(n_particles, dtype=int) * prototype_indices_choices if \
+                isinstance(prototype_indices_choices, int) else \
+                np.random.choice(prototype_indices_choices, size=(n_particles,))
+        else:
+            prototype_indices = None
+
+        # Create and return the generated instancer
+        return cls.generate_particle_instancer(
+            idn=idn,
+            particle_group=particle_group,
+            n_particles=n_particles,
+            positions=particle_positions,
+            velocities=None,
+            orientations=None,
+            scales=None,
+            self_collision=self_collision,
+            prototype_indices=prototype_indices,
+        )
+
+    @classmethod
     def generate_particle_instancer_from_mesh(
             cls,
             mesh_prim_path,
@@ -792,10 +901,7 @@ class MicroParticleSystem(BaseParticleSystem):
         """
         # Run sanity checks
         assert cls.initialized, "Must initialize system before generating particle instancers!"
-
-        # Generate standardized prim path for this instancer
-        name = cls.particle_instancer_idn_to_name(idn=idn)
-        instancer_prim_path = f"{cls.prim_path}/{name}"
+        assert cls.simulator.is_stopped(), "Can only sample particles from a mesh using Omni's API when simulator is stopped!"
 
         # Create points prim (this is used initially to generate the particles) and apply particle set API
         points_prim_path = f"{cls.prim_path}/tempSampledPoints"
