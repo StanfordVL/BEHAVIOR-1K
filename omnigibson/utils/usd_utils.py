@@ -266,6 +266,10 @@ class BoundingBoxAPI:
         # Grab aabb
         aabb = compute_aabb(bbox_cache=cls.CACHE, prim_path=prim_path)
 
+        # Sanity check values
+        if np.any(aabb[3:] < aabb[:3]):
+            raise ValueError(f"Got invalid aabb values: low={aabb[:3]}, high={aabb[3:]}")
+
         return aabb[:3], aabb[3:]
 
     @classmethod
