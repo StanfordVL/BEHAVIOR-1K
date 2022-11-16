@@ -260,6 +260,8 @@ class Covered(RelativeObjectState, BooleanState):
         return list(get_visual_particle_systems().values()) + list(get_fluid_systems().values())
 
     def _dump_state(self):
+        # For fluid systems, we don't need to dump state, because the fluid systems themselves handle all state dumping
+        # related to fluids
         # For every visual particle system, add the initial number of particles
         state = OrderedDict()
         for system in get_visual_particle_systems().values():
@@ -269,6 +271,8 @@ class Covered(RelativeObjectState, BooleanState):
         return state
 
     def _load_state(self, state):
+        # For fluid systems, we don't need to load state, because the fluid systems themselves handle all state loading
+        # related to fluids
         # For every visual particle system, set the initial number of particles
         for system in get_visual_particle_systems().values():
             name = get_element_name_from_system(system)
