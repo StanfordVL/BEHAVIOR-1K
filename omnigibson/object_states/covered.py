@@ -236,12 +236,9 @@ class Covered(RelativeObjectState, BooleanState):
                     )
                 else:
                     # We hide all particles within range to be garbage collected by fluid system
-                    for inst in system.particle_instancers.values():
-                        inst.particle_visibilities = 1 - check_points_z_proximity_to_object_surface(
-                            obj=self.obj,
-                            particle_positions=inst.particle_positions,
-                            max_distance=system.particle_radius * 2,
-                        )
+                    for inst, particle_idxs in system.state_cache["particle_contacts"][self.obj]:
+                        idxs = np.array(list(particle_idxs))
+                        inst.particle_visibilities[idxs] = 0
 
         else:
             raise ValueError(f"Invalid system {system} received for setting Covered state!"

@@ -1166,6 +1166,18 @@ class MicroParticleSystem(BaseParticleSystem):
         """
         Cache the collision hits for all particle systems, to be used by the object state system to determine
         if a particle is in contact with a given object.
+
+        Currently, state_cache includes the following entries:
+
+        "particle_contacts": {
+            obj0: {
+                inst0: {particle_idx0, ...},
+                inst1: {...},
+                ...
+            },
+            obj1: ...,
+        }
+
         """
         particle_contacts = defaultdict(lambda: defaultdict(set))
 
