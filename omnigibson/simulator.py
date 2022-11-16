@@ -968,9 +968,12 @@ class Simulator(SimulationContext, Serializable):
         # Highlight that at the current step, the non-kinematic states are potentially inaccurate because a sim
         # step is needed to propagate specific states in physics backend
         # TODO: This should be resolved in a future omniverse release!
-        disclaimer("Attempting to load simulator state. Currently, omniverse does not support exclusively stepping "
-                   "kinematics, so we cannot update some of our object states relying on updated kinematics until a "
-                   "simulator step is taken! This should be resolved by the next NVIDIA Isaac Sim release.")
+        disclaimer("Attempting to load simulator state.\n"
+                   "Currently, omniverse does not support exclusively stepping kinematics, so we cannot update some "
+                   "of our object states relying on updated kinematics until a simulator step is taken!\n"
+                   "Object states such as OnTop, Inside, etc. relying on relative spatial information will inaccurate"
+                   "until a single sim step is taken.\n"
+                   "This should be resolved by the next NVIDIA Isaac Sim release.")
 
     def _serialize(self, state):
         # Default state is from the scene
