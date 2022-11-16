@@ -247,6 +247,7 @@ def create_physx_particleset_pointinstancer(
     if is_isosurface:
         # We have to update the physics for a single step here, and then pause the simulator and take an additional sim
         # step in order for the isosurface to be rendered correctly! (empirically validated, idk why)
+        # TODO: Follow-up / cleanup with omni team to see if this is expected BEHAVIOR
         og.sim.step_physics()
         with og.sim.paused():
             og.sim.step()

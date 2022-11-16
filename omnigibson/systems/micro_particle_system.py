@@ -1072,9 +1072,15 @@ class MicroParticleSystem(BaseParticleSystem):
         if og.sim.is_playing():
             # Post disclaimer, we cannot write to omni particle states when sim is playing currently
             disclaimer(f"We are attempting to load the [{cls.name}], a particle system, state, which requires writing "
-                       f"to individual particle positions. Currently, Omniverse does not respect writing to these "
-                       f"states, but this should be resolved by the next public release. As a result, the fluid "
-                       f"state may not be set correctly.")
+                       f"to individual particle positions.\n"
+                       f"Currently, Omniverse does not respect writing to these "
+                       f"states, but this should be resolved by the next public release.\n"
+                       f"As a result, the fluid state may not be set correctly.\n"
+                       f"Two explicit cases where a failure case will occur:\n"
+                       f"    - Isosurfaces: Because an extra physics step is required to render the fluid correctly"
+                       f"           when generating isosurfaces, we lose the ability to set positions afterwards\n"
+                       f"    - Existing instance with different positions: Because this instance will not be deleted "
+                       f"           and recreated in the simulator, we lose the ability to set positions.")
 
         # Synchronize the particle instancers
         cls._sync_particle_instancers(
