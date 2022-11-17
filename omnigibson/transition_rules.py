@@ -489,6 +489,96 @@ class ContainerGarbageRule(BaseTransitionRule):
         return t_results
 
 
+class BlenderRule(BaseTransitionRule):
+    def __init__(self, output_fluid, fluid_requirements=None, obj_requirements=None):
+        """
+        Transition rule to apply when objects are blended together
+
+        Args:
+            output_fluid (FluidSystem): Fluid to generate once all the input ingredients are blended
+            fluid_requirements (None or dict): If specified, should map fluid system to the minimum number of fluid
+                particles required in order to successfully blend
+            obj_requirements (None or dict): If specified, should map object category names to minimum number of that
+                type of object rqeuired in order to successfully blend
+        """
+        # We want to filter for any object that is included in @obj_requirements and also separately for blender
+        individual_filters = {"blender": CategoryFilter("blender")}
+        group_filters = {category: CategoryFilter(category) for category in obj_requirements.keys()}
+
+        # Store internal variables
+        self.output_fluid = output_fluid
+        self.fluid_requirements = fluid_requirements
+        self.obj_requirements = obj_requirements
+
+        # Store a cached dictionary to check blender volumes so we don't have to do this later
+        self._check_in_volume = OrderedDict()
+
+        # Call super method
+        super().__init__(individual_filters=individual_filters, group_filters=group_filters)
+
+    def condition(self, individual_objects, group_objects):
+
+
+        # TODO: Check blender if both toggled on and lid is closed!
+
+
+        blender = individual_objects["blender"]
+        # If this blender doesn't exist in our volume checker, we add it
+        if blender.name not in self._check_in_volume:
+            self._check_in_volume[blender.name] = lambda pos: blender.states[Filled].check_in_volume(pos.reshape(-1, 3))
+
+        # Check to see which objects are inside the blender container
+        for obj_category, objs in group_objects.items():
+            inside_objs = []
+            for obj in objs:
+                if bool(self._check_in_volume[blender.name](obj.aabb_center)[0]):
+                    inside_objs.append(obj)
+            # Make sure the number of objects inside meets the required threshold, else we trigger a failure
+            if len(inside_objs) < self.obj_requirements[obj_category]:
+                return False
+            # We mutate the group_objects in place so that we only keep the ones inside the blender
+            group_objects[obj_category] = inside_objs
+
+        # Check whether we have sufficient fluids as well
+        for system, n_min_particles in self.fluid_requirements.items():
+            if len(system.particle_instancers) > 0:
+                particle_positions = np.concatenate([inst.particle_positions for inst in system.particle_instancers.values()], axis=0)
+                n_particles_in_volume = np.sum(self._check_in_volume[blender.name](particle_positions))
+                if n_particles_in_volume < n_min_particles:
+                    return False
+            else:
+                # Fluid doesn't even exist yet, so we know the condition is not met
+                return False
+
+        # Our condition is whether we have sufficient ingredients or not
+        return True
+
+    def transition(self, individual_objects, group_objects):
+        blender = individual_objects["blender"]
+        # For every object in group_objects, we remove them from the simulator
+        # TODO: Removing them crashes the sim, so we simply move them out of the scene for now into a virtual graveyard
+        offset = 0
+        for i, (obj_category, objs) in enumerate(group_objects.items()):
+            for j, obj in enumerate(objs):
+                obj.set_position(np.array([100., 100., 1.0 * offset]))
+                offset += 1.0
+
+        # Hide all fluid particles that are inside the blender
+        for system in self.fluid_requirements.keys():
+            # No need to check for whether particle instancers exist because they must due to @self.condition passing!
+            for inst in system.particle_instancers.values():
+                inst.particle_visibilities = 1 - self._check_in_volume[blender.name](inst.particle_positions)
+
+        # Take a physics step to propagate everything
+        og.sim.step_physics()
+
+        # Spawn in blended fluid!
+        blender.states[Filled].set_value(self.output_fluid, True)
+
+        # Take a physics step to propagate everything again
+        og.sim.step_physics()
+
+
 """See the following example for writing simple rules.
 
   GenericTransitionRule(
@@ -500,6 +590,14 @@ class ContainerGarbageRule(BaseTransitionRule):
       transition_fn=lambda light, key: light.states[ToggledOn].set_value(True),
   )
 """
-DEFAULT_RULES = [
+# TODO: To prevent bugs for now, we make this READ-ONLY (tuple). In the future, rules should be allowed to be added
+# dynamically
+DEFAULT_RULES = (
     SlicingRule(),
-]
+    # Strawberry smoothie
+    BlenderRule(
+        output_fluid=StrawberrySmoothieSystem,
+        fluid_requirements={MilkSystem: 10},
+        obj_requirements={"strawberry": 5, "ice_cube": 5},
+    ),
+)
