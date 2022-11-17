@@ -85,7 +85,7 @@ class ToggledOn(AbsoluteObjectState, BooleanState, LinkBasedStateMixin):
         return albedo_add, diffuse_tint
 
     @property
-    def settable(self):
+    def stateful(self):
         return True
 
     @property

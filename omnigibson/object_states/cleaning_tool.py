@@ -1,7 +1,7 @@
 from omnigibson.macros import gm, create_module_macros
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.contact_bodies import ContactBodies
-from omnigibson.object_states.dirty import Dusty, Stained
+from omnigibson.object_states.covered import Covered
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from omnigibson.object_states.object_state_base import AbsoluteObjectState
 from omnigibson.object_states.soaked import Soaked
@@ -76,4 +76,4 @@ class CleaningTool(AbsoluteObjectState, LinkBasedStateMixin):
 
     @staticmethod
     def get_optional_dependencies():
-        return AbsoluteObjectState.get_optional_dependencies() + [Dusty, Stained, Soaked, ToggledOn, ContactBodies]
+        return AbsoluteObjectState.get_optional_dependencies() + [Covered, Soaked, ToggledOn, ContactBodies]

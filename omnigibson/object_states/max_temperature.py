@@ -29,7 +29,7 @@ class MaxTemperature(AbsoluteObjectState):
         self.value = max(self.obj.states[Temperature].get_value(), self.value)
 
     @property
-    def settable(self):
+    def stateful(self):
         return True
 
     def _dump_state(self):

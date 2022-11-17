@@ -5,6 +5,7 @@ import omni
 from omni.isaac.core.utils.prims import get_prim_at_path
 from omni.isaac.core.utils.stage import get_current_stage
 from omni.physx.scripts import physicsUtils, particleUtils
+import omnigibson as og
 from omnigibson.utils.usd_utils import array_to_vtarray
 
 
@@ -195,7 +196,7 @@ def create_physx_particleset_pointinstancer(
                     particle_system.GetAttribute("physxParticleIsosurface:isosurfaceEnabled").Get()
 
     for prototype_prim_path in prototype_prim_paths:
-        # Make sure this prim is visible first
+        # Make sure this prim is visible first if we're not using isosurface
         if is_isosurface:
             UsdGeom.Imageable(get_prim_at_path(prototype_prim_path)).MakeInvisible()
         else:
@@ -242,5 +243,13 @@ def create_physx_particleset_pointinstancer(
 
     # Add ability to translate instancer as well
     physicsUtils.set_or_add_translate_op(instancer, Gf.Vec3f(0, 0, 0))
+
+    if is_isosurface:
+        # We have to update the physics for a single step here, and then pause the simulator and take an additional sim
+        # step in order for the isosurface to be rendered correctly! (empirically validated, idk why)
+        # TODO: Follow-up / cleanup with omni team to see if this is expected BEHAVIOR
+        og.sim.step_physics()
+        with og.sim.paused():
+            og.sim.step()
 
     return instancer_prim

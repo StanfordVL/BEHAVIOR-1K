@@ -994,6 +994,22 @@ class MaterialPrim(BasePrim):
         self.set_input(inp="diffuse_reflection_color", val=Gf.Vec3f(*np.array(color, dtype=float)))
 
     @property
+    def specular_reflection_color(self):
+        """
+        Returns:
+            3-array: this material's specular_reflection_color in (R,G,B)
+        """
+        return np.array(self.get_input(inp="specular_reflection_color"))
+
+    @specular_reflection_color.setter
+    def specular_reflection_color(self, color):
+        """
+        Args:
+             color (3-array): this material's specular_reflection_color in (R,G,B)
+        """
+        self.set_input(inp="specular_reflection_color", val=Gf.Vec3f(*np.array(color, dtype=float)))
+
+    @property
     def specular_transmission_color(self):
         """
         Returns:

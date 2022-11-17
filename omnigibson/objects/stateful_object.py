@@ -401,7 +401,7 @@ class StatefulObject(BaseObject):
         # Also add non-kinematic states
         non_kin_states = OrderedDict()
         for state_type, state_instance in self._states.items():
-            if state_instance.settable:
+            if state_instance.stateful:
                 non_kin_states[get_state_name(state_type)] = state_instance.dump_state(serialized=False)
 
         state["non_kin"] = non_kin_states
@@ -412,10 +412,10 @@ class StatefulObject(BaseObject):
         # Call super method first
         super()._load_state(state=state)
 
-        # Load all states that are settable
+        # Load all states that are stateful
         for state_type, state_instance in self._states.items():
             state_name = get_state_name(state_type)
-            if state_instance.settable:
+            if state_instance.stateful:
                 if state_name in state["non_kin"]:
                     state_instance.load_state(state=state["non_kin"][state_name], serialized=False)
                 else:
@@ -439,11 +439,11 @@ class StatefulObject(BaseObject):
         # Call super method first
         state_dic, idx = super()._deserialize(state=state)
 
-        # Iterate over all states and deserialize their states if they're settable
+        # Iterate over all states and deserialize their states if they're stateful
         non_kin_state_dic = OrderedDict()
         for state_type, state_instance in self._states.items():
             state_name = get_state_name(state_type)
-            if state_instance.settable:
+            if state_instance.stateful:
                 non_kin_state_dic[state_name] = state_instance.deserialize(state[idx:idx+state_instance.state_size])
                 idx += state_instance.state_size
         state_dic["non_kin"] = non_kin_state_dic

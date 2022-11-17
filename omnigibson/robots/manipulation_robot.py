@@ -19,7 +19,7 @@ from omnigibson.controllers import (
 from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.robots.robot_base import BaseRobot
 from omnigibson.utils.python_utils import classproperty, assert_valid_key
-from omnigibson.object_states.filled import generate_points_in_volume_checker_function
+from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
 from omnigibson.utils.constants import JointType, PrimType
 from omnigibson.utils.usd_utils import create_joint
 
@@ -249,7 +249,7 @@ class ManipulationRobot(BaseRobot):
         if gm.AG_CLOTH:
             for arm in self.arm_names:
                 self._ag_check_in_volume[arm], self._ag_calculate_volume[arm] = \
-                    generate_points_in_volume_checker_function(obj=self, volume_link=self.eef_links[arm])
+                    generate_points_in_volume_checker_function(obj=self, volume_link=self.eef_links[arm], mesh_name_prefixes="container")
 
     def is_grasping(self, arm="default", candidate_obj=None):
         """

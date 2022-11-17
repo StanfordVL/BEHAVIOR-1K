@@ -6,7 +6,7 @@ from omnigibson.object_states.burnt import Burnt
 from omnigibson.object_states.cleaning_tool import CleaningTool
 from omnigibson.object_states.contact_bodies import ContactBodies
 from omnigibson.object_states.cooked import Cooked
-from omnigibson.object_states.dirty import Dusty, Stained
+from omnigibson.object_states.covered import Covered
 from omnigibson.object_states.frozen import Frozen
 from omnigibson.object_states.heat_source_or_sink import HeatSourceOrSink
 from omnigibson.object_states.heated import Heated

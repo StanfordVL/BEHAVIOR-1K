@@ -81,7 +81,7 @@ class Temperature(AbsoluteObjectState):
         self.value = new_temperature
 
     @property
-    def settable(self):
+    def stateful(self):
         return True
 
     # For this state, we simply store its value.

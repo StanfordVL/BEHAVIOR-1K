@@ -17,6 +17,9 @@ gm.HEADLESS = False
 # Whether to use extra settings (verboseness, extra GUI features) for debugging
 gm.DEBUG = True
 
+# Whether to print out disclaimers (i.e.: known failure cases resulting from Omniverse's current bugs / limitations)
+gm.SHOW_DISCLAIMERS = True
+
 # Whether to enable (a) [global / robot] contact checking or not
 # Note: You can enable the robot contact checking, even if global checking is disabled
 # If global checking is enabled but robot checking disabled, global checking will take
