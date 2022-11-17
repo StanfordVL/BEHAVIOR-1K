@@ -23,7 +23,7 @@ from omni.isaac.core.utils.stage import open_stage
 from omni.isaac.dynamic_control import _dynamic_control
 import omni.kit.loop._loop as omni_loop
 import builtins
-from pxr import Usd, Gf, UsdGeom, Sdf, UsdPhysics, PhysxSchema
+from pxr import Usd, Gf, UsdGeom, Sdf, UsdPhysics, PhysxSchema, PhysicsSchemaTools
 from omni.isaac.core.utils.viewports import set_camera_view
 from omni.isaac.core.loggers import DataLogger
 from typing import Optional, List
@@ -39,6 +39,7 @@ from omnigibson.utils.ui_utils import CameraMover, disclaimer
 from omnigibson.scenes import Scene
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.objects.stateful_object import StatefulObject
+from omnigibson.object_states.contact_subscribed_state_mixin import ContactSubscribedStateMixin
 from omnigibson.object_states.factory import get_states_by_dependency_order
 from omnigibson.sensors.vision_sensor import VisionSensor
 from omnigibson.transition_rules import DEFAULT_RULES, TransitionResults
@@ -122,6 +123,7 @@ class Simulator(SimulationContext, Serializable):
         #     self.start_simulation()
         set_camera_view()
         self._data_logger = DataLogger()
+        self._contact_callback = self._physics_context._physx_sim_interface.subscribe_contact_report_events(self._on_contact)
 
         # Store other internal vars
         self.gravity = gravity
@@ -578,6 +580,29 @@ class Simulator(SimulationContext, Serializable):
         """
         self._physics_context._step(current_time=self.current_time)
 
+    def _on_contact(self, contact_headers, contact_data):
+        """
+        This callback will be invoked after every PHYSICS step if there is any contact.
+        For each of the pair of objects in each contact, we invoke the on_contact function for each of its states
+        that subclass ContactSubscribedStateMixin. These states update based on contact events.
+        """
+        for contact_header in contact_headers:
+            actor0 = str(PhysicsSchemaTools.intToSdfPath(contact_header.actor0))
+            actor1 = str(PhysicsSchemaTools.intToSdfPath(contact_header.actor1))
+            # actor0/1 are prim paths for links that are in contact. Find the corresponding objects.
+            actor0_obj = self._scene.object_registry("prim_path", "/".join(actor0.split("/")[:-1]))
+            actor1_obj = self._scene.object_registry("prim_path", "/".join(actor1.split("/")[:-1]))
+            if actor0_obj is None or actor1_obj is None or not actor0_obj.initialized or not actor1_obj.initialized:
+                continue
+
+            for obj0, obj1 in [(actor0_obj, actor1_obj), (actor1_obj, actor0_obj)]:
+                if not isinstance(obj0, StatefulObject):
+                    continue
+                for state_type in obj0.states:
+                    if not issubclass(state_type, ContactSubscribedStateMixin):
+                        continue
+                    obj0.states[state_type].on_contact(obj1, contact_header, contact_data)
+
     # TODO: Do we need this?
     # def sync(self, force_sync=False):
     #     """
@@ -903,10 +928,11 @@ class Simulator(SimulationContext, Serializable):
         self._stage_open_callback = (
             omni.usd.get_context().get_stage_event_stream().create_subscription_to_pop(self._stage_open_callback_fn)
         )
+        self._contact_callback = self._physics_context._physx_sim_interface.subscribe_contact_report_events(self._on_contact)
 
         # Set the viewer camera, and then set its default pose
         self._set_viewer_camera()
-        og.sim.viewer_camera.set_position_orientation(
+        self.viewer_camera.set_position_orientation(
             position=np.array(m.DEFAULT_VIEWER_CAMERA_POS),
             orientation=np.array(m.DEFAULT_VIEWER_CAMERA_QUAT),
         )

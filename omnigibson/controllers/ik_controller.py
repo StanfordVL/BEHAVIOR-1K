@@ -195,7 +195,7 @@ class InverseKinematicsController(ManipulationController):
             state_flat,
             np.zeros(4) if state["quat_target"] is None else state["quat_target"],      # Encode None as zeros for consistent serialization size
             self.control_filter.serialize(state=state["control_filter"]),
-        ])
+        ]).astype(float)
 
     def _deserialize(self, state):
         # Run super first

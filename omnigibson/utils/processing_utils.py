@@ -127,7 +127,7 @@ class MovingAverageFilter(Filter):
             state["past_samples"].flatten(),
             [state["current_idx"]],
             [state["fully_filled"]],
-        ])
+        ]).astype(float)
 
     def _deserialize(self, state):
         # Run super first
@@ -139,7 +139,7 @@ class MovingAverageFilter(Filter):
         state_dict["current_idx"] = int(state[idx + samples_len])
         state_dict["fully_filled"] = bool(state[idx + samples_len + 1])
 
-        return state_dict, idx + samples_len + 1
+        return state_dict, idx + samples_len + 2
 
 
 class ExponentialAverageFilter(Filter):
@@ -207,7 +207,7 @@ class ExponentialAverageFilter(Filter):
             state_flat,
             state["avg"],
             [state["num_samples"]],
-        ])
+        ]).astype(float)
 
     def _deserialize(self, state):
         # Run super first
@@ -217,7 +217,7 @@ class ExponentialAverageFilter(Filter):
         state_dict["avg"] = state[idx: idx + self.obs_dim]
         state_dict["num_samples"] = int(state[idx + self.obs_dim])
 
-        return state_dict, idx + self.obs_dim
+        return state_dict, idx + self.obs_dim + 1
 
 
 class Subsampler:

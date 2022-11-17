@@ -1,10 +1,11 @@
 import numpy as np
 
 import omnigibson as og
-from omnigibson import object_states
 from omnigibson.macros import gm
 from omnigibson.objects import DatasetObject, LightObject
 from omnigibson.utils.ui_utils import choose_from_options
+from omnigibson.object_states.attachment import AttachmentType
+from omnigibson.object_states import Attached
 
 
 def setup_scene_for_abilities(abilities1, abilities2):
@@ -13,7 +14,7 @@ def setup_scene_for_abilities(abilities1, abilities2):
 
     # Recreate the environment (this will automatically override the old environment instance)
     # We load the default config, which is simply an EmptyScene with no objects loaded in by default
-    env = og.Environment(configs=f"{og.example_config_path}/default_cfg.yaml") #, physics_timestep=1/120., action_timestep=1/60.)
+    env = og.Environment(configs=f"{og.example_config_path}/default_cfg.yaml")
 
     objs = [None, None]
     abilities_arr = [abilities1, abilities2]
@@ -57,17 +58,20 @@ def setup_scene_for_abilities(abilities1, abilities2):
 
 def demo_sticky_attachment():
     ######################################################################################
-    # StickyAttachment
-    #   can attach if touching and at least one object has sticky state.
+    # Sticky attachment
+    #   can attach if touching and at least one object has the sticky attachment type.
     ######################################################################################
-    env, obj1, obj2 = setup_scene_for_abilities(abilities1={"sticky": {}}, abilities2={})
-    assert object_states.StickyAttachment in obj1.states
+    env, obj1, obj2 = setup_scene_for_abilities(
+        abilities1={"attachable": {"attachment_type": AttachmentType.STICKY}},
+        abilities2={})
+    assert Attached in obj1.states
 
     # Obj1 moves towards obj2 and they are attached together.
     obj1.set_linear_velocity(velocity=np.array([3.0, 0, 3.0]))
     for i in range(100):
         og.sim.step()
-    assert obj1.states[object_states.StickyAttachment].get_value(obj2)
+
+    assert obj1.states[Attached].get_value(obj2)
 
     # Apply a large force to obj1 but the two objects cannot move much because obj2 is heavy.
     obj1.set_linear_velocity(velocity=np.array([10.0, 0, 50.0]))
@@ -75,30 +79,32 @@ def demo_sticky_attachment():
         env.step(np.array([]))  # empty action array since action space is 0 (no robots in the env)
 
     # Unattach obj1 and obj2.
-    obj1.states[object_states.StickyAttachment].set_value(obj2, False)
-    assert not obj1.states[object_states.StickyAttachment].get_value(obj2)
+    obj1.states[Attached].set_value(obj2, False)
+    assert not obj1.states[Attached].get_value(obj2)
 
     # Obj1 moves away from obj2.
-    obj1.set_linear_velocity(velocity=np.array([-2.0, 0, 1.0]))
+    # obj1.set_linear_velocity(velocity=np.array([-2.0, 0, 1.0]))
     for i in range(100):
         env.step(np.array([]))  # empty action array since action space is 0 (no robots in the env)
 
 
-def demo_magnetic_attachment():
+def demo_symmetric_attachment():
     ######################################################################################
-    # MagneticAttachment
-    #   can attach if touching and both objects have magnetic state.
+    # Symmetric attachment
+    #   can attach if touching and both objects have the symmetric attachment type and the same attachment category
     ######################################################################################
-    env, obj1, obj2 = setup_scene_for_abilities(abilities1={"magnetic": {}}, abilities2={"magnetic": {}})
-    assert object_states.MagneticAttachment in obj1.states
-    assert object_states.MagneticAttachment in obj2.states
+    env, obj1, obj2 = setup_scene_for_abilities(
+        abilities1={"attachable": {"attachment_type": AttachmentType.SYMMETRIC, "attachment_category": "magnet"}},
+        abilities2={"attachable": {"attachment_type": AttachmentType.SYMMETRIC, "attachment_category": "magnet"}})
+    assert Attached in obj1.states
+    assert Attached in obj2.states
 
     # Obj1 moves towards obj2 and they are attached together.
     obj1.set_linear_velocity(velocity=np.array([3.0, 0, 3.0]))
     for i in range(100):
         env.step(np.array([]))  # empty action array since action space is 0 (no robots in the env)
-    assert obj1.states[object_states.MagneticAttachment].get_value(obj2)
-    assert obj2.states[object_states.MagneticAttachment].get_value(obj1)
+    assert obj1.states[Attached].get_value(obj2)
+    assert obj2.states[Attached].get_value(obj1)
 
     # Apply a large force to obj1 but the two objects cannot move much because obj2 is heavy.
     obj1.set_linear_velocity(velocity=np.array([10.0, 0, 50.0]))
@@ -106,9 +112,9 @@ def demo_magnetic_attachment():
         env.step(np.array([]))  # empty action array since action space is 0 (no robots in the env)
 
     # Unattach obj1 and obj2.
-    obj1.states[object_states.MagneticAttachment].set_value(obj2, False)
-    assert not obj1.states[object_states.MagneticAttachment].get_value(obj2)
-    assert not obj2.states[object_states.MagneticAttachment].get_value(obj1)
+    obj1.states[Attached].set_value(obj2, False)
+    assert not obj1.states[Attached].get_value(obj2)
+    assert not obj2.states[Attached].get_value(obj1)
 
     # Obj1 moves away from obj2.
     obj1.set_linear_velocity(velocity=np.array([-2.0, 0, 1.0]))
@@ -116,20 +122,45 @@ def demo_magnetic_attachment():
         env.step(np.array([]))  # empty action array since action space is 0 (no robots in the env)
 
 
-def demo_failed_magnetic_attachment():
+def demo_failed_symmetric_attachment_missing_symmetric():
     ######################################################################################
-    # MagneticAttachment - FAIL because only 1 object has magnetic state
-    #   can attach if touching and both objects have magnetic state.
+    # Symmetric attachment - FAIL because only 1 object has the symmetric attachment type
+    #   can attach if touching and both objects have the symmetric attachment type and the same attachment category
     ######################################################################################
-    env, obj1, obj2 = setup_scene_for_abilities(abilities1={"magnetic": {}}, abilities2={})
-    assert object_states.MagneticAttachment in obj1.states
-    assert object_states.MagneticAttachment not in obj2.states
+    env, obj1, obj2 = setup_scene_for_abilities(
+        abilities1={"attachable": {"attachment_type": AttachmentType.SYMMETRIC, "attachment_category": "magnet"}},
+        abilities2={})
+    assert Attached in obj1.states
+    assert Attached not in obj2.states
 
-    # Obj1 moves towards obj2 and but they are NOT attached together.
+    # Obj1 moves towards obj2 but they are NOT attached together.
     obj1.set_linear_velocity(velocity=np.array([3.0, 0, 3.0]))
     for i in range(100):
         env.step(np.array([]))  # empty action array since action space is 0 (no robots in the env)
-    assert not obj1.states[object_states.MagneticAttachment].get_value(obj2)
+    assert not obj1.states[Attached].get_value(obj2)
+
+    # Obj1 moves away from obj2.
+    obj1.set_linear_velocity(velocity=np.array([-2.0, 0, 1.0]))
+    for i in range(100):
+        env.step(np.array([]))  # empty action array since action space is 0 (no robots in the env)
+
+
+def demo_failed_symmetric_attachment_diff_categories():
+    ######################################################################################
+    # Symmetric attachment - FAIL because the two objects have different attachment category
+    #   can attach if touching and both objects have the symmetric attachment type and the same attachment category
+    ######################################################################################
+    env, obj1, obj2 = setup_scene_for_abilities(
+        abilities1={"attachable": {"attachment_type": AttachmentType.SYMMETRIC, "attachment_category": "magnet"}},
+        abilities2={"attachable": {"attachment_type": AttachmentType.SYMMETRIC, "attachment_category": "velcro"}})
+    assert Attached in obj1.states
+    assert Attached in obj2.states
+
+    # Obj1 moves towards obj2 but they are NOT attached together.
+    obj1.set_linear_velocity(velocity=np.array([3.0, 0, 3.0]))
+    for i in range(100):
+        env.step(np.array([]))  # empty action array since action space is 0 (no robots in the env)
+    assert not obj1.states[Attached].get_value(obj2)
 
     # Obj1 moves away from obj2.
     obj1.set_linear_velocity(velocity=np.array([-2.0, 0, 1.0]))
@@ -139,19 +170,21 @@ def demo_failed_magnetic_attachment():
 
 def demo_male_female_attachment():
     ######################################################################################
-    # MaleAttachment / FemaleAttachment
-    #   can attach if touching, self is male and the other is female.
+    # Male / female attachment
+    #   can attach if touching, both have the opposite end (male / female) but the same attachment category
     ######################################################################################
-    env, obj1, obj2 = setup_scene_for_abilities(abilities1={"maleAttachable": {}}, abilities2={"femaleAttachable": {}})
-    assert object_states.MaleAttachment in obj1.states
-    assert object_states.FemaleAttachment in obj2.states
+    env, obj1, obj2 = setup_scene_for_abilities(
+        abilities1={"attachable": {"attachment_type": AttachmentType.MALE, "attachment_category": "usb"}},
+        abilities2={"attachable": {"attachment_type": AttachmentType.FEMALE, "attachment_category": "usb"}})
+    assert Attached in obj1.states
+    assert Attached in obj2.states
 
     # Obj1 moves towards obj2 and they are attached together.
     obj1.set_linear_velocity(velocity=np.array([3.0, 0, 3.0]))
     for i in range(100):
         env.step(np.array([]))  # empty action array since action space is 0 (no robots in the env)
-    assert obj1.states[object_states.MaleAttachment].get_value(obj2)
-    assert obj2.states[object_states.FemaleAttachment].get_value(obj1)
+    assert obj1.states[Attached].get_value(obj2)
+    assert obj2.states[Attached].get_value(obj1)
 
     # Apply a large force to obj1 but the two objects cannot move much because obj2 is heavy.
     obj1.set_linear_velocity(velocity=np.array([10.0, 0, 50.0]))
@@ -159,9 +192,9 @@ def demo_male_female_attachment():
         env.step(np.array([]))  # empty action array since action space is 0 (no robots in the env)
 
     # Unattach obj1 and obj2.
-    obj1.states[object_states.MaleAttachment].set_value(obj2, False)
-    assert not obj1.states[object_states.MaleAttachment].get_value(obj2)
-    assert not obj2.states[object_states.FemaleAttachment].get_value(obj1)
+    obj1.states[Attached].set_value(obj2, False)
+    assert not obj1.states[Attached].get_value(obj2)
+    assert not obj2.states[Attached].get_value(obj1)
 
     # Obj1 moves away from obj2.
     obj1.set_linear_velocity(velocity=np.array([-2.0, 0, 1.0]))
@@ -169,20 +202,22 @@ def demo_male_female_attachment():
         env.step(np.array([]))  # empty action array since action space is 0 (no robots in the env)
 
 
-def demo_failed_male_female_attachment():
+def demo_failed_male_female_attachment_missing_opposite_end():
     ######################################################################################
-    # MaleAttachment - FAIL because the other object is not female
-    #   can attach if touching, self is male and the other is female.
+    # Male / female attachment - FAIL because both objects are male.
+    #   can attach if touching, both have the opposite end (male / female) but the same attachment category
     ######################################################################################
-    env, obj1, obj2 = setup_scene_for_abilities(abilities1={"maleAttachable": {}}, abilities2={"maleAttachable": {}})
-    assert object_states.MaleAttachment in obj1.states
-    assert object_states.FemaleAttachment not in obj2.states
+    env, obj1, obj2 = setup_scene_for_abilities(
+        abilities1={"attachable": {"attachment_type": AttachmentType.MALE, "attachment_category": "usb"}},
+        abilities2={"attachable": {"attachment_type": AttachmentType.MALE, "attachment_category": "usb"}})
+    assert Attached in obj1.states
+    assert Attached in obj2.states
 
     # Obj1 moves towards obj2 and but they are NOT attached together.
     obj1.set_linear_velocity(velocity=np.array([3.0, 0, 3.0]))
     for i in range(100):
         env.step(np.array([]))  # empty action array since action space is 0 (no robots in the env)
-    assert not obj1.states[object_states.MaleAttachment].get_value(obj2)
+    assert not obj1.states[Attached].get_value(obj2)
 
     # Obj1 moves away from obj2.
     obj1.set_linear_velocity(velocity=np.array([-2.0, 0, 1.0]))
@@ -190,22 +225,49 @@ def demo_failed_male_female_attachment():
         env.step(np.array([]))  # empty action array since action space is 0 (no robots in the env)
 
 
-def demo_hung_male_female_attachment():
+def demo_failed_male_female_attachment_diff_categories():
     ######################################################################################
-    # HungMaleAttachment / HungFemaleAttachment
-    #   can attach if touching, self is male, the other is female,
-    #   and the male hanging object is "below" the female mounting object (center of bbox).
+    # Male / female attachment - FAIL because the two objects have different attachment category
+    #   can attach if touching, both have the opposite end (male / female) but the same attachment category
     ######################################################################################
-    env, obj1, obj2 = setup_scene_for_abilities(abilities1={"hungMaleAttachable": {}}, abilities2={"hungFemaleAttachable": {}})
-    assert object_states.HungMaleAttachment in obj1.states
-    assert object_states.HungFemaleAttachment in obj2.states
+    env, obj1, obj2 = setup_scene_for_abilities(
+        abilities1={"attachable": {"attachment_type": AttachmentType.MALE, "attachment_category": "usb"}},
+        abilities2={"attachable": {"attachment_type": AttachmentType.FEMALE, "attachment_category": "hdmi"}})
+    assert Attached in obj1.states
+    assert Attached in obj2.states
+
+    # Obj1 moves towards obj2 and but they are NOT attached together.
+    obj1.set_linear_velocity(velocity=np.array([3.0, 0, 3.0]))
+    for i in range(100):
+        env.step(np.array([]))  # empty action array since action space is 0 (no robots in the env)
+    assert not obj1.states[Attached].get_value(obj2)
+
+    # Obj1 moves away from obj2.
+    obj1.set_linear_velocity(velocity=np.array([-2.0, 0, 1.0]))
+    for i in range(100):
+        env.step(np.array([]))  # empty action array since action space is 0 (no robots in the env)
+
+
+def demo_male_female_attachment_dump_load():
+    ######################################################################################
+    # Male / female attachment with dump_state and load_state
+    #   can attach if touching, both have the opposite end (male / female) but the same attachment category
+    ######################################################################################
+    env, obj1, obj2 = setup_scene_for_abilities(
+        abilities1={"attachable": {"attachment_type": AttachmentType.MALE, "attachment_category": "usb"}},
+        abilities2={"attachable": {"attachment_type": AttachmentType.FEMALE, "attachment_category": "usb"}})
+    assert Attached in obj1.states
+    assert Attached in obj2.states
 
     # Obj1 moves towards obj2 and they are attached together.
     obj1.set_linear_velocity(velocity=np.array([3.0, 0, 3.0]))
     for i in range(100):
         env.step(np.array([]))  # empty action array since action space is 0 (no robots in the env)
-    assert obj1.states[object_states.HungMaleAttachment].get_value(obj2)
-    assert obj2.states[object_states.HungFemaleAttachment].get_value(obj1)
+    assert obj1.states[Attached].get_value(obj2)
+    assert obj2.states[Attached].get_value(obj1)
+
+    # Save the state.
+    state = og.sim.dump_state()
 
     # Apply a large force to obj1 but the two objects cannot move much because obj2 is heavy.
     obj1.set_linear_velocity(velocity=np.array([10.0, 0, 50.0]))
@@ -213,69 +275,36 @@ def demo_hung_male_female_attachment():
         env.step(np.array([]))  # empty action array since action space is 0 (no robots in the env)
 
     # Unattach obj1 and obj2.
-    obj1.states[object_states.HungMaleAttachment].set_value(obj2, False)
-    assert not obj1.states[object_states.HungMaleAttachment].get_value(obj2)
-    assert not obj2.states[object_states.HungFemaleAttachment].get_value(obj1)
+    obj1.states[Attached].set_value(obj2, False)
+    assert not obj1.states[Attached].get_value(obj2)
+    assert not obj2.states[Attached].get_value(obj1)
 
     # Obj1 moves away from obj2.
     obj1.set_linear_velocity(velocity=np.array([-2.0, 0, 1.0]))
     for i in range(100):
         env.step(np.array([]))  # empty action array since action space is 0 (no robots in the env)
 
+    # Load the state where the two objects are attached.
+    og.sim.load_state(state)
 
-def demo_failed_hung_male_female_incompatibility_attachment():
-    ######################################################################################
-    # HungMaleAttachment - FAIL because the other object is not female hung
-    #   can attach if touching, self is male, the other is female,
-    #   and the male hanging object is "below" the female mounting object (center of bbox).
-    ######################################################################################
-    env, obj1, obj2 = setup_scene_for_abilities(abilities1={"hungMaleAttachable": {}}, abilities2={"hungMaleAttachable": {}})
-    assert object_states.HungMaleAttachment in obj1.states
-    assert object_states.HungFemaleAttachment not in obj2.states
+    # Attached state should be restored correctly
+    assert obj1.states[Attached].get_value(obj2)
+    assert obj2.states[Attached].get_value(obj1)
 
-    # Obj1 moves towards obj2 and but they are NOT attached together.
-    obj1.set_linear_velocity(velocity=np.array([3.0, 0, 3.0]))
+    # Apply a large force to obj1 but the two objects cannot move much because obj2 is heavy.
+    obj1.set_linear_velocity(velocity=np.array([10.0, 0, 50.0]))
     for i in range(100):
         env.step(np.array([]))  # empty action array since action space is 0 (no robots in the env)
-    assert not obj1.states[object_states.HungMaleAttachment].get_value(obj2)
-
-    # Obj1 moves away from obj2.
-    obj1.set_linear_velocity(velocity=np.array([-2.0, 0, 1.0]))
-    for i in range(100):
-        env.step(np.array([]))  # empty action array since action space is 0 (no robots in the env)
-
-
-def demo_failed_hung_male_female_mislocation_attachment():
-    ######################################################################################
-    # HungMaleAttachment / FemaleAttachment - FAIL because the male object is above the female object
-    #   can attach if touching, self is male, the other is female,
-    #   and the male hanging object is "below" the female mounting object (center of bbox).
-    ######################################################################################
-    env, obj1, obj2 = setup_scene_for_abilities(abilities1={"hungMaleAttachable": {}}, abilities2={"hungFemaleAttachable": {}})
-    assert object_states.HungMaleAttachment in obj1.states
-    assert object_states.HungFemaleAttachment in obj2.states
-
-    # Obj1 moves towards obj2 and but they are NOT attached together.
-    obj1.set_linear_velocity(velocity=np.array([5.0, 0, 5.0]))
-    for i in range(100):
-        env.step(np.array([]))  # empty action array since action space is 0 (no robots in the env)
-    assert not obj1.states[object_states.HungMaleAttachment].get_value(obj2)
-
-    # Obj1 moves away from obj2.
-    obj1.set_linear_velocity(velocity=np.array([-2.0, 0, 1.0]))
-    for i in range(100):
-        env.step(np.array([]))  # empty action array since action space is 0 (no robots in the env)
-
 
 demo_names_to_demos = {
     "demo_sticky_attachment": demo_sticky_attachment,
-    "demo_magnetic_attachment": demo_magnetic_attachment,
-    "demo_failed_magnetic_attachment" : demo_failed_magnetic_attachment,
+    "demo_symmetric_attachment": demo_symmetric_attachment,
+    "demo_failed_symmetric_attachment_missing_symmetric": demo_failed_symmetric_attachment_missing_symmetric,
+    "demo_failed_symmetric_attachment_diff_categories": demo_failed_symmetric_attachment_diff_categories,
     "demo_male_female_attachment": demo_male_female_attachment,
-    "demo_failed_male_female_attachment": demo_failed_male_female_attachment,
-    "demo_hung_male_female_attachment": demo_hung_male_female_attachment,
-    "demo_failed_hung_male_female_incompatibility_attachment": demo_failed_hung_male_female_incompatibility_attachment,
-    "demo_failed_hung_male_female_mislocation_attachment": demo_failed_hung_male_female_mislocation_attachment,
+    "demo_failed_male_female_attachment_missing_opposite_end": demo_failed_male_female_attachment_missing_opposite_end,
+    "demo_failed_male_female_attachment_diff_categories": demo_failed_male_female_attachment_diff_categories,
+    "demo_male_female_attachment_dump_load": demo_male_female_attachment_dump_load,
 }
 
 

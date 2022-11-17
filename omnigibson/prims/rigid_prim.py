@@ -705,7 +705,7 @@ class RigidPrim(XFormPrim):
         # Call supermethod first
         state_dic, idx = super()._deserialize(state=state)
         # We deserialize deterministically by knowing the order of values -- lin_vel, ang_vel
-        state_dic["lin_vel"] = state[7:10]
-        state_dic["ang_vel"] = state[10:13]
+        state_dic["lin_vel"] = state[idx: idx+3]
+        state_dic["ang_vel"] = state[idx + 3: idx + 6]
 
-        return state_dic, 13
+        return state_dic, idx + 6

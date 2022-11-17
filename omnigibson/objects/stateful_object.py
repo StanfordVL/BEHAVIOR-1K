@@ -432,7 +432,7 @@ class StatefulObject(BaseObject):
         ]) if len(state["non_kin"]) > 0 else np.array([])
 
         # Combine these two arrays
-        return np.concatenate([state_flat, non_kin_state_flat])
+        return np.concatenate([state_flat, non_kin_state_flat]).astype(float)
 
     def _deserialize(self, state):
         # TODO: Need to check that self._state_size is accurate at the end of initialize()

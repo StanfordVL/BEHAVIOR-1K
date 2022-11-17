@@ -1356,7 +1356,7 @@ class EntityPrim(XFormPrim):
                 )
             )
 
-        return np.concatenate(state_flat)
+        return np.concatenate(state_flat).astype(float)
 
     def _deserialize(self, state):
         # We deserialize by first de-flattening the root link state and then iterating over all joints and

@@ -159,7 +159,7 @@ class MacroParticleSystem(BaseParticleSystem):
         if state["template_pose"] is not None:
             states_flat += [*state["template_pose"], state["template_scale"]]
 
-        return np.concatenate(states_flat)
+        return np.concatenate(states_flat).astype(float)
 
     @classmethod
     def _deserialize(cls, state):
@@ -189,8 +189,8 @@ class MacroParticleSystem(BaseParticleSystem):
         # If our state size is larger than the current index we're at, this corresponds to the template info
         if cls.state_size > idx:
             template_pose = [
-                state[idx : idx + 3],
-                state[idx + 3 : idx + 7],
+                state[idx: idx + 3],
+                state[idx + 3: idx + 7],
             ]
             template_scale = state[idx + 7: idx + 10]
             idx += 10
@@ -806,7 +806,7 @@ class VisualParticleSystem(MacroParticleSystem):
                 [group_obj_link2id[link_name] for link_name in group_dict["particle_attached_link_names"]],
             ]
 
-        return np.concatenate([*state_group_flat, state_flat])
+        return np.concatenate([*state_group_flat, state_flat]).astype(float)
 
     @classmethod
     def _deserialize(cls, state):
