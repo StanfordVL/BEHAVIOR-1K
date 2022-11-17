@@ -53,6 +53,9 @@ gm.GPU_MAX_PARTICLE_CONTACTS = 1024 * 1024
 # Whether to enable object state logic or not
 gm.ENABLE_OBJECT_STATES = True
 
+# Whether to enable transiiton rules or not
+gm.ENABLE_TRANSITION_RULES = True
+
 # Default settings for the omni UI viewer
 gm.DEFAULT_VIEWER_WIDTH = 1280
 gm.DEFAULT_VIEWER_HEIGHT = 720

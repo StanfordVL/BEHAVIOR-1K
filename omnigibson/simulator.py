@@ -90,7 +90,6 @@ class Simulator(SimulationContext, Serializable):
             :param viewer_height: height of the camera image
             :param vertical_fov: vertical field of view of the camera image in degrees
             :param device: None or str, specifies the device to be used if running on the gpu with torch backend
-            apply_transitions (bool): True to apply the transition rules.
         """
 
     _world_initialized = False
@@ -105,7 +104,6 @@ class Simulator(SimulationContext, Serializable):
             viewer_height=gm.DEFAULT_VIEWER_HEIGHT,
             vertical_fov=90,
             device=None,
-            apply_transitions=False,
     ) -> None:
         super().__init__(
             physics_dt=physics_dt,
@@ -150,7 +148,6 @@ class Simulator(SimulationContext, Serializable):
         self.object_state_types = get_states_by_dependency_order()
 
         # Set of all non-Omniverse transition rules to apply.
-        self._apply_transitions = apply_transitions
         self._transition_rules = DEFAULT_RULES
 
         # Toggle simulator state once so that downstream omni features can be used without bugs
@@ -174,7 +171,6 @@ class Simulator(SimulationContext, Serializable):
         viewer_height=gm.DEFAULT_VIEWER_HEIGHT,
         vertical_fov=90,
         device_idx=0,
-        apply_transitions=False,
     ) -> None:
         # Overwrite since we have different kwargs
         if Simulator._instance is None:
@@ -566,7 +562,7 @@ class Simulator(SimulationContext, Serializable):
         # Additionally run non physics things if we have a valid scene
         if self._scene is not None:
             self._non_physics_step()
-            if self._apply_transitions:
+            if self.is_playing() and gm.ENABLE_TRANSITION_RULES:
                 self._transition_rule_step()
 
         # TODO (eric): After stage changes (e.g. pose, texture change), it will take two super().step(render=True) for
