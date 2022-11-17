@@ -455,41 +455,57 @@ class Simulator(SimulationContext, Serializable):
     def _transition_rule_step(self):
         """Applies all internal non-Omniverse transition rules."""
         # Create a dict from rule to filter to objects we care about.
-        obj_dict = defaultdict(lambda: defaultdict(list))
-        for obj in self.scene.objects:
+        obj_dict = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
+        for obj in self.scene.objects + self.scene.robots:
             for rule in self._transition_rules:
-                for f in rule.filters:
+                for fname, f in rule.individual_filters.items():
                     if f(obj):
-                        obj_dict[rule][f].append(obj)
+                        obj_dict[rule]["individual"][fname].append(obj)
+                for fname, f in rule.group_filters.items():
+                    if f(obj):
+                        obj_dict[rule]["group"][fname].append(obj)
 
         # For each rule, create a subset of the dict and apply it if applicable.
         added_obj_attrs = []
         removed_objs = []
         for rule in self._transition_rules:
+            # Skip any rule that has no objects
             if rule not in obj_dict:
                 continue
-            # Create lists of objects that this rule potentially cares about.
-            # Skip the rule if any of the object lists is empty.
-            obj_list_rule = list(obj_dict[rule][f] for f in rule.filters)
-            if any(not obj_list_filter for obj_list_filter in obj_list_rule):
-                continue
-            # For each possible combination of objects, check if the rule is
-            # applicable, and if so, apply the transition defined by the rule.
-            # If objects are to be added / removed, the transition function is
-            # expected to return an instance of TransitionResults containing
-            # information about those objects.
-            # TODO: Consider optimizing itertools.product.
-            # TODO: Track what needs to be added / removed at the Scene object level.
-            # Comments from a PR on possible changes:
-            # - Make the transition function immediately apply the transition.
-            # - Addition / removal tracking on the Scene object.
-            # - Check if the objects are still in the scene in each step.
-            for obj_tuple in itertools.product(*obj_list_rule):
-                if rule.condition(self, *obj_tuple):
-                    t_results = rule.transition(self, *obj_tuple)
-                    if isinstance(t_results, TransitionResults):
-                        added_obj_attrs.extend(t_results.add)
-                        removed_objs.extend(t_results.remove)
+            # Skip any rule that has no group filters if it requires group filters
+            group_f_objs = dict()
+            if rule.requires_group_filters:
+                group_f_objs = obj_dict[rule]["group"]
+                if len(group_f_objs) == 0:
+                    continue
+
+            # Skip any rule that is missing an individual filter if it requires individual filters
+            if rule.requires_individual_filters:
+                individual_f_objs = obj_dict[rule]["individual"]
+                if not all(fname in individual_f_objs for fname in rule.individual_filters.keys()):
+                    continue
+                # Get all cartesian cross product over all individual filter objects, and then attempt the transition rule.
+                # If objects are to be added / removed, the transition function is
+                # expected to return an instance of TransitionResults containing
+                # information about those objects.
+                # TODO: Consider optimizing itertools.product.
+                # TODO: Track what needs to be added / removed at the Scene object level.
+                # Comments from a PR on possible changes:
+                # - Addition / removal tracking on the Scene object.
+                # - Check if the objects are still in the scene in each step.
+                for obj_tuple in itertools.product(*list(individual_f_objs.values())):
+                    individual_objects = {fname: obj for fname, obj in zip(individual_f_objs.keys(), obj_tuple)}
+                    did_transition, transition_output = rule.process(individual_objects=individual_objects, group_objects=group_f_objs)
+                    if isinstance(transition_output, TransitionResults):
+                        added_obj_attrs.extend(transition_output.add)
+                        removed_objs.extend(transition_output.remove)
+            else:
+                # We try the transition rule once, since there's no cartesian cross product of combinations from the
+                # individual filters we need to handle
+                did_transition, transition_output = rule.process(individual_objects=dict(), group_objects=group_f_objs)
+                if isinstance(transition_output, TransitionResults):
+                    added_obj_attrs.extend(transition_output.add)
+                    removed_objs.extend(transition_output.remove)
 
         # Process all transition results.
         for added_obj_attr in added_obj_attrs:

@@ -1,10 +1,11 @@
 from abc import ABCMeta, abstractmethod
-from collections import namedtuple
+from collections import namedtuple, OrderedDict
 
 import numpy as np
-from omni.isaac.utils._isaac_utils import math as math_utils
 
+import omnigibson as og
 from omnigibson import og_dataset_path
+from omnigibson.systems import *
 from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.object_states import *
 import omnigibson.utils.transform_utils as T
@@ -23,6 +24,26 @@ TransitionResults = namedtuple(
 
 class BaseFilter(metaclass=ABCMeta):
     """Defines a filter to apply to objects."""
+    # Class global variable for maintaining cached state
+    # Maps tuple of unique filter inputs to cached output value (T / F)
+    state = None
+
+    @classmethod
+    def __new__(cls, *args, **kwargs):
+        """
+        Initializes the cached state for this filter if it doesn't already exist
+        """
+        if cls.state is None:
+            cls.state = OrderedDict()
+
+        return super(BaseFilter, cls).__new__(cls)
+
+    @classmethod
+    def update(cls):
+        """
+        Updates the internal state by checking the filter status on all filter inputs
+        """
+        raise NotImplementedError()
 
     @abstractmethod
     def __call__(self, obj):
@@ -87,52 +108,155 @@ class BaseTransitionRule(metaclass=ABCMeta):
     """Defines a set of categories of objects and how to transition their states."""
 
     @abstractmethod
-    def __init__(self, filters):
+    def __init__(self, individual_filters=None, group_filters=None):
         """TransitionRule ctor.
 
         Args:
-            filters: (tuple) Object filters that this rule cares about.
+            individual_filters (None or dict): Individual object filters that this filter cares about.
+                For each name, filter key-value pair, the global transition rule step will produce tuples of valid
+                filtered objects such that the cross product over all individual filter outputs occur.
+                For example, if the individual filters are:
+
+                    {"apple": CategoryFilter("apple"), "knife": CategoryFilter("knife")},
+
+                the transition rule step will produce all 2-tuples of valid (apple, knife) combinations:
+
+                    {"apple": apple_i, "knife": knife_j}
+
+                based on the current instances of each object type in the scene and pass them to @self.condition as the
+                @individual_objects entry.
+                If None is specified, then no filter will be applied
+
+            group_filters (None or dict): Group object filters that this filter cares about. For each name, filter
+                key-value pair, the global transition rule step will produce a single dictionary of valid filtered
+                objects.
+                For example, if the group filters are:
+
+                    {"apple": CategoryFilter("apple"), "knife": CategoryFilter("knife")},
+
+                the transition rule step will produce the following dictionary:
+
+                    {"apple": [apple0, apple1, ...], "knife": [knife0, knife1, ...]}
+
+                based on the current instances of each object type in the scene and pass them to @self.condition
+                as the @group_objects entry.
+                If None is specified, then no filter will be applied
         """
-        self.filters = filters
+        # Make sure at least one set of filters is specified -- in general, there should never be a rule
+        # where no filter is specified
+        assert not (individual_filters is None and group_filters is None),\
+            "At least one of individual_filters or group_filters must be specified!"
+
+        # Store the filters
+        self.individual_filters = dict() if individual_filters is None else individual_filters
+        self.group_filters = dict() if group_filters is None else group_filters
+
+    def process(self, individual_objects, group_objects):
+        """
+        Processes this transition rule at the current simulator step. If @condition evaluates to True, then
+        @transition will be executed.
+
+        Args:
+            individual_objects (dict): Dictionary mapping corresponding keys from @individual_filters to individual
+                object instances where the filter is satisfied. Note: if @self.individual_filters is None or no values
+                satisfy the filter, then this will be an empty dictionary
+            group_objects (dict): Dictionary mapping corresponding keys from @group_filters to a list of individual
+                object instances where the filter is satisfied. Note: if @self.group_filters is None or no values
+                satisfy the filter, then this will be an empty dictionary
+
+        Returns:
+            2-tuple:
+                - bool: Whether @self.condition is met
+                - None or TransitionResults: Output from @self.transition (None if it was never executed)
+        """
+        should_transition = self.condition(individual_objects=individual_objects, group_objects=group_objects)
+        return should_transition, \
+               self.transition(individual_objects=individual_objects, group_objects=group_objects) \
+                   if should_transition else None
+
+    @property
+    def requires_individual_filters(self):
+        """
+        Returns:
+            bool: Whether this transition rule requires any specific filters
+        """
+        return len(self.individual_filters) > 0
+
+    @property
+    def requires_group_filters(self):
+        """
+        Returns:
+            bool: Whether this transition rule requires any group filters
+        """
+        return len(self.group_filters) > 0
 
     @abstractmethod
-    def condition(self, simulator, *args):
-        """Returns True if the rule applies to the object tuple."""
+    def condition(self, individual_objects, group_objects):
+        """
+        Returns True if the rule applies to the object tuple.
+
+        Args:
+            individual_objects (dict): Dictionary mapping corresponding keys from @individual_filters to individual
+                object instances where the filter is satisfied. Note: if @self.individual_filters is None or no values
+                satisfy the filter, then this will be an empty dictionary
+            group_objects (dict): Dictionary mapping corresponding keys from @group_filters to a list of individual
+                object instances where the filter is satisfied. Note: if @self.group_filters is None or no values
+                satisfy the filter, then this will be an empty dictionary
+
+        Returns:
+            bool: Whether the condition is met or not
+        """
         pass
 
     @abstractmethod
-    def transition(self, simulator, *args):
-        """Rule to apply for each tuples satisfying the condition."""
+    def transition(self, individual_objects, group_objects):
+        """
+        Rule to apply for each set of objects satisfying the condition.
+
+        Args:
+            individual_objects (dict): Dictionary mapping corresponding keys from @individual_filters to individual
+                object instances where the filter is satisfied. Note: if @self.individual_filters is None or no values
+                satisfy the filter, then this will be an empty dictionary
+            group_objects (dict): Dictionary mapping corresponding keys from @group_filters to a list of individual
+                object instances where the filter is satisfied. Note: if @self.group_filters is None or no values
+                satisfy the filter, then this will be an empty dictionary
+
+        Returns:
+            TransitionResults: results from the executed transition
+        """
         pass
 
 
 class GenericTransitionRule(BaseTransitionRule):
     """A generic transition rule template used typically for simple rules."""
 
-    def __init__(self, filters, condition_fn, transition_fn):
-        super(GenericTransitionRule, self).__init__(filters)
+    def __init__(self, individual_filters, group_filters, condition_fn, transition_fn):
+        super(GenericTransitionRule, self).__init__(individual_filters, group_filters)
         self.condition_fn = condition_fn
         self.transition_fn = transition_fn
 
-    def condition(self, simulator, *args):
-        return self.condition_fn(*args)
+    def condition(self, individual_objects, group_objects):
+        return self.condition_fn(individual_objects, group_objects)
 
-    def transition(self, simulator, *args):
-        return self.transition_fn(*args)
+    def transition(self, individual_objects, group_objects):
+        return self.transition_fn(individual_objects, group_objects)
 
 
 class SlicingRule(BaseTransitionRule):
     """Transition rule to apply to sliced / slicer object pairs."""
 
     def __init__(self):
-        a_filter_sliceable = AbilityFilter("sliceable")
-        a_filter_slicer = AbilityFilter("slicer")
-        super(SlicingRule, self).__init__((a_filter_sliceable, a_filter_slicer))
+        # Define an individual filter dictionary so we can track all valid combos of slicer - sliceable
+        individual_filters = {ability: AbilityFilter(ability) for ability in ("sliceable", "slicer")}
 
-    def condition(self, simulator, sliced_obj, slicer_obj):
+        # Run super
+        super().__init__(individual_filters=individual_filters)
+
+    def condition(self, individual_objects, group_objects):
+        slicer_obj, sliced_obj = individual_objects["slicer"], individual_objects["sliceable"]
         slicer_position = slicer_obj.states[Slicer].get_link_position()
         if slicer_position is None:
-            False
+            return False
 
         contact_list = slicer_obj.states[ContactBodies].get_value()
         sliced_link_paths = {link.prim_path for link in sliced_obj.links.values()}
@@ -145,7 +269,7 @@ class SlicingRule(BaseTransitionRule):
             return False
 
         # Calculate the normal force applied to the contact object.
-        normal_force = math_utils.dot(sliced_c.impulse, sliced_c.normal) / sliced_c.dt
+        normal_force = np.dot(sliced_c.impulse, sliced_c.normal) / sliced_c.dt
         if Sliced in sliced_obj.states:
             if (
                 not sliced_obj.states[Sliced].get_value()
@@ -156,7 +280,8 @@ class SlicingRule(BaseTransitionRule):
                 return True
         return False
 
-    def transition(self, simulator, sliced_obj, slicer_obj):
+    def transition(self, individual_objects, group_objects):
+        slicer_obj, sliced_obj = individual_objects["slicer"], individual_objects["sliceable"]
         # Object parts offset annotation are w.r.t the base link of the whole object.
         sliced_obj.states[Sliced].set_value(True)
         pos, orn = sliced_obj.get_position_orientation()
@@ -227,14 +352,14 @@ class ContainerRule(BaseTransitionRule):
         self._current_steps = 1
         self._counter = 0
 
-    def condition(self, simulator, container_obj, *contained_objs):
+    def condition(self, container_obj, *contained_objs):
         if (
             ToggledOn in container_obj.states and
             not container_obj.states[ToggledOn].get_value()
         ):
             return False
         # Check all objects inside the container against the expected objects.
-        all_contained_objs = _contained_objects(simulator.scene, container_obj)
+        all_contained_objs = _contained_objects(og.sim.scene, container_obj)
         contained_prim_paths = set(obj.prim_path for obj in contained_objs)
         all_contained_prim_paths = set(obj.prim_path for obj in all_contained_objs)
         if contained_prim_paths != all_contained_prim_paths:
@@ -246,7 +371,7 @@ class ContainerRule(BaseTransitionRule):
         self._current_steps = 1
         return True
 
-    def transition(self, simulator, container_obj, *contained_objs):
+    def transition(self, container_obj, *contained_objs):
         t_results = TransitionResults()
 
         # Create a new object to be added.
@@ -308,13 +433,13 @@ class ContainerGarbageRule(BaseTransitionRule):
         self._cached_contained_objs = None
         self._counter = 0
 
-    def condition(self, simulator, container_obj):
+    def condition(self, container_obj):
         if (
             ToggledOn in container_obj.states and
             not container_obj.states[ToggledOn].get_value()
         ):
             return False
-        self._cached_contained_objs = _contained_objects(simulator.scene, container_obj)
+        self._cached_contained_objs = _contained_objects(og.sim.scene, container_obj)
         # Skip in case only a garbage object is inside the container.
         if len(self._cached_contained_objs) == 1:
             contained_obj = self._cached_contained_objs[0]
@@ -323,7 +448,7 @@ class ContainerGarbageRule(BaseTransitionRule):
                 return False
         return bool(self._cached_contained_objs)
 
-    def transition(self, simulator, container_obj):
+    def transition(self, container_obj):
         t_results = TransitionResults()
 
         # Create a single garbage object to be added.
