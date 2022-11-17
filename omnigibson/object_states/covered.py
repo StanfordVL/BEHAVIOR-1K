@@ -11,9 +11,11 @@ import numpy as np
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
-# Value in [0, 1] determining the minimum proportion of particles needed to be present in order for Covered --> True
+# Value in [0, 1] determining the minimum proportion of particles needed in order for Covered --> True
 m.VISUAL_PARTICLE_THRESHOLD = 0.75
-m.FLUID_THRESHOLD = 0.1
+
+# Number of fluid particles needed in order for Covered --> True
+m.FLUID_THRESHOLD = 50
 
 
 def check_points_z_proximity_to_object_surface(obj, particle_positions, max_distance=0.01):
@@ -183,13 +185,9 @@ class Covered(RelativeObjectState, BooleanState):
             if len(system.particle_instancers) > 0:
                 # We've already cached particle contacts, so we merely search through them to see if any particles are
                 # touching the object
-                particle_width = system.particle_radius * 2
                 n_near_particles = np.sum([len(idxs) for idxs in system.state_cache["particle_contacts"][self.obj].values()])
-                # Heuristic: Assuming each particle has net surface area coverage of particle_width ^ 2 (i.e.: square),
-                # We find the total area coverage proportion with respect to the bird's eye view area of the object
-                area_covered = n_near_particles * (particle_width ** 2)
-                total_area = get_projected_surface_area_to_z_plane(obj=self.obj, precision=0.01)
-                value = area_covered / total_area > m.FLUID_THRESHOLD
+                # Heuristic: If the number of near particles is above the threshold, we consdier this covered
+                value = n_near_particles >= m.FLUID_THRESHOLD
         else:
             raise ValueError(f"Invalid system {system} received for getting Covered state!"
                              f"Currently, only VisualParticleSystems and FluidSystems are supported.")
