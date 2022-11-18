@@ -20,9 +20,10 @@ m.CAN_TOGGLE_STEPS = 5
 
 class ToggledOn(AbsoluteObjectState, BooleanState, LinkBasedStateMixin):
     def __init__(self, obj):
-        super(ToggledOn, self).__init__(obj)
         self.value = False
         self.robot_can_toggle_steps = 0
+        self.visual_marker = None
+        super(ToggledOn, self).__init__(obj)
 
     def _get_value(self):
         return self.value
