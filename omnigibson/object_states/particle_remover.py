@@ -10,11 +10,13 @@ from omnigibson.object_states.object_state_base import AbsoluteObjectState
 from omnigibson.object_states.saturated import Saturated
 from omnigibson.object_states.toggle import ToggledOn
 from omnigibson.utils.usd_utils import BoundingBoxAPI
+from omnigibson.systems.system_base import get_system_from_element_name, get_element_name_from_system
 from omnigibson.systems.macro_particle_system import VisualParticleSystem, get_visual_particle_systems
 from omnigibson.systems.micro_particle_system import FluidSystem, get_fluid_systems
 from omnigibson.utils.constants import ParticleModifyMethod, PrimType
 from omnigibson.utils.usd_utils import create_primitive_mesh
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
+from omnigibson.utils.python_utils import assert_valid_key, classproperty
 from omni.physx import get_physx_scene_query_interface as psqi
 from omni.isaac.core.utils.prims import get_prim_at_path
 from pxr import PhysicsSchemaTools
@@ -75,15 +77,13 @@ class ParticleRemover(AbsoluteObjectState, LinkBasedStateMixin):
             projection_mesh_params is None else projection_mesh_params
 
         # Map of system to number of absorbed particles for this object corresponding to the specific system
-        self.absorbed_particle_count = OrderedDict([(system, 0) for system in self._supported_systems])
+        self.absorbed_particle_count = OrderedDict([(system, 0) for system in self.supported_systems])
 
         # Standardize the conditions (make sure every system has at least one condition, which to make sure
         # the object isn't already saturated with the specific number of particles)
         for system, conds in conditions.items():
             # Make sure the system is supported
-            assert system in self._supported_systems, \
-                f"Invalid system for particle remover! Supported systems: " \
-                f"{[sys.name for sys in self._supported_systems]}, got: {system.name}"
+            assert_valid_key(key=system, valid_keys=self.supported_systems, name="particle system")
             # Make sure conds isn't empty
             if conds is None:
                 conds = []
@@ -194,7 +194,7 @@ class ParticleRemover(AbsoluteObjectState, LinkBasedStateMixin):
             # Iterate over all particles and remove any that are within the relaxed AABB of the remover volume
             for particle_name in list(system.particles.keys()):
                 # If saturated, stop absorbing
-                if not self.conditions[system][-1]():
+                if self.check_saturation(system=system):
                     break
                 particle = system.particles[particle_name]
                 pos = particle.get_position()
@@ -222,7 +222,7 @@ class ParticleRemover(AbsoluteObjectState, LinkBasedStateMixin):
             # Iterate over all particles and hide any that are detected to be removed
             for instancer, particle_idxs in instancer_to_particle_idxs.items():
                 # If saturated, stop absorbing
-                if not self.conditions[system][-1]():
+                if self.check_saturation(system=system):
                     break
                 max_particle_absorbed = m.FLUID_PARTICLES_REMOVAL_LIMIT - self.absorbed_particle_count[system]
                 particles_to_absorb = min(len(particle_idxs), max_particle_absorbed)
@@ -236,7 +236,7 @@ class ParticleRemover(AbsoluteObjectState, LinkBasedStateMixin):
 
         else:
             # Invalid system queried
-            self._unsupported_system_error(system=system)
+            self.unsupported_system_error(system=system)
 
     def _remove_overlap_particles_in_projection_mesh(self, system):
         """
@@ -251,7 +251,7 @@ class ParticleRemover(AbsoluteObjectState, LinkBasedStateMixin):
             # Iterate over all particles and remove any that are within the volume
             for particle_name in list(system.particles.keys()):
                 # If saturated, stop absorbing
-                if not self.conditions[system][-1]():
+                if self.check_saturation(system=system):
                     break
                 particle = system.particles[particle_name]
                 pos = particle.get_position()
@@ -263,7 +263,7 @@ class ParticleRemover(AbsoluteObjectState, LinkBasedStateMixin):
             # Iterate over all particles and remove any that are within the volume
             for inst in system.particle_instancers.values():
                 # If saturated, stop absorbing
-                if not self.conditions[system][-1]():
+                if self.check_saturation(system=system):
                     break
                 particle_idxs = np.where(self._check_in_projection_mesh(inst.particle_positions))
                 max_particle_absorbed = m.FLUID_PARTICLES_REMOVAL_LIMIT - self.absorbed_particle_count[system]
@@ -273,7 +273,7 @@ class ParticleRemover(AbsoluteObjectState, LinkBasedStateMixin):
 
         else:
             # Invalid system queried
-            self._unsupported_system_error(system=system)
+            self.unsupported_system_error(system=system)
 
     def _generate_saturation_condition(self, system):
         """
@@ -292,7 +292,7 @@ class ParticleRemover(AbsoluteObjectState, LinkBasedStateMixin):
             def condition():
                 return self.absorbed_particle_count[system] < m.FLUID_PARTICLES_REMOVAL_LIMIT
         else:
-            self._unsupported_system_error(system=system)
+            self.unsupported_system_error(system=system)
 
         return condition
 
@@ -303,6 +303,8 @@ class ParticleRemover(AbsoluteObjectState, LinkBasedStateMixin):
             for system, conditions in self.conditions.items():
                 # Check if all conditions are met
                 if np.all([condition() for condition in conditions]):
+                    # Sanity check for oversaturation
+                    self.check_saturation(system=system, verify_no_oversaturation=True)
                     # Potentially remove particles within the volume
                     self._remove_particles(system=system)
 
@@ -320,20 +322,93 @@ class ParticleRemover(AbsoluteObjectState, LinkBasedStateMixin):
     def get_optional_dependencies():
         return AbsoluteObjectState.get_optional_dependencies() + [Covered, Saturated, ToggledOn, ContactBodies]
 
-    def _unsupported_system_error(self, system):
+    def check_saturation(self, system, verify_no_oversaturation=False):
+        """
+        Checks whether this object is fully saturated with particles absorbed from particle system @system. Also,
+        potentially sanity checks whether the object is oversaturated, if @verify_no_oversaturation is True
+
+        Args:
+            system (ParticleSystem): System to check for particle saturation within this object
+            verify_no_oversaturation (bool): Whether to sanity check whether this object is oversaturated with particles
+                from @system
+
+        Returns:
+            bool: True if the object is saturated with objects from @system, otherwise False
+        """
+        # If requested, run sanity check to make sure we're not oversaturated with this system's particles
+        if verify_no_oversaturation:
+            if issubclass(system, VisualParticleSystem):
+                limit = m.VISUAL_PARTICLES_REMOVAL_LIMIT
+            elif issubclass(system, FluidSystem):
+                limit = m.FLUID_PARTICLES_REMOVAL_LIMIT
+            else:
+                self.unsupported_system_error(system=system)
+            assert self.absorbed_particle_count[system] <= limit, \
+                f"Particle remover should not be oversaturated! Max: {limit}, got: {self.absorbed_particle_count[system]}"
+
+        return self.absorbed_particle_count[system] == limit
+
+    def set_saturation(self, system, value):
+        """
+        Sets the specific saturation value for system @system
+
+        Args:
+            system (ParticleSystem): System to set corresponding absorbed particle count saturation level for
+            value (bool): Whether to set the particle saturation level to be saturated or not
+        """
+        n_particles = 0
+        if value:
+            if issubclass(system, VisualParticleSystem):
+                n_particles = m.VISUAL_PARTICLES_REMOVAL_LIMIT
+            elif issubclass(system, FluidSystem):
+                n_particles = m.FLUID_PARTICLES_REMOVAL_LIMIT
+            else:
+                self.unsupported_system_error(system=system)
+        self.absorbed_particle_count[system] = n_particles
+
+    @classmethod
+    def unsupported_system_error(cls, system):
         """
         Raises a ValueError given unsupported system @system
 
         Args:
-            system (ParticleSystem): Any unsupported system (any system that does not exist in @self._supported_systems)
+            system (ParticleSystem): Any unsupported system (any system that does not exist in @self.supported_systems)
         """
         raise ValueError(f"Invalid system for particle remover! Supported systems: "
-                         f"{[sys.name for sys in self._supported_systems]}, got: {system.name}")
+                         f"{[sys.name for sys in cls.supported_systems]}, got: {system.name}")
 
-    @property
-    def _supported_systems(self):
+    @classproperty
+    def supported_systems(self):
         """
         Returns:
             list: All systems used in this state, ordered deterministically
         """
         return list(get_visual_particle_systems().values()) + list(get_fluid_systems().values())
+
+    @property
+    def stateful(self):
+        return True
+
+    @property
+    def state_size(self):
+        return len(self.absorbed_particle_count)
+
+    def _dump_state(self):
+        state = OrderedDict()
+        for system, val in self.absorbed_particle_count.items():
+            state[get_element_name_from_system(system)] = val
+        return state
+
+    def _load_state(self, state):
+        for system_name, val in state.items():
+            self.absorbed_particle_count[get_system_from_element_name(system_name)] = val
+
+    def _serialize(self, state):
+        return np.array(list(state.values()), dtype=float)
+
+    def _deserialize(self, state):
+        state_dict = OrderedDict()
+        for i, system in enumerate(self.absorbed_particle_count.keys()):
+            state_dict[get_element_name_from_system(system)] = int(state[i])
+
+        return state_dict, len(self.absorbed_particle_count)
