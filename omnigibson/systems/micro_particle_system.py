@@ -1169,17 +1169,31 @@ class MicroParticleSystem(BaseParticleSystem):
 
         Currently, state_cache includes the following entries:
 
-        "particle_contacts": {
+        "obj_particle_contacts": {
             obj0: {
                 inst0: {particle_idx0, ...},
                 inst1: {...},
                 ...
             },
             obj1: ...,
-        }
+        },
+
+        where obji is an instance of BaseObject
+
+        "link_particle_contacts": {
+            link0: {
+                inst0: {particle_idx0, ...},
+                inst1: {...},
+                ...
+            },
+            link1: ...,
+        },
+
+        where linki is a string representing the link's (rigid body's) prim path
 
         """
-        particle_contacts = defaultdict(lambda: defaultdict(set))
+        obj_particle_contacts = defaultdict(lambda: defaultdict(set))
+        link_particle_contacts = defaultdict(lambda: defaultdict(set))
 
         particle_instancer = None
         particle_idx = 0
@@ -1187,7 +1201,8 @@ class MicroParticleSystem(BaseParticleSystem):
         def report_hit(hit):
             base = "/".join(hit.rigid_body.split("/")[:-1])
             obj = cls.simulator.scene.object_registry("prim_path", base)
-            particle_contacts[obj][particle_instancer].add(particle_idx)
+            obj_particle_contacts[obj][particle_instancer].add(particle_idx)
+            link_particle_contacts[hit.rigid_body][particle_instancer].add(particle_idx)
             return True
 
         for inst_name, inst in cls.particle_instancers.items():
@@ -1196,7 +1211,8 @@ class MicroParticleSystem(BaseParticleSystem):
                 particle_instancer = inst
                 get_physx_scene_query_interface().overlap_sphere(cls.particle_contact_offset, pos, report_hit, False)
 
-        cls.state_cache["particle_contacts"] = particle_contacts
+        cls.state_cache["obj_particle_contacts"] = obj_particle_contacts
+        cls.state_cache["link_particle_contacts"] = link_particle_contacts
 
 
 class FluidSystem(MicroParticleSystem):

@@ -187,11 +187,12 @@ def generate_points_in_volume_checker_function(obj, volume_link, use_visual_mesh
             where @vol is the total volume being checked (expressed in global scale) aggregated across
             all container sub-volumes
     """
-    # If the object doesn't have scale [1, 1, 1], we make sure the volume link has no relative orientation w.r.t to
-    # the object (root link) frame
+    # If the object doesn't have uniform scale [1, 1, 1], we make sure the volume link has no relative orientation
+    # w.r.t to the object (root link) frame
     # TODO (eric): make this more general: convert particle_positions from 1) global frame -> 2) object frame ->
     #  3) link frame -> 4) mesh frame.
-    if not np.all(np.isclose(obj.scale, 1, atol=1e-3)):
+    # if not np.all(np.isclose(obj.scale, 1, atol=1e-3)):
+    if (obj.scale.max() - obj.scale.min()) > 1e-3:
         volume_link_quat = volume_link.get_orientation()
         object_quat = obj.get_orientation()
         quat_distance = T.quat_distance(volume_link_quat, object_quat)
