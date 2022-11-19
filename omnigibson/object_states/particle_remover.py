@@ -7,7 +7,6 @@ from omnigibson.object_states.contact_bodies import ContactBodies
 from omnigibson.object_states.covered import Covered
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from omnigibson.object_states.object_state_base import AbsoluteObjectState
-from omnigibson.object_states.saturated import Saturated
 from omnigibson.object_states.toggle import ToggledOn
 from omnigibson.utils.usd_utils import BoundingBoxAPI
 from omnigibson.systems.system_base import get_system_from_element_name, get_element_name_from_system
@@ -32,7 +31,7 @@ m.VISUAL_PARTICLE_REMOVER_AREA_MARGIN = 0.05
 
 
 # Saturation thresholds -- maximum number of particles that can be removed ("absorbed") by this object
-m.FLUID_PARTICLES_REMOVAL_LIMIT = 40
+m.FLUID_PARTICLES_REMOVAL_LIMIT = 400
 m.VISUAL_PARTICLES_REMOVAL_LIMIT = 40
 
 
@@ -72,9 +71,8 @@ class ParticleRemover(AbsoluteObjectState, LinkBasedStateMixin):
         self._check_in_projection_mesh = None
         self._check_overlap = None
         self._remove_particles = None
-        self._link_prim_paths = set([link.prim_path for link in obj.links.values()])
-        self._projection_mesh_params = obj.metadata["meta_links"][m.LINK_NAME] if \
-            projection_mesh_params is None else projection_mesh_params
+        self._link_prim_paths = None
+        self._projection_mesh_params = projection_mesh_params
 
         # Map of system to number of absorbed particles for this object corresponding to the specific system
         self.absorbed_particle_count = OrderedDict([(system, 0) for system in self.supported_systems])
@@ -105,6 +103,9 @@ class ParticleRemover(AbsoluteObjectState, LinkBasedStateMixin):
         # Run link initialization
         self.initialize_link_mixin()
 
+        # Grab link prim paths and potentially update projection mesh params
+        self._link_prim_paths = set([link.prim_path for link in self.obj.links.values()])
+
         # Define callback used during overlap method
         # We want to ignore any hits that are with this object itself
         valid_hit = False
@@ -116,6 +117,17 @@ class ParticleRemover(AbsoluteObjectState, LinkBasedStateMixin):
 
         # Possibly create a projection volume if we're using the projection method
         if self.method == ParticleModifyMethod.PROJECTION:
+            # Make sure projection mesh params are specified
+            # Import here to avoid circular imports
+            from omnigibson.objects.dataset_object import DatasetObject
+            if self._projection_mesh_params is None and isinstance(self.obj, DatasetObject):
+                # We try to grab metadata for this object
+                self._projection_mesh_params = self.obj.metadata.get("meta_links", dict()).get(m.LINK_NAME, None)
+            # Sanity check to make sure projection mesh params is not None
+            assert self._projection_mesh_params is not None, \
+                f"Projection mesh params must be specified for {self.obj.name}'s ParticleRemover state when " \
+                f"method=ParticleModifyMethod.PROJECTION!"
+
             mesh_prim_path = f"{self.link.prim_path}/projection_mesh"
             # Create a primitive mesh if it doesn't already exist
             if not get_prim_at_path(mesh_prim_path):
@@ -220,7 +232,7 @@ class ParticleRemover(AbsoluteObjectState, LinkBasedStateMixin):
                     self.link is None else system.state_cache["link_particle_contacts"][self.link.prim_path]
 
             # Iterate over all particles and hide any that are detected to be removed
-            for instancer, particle_idxs in instancer_to_particle_idxs.items():
+            for inst, particle_idxs in instancer_to_particle_idxs.items():
                 # If saturated, stop absorbing
                 if self.check_saturation(system=system):
                     break
@@ -229,7 +241,9 @@ class ParticleRemover(AbsoluteObjectState, LinkBasedStateMixin):
                 particle_idxs_to_absorb = list(particle_idxs)[:particles_to_absorb]
 
                 # Hide particles that have been absorbed
-                inst.particle_visibilities[particle_idxs_to_absorb] = 0
+                visibilities = inst.particle_visibilities
+                visibilities[particle_idxs_to_absorb] = 0
+                inst.particle_visibilities = visibilities
 
                 # Keep track of the particles that have been absorbed
                 self.absorbed_particle_count[system] += particles_to_absorb
@@ -269,7 +283,9 @@ class ParticleRemover(AbsoluteObjectState, LinkBasedStateMixin):
                 max_particle_absorbed = m.FLUID_PARTICLES_REMOVAL_LIMIT - self.absorbed_particle_count[system]
                 particles_to_absorb = min(len(particle_idxs), max_particle_absorbed)
                 particle_idxs_to_absorb = particle_idxs[:particles_to_absorb]
-                inst.particle_visibilities[particle_idxs_to_absorb] = 0
+                visibilities = inst.particle_visibilities
+                visibilities[particle_idxs_to_absorb] = 0
+                inst.particle_visibilities = visibilities
 
         else:
             # Invalid system queried
@@ -320,7 +336,7 @@ class ParticleRemover(AbsoluteObjectState, LinkBasedStateMixin):
 
     @staticmethod
     def get_optional_dependencies():
-        return AbsoluteObjectState.get_optional_dependencies() + [Covered, Saturated, ToggledOn, ContactBodies]
+        return AbsoluteObjectState.get_optional_dependencies() + [Covered, ToggledOn, ContactBodies]
 
     def check_saturation(self, system, verify_no_oversaturation=False):
         """
@@ -335,14 +351,15 @@ class ParticleRemover(AbsoluteObjectState, LinkBasedStateMixin):
         Returns:
             bool: True if the object is saturated with objects from @system, otherwise False
         """
+        if issubclass(system, VisualParticleSystem):
+            limit = m.VISUAL_PARTICLES_REMOVAL_LIMIT
+        elif issubclass(system, FluidSystem):
+            limit = m.FLUID_PARTICLES_REMOVAL_LIMIT
+        else:
+            self.unsupported_system_error(system=system)
+
         # If requested, run sanity check to make sure we're not oversaturated with this system's particles
         if verify_no_oversaturation:
-            if issubclass(system, VisualParticleSystem):
-                limit = m.VISUAL_PARTICLES_REMOVAL_LIMIT
-            elif issubclass(system, FluidSystem):
-                limit = m.FLUID_PARTICLES_REMOVAL_LIMIT
-            else:
-                self.unsupported_system_error(system=system)
             assert self.absorbed_particle_count[system] <= limit, \
                 f"Particle remover should not be oversaturated! Max: {limit}, got: {self.absorbed_particle_count[system]}"
 

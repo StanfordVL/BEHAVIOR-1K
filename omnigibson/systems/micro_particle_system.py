@@ -1206,10 +1206,13 @@ class MicroParticleSystem(BaseParticleSystem):
             return True
 
         for inst_name, inst in cls.particle_instancers.items():
+            visibilities = inst.particle_visibilities
             for idx, pos in enumerate(inst.particle_positions):
                 particle_idx = idx
                 particle_instancer = inst
-                get_physx_scene_query_interface().overlap_sphere(cls.particle_contact_offset, pos, report_hit, False)
+                # Only run the scene query if the particle is not hidden
+                if visibilities[idx]:
+                    get_physx_scene_query_interface().overlap_sphere(cls.particle_contact_offset, pos, report_hit, False)
 
         cls.state_cache["obj_particle_contacts"] = obj_particle_contacts
         cls.state_cache["link_particle_contacts"] = link_particle_contacts

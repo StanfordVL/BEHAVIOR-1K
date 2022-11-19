@@ -3,7 +3,6 @@ from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.adjacency import HorizontalAdjacency, VerticalAdjacency
 from omnigibson.object_states.attachment import Attached
 from omnigibson.object_states.burnt import Burnt
-from omnigibson.object_states.cleaning_tool import CleaningTool
 from omnigibson.object_states.contact_bodies import ContactBodies
 from omnigibson.object_states.cooked import Cooked
 from omnigibson.object_states.covered import Covered
@@ -16,6 +15,7 @@ from omnigibson.object_states.next_to import NextTo
 from omnigibson.object_states.on_floor import OnFloor
 from omnigibson.object_states.on_top import OnTop
 from omnigibson.object_states.open import Open
+from omnigibson.object_states.particle_remover import ParticleRemover
 from omnigibson.object_states.pose import Pose
 from omnigibson.object_states.robot_related_states import (
     InFOVOfRobot,
@@ -51,9 +51,9 @@ from omnigibson.object_states.room_states import (
     IsInUndefined,
     IsInUtilityRoom,
 )
+from omnigibson.object_states.saturated import Saturated
 from omnigibson.object_states.sliced import Sliced
 from omnigibson.object_states.slicer import Slicer
-from omnigibson.object_states.soaked import Soaked
 from omnigibson.object_states.temperature import Temperature
 from omnigibson.object_states.toggle import ToggledOn
 from omnigibson.object_states.touching import Touching

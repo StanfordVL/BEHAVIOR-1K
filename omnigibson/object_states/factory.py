@@ -8,7 +8,6 @@ _ALL_STATES = frozenset(
     [
         AABB,
         Burnt,
-        CleaningTool,
         ContactBodies,
         Cooked,
         Covered,
@@ -29,10 +28,11 @@ _ALL_STATES = frozenset(
         OnFloor,
         OnTop,
         Open,
+        ParticleRemover,
         Pose,
+        Saturated,
         Sliced,
         Slicer,
-        Soaked,
         Temperature,
         ToggledOn,
         Touching,
@@ -49,17 +49,18 @@ _ALL_STATES = frozenset(
 _ABILITY_TO_STATE_MAPPING = {
     "attachable": [Attached],
     "burnable": [Burnt],
-    "cleaningTool": [CleaningTool],
+    "particleRemover": [ParticleRemover],
     "coldSource": [HeatSourceOrSink],
     "cookable": [Cooked],
+    "coverable": [Covered],
     "freezable": [Frozen],
     "heatable": [Heated],
     "heatSource": [HeatSourceOrSink],
     "openable": [Open],
     "robot": ROOM_STATES + [ObjectsInFOVOfRobot],
+    "saturable": [Saturated],
     "sliceable": [Sliced],
     "slicer": [Slicer],
-    "soakable": [Soaked],
     "toggleable": [ToggledOn],
     "waterSource": [WaterSource],
     "waterSink": [WaterSink],
@@ -100,8 +101,7 @@ _TEXTURE_CHANGE_STATE_SET = frozenset(
         Burnt,
         Cooked,
         Frozen,
-        Soaked,
-        ToggledOn
+        ToggledOn,
     ]
 )
 
@@ -109,7 +109,6 @@ _TEXTURE_CHANGE_PRIORITY = {
     Frozen: 4,
     Burnt: 3,
     Cooked: 2,
-    Soaked: 1,
     ToggledOn: 0,
 }
 
