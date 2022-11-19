@@ -59,6 +59,35 @@ def check_points_in_cube(size, pos, quat, scale, particle_positions):
     return ((-size / 2.0 < particle_positions) & (particle_positions < size / 2.0)).sum(axis=-1) == 3
 
 
+def check_points_in_cone(size, pos, quat, scale, particle_positions):
+    """
+    Checks which points are within a cone with specified size @size.
+
+    NOTE: Assumes the cone and positions are
+    expressed in the same coordinate frame such that the cone's height is aligned with the z-axis
+
+    Args:
+        size (2-array): (radius, height) dimensions of the cone, specified in its local frame
+        pos (3-array): (x,y,z) local location of the cone
+        quat (4-array): (x,y,z,w) local orientation of the cone
+        scale (3-array): (x,y,z) local scale of the cone, specified in its local frame
+        particle_positions ((N, 3) array): positions to check for whether it is in the cone
+
+    Returns:
+        (N,) array: boolean numpy array specifying whether each point lies in the cone.
+    """
+    particle_positions = get_particle_positions_in_frame(
+        pos=pos,
+        quat=quat,
+        scale=scale,
+        particle_positions=particle_positions,
+    )
+    radius, height = size
+    in_height = (-height / 2.0 < particle_positions[:, -1]) & (particle_positions[:, -1] < height / 2.0)
+    in_radius = np.linalg.norm(particle_positions[:, :-1], axis=-1) < (radius * (1 - (particle_positions[:, -1] + height / 2.0) / height ))
+    return in_height & in_radius
+
+
 def check_points_in_cylinder(size, pos, quat, scale, particle_positions):
     """
     Checks which points are within a cylinder with specified size @size.
@@ -241,6 +270,15 @@ def generate_points_in_volume_checker_function(obj, volume_link, use_visual_mesh
             vol_fcn = lambda mesh: 4 / 3 * np.pi * (mesh.GetAttribute("radius").Get() ** 3)
         elif mesh_type == "Cylinder":
             fcn = lambda mesh, particle_positions: check_points_in_cylinder(
+                size=[mesh.GetAttribute("radius").Get(), mesh.GetAttribute("height").Get()],
+                pos=np.array(mesh.GetAttribute("xformOp:translate").Get()),
+                quat=np.array([*(mesh.GetAttribute("xformOp:orient").Get().imaginary), mesh.GetAttribute("xformOp:orient").Get().real]),
+                scale=np.array(mesh.GetAttribute("xformOp:scale").Get()),
+                particle_positions=particle_positions,
+            )
+            vol_fcn = lambda mesh: np.pi * (mesh.GetAttribute("radius").Get() ** 2) * mesh.GetAttribute("height").Get()
+        elif mesh_type == "Cone":
+            fcn = lambda mesh, particle_positions: check_points_in_cone(
                 size=[mesh.GetAttribute("radius").Get(), mesh.GetAttribute("height").Get()],
                 pos=np.array(mesh.GetAttribute("xformOp:translate").Get()),
                 quat=np.array([*(mesh.GetAttribute("xformOp:orient").Get().imaginary), mesh.GetAttribute("xformOp:orient").Get().real]),

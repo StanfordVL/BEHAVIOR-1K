@@ -1,5 +1,6 @@
 from collections import namedtuple, Sized, OrderedDict
 import numpy as np
+import omnigibson as og
 from omnigibson.macros import gm, create_module_macros
 from omnigibson.prims.geom_prim import VisualGeomPrim
 from omnigibson.object_states.aabb import AABB
@@ -18,7 +19,7 @@ from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_fu
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
 from omni.physx import get_physx_scene_query_interface as psqi
 from omni.isaac.core.utils.prims import get_prim_at_path
-from pxr import PhysicsSchemaTools
+from pxr import PhysicsSchemaTools, UsdGeom
 
 
 # Create settings for this module
@@ -131,18 +132,24 @@ class ParticleRemover(AbsoluteObjectState, LinkBasedStateMixin):
             mesh_prim_path = f"{self.link.prim_path}/projection_mesh"
             # Create a primitive mesh if it doesn't already exist
             if not get_prim_at_path(mesh_prim_path):
-                mesh = create_primitive_mesh(
-                    prim_path=mesh_prim_path,
-                    primitive_type=self._projection_mesh_params["type"],
-                    extents=self._projection_mesh_params["extents"],
-                )
+                mesh = UsdGeom.__dict__[self._projection_mesh_params["type"]].Define(og.sim.stage, mesh_prim_path).GetPrim()
+                # Set the height and radius
+                # TODO: Generalize to objects other than cylinder and radius
+                mesh.GetAttribute("height").Set(self._projection_mesh_params["extents"][2] / 2.0)
+                mesh.GetAttribute("radius").Set(self._projection_mesh_params["extents"][0] / 4.0)
 
             # Create the visual geom instance referencing the generated mesh prim
             self.projection_mesh = VisualGeomPrim(prim_path=mesh_prim_path, name=f"{self.obj.name}_projection_mesh")
             self.projection_mesh.initialize()
 
-            # Make sure the mesh isn't translated at all
-            self.projection_mesh.set_local_pose(translation=np.zeros(3), orientation=np.array([0, 0, 0, 1.0]))
+            # Make sure the object updates its meshes
+            self.link.update_meshes()
+
+            # Make sure the mesh is translated so that its tip lies at the metalink origin
+            self.projection_mesh.set_local_pose(
+                translation=np.array([0, 0, -self._projection_mesh_params["extents"][2] / (2 * self.link.scale[2])]),
+                orientation=np.array([0, 0, 0, 1.0]),
+            )
 
             # Set the removal method used
             self._remove_particles = self._remove_overlap_particles_in_projection_mesh
@@ -161,7 +168,7 @@ class ParticleRemover(AbsoluteObjectState, LinkBasedStateMixin):
             def check_overlap():
                 nonlocal valid_hit
                 valid_hit = False
-                psqi().overlap_mesh(*projection_mesh_ids, reportFn=overlap_callback)
+                psqi().overlap_shape(*projection_mesh_ids, reportFn=overlap_callback)
                 return valid_hit
 
         elif self.method == ParticleModifyMethod.ADJACENCY:
