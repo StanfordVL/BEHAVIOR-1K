@@ -27,7 +27,7 @@ from omnigibson.objects.object_base import BaseObject
 from omnigibson.systems import get_system_from_element_name, get_element_name_from_system
 from omnigibson.renderer_settings.renderer_settings import RendererSettings
 from omnigibson.utils.constants import PrimType, EmitterType
-from omnigibson.object_states import Soaked
+from omnigibson.object_states import Saturated
 
 
 # Optionally import bddl for object taxonomy.
@@ -336,7 +336,7 @@ class StatefulObject(BaseObject):
         emitter_enabled = defaultdict(bool)
         for state_type, state in self.states.items():
             if state_type in get_texture_change_states():
-                if state_type == Soaked:
+                if state_type == Saturated:
                     for fluid_system in state.absorbed_particle_system_count.keys():
                         if state.get_value(fluid_system):
                             texture_change_states.append(state)
@@ -393,6 +393,21 @@ class StatefulObject(BaseObject):
 
         if not np.allclose(material.diffuse_tint, diffuse_tint):
             material.diffuse_tint = diffuse_tint
+
+    def remove(self, simulator=None):
+        """
+        Removes this prim from omniverse stage
+
+        Args:
+            simulator (None or SimulationContext): If specified, should be simulator into which this prim will be
+                removed. Otherwise, it will be removed from the default stage
+        """
+        # Iterate over all states and run their remove call
+        for state_instance in self._states.values():
+            state_instance.remove()
+
+        # Run super
+        super().remove(simulator=simulator)
 
     def _dump_state(self):
         # Grab state from super class

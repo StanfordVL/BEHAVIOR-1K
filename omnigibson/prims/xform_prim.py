@@ -429,7 +429,7 @@ class XFormPrim(BasePrim):
         Args:
             material (MaterialPrim): Material to bind to this prim
         """
-        self._binding_api.Bind(material.prim, bindingStrength=UsdShade.Tokens.weakerThanDescendants)
+        self._binding_api.Bind(UsdShade.Material(material.prim), bindingStrength=UsdShade.Tokens.weakerThanDescendants)
         self._material = material
 
     def add_filtered_collision_pair(self, prim):

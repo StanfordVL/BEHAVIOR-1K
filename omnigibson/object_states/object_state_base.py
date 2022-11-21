@@ -89,6 +89,12 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
     def _set_value(self, *args, **kwargs):
         raise NotImplementedError
 
+    def remove(self):
+        """
+        Any cleanup functionality to deploy when @self.obj is removed from the simulator
+        """
+        pass
+
     def dump_state(self, serialized=False):
         assert self._initialized
         assert self.stateful

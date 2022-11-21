@@ -15,13 +15,15 @@ from omnigibson.systems.system_base import get_system_from_element_name, get_ele
 from omnigibson.systems.macro_particle_system import VisualParticleSystem, get_visual_particle_systems
 from omnigibson.systems.micro_particle_system import FluidSystem, get_fluid_systems
 from omnigibson.utils.constants import ParticleModifyMethod, PrimType
-from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function, get_particle_positions_in_frame
+from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function, get_particle_positions_from_frame
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
+from omnigibson.utils.deprecated_utils import Core
+from omnigibson.utils.usd_utils import create_primitive_mesh
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.sampling_utils import raytest_batch
 from omni.physx import get_physx_scene_query_interface as psqi
-from omni.isaac.core.utils.prims import get_prim_at_path
-from pxr import PhysicsSchemaTools, UsdGeom
+from omni.isaac.core.utils.prims import get_prim_at_path, delete_prim, move_prim, is_prim_path_valid
+from pxr import PhysicsSchemaTools, UsdGeom, Gf, Sdf
 
 
 # Create settings for this module
@@ -46,8 +48,102 @@ m.FLUID_PARTICLES_APPLICATION_LIMIT = 1000000
 m.VISUAL_PARTICLES_REMOVAL_LIMIT = 40
 m.FLUID_PARTICLES_REMOVAL_LIMIT = 400
 
+# Fallback particle visualization radius for visualizing projected visual particles
+m.VISUAL_PARTICLE_PROJECTION_PARTICLE_RADIUS = 0.01
+
 # The margin (> 0) to add to the remover area's AABB when detecting overlaps with other objects
 m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN = 0.05
+
+# Settings for determining how the projection particles are visualized as they're projected
+m.PROJECTION_VISUALIZATION_RATE = 200
+m.PROJECTION_VISUALIZATION_SPEED = 3.0
+
+
+def create_projection_visualization(
+        prim_path,
+        shape,
+        projection_name,
+        projection_radius,
+        projection_height,
+        particle_radius,
+        material=None,
+):
+    """
+    Helper function to generate a projection visualization using Omniverse's particle visualization system
+
+    NOTE: Due to limitations with omniverse's generation scheme, the generated projection must have its origin at
+    the origin of its parent frame, with its cone / cylinder facing in the local x-axis direction. The parent frame
+    should also be aligned to its own parent frame to one of its own parent frame's axes - ie: any orientation such
+    that its axes are exactly parallel / orthogonal to its parent axes.
+
+    Args:
+        prim_path (str): Stage location for where to generate the projection visualization
+        shape (str): Shape of the projection to generate. Valid options are: {Sphere, Cone}
+        projection_name (str): Name associated with this projection visualization. Should be unique!
+        projection_radius (float): Radius of the generated projection visualization overall volume
+        projection_height (float): Height of the generated projection visualization overall volume
+        particle_radius (float): Radius of the particles composing the projection visualization
+        material (None or MaterialPrim): If specified, specifies the material to associate with the generated
+            particles within the projection visualization
+
+    Returns:
+        2-tuple:
+            - UsdPrim: Generated ParticleSystem (ComputeGraph) prim generated
+            - UsdPrim: Generated Emitter (ComputeGraph) prim generated
+    """
+    # Create the desired shape which will be used as the source input prim into the generated projection visualization
+    source = UsdGeom.Sphere.Define(og.sim.stage, Sdf.Path(prim_path))
+    # Modify the radius according to the desired @shape (and also infer the desired spread values)
+    if shape == "Cylinder":
+        source_radius = projection_radius
+        spread = np.zeros(3)
+    elif shape == "Cone":
+        # Default to close ot singular point otherwise
+        source_radius = 0.001
+        spread_ratio = projection_radius * 2.0 / projection_height
+        spread = np.ones(3) * spread_ratio * 100
+    else:
+        raise ValueError(f"Invalid shape specified for projection visualization! Valid options are: [Sphere, Cylinder], got: {shape}")
+    # Set the radius
+    # Note that we divide the expected value in half since the native Sphere geom has native extents [2, 2, 2]
+    source.GetRadiusAttr().Set(source_radius / 2.0)
+    # Also make the prim invisible
+    UsdGeom.Imageable(source.GetPrim()).MakeInvisible()
+    # Generate the ComputeGraph nodes to render the projection
+    core = Core(lambda val: None, particle_system_name=projection_name)
+    system_path, _, emitter_path, instancer_path, sprite_path, mat_path, output_path = core.create_particle_system(display="point_instancer", paths=[prim_path])
+    # Override the prototype with our own sphere with optional material
+    prototype_path = "/".join(sprite_path.split("/")[:-1]) + "/prototype"
+    create_primitive_mesh(prototype_path, primitive_type="Sphere")
+    prototype = VisualGeomPrim(prim_path=prototype_path, name=f"{projection_name}_prototype")
+    prototype.initialize()
+    # Set the scale (native scaling --> radius 0.5) and possibly update the material
+    prototype.scale = particle_radius * 2.0
+    if material is not None:
+        prototype.material = material
+    # Override the prototype used by the instancer
+    instancer_prim = get_prim_at_path(instancer_path)
+    instancer_prim.GetProperty("inputs:prototypes").SetTargets([prototype_path])
+
+    # Destroy the old mat path since we don't use the sprites
+    delete_prim(mat_path)
+
+    # Modify the settings of the emitter to match the desired shape from inputs
+    emitter_prim = get_prim_at_path(emitter_path)
+    emitter_prim.GetProperty("inputs:rate").Set(m.PROJECTION_VISUALIZATION_RATE)
+    emitter_prim.GetProperty("inputs:lifespan").Set(projection_height / m.PROJECTION_VISUALIZATION_SPEED)
+    emitter_prim.GetProperty("inputs:speed").Set(m.PROJECTION_VISUALIZATION_SPEED)
+    emitter_prim.GetProperty("inputs:alongAxis").Set(100.0)
+    emitter_prim.GetProperty("inputs:scale").Set(Gf.Vec3f(1.0, 1.0, 1.0))
+    emitter_prim.GetProperty("inputs:directionRandom").Set(Gf.Vec3f(*spread))
+
+    # Move the output path so it moves with the particle system prim
+    og.sim.render()
+    output_name = output_path.split("/")[-1]
+    move_prim(output_path, f"{system_path}/{output_name}")
+
+    # Return the particle system prim which "owns" everything
+    return get_prim_at_path(system_path), emitter_prim
 
 
 class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin):
@@ -83,6 +179,8 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin):
         self.method = method
         self.conditions = conditions
         self.projection_mesh = None
+        self.projection_system = None
+        self.projection_emitter = None
         self._check_in_projection_mesh = None
         self._check_overlap = None
         self._modify_particles = None
@@ -152,26 +250,51 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin):
                 f"when method=ParticleModifyMethod.PROJECTION!"
 
             mesh_prim_path = f"{self.link.prim_path}/projection_mesh"
-            # Create a primitive mesh if it doesn't already exist
+            # Create a primitive shape if it doesn't already exist
+            radius, height = self._projection_mesh_params["extents"][0] / 2.0, self._projection_mesh_params["extents"][2]
             if not get_prim_at_path(mesh_prim_path):
                 mesh = UsdGeom.__dict__[self._projection_mesh_params["type"]].Define(og.sim.stage, mesh_prim_path).GetPrim()
-                # Set the height and radius
+                # Set the height and radius (scaled by half since the native objects have extents [2, 2, 2]
                 # TODO: Generalize to objects other than cylinder and radius
-                mesh.GetAttribute("height").Set(self._projection_mesh_params["extents"][2] / 2.0)
-                mesh.GetAttribute("radius").Set(self._projection_mesh_params["extents"][0] / 4.0)
+                mesh.GetAttribute("height").Set(height / 2.0)
+                mesh.GetAttribute("radius").Set(radius / 2.0)
 
-            # Create the visual geom instance referencing the generated mesh prim
+            # Create the visual geom instance referencing the generated mesh prim, and then hide it
             self.projection_mesh = VisualGeomPrim(prim_path=mesh_prim_path, name=f"{self.obj.name}_projection_mesh")
             self.projection_mesh.initialize()
+            self.projection_mesh.visible = False
 
             # Make sure the object updates its meshes
             self.link.update_meshes()
 
-            # Make sure the mesh is translated so that its tip lies at the metalink origin
+            # Make sure the mesh is translated so that its tip lies at the metalink origin, and rotated so the vector
+            # from tip to tail faces the positive x axis
             self.projection_mesh.set_local_pose(
-                translation=np.array([0, 0, -self._projection_mesh_params["extents"][2] / (2 * self.link.scale[2])]),
-                orientation=np.array([0, 0, 0, 1.0]),
+                translation=np.array([self._projection_mesh_params["extents"][2] / (2 * self.link.scale[2]), 0, 0]),
+                orientation=np.array([0, -0.707, 0, 0.707]),
             )
+
+            # Generate the projection visualization
+            system = list(self.conditions.keys())[0]    # Only one system should be included for a ParticleApplier!
+            particle_radius = m.VISUAL_PARTICLE_PROJECTION_PARTICLE_RADIUS if issubclass(system, VisualParticleSystem) else system.particle_radius
+            particle_material = system.particle_object.material if issubclass(system, VisualParticleSystem) else system.material
+
+            # Create the projection visualization if it doesn't already exist, otherwise we reference it directly
+            projection_name = f"{self.obj.name}_projection_visualization"
+            projection_path = f"/OmniGraph/{projection_name}"
+            if is_prim_path_valid(projection_path):
+                self.projection_system = get_prim_at_path(projection_path)
+                self.projection_emitter = get_prim_at_path(f"{projection_path}/emitter")
+            else:
+                self.projection_system, self.projection_emitter = create_projection_visualization(
+                    prim_path=f"{self.link.prim_path}/projection_visualization",
+                    shape=self._projection_mesh_params["type"],
+                    projection_name=projection_name,
+                    projection_radius=radius,
+                    projection_height=height,
+                    particle_radius=particle_radius,
+                    material=particle_material,
+                )
 
             # Set the modification method used
             self._modify_particles = self._modify_overlap_particles_in_projection_mesh
@@ -286,6 +409,11 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin):
 
     def _get_value(self):
         pass
+
+    def remove(self):
+        # We need to remove the generated particle system if we've created one
+        if self.method == ParticleModifyMethod.PROJECTION:
+            delete_prim(self.projection_system.GetPrimPath().pathString)
 
     @staticmethod
     def get_dependencies():
@@ -529,6 +657,15 @@ class ParticleApplier(ParticleModifier):
     ParticleModifier where the modification results in potentially adding particles into the simulation.
     """
 
+    def _initialize(self):
+        # First, sanity check to make sure only one system is being applied, since unlike a ParticleRemover, which
+        # can potentially remove multiple types of particles, a ParticleApplier should only apply one type of particle
+        assert len(self.conditions) == 1, f"A ParticleApplier can only have a single ParticleSystem associated " \
+                                          f"with it! Got: {[system.name for system in self.conditions.keys()]}"
+
+        # Run super
+        super()._initialize()
+
     def _modify_overlap_particles_in_adjacency(self, system):
         # Sample potential locations to apply particles
         hits = self._sample_particle_locations_from_adjacency_area(system=system)
@@ -616,9 +753,9 @@ class ParticleApplier(ParticleModifier):
         sampled_r_theta = sampled_r_theta * np.array([r, np.pi * 2]).reshape(1, 2)
         # Get start, end points in local link frame
         end_points = np.stack([
+            h * np.ones(n_samples),
             sampled_r_theta[:, 0] * np.cos(sampled_r_theta[:, 1]),
-            sampled_r_theta[:, 0] * np.cos(sampled_r_theta[:, 1]),
-            -h * np.ones(n_samples),
+            sampled_r_theta[:, 0] * np.sin(sampled_r_theta[:, 1]),
         ], axis=1)
         if self._projection_mesh_params["type"] == "Cone":
             # All start points are the cone tip, which is the local link origin
@@ -626,7 +763,7 @@ class ParticleApplier(ParticleModifier):
         elif self._projection_mesh_params["type"] == "Cylinder":
             # All start points are the parallel point for their corresponding end point
             # i.e.: (x, y, 0)
-            start_points = end_points + np.array([0, 0, h]).reshape(1, 3)
+            start_points = end_points + np.array([-h, 0, 0]).reshape(1, 3)
         else:
             raise ValueError(f"Unsupported projection mesh type: {self._projection_mesh_params['type']}!")
 
@@ -635,9 +772,9 @@ class ParticleApplier(ParticleModifier):
         # We also combine start and end points for efficiency when doing the transform, then split them up again
         points = np.concatenate([start_points, end_points], axis=0)
         pos, quat = self.link.get_position_orientation()
-        points = get_particle_positions_in_frame(
-            pos=-pos,
-            quat=T.quat_inverse(quat),
+        points = get_particle_positions_from_frame(
+            pos=pos,
+            quat=quat,
             scale=np.ones(3),
             particle_positions=points,
         )

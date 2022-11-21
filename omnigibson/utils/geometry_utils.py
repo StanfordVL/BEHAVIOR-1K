@@ -33,6 +33,33 @@ def get_particle_positions_in_frame(pos, quat, scale, particle_positions):
     return particle_positions / scale.reshape(1, 3)
 
 
+def get_particle_positions_from_frame(pos, quat, scale, particle_positions):
+    """
+    Transforms particle positions @positions from the frame specified by @pos and @quat with new scale @scale.
+
+    This is similar to @get_particle_positions_in_frame, but does the reverse operation, inverting @pos and @quat
+
+    Args:
+        pos (3-array): (x,y,z) pos of the local frame
+        quat (4-array): (x,y,z,w) quaternion orientation of the local frame
+        scale (3-array): (x,y,z) local scale of the local frame
+        particle_positions ((N, 3) array): positions
+
+    Returns:
+        (N,) array: updated particle positions in the parent coordinate frame
+    """
+
+    # Get pose of origin (global frame) in new_frame
+    origin_in_new_frame = T.pose2mat((pos, quat))
+    # Batch the transforms to get all particle points in the local link frame
+    positions_tensor = np.tile(np.eye(4).reshape(1, 4, 4), (len(particle_positions), 1, 1))  # (N, 4, 4)
+    # Scale by the new scale#
+    positions_tensor[:, :3, 3] = particle_positions
+    particle_positions = (origin_in_new_frame @ positions_tensor)[:, :3, 3]  # (N, 3)
+    # Scale by the new scale
+    return particle_positions / scale.reshape(1, 3)
+
+
 def check_points_in_cube(size, pos, quat, scale, particle_positions):
     """
     Checks which points are within a cube with specified size @size.
