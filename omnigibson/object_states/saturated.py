@@ -8,7 +8,7 @@ from omnigibson.systems.micro_particle_system import FluidSystem
 from omnigibson.macros import gm, create_module_macros
 from omnigibson.object_states.object_state_base import RelativeObjectState, BooleanState
 from omnigibson.object_states.aabb import AABB
-from omnigibson.object_states.particle_remover import ParticleRemover
+from omnigibson.object_states.particle_modifier import ParticleRemover
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.constants import PrimType
 from pxr import Sdf
@@ -25,7 +25,7 @@ class Saturated(RelativeObjectState, BooleanState):
         super().__init__(obj)
 
     def _get_value(self, system):
-        return self.obj.states[ParticleRemover].check_saturation(system=system)
+        return self.obj.states[ParticleRemover].check_at_limit(system=system)
 
     def _set_value(self, system, new_value):
         assert_valid_key(key=system, valid_keys=ParticleRemover.supported_systems, name="particle system")

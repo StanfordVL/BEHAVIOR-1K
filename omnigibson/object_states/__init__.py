@@ -15,7 +15,7 @@ from omnigibson.object_states.next_to import NextTo
 from omnigibson.object_states.on_floor import OnFloor
 from omnigibson.object_states.on_top import OnTop
 from omnigibson.object_states.open import Open
-from omnigibson.object_states.particle_remover import ParticleRemover
+from omnigibson.object_states.particle_modifier import ParticleRemover, ParticleApplier
 from omnigibson.object_states.pose import Pose
 from omnigibson.object_states.robot_related_states import (
     InFOVOfRobot,

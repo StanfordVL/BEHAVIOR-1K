@@ -972,6 +972,23 @@ def matrix_inverse(matrix):
     return np.linalg.inv(matrix)
 
 
+def vecs2axisangle(vec0, vec1):
+    """
+    Converts the angle from unnormalized 3D vectors @vec0 to @vec1 into an axis-angle representation of the angle
+
+    Args:
+        vec0 (3-array): (x,y,z) 3D vector, possibly unnormalized
+        vec1 (3-array): (x,y,z) 3D vector, possibly unnormalized
+    """
+    # Normalize vectors
+    vec0 = normalize(vec0)
+    vec1 = normalize(vec1)
+
+    # Get cross product for direction of angle, and multiply by arcos of the dot product which is the angle
+    return np.cross(vec0, vec1) * np.arccos(np.dot(vec0, vec1))
+
+
+
 def l2_distance(v1, v2):
     """Returns the L2 distance between vector v1 and v2."""
     return np.linalg.norm(np.array(v1) - np.array(v2))

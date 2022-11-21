@@ -28,6 +28,7 @@ _ALL_STATES = frozenset(
         OnFloor,
         OnTop,
         Open,
+        ParticleApplier,
         ParticleRemover,
         Pose,
         Saturated,
@@ -49,6 +50,7 @@ _ALL_STATES = frozenset(
 _ABILITY_TO_STATE_MAPPING = {
     "attachable": [Attached],
     "burnable": [Burnt],
+    "particleApplier": [ParticleApplier],
     "particleRemover": [ParticleRemover],
     "coldSource": [HeatSourceOrSink],
     "cookable": [Cooked],

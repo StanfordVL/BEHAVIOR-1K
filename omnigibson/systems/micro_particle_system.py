@@ -1265,9 +1265,10 @@ class FluidSystem(MicroParticleSystem):
     def update(cls):
         # For each particle instance, garbage collect particles if the number of visible particles
         # is below the garbage collection threshold (m.GC_THRESHOLD)
-        for instancer, value in cls.particle_instancers.items(): # type: ignore
-            if np.mean(value.particle_visibilities) <= m.GC_THRESHOLD:
-                cls.remove_particle_instancer(instancer)
+        instancer_names = list(cls.particle_instancers.keys())
+        for inst_name in instancer_names: # type: ignore
+            if np.mean(cls.particle_instancers[inst_name].particle_visibilities) <= m.GC_THRESHOLD:
+                cls.remove_particle_instancer(inst_name)
 
     @classmethod
     def _create_particle_material_template(cls):

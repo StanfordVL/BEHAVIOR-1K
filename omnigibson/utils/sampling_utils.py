@@ -283,7 +283,8 @@ def raytest(
             if hit.rigid_body not in ignore_bodies and hit.collision not in ignore_collisions:
                 hits.append({
                     "hit": True,
-                    "position": hit.position,
+                    "position": np.array(hit.position),
+                    "normal": np.array(hit.normal),
                     "distance": hit.distance,
                     "collision": hit.collision,
                     "rigidBody": hit.rigid_body,

@@ -470,6 +470,20 @@ class VisualParticleSystem(MacroParticleSystem):
         return len(cls._group_particles[group])
 
     @classmethod
+    def get_group_name(cls, obj):
+        """
+        Grabs the corresponding group name for object @obj
+
+        Args:
+            obj (BaseObject): Object for which its procedurally generated particle attachment name should be grabbed
+
+        Returns:
+            str: Name of the attachment group to use when executing commands from this class on
+                that specific attachment group
+        """
+        return obj.name
+
+    @classmethod
     def create_attachment_group(cls, obj):
         """
         Creates an attachment group internally for object @obj. Note that this does NOT automatically generate particles
@@ -482,7 +496,7 @@ class VisualParticleSystem(MacroParticleSystem):
             str: Name of the attachment group to use when executing commands from this class on
                 that specific attachment group
         """
-        group = obj.name
+        group = cls.get_group_name(obj=obj)
         # This should only happen once for a single attachment group, so we explicitly check to make sure the object
         # doesn't already exist
         assert group not in cls.groups, \
@@ -520,6 +534,92 @@ class VisualParticleSystem(MacroParticleSystem):
         return group
 
     @classmethod
+    def update_particle_scaling(cls, group):
+        """
+        Update particle scaling for group @group before generating group particles. Default is a no-op
+        (i.e.: returns the current cls.min_scale, cls.max_scale)
+
+        Args:
+            group (str): Specific group for which to modify the particle scaling
+
+        Returns:
+            2-tuple:
+                - 3-array: min scaling factor to set
+                - 3-array: max scaling factor to set
+        """
+        return cls.min_scale, cls.max_scale
+
+    @classmethod
+    def create_group_particles(
+            cls,
+            group,
+            positions,
+            orientations=None,
+            link_prim_paths=None,
+    ):
+        """
+        Generates new particle objects within group @group at the specified pose (@positions, @orientations) with
+        corresponding scales @scales.
+
+        NOTE: Assumes positions are the exact contact point on @group object's surface. If cls._CLIP_INTO_OBJECTS
+            is not True, then the positions will be offset away from the object by half of its bbox
+
+        Args:
+            group (str): Object on which to sample particle locations
+            positions (np.array): (n_particles, 3) shaped array specifying per-particle (x,y,z) positions
+            orientations (None or np.array): (n_particles, 4) shaped array specifying per-particle (x,y,z,w) quaternion
+                orientations. If not specified, all will be set to canonical orientation (0, 0, 0, 1)
+            link_prim_paths (None or list of str): Determines which link each generated particle will
+                be attached to. If not specified, all will be attached to the group object's root link
+        """
+        # Make sure the group exists
+        cls._validate_group(group=group)
+
+        # Update scaling
+        cls.set_scale_limits(*cls.update_particle_scaling(group=group))
+
+        # Standardize orientations and links
+        obj = cls._group_objects[group]
+        n_particles = positions.shape[0]
+        if orientations is None:
+            orientations = np.zeros((n_particles, 4))
+            orientations[:, -1] = 1.0
+        link_prim_paths = [obj.root_link.prim_path] * n_particles if link_prim_paths is None else link_prim_paths
+
+        # Sample scales of the particles to generate
+        # Since the particles will be placed under the object, it will be affected/stretched by obj.scale. In order to
+        # preserve the absolute size of the particles, we need to scale the particle by obj.scale in some way. However,
+        # since the particles have a relative rotation w.r.t the object, the scale between the two don't align. As a
+        # heuristics, we divide it by the avg_scale, which is the cubic root of the product of the scales along 3 axes.
+        avg_scale = np.cbrt(np.product(obj.scale))
+        scales = np.random.uniform(cls.min_scale, cls.max_scale, (n_particles, 3)) / avg_scale
+
+        bbox_extents = [(cls.particle_object.aabb_extent * scale).tolist() for scale in scales]
+
+        # Generate particles
+        z_up = np.zeros((3, 1))
+        z_up[-1] = 1.0
+        for position, orientation, scale, bbox_extent, link_prim_path in \
+                zip(positions, orientations, scales, bbox_extents, link_prim_paths):
+            # Possibly shift the particle slightly away from the object if we're not clipping into objects
+            if not cls._CLIP_INTO_OBJECTS:
+                # Shift the particle halfway down
+                base_to_center = bbox_extent[2] / 2.0
+                normal = (T.quat2mat(orientation) @ z_up).flatten()
+                position += normal * base_to_center
+
+            # Create particle
+            particle = cls.add_particle(
+                prim_path=link_prim_path,
+                position=position,
+                orientation=orientation,
+                scale=scale,
+            )
+
+            # Add to group
+            cls._group_particles[group][particle.name] = particle
+
+    @classmethod
     def generate_group_particles(cls, group, n_particles=None, min_particles_for_success=1):
         """
         Generates @n_particles new particle objects and samples their locations on the surface of object @obj. Note
@@ -538,6 +638,9 @@ class VisualParticleSystem(MacroParticleSystem):
         """
         # Make sure the group exists
         cls._validate_group(group=group)
+
+        # Update scaling
+        cls.set_scale_limits(*cls.update_particle_scaling(group=group))
 
         # Remove all stale particles
         cls.remove_all_group_particles(group=group)
@@ -594,7 +697,7 @@ class VisualParticleSystem(MacroParticleSystem):
                     surface_point = position
                     if cls._CLIP_INTO_OBJECTS:
                         # Shift the object halfway down.
-                        cuboid_base_to_center = particle.aabb_extent[2] / 2.0
+                        cuboid_base_to_center = bbox_extent[2] / 2.0
                         surface_point -= normal * cuboid_base_to_center
 
                     # Create particle
@@ -686,6 +789,11 @@ class VisualParticleSystem(MacroParticleSystem):
     def create(cls, particle_name, n_particles_per_group, create_particle_template, min_scale=None, max_scale=None, **kwargs):
         """
         Utility function to programmatically generate monolithic visual particle system classes.
+
+        Note: If using super() calls in any functions, we have to use slightly esoteric syntax in order to
+        accommodate this procedural method for using super calls
+        cf. https://stackoverflow.com/questions/22403897/what-does-it-mean-by-the-super-object-returned-is-unbound-in-python
+            Use: super(cls).__get__(cls).<METHOD_NAME>(<KWARGS>)
 
         Args:
             particle_name (str): Name of the visual particles
@@ -842,13 +950,10 @@ class VisualParticleSystem(MacroParticleSystem):
         return state_dict, idx + idx_super
 
 
-# We need to define an overriding method for StainSystem so that the stain values are modified based on
+# We need to define an overriding method for StainSystem so that the stain scaling values are modified based on
 # the parent's native object size
 @classmethod
-def stain_generate_group_particles(cls, group, n_particles=None, min_particles_for_success=1):
-    # Make sure the group exists
-    cls._validate_group(group=group)
-
+def stain_update_particle_scaling(cls, group):
     # First set the bbox ranges -- depends on the object's bounding box
     obj = cls._group_objects[group]
     median_aabb_dim = np.median(obj.aabb_extent)
@@ -870,19 +975,9 @@ def stain_generate_group_particles(cls, group, n_particles=None, min_particles_f
 
     # Convert these into scaling factors for the x and y axes for our particle object
     particle_bbox = cls.particle_object.aabb_extent
-    cls.set_scale_limits(
-        minimum=np.array([bbox_lower_limit / particle_bbox[0], bbox_lower_limit / particle_bbox[1], 1.0]),
-        maximum=np.array([bbox_upper_limit / particle_bbox[0], bbox_upper_limit / particle_bbox[1], 1.0]),
-    )
-
-    # Run super method like normal to generate particles
-    # we have to use a bit esoteric syntax in order to accommodate this procedural method for using super calls
-    # cf. https://stackoverflow.com/questions/22403897/what-does-it-mean-by-the-super-object-returned-is-unbound-in-python
-    return super(cls).__get__(cls).generate_group_particles(
-        group=group,
-        n_particles=n_particles,
-        min_particles_for_success=min_particles_for_success
-    )
+    minimum = np.array([bbox_lower_limit / particle_bbox[0], bbox_lower_limit / particle_bbox[1], 1.0])
+    maximum = np.array([bbox_upper_limit / particle_bbox[0], bbox_upper_limit / particle_bbox[1], 1.0])
+    return minimum, maximum
 
 
 DustSystem = VisualParticleSystem.create(
@@ -923,9 +1018,9 @@ StainSystem = VisualParticleSystem.create(
     _BOUNDING_BOX_UPPER_LIMIT_FRACTION_OF_AABB=0.1,
     _BOUNDING_BOX_UPPER_LIMIT_MIN=0.02,
     _BOUNDING_BOX_UPPER_LIMIT_MAX=0.1,
-    # Also need to override the how we generate group particles, since they get scaled according to the parent object's
+    # Also need to override the how we process particle scaling, since they get scaled according to the parent object's
     # native size
-    generate_group_particles=stain_generate_group_particles,
+    update_particle_scaling=stain_update_particle_scaling,
 )
 
 
