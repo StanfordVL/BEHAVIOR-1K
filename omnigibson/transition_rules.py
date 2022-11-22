@@ -269,6 +269,7 @@ class SlicingRule(BaseTransitionRule):
             return False
 
         # Calculate the normal force applied to the contact object.
+        # TODO: Fix this -- dt is 0.0 for some reason, so we get a divide by zero error
         normal_force = np.dot(sliced_c.impulse, sliced_c.normal) / sliced_c.dt
         if Sliced in sliced_obj.states:
             if (
@@ -531,7 +532,7 @@ class BlenderRule(BaseTransitionRule):
         for obj_category, objs in group_objects.items():
             inside_objs = []
             for obj in objs:
-                if bool(self._check_in_volume[blender.name](obj.aabb_center)[0]):
+                if obj.states[Inside].get_value(blender):
                     inside_objs.append(obj)
             # Make sure the number of objects inside meets the required threshold, else we trigger a failure
             if len(inside_objs) < self.obj_requirements[obj_category]:
@@ -567,16 +568,12 @@ class BlenderRule(BaseTransitionRule):
         for system in self.fluid_requirements.keys():
             # No need to check for whether particle instancers exist because they must due to @self.condition passing!
             for inst in system.particle_instancers.values():
-                inst.particle_visibilities = 1 - self._check_in_volume[blender.name](inst.particle_positions)
-
-        # Take a physics step to propagate everything
-        og.sim.step_physics()
+                vis = inst.particle_visibilities
+                vis[self._check_in_volume[blender.name](inst.particle_positions).nonzero()[0]] = 0
+                inst.particle_visibilities = vis
 
         # Spawn in blended fluid!
         blender.states[Filled].set_value(self.output_fluid, True)
-
-        # Take a physics step to propagate everything again
-        og.sim.step_physics()
 
 
 """See the following example for writing simple rules.

@@ -496,14 +496,15 @@ class Simulator(SimulationContext, Serializable):
                 for obj_tuple in itertools.product(*list(individual_f_objs.values())):
                     individual_objects = {fname: obj for fname, obj in zip(individual_f_objs.keys(), obj_tuple)}
                     did_transition, transition_output = rule.process(individual_objects=individual_objects, group_objects=group_f_objs)
-                    if isinstance(transition_output, TransitionResults):
+                    if transition_output is not None:
+                        # Transition output is a TransitionResults object
                         added_obj_attrs.extend(transition_output.add)
                         removed_objs.extend(transition_output.remove)
             else:
                 # We try the transition rule once, since there's no cartesian cross product of combinations from the
                 # individual filters we need to handle
                 did_transition, transition_output = rule.process(individual_objects=dict(), group_objects=group_f_objs)
-                if isinstance(transition_output, TransitionResults):
+                if transition_output is not None:
                     added_obj_attrs.extend(transition_output.add)
                     removed_objs.extend(transition_output.remove)
 
