@@ -54,8 +54,6 @@ SUPPORTED_PREDICATES = {
     "burnt": get_unary_predicate_for_state(object_states.Burnt, "burnt"),
     "soaked": get_unary_predicate_for_state(object_states.Soaked, "soaked"),
     "open": get_unary_predicate_for_state(object_states.Open, "open"),
-    "dusty": get_unary_predicate_for_state(object_states.Dusty, "dusty"),
-    "stained": get_unary_predicate_for_state(object_states.Stained, "stained"),
     "sliced": get_unary_predicate_for_state(object_states.Sliced, "sliced"),
     "toggled_on": get_unary_predicate_for_state(object_states.ToggledOn, "toggled_on"),
     "frozen": get_unary_predicate_for_state(object_states.Frozen, "frozen"),
