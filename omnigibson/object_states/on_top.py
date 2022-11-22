@@ -2,17 +2,17 @@
 from IPython import embed
 
 import omnigibson
+from omnigibson.object_states.kinematics import KinematicsMixin
 from omnigibson.object_states.adjacency import VerticalAdjacency
-from omnigibson.object_states.memoization import PositionalValidationMemoizedObjectStateMixin
 from omnigibson.object_states.object_state_base import BooleanState, RelativeObjectState
 from omnigibson.object_states.touching import Touching
 from omnigibson.utils.object_state_utils import sample_kinematics
 
 
-class OnTop(PositionalValidationMemoizedObjectStateMixin, RelativeObjectState, BooleanState):
+class OnTop(KinematicsMixin, RelativeObjectState, BooleanState):
     @staticmethod
     def get_dependencies():
-        return RelativeObjectState.get_dependencies() + [Touching, VerticalAdjacency]
+        return KinematicsMixin.get_dependencies() + RelativeObjectState.get_dependencies() + [Touching, VerticalAdjacency]
 
     def _set_value(self, other, new_value, use_ray_casting_method=False):
         state = self._simulator.dump_state(serialized=False)

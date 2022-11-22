@@ -1,9 +1,9 @@
 import numpy as np
 import logging
 
-class LinkBasedStateMixin(object):
+class LinkBasedStateMixin:
     def __init__(self):
-        super(LinkBasedStateMixin, self).__init__()
+        super().__init__()
 
         self.link = None
 

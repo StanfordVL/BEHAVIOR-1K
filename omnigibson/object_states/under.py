@@ -3,15 +3,15 @@ from IPython import embed
 
 import omnigibson
 from omnigibson.object_states.adjacency import VerticalAdjacency
-from omnigibson.object_states.memoization import PositionalValidationMemoizedObjectStateMixin
+from omnigibson.object_states.kinematics import KinematicsMixin
 from omnigibson.object_states.object_state_base import BooleanState, RelativeObjectState
 from omnigibson.utils.object_state_utils import sample_kinematics
 
 
-class Under(PositionalValidationMemoizedObjectStateMixin, RelativeObjectState, BooleanState):
+class Under(KinematicsMixin, RelativeObjectState, BooleanState):
     @staticmethod
     def get_dependencies():
-        return RelativeObjectState.get_dependencies() + [VerticalAdjacency]
+        return KinematicsMixin.get_dependencies() + RelativeObjectState.get_dependencies() + [VerticalAdjacency]
 
     def _set_value(self, other, new_value):
         state = self._simulator.dump_state(serialized=False)

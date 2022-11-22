@@ -5,14 +5,13 @@ import omnigibson
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.adjacency import HorizontalAdjacency, VerticalAdjacency, flatten_planes
 from omnigibson.object_states.kinematics import KinematicsMixin
-from omnigibson.object_states.memoization import PositionalValidationMemoizedObjectStateMixin
 from omnigibson.object_states.object_state_base import BooleanState, RelativeObjectState
 from omnigibson.object_states.pose import Pose
 from omnigibson.utils.object_state_utils import sample_kinematics
 from omnigibson.utils.usd_utils import BoundingBoxAPI
 
 
-class Inside(PositionalValidationMemoizedObjectStateMixin, KinematicsMixin, RelativeObjectState, BooleanState):
+class Inside(KinematicsMixin, RelativeObjectState, BooleanState):
     @staticmethod
     def get_dependencies():
         return KinematicsMixin.get_dependencies() + [AABB, Pose, HorizontalAdjacency, VerticalAdjacency]
@@ -39,8 +38,7 @@ class Inside(PositionalValidationMemoizedObjectStateMixin, KinematicsMixin, Rela
 
         return sampling_success
 
-    def _get_value(self, other, use_ray_casting_method=False):
-        del use_ray_casting_method
+    def _get_value(self, other):
 
         # First check that the inner object's position is inside the outer's AABB.
         # Since we usually check for a small set of outer objects, this is cheap.

@@ -2,7 +2,7 @@ import random
 import numpy as np
 
 from omnigibson.macros import create_module_macros
-from omnigibson.object_states.object_state_base import BooleanState, CachingEnabledObjectState
+from omnigibson.object_states.object_state_base import BooleanState, AbsoluteObjectState
 
 
 # Create settings for this module
@@ -76,8 +76,8 @@ def _get_relevant_joints(obj):
     return both_sides, relevant_joints, joint_directions
 
 
-class Open(CachingEnabledObjectState, BooleanState):
-    def _compute_value(self):
+class Open(AbsoluteObjectState, BooleanState):
+    def _get_value(self):
         both_sides, relevant_joints, joint_directions = _get_relevant_joints(self.obj)
         if not relevant_joints:
             return False
@@ -160,7 +160,7 @@ class Open(CachingEnabledObjectState, BooleanState):
                 joint.set_pos(joint_pos)
 
             # If we succeeded, return now.
-            if self._compute_value() == new_value:
+            if self._get_value() == new_value:
                 return True
 
         # We exhausted our attempts and could not find a working sample.

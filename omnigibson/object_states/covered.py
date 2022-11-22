@@ -158,8 +158,8 @@ class Covered(RelativeObjectState, BooleanState):
         # AABB needed for sampling visual particles on an object
         return RelativeObjectState.get_dependencies() + [AABB]
 
-    @property
-    def stateful(self):
+    @classproperty
+    def stateful(cls):
         return True
 
     def _initialize(self):

@@ -23,7 +23,7 @@ class RoomFloor(object):
         return getattr(self.floor_obj, item)
 
 
-class OnFloor(RelativeObjectState, KinematicsMixin, BooleanState):
+class OnFloor(KinematicsMixin, RelativeObjectState, BooleanState):
     @staticmethod
     def get_dependencies():
         return KinematicsMixin.get_dependencies() + [Touching]

@@ -6,6 +6,7 @@ from omnigibson.prims.geom_prim import VisualGeomPrim
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
 from omnigibson.utils.usd_utils import create_primitive_mesh
+from omnigibson.utils.python_utils import classproperty
 from omni.isaac.core.utils.prims import get_prim_at_path
 
 
@@ -85,8 +86,8 @@ class ToggledOn(AbsoluteObjectState, BooleanState, LinkBasedStateMixin):
         diffuse_tint = (1.0, 1.0, 1.0)
         return albedo_add, diffuse_tint
 
-    @property
-    def stateful(self):
+    @classproperty
+    def stateful(cls):
         return True
 
     @property

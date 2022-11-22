@@ -41,10 +41,11 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
         super(BaseObjectState, self).__init__()
         self.obj = obj
         self._initialized = False
+        self._cache = None
         self._simulator = None
 
-    @property
-    def stateful(self):
+    @classproperty
+    def stateful(cls):
         """
         Returns:
             bool: True if this object has a state that can be directly dumped / loaded via dump_state() and
@@ -53,6 +54,15 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
         """
         # False by default
         return False
+
+    @property
+    def cache(self):
+        """
+        Returns:
+            OrdereDict: Dictionary mapping specific argument combinations from @self.get_value() to cached values and
+                information stored for that specific combination
+        """
+        return self._cache
 
     def _update(self):
         """This function will be called once for every simulator step."""
@@ -65,19 +75,80 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
     def initialize(self, simulator):
         assert not self._initialized, "State is already initialized."
 
-        # Store simulator reference
+        # Store simulator reference and create cache
         self._simulator = simulator
+        self._cache = OrderedDict()
 
         self._initialize()
         self._initialized = True
 
     def update(self):
-        assert self._initialized, "Cannot update uninitalized state."
+        assert self._initialized, "Cannot update uninitialized state."
+        # Potentially clear cache
+        self.clear_cache(force=False)
         return self._update()
+
+    def clear_cache(self, force=True):
+        """
+        Clears the internal cache, either softly (checking under certain conditions under which the cache will not
+        be cleared), or forcefully (if @force=True)
+
+        Args:
+            force (bool): Whether to force a clearing of cached values or to potentially check whether they should
+                be cleared or not
+        """
+        if force:
+            # Clear all entries
+            self._cache = OrderedDict()
+        else:
+            for args in list(self._cache.items()):
+                # Check whether we should clear the cache
+                if self._should_clear_cache(get_value_args=args, cache_info=self._cache[args]["info"]):
+                    self._cache.pop(args)
+
+    def _cache_info(self, get_value_args):
+        """
+        Helper function to cache relevant information at the current timestep.
+        Stores it under @self._cache[<KEY>]["value"]
+
+        Args:
+            get_value_args (tuple): Specific argument combinations (usually tuple of objects) passed into
+                @self.get_value whose caching information should be computed
+
+        Returns:
+            OrderedDict: Any caching information to include at the current timestep when this state's value is computed
+        """
+        # Default is an empty dictionary
+        return OrderedDict()
+
+    def _should_clear_cache(self, get_value_args, cache_info):
+        """
+        Checks whether the cache should be cleared based on information from @cache_info
+
+        Args:
+            get_value_args (tuple): Specific argument combinations (usually tuple of objects) passed into
+                @self.get_value whose caching condition should be checked
+            cache_info (OrderedDict): Cache information associated the argument tuple @key
+
+        Returns:
+            bool: Whether the cache should be cleared for specific combination @get_value_args
+        """
+        # Default is always True
+        return True
 
     def get_value(self, *args, **kwargs):
         assert self._initialized
-        return self._get_value(*args, **kwargs)
+
+        # Compile args and kwargs deterministically, and if it already exists in our cache, we return that value,
+        # otherwise we calculate the value and store it in our cache
+        key = (*args, *tuple(kwargs.values()))
+        if key in self._cache:
+            val = self._cache[key]["value"]
+        else:
+            val = self._get_value(*args, **kwargs)
+            self._cache[key] = OrderedDict(value=val, info=self._cache_info())
+
+        return val
 
     def _get_value(self, *args, **kwargs):
         raise NotImplementedError
@@ -133,48 +204,6 @@ class AbsoluteObjectState(BaseObjectState):
         # Don't register this class since it's an abstract template
         classes = super()._do_not_register_classes
         classes.add("AbsoluteObjectState")
-        return classes
-
-
-class CachingEnabledObjectState(AbsoluteObjectState):
-    """
-    This class is used to track absolute states that are expensive to compute. It adds out-of-the-box support for
-    caching the results for each simulator step.
-    """
-
-    def __init__(self, obj):
-        super(CachingEnabledObjectState, self).__init__(obj)
-        self.value = None
-
-    @abstractmethod
-    def _compute_value(self):
-        """
-        This function should compute the value of the state and return it. It should not set self.value.
-
-        :return: The computed value.
-        """
-        raise NotImplementedError()
-
-    def _get_value(self):
-        # If we don't have a value cached, compute it now.
-        if self.value is None:
-            self.value = self._compute_value()
-
-        return self.value
-
-    def clear_cached_value(self):
-        self.value = None
-
-    def _update(self):
-        # Reset the cached state value on Simulator step.
-        super(CachingEnabledObjectState, self)._update()
-        self.clear_cached_value()
-
-    @classproperty
-    def _do_not_register_classes(cls):
-        # Don't register this class since it's an abstract template
-        classes = super()._do_not_register_classes
-        classes.add("CachingEnabledObjectState")
         return classes
 
 

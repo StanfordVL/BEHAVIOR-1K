@@ -512,8 +512,8 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin):
         """
         raise NotImplementedError()
 
-    @property
-    def stateful(self):
+    @classproperty
+    def stateful(cls):
         return True
 
     @property

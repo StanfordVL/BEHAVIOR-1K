@@ -6,6 +6,7 @@ from omnigibson.object_states.inside import Inside
 from omnigibson.object_states.object_state_base import AbsoluteObjectState
 from omnigibson.object_states.pose import Pose
 import omnigibson.utils.transform_utils as T
+from omnigibson.utils.python_utils import classproperty
 
 
 # Create settings for this module
@@ -80,8 +81,8 @@ class Temperature(AbsoluteObjectState):
 
         self.value = new_temperature
 
-    @property
-    def stateful(self):
+    @classproperty
+    def stateful(cls):
         return True
 
     # For this state, we simply store its value.

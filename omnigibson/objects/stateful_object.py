@@ -20,7 +20,7 @@ from omnigibson.object_states.factory import (
     get_steam_states,
     get_texture_change_priority,
 )
-from omnigibson.object_states.object_state_base import REGISTERED_OBJECT_STATES, CachingEnabledObjectState
+from omnigibson.object_states.object_state_base import REGISTERED_OBJECT_STATES
 from omnigibson.object_states.heat_source_or_sink import HeatSourceOrSink
 from omnigibson.object_states.heated import Heated
 from omnigibson.objects.object_base import BaseObject
@@ -465,19 +465,26 @@ class StatefulObject(BaseObject):
 
         return state_dic, idx
 
-    def clear_cached_states(self):
+    def clear_cached_states(self, force=True):
+        """
+        Clears the internal cache from all owned states, either softly (checking under certain conditions under which
+        the cache will not be cleared), or forcefully (if @force=True)
+
+        Args:
+            force (bool): Whether to force a clearing of cached values or to potentially check whether they should
+                be cleared or not
+        """
         # Check self._states just in case states have not been initialized yet.
         if not self._states:
             return
         for _, obj_state in self._states.items():
-            if isinstance(obj_state, CachingEnabledObjectState):
-                obj_state.clear_cached_value()
+            obj_state.clear_cache(force=force)
 
     def set_position_orientation(self, position=None, orientation=None):
         super().set_position_orientation(position=position, orientation=orientation)
-        self.clear_cached_states()
+        self.clear_cached_states(force=True)
 
     # TODO: Redundant?
     def set_base_link_position_orientation(self, position, orientation):
         super().set_position_orientation(position=position, orientation=orientation)
-        self.clear_cached_states()
+        self.clear_cached_states(force=True)
