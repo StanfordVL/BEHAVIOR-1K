@@ -101,7 +101,7 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
             # Clear all entries
             self._cache = OrderedDict()
         else:
-            for args in list(self._cache.items()):
+            for args in list(self._cache.keys()):
                 # Check whether we should clear the cache
                 if self._should_clear_cache(get_value_args=args, cache_info=self._cache[args]["info"]):
                     self._cache.pop(args)
@@ -146,7 +146,7 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
             val = self._cache[key]["value"]
         else:
             val = self._get_value(*args, **kwargs)
-            self._cache[key] = OrderedDict(value=val, info=self._cache_info())
+            self._cache[key] = OrderedDict(value=val, info=self._cache_info(get_value_args=key))
 
         return val
 
