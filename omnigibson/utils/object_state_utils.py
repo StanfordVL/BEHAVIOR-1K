@@ -51,7 +51,7 @@ def sample_kinematics(
     binary_state,
     use_ray_casting_method=False,
     max_trials=100,
-    z_offset=0.05,
+    z_offset=0.01,
     skip_falling=False,
 ):
     # Can only sample kinematics for binary_states currently
@@ -116,7 +116,7 @@ def sample_kinematics(
                     xy_aligned=True
                 )
 
-                sampling_results = sampling_utils.sample_cuboid_on_object(
+                sampling_results = sampling_utils.sample_cuboid_on_object_symmetric_bimodal_distribution(
                     objB,
                     num_samples=1,
                     cuboid_dimensions=parallel_bbox_extents,

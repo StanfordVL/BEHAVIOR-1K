@@ -75,11 +75,12 @@ class Soaked(RelativeObjectState, BooleanState):
             for instancer, particle_idxs in instancer_name_to_particle_idxs.items():
                 max_particle_absorbed = m.SOAK_PARTICLE_THRESHOLD - self.absorbed_particle_system_count[fluid_system]
                 particles_to_absorb = min(len(particle_idxs), max_particle_absorbed)
-                particle_idxs_to_absorb = list(particle_idxs)[:particles_to_absorb]
+                particle_idxs_to_absorb = np.array(list(particle_idxs))[:particles_to_absorb]
 
                 # Hide particles that have been absorbed
-                particle_visibilities = fluid_system.particle_instancers[instancer].particle_visibilities
-                particle_visibilities[particle_idxs_to_absorb] = 0
+                current_visibilities = fluid_system.particle_instancers[instancer].particle_visibilities
+                current_visibilities[particle_idxs_to_absorb] = 0
+                fluid_system.particle_instancers[instancer].particle_visibilities = current_visibilities
 
                 # Keep track of the particles that have been absorbed
                 self.absorbed_particle_system_count[fluid_system] += particles_to_absorb
@@ -89,7 +90,6 @@ class Soaked(RelativeObjectState, BooleanState):
                     break
 
     def get_texture_change_params(self):
-        albedo_add = 0.1
         colors = []
 
         for fluid_system in self.absorbed_particle_system_count.keys():

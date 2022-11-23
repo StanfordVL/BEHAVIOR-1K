@@ -13,6 +13,7 @@ from omnigibson.utils.gym_utils import GymObservable
 from omnigibson.utils.python_utils import Registerable, classproperty
 from omnigibson.utils.vision_utils import segmentation_to_rgb
 import omnigibson.utils.transform_utils as T
+from omnigibson.utils.constants import PrimType
 from pxr import PhysxSchema
 
 # Global dicts that will contain mappings
@@ -124,6 +125,8 @@ class BaseRobot(USDObject, ControllableObject, GymObservable, Registerable):
             fixed_base=fixed_base,
             visual_only=visual_only,
             self_collisions=self_collisions,
+            prim_type=PrimType.RIGID,
+            include_default_state=True,
             load_config=load_config,
             abilities=abilities,
             control_freq=control_freq,

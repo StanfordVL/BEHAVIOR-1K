@@ -35,6 +35,7 @@ class SemanticClass(IntEnum):
     SCENE_OBJS = 3
     # The following class ids count backwards from MAX_CLASS_COUNT (instead of counting forward from 4) because we want
     # to maintain backward compatibility
+    GRASS = 506
     DIRT = 507
     STAIN = 508
     WATER = 509

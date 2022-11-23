@@ -67,6 +67,7 @@ class StatefulObject(BaseObject):
             prim_type=PrimType.RIGID,
             load_config=None,
             abilities=None,
+            include_default_state=True,
             **kwargs,
     ):
         """
@@ -89,6 +90,7 @@ class StatefulObject(BaseObject):
             loading this prim at runtime.
         @param abilities: dict in the form of {ability: {param: value}} containing
             object abilities and parameters.
+        @param include_default_state: bool, whether to include the default states from @get_default_states
         kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
             for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
             Note that this base object does NOT pass kwargs down into the Prim-type super() classes, and we assume
@@ -100,19 +102,16 @@ class StatefulObject(BaseObject):
 
         # Load abilities from taxonomy if needed & possible
         if abilities is None:
+            abilities = {}
             if OBJECT_TAXONOMY is not None:
                 # TODO! Update!!
                 taxonomy_class = OBJECT_TAXONOMY.get_class_name_from_igibson_category(category)
                 if taxonomy_class is not None:
                     abilities = OBJECT_TAXONOMY.get_abilities(taxonomy_class)
-                else:
-                    abilities = {}
-            else:
-                abilities = {}
         assert isinstance(abilities, dict), "Object abilities must be in dictionary form."
 
         self._abilities = abilities
-        self.prepare_object_states(abilities=abilities)
+        self.prepare_object_states(abilities=abilities, include_default_state=include_default_state)
 
         # Run super init
         super().__init__(
@@ -168,7 +167,7 @@ class StatefulObject(BaseObject):
         """
         return self._states
 
-    def prepare_object_states(self, abilities=None):
+    def prepare_object_states(self, abilities=None, include_default_state=True):
         """
         Prepare the state dictionary for an object by generating the appropriate
         object state instances.
@@ -178,11 +177,12 @@ class StatefulObject(BaseObject):
 
         :param abilities: dict in the form of {ability: {param: value}} containing
             object abilities and parameters.
+        @param include_default_state: bool, whether to include the default states from @get_default_states
         """
         if abilities is None:
             abilities = {}
 
-        state_types_and_params = [(state, {}) for state in get_default_states()]
+        state_types_and_params = [(state, {}) for state in get_default_states()] if include_default_state else []
 
         # Map the ability params to the states immediately imported by the abilities
         for ability, params in abilities.items():

@@ -4,7 +4,7 @@ from omnigibson.object_states.object_state_base import RelativeObjectState, Bool
 from omnigibson.systems.system_base import get_element_name_from_system, get_system_from_element_name
 from omnigibson.systems.macro_particle_system import VisualParticleSystem, get_visual_particle_systems
 from omnigibson.systems.micro_particle_system import FluidSystem, get_fluid_systems
-from omnigibson.utils.sampling_utils import raytest_batch
+from omnigibson.utils.sampling_utils import raytest_batch, sample_cuboid_on_object_full_grid_topdown
 from collections import OrderedDict
 import numpy as np
 
@@ -184,8 +184,11 @@ class Covered(RelativeObjectState, BooleanState):
             # We only check if we have particle instancers currently
             if len(system.particle_instancers) > 0:
                 # We've already cached particle contacts, so we merely search through them to see if any particles are
-                # touching the object
-                n_near_particles = np.sum([len(idxs) for idxs in system.state_cache["particle_contacts"][self.obj].values()])
+                # touching the object and are visible (the non-visible ones are considered already "removed")
+                n_near_particles = 0
+                for instancer, particle_idxs in system.state_cache["particle_contacts"][self.obj].items():
+                    particle_idxs = np.array(list(particle_idxs))
+                    n_near_particles += np.sum(instancer.particle_visibilities[particle_idxs])
                 # Heuristic: If the number of near particles is above the threshold, we consdier this covered
                 value = n_near_particles >= m.FLUID_THRESHOLD
         else:
@@ -219,24 +222,34 @@ class Covered(RelativeObjectState, BooleanState):
             # Check current state and only do something if we're changing state
             if self.get_value(system) != new_value:
                 if new_value:
-                    # We first shoot grid-wise rays downwards onto the object
-                    # For any rays that hit the object, we determine the appropriate z distance that is slightly offset
-                    # above the object's surface and store those positions
-                    # Then we sample particles at each of those positions
-                    particle_positions = sample_particle_positions_on_object_top_surface(
-                        obj=self.obj,
-                        particle_spacing=system.particle_radius * 2,
-                        z_offset=0.001,
+                    # We densely sample a grid of points by ray-casting from top to bottom to find the valid positions
+                    radius = system.particle_radius
+                    results = sample_cuboid_on_object_full_grid_topdown(
+                        self.obj,
+                        # the grid is fully dense - particles are sitting next to each other
+                        ray_spacing=radius * 2,
+                        # assume the particles are extremely small - sample cuboids of size 0 for better performance
+                        cuboid_dimensions=np.zeros(3),
+                        # raycast start inside the aabb in x-y plane and outside the aabb in the z-axis
+                        aabb_offset=np.array([-radius, -radius, radius]),
+                        # bottom padding should be the same as the particle radius
+                        cuboid_bottom_padding=radius,
+                        # undo_padding should be False - the sampled positions are above the surface by its radius
+                        undo_padding=False
                     )
+                    particle_positions = [result[0] for result in results if result[0] is not None]
+                    # Spawn the particles at the valid positions
                     system.generate_particle_instancer(
                         n_particles=len(particle_positions),
                         positions=particle_positions,
                     )
                 else:
                     # We hide all particles within range to be garbage collected by fluid system
-                    for inst, particle_idxs in system.state_cache["particle_contacts"][self.obj]:
-                        idxs = np.array(list(particle_idxs))
-                        inst.particle_visibilities[idxs] = 0
+                    for inst, particle_idxs in system.state_cache["particle_contacts"][self.obj].items():
+                        indices = np.array(list(particle_idxs))
+                        current_visibilities = inst.particle_visibilities
+                        current_visibilities[indices] = 0
+                        inst.particle_visibilities = current_visibilities
 
         else:
             raise ValueError(f"Invalid system {system} received for setting Covered state!"

@@ -568,9 +568,10 @@ class BlenderRule(BaseTransitionRule):
         for system in self.fluid_requirements.keys():
             # No need to check for whether particle instancers exist because they must due to @self.condition passing!
             for inst in system.particle_instancers.values():
-                vis = inst.particle_visibilities
-                vis[self._check_in_volume[blender.name](inst.particle_positions).nonzero()[0]] = 0
-                inst.particle_visibilities = vis
+                indices = self._check_in_volume[blender.name](inst.particle_positions).nonzero()[0]
+                current_visibilities = inst.particle_visibilities
+                current_visibilities[indices] = 0
+                inst.particle_visibilities = current_visibilities
 
         # Spawn in blended fluid!
         blender.states[Filled].set_value(self.output_fluid, True)

@@ -61,6 +61,7 @@ class LightObject(StatefulObject):
         rendering_params (dict): Any relevant rendering settings for this object.
         load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
             loading this prim at runtime. For this xform prim, the below values can be specified
+        @param include_default_state: bool, whether to include the default states from @get_default_states
         abilities (dict): dict in the form of {ability: {param: value}} containing
             object abilities and parameters.
         radius (float): Radius for this light.
@@ -80,6 +81,7 @@ class LightObject(StatefulObject):
         scale=None,
         rendering_params=None,
         load_config=None,
+        include_default_state=True,
         abilities=None,
         radius=1.0,
         intensity=50000.0,
@@ -112,6 +114,7 @@ class LightObject(StatefulObject):
             visual_only=True,
             self_collisions=False,
             prim_type=PrimType.RIGID,
+            include_default_state=include_default_state,
             load_config=load_config,
             abilities=abilities,
             **kwargs,

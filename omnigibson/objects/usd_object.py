@@ -28,6 +28,7 @@ class USDObject(StatefulObject):
         visual_only=False,
         self_collisions=False,
         prim_type=PrimType.RIGID,
+        include_default_state=True,
         load_config=None,
         abilities=None,
         **kwargs,
@@ -49,6 +50,7 @@ class USDObject(StatefulObject):
         visual_only (bool): Whether this object should be visual only (and not collide with any other objects)
         self_collisions (bool): Whether to enable self collisions for this object
         prim_type (PrimType): Which type of prim the object is, Valid options are: {PrimType.RIGID, PrimType.CLOTH}
+        @param include_default_state: bool, whether to include the default states from @get_default_states
         load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
             loading this prim at runtime.
         @param abilities: dict in the form of {ability: {param: value}} containing
@@ -70,6 +72,7 @@ class USDObject(StatefulObject):
             visual_only=visual_only,
             self_collisions=self_collisions,
             prim_type=prim_type,
+            include_default_state=include_default_state,
             load_config=load_config,
             abilities=abilities,
             **kwargs,

@@ -10,7 +10,7 @@ from omnigibson.systems.particle_system_base import BaseParticleSystem
 from omnigibson.utils.constants import SemanticClass
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
 from omnigibson.utils.python_utils import classproperty, assert_valid_key, subclass_factory
-from omnigibson.utils.sampling_utils import sample_cuboid_on_object
+from omnigibson.utils.sampling_utils import sample_cuboid_on_object_symmetric_bimodal_distribution
 from omnigibson.utils.usd_utils import create_joint, array_to_vtarray
 from omnigibson.utils.ui_utils import disclaimer
 from omnigibson.utils.physx_utils import create_physx_particle_system, create_physx_particleset_pointinstancer, \
@@ -296,7 +296,7 @@ class PhysxParticleInstancer(BasePrim):
     def particle_visibilities(self):
         """
         Returns:
-            np.array: (N,) numpy array, where each entry is the specific particle's visiblity
+            np.array: (N,) numpy array, where each entry is the specific particle's visibility
                 (1 if visible, 0 otherwise)
         """
         # We leverage the ids + invisibleIds prim fields to infer visibility
@@ -310,7 +310,7 @@ class PhysxParticleInstancer(BasePrim):
         Set the particle visibilities for this instancer
 
         Args:
-            np.array: (N,) numpy array, where each entry is the specific particle's desired visiblity
+            np.array: (N,) numpy array, where each entry is the specific particle's desired visibility
                 (1 if visible, 0 otherwise)
         """
         assert visibilities.shape[0] == self._n_particles, \

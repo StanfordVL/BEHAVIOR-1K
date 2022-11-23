@@ -77,6 +77,7 @@ _DEFAULT_STATE_SET = frozenset(
         OnTop,
         Touching,
         Under,
+        Covered,
     ]
 )
 
