@@ -41,6 +41,7 @@ _ALL_STATES = frozenset(
         WaterSource,
         WaterSink,
         Filled,
+        Folded,
     ]
     + ROOM_STATES
 )
@@ -63,6 +64,7 @@ _ABILITY_TO_STATE_MAPPING = {
     "waterSource": [WaterSource],
     "waterSink": [WaterSink],
     "fillable": [Filled],
+    "foldable": [Folded],
 }
 
 _DEFAULT_STATE_SET = frozenset(
