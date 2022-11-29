@@ -44,7 +44,7 @@ class Pose(AbsoluteObjectState):
         return info
 
     def _should_clear_cache(self, get_value_args, cache_info):
-        # Only clear cache if the squared distance between cached position and current position has not
+        # Only clear cache if the squared distance between cached position and current position has
         # changed above some threshold
         dist_squared = np.sum(np.square(self.obj.get_position() - cache_info["pos"]))
         self._has_moved = dist_squared > m.POSITIONAL_VALIDATION_EPSILON
