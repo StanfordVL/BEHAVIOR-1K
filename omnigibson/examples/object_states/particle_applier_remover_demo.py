@@ -129,8 +129,6 @@ def main(random_selection=False, headless=False, short_exec=False):
         category="breakfast_table",
         model="265851637a59eb2f882f822c83877cbc",
         scale=[4.0, 4.0, 4.0],
-        # We make sure this table can be covered with particles
-        abilities={"coverable": {}},
     )
     og.sim.import_object(table)
     table.set_position(np.array([0, 0, 0.5]))
