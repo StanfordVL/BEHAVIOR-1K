@@ -111,6 +111,7 @@ _TEXTURE_CHANGE_PRIORITY = {
     Frozen: 4,
     Burnt: 3,
     Cooked: 2,
+    Saturated: 1,
     ToggledOn: 0,
 }
 
