@@ -30,7 +30,7 @@ class KinematicsMixin(BaseObjectState):
         return info
 
     def _should_clear_cache(self, get_value_args, cache_info):
-        # Only clear cache if all the objects have not moved
+        # Only clear cache if at least one object has moved
         for obj in cache_info.values():
             if obj.states[Pose].has_moved:
                 # We need to clear the cache because at least one relevant object's position has changed
