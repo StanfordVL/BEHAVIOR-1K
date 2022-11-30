@@ -139,12 +139,6 @@ class StatefulObject(BaseObject):
         for state in self._states.values():
             state.initialize(self._simulator)
 
-    def initialize_states(self):
-        """
-        Initializes states for this object, and also clears any states that were existing beforehand.
-        """
-        self._states = OrderedDict()
-
     def add_state(self, state):
         """
         Adds state @state with name @name to self.states.
@@ -196,7 +190,7 @@ class StatefulObject(BaseObject):
                     state_types_and_params.append((dependency, {}))
 
         # Now generate the states in topological order.
-        self.initialize_states()
+        self._states = OrderedDict()
         for state_type, params in reversed(state_types_and_params):
             self._states[state_type] = get_object_state_instance(state_type, self, params)
 
@@ -465,26 +459,21 @@ class StatefulObject(BaseObject):
 
         return state_dic, idx
 
-    def clear_cached_states(self, force=True):
+    def clear_cached_states(self):
         """
-        Clears the internal cache from all owned states, either softly (checking under certain conditions under which
-        the cache will not be cleared), or forcefully (if @force=True)
-
-        Args:
-            force (bool): Whether to force a clearing of cached values or to potentially check whether they should
-                be cleared or not
+        Clears the internal cache from all owned states
         """
         # Check self._states just in case states have not been initialized yet.
         if not self._states:
             return
         for _, obj_state in self._states.items():
-            obj_state.clear_cache(force=force)
+            obj_state.clear_cache()
 
     def set_position_orientation(self, position=None, orientation=None):
         super().set_position_orientation(position=position, orientation=orientation)
-        self.clear_cached_states(force=True)
+        self.clear_cached_states()
 
     # TODO: Redundant?
     def set_base_link_position_orientation(self, position, orientation):
         super().set_position_orientation(position=position, orientation=orientation)
-        self.clear_cached_states(force=True)
+        self.clear_cached_states()

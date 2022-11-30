@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from collections import OrderedDict
+import omnigibson as og
 from omnigibson.utils.python_utils import classproperty, Serializable, Registerable, Recreatable
 
 
@@ -38,10 +39,14 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
         return []
 
     def __init__(self, obj):
-        super(BaseObjectState, self).__init__()
+        super().__init__()
         self.obj = obj
         self._initialized = False
+        self._cache_is_valid_called = False
+        self._history = None
         self._cache = None
+        self._changed = None
+        self._last_queried_timestep = None
         self._simulator = None
 
     @classproperty
@@ -54,6 +59,15 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
         """
         # False by default
         return False
+
+    def reset(self):
+        """
+        Resets this object state. By default, it clears all internal caching data
+        """
+        self._history = OrderedDict()
+        self._cache = OrderedDict()
+        self._changed = OrderedDict()
+        self._last_queried_timestep = OrderedDict()
 
     @property
     def cache(self):
@@ -77,76 +91,100 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
 
         # Store simulator reference and create cache
         self._simulator = simulator
-        self._cache = OrderedDict()
+        self.reset()
 
         self._initialize()
         self._initialized = True
 
     def update(self):
+        """
+        Updates the object state, possibly clearing internal cached information
+        """
         assert self._initialized, "Cannot update uninitialized state."
-        # Potentially clear cache
-        self.clear_cache(force=False)
+        # Clear all the changed values
+        self._changed = OrderedDict()
         return self._update()
 
-    def clear_cache(self, force=True):
+    def clear_cache(self):
         """
-        Clears the internal cache, either softly (checking under certain conditions under which the cache will not
-        be cleared), or forcefully (if @force=True)
+        Clears the internal cache
+        """
+        # Clear all entries
+        self._cache = OrderedDict()
+
+    def has_changed(self, get_value_args, t=None):
+        """
+        A helper function to query whether this object state has changed between an arbitrary previous timestep @t and
+        the current timestep.
+        @t, in addition to *args and **kwargs, will serve as a unique key into an internal dictionary,
+        such that specific @t will result in a computation conducted exactly once.
+        This is done for performance reasons; so that multiple states relying on the same state dependency can all
+        query whether that state has changed between the same timesteps with only a single computation.
 
         Args:
-            force (bool): Whether to force a clearing of cached values or to potentially check whether they should
-                be cleared or not
+            get_value_args (tuple): Specific argument combinations (usually tuple of objects) passed into
+                @self.get_value
+            t (int or None): Initial timestep to compare against. This should be an index of the steps taken,
+                i.e. a value queried from og.sim.current_time_step_index at some point in time.
+                Note that this state must have been queried at @t in the past, in order to compare against.
+
+        Returns:
+            bool: Whether this object state has changed between @t and the current timestep index for the specific
+                *args and **kwargs
         """
-        if force:
-            # Clear all entries
-            self._cache = OrderedDict()
+        # If t isn't specified, we grab the last queried timestep
+        if t is None:
+            t = self._last_queried_timestep[get_value_args]
+        # Compile t, args, and kwargs deterministically
+        history_key = (t, *get_value_args)
+        # If t == the current timestep, then we obviously haven't changed so our value is False
+        if t == og.sim.current_time_step_index:
+            val = False
+        # Otherwise, check if it already exists in our has changed dictionary; we return that value if so
+        elif history_key in self._changed:
+            val = self._changed[history_key]
+        # Otherwise, we calculate the value and store it in our changed dictionary
         else:
-            for args in list(self._cache.keys()):
-                # Check whether we should clear the cache
-                if self._should_clear_cache(get_value_args=args, cache_info=self._cache[args]["info"]):
-                    self._cache.pop(args)
+            val = self._has_changed(get_value_args=get_value_args, t=t)
+            self._changed[history_key] = val
 
-    def _cache_info(self, get_value_args):
+        return val
+
+    def _has_changed(self, get_value_args, t):
         """
-        Helper function to cache relevant information at the current timestep.
-        Stores it under @self._cache[<KEY>]["value"]
+        Checks whether @old_value has changed from @new_value. By default, it returns True.
+
+        Any custom checks should be overridden by subclass.
 
         Args:
             get_value_args (tuple): Specific argument combinations (usually tuple of objects) passed into
-                @self.get_value whose caching information should be computed
+                @self.get_value
+            t (int): Initial timestep to compare against. This should be an index of the steps taken,
+                i.e. a value queried from og.sim.current_time_step_index at some point in time.
+                Note that this state must have been queried at @t in the past, in order to compare against.
 
         Returns:
-            OrderedDict: Any caching information to include at the current timestep when this state's value is computed
+            bool: Whether the value has changed between time @t and the current timestep
         """
-        # Default is an empty dictionary
-        return OrderedDict()
-
-    def _should_clear_cache(self, get_value_args, cache_info):
-        """
-        Checks whether the cache should be cleared based on information from @cache_info
-
-        Args:
-            get_value_args (tuple): Specific argument combinations (usually tuple of objects) passed into
-                @self.get_value whose caching condition should be checked
-            cache_info (OrderedDict): Cache information associated the argument tuple @key
-
-        Returns:
-            bool: Whether the cache should be cleared for specific combination @get_value_args
-        """
-        # Default is always True
         return True
 
     def get_value(self, *args, **kwargs):
         assert self._initialized
 
-        # Compile args and kwargs deterministically, and if it already exists in our cache, we return that value,
-        # otherwise we calculate the value and store it in our cache
+        # Compile args and kwargs deterministically, and if it already exists in our cache and our value has not
+        # changed, we return that value, otherwise we compute the value and store it in our cache and history
         key = (*args, *tuple(kwargs.values()))
-        if key in self._cache:
-            val = self._cache[key]["value"]
+        if key in self._cache and not self.has_changed(get_value_args=key, t=None):
+            val = self._cache[key]
         else:
             val = self._get_value(*args, **kwargs)
-            self._cache[key] = OrderedDict(value=val, info=self._cache_info(get_value_args=key))
+            self._cache[key] = val
+
+        # Update the history and last queried timestep
+        t = og.sim.current_time_step_index
+        history_key = (t, *key)
+        self._history[history_key] = val
+        self._last_queried_timestep[key] = t
 
         return val
 
