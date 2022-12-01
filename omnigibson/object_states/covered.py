@@ -210,7 +210,7 @@ class Covered(RelativeObjectState, BooleanState):
                 group = self._visual_particle_groups[name]
                 if new_value:
                     # Generate particles
-                    success = system.generate_group_particles(group=group)
+                    success = system.generate_group_particles_on_object(group=group)
                     # If we succeeded with generating particles (new_value = True), store additional info
                     if success:
                         # Store how many particles there are now -- this is the "maximum" number possible
