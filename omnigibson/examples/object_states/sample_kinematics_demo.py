@@ -30,6 +30,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Create the environment
     env = og.Environment(configs=cfg, action_timestep=1/60., physics_timestep=1/60.)
+    env.step([])
 
     # Sample microwave and boxes
     sample_boxes_on_shelf(env)
@@ -47,22 +48,8 @@ def main(random_selection=False, headless=False, short_exec=False):
 
 def sample_microwave_plates_apples(env):
     # Load cabinet, set position manually, and step 100 times
-    logging.info("Loading cabinet")
-    cabinet = DatasetObject(
-        prim_path="/World/cabinet",
-        name="cabinet",
-        category="bottom_cabinet",
-        model="46380",
-    )
-    og.sim.import_object(cabinet)
-    z_offset = -cabinet.aabb_center[2] + cabinet.aabb_extent[2] / 2
-    cabinet.set_position(np.array([1.0, 0, z_offset]))
-    env.step(np.array([]))              # One step is needed for the object to be fully initialized
-    for _ in range(50):
-        env.step(np.array([]))
+    logging.info("Loading cabinet and microwave")
 
-    # Load microwave, set position on top of the cabinet, open it, and step 100 times
-    logging.info("Loading microwave Open and OnTop of the cabinet")
     microwave = DatasetObject(
         prim_path="/World/microwave",
         name="microwave",
@@ -71,7 +58,23 @@ def sample_microwave_plates_apples(env):
         scale=0.5,
     )
     og.sim.import_object(microwave)
+    microwave.set_position(np.array([0, 0, 5.0]))
     env.step(np.array([]))              # One step is needed for the object to be fully initialized
+
+    cabinet = DatasetObject(
+        prim_path="/World/cabinet",
+        name="cabinet",
+        category="bottom_cabinet",
+        model="46380",
+    )
+
+    og.sim.import_object(cabinet)
+    z_offset = -cabinet.aabb_center[2] + cabinet.aabb_extent[2] / 2
+    cabinet.set_position(np.array([1.0, 0, z_offset]))
+    env.step(np.array([]))              # One step is needed for the object to be fully initialized
+
+    # Set microwave on top of the cabinet, open it, and step 100 times
+    logging.info("Placing microwave OnTop of the cabinet")
     assert microwave.states[object_states.OnTop].set_value(cabinet, True, use_ray_casting_method=True)
     assert microwave.states[object_states.Open].set_value(True)
     logging.info("Microwave loaded and placed")
