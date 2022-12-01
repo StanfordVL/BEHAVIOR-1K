@@ -41,7 +41,6 @@ class SemanticClass(IntEnum):
     WATER = 509
     HEAT_SOURCE_MARKER = 510
     TOGGLE_MARKER = 511
-    GRASS = 512
 
 
 # Specific methods for applying / removing particles
