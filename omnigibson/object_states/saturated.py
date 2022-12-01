@@ -31,7 +31,7 @@ class Saturated(RelativeObjectState, BooleanState):
         assert_valid_key(key=system, valid_keys=ParticleRemover.supported_systems, name="particle system")
         # Only set the value if it's different than what currently exists
         if new_value != self.get_value(system):
-            self.obj.states[ParticleRemover].set_value(new_value)
+            self.obj.states[ParticleRemover].set_at_limit(system, new_value)
         return True
 
     def get_texture_change_params(self):
