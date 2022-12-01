@@ -111,7 +111,8 @@ def check_points_in_cone(size, pos, quat, scale, particle_positions):
     )
     radius, height = size
     in_height = (-height / 2.0 < particle_positions[:, -1]) & (particle_positions[:, -1] < height / 2.0)
-    in_radius = np.linalg.norm(particle_positions[:, :-1], axis=-1) < (radius * (1 - (particle_positions[:, -1] + height / 2.0) / height ))
+    in_radius = np.linalg.norm(particle_positions[:, :-1], axis=-1) < \
+                (radius * (1 - (particle_positions[:, -1] + height / 2.0) / height ))
     return in_height & in_radius
 
 
