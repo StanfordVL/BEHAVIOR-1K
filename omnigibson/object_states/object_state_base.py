@@ -213,25 +213,6 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
 
         return val
 
-        #
-        # # Update history
-        # # First, check if we have a value in the cache -- if so, we need to see if this value has changed or not
-        # if key in self._cache and not self.has_changed(get_value_args=key, t=None):
-        #     val = self._cache[key]
-        #     # Update the history and last queried timestep
-        #     self._history[history_key] = val
-        #     self._last_queried_timestep[key] = t
-        # # Otherwise, since has_changed may have internally updated the values, we now check to see if we queried our
-        # # state at the current timestep. If so, we simply return the historical value
-        # elif self._last_queried_timestep[key] == t:
-        #     val = self._history[history_key]
-        # # Fallback is updating the cache and history
-        # else:
-        #     self.update_cache(get_value_args=key)
-        #     val = self._cache[key]
-        #
-        # return val
-
     def _get_value(self, *args, **kwargs):
         raise NotImplementedError
 
