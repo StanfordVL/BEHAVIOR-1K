@@ -645,6 +645,9 @@ def sample_cuboid_on_object(
             zero_cuboid_dimension = (this_cuboid_dimensions == 0.0).all()
 
             if not zero_cuboid_dimension:
+                # Make sure we have valid (nonzero) x and y values
+                assert (this_cuboid_dimensions[:-1] > 0).all(), \
+                    f"Cuboid x and y dimensions must not be zero if z dimension is nonzero! Got: {this_cuboid_dimensions}"
                 # Obtain the parallel rays using the direction sampling method.
                 sources, destinations, grid = np.array(get_parallel_rays(
                     start_pos, end_pos, this_cuboid_dimensions[:2] / 2.0, new_ray_per_horizontal_distance,
@@ -901,13 +904,18 @@ def check_cuboid_empty(hit_normal, bottom_corner_positions, this_cuboid_dimensio
     # Compute top corners.
     top_corner_positions = bottom_corner_positions + hit_normal * this_cuboid_dimensions[2]
 
+    # We only generate valid rays that have nonzero distances. If the inputted cuboid is flat (i.e.: one dimension
+    # is zero, i.e.: it is in fact a rectangle), some of our generated rays will have zero distance
+
     # Get all the top-to-bottom corner pairs. When we cast these rays, we check for two things: that the cuboid
     # height is actually available, and the faces & volume of the cuboid are unoccupied.
-    top_to_bottom_pairs = list(itertools.product(top_corner_positions, bottom_corner_positions))
+    top_to_bottom_pairs = [] if this_cuboid_dimensions[2] == 0 else \
+        list(itertools.product(top_corner_positions, bottom_corner_positions))
 
     # Get all the same-height pairs. These also check that the surfaces areas are empty.
+    # Note: These are redundant if our cuboid has zero height!
     bottom_pairs = list(itertools.combinations(bottom_corner_positions, 2))
-    top_pairs = list(itertools.combinations(top_corner_positions, 2))
+    top_pairs = [] if this_cuboid_dimensions[2] == 0 else list(itertools.combinations(top_corner_positions, 2))
 
     # Combine all these pairs, cast the rays, and make sure the rays don't hit anything.
     all_pairs = np.array(top_to_bottom_pairs + bottom_pairs + top_pairs)
