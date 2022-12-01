@@ -1201,9 +1201,10 @@ class MicroParticleSystem(BaseParticleSystem):
         def report_hit(hit):
             base, body = "/".join(hit.rigid_body.split("/")[:-1]), hit.rigid_body.split("/")[-1]
             obj = cls.simulator.scene.object_registry("prim_path", base)
-            link = obj.links[body]
-            obj_particle_contacts[obj][particle_instancer].add(particle_idx)
-            link_particle_contacts[link][particle_instancer].add(particle_idx)
+            if obj is not None:
+                link = obj.links[body]
+                obj_particle_contacts[obj][particle_instancer].add(particle_idx)
+                link_particle_contacts[link][particle_instancer].add(particle_idx)
             return True
 
         for inst_name, inst in cls.particle_instancers.items():
