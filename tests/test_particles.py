@@ -60,7 +60,7 @@ sim.play()
 
 # Generate particles on the cabinet
 attachment_group = system.create_attachment_group(obj=milk)
-system.generate_group_particles(group=attachment_group)
+system.generate_group_particles_on_object(group=attachment_group)
 
 # start the sim so everything is initialized correctly
 sim.step()

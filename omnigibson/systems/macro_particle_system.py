@@ -550,11 +550,12 @@ class VisualParticleSystem(MacroParticleSystem):
         return cls.min_scale, cls.max_scale
 
     @classmethod
-    def create_group_particles(
+    def generate_group_particles(
             cls,
             group,
             positions,
             orientations=None,
+            scales=None,
             link_prim_paths=None,
     ):
         """
@@ -569,6 +570,8 @@ class VisualParticleSystem(MacroParticleSystem):
             positions (np.array): (n_particles, 3) shaped array specifying per-particle (x,y,z) positions
             orientations (None or np.array): (n_particles, 4) shaped array specifying per-particle (x,y,z,w) quaternion
                 orientations. If not specified, all will be set to canonical orientation (0, 0, 0, 1)
+            scales (None or np.array): (n_particles, 3) shaped array specifying per-particle (x,y,z) scaling.
+                If not specified, all we randomly sampled based on @cls.min_scale and @cls.max_scale
             link_prim_paths (None or list of str): Determines which link each generated particle will
                 be attached to. If not specified, all will be attached to the group object's root link
         """
@@ -586,13 +589,14 @@ class VisualParticleSystem(MacroParticleSystem):
             orientations[:, -1] = 1.0
         link_prim_paths = [obj.root_link.prim_path] * n_particles if link_prim_paths is None else link_prim_paths
 
-        # Sample scales of the particles to generate
-        # Since the particles will be placed under the object, it will be affected/stretched by obj.scale. In order to
-        # preserve the absolute size of the particles, we need to scale the particle by obj.scale in some way. However,
-        # since the particles have a relative rotation w.r.t the object, the scale between the two don't align. As a
-        # heuristics, we divide it by the avg_scale, which is the cubic root of the product of the scales along 3 axes.
-        avg_scale = np.cbrt(np.product(obj.scale))
-        scales = np.random.uniform(cls.min_scale, cls.max_scale, (n_particles, 3)) / avg_scale
+        if scales is None:
+            # Sample scales of the particles to generate
+            # Since the particles will be placed under the object, it will be affected/stretched by obj.scale. In order to
+            # preserve the absolute size of the particles, we need to scale the particle by obj.scale in some way. However,
+            # since the particles have a relative rotation w.r.t the object, the scale between the two don't align. As a
+            # heuristics, we divide it by the avg_scale, which is the cubic root of the product of the scales along 3 axes.
+            avg_scale = np.cbrt(np.product(obj.scale))
+            scales = np.random.uniform(cls.min_scale, cls.max_scale, (n_particles, 3)) / avg_scale
 
         bbox_extents = [(cls.particle_object.aabb_extent * scale).tolist() for scale in scales]
 
@@ -620,7 +624,7 @@ class VisualParticleSystem(MacroParticleSystem):
             cls._group_particles[group][particle.name] = particle
 
     @classmethod
-    def generate_group_particles(cls, group, n_particles=None, min_particles_for_success=1):
+    def generate_group_particles_on_object(cls, group, n_particles=None, min_particles_for_success=1):
         """
         Generates @n_particles new particle objects and samples their locations on the surface of object @obj. Note
         that if any objects are in the group already, they will be removed
@@ -669,7 +673,7 @@ class VisualParticleSystem(MacroParticleSystem):
             bimodal_mean_fraction=cls._SAMPLING_BIMODAL_MEAN_FRACTION,
             bimodal_stdev_fraction=cls._SAMPLING_BIMODAL_STDEV_FRACTION,
             axis_probabilities=cls._SAMPLING_AXIS_PROBABILITIES,
-            undo_padding=True,
+            undo_padding=False,
             aabb_offset=cls._SAMPLING_AABB_OFFSET,
             max_sampling_attempts=cls._SAMPLING_MAX_ATTEMPTS,
             refuse_downwards=True,
@@ -677,41 +681,28 @@ class VisualParticleSystem(MacroParticleSystem):
 
         print(f"RESULTS: \n{results}")
 
-        # Get total number of sampled points
-        n_success = sum(result[0] is not None for result in results)
+        # Use sampled points
+        positions, orientations, particle_scales, link_prim_paths = [], [], [], []
+        for result, scale in zip(results, scales):
+            position, normal, quaternion, hit_link, reasons = result
+            if position is not None:
+                positions.append(position)
+                orientations.append(quaternion)
+                particle_scales.append(scale)
+                link_prim_paths.append(hit_link)
 
-        # If we aren't successful, then we terminate early
-        if n_success < min_particles_for_success:
-            return False
+        success = len(position) >= min_particles_for_success
+        # If we generated a sufficient number of points, generate them in the simulator
+        if success:
+            cls.generate_group_particles(
+                group=group,
+                positions=np.array(positions),
+                orientations=np.array(orientations),
+                scales=np.array(scales),
+                link_prim_paths=link_prim_paths,
+            )
 
-        else:
-            # Use sampled points
-            for result, scale, bbox_extent in zip(results, scales, bbox_extents):
-                position, normal, quaternion, hit_link, reasons = result
-
-                # For now, we make sure all points were sampled successfully
-                # TODO: Need to guarantee that all points are sampled correctly
-                # assert position is not None, f"Unsuccessfully sampled some points!"
-                if position is not None:
-                    # Compute the point to stick the particle to.
-                    surface_point = position
-                    if cls._CLIP_INTO_OBJECTS:
-                        # Shift the object halfway down.
-                        cuboid_base_to_center = bbox_extent[2] / 2.0
-                        surface_point -= normal * cuboid_base_to_center
-
-                    # Create particle
-                    particle = cls.add_particle(
-                        prim_path=hit_link,
-                        position=surface_point,
-                        orientation=quaternion,
-                        scale=scale,
-                    )
-
-                    # Add to group
-                    cls._group_particles[group][particle.name] = particle
-
-            return True
+        return success
 
     @classmethod
     def _validate_group(cls, group):
