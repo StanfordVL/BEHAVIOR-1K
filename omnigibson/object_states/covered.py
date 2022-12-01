@@ -187,7 +187,7 @@ class Covered(RelativeObjectState, BooleanState):
                 # We've already cached particle contacts, so we merely search through them to see if any particles are
                 # touching the object and are visible (the non-visible ones are considered already "removed")
                 n_near_particles = 0
-                for instancer, particle_idxs in system.state_cache["particle_contacts"][self.obj].items():
+                for instancer, particle_idxs in system.state_cache["obj_particle_contacts"][self.obj].items():
                     particle_idxs = np.array(list(particle_idxs))
                     n_near_particles += np.sum(instancer.particle_visibilities[particle_idxs])
                 # Heuristic: If the number of near particles is above the threshold, we consdier this covered
@@ -246,7 +246,7 @@ class Covered(RelativeObjectState, BooleanState):
                     )
                 else:
                     # We hide all particles within range to be garbage collected by fluid system
-                    for inst, particle_idxs in system.state_cache["particle_contacts"][self.obj].items():
+                    for inst, particle_idxs in system.state_cache["obj_particle_contacts"][self.obj].items():
                         indices = np.array(list(particle_idxs))
                         current_visibilities = inst.particle_visibilities
                         current_visibilities[indices] = 0

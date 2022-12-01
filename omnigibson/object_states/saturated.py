@@ -35,7 +35,6 @@ class Saturated(RelativeObjectState, BooleanState):
         return True
 
     def get_texture_change_params(self):
-        albedo_add = 0.1
         colors = []
 
         for system in ParticleRemover.supported_systems:

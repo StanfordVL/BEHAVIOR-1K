@@ -10,6 +10,7 @@ from omnigibson.systems.particle_system_base import BaseParticleSystem
 from omnigibson.utils.constants import SemanticClass
 from omnigibson.utils.python_utils import classproperty, subclass_factory
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object_symmetric_bimodal_distribution
+import omnigibson.utils.transform_utils as T
 from omnigibson.prims.geom_prim import VisualGeomPrim
 from collections import OrderedDict
 import numpy as np
@@ -691,7 +692,7 @@ class VisualParticleSystem(MacroParticleSystem):
                 particle_scales.append(scale)
                 link_prim_paths.append(hit_link)
 
-        success = len(position) >= min_particles_for_success
+        success = len(positions) >= min_particles_for_success
         # If we generated a sufficient number of points, generate them in the simulator
         if success:
             cls.generate_group_particles(
