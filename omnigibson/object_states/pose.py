@@ -23,6 +23,8 @@ class Pose(AbsoluteObjectState):
         # Only changed if the squared distance between old position and current position has
         # changed above some threshold
         old_pos = self._history[(t, *get_value_args)][0]
-        current_pos = self.get_value()[0]
+        # Update cache to get current pose
+        self.update_cache(get_value_args=get_value_args)
+        current_pos = self._cache[get_value_args][0]
         dist_squared = np.sum(np.square(current_pos - old_pos))
         return dist_squared > m.POSITIONAL_VALIDATION_EPSILON

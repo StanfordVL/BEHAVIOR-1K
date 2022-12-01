@@ -26,3 +26,13 @@ class KinematicsMixin(BaseObjectState):
 
         # Otherwise, nothing has moved, return False
         return False
+
+    def _get_value(self, *args, **kwargs):
+        # Import here to avoid circular imports
+        from omnigibson.objects.stateful_object import StatefulObject
+
+        # Make sure all poses are cached so we can check in the future if values have changed
+        get_value_args = (*args, *tuple(kwargs.values()))
+        for arg in get_value_args:
+            if isinstance(arg, StatefulObject):
+                arg.states[Pose].get_value()

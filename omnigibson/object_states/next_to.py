@@ -15,6 +15,9 @@ class NextTo(KinematicsMixin, RelativeObjectState, BooleanState):
         raise NotImplementedError()
 
     def _get_value(self, other):
+        # Call kinematics super call first to make sure poses are cached
+        _ = super()._get_value(other)
+
         objA_states = self.obj.states
         objB_states = other.states
 

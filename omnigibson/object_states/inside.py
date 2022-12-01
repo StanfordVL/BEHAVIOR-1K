@@ -39,6 +39,8 @@ class Inside(KinematicsMixin, RelativeObjectState, BooleanState):
         return sampling_success
 
     def _get_value(self, other):
+        # Call kinematics super call first to make sure poses are cached
+        _ = super()._get_value(other)
 
         # First check that the inner object's position is inside the outer's AABB.
         # Since we usually check for a small set of outer objects, this is cheap.

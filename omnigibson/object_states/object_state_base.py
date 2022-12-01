@@ -112,11 +112,29 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
         # Clear all entries
         self._cache = OrderedDict()
 
+    def update_cache(self, get_value_args):
+        """
+        Updates the internal cached value based on the evaluation of @self._get_value(*get_value_args)
+
+        Args:
+            get_value_args (tuple): Specific argument combinations (usually tuple of objects) passed into
+                @self.get_value / @self._get_value
+        """
+        t = og.sim.current_time_step_index
+        history_key = (t, *get_value_args)
+        # Compute value and update cache
+        val = self._get_value(*get_value_args)
+        self._cache[get_value_args] = val
+
+        # Update the history and last queried timestep
+        self._history[history_key] = val
+        self._last_queried_timestep[get_value_args] = t
+
     def has_changed(self, get_value_args, t=None):
         """
         A helper function to query whether this object state has changed between an arbitrary previous timestep @t and
         the current timestep.
-        @t, in addition to *args and **kwargs, will serve as a unique key into an internal dictionary,
+        @t, in addition to @get_value_args, will serve as a unique key into an internal dictionary,
         such that specific @t will result in a computation conducted exactly once.
         This is done for performance reasons; so that multiple states relying on the same state dependency can all
         query whether that state has changed between the same timesteps with only a single computation.
@@ -152,7 +170,8 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
 
     def _has_changed(self, get_value_args, t):
         """
-        Checks whether @old_value has changed from @new_value. By default, it returns True.
+        Checks whether the previous value evaluated at time @t has changed with the current timestep.
+        By default, it returns True.
 
         Any custom checks should be overridden by subclass.
 
@@ -171,22 +190,47 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
     def get_value(self, *args, **kwargs):
         assert self._initialized
 
-        # Compile args and kwargs deterministically, and if it already exists in our cache and our value has not
-        # changed, we return that value, otherwise we compute the value and store it in our cache and history
-        key = (*args, *tuple(kwargs.values()))
-        if key in self._cache and not self.has_changed(get_value_args=key, t=None):
-            val = self._cache[key]
-        else:
-            val = self._get_value(*args, **kwargs)
-            self._cache[key] = val
-
-        # Update the history and last queried timestep
+        # Compile args and kwargs deterministically
         t = og.sim.current_time_step_index
+        key = (*args, *tuple(kwargs.values()))
         history_key = (t, *key)
-        self._history[history_key] = val
-        self._last_queried_timestep[key] = t
+        # We need to see if we need to update our cache -- we do so if and only if one of the following conditions are met:
+        # (a) key is NOT in the cache
+        # (b) Our current value has changed AND our last queried timestep is not the current timestep
+        #    (this check is needed in this specific order because has_changed(...) may itself update the cache manually)
+        if key not in self._cache or \
+                (self.has_changed(get_value_args=key, t=None) and self._last_queried_timestep.get(key, -1) != t):
+            # Update the cache
+            self.update_cache(get_value_args=key)
+
+        # Value is the cached value
+        val = self._cache[key]
+
+        # Update history if our last queried timestep is not the current timestep
+        if self._last_queried_timestep[key] != t:
+            self._history[history_key] = val
+            self._last_queried_timestep[key] = t
 
         return val
+
+        #
+        # # Update history
+        # # First, check if we have a value in the cache -- if so, we need to see if this value has changed or not
+        # if key in self._cache and not self.has_changed(get_value_args=key, t=None):
+        #     val = self._cache[key]
+        #     # Update the history and last queried timestep
+        #     self._history[history_key] = val
+        #     self._last_queried_timestep[key] = t
+        # # Otherwise, since has_changed may have internally updated the values, we now check to see if we queried our
+        # # state at the current timestep. If so, we simply return the historical value
+        # elif self._last_queried_timestep[key] == t:
+        #     val = self._history[history_key]
+        # # Fallback is updating the cache and history
+        # else:
+        #     self.update_cache(get_value_args=key)
+        #     val = self._cache[key]
+        #
+        # return val
 
     def _get_value(self, *args, **kwargs):
         raise NotImplementedError
