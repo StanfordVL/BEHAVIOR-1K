@@ -203,7 +203,6 @@ class StatefulObject(BaseObject):
         if len(set(self.states) & set(get_fire_states())) > 0 and self.states[HeatSourceOrSink].get_state_link_name() in self._links:
             self._create_emitter_apis(EmitterType.FIRE)
 
-
     def _create_emitter_apis(self, emitter_type):
         """
         Create necessary prims and apis for steam effects.
@@ -468,6 +467,23 @@ class StatefulObject(BaseObject):
             return
         for _, obj_state in self._states.items():
             obj_state.clear_cache()
+
+    def reset_states(self):
+        """
+        Resets all object states' internal values
+        """
+        # Check self._states just in case states have not been initialized yet.
+        if not self._states:
+            return
+        for _, obj_state in self._states.items():
+            obj_state.reset()
+
+    def reset(self):
+        # Call super first
+        super().reset()
+
+        # Reset all states
+        self.reset_states()
 
     def set_position_orientation(self, position=None, orientation=None):
         super().set_position_orientation(position=position, orientation=orientation)
