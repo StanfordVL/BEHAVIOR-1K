@@ -18,106 +18,8 @@ m.VISUAL_PARTICLE_THRESHOLD = 0.75
 # Number of fluid particles needed in order for Covered --> True
 m.FLUID_THRESHOLD = 50
 
-
-def check_points_z_proximity_to_object_surface(obj, particle_positions, max_distance=0.01):
-    """
-    Checks which points from @particle_positions are within @max_distance to @obj's surface in the z direction
-
-    Args:
-        obj (EntityPrim): Object whose surface will be used to check points' proximity
-        particle_positions ((N, 3) array): positions to check for whether it is close to the object's surface
-        max_distance (float): Maximum allowable distance for a point to be considered close to the object surface, in m
-
-    Returns:
-        (N,) array: boolean numpy array specifying whether each point lies in the mesh
-    """
-    # For every point, we raycast downwards to check how far away the distance is
-    # Grab the lower z bound for the object and set this as the end points for our raytest we'll apply for all particles
-    end_positions = np.array(particle_positions)
-    end_positions[:, 2] = obj.aabb[0][2]
-    # A point is considered close if:
-    # 1. A hit has occurred
-    # 2. The body hit belongs to obj
-    # 3. The distance of the hit is less than the max_distance
-    obj_prim_paths = set([link.prim_path for link in obj.links.values()])
-    return np.array([res["hit"] and res["rigidBody"] in obj_prim_paths and res["distance"] < max_distance for res in raytest_batch(
-        start_points=particle_positions,
-        end_points=end_positions,
-        hit_number=0,
-    )])
-
-
-def sample_gridwise_downward_rays_onto_object(obj, ray_spacing=0.01, z_offset=0.001):
-    """
-    Samples a uniformly spaced grid of rays cast onto the object @obj in the z-axis, returning any valid 0th hits on
-    the object
-
-    Args:
-        obj (EntityPrim): Object on which to cast rays
-        ray_spacing (float): Spacing between sampled rays, in meters
-        z_offset (float): Distance from top of object's AABB z boundary from which to cast rays
-
-    Returns:
-        tuple:
-            - int: number of rays sampled
-            - list of dict: sampled raytest results only including those that hit the object
-    """
-    # Generate start points to use -- this is the gridwise-sampled top surface of the object's AABB plus
-    # some small tolerance
-    lower, upper = obj.aabb
-    x = np.linspace(lower[0], upper[0], int((upper[0] - lower[0]) / ray_spacing))
-    y = np.linspace(lower[1], upper[1], int((upper[1] - lower[1]) / ray_spacing))
-    n_rays = len(x) * len(y)
-    start_points = np.stack([
-        np.tile(x, len(y)),
-        np.repeat(y, len(x)),
-        np.ones(n_rays) * upper[2] + z_offset,
-    ]).T
-    # Bottom points are the same locations but with the lower z value
-    end_points = np.array(start_points)
-    end_points[:, 2] = lower[2]
-    # Run raytest -- estimated area is the proportion of the overall aabb xy extent area which was hit by the object
-    obj_prim_paths = set([link.prim_path for link in obj.links.values()])
-    return n_rays, [res for res in raytest_batch(
-        start_points=start_points,
-        end_points=end_points,
-        hit_number=0,
-    ) if res["hit"] and res["rigidBody"] in obj_prim_paths]
-
-
-def get_projected_surface_area_to_z_plane(obj, precision=0.01, z_offset=0.001):
-    """
-    Checks the projected surface area of the object onto the z-plane
-
-    NOTE: This is a stochastic method; Monte Carlo sampling is conducted: a gridwise raytest batch is executed top-down,
-    and the resulting proportion of hits determines the proportion of the xy bounding box area that is assumed to be
-    filled with the object.
-
-    Args:
-        obj (EntityPrim): Object whose surface should be projected into z-plane
-        precision (float): Relative precision to use. This will implicitly determine the number of rays generated
-        z_offset (float): Distance from top of object's AABB z boundary from which to cast rays
-
-    Returns:
-        float: Estimated projected surface area in the z-plane
-    """
-    # Determine how to space the rays in order to achieve the desired precision
-    # We need at least 1 / precision total rays in order to achieve the precision
-    # So we take the minimum between the x and y AABB lengths, and then multiply by the square root of the precision to
-    # get the ray spacing to achieve the precision
-    ray_spacing = obj.aabb_extent[:2].min() * np.sqrt(precision)
-    # Get sampled points that hit the object
-    n_points, hits = sample_gridwise_downward_rays_onto_object(obj=obj, ray_spacing=ray_spacing, z_offset=z_offset)
-
-    # Estimated area is the proportion of the overall aabb xy extent area which was hit by the object
-    return np.product(obj.aabb_extent[:2]) * len(hits) / n_points
-
-
-def sample_particle_positions_on_object_top_surface(obj, particle_spacing, z_offset=0.001):
-    """
-    Samples particle positions on the object @obj's top surface (top wrt the world frame of reference) such that
-    its surface would be covered by particles.
-
+# Maximum number of fluid particles to sample when setting an object to be covered = True
+m.MAX_FLUID_PARTICLES = 5000
 
     Checks the projected surface area of the object onto the z-plane
 
@@ -223,27 +125,8 @@ class Covered(RelativeObjectState, BooleanState):
             # Check current state and only do something if we're changing state
             if self.get_value(system) != new_value:
                 if new_value:
-                    # We densely sample a grid of points by ray-casting from top to bottom to find the valid positions
-                    radius = system.particle_radius
-                    results = sample_cuboid_on_object_full_grid_topdown(
-                        self.obj,
-                        # the grid is fully dense - particles are sitting next to each other
-                        ray_spacing=radius * 2,
-                        # assume the particles are extremely small - sample cuboids of size 0 for better performance
-                        cuboid_dimensions=np.zeros(3),
-                        # raycast start inside the aabb in x-y plane and outside the aabb in the z-axis
-                        aabb_offset=np.array([-radius, -radius, radius]),
-                        # bottom padding should be the same as the particle radius
-                        cuboid_bottom_padding=radius,
-                        # undo_padding should be False - the sampled positions are above the surface by its radius
-                        undo_padding=False
-                    )
-                    particle_positions = [result[0] for result in results if result[0] is not None]
-                    # Spawn the particles at the valid positions
-                    system.generate_particle_instancer(
-                        n_particles=len(particle_positions),
-                        positions=particle_positions,
-                    )
+                    # Sample particles on top of the object
+                    system.generate_particle_instancer_on_object(obj=self.obj, max_samples=m.MAX_FLUID_PARTICLES)
                 else:
                     # We hide all particles within range to be garbage collected by fluid system
                     for inst, particle_idxs in system.state_cache["obj_particle_contacts"][self.obj].items():
