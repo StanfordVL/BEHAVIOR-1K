@@ -580,7 +580,7 @@ class ParticleRemover(ParticleModifier):
             # Otherwise, we can simply use the contact cached information for each particle
             else:
                 instancer_to_particle_idxs = system.state_cache["obj_particle_contacts"][self.obj] if \
-                    self.link is None else system.state_cache["link_particle_contacts"][self.link.prim_path]
+                    self.link is None else system.state_cache["link_particle_contacts"][self.link]
 
             # Iterate over all particles and hide any that are detected to be removed
             for inst, particle_idxs in instancer_to_particle_idxs.items():
