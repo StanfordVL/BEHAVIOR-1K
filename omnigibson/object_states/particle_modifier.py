@@ -518,17 +518,22 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin):
 
     @property
     def state_size(self):
-        return len(self.modified_particle_count)
+        # One entry per system plus the current_step
+        return len(self.modified_particle_count) + 1
 
     def _dump_state(self):
         state = OrderedDict()
         for system, val in self.modified_particle_count.items():
             state[get_element_name_from_system(system)] = val
+        # Add current step
+        state["current_step"] = self._current_step
         return state
 
     def _load_state(self, state):
         for system_name, val in state.items():
             self.modified_particle_count[get_system_from_element_name(system_name)] = val
+        # Set current step
+        self._current_step = state["current_step"]
 
     def _serialize(self, state):
         return np.array(list(state.values()), dtype=float)
@@ -537,8 +542,9 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin):
         state_dict = OrderedDict()
         for i, system in enumerate(self.modified_particle_count.keys()):
             state_dict[get_element_name_from_system(system)] = int(state[i])
+        state_dict["current_step"] = int(state[len(self.modified_particle_count)])
 
-        return state_dict, len(self.modified_particle_count)
+        return state_dict, len(self.modified_particle_count) + 1
 
 
 class ParticleRemover(ParticleModifier):
