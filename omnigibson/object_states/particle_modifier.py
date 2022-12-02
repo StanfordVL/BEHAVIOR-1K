@@ -55,8 +55,10 @@ m.VISUAL_PARTICLE_PROJECTION_PARTICLE_RADIUS = 0.01
 m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN = 0.05
 
 # Settings for determining how the projection particles are visualized as they're projected
+m.PROJECTION_VISUALIZATION_CONE_TIP_RADIUS = 0.001
 m.PROJECTION_VISUALIZATION_RATE = 200
 m.PROJECTION_VISUALIZATION_SPEED = 3.0
+m.PROJECTION_VISUALIZATION_ORIENTATION_BIAS = 100.0
 
 
 def create_projection_visualization(
@@ -98,10 +100,10 @@ def create_projection_visualization(
         source_radius = projection_radius
         spread = np.zeros(3)
     elif shape == "Cone":
-        # Default to close ot singular point otherwise
-        source_radius = 0.001
+        # Default to close to singular point otherwise
+        source_radius = m.PROJECTION_VISUALIZATION_CONE_TIP_RADIUS
         spread_ratio = projection_radius * 2.0 / projection_height
-        spread = np.ones(3) * spread_ratio * 100
+        spread = np.ones(3) * spread_ratio * m.PROJECTION_VISUALIZATION_ORIENTATION_BIAS
     else:
         raise ValueError(f"Invalid shape specified for projection visualization! Valid options are: [Sphere, Cylinder], got: {shape}")
     # Set the radius
@@ -133,7 +135,7 @@ def create_projection_visualization(
     emitter_prim.GetProperty("inputs:rate").Set(m.PROJECTION_VISUALIZATION_RATE)
     emitter_prim.GetProperty("inputs:lifespan").Set(projection_height / m.PROJECTION_VISUALIZATION_SPEED)
     emitter_prim.GetProperty("inputs:speed").Set(m.PROJECTION_VISUALIZATION_SPEED)
-    emitter_prim.GetProperty("inputs:alongAxis").Set(100.0)
+    emitter_prim.GetProperty("inputs:alongAxis").Set(m.PROJECTION_VISUALIZATION_ORIENTATION_BIAS)
     emitter_prim.GetProperty("inputs:scale").Set(Gf.Vec3f(1.0, 1.0, 1.0))
     emitter_prim.GetProperty("inputs:directionRandom").Set(Gf.Vec3f(*spread))
 
@@ -168,7 +170,7 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin):
             manually overrides any metadata found from @obj.metadata to infer what projection volume to generate
             for this particle modifier. Expected entries are as follows:
 
-                "type": (str), one of {"Cylinder", "Cone", "Cube"}
+                "type": (str), one of {"Cylinder", "Cone"}
                 "extents": (3-array), the (x,y,z) extents of the generated volume
 
             If None, information found from @obj.metadata will be used instead.
@@ -197,12 +199,8 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin):
         for system, conds in conditions.items():
             # Make sure the system is supported
             assert_valid_key(key=system, valid_keys=self.supported_systems, name="particle system")
-            # Make sure conds isn't empty
-            if conds is None:
-                conds = []
-            # Make sure conds is a list
-            if not isinstance(conds, Sized):
-                conds = [conds]
+            # Make sure conds isn't empty and is a list
+            conds = [] if conds is None else list(conds)
             # Add the condition to avoid limits
             conds.append(self._generate_limit_condition(system=system))
             conditions[system] = conds
@@ -238,6 +236,8 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin):
 
         # Possibly create a projection volume if we're using the projection method
         if self.method == ParticleModifyMethod.PROJECTION:
+            # Make sure link is defined
+            assert self.link is not None, f"Cannot use particle projection method without a metalink specified!"
             # Make sure projection mesh params are specified
             # Import here to avoid circular imports
             from omnigibson.objects.dataset_object import DatasetObject
@@ -271,7 +271,7 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin):
             # from tip to tail faces the positive x axis
             self.projection_mesh.set_local_pose(
                 translation=np.array([self._projection_mesh_params["extents"][2] / (2 * self.link.scale[2]), 0, 0]),
-                orientation=np.array([0, -0.707, 0, 0.707]),
+                orientation=T.euler2quat([0, -np.pi / 2, 0]),
             )
 
             # Generate the projection visualization
@@ -547,6 +547,9 @@ class ParticleRemover(ParticleModifier):
     """
 
     def _modify_overlap_particles_in_adjacency(self, system):
+        # If at the limit, don't modify anything
+        if self.check_at_limit(system=system):
+            return
         # Define the AABB bounds
         lower, upper = self.obj.states[AABB].get_value() if self.link is None else self.link.aabb
         # Check the system
@@ -555,15 +558,14 @@ class ParticleRemover(ParticleModifier):
             lower -= m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN
             upper += m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN
             # Iterate over all particles and remove any that are within the relaxed AABB of the remover volume
-            for particle_name in list(system.particles.keys()):
-                # If at the limit, stop absorbing
-                if self.check_at_limit(system=system):
-                    break
-                particle = system.particles[particle_name]
-                pos = particle.get_position()
-                if BoundingBoxAPI.aabb_contains_point(pos, (lower, upper)):
-                    system.remove_particle(particle_name)
-                    self.modified_particle_count[system] += 1
+            particle_names = list(system.particles.keys())
+            particle_positions = np.array([particle.get_position() for particle in system.particles.values()])
+            inbound = ((lower < particle_positions) & (particle_positions < upper))
+            inbound_idxs = inbound.all(axis=1).nonzero()[0]
+            max_particle_absorbed = self.visual_particle_modification_limit - self.modified_particle_count[system]
+            for idx in inbound_idxs[:max_particle_absorbed]:
+                system.remove_particle(particle_names[idx])
+            self.modified_particle_count[system] += min(len(inbound_idxs), max_particle_absorbed)
 
         elif issubclass(system, FluidSystem):
             instancer_to_particle_idxs = {}
@@ -587,7 +589,7 @@ class ParticleRemover(ParticleModifier):
                 # If at the limit, stop absorbing
                 if self.check_at_limit(system=system):
                     break
-                max_particle_absorbed = m.FLUID_PARTICLES_REMOVAL_LIMIT - self.modified_particle_count[system]
+                max_particle_absorbed = self.fluid_particle_modification_limit - self.modified_particle_count[system]
                 particles_to_absorb = min(len(particle_idxs), max_particle_absorbed)
                 particle_idxs_to_absorb = list(particle_idxs)[:particles_to_absorb]
 
@@ -604,18 +606,19 @@ class ParticleRemover(ParticleModifier):
             self.unsupported_system_error(system=system)
 
     def _modify_overlap_particles_in_projection_mesh(self, system):
+        # If at the limit, don't modify anything
+        if self.check_at_limit(system=system):
+            return
         # Check the system
         if issubclass(system, VisualParticleSystem):
             # Iterate over all particles and remove any that are within the volume
-            for particle_name in list(system.particles.keys()):
-                # If at the limit, stop absorbing
-                if self.check_at_limit(system=system):
-                    break
-                particle = system.particles[particle_name]
-                pos = particle.get_position()
-                if self._check_in_projection_mesh(pos.reshape(1, 3))[0]:
-                    system.remove_particle(particle_name)
-                    self.modified_particle_count[system] += 1
+            particle_names = list(system.particles.keys())
+            particle_positions = np.array([particle.get_position() for particle in system.particles.values()])
+            particle_idxs = np.where(self._check_in_projection_mesh(particle_positions))[0]
+            max_particle_absorbed = self.visual_particle_modification_limit - self.modified_particle_count[system]
+            for idx in particle_idxs[:max_particle_absorbed]:
+                system.remove_particle(particle_names[idx])
+            self.modified_particle_count[system] += min(len(particle_idxs), max_particle_absorbed)
 
         elif issubclass(system, FluidSystem):
             # Iterate over all particles and remove any that are within the volume
@@ -623,8 +626,8 @@ class ParticleRemover(ParticleModifier):
                 # If at the limit, stop absorbing
                 if self.check_at_limit(system=system):
                     break
-                particle_idxs = np.where(self._check_in_projection_mesh(inst.particle_positions))
-                max_particle_absorbed = m.FLUID_PARTICLES_REMOVAL_LIMIT - self.modified_particle_count[system]
+                particle_idxs = np.where(self._check_in_projection_mesh(inst.particle_positions))[0]
+                max_particle_absorbed = self.fluid_particle_modification_limit - self.modified_particle_count[system]
                 particles_to_absorb = min(len(particle_idxs), max_particle_absorbed)
                 particle_idxs_to_absorb = particle_idxs[:particles_to_absorb]
                 visibilities = inst.particle_visibilities
