@@ -1,4 +1,5 @@
 import os
+import matplotlib.pyplot as plt
 import omni
 from omni.isaac.core.utils.prims import get_prim_at_path
 
@@ -50,6 +51,9 @@ class MacroParticleSystem(BaseParticleSystem):
     # Max particle identification number -- this monotonically increases until reset() is called
     max_particle_idn = None
 
+    # Color associated with this system (NOTE: external queries should call cls.color)
+    _color = None
+
     @classmethod
     def initialize(cls, simulator):
         # Run super method first
@@ -66,7 +70,7 @@ class MacroParticleSystem(BaseParticleSystem):
         simulator.import_object(obj=particle_template, register=False, auto_initialize=True)
 
         # Class particle objet is assumed to be the first and only visual mesh belonging to the root link
-        cls.particle_object = list(particle_template.root_link.visual_meshes.values())[0]
+        cls.set_particle_template_object(obj=list(particle_template.root_link.visual_meshes.values())[0])
 
     @classmethod
     def _create_particle_template(cls):
@@ -210,6 +214,12 @@ class MacroParticleSystem(BaseParticleSystem):
         Args:
             obj (BasePrim): Object to serve as template
         """
+        # Update color if it exists and store particle object
+        color = np.ones(3)
+        if obj.has_material():
+            diffuse_texture = obj.material.diffuse_texture
+            color = plt.imread(diffuse_texture).mean(axis=(0, 1)) if diffuse_texture else obj.material.diffuse_color_constant
+        cls._color = color
         cls.particle_object = obj
 
     @classmethod
@@ -337,6 +347,10 @@ class MacroParticleSystem(BaseParticleSystem):
                 Note: This is
         """
         return cls.max_particle_idn + 1
+
+    @classproperty
+    def color(cls):
+        return np.array(cls._color)
 
 
 class VisualParticleSystem(MacroParticleSystem):

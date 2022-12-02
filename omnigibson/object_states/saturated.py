@@ -39,30 +39,7 @@ class Saturated(RelativeObjectState, BooleanState):
 
         for system in ParticleRemover.supported_systems:
             if self.get_value(system):
-                if issubclass(system, VisualParticleSystem):
-                    # If an texture of the particle exists, grab its mean color and set that
-                    # Otherwise, set the RGB value
-                    diffuse_texture = system.particle_object.material.diffuse_texture
-                    color = plt.imread(diffuse_texture).mean(axis=(0, 1)) if diffuse_texture else system.particle_object.material.diffuse_color_constant
-                elif issubclass(system, FluidSystem):
-                    # Figure out the color for this particular fluid
-                    mat = system.material
-                    base_color_weight = mat.diffuse_reflection_weight
-                    transmission_weight = mat.enable_specular_transmission * mat.specular_transmission_weight
-                    total_weight = base_color_weight + transmission_weight
-                    if total_weight == 0.0:
-                        # If the fluid doesn't have any color, we add a "blue" tint by default
-                        color = np.array([0.0, 0.0, 1.0])
-                    else:
-                        base_color_weight /= total_weight
-                        transmission_weight /= total_weight
-                        # Weighted sum of base color and transmission color
-                        color = base_color_weight * mat.diffuse_reflection_color + \
-                                transmission_weight * (0.5 * mat.specular_transmission_color + \
-                                                       0.5 * mat.specular_transmission_scattering_color)
-                else:
-                    ParticleRemover.unsupported_system_error(system=system)
-                colors.append(color)
+                colors.append(system.color)
 
         if len(colors) == 0:
             # If no fluid system has Soaked=True, keep the default albedo value

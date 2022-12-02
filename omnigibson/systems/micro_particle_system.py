@@ -405,6 +405,9 @@ class MicroParticleSystem(BaseParticleSystem):
     # Material -- either a MaterialPrim or None if no material is used for this particle system
     _material = None
 
+    # Color associated with this system (NOTE: external queries should call cls.color)
+    _color = None
+
     # Scaling factor to sample from when generating a new particle
     min_scale = None                # (x,y,z) scaling
     max_scale = None                # (x,y,z) scaling
@@ -531,18 +534,22 @@ class MicroParticleSystem(BaseParticleSystem):
             # We also modify the grid smoothing radius to avoid "blobby" appearances
             cls.prim.GetAttribute("physxParticleIsosurface:gridSmoothingRadius").Set(0.0001)
 
-        # # Create dummy
-        # create_physx_particleset_pointinstancer(
-        #     name="dummy",
-        #     particle_system_path=cls.prim_path,
-        #     particle_group=0,
-        #     positions=np.zeros((1, 3)),
-        #     fluid=cls.is_fluid,
-        #     particle_mass=0.001,
-        #     particle_density=None,#cls.particle_density,
-        #     prototype_prim_paths=[pp.GetPrimPath().pathString for pp in cls.particle_prototypes],
-        #     enabled=not cls.visual_only,
-        # )
+        # Set the color for this system
+        if cls._material is not None:
+            base_color_weight = cls._material.diffuse_reflection_weight
+            transmission_weight = cls._material.enable_specular_transmission * cls._material.specular_transmission_weight
+            total_weight = base_color_weight + transmission_weight
+            if total_weight == 0.0:
+                # If the fluid doesn't have any color, we add a "blue" tint by default
+                color = np.array([0.0, 0.0, 1.0])
+            else:
+                base_color_weight /= total_weight
+                transmission_weight /= total_weight
+                # Weighted sum of base color and transmission color
+                color = base_color_weight * cls._material.diffuse_reflection_color + \
+                        transmission_weight * (0.5 * cls._material.specular_transmission_color + \
+                                               0.5 * cls._material.specular_transmission_scattering_color)
+            cls._color = color
 
     @classmethod
     def reset(cls):
@@ -567,6 +574,10 @@ class MicroParticleSystem(BaseParticleSystem):
                 system already on the stage
         """
         return is_prim_path_valid(cls.prim_path)
+
+    @classproperty
+    def color(cls):
+        return cls._color
 
     @classproperty
     def is_fluid(cls):

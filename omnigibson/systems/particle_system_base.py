@@ -14,3 +14,11 @@ class BaseParticleSystem(BaseSystem):
             int: Number of active particles in this system
         """
         raise NotImplementedError()
+
+    @classproperty
+    def color(cls):
+        """
+        Returns:
+            3-array: (R,G,B) color of the particles generated from this system
+        """
+        raise NotImplementedError()
