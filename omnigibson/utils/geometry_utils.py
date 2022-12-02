@@ -48,6 +48,8 @@ def get_particle_positions_from_frame(pos, quat, scale, particle_positions):
     Returns:
         (N,) array: updated particle positions in the parent coordinate frame
     """
+    # Scale by the new scale
+    particle_positions = particle_positions * scale.reshape(1, 3)
 
     # Get pose of origin (global frame) in new_frame
     origin_in_new_frame = T.pose2mat((pos, quat))
@@ -55,9 +57,7 @@ def get_particle_positions_from_frame(pos, quat, scale, particle_positions):
     positions_tensor = np.tile(np.eye(4).reshape(1, 4, 4), (len(particle_positions), 1, 1))  # (N, 4, 4)
     # Scale by the new scale#
     positions_tensor[:, :3, 3] = particle_positions
-    particle_positions = (origin_in_new_frame @ positions_tensor)[:, :3, 3]  # (N, 3)
-    # Scale by the new scale
-    return particle_positions / scale.reshape(1, 3)
+    return (origin_in_new_frame @ positions_tensor)[:, :3, 3]  # (N, 3)
 
 
 def check_points_in_cube(size, pos, quat, scale, particle_positions):
@@ -244,19 +244,6 @@ def generate_points_in_volume_checker_function(obj, volume_link, use_visual_mesh
             where @vol is the total volume being checked (expressed in global scale) aggregated across
             all container sub-volumes
     """
-    # If the object doesn't have uniform scale [1, 1, 1], we make sure the volume link has no relative orientation
-    # w.r.t to the object (root link) frame
-    # TODO (eric): make this more general: convert particle_positions from 1) global frame -> 2) object frame ->
-    #  3) link frame -> 4) mesh frame.
-    # if not np.all(np.isclose(obj.scale, 1, atol=1e-3)):
-    if (obj.scale.max() - obj.scale.min()) > 1e-3:
-        volume_link_quat = volume_link.get_orientation()
-        object_quat = obj.get_orientation()
-        quat_distance = T.quat_distance(volume_link_quat, object_quat)
-        assert np.isclose(quat_distance[3], 1, atol=1e-3), \
-            f"Volume link must have no relative orientation w.r.t the root link! (i.e.: quat distance [0, 0, 0, 1])! " \
-            f"Got quat distance: {quat_distance}"
-
     # Iterate through all visual meshes and keep track of any that are prefixed with container
     container_meshes = []
     meshes = volume_link.visual_meshes if use_visual_meshes else volume_link.collision_meshes
@@ -313,7 +300,7 @@ def generate_points_in_volume_checker_function(obj, volume_link, use_visual_mesh
                 scale=np.array(mesh.GetAttribute("xformOp:scale").Get()),
                 particle_positions=particle_positions,
             )
-            vol_fcn = lambda mesh: np.pi * (mesh.GetAttribute("radius").Get() ** 2) * mesh.GetAttribute("height").Get()
+            vol_fcn = lambda mesh: np.pi * (mesh.GetAttribute("radius").Get() ** 2) * mesh.GetAttribute("height").Get() / 3.0
         elif mesh_type == "Cube":
             fcn = lambda mesh, particle_positions: check_points_in_cube(
                 size=mesh.GetAttribute("size").Get(),
@@ -332,15 +319,14 @@ def generate_points_in_volume_checker_function(obj, volume_link, use_visual_mesh
     # Define the actual volume checker function
     def check_points_in_volumes(particle_positions):
         # Algo
-        # 1. Particles in global frame --> particles in volume link frame
-        # 2. Re-scale particles according to object top-level scale
-        # 3. For each volume checker function, apply volume checking
-        # 4. Aggregate across all functions with OR condition (any volume satisfied for that point)
+        # 1. Particles in global frame --> particles in volume link frame (including scaling)
+        # 2. For each volume checker function, apply volume checking
+        # 3. Aggregate across all functions with OR condition (any volume satisfied for that point)
         ######
 
         n_particles = len(particle_positions)
         # Get pose of origin (global frame) in frame of volume link
-        # TODO (eric): this seems to assume there is no relative scaling between obj and volume link
+        # NOTE: This assumes there is no relative scaling between obj and volume link
         volume_link_pos, volume_link_quat = volume_link.get_position_orientation()
         particle_positions = get_particle_positions_in_frame(
             pos=volume_link_pos,
