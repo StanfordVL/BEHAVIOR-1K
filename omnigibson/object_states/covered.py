@@ -1,11 +1,10 @@
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states import AABB
 from omnigibson.object_states.object_state_base import RelativeObjectState, BooleanState
-from omnigibson.systems.system_base import get_element_name_from_system, get_system_from_element_name
+from omnigibson.systems.system_base import get_element_name_from_system
 from omnigibson.systems.macro_particle_system import VisualParticleSystem, get_visual_particle_systems
 from omnigibson.systems.micro_particle_system import FluidSystem, get_fluid_systems
 from omnigibson.utils.python_utils import classproperty
-from omnigibson.utils.sampling_utils import raytest_batch, sample_cuboid_on_object_full_grid_topdown
 from collections import OrderedDict
 import numpy as np
 
