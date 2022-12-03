@@ -13,7 +13,7 @@ from omni.isaac.core.utils.stage import add_reference_to_stage
 # Set macros for this example
 macros.object_states.particle_modifier.VISUAL_PARTICLES_REMOVAL_LIMIT = 1000
 macros.object_states.particle_modifier.FLUID_PARTICLES_REMOVAL_LIMIT = 8000
-macros.object_states.particle_modifier.MAX_VISUAL_PARTICLES_APPLIED_PER_STEP = 2
+macros.object_states.particle_modifier.MAX_VISUAL_PARTICLES_APPLIED_PER_STEP = 10
 macros.object_states.particle_modifier.MAX_FLUID_PARTICLES_APPLIED_PER_STEP = 40
 StainSystem._N_PARTICLES_PER_GROUP = 300
 
@@ -181,7 +181,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         env.step(np.array([]))
 
     # Set the modifier object to be in position to modify particles
-    modifier.set_position(np.array([0, 0.3, 1.85 if method_type == "Projection" else 1.15]))
+    modifier.set_position(np.array([0, 0.3, 1.85 if method_type == "Projection" else 1.175]))
 
     # Move object in square around table
     deltas = [
