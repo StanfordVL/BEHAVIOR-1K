@@ -574,6 +574,7 @@ def sample_cuboid_on_object(
     start_points,
     end_points,
     cuboid_dimensions,
+    ignore_objs=None,
     new_ray_per_horizontal_distance=m.DEFAULT_NEW_RAY_PER_HORIZONTAL_DISTANCE,
     hit_proportion=m.DEFAULT_HIT_PROPORTION,
     max_angle_with_z_axis=m.DEFAULT_MAX_ANGLE_WITH_Z_AXIS,
@@ -586,7 +587,8 @@ def sample_cuboid_on_object(
     """
     Samples points on an object's surface using ray casting.
 
-    :param obj: The object to sample points on.
+    :param obj: (None or EntityPrim) The object to sample points on. If None, will sample points on arbitrary
+        objects hit
     :param start_points: the start points for raycasting, defined in the world frame,
         numpy array of shape [num_samples, max_sampling_attempts, 3]
     :param end_points: the end points for raycasting, defined in the world frame,
@@ -595,6 +597,9 @@ def sample_cuboid_on_object(
         provide list of cuboid dimension triplets in which case each i'th sample will be sampled using the i'th triplet.
         Alternatively, cuboid_dimensions can be set to be all zeros if the user just wants to sample points (instead of
         cuboids) for significantly better performance. This applies when the user wants to sample very small particles.
+    :param ignore_objs: (None or list of EntityPrim) If @obj is None, this can be used to filter objects when checking
+        for valid cuboid locations. Any sampled rays that hit an object in @ignore_objs will be ignored. If None,
+        no filtering will be used
     :param new_ray_per_horizontal_distance: float, per this distance of the cuboid dimension, increase the grid size of
         the parallel ray-testing by 1. This controls how fine-grained the grid ray-casting should be with respect to
         the size of the sampled cuboid.
@@ -634,6 +639,9 @@ def sample_cuboid_on_object(
         assert cuboid_dimensions.shape[0] == num_samples, "Need as many offsets as samples requested."
 
     results = [(None, None, None, None, defaultdict(list)) for _ in range(num_samples)]
+    rigid_bodies = None if obj is None else [link.prim_path for link in obj.links.values()]
+    ignore_rigid_bodies = None if ignore_objs is None else \
+        [link.prim_path for ignore_obj in ignore_objs for link in ignore_obj.links.values()]
 
     for i in range(num_samples):
         refusal_reasons = results[i][4]
@@ -649,6 +657,8 @@ def sample_cuboid_on_object(
                 assert (this_cuboid_dimensions[:-1] > 0).all(), \
                     f"Cuboid x and y dimensions must not be zero if z dimension is nonzero! Got: {this_cuboid_dimensions}"
                 # Obtain the parallel rays using the direction sampling method.
+                # from IPython import embed; embed()
+
                 sources, destinations, grid = np.array(get_parallel_rays(
                     start_pos, end_pos, this_cuboid_dimensions[:2] / 2.0, new_ray_per_horizontal_distance,
                 ))
@@ -660,9 +670,8 @@ def sample_cuboid_on_object(
             cast_results = raytest_batch(start_points=sources, end_points=destinations)
 
             # Check whether sufficient number of rays hit the object
-            rigid_bodies = [link.prim_path for link in obj.links.values()]
             hits = check_rays_hit_object(
-                cast_results, rigid_bodies, hit_proportion, refusal_reasons["missed_object"])
+                cast_results, hit_proportion, refusal_reasons["missed_object"], rigid_bodies, ignore_rigid_bodies)
             if hits is None:
                 continue
 
@@ -754,10 +763,13 @@ def sample_cuboid_on_object(
                     )
                 )
 
-                # Now we use the cuboid's diagonals to check that the cuboid is actually empty.
-                # TODO: Uncomment this check before after confirming logic with Eric
+                # Now we use the cuboid's diagonals to check that the cuboid is actually empty
                 if not check_cuboid_empty(
-                    plane_normal, corner_positions, this_cuboid_dimensions, refusal_reasons["cuboid_not_empty"]
+                        plane_normal,
+                        corner_positions,
+                        this_cuboid_dimensions,
+                        refusal_reasons["cuboid_not_empty"],
+                        ignore_body_names=ignore_rigid_bodies,
                 ):
                     continue
 
@@ -829,23 +841,31 @@ def check_normal_similarity(center_hit_normal, hit_normals, tolerance, refusal_l
     return True
 
 
-def check_rays_hit_object(cast_results, body_names, threshold, refusal_log):
+def check_rays_hit_object(cast_results, threshold, refusal_log, body_names=None, ignore_body_names=None):
     """
     Checks whether rays hit a specific object, as specified by a list of @body_names
 
     Args:
         cast_results (list of dict): Output from raycast_batch.
-        body_names (list or set of str): absolute USD paths to rigid bodies to check for hit
         threshold (float): Relative ratio in [0, 1] specifying proportion of rays from @cast_results are
             required to hit @body_names to count as the object being hit
         refusal_log (list of str): Logging array for adding debug logs
+        body_names (None or list or set of str): absolute USD paths to rigid bodies to check for hit. If not
+            specified, then any valid hit will be accepted
+        ignore_body_names (None or list or set of str): absolute USD paths to rigid bodies to ignore for hit. If not
+            specified, then any valid hit will be accepted
 
     Returns:
         tuple:
             - list of bool or None: Individual T/F for each ray -- whether it hit the object or not
     """
-    body_names = set(body_names)
-    ray_hits = [ray_res["hit"] and ray_res["rigidBody"] in body_names for ray_res in cast_results]
+    body_names = None if body_names is None else set(body_names)
+    ray_hits = [
+        ray_res["hit"] and
+        (body_names is None or ray_res["rigidBody"] in body_names) and
+        (ignore_body_names is None or ray_res["rigidBody"] not in ignore_body_names)
+        for ray_res in cast_results
+    ]
     if sum(ray_hits) / len(cast_results) < threshold:
         if og.debug_sampling:
             refusal_log.append(f"{sum(ray_hits)} / {len(cast_results)} < {threshold} hits: {[ray_res['rigidBody'] for ray_res in cast_results if ray_res['hit']]}")
@@ -897,7 +917,7 @@ def compute_ray_destination(axis, is_top, start_pos, aabb_min, aabb_max):
     return point_on_face
 
 
-def check_cuboid_empty(hit_normal, bottom_corner_positions, this_cuboid_dimensions, refusal_log):
+def check_cuboid_empty(hit_normal, bottom_corner_positions, this_cuboid_dimensions, refusal_log, ignore_body_names=None):
     if og.debug_sampling:
         draw_debug_markers(bottom_corner_positions)
 
@@ -919,7 +939,7 @@ def check_cuboid_empty(hit_normal, bottom_corner_positions, this_cuboid_dimensio
 
     # Combine all these pairs, cast the rays, and make sure the rays don't hit anything.
     all_pairs = np.array(top_to_bottom_pairs + bottom_pairs + top_pairs)
-    check_cast_results = raytest_batch(start_points=all_pairs[:, 0, :], end_points=all_pairs[:, 1, :])
+    check_cast_results = raytest_batch(start_points=all_pairs[:, 0, :], end_points=all_pairs[:, 1, :], ignore_bodies=ignore_body_names)
     if any(ray["hit"] for ray in check_cast_results):
         if og.debug_sampling:
             refusal_log.append("check ray info: %r" % (check_cast_results))
