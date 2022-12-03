@@ -565,6 +565,33 @@ class VisualParticleSystem(MacroParticleSystem):
         return cls.min_scale, cls.max_scale
 
     @classmethod
+    def sample_scales(cls, group, n):
+        """
+        Samples @n particle scales for group @group.
+
+        Args:
+            group (str): Specific group for which to sample scales
+            n (int): Number of scales to sample
+
+        Returns:
+            (n, 3) array: Array of sampled scales
+        """
+        # Make sure the group exists
+        cls._validate_group(group=group)
+
+        # Update scaling and grab object
+        cls.set_scale_limits(*cls.update_particle_scaling(group=group))
+        obj = cls._group_objects[group]
+
+        # Sample scales of the particles to generate
+        # Since the particles will be placed under the object, it will be affected/stretched by obj.scale. In order to
+        # preserve the absolute size of the particles, we need to scale the particle by obj.scale in some way. However,
+        # since the particles have a relative rotation w.r.t the object, the scale between the two don't align. As a
+        # heuristics, we divide it by the avg_scale, which is the cubic root of the product of the scales along 3 axes.
+        avg_scale = np.cbrt(np.product(obj.scale))
+        return np.random.uniform(cls.min_scale, cls.max_scale, (n, 3)) / avg_scale
+
+    @classmethod
     def generate_group_particles(
             cls,
             group,
@@ -605,13 +632,7 @@ class VisualParticleSystem(MacroParticleSystem):
         link_prim_paths = [obj.root_link.prim_path] * n_particles if link_prim_paths is None else link_prim_paths
 
         if scales is None:
-            # Sample scales of the particles to generate
-            # Since the particles will be placed under the object, it will be affected/stretched by obj.scale. In order to
-            # preserve the absolute size of the particles, we need to scale the particle by obj.scale in some way. However,
-            # since the particles have a relative rotation w.r.t the object, the scale between the two don't align. As a
-            # heuristics, we divide it by the avg_scale, which is the cubic root of the product of the scales along 3 axes.
-            avg_scale = np.cbrt(np.product(obj.scale))
-            scales = np.random.uniform(cls.min_scale, cls.max_scale, (n_particles, 3)) / avg_scale
+            scales = cls.sample_scales(group=group, n=n_particles)
 
         bbox_extents = [(cls.particle_object.aabb_extent * scale).tolist() for scale in scales]
 
@@ -621,11 +642,11 @@ class VisualParticleSystem(MacroParticleSystem):
         for position, orientation, scale, bbox_extent, link_prim_path in \
                 zip(positions, orientations, scales, bbox_extents, link_prim_paths):
             # Possibly shift the particle slightly away from the object if we're not clipping into objects
-            if not cls._CLIP_INTO_OBJECTS:
+            if cls._CLIP_INTO_OBJECTS:
                 # Shift the particle halfway down
                 base_to_center = bbox_extent[2] / 2.0
                 normal = (T.quat2mat(orientation) @ z_up).flatten()
-                position += normal * base_to_center
+                position -= normal * base_to_center
 
             # Create particle
             particle = cls.add_particle(
@@ -658,9 +679,6 @@ class VisualParticleSystem(MacroParticleSystem):
         # Make sure the group exists
         cls._validate_group(group=group)
 
-        # Update scaling
-        cls.set_scale_limits(*cls.update_particle_scaling(group=group))
-
         # Remove all stale particles
         cls.remove_all_group_particles(group=group)
 
@@ -670,13 +688,8 @@ class VisualParticleSystem(MacroParticleSystem):
         # Sample scales of the particles to generate
         n_particles = cls._N_PARTICLES_PER_GROUP if n_particles is None else n_particles
 
-        # Since the particles will be placed under the object, it will be affected/stretched by obj.scale. In order to
-        # preserve the absolute size of the particles, we need to scale the particle by obj.scale in some way. However,
-        # since the particles have a relative rotation w.r.t the object, the scale between the two don't align. As a
-        # heuristics, we divide it by the avg_scale, which is the cubic root of the product of the scales along 3 axes.
-        avg_scale = np.cbrt(np.product(obj.scale))
-        scales = np.random.uniform(cls.min_scale, cls.max_scale, (n_particles, 3)) / avg_scale
-
+        # Sample scales and corresponding bbox extents
+        scales = cls.sample_scales(group=group, n=n_particles)
         bbox_extents = [(cls.particle_object.aabb_extent * scale).tolist() for scale in scales]
 
         # Sample locations for all particles
@@ -688,7 +701,7 @@ class VisualParticleSystem(MacroParticleSystem):
             bimodal_mean_fraction=cls._SAMPLING_BIMODAL_MEAN_FRACTION,
             bimodal_stdev_fraction=cls._SAMPLING_BIMODAL_STDEV_FRACTION,
             axis_probabilities=cls._SAMPLING_AXIS_PROBABILITIES,
-            undo_padding=True,
+            undo_padding=False,
             aabb_offset=cls._SAMPLING_AABB_OFFSET,
             max_sampling_attempts=cls._SAMPLING_MAX_ATTEMPTS,
             refuse_downwards=True,
