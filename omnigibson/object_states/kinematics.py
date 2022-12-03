@@ -14,25 +14,25 @@ class KinematicsMixin(BaseObjectState):
     def get_dependencies():
         return BaseObjectState.get_dependencies() + [Pose, AABB, ContactBodies]
 
-    def _has_changed(self, get_value_args, t):
+    def cache_info(self, get_value_args):
         # Import here to avoid circular imports
         from omnigibson.objects.stateful_object import StatefulObject
 
-        # Only clear cache if at least one object has moved
-        for arg in get_value_args:
-            if isinstance(arg, StatefulObject) and arg.states[Pose].has_changed(get_value_args=(), t=t):
-                # We've changed because at least one relevant object's position has changed
-                return True
+        # Run super first
+        info = super().cache_info(get_value_args=get_value_args)
 
-        # Otherwise, nothing has moved, return False
-        return False
-
-    def _get_value(self, *args, **kwargs):
-        # Import here to avoid circular imports
-        from omnigibson.objects.stateful_object import StatefulObject
-
-        # Make sure all poses are cached so we can check in the future if values have changed
-        get_value_args = (*args, *tuple(kwargs.values()))
+        # Store this object as well as any other objects from @get_value_args
+        info[self.obj] = self.obj.states[Pose].get_value()
         for arg in get_value_args:
             if isinstance(arg, StatefulObject):
-                arg.states[Pose].get_value()
+                info[arg] = arg.states[Pose].get_value()
+
+        return info
+
+    def _cache_is_valid(self, get_value_args):
+        # Cache is valid if and only if all of our cached objects have not changed
+        t = self._cache[get_value_args]["t"]
+        for obj, pose in self._cache[get_value_args]["info"].items():
+            if obj.states[Pose].has_changed(get_value_args=(), value=pose, info={}, t=t):
+                return False
+        return True

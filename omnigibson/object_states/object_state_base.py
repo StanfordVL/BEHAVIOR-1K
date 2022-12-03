@@ -42,11 +42,8 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
         super().__init__()
         self.obj = obj
         self._initialized = False
-        self._cache_is_valid_called = False
-        self._history = None
         self._cache = None
         self._changed = None
-        self._last_queried_timestep = None
         self._simulator = None
 
     @classproperty
@@ -64,10 +61,8 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
         """
         Resets this object state. By default, it clears all internal caching data
         """
-        self._history = OrderedDict()
         self._cache = OrderedDict()
         self._changed = OrderedDict()
-        self._last_queried_timestep = OrderedDict()
 
     @property
     def cache(self):
@@ -121,38 +116,80 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
                 @self.get_value / @self._get_value
         """
         t = og.sim.current_time_step_index
-        history_key = (t, *get_value_args)
         # Compute value and update cache
         val = self._get_value(*get_value_args)
-        self._cache[get_value_args] = val
+        self._cache[get_value_args] = OrderedDict(value=val, info=self.cache_info(get_value_args=get_value_args), t=t)
 
-        # Update the history and last queried timestep
-        self._history[history_key] = val
-        self._last_queried_timestep[get_value_args] = t
-
-    def has_changed(self, get_value_args, t=None):
+    def cache_info(self, get_value_args):
         """
-        A helper function to query whether this object state has changed between an arbitrary previous timestep @t and
+        Helper function to cache relevant information at the current timestep.
+        Stores it under @self._cache[<KEY>]["info"]
+
+        Args:
+            get_value_args (tuple): Specific argument combinations (usually tuple of objects) passed into
+                @self.get_value whose caching information should be computed
+
+        Returns:
+            OrderedDict: Any caching information to include at the current timestep when this state's value is computed
+        """
+        # Default is an empty dictionary
+        return OrderedDict()
+
+    def cache_is_valid(self, get_value_args):
+        """
+        Helper function to check whether the current cached value is valid or not at the current timestep.
+        Default is False unless we're at the current timestep.
+
+        Args:
+            get_value_args (tuple): Specific argument combinations (usually tuple of objects) passed into
+                @self.get_value whose cached values should be validated
+
+        Returns:
+            bool: True if the cache is valid, else False
+        """
+        # If t == the current timestep, then our cache is obviously valid otherwise we assume it isn't
+        return True if self._cache[get_value_args]["t"] == og.sim.current_time_step_index else \
+            self._cache_is_valid(get_value_args=get_value_args)
+
+    def _cache_is_valid(self, get_value_args):
+        """
+        Helper function to check whether the current cached value is valid or not at the current timestep.
+        Default is False. Subclasses should implement special logic otherwise.
+
+        Args:
+            get_value_args (tuple): Specific argument combinations (usually tuple of objects) passed into
+                @self.get_value whose cached values should be validated
+
+        Returns:
+            bool: True if the cache is valid, else False
+        """
+        return False
+
+    def has_changed(self, get_value_args, value, info, t):
+        """
+        A helper function to query whether this object state has changed between an arbitrary previous timestep @t with
+        corresponding cached value @value and cache information @info
         the current timestep.
-        @t, in addition to @get_value_args, will serve as a unique key into an internal dictionary,
-        such that specific @t will result in a computation conducted exactly once.
+
+        Note that this may require some non-trivial compute, so we leverage @t, in addition to @get_value_args,
+        as a unique key into an internal dictionary, such that specific @t will result in a computation conducted
+        exactly once.
         This is done for performance reasons; so that multiple states relying on the same state dependency can all
         query whether that state has changed between the same timesteps with only a single computation.
 
         Args:
             get_value_args (tuple): Specific argument combinations (usually tuple of objects) passed into
                 @self.get_value
-            t (int or None): Initial timestep to compare against. This should be an index of the steps taken,
-                i.e. a value queried from og.sim.current_time_step_index at some point in time.
-                Note that this state must have been queried at @t in the past, in order to compare against.
+            value (any): Cached value computed at timestep @t for this object state
+            info (OrderedDict): Information calculated at timestep @t when computing this state's value
+            t (int): Initial timestep to compare against. This should be an index of the steps taken,
+                i.e. a value queried from og.sim.current_time_step_index at some point in time. It is assumed @value
+                and @info were computed at this timestep
 
         Returns:
             bool: Whether this object state has changed between @t and the current timestep index for the specific
-                *args and **kwargs
+                @get_value_args
         """
-        # If t isn't specified, we grab the last queried timestep
-        if t is None:
-            t = self._last_queried_timestep[get_value_args]
         # Compile t, args, and kwargs deterministically
         history_key = (t, *get_value_args)
         # If t == the current timestep, then we obviously haven't changed so our value is False
@@ -163,12 +200,12 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
             val = self._changed[history_key]
         # Otherwise, we calculate the value and store it in our changed dictionary
         else:
-            val = self._has_changed(get_value_args=get_value_args, t=t)
+            val = self._has_changed(get_value_args=get_value_args, value=value, info=info)
             self._changed[history_key] = val
 
         return val
 
-    def _has_changed(self, get_value_args, t):
+    def _has_changed(self, get_value_args, value, info):
         """
         Checks whether the previous value evaluated at time @t has changed with the current timestep.
         By default, it returns True.
@@ -178,12 +215,12 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
         Args:
             get_value_args (tuple): Specific argument combinations (usually tuple of objects) passed into
                 @self.get_value
-            t (int): Initial timestep to compare against. This should be an index of the steps taken,
-                i.e. a value queried from og.sim.current_time_step_index at some point in time.
-                Note that this state must have been queried at @t in the past, in order to compare against.
+            value (any): Cached value computed at timestep @t for this object state
+            info (OrderedDict): Information calculated at timestep @t when computing this state's value
 
         Returns:
-            bool: Whether the value has changed between time @t and the current timestep
+            bool: Whether the value has changed between @value and @info and the coresponding value and info computed
+                at the current timestep
         """
         return True
 
@@ -191,25 +228,16 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
         assert self._initialized
 
         # Compile args and kwargs deterministically
-        t = og.sim.current_time_step_index
         key = (*args, *tuple(kwargs.values()))
-        history_key = (t, *key)
         # We need to see if we need to update our cache -- we do so if and only if one of the following conditions are met:
         # (a) key is NOT in the cache
-        # (b) Our current value has changed AND our last queried timestep is not the current timestep
-        #    (this check is needed in this specific order because has_changed(...) may itself update the cache manually)
-        if key not in self._cache or \
-                (self.has_changed(get_value_args=key, t=None) and self._last_queried_timestep.get(key, -1) != t):
+        # (b) Our cache is not valid
+        if key not in self._cache or not self.cache_is_valid(get_value_args=key):
             # Update the cache
             self.update_cache(get_value_args=key)
 
         # Value is the cached value
-        val = self._cache[key]
-
-        # Update history if our last queried timestep is not the current timestep
-        if self._last_queried_timestep[key] != t:
-            self._history[history_key] = val
-            self._last_queried_timestep[key] = t
+        val = self._cache[key]["value"]
 
         return val
 

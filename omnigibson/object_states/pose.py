@@ -7,6 +7,7 @@ from omnigibson.object_states.object_state_base import AbsoluteObjectState
 m = create_module_macros(module_path=__file__)
 
 m.POSITIONAL_VALIDATION_EPSILON = 1e-10
+m.ORIENTATION_VALIDATION_EPSILON = 0.003        # ~5 degrees error tolerance
 
 
 class Pose(AbsoluteObjectState):
@@ -19,12 +20,20 @@ class Pose(AbsoluteObjectState):
     def _set_value(self, new_value):
         raise NotImplementedError("Pose state currently does not support setting.")
 
-    def _has_changed(self, get_value_args, t):
+    def _has_changed(self, get_value_args, value, info):
         # Only changed if the squared distance between old position and current position has
         # changed above some threshold
-        old_pos = self._history[(t, *get_value_args)][0]
-        # Update cache to get current pose
-        self.update_cache(get_value_args=get_value_args)
-        current_pos = self._cache[get_value_args][0]
+        old_pos, old_quat = value
+        # Get current pose
+        current_pos, current_quat = self.get_value()
+        # Check position and orientation -- either changing means we've changed poses
         dist_squared = np.sum(np.square(current_pos - old_pos))
-        return dist_squared > m.POSITIONAL_VALIDATION_EPSILON
+        if dist_squared > m.POSITIONAL_VALIDATION_EPSILON:
+            return True
+        # Calculate quat distance simply as the dot product
+        # A * B = |A||B|cos(theta)
+        quat_cos_angle = np.abs(np.dot(old_quat, current_quat))
+        if (1 - quat_cos_angle) > m.ORIENTATION_VALIDATION_EPSILON:
+            return True
+
+        return False

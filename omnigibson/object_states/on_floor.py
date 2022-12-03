@@ -51,9 +51,6 @@ class OnFloor(KinematicsMixin, RelativeObjectState, BooleanState):
         return sampling_success
 
     def _get_value(self, other):
-        # Call kinematics super call first to make sure poses are cached
-        _ = super()._get_value(other)
-
         if not isinstance(other, RoomFloor):
             return False
 
