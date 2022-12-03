@@ -186,7 +186,6 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin):
         self._check_in_mesh = None
         self._check_overlap = None
         self._link_prim_paths = None
-        self._current_hit = None
         self._current_step = None
         self._projection_mesh_params = projection_mesh_params
 
@@ -227,9 +226,6 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin):
         def overlap_callback(hit):
             nonlocal valid_hit
             valid_hit = hit.rigid_body not in self._link_prim_paths
-            # Update current hit if we have a valid hit
-            if valid_hit:
-                self._current_hit = hit
             # Continue traversal only if we don't have a valid hit yet
             return not valid_hit
 
