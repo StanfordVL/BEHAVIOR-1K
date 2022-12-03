@@ -2,7 +2,7 @@ from abc import abstractmethod
 from collections import namedtuple, Sized, OrderedDict, defaultdict
 import numpy as np
 import omnigibson as og
-from omnigibson.macros import gm, create_module_macros
+from omnigibson.macros import gm, create_module_macros, macros
 from omnigibson.prims.geom_prim import VisualGeomPrim
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.contact_bodies import ContactBodies
@@ -20,7 +20,7 @@ from omnigibson.utils.python_utils import assert_valid_key, classproperty
 from omnigibson.utils.deprecated_utils import Core
 from omnigibson.utils.usd_utils import create_primitive_mesh
 import omnigibson.utils.transform_utils as T
-from omnigibson.utils.sampling_utils import raytest_batch
+from omnigibson.utils.sampling_utils import sample_cuboid_on_object
 from omni.physx import get_physx_scene_query_interface as psqi
 from omni.isaac.core.utils.prims import get_prim_at_path, delete_prim, move_prim, is_prim_path_valid
 from pxr import PhysicsSchemaTools, UsdGeom, Gf, Sdf
@@ -183,9 +183,8 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin):
         self.projection_mesh = None
         self.projection_system = None
         self.projection_emitter = None
-        self._check_in_projection_mesh = None
+        self._check_in_mesh = None
         self._check_overlap = None
-        self._modify_particles = None
         self._link_prim_paths = None
         self._current_hit = None
         self._current_step = None
@@ -220,7 +219,7 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin):
         self._current_step = 0
 
         # Grab link prim paths and potentially update projection mesh params
-        self._link_prim_paths = set([link.prim_path for link in self.obj.links.values()])
+        self._link_prim_paths = set(self.obj.link_prim_paths)
 
         # Define callback used during overlap method
         # We want to ignore any hits that are with this object itself
@@ -296,11 +295,8 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin):
                     material=particle_material,
                 )
 
-            # Set the modification method used
-            self._modify_particles = self._modify_overlap_particles_in_projection_mesh
-
             # Generate the function for checking whether points are within the projection mesh
-            self._check_in_projection_mesh, _ = generate_points_in_volume_checker_function(
+            self._check_in_mesh, _ = generate_points_in_volume_checker_function(
                 obj=self.obj,
                 volume_link=self.link,
                 mesh_name_prefixes="projection",
@@ -317,8 +313,15 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin):
                 return valid_hit
 
         elif self.method == ParticleModifyMethod.ADJACENCY:
-            # Set the modification method used
-            self._modify_particles = self._modify_overlap_particles_in_adjacency
+            # Define the function for checking whether points are within the adjacency mesh
+            def check_in_adjacency_mesh(particle_positions):
+                # Define the AABB bounds
+                lower, upper = self.obj.states[AABB].get_value() if self.link is None else self.link.aabb
+                # Add the margin
+                lower -= m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN
+                upper += m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN
+                return ((lower < particle_positions) & (particle_positions < upper)).all(axis=-1)
+            self._check_in_mesh = check_in_adjacency_mesh
 
             # Define the function for checking overlaps at runtime
             def check_overlap():
@@ -340,24 +343,15 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin):
         self._check_overlap = check_overlap
 
     @abstractmethod
-    def _modify_overlap_particles_in_adjacency(self, system):
+    def _modify_particles(self, system):
         """
-        Helper function to modify any particles belonging to @system that are overlapping within the relaxed AABB
-        defining adjacency to this object's modification link.
-        NOTE: This should only be used if @self.method = ParticleModifyMethod.ADJACENCY
+        Helper function to modify any particles belonging to @system.
 
-        Must be implemented by subclass.
+        NOTE: This should handle both cases for @self.method:
 
-        Args:
-            system (ParticleSystem): Particle system whose corresponding particles will be checked for modification
-        """
-        raise NotImplementedError()
-
-    @abstractmethod
-    def _modify_overlap_particles_in_projection_mesh(self, system):
-        """
-        Helper function to modify any particles belonging to @system that are overlapping within the projection mesh.
-        NOTE: This should only be used if @self.method = ParticleModifyMethod.PROJECTION
+            ParticleModifyMethod.ADJACENCY: modify any particles that are overlapping within the relaxed AABB
+                defining adjacency to this object's modification link.
+            ParticleModifyMethod.PROJECTION: modify any particles that are overlapping within the projection mesh.
 
         Must be implemented by subclass.
 
@@ -552,22 +546,16 @@ class ParticleRemover(ParticleModifier):
     ParticleModifier where the modification results in potentially removing particles from the simulation.
     """
 
-    def _modify_overlap_particles_in_adjacency(self, system):
+    def _modify_particles(self, system):
         # If at the limit, don't modify anything
         if self.check_at_limit(system=system):
             return
-        # Define the AABB bounds
-        lower, upper = self.obj.states[AABB].get_value() if self.link is None else self.link.aabb
         # Check the system
         if issubclass(system, VisualParticleSystem):
-            # Margin is defined manually for visual particles
-            lower -= m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN
-            upper += m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN
             # Iterate over all particles and remove any that are within the relaxed AABB of the remover volume
             particle_names = list(system.particles.keys())
             particle_positions = np.array([particle.get_position() for particle in system.particles.values()])
-            inbound = ((lower < particle_positions) & (particle_positions < upper))
-            inbound_idxs = inbound.all(axis=1).nonzero()[0]
+            inbound_idxs = self._check_in_mesh(particle_positions).nonzero()[0]
             max_particle_absorbed = self.visual_particle_modification_limit - self.modified_particle_count[system]
             for idx in inbound_idxs[:max_particle_absorbed]:
                 system.remove_particle(particle_names[idx])
@@ -575,15 +563,13 @@ class ParticleRemover(ParticleModifier):
 
         elif issubclass(system, FluidSystem):
             instancer_to_particle_idxs = {}
-            # If we're a cloth, we have to use relaxed AABB since we can't detect collisions via scene query interface
+            # If we're a cloth and using adjacency, we have to use check_in_mesh with the relaxed AABB since we
+            # can't detect collisions via scene query interface. Alternatively, if we're using the projection method,
+            # we also need to use check_in_mesh to check for overlap with the projection mesh
             # We'll check for if the fluid particles are within this relaxed AABB
-            if self.obj.prim_type == PrimType.CLOTH:
-                # Margin is defined by particle radius
-                lower -= system.particle_radius
-                upper += system.particle_radius
+            if self.obj.prim_type == PrimType.CLOTH or self.method == ParticleModifyMethod.PROJECTION:
                 for inst in system.particle_instancers.values():
-                    inbound = ((lower < inst.particle_positions) & (inst.particle_positions < upper))
-                    inbound_idxs = inbound.all(axis=1).nonzero()[0]
+                    inbound_idxs = self._check_in_mesh(inst.particle_positions).nonzero()[0]
                     instancer_to_particle_idxs[inst] = inbound_idxs
             # Otherwise, we can simply use the contact cached information for each particle
             else:
@@ -595,7 +581,8 @@ class ParticleRemover(ParticleModifier):
                 # If at the limit, stop absorbing
                 if self.check_at_limit(system=system):
                     break
-                max_particle_absorbed = self.fluid_particle_modification_limit - self.modified_particle_count[system]
+                max_particle_absorbed = self.fluid_particle_modification_limit - self.modified_particle_count[
+                    system]
                 particles_to_absorb = min(len(particle_idxs), max_particle_absorbed)
                 particle_idxs_to_absorb = list(particle_idxs)[:particles_to_absorb]
 
@@ -606,39 +593,6 @@ class ParticleRemover(ParticleModifier):
 
                 # Keep track of the particles that have been absorbed
                 self.modified_particle_count[system] += particles_to_absorb
-
-        else:
-            # Invalid system queried
-            self.unsupported_system_error(system=system)
-
-    def _modify_overlap_particles_in_projection_mesh(self, system):
-        # If at the limit, don't modify anything
-        if self.check_at_limit(system=system):
-            return
-        # Check the system
-        if issubclass(system, VisualParticleSystem):
-            # Iterate over all particles and remove any that are within the volume
-            particle_names = list(system.particles.keys())
-            particle_positions = np.array([particle.get_position() for particle in system.particles.values()])
-            particle_idxs = np.where(self._check_in_projection_mesh(particle_positions))[0]
-            max_particle_absorbed = self.visual_particle_modification_limit - self.modified_particle_count[system]
-            for idx in particle_idxs[:max_particle_absorbed]:
-                system.remove_particle(particle_names[idx])
-            self.modified_particle_count[system] += min(len(particle_idxs), max_particle_absorbed)
-
-        elif issubclass(system, FluidSystem):
-            # Iterate over all particles and remove any that are within the volume
-            for inst in system.particle_instancers.values():
-                # If at the limit, stop absorbing
-                if self.check_at_limit(system=system):
-                    break
-                particle_idxs = np.where(self._check_in_projection_mesh(inst.particle_positions))[0]
-                max_particle_absorbed = self.fluid_particle_modification_limit - self.modified_particle_count[system]
-                particles_to_absorb = min(len(particle_idxs), max_particle_absorbed)
-                particle_idxs_to_absorb = particle_idxs[:particles_to_absorb]
-                visibilities = inst.particle_visibilities
-                visibilities[particle_idxs_to_absorb] = 0
-                inst.particle_visibilities = visibilities
 
         else:
             # Invalid system queried
@@ -665,6 +619,12 @@ class ParticleApplier(ParticleModifier):
     """
     ParticleModifier where the modification results in potentially adding particles into the simulation.
     """
+    def __init__(self, obj, method, conditions, projection_mesh_params=None):
+        # Store internal value
+        self._sample_particle_locations = None
+
+        # Run super
+        super().__init__(obj=obj, method=method, conditions=conditions, projection_mesh_params=projection_mesh_params)
 
     def _initialize(self):
         # First, sanity check to make sure only one system is being applied, since unlike a ParticleRemover, which
@@ -675,14 +635,45 @@ class ParticleApplier(ParticleModifier):
         # Run super
         super()._initialize()
 
-    def _modify_overlap_particles_in_adjacency(self, system):
-        # Sample potential locations to apply particles
-        hits = self._sample_particle_locations_from_adjacency_area(system=system)
-        self._apply_particles_at_raycast_hits(system=system, hits=hits)
+        # # Make sure a particle group exists for this object for each visual particle system
+        # # We need this so we can scale sampled visual particles according to this object's native size
+        # for system in get_visual_particle_systems().values():
+        #     group = system.get_group_name(obj=self.obj)
+        #     if group not in system.groups:
+        #         system.create_attachment_group(obj=self.obj)
 
-    def _modify_overlap_particles_in_projection_mesh(self, system):
-        # Sample potential locations to apply particles
-        hits = self._sample_particle_locations_from_projection_volume(system=system)
+        # Store which method to use for sampling particle locations
+        if self.method == ParticleModifyMethod.PROJECTION:
+            self._sample_particle_locations = self._sample_particle_locations_from_projection_volume
+        elif self.method == ParticleModifyMethod.ADJACENCY:
+            self._sample_particle_locations = self._sample_particle_locations_from_adjacency_area
+        else:
+            raise ValueError(f"Unsupported ParticleModifyMethod: {self.method}!")
+
+    def _modify_particles(self, system):
+        # If at the limit, don't modify anything
+        if self.check_at_limit(system=system):
+            return
+
+        # Sample potential locations to apply particles, and then apply them
+        start_points, end_points = self._sample_particle_locations(system=system)
+        n_samples = len(start_points)
+
+        # Sample the rays to see where particle can be generated
+        hits = [result for result in sample_cuboid_on_object(
+            obj=None,
+            start_points=start_points.reshape(n_samples, 1, 3),
+            end_points=end_points.reshape(n_samples, 1, 3),
+            cuboid_dimensions=system.sample_scales(
+                group=system.get_group_name(obj=self.obj), n=len(start_points)) * system.particle_object.aabb_extent.reshape(1, 3)
+            if issubclass(system, VisualParticleSystem) else np.zeros(3),
+            ignore_objs=[self.obj],
+            hit_proportion=0.0,             # We want all hits
+            undo_padding=False,
+            cuboid_bottom_padding=system.particle_radius if issubclass(system, FluidSystem) else
+            macros.utils.sampling_utils.DEFAULT_CUBOID_BOTTOM_PADDING,
+        ) if result[0] is not None]
+
         self._apply_particles_at_raycast_hits(system=system, hits=hits)
 
     def _apply_particles_at_raycast_hits(self, system, hits):
@@ -703,39 +694,42 @@ class ParticleApplier(ParticleModifier):
             z_up = np.zeros(3)
             z_up[-1] = 1.0
             n_particles = min(len(hits), m.VISUAL_PARTICLES_APPLICATION_LIMIT - self.modified_particle_count[system])
+            # Generate particle info -- maps group name to particle info for that group,
+            # i.e.: positions, orientations, and link_prim_paths
+            particles_info = defaultdict(lambda: defaultdict(lambda: []))
             for hit in hits[:n_particles]:
                 # Infer which object was hit
-                hit_obj = og.sim.scene.object_registry("prim_path", "/".join(hit["rigidBody"].split("/")[:-1]), None)
+                hit_obj = og.sim.scene.object_registry("prim_path", "/".join(hit[3].split("/")[:-1]), None)
                 print(f"hit obj: {hit_obj}")
                 if hit_obj is not None:
                     # Create an attachment group if necessary
                     group = system.get_group_name(obj=hit_obj)
                     if group not in system.groups:
                         system.create_attachment_group(obj=hit_obj)
-                    # Generate a particle for this group
-                    system.create_group_particles(
-                        group=group,
-                        positions=hit["position"].reshape(1, 3),
-                        orientations=T.axisangle2quat(T.vecs2axisangle(z_up, hit["normal"])).reshape(1, 4),
-                        link_prim_paths=[hit["rigidBody"]],
-                    )
-                    # Update our particle count
-                    self.modified_particle_count[system] += 1
+                    # Add to info
+                    particles_info[group]["positions"].append(hit[0])
+                    particles_info[group]["orientations"].append(hit[2])
+                    particles_info[group]["link_prim_paths"].append(hit[3])
+            # Generate all the particles for each group
+            for group, particle_info in particles_info.items():
+                # Generate particles for this group
+                system.generate_group_particles(
+                    group=group,
+                    positions=np.array(particle_info["positions"]),
+                    orientations=np.array(particle_info["orientations"]),
+                    link_prim_paths=particle_info["link_prim_paths"],
+                )
+                # Update our particle count
+                self.modified_particle_count[system] += len(particle_info["link_prim_paths"])
 
         elif issubclass(system, FluidSystem):
-            # Compile the particle poses to generate
-            positions = []
+            # Compile the particle poses to generate and sample the particles
             n_particles = min(len(hits), m.FLUID_PARTICLES_APPLICATION_LIMIT - self.modified_particle_count[system])
-            # Only generate particles if we have a positive number of requested particles
+            # Generate particle instancer
             if n_particles > 0:
-                for hit in hits[:n_particles]:
-                    # Calculate sampled particle position in world space, which is the hit position offset in the normal
-                    # direction by particle radius distance
-                    positions.append(hit["position"] + hit["normal"] * system.particle_radius)
-                # Generate particle instancer
                 system.generate_particle_instancer(
                     n_particles=n_particles,
-                    positions=np.array(positions),
+                    positions=np.array([hit[0] for hit in hits[:n_particles]]),
                 )
                 # Update our particle count
                 self.modified_particle_count[system] += n_particles
@@ -752,8 +746,9 @@ class ParticleApplier(ParticleModifier):
             system (ParticleSystem): System to sample potential particle positions for
 
         Returns:
-            list of dict: Successful particle hit information resulting from
-                omnigibson.utils.sampling_utils.raytest_batch
+            2-tuple:
+                - (n, 3) array: Ray start points to sample
+                - (n, 3) array: Ray end points to sample
         """
         # Randomly sample end points from the base of the cone / cylinder
         n_samples = self._get_max_particles_limit_per_step(system=system)
@@ -788,12 +783,7 @@ class ParticleApplier(ParticleModifier):
             particle_positions=points,
         )
 
-        # Run the batched raytest and return results
-        return [result for result in raytest_batch(
-            start_points=points[:n_samples, :],
-            end_points=points[n_samples:, :],
-            ignore_bodies=self._link_prim_paths,
-        ) if result["hit"]]
+        return points[:n_samples, :], points[n_samples:, :]
 
     def _sample_particle_locations_from_adjacency_area(self, system):
         """
@@ -803,37 +793,25 @@ class ParticleApplier(ParticleModifier):
             system (ParticleSystem): System to sample potential particle positions for
 
         Returns:
-            list of dict: Successful particle hit information resulting from
-                omnigibson.utils.sampling_utils.raytest_batch
+            2-tuple:
+                - (n, 3) array: Ray start points to sample
+                - (n, 3) array: Ray end points to sample
         """
         # Randomly sample end points from within the object's AABB
         n_samples = self._get_max_particles_limit_per_step(system=system)
         lower, upper = self.obj.states[AABB].get_value() if self.link is None else self.link.aabb
         lower = lower.reshape(1, 3) - m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN
         upper = upper.reshape(1, 3) + m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN
-        start_points = lower + (upper - lower) * np.random.rand(n_samples, 3)
-        # Get the direction of the contact, by inferring which object was hit and then getting the vector pointing
-        # in that object link's relative direction
+        lower_upper = np.concatenate([lower, upper], axis=0)
+
+        # Sample in all directions, shooting from the center of the link / object frame
         pos = self.obj.get_position() if self.link is None else self.link.get_position()
-        # Infer which object was hit
-        obj_prim_path = "/".join(self._current_hit.rigid_body.split("/")[:-1])
-        obj_link_name = self._current_hit.rigid_body.split("/")[-1]
-        hit_obj = og.sim.scene.object_registry("prim_path", obj_prim_path, None)
-        # Break early if we have an invalid hit obj
-        if hit_obj is None:
-            return []
-        direction = hit_obj.links[obj_link_name].get_position() - pos
-        # All the end points will the be the sampled start points pointing in @direction, and then clipped to be within
-        # the relaxed bounding box
-        end_points = (start_points + direction.reshape(1, 3)).clip(lower, upper)
+        start_points = np.ones((n_samples, 3)) * pos.reshape(1, 3)
+        end_points = np.random.uniform(low=lower, high=upper, size=(n_samples, 3))
+        sides, axes = np.random.randint(2, size=(n_samples,)), np.random.randint(3, size=(n_samples,))
+        end_points[np.arange(n_samples), axes] = lower_upper[sides, axes]
 
-        # Run the batched raytest and return results
-
-        return [result for result in raytest_batch(
-            start_points=start_points,
-            end_points=end_points,
-            ignore_bodies=self._link_prim_paths,
-        ) if result["hit"]]
+        return start_points, end_points
 
     def _get_max_particles_limit_per_step(self, system):
         """
