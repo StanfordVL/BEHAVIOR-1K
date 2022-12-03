@@ -21,30 +21,6 @@ m.FLUID_THRESHOLD = 50
 # Maximum number of fluid particles to sample when setting an object to be covered = True
 m.MAX_FLUID_PARTICLES = 5000
 
-    Checks the projected surface area of the object onto the z-plane
-
-    NOTE: This is a stochastic method; Monte Carlo sampling is conducted: a gridwise raytest batch is executed top-down,
-    and the resulting proportion of hits determines the proportion of the xy bounding box area that is assumed to be
-    filled with the object.
-
-    Args:
-        obj (EntityPrim): Object whose surface should be projected into z-plane
-        particle_spacing (float): Distance between sampled particle positions
-        z_offset (float): Distance in the z-axis to offset the particles from the object surface, in addition to the
-            desired @particle_spacing distance
-
-    Returns:
-        (N, 3) array: Sampled particle positions for covering the object's top surface
-    """
-    # Sample rays to determine where a valid particle can be sampled
-    _, hits = sample_gridwise_downward_rays_onto_object(obj=obj, ray_spacing=particle_spacing, z_offset=particle_spacing)
-
-    # Convert the hits into a numpy array of values
-    particle_positions = np.array([hit["position"] for hit in hits])
-    particle_positions[:, 2] = particle_positions[:, 2] + particle_spacing + z_offset
-
-    return particle_positions
-
 
 class Covered(RelativeObjectState, BooleanState):
     def __init__(self, obj):
