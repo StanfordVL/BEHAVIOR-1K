@@ -110,7 +110,7 @@ def get_parallel_rays(
     orthogonal_vector_1 /= np.linalg.norm(orthogonal_vector_1)
 
     # Get a second vector orthogonal to both the ray and the first vector.
-    orthogonal_vector_2 = np.cross(ray_direction, orthogonal_vector_1)
+    orthogonal_vector_2 = -np.cross(ray_direction, orthogonal_vector_1)
     orthogonal_vector_2 /= np.linalg.norm(orthogonal_vector_2)
 
     orthogonal_vectors = np.array([orthogonal_vector_1, orthogonal_vector_2])
