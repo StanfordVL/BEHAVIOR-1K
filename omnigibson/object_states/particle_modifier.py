@@ -631,13 +631,6 @@ class ParticleApplier(ParticleModifier):
         # Run super
         super()._initialize()
 
-        # # Make sure a particle group exists for this object for each visual particle system
-        # # We need this so we can scale sampled visual particles according to this object's native size
-        # for system in get_visual_particle_systems().values():
-        #     group = system.get_group_name(obj=self.obj)
-        #     if group not in system.groups:
-        #         system.create_attachment_group(obj=self.obj)
-
         # Store which method to use for sampling particle locations
         if self.method == ParticleModifyMethod.PROJECTION:
             self._sample_particle_locations = self._sample_particle_locations_from_projection_volume
