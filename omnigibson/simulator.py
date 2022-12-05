@@ -584,9 +584,9 @@ class Simulator(SimulationContext, Serializable):
         # Additionally run non physics things if we have a valid scene
         if self._scene is not None:
             self._omni_update_step()
-            if not self.is_stopped():
+            if self.is_playing():
                 self._non_physics_step()
-                if self.is_playing() and gm.ENABLE_TRANSITION_RULES:
+                if gm.ENABLE_TRANSITION_RULES:
                     self._transition_rule_step()
 
         # TODO (eric): After stage changes (e.g. pose, texture change), it will take two super().step(render=True) for
