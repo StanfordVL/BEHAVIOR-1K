@@ -1030,8 +1030,8 @@ class MicroParticleSystem(BaseParticleSystem):
             aabb_offset=np.array([-radius, -radius, radius]),
             # bottom padding should be the same as the particle radius
             cuboid_bottom_padding=radius,
-            # undo_padding should be False - the sampled positions are above the surface by its radius
-            undo_padding=False,
+            # undo_cuboid_bottom_padding should be False - the sampled positions are above the surface by its radius
+            undo_cuboid_bottom_padding=False,
         )
         particle_positions = np.array([result[0] for result in results if result[0] is not None])
         # Also potentially sub-sample if we're past our limit

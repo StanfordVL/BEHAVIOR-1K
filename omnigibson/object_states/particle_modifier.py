@@ -658,7 +658,7 @@ class ParticleApplier(ParticleModifier):
             if issubclass(system, VisualParticleSystem) else np.zeros(3),
             ignore_objs=[self.obj],
             hit_proportion=0.0,             # We want all hits
-            undo_padding=False,
+            undo_cuboid_bottom_padding=issubclass(system, VisualParticleSystem),      # micro particles have zero cuboid dimensions so we need to maintain padding
             cuboid_bottom_padding=system.particle_radius if issubclass(system, FluidSystem) else
             macros.utils.sampling_utils.DEFAULT_CUBOID_BOTTOM_PADDING,
         ) if result[0] is not None]

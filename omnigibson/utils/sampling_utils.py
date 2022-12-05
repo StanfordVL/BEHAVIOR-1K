@@ -429,7 +429,7 @@ def sample_cuboid_on_object_symmetric_bimodal_distribution(
     parallel_ray_normal_angle_tolerance=m.DEFAULT_PARALLEL_RAY_NORMAL_ANGLE_TOLERANCE,
     hit_to_plane_threshold=m.DEFAULT_HIT_TO_PLANE_THRESHOLD,
     cuboid_bottom_padding=m.DEFAULT_CUBOID_BOTTOM_PADDING,
-    undo_padding=True,
+    undo_cuboid_bottom_padding=True,
     refuse_downwards=False,
 ):
     """
@@ -463,7 +463,7 @@ def sample_cuboid_on_object_symmetric_bimodal_distribution(
         emptiness check (@check_cuboid_empty) within the cuboid. un_padding=True can be set if the user wants to remove
         the padding after the emptiness check.
     :param refuse_downwards: bool, whether downward-facing hits (as defined by max_angle_with_z_axis) are allowed.
-    :param undo_padding: bool. Whether the bottom padding that's applied to the cuboid should be removed before return.
+    :param undo_cuboid_bottom_padding: bool. Whether the bottom padding that's applied to the cuboid should be removed before return.
         Useful when the cuboid needs to be flush with the surface for whatever reason. Note that the padding will still
         be applied initially (since it's not possible to do the cuboid emptiness check without doing this - otherwise
         the rays will hit the sampled-on object), so the emptiness check still checks a padded cuboid. This flag will
@@ -487,7 +487,7 @@ def sample_cuboid_on_object_symmetric_bimodal_distribution(
         start_points,
         end_points,
         cuboid_dimensions,
-        undo_padding=undo_padding,
+        undo_cuboid_bottom_padding=undo_cuboid_bottom_padding,
         new_ray_per_horizontal_distance=new_ray_per_horizontal_distance,
         hit_proportion=hit_proportion,
         max_angle_with_z_axis=max_angle_with_z_axis,
@@ -509,7 +509,7 @@ def sample_cuboid_on_object_full_grid_topdown(
     parallel_ray_normal_angle_tolerance=m.DEFAULT_PARALLEL_RAY_NORMAL_ANGLE_TOLERANCE,
     hit_to_plane_threshold=m.DEFAULT_HIT_TO_PLANE_THRESHOLD,
     cuboid_bottom_padding=m.DEFAULT_CUBOID_BOTTOM_PADDING,
-    undo_padding=True,
+    undo_cuboid_bottom_padding=True,
     refuse_downwards=False,
 ):
     """
@@ -538,7 +538,7 @@ def sample_cuboid_on_object_full_grid_topdown(
         emptiness check (@check_cuboid_empty) within the cuboid. un_padding=True can be set if the user wants to remove
         the padding after the emptiness check.
     :param refuse_downwards: bool, whether downward-facing hits (as defined by max_angle_with_z_axis) are allowed.
-    :param undo_padding: bool. Whether the bottom padding that's applied to the cuboid should be removed before return.
+    :param undo_cuboid_bottom_padding: bool. Whether the bottom padding that's applied to the cuboid should be removed before return.
         Useful when the cuboid needs to be flush with the surface for whatever reason. Note that the padding will still
         be applied initially (since it's not possible to do the cuboid emptiness check without doing this - otherwise
         the rays will hit the sampled-on object), so the emptiness check still checks a padded cuboid. This flag will
@@ -558,7 +558,7 @@ def sample_cuboid_on_object_full_grid_topdown(
         start_points,
         end_points,
         cuboid_dimensions,
-        undo_padding=undo_padding,
+        undo_cuboid_bottom_padding=undo_cuboid_bottom_padding,
         new_ray_per_horizontal_distance=new_ray_per_horizontal_distance,
         hit_proportion=hit_proportion,
         max_angle_with_z_axis=max_angle_with_z_axis,
@@ -581,7 +581,7 @@ def sample_cuboid_on_object(
     parallel_ray_normal_angle_tolerance=m.DEFAULT_PARALLEL_RAY_NORMAL_ANGLE_TOLERANCE,
     hit_to_plane_threshold=m.DEFAULT_HIT_TO_PLANE_THRESHOLD,
     cuboid_bottom_padding=m.DEFAULT_CUBOID_BOTTOM_PADDING,
-    undo_padding=True,
+    undo_cuboid_bottom_padding=True,
     refuse_downwards=False,
 ):
     """
@@ -613,7 +613,7 @@ def sample_cuboid_on_object(
     :param cuboid_bottom_padding: float, additional padding applied to the bottom of the cuboid. This is needed for the
         emptiness check (@check_cuboid_empty) within the cuboid. un_padding=True can be set if the user wants to remove
         the padding after the emptiness check.
-    :param undo_padding: bool. Whether the bottom padding that's applied to the cuboid should be removed before return.
+    :param undo_cuboid_bottom_padding: bool. Whether the bottom padding that's applied to the cuboid should be removed before return.
         Useful when the cuboid needs to be flush with the surface for whatever reason. Note that the padding will still
         be applied initially (since it's not possible to do the cuboid emptiness check without doing this - otherwise
         the rays will hit the sampled-on object), so the emptiness check still checks a padded cuboid. This flag will
@@ -771,12 +771,12 @@ def sample_cuboid_on_object(
                 ):
                     continue
 
-                if undo_padding:
+                if undo_cuboid_bottom_padding:
                     cuboid_centroid -= padding
 
             else:
                 cuboid_centroid = center_hit_pos
-                if not undo_padding:
+                if not undo_cuboid_bottom_padding:
                     padding = cuboid_bottom_padding * center_hit_normal
                     cuboid_centroid += padding
                 plane_normal = np.zeros(3)

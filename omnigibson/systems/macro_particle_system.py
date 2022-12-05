@@ -701,7 +701,7 @@ class VisualParticleSystem(MacroParticleSystem):
             bimodal_mean_fraction=cls._SAMPLING_BIMODAL_MEAN_FRACTION,
             bimodal_stdev_fraction=cls._SAMPLING_BIMODAL_STDEV_FRACTION,
             axis_probabilities=cls._SAMPLING_AXIS_PROBABILITIES,
-            undo_padding=True,
+            undo_cuboid_bottom_padding=True,
             aabb_offset=cls._SAMPLING_AABB_OFFSET,
             max_sampling_attempts=cls._SAMPLING_MAX_ATTEMPTS,
             refuse_downwards=True,
