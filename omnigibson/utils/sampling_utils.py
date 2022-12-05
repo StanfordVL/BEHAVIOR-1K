@@ -657,8 +657,6 @@ def sample_cuboid_on_object(
                 assert (this_cuboid_dimensions[:-1] > 0).all(), \
                     f"Cuboid x and y dimensions must not be zero if z dimension is nonzero! Got: {this_cuboid_dimensions}"
                 # Obtain the parallel rays using the direction sampling method.
-                # from IPython import embed; embed()
-
                 sources, destinations, grid = np.array(get_parallel_rays(
                     start_pos, end_pos, this_cuboid_dimensions[:2] / 2.0, new_ray_per_horizontal_distance,
                 ))
