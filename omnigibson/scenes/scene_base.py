@@ -13,7 +13,7 @@ from omnigibson.utils.config_utils import NumpyEncoder
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.objects.stateful_object import StatefulObject
 from omnigibson.systems import SYSTEMS_REGISTRY
-from omnigibson.robots.robot_base import BaseRobot
+from omnigibson.robots.robot_base import m as robot_macros
 
 # Global dicts that will contain mappings
 REGISTERED_SCENES = OrderedDict()
@@ -89,7 +89,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Returns:
             list of BaseRobot: Robot(s) that are currently in this scene
         """
-        return list(self.object_registry("category", "agent", []))
+        return list(self.object_registry("category", robot_macros.ROBOT_CATEGORY, []))
 
     @property
     def systems(self):

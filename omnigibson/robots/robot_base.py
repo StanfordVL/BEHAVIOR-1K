@@ -5,7 +5,7 @@ from copy import deepcopy
 from collections import OrderedDict
 import numpy as np
 import matplotlib.pyplot as plt
-from omnigibson.macros import gm
+from omnigibson.macros import gm, create_module_macros
 from omnigibson.sensors import create_sensor, SENSOR_PRIMS_TO_SENSOR_CLS, ALL_SENSOR_MODALITIES, VisionSensor, ScanSensor
 from omnigibson.objects.usd_object import USDObject
 from omnigibson.objects.controllable_object import ControllableObject
@@ -22,6 +22,12 @@ REGISTERED_ROBOTS = OrderedDict()
 # Add proprio sensor modality to ALL_SENSOR_MODALITIES
 ALL_SENSOR_MODALITIES.add("proprio")
 
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
+
+# Name of the category to assign to all robots
+m.ROBOT_CATEGORY = "agent"
+
 
 class BaseRobot(USDObject, ControllableObject, GymObservable, Registerable):
     """
@@ -35,7 +41,6 @@ class BaseRobot(USDObject, ControllableObject, GymObservable, Registerable):
         # Shared kwargs in hierarchy
         prim_path,
         name=None,
-        category="agent",
         class_id=None,
         uuid=None,
         scale=None,
@@ -66,7 +71,6 @@ class BaseRobot(USDObject, ControllableObject, GymObservable, Registerable):
         @param prim_path: str, global path in the stage to this object
         @param name: Name for the object. Names need to be unique per scene. If no name is set, a name will be generated
             at the time the object is added to the scene, using the object's category.
-        @param category: Category for the object. Defaults to "object".
         @param class_id: What class ID the object should be assigned in semantic segmentation rendering mode.
         @param uuid: Unique unsigned-integer identifier to assign to this object (max 8-numbers).
             If None is specified, then it will be auto-generated
@@ -116,7 +120,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable, Registerable):
             prim_path=prim_path,
             usd_path=self.usd_path,
             name=name,
-            category=category,
+            category=m.ROBOT_CATEGORY,
             class_id=class_id,
             uuid=uuid,
             scale=scale,

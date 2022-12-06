@@ -53,7 +53,6 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         # Shared kwargs in hierarchy
         prim_path,
         name=None,
-        category="agent",
         class_id=None,
         uuid=None,
         scale=None,
@@ -92,7 +91,6 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         @param prim_path: str, global path in the stage to this object
         @param name: Name for the object. Names need to be unique per scene. If no name is set, a name will be generated
             at the time the object is added to the scene, using the object's category.
-        @param category: Category for the object. Defaults to "object".
         @param class_id: What class ID the object should be assigned in semantic segmentation rendering mode.
         @param uuid: Unique unsigned-integer identifier to assign to this object (max 8-numbers).
             If None is specified, then it will be auto-generated
@@ -155,7 +153,6 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         super().__init__(
             prim_path=prim_path,
             name=name,
-            category=category,
             class_id=class_id,
             uuid=uuid,
             scale=scale,
