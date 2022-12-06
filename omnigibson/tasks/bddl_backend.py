@@ -49,7 +49,6 @@ SUPPORTED_PREDICATES = {
     "ontop": get_binary_predicate_for_state(object_states.OnTop, "ontop"),
     "under": get_binary_predicate_for_state(object_states.Under, "under"),
     "touching": get_binary_predicate_for_state(object_states.Touching, "touching"),
-    "onfloor": get_binary_predicate_for_state(object_states.OnFloor, "onfloor"),
     "cooked": get_unary_predicate_for_state(object_states.Cooked, "cooked"),
     "burnt": get_unary_predicate_for_state(object_states.Burnt, "burnt"),
     "open": get_unary_predicate_for_state(object_states.Open, "open"),

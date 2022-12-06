@@ -22,7 +22,6 @@ from bddl.logic_base import AtomicFormula
 from bddl.object_taxonomy import ObjectTaxonomy
 
 import omnigibson as og
-from omnigibson.object_states.on_floor import RoomFloor
 from omnigibson.objects.dataset_object import DatasetObject
 # from omnigibson.objects.multi_object_wrappers import ObjectGrouper, ObjectMultiplexer
 from omnigibson.reward_functions.potential_reward import PotentialReward
@@ -178,7 +177,7 @@ class BehaviorTask(BaseTask):
         # Highlight any task relevant objects if requested
         if self.highlight_task_relevant_objs:
             for obj_name, obj in self.object_scope.items():
-                if isinstance(obj, BaseRobot) or isinstance(obj, RoomFloor):
+                if isinstance(obj, BaseRobot):
                     continue
                 obj.highlighted = True
 
@@ -380,27 +379,14 @@ class BehaviorTask(BaseTask):
                 obj_cat = self.object_instance_to_category[obj_inst]
 
                 # We allow burners to be used as if they are stoves
-                categories = self.object_taxonomy.get_subtree_omnigibson_categories(obj_cat)
+                categories = self.object_taxonomy.get_subtree_igibson_categories(obj_cat)
                 if obj_cat == "stove.n.01":
-                    categories += self.object_taxonomy.get_subtree_omnigibson_categories("burner.n.02")
+                    categories += self.object_taxonomy.get_subtree_igibson_categories("burner.n.02")
 
                 for room_inst in og.sim.scene.seg_map.room_sem_name_to_ins_name[room_type]:
-                    if obj_cat == FLOOR_SYNSET:
-                        # TODO: remove after split floors
-                        # Create a RoomFloor for each room instance
-                        # This object is NOT imported by the simulator
-                        room_floor = RoomFloor(
-                            category="room_floor",
-                            name="room_floor_{}".format(room_inst),
-                            scene=og.sim.scene,
-                            room_instance=room_inst,
-                            floor_obj=og.sim.scene.object_registry("name", "floors"),
-                        )
-                        scene_objs = [room_floor]
-                    else:
-                        # A list of scene objects that satisfy the requested categories
-                        room_objs = og.sim.scene.object_registry("in_rooms", room_inst, default_val=[])
-                        scene_objs = [obj for obj in room_objs if obj.category in categories]
+                    # A list of scene objects that satisfy the requested categories
+                    room_objs = og.sim.scene.object_registry("in_rooms", room_inst, default_val=[])
+                    scene_objs = [obj for obj in room_objs if obj.category in categories]
 
                     if len(scene_objs) != 0:
                         room_type_to_scene_objs[room_type][obj_inst][room_inst] = scene_objs
@@ -421,7 +407,7 @@ class BehaviorTask(BaseTask):
             if obj_cat in NON_SAMPLEABLE_OBJECTS:
                 continue
             is_sliceable = self.object_taxonomy.has_ability(obj_cat, "sliceable")
-            categories = self.object_taxonomy.get_subtree_omnigibson_categories(obj_cat)
+            categories = self.object_taxonomy.get_subtree_igibson_categories(obj_cat)
 
             # TODO: temporary hack
             remove_categories = [
@@ -441,7 +427,7 @@ class BehaviorTask(BaseTask):
                 )
 
                 # Filter object models if the object category is openable
-                synset = self.object_taxonomy.get_class_name_from_omnigibson_category(category)
+                synset = self.object_taxonomy.get_class_name_from_igibson_category(category)
                 if self.object_taxonomy.has_ability(synset, "openable"):
                     # Always use the articulated version of a certain object if its category is openable
                     # E.g. backpack, jar, etc
@@ -520,21 +506,7 @@ class BehaviorTask(BaseTask):
         # Assign object_scope based on a cached scene
         for obj_inst in self.object_scope:
             matched_sim_obj = None
-            # TODO: remove after split floors
-            if "floor.n.01" in obj_inst:
-                floor_obj = og.sim.scene.object_registry("name", "floors")
-                bddl_object_scope = floor_obj.bddl_object_scope.split(",")
-                bddl_object_scope = {item.split(":")[0]: item.split(":")[1] for item in bddl_object_scope}
-                assert obj_inst in bddl_object_scope
-                room_inst = bddl_object_scope[obj_inst].replace("room_floor_", "")
-                matched_sim_obj = RoomFloor(
-                    category="room_floor",
-                    name=bddl_object_scope[obj_inst],
-                    scene=og.sim.scene,
-                    room_instance=room_inst,
-                    floor_obj=floor_obj,
-                )
-            elif obj_inst == "agent.n.01_1":
+            if obj_inst == "agent.n.01_1":
                 matched_sim_obj = self.get_agent(env)
             else:
                 print(f"checking objects...")

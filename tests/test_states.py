@@ -721,14 +721,9 @@ def test_touching():
 
             # touching = apple_1.states[object_states.Touching].get_value(apple_2)
             # print("apple 1 is touching apple 2:", touching)
-            # # floor = apple_1.states[object_states.OnFloor].get_value(apple_1.room_floor)
-            # # print("apple 1 is on the floor:", floor)
 
             # touching = apple_2.states[object_states.Touching].get_value(apple_1)
             # print("apple 2 is touching apple 1:", touching)
-            # # floor = apple_2.states[object_states.OnFloor].get_value(apple_2.room_floor)
-            # # print("apple 2 is on the floor:", floor)
-            # print()
 
     finally:
         app.close()

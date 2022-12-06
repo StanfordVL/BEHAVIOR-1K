@@ -140,7 +140,7 @@ class JointType:
 AVERAGE_OBJ_DENSITY = 67.0
 AVERAGE_CATEGORY_SPECS = get_og_avg_category_specs()
 
-KINEMATICS_STATES = frozenset({"inside", "ontop", "under", "onfloor"})
+KINEMATICS_STATES = frozenset({"inside", "ontop", "under"})
 
 
 def get_collision_group_mask(groups_to_exclude=[]):
