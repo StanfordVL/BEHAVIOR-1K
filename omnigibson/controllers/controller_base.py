@@ -49,10 +49,12 @@ class ControlType:
     @classmethod
     def get_type(cls, type_str):
         """
-        :param type_str: One of "position", "velocity", or "effort" (any case), and maps it
-        to the corresponding type
+        Args:
+            type_str (str): One of "position", "velocity", or "effort" (any case), and maps it
+                to the corresponding type
 
-        :return ControlType: control type corresponding to the associated string
+        Returns:
+            ControlType: control type corresponding to the associated string
         """
         assert_valid_key(key=type_str.lower(), valid_keys=cls._MAPPING, name="control type")
         return cls._MAPPING[type_str.lower()]
@@ -72,26 +74,27 @@ class BaseController(Serializable, Registerable, Recreatable):
         command_output_limits="default",
     ):
         """
-        :param control_freq: int, controller loop frequency
-        :param control_limits: Dict[str, Tuple[Array[float], Array[float]]]: The min/max limits to the outputted
-            control signal. Should specify per-dof type limits, i.e.:
+        Args:
+            control_freq (int): controller loop frequency
+            control_limits (Dict[str, Tuple[Array[float], Array[float]]]): The min/max limits to the outputted
+                control signal. Should specify per-dof type limits, i.e.:
 
-            "position": [[min], [max]]
-            "velocity": [[min], [max]]
-            "effort": [[min], [max]]
-            "has_limit": [...bool...]
+                "position": [[min], [max]]
+                "velocity": [[min], [max]]
+                "effort": [[min], [max]]
+                "has_limit": [...bool...]
 
-            Values outside of this range will be clipped, if the corresponding joint index in has_limit is True.
-        :param dof_idx: Array[int], specific dof indices controlled by this robot. Used for inferring
-            controller-relevant values during control computations
-        :param command_input_limits: None or "default" or Tuple[float, float] or Tuple[Array[float], Array[float]],
-            if set, is the min/max acceptable inputted command. Values outside of this range will be clipped.
-            If None, no clipping will be used. If "default", range will be set to (-1, 1)
-        :param command_output_limits: None or "default" or Tuple[float, float] or Tuple[Array[float], Array[float]], if set,
-            is the min/max scaled command. If both this value and @command_input_limits is not None,
-            then all inputted command values will be scaled from the input range to the output range.
-            If either is None, no scaling will be used. If "default", then this range will automatically be set
-            to the @control_limits entry corresponding to self.control_type
+                Values outside of this range will be clipped, if the corresponding joint index in has_limit is True.
+            dof_idx (Array[int]): specific dof indices controlled by this robot. Used for inferring
+                controller-relevant values during control computations
+            command_input_limits (None or "default" or Tuple[float, float] or Tuple[Array[float], Array[float]]):
+                if set, is the min/max acceptable inputted command. Values outside this range will be clipped.
+                If None, no clipping will be used. If "default", range will be set to (-1, 1)
+            command_output_limits (None or "default" or Tuple[float, float] or Tuple[Array[float], Array[float]]):
+                if set, is the min/max scaled command. If both this value and @command_input_limits is not None,
+                then all inputted command values will be scaled from the input range to the output range.
+                If either is None, no scaling will be used. If "default", then this range will automatically be set
+                to the @control_limits entry corresponding to self.control_type
         """
         # Store arguments
         self._control_freq = control_freq
@@ -148,8 +151,11 @@ class BaseController(Serializable, Registerable, Recreatable):
         If self.command_input_limits is None, then no clipping will occur. If either self.command_input_limits
         or self.command_output_limits is None, then no scaling will occur.
 
-        :param command: Array[float] or float, Inputted command vector
-        :return Array[float]: Processed command vector
+        Args:
+            command (Array[float] or float): Inputted command vector
+
+        Returns:
+            Array[float]: Processed command vector
         """
         # Make sure command is a np.array
         command = np.array([command]) if type(command) in {int, float} else np.array(command)
@@ -179,7 +185,8 @@ class BaseController(Serializable, Registerable, Recreatable):
         """
         Updates inputted @command internally.
 
-        :param command: Array[float], inputted command to store internally in this controller
+        Args:
+            command (Array[float]): inputted command to store internally in this controller
         """
         # Sanity check the command
         assert len(command) == self.command_dim, "Commands must be dimension {}, got dim {} instead.".format(
@@ -192,9 +199,11 @@ class BaseController(Serializable, Registerable, Recreatable):
         """
         Clips the inputted @control signal based on @control_limits.
 
-        :param control: Array[float], control signal to clip
+        Args:
+            control (Array[float]): control signal to clip
 
-        :return Array[float]: Clipped control signal
+        Returns:
+            Array[float]: Clipped control signal
         """
         clipped_control = control.clip(
             self._control_limits[self.control_type][0][self.dof_idx],
@@ -212,10 +221,12 @@ class BaseController(Serializable, Registerable, Recreatable):
         """
         Take a controller step.
 
-        :param control_dict: Dict[str, Any], dictionary that should include any relevant keyword-mapped
-            states necessary for controller computation
+        Args:
+            control_dict (Dict[str, Any]): dictionary that should include any relevant keyword-mapped
+                states necessary for controller computation
 
-        :return Array[float]: numpy array of outputted control signals
+        Returns:
+            Array[float]: numpy array of outputted control signals
         """
         control = self._command_to_control(command=self._command, control_dict=control_dict)
         self._control = self.clip_control(control=control)
@@ -248,11 +259,13 @@ class BaseController(Serializable, Registerable, Recreatable):
         Converts the (already preprocessed) inputted @command into deployable (non-clipped!) control signal.
         Should be implemented by subclass.
 
-        :param command: Array[float], desired (already preprocessed) command to convert into control signals
-        :param control_dict: Dict[str, Any], dictionary that should include any relevant keyword-mapped
-            states necessary for controller computation
+        Args:
+            command (Array[float]): desired (already preprocessed) command to convert into control signals
+            control_dict (Dict[str, Any]): dictionary that should include any relevant keyword-mapped
+                states necessary for controller computation
 
-        :return: Array[float], outputted (non-clipped!) control signal to deploy
+        Returns:
+            Array[float]: outputted (non-clipped!) control signal to deploy
         """
         raise NotImplementedError
 
@@ -261,9 +274,11 @@ class BaseController(Serializable, Registerable, Recreatable):
         """
         Convert input @nums into numpy array of length @dim. If @nums is a single number, broadcasts it to the
         corresponding dimension size @dim before converting into a numpy array
+
         Args:
             nums (numeric or Iterable): Either single value or array of numbers
             dim (int): Size of array to broadcast input to
+
         Returns:
             np.array: Array filled with values specified in @nums
         """
@@ -299,14 +314,16 @@ class BaseController(Serializable, Registerable, Recreatable):
     @property
     def control_dim(self):
         """
-        :return int: Expected size of outputted controls
+        Returns:
+            int: Expected size of outputted controls
         """
         return len(self.dof_idx)
 
     @property
     def control_type(self):
         """
-        :return ControlType: Type of control returned by this controller
+        Returns:
+            ControlType: Type of control returned by this controller
         """
         raise NotImplementedError
 
@@ -331,14 +348,16 @@ class BaseController(Serializable, Registerable, Recreatable):
     @property
     def command_dim(self):
         """
-        :return int: Expected size of inputted commands
+        Returns:
+            int: Expected size of inputted commands
         """
         raise NotImplementedError
 
     @property
     def dof_idx(self):
         """
-        :return Array[int]: DOF indices corresponding to the specific DOFs being controlled by this robot
+        Returns:
+            Array[int]: DOF indices corresponding to the specific DOFs being controlled by this robot
         """
         return np.array(self._dof_idx)
 

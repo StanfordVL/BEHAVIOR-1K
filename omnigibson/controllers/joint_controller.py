@@ -29,32 +29,33 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         compute_delta_in_quat_space=None,
     ):
         """
-        :param control_freq: int, controller loop frequency
-        :param motor_type: str, type of motor being controlled, one of {position, velocity, effort}
-        :param control_limits: Dict[str, Tuple[Array[float], Array[float]]]: The min/max limits to the outputted
-            control signal. Should specify per-actuator type limits, i.e.:
+        Args:
+            control_freq (int): controller loop frequency
+            motor_type (str): type of motor being controlled, one of {position, velocity, effort}
+            control_limits (Dict[str, Tuple[Array[float], Array[float]]]): The min/max limits to the outputted
+                control signal. Should specify per-dof type limits, i.e.:
 
-            "position": [[min], [max]]
-            "velocity": [[min], [max]]
-            "effort": [[min], [max]]
-            "has_limit": [...bool...]
+                "position": [[min], [max]]
+                "velocity": [[min], [max]]
+                "effort": [[min], [max]]
+                "has_limit": [...bool...]
 
-            Values outside of this range will be clipped, if the corresponding joint index in has_limit is True.
-        :param dof_idx: Array[int], specific dof indices controlled by this robot. Used for inferring
-            controller-relevant values during control computations
-        :param command_input_limits: None or "default" or Tuple[float, float] or Tuple[Array[float], Array[float]],
-            if set, is the min/max acceptable inputted command. Values outside of this range will be clipped.
-            If None, no clipping will be used. If "default", range will be set to (-1, 1)
-        :param command_output_limits: None or "default" or Tuple[float, float] or Tuple[Array[float], Array[float]], if set,
-            is the min/max scaled command. If both this value and @command_input_limits is not None,
-            then all inputted command values will be scaled from the input range to the output range.
-            If either is None, no scaling will be used. If "default", then this range will automatically be set
-            to the @control_limits entry corresponding to self.control_type
-        :param use_delta_commands: bool, whether inputted commands should be interpreted as delta or absolute values
-        :param compute_delta_in_quat_space: None or List[(rx_idx, ry_idx, rz_idx), ...], if specified, groups of
-            joints that need to be processed in quaternion space to avoid gimbal lock issues normally faced by
-            3 DOF rotation joints. Each group needs to consist of three idxes corresponding to the indices in
-            the input space. This is only used in the delta_commands mode.
+                Values outside of this range will be clipped, if the corresponding joint index in has_limit is True.
+            dof_idx (Array[int]): specific dof indices controlled by this robot. Used for inferring
+                controller-relevant values during control computations
+            command_input_limits (None or "default" or Tuple[float, float] or Tuple[Array[float], Array[float]]):
+                if set, is the min/max acceptable inputted command. Values outside this range will be clipped.
+                If None, no clipping will be used. If "default", range will be set to (-1, 1)
+            command_output_limits (None or "default" or Tuple[float, float] or Tuple[Array[float], Array[float]]):
+                if set, is the min/max scaled command. If both this value and @command_input_limits is not None,
+                then all inputted command values will be scaled from the input range to the output range.
+                If either is None, no scaling will be used. If "default", then this range will automatically be set
+                to the @control_limits entry corresponding to self.control_type
+            use_delta_commands (bool): whether inputted commands should be interpreted as delta or absolute values
+            compute_delta_in_quat_space (None or List[(rx_idx, ry_idx, rz_idx), ...]): if specified, groups of
+                joints that need to be processed in quaternion space to avoid gimbal lock issues normally faced by
+                3 DOF rotation joints. Each group needs to consist of three idxes corresponding to the indices in
+                the input space. This is only used in the delta_commands mode.
         """
         # Store arguments
         assert_valid_key(key=motor_type.lower(), valid_keys=ControlType.VALID_TYPES_STR, name="motor_type")
@@ -85,14 +86,16 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         """
         Converts the (already preprocessed) inputted @command into deployable (non-clipped!) joint control signal
 
-        :param command: Array[float], desired (already preprocessed) command to convert into control signals
-        :param control_dict: Dict[str, Any], dictionary that should include any relevant keyword-mapped
-            states necessary for controller computation. Must include the following keys:
-                joint_position: Array of current joint positions
-                joint_velocity: Array of current joint velocities
-                joint_effort: Array of current joint effort
+        Args:
+            command (Array[float]): desired (already preprocessed) command to convert into control signals
+            control_dict (Dict[str, Any]): dictionary that should include any relevant keyword-mapped
+                states necessary for controller computation. Must include the following keys:
+                    joint_position: Array of current joint positions
+                    joint_velocity: Array of current joint velocities
+                    joint_effort: Array of current joint effort
 
-        :return: Array[float], outputted (non-clipped!) control signal to deploy
+        Returns:
+            Array[float]: outputted (non-clipped!) control signal to deploy
         """
         # If we're using delta commands, add this value
         if self._use_delta_commands:

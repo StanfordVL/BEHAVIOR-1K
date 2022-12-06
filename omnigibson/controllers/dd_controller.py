@@ -24,30 +24,30 @@ class DifferentialDriveController(LocomotionController):
         command_output_limits="default",
     ):
         """
-        :param wheel_radius: float, radius of the wheels (both assumed to be same radius)
-        :param wheel_axle_length: float, perpendicular distance between the two wheels
-        :param control_freq: int, controller loop frequency
-        :param control_limits: Dict[str, Tuple[Array[float], Array[float]]]: The min/max limits to the outputted
-            control signal. Should specify per-dof type limits, i.e.:
+        Args:
+            wheel_radius (float): radius of the wheels (both assumed to be same radius)
+            wheel_axle_length (float): perpendicular distance between the two wheels
+            control_freq (int): controller loop frequency
+            control_limits (Dict[str, Tuple[Array[float], Array[float]]]): The min/max limits to the outputted
+                control signal. Should specify per-dof type limits, i.e.:
 
-            "position": [[min], [max]]
-            "velocity": [[min], [max]]
-            "effort": [[min], [max]]
-            "has_limit": [...bool...]
+                "position": [[min], [max]]
+                "velocity": [[min], [max]]
+                "effort": [[min], [max]]
+                "has_limit": [...bool...]
 
-            Values outside of this range will be clipped, if the corresponding joint index in has_limit is True.
-            Assumes order is [left_wheel, right_wheel] for each set of values.
-        :param dof_idx: Array[int], specific dof indices controlled by this robot. Used for inferring
-            controller-relevant values during control computations
-        :param command_input_limits: None or "default" or Tuple[float, float] or Tuple[Array[float], Array[float]],
-            if set, is the min/max acceptable inputted command. Values outside of this range will be clipped.
-            If None, no clipping will be used. If "default", range will be set to (-1, 1)
-        :param command_output_limits: None or "default" or Tuple[float, float] or Tuple[Array[float], Array[float]], if set,
-            is the min/max scaled command. If both this value and @command_input_limits is not None,
-            then all inputted command values will be scaled from the input range to the output range.
-            If either is None, no scaling will be used. If "default", then this range will automatically be set
-            to the maximum linear and angular velocities calculated from @wheel_radius, @wheel_axle_length, and
-            @control_limits velocity limits entry
+                Values outside of this range will be clipped, if the corresponding joint index in has_limit is True.
+            dof_idx (Array[int]): specific dof indices controlled by this robot. Used for inferring
+                controller-relevant values during control computations
+            command_input_limits (None or "default" or Tuple[float, float] or Tuple[Array[float], Array[float]]):
+                if set, is the min/max acceptable inputted command. Values outside this range will be clipped.
+                If None, no clipping will be used. If "default", range will be set to (-1, 1)
+            command_output_limits (None or "default" or Tuple[float, float] or Tuple[Array[float], Array[float]]):
+                if set, is the min/max scaled command. If both this value and @command_input_limits is not None,
+                then all inputted command values will be scaled from the input range to the output range.
+                If either is None, no scaling will be used. If "default", then this range will automatically be set
+                to the maximum linear and angular velocities calculated from @wheel_radius, @wheel_axle_length, and
+                @control_limits velocity limits entry
         """
         # Store internal variables
         self._wheel_radius = wheel_radius
@@ -89,13 +89,15 @@ class DifferentialDriveController(LocomotionController):
         This processes converts the desired (lin_vel, ang_vel) command into (left, right) wheel joint velocity control
         signals.
 
-        :param command: Array[float], desired (already preprocessed) 2D command to convert into control signals
-            Consists of desired (lin_vel, ang_vel) of the controlled body
-        :param control_dict: Dict[str, Any], dictionary that should include any relevant keyword-mapped
-            states necessary for controller computation. Must include the following keys:
+        Args:
+            command (Array[float]): desired (already preprocessed) 2D command to convert into control signals
+                Consists of desired (lin_vel, ang_vel) of the controlled body
+            control_dict (Dict[str, Any]): dictionary that should include any relevant keyword-mapped
+                states necessary for controller computation. Must include the following keys:
 
-        :return: Array[float], outputted (non-clipped!) velocity control signal to deploy
-            to the [left, right] wheel joints
+        Returns:
+            Array[float]: outputted (non-clipped!) velocity control signal to deploy
+                to the [left, right] wheel joints
         """
         lin_vel, ang_vel = command
 

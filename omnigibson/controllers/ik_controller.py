@@ -45,57 +45,58 @@ class InverseKinematicsController(ManipulationController):
         workspace_pose_limiter=None,
     ):
         """
-        :param task_name: str, name assigned to this task frame for computing IK control. During control calculations,
-            the inputted control_dict should include entries named <@task_name>_pos_relative and
-            <@task_name>_quat_relative. See self._command_to_control() for what these values should entail.
-        :param robot_description_path: str, path to robot descriptor yaml file
-        :param robot_urdf_path: str, path to robot urdf file
-        :param eef_name: str, end effector frame name
-        :param control_freq: int, controller loop frequency
-        :param default_joint_pos: Array[float], default joint positions, used as part of nullspace controller in IK.
-            Note that this should correspond to ALL the joints; the exact indices will be extracted via @dof_idx
-        :param control_limits: Dict[str, Tuple[Array[float], Array[float]]]: The min/max limits to the outputted
-            control signal. Should specify per-actuator type limits, i.e.:
+        Args:
+            task_name (str): name assigned to this task frame for computing IK control. During control calculations,
+                the inputted control_dict should include entries named <@task_name>_pos_relative and
+                <@task_name>_quat_relative. See self._command_to_control() for what these values should entail.
+            robot_description_path (str): path to robot descriptor yaml file
+            robot_urdf_path (str): path to robot urdf file
+            eef_name (str): end effector frame name
+            control_freq (int): controller loop frequency
+            default_joint_pos (Array[float]): default joint positions, used as part of nullspace controller in IK.
+                Note that this should correspond to ALL the joints; the exact indices will be extracted via @dof_idx
+            control_limits (Dict[str, Tuple[Array[float], Array[float]]]): The min/max limits to the outputted
+                    control signal. Should specify per-dof type limits, i.e.:
 
-            "position": [[min], [max]]
-            "velocity": [[min], [max]]
-            "torque": [[min], [max]]
-            "has_limit": [...bool...]
+                    "position": [[min], [max]]
+                    "velocity": [[min], [max]]
+                    "effort": [[min], [max]]
+                    "has_limit": [...bool...]
 
-            Values outside of this range will be clipped, if the corresponding joint index in has_limit is True.
-        :param dof_idx: Array[int], specific dof indices controlled by this robot. Used for inferring
-            controller-relevant values during control computations
-        :param command_input_limits: None or "default" or Tuple[float, float] or Tuple[Array[float], Array[float]],
-            if set, is the min/max acceptable inputted command. Values outside of this range will be clipped.
-            If None, no clipping will be used. If "default", range will be set to (-1, 1)
-        :param command_output_limits: None or "default" or Tuple[float, float] or Tuple[Array[float], Array[float]], if set,
-            is the min/max scaled command. If both this value and @command_input_limits is not None,
-            then all inputted command values will be scaled from the input range to the output range.
-            If either is None, no scaling will be used. If "default", then this range will automatically be set
-            to the @control_limits entry corresponding to self.control_type
-        :param motor_type: str, type of motor being controlled, one of {position, velocity}
-        :param kv: float, Gain applied to error between IK-commanded joint positions and current joint positions if
-            using @motor_type = velocity
-        :param mode: str, mode to use when computing IK. In all cases, position commands are 3DOF delta (dx,dy,dz)
-            cartesian values, relative to the robot base frame. Valid options are:
-                - "pose_absolute_ori": 6DOF (dx,dy,dz,ax,ay,az) control over pose,
-                    where the orientation is given in absolute axis-angle coordinates
-                - "pose_delta_ori": 6DOF (dx,dy,dz,dax,day,daz) control over pose
-                - "position_fixed_ori": 3DOF (dx,dy,dz) control over position,
-                    with orientation commands being kept as fixed initial absolute orientation
-                - "position_compliant_ori": 3DOF (dx,dy,dz) control over position,
-                    with orientation commands automatically being sent as 0s (so can drift over time)
-        :param smoothing_filter_size: None or int, if specified, sets the size of a moving average filter to apply
-            on all outputted IK joint positions.
-        :param workspace_pose_limiter: None or function, if specified, callback method that should clip absolute
-            target (x,y,z) cartesian position and absolute quaternion orientation (x,y,z,w) to a specific workspace
-            range (i.e.: this can be unique to each robot, and implemented by each embodiment).
-            Function signature should be:
+                Values outside of this range will be clipped, if the corresponding joint index in has_limit is True.
+            dof_idx (Array[int]): specific dof indices controlled by this robot. Used for inferring
+                controller-relevant values during control computations
+            command_input_limits (None or "default" or Tuple[float, float] or Tuple[Array[float], Array[float]]):
+                if set, is the min/max acceptable inputted command. Values outside this range will be clipped.
+                If None, no clipping will be used. If "default", range will be set to (-1, 1)
+            command_output_limits (None or "default" or Tuple[float, float] or Tuple[Array[float], Array[float]]):
+                if set, is the min/max scaled command. If both this value and @command_input_limits is not None,
+                then all inputted command values will be scaled from the input range to the output range.
+                If either is None, no scaling will be used. If "default", then this range will automatically be set
+                to the @control_limits entry corresponding to self.control_type
+            motor_type (str): type of motor being controlled, one of {position, velocity}
+            kv (float): Gain applied to error between IK-commanded joint positions and current joint positions if
+                using @motor_type = velocity
+            mode (str): mode to use when computing IK. In all cases, position commands are 3DOF delta (dx,dy,dz)
+                cartesian values, relative to the robot base frame. Valid options are:
+                    - "pose_absolute_ori": 6DOF (dx,dy,dz,ax,ay,az) control over pose,
+                        where the orientation is given in absolute axis-angle coordinates
+                    - "pose_delta_ori": 6DOF (dx,dy,dz,dax,day,daz) control over pose
+                    - "position_fixed_ori": 3DOF (dx,dy,dz) control over position,
+                        with orientation commands being kept as fixed initial absolute orientation
+                    - "position_compliant_ori": 3DOF (dx,dy,dz) control over position,
+                        with orientation commands automatically being sent as 0s (so can drift over time)
+            smoothing_filter_size (None or int): if specified, sets the size of a moving average filter to apply
+                on all outputted IK joint positions.
+            workspace_pose_limiter (None or function): if specified, callback method that should clip absolute
+                target (x,y,z) cartesian position and absolute quaternion orientation (x,y,z,w) to a specific workspace
+                range (i.e.: this can be unique to each robot, and implemented by each embodiment).
+                Function signature should be:
 
-                def limiter(command_pos: Array[float], command_quat: Array[float], control_dict: Dict[str, Any]) --> Tuple[Array[float], Array[float]]
+                    def limiter(command_pos: Array[float], command_quat: Array[float], control_dict: Dict[str, Any]) --> Tuple[Array[float], Array[float]]
 
-            where pos_command is (x,y,z) cartesian position values, command_quat is (x,y,z,w) quarternion orientation
-            values, and the returned tuple is the processed (pos, quat) command.
+                where pos_command is (x,y,z) cartesian position values, command_quat is (x,y,z,w) quarternion orientation
+                values, and the returned tuple is the processed (pos, quat) command.
         """
         # Store arguments
         control_dim = len(dof_idx)
@@ -212,22 +213,24 @@ class InverseKinematicsController(ManipulationController):
         Converts the (already preprocessed) inputted @command into deployable (non-clipped!) joint control signal.
         This processes the command based on self.mode, possibly clips the command based on self.workspace_pose_limiter,
 
-        :param command: Array[float], desired (already preprocessed) command to convert into control signals
-            Is one of:
-                (dx,dy,dz) - desired delta cartesian position
-                (dx,dy,dz,dax,day,daz) - desired delta cartesian position and delta axis-angle orientation
-                (dx,dy,dz,ax,ay,az) - desired delta cartesian position and global axis-angle orientation
-        :param control_dict: Dict[str, Any], dictionary that should include any relevant keyword-mapped
-            states necessary for controller computation. Must include the following keys:
-                joint_position: Array of current joint positions
-                base_pos: (x,y,z) cartesian position of the robot's base relative to the static global frame
-                base_quat: (x,y,z,w) quaternion orientation of the robot's base relative to the static global frame
-                <@self.task_name>_pos_relative: (x,y,z) relative cartesian position of the desired task frame to
-                    control, computed in its local frame (e.g.: robot base frame)
-                <@self.task_name>_quat_relative: (x,y,z,w) relative quaternion orientation of the desired task
-                    frame to control, computed in its local frame (e.g.: robot base frame)
+        Args:
+            command (Array[float]): desired (already preprocessed) command to convert into control signals
+                Is one of:
+                    (dx,dy,dz) - desired delta cartesian position
+                    (dx,dy,dz,dax,day,daz) - desired delta cartesian position and delta axis-angle orientation
+                    (dx,dy,dz,ax,ay,az) - desired delta cartesian position and global axis-angle orientation
+            control_dict (Dict[str, Any]): dictionary that should include any relevant keyword-mapped
+                states necessary for controller computation. Must include the following keys:
+                    joint_position: Array of current joint positions
+                    base_pos: (x,y,z) cartesian position of the robot's base relative to the static global frame
+                    base_quat: (x,y,z,w) quaternion orientation of the robot's base relative to the static global frame
+                    <@self.task_name>_pos_relative: (x,y,z) relative cartesian position of the desired task frame to
+                        control, computed in its local frame (e.g.: robot base frame)
+                    <@self.task_name>_quat_relative: (x,y,z,w) relative quaternion orientation of the desired task
+                        frame to control, computed in its local frame (e.g.: robot base frame)
 
-        :return: Array[float], outputted (non-clipped!) velocity control signal to deploy
+        Returns:
+            Array[float]: outputted (non-clipped!) velocity control signal to deploy
         """
         # Grab important info from control dict
         pos_relative = np.array(control_dict["{}_pos_relative".format(self.task_name)])

@@ -43,36 +43,38 @@ class MultiFingerGripperController(GripperController):
         limit_tolerance=0.001,
     ):
         """
-        :param control_freq: int, controller loop frequency
-        :param control_limits: Dict[str, Tuple[Array[float], Array[float]]]: The min/max limits to the outputted
-            control signal. Should specify per-actuator type limits, i.e.:
+        Args:
+            control_freq (int): controller loop frequency
+            control_limits (Dict[str, Tuple[Array[float], Array[float]]]): The min/max limits to the outputted
+                control signal. Should specify per-dof type limits, i.e.:
 
-            "position": [[min], [max]]
-            "velocity": [[min], [max]]
-            "torque": [[min], [max]]
-            "has_limit": [...bool...]
+                "position": [[min], [max]]
+                "velocity": [[min], [max]]
+                "effort": [[min], [max]]
+                "has_limit": [...bool...]
 
-            Values outside of this range will be clipped, if the corresponding joint index in has_limit is True.
-        :param dof_idx: Array[int], specific dof indices controlled by this robot. Used for inferring
-            controller-relevant values during control computations
-        :param command_input_limits: None or "default" or Tuple[float, float] or Tuple[Array[float], Array[float]],
-            if set, is the min/max acceptable inputted command. Values outside of this range will be clipped.
-            If None, no clipping will be used. If "default", range will be set to (-1, 1)
-        :param command_output_limits: None or "default" or Tuple[float, float] or Tuple[Array[float], Array[float]], if set,
-            is the min/max scaled command. If both this value and @command_input_limits is not None,
-            then all inputted command values will be scaled from the input range to the output range.
-            If either is None, no scaling will be used. If "default", then this range will automatically be set
-            to the @control_limits entry corresponding to self.control_type
-        :param inverted: bool, whether or not the command direction (grasp is negative) and the control direction are
-            inverted, e.g. to grasp you need to move the joint in the positive direction.
-        :param mode: str, mode for this controller. Valid options are:
+                Values outside of this range will be clipped, if the corresponding joint index in has_limit is True.
+            dof_idx (Array[int]): specific dof indices controlled by this robot. Used for inferring
+                controller-relevant values during control computations
+            command_input_limits (None or "default" or Tuple[float, float] or Tuple[Array[float], Array[float]]):
+                if set, is the min/max acceptable inputted command. Values outside this range will be clipped.
+                If None, no clipping will be used. If "default", range will be set to (-1, 1)
+            command_output_limits (None or "default" or Tuple[float, float] or Tuple[Array[float], Array[float]]):
+                if set, is the min/max scaled command. If both this value and @command_input_limits is not None,
+                then all inputted command values will be scaled from the input range to the output range.
+                If either is None, no scaling will be used. If "default", then this range will automatically be set
+                to the @control_limits entry corresponding to self.control_type
+            inverted (bool): whether or not the command direction (grasp is negative) and the control direction are
+                inverted, e.g. to grasp you need to move the joint in the positive direction.
+            mode (str): mode for this controller. Valid options are:
 
-            "binary": 1D command, if preprocessed value > 0 is interpreted as an max open
-                (send max pos / vel / tor signal), otherwise send max close control signals
-            "smooth": 1D command, sends symmetric signal to both finger joints equal to the preprocessed commands
-            "independent": 2D command, sends independent signals to each finger joint equal to the preprocessed command
-        :param limit_tolerance: float, sets the tolerance from the joint limit ends, below which controls will be zeroed
-            out if the control is using velocity or torque control
+                "binary": 1D command, if preprocessed value > 0 is interpreted as an max open
+                    (send max pos / vel / tor signal), otherwise send max close control signals
+                "smooth": 1D command, sends symmetric signal to both finger joints equal to the preprocessed commands
+                "independent": 2D command, sends independent signals to each finger joint equal to the preprocessed command
+
+            limit_tolerance (float): sets the tolerance from the joint limit ends, below which controls will be zeroed
+                out if the control is using velocity or torque control
         """
         # Store arguments
         assert_valid_key(key=motor_type.lower(), valid_keys=ControlType.VALID_TYPES_STR, name="motor_type")
@@ -123,14 +125,16 @@ class MultiFingerGripperController(GripperController):
         Converts the (already preprocessed) inputted @command into deployable (non-clipped!) gripper
         joint control signal
 
-        :param command: Array[float], desired (already preprocessed) command to convert into control signals.
-            This should always be 2D command for each gripper joint
-        :param control_dict: Dict[str, Any], dictionary that should include any relevant keyword-mapped
-            states necessary for controller computation. Must include the following keys:
-                joint_position: Array of current joint positions
-                joint_velocity: Array of current joint velocities
+        Args:
+            command (Array[float]): desired (already preprocessed) command to convert into control signals.
+                This should always be 2D command for each gripper joint
+            control_dict (Dict[str, Any]): dictionary that should include any relevant keyword-mapped
+                states necessary for controller computation. Must include the following keys:
+                    joint_position: Array of current joint positions
+                    joint_velocity: Array of current joint velocities
 
-        :return: Array[float], outputted (non-clipped!) control signal to deploy
+        Returns:
+            Array[float]: outputted (non-clipped!) control signal to deploy
         """
         joint_pos = control_dict["joint_position"][self.dof_idx]
         # Choose what to do based on control mode
@@ -168,10 +172,10 @@ class MultiFingerGripperController(GripperController):
 
         Args:
             control_dict (dict): dictionary that should include any relevant keyword-mapped
-            states necessary for controller computation. Must include the following keys:
+                states necessary for controller computation. Must include the following keys:
 
-                joint_position: Array of current joint positions
-                joint_velocity: Array of current joint velocities
+                    joint_position: Array of current joint positions
+                    joint_velocity: Array of current joint velocities
         """
         # Calculate grasping state based on mode of this controller
 

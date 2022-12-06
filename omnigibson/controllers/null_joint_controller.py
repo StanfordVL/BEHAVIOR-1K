@@ -21,29 +21,29 @@ class NullJointController(JointController):
         default_command=None,
     ):
         """
-        :param control_freq: int, controller loop frequency
-        :param motor_type: str, type of motor being controlled, one of {position, velocity, effort}
-        :param control_limits: Dict[str, Tuple[Array[float], Array[float]]]: The min/max limits to the outputted
-            control signal. Should specify per-actuator type limits, i.e.:
+        Args:
+            control_freq (int): controller loop frequency
+            control_limits (Dict[str, Tuple[Array[float], Array[float]]]): The min/max limits to the outputted
+                control signal. Should specify per-dof type limits, i.e.:
 
-            "position": [[min], [max]]
-            "velocity": [[min], [max]]
-            "torque": [[min], [max]]
-            "has_limit": [...bool...]
+                "position": [[min], [max]]
+                "velocity": [[min], [max]]
+                "effort": [[min], [max]]
+                "has_limit": [...bool...]
 
-            Values outside of this range will be clipped, if the corresponding joint index in has_limit is True.
-        :param dof_idx: Array[int], specific dof indices controlled by this robot. Used for inferring
-            controller-relevant values during control computations
-        :param command_input_limits: None or "default" or Tuple[float, float] or Tuple[Array[float], Array[float]],
-            if set, is the min/max acceptable inputted command. Values outside of this range will be clipped.
-            If None, no clipping will be used. If "default", range will be set to (-1, 1)
-        :param command_output_limits: None or "default" or Tuple[float, float] or Tuple[Array[float], Array[float]], if set,
-            is the min/max scaled command. If both this value and @command_input_limits is not None,
-            then all inputted command values will be scaled from the input range to the output range.
-            If either is None, no scaling will be used. If "default", then this range will automatically be set
-            to the @control_limits entry corresponding to self.control_type
-        :param default_command: None or n-array, if specified, should be the same length as @dof_idx, specifying
-            the default control for this controller to output
+                Values outside of this range will be clipped, if the corresponding joint index in has_limit is True.
+            dof_idx (Array[int]): specific dof indices controlled by this robot. Used for inferring
+                controller-relevant values during control computations
+            command_input_limits (None or "default" or Tuple[float, float] or Tuple[Array[float], Array[float]]):
+                if set, is the min/max acceptable inputted command. Values outside this range will be clipped.
+                If None, no clipping will be used. If "default", range will be set to (-1, 1)
+            command_output_limits (None or "default" or Tuple[float, float] or Tuple[Array[float], Array[float]]):
+                if set, is the min/max scaled command. If both this value and @command_input_limits is not None,
+                then all inputted command values will be scaled from the input range to the output range.
+                If either is None, no scaling will be used. If "default", then this range will automatically be set
+                to the @control_limits entry corresponding to self.control_type
+            default_command (None or n-array): if specified, should be the same length as @dof_idx, specifying
+                the default control for this controller to output
         """
         # Store values
         self._default_command = np.zeros(len(dof_idx)) if default_command is None else np.array(default_command)

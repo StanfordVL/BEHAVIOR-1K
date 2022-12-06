@@ -20,10 +20,12 @@ def create_controller(name, **kwargs):
     """
     Creates a controller of type @name with corresponding necessary keyword arguments @kwargs
 
-    :param name: str, type of controller to use (e.g. JointController, InverseKinematicsController, etc.)
-    :param kwargs: Any relevant keyword arguments to pass to the controller
+    Args:
+        name (str): type of controller to use (e.g. JointController, InverseKinematicsController, etc.)
+        **kwargs: Any relevant keyword arguments to pass to the controller
 
-    :return Controller: created controller
+    Returns:
+        Controller: created controller
     """
     assert_valid_key(key=name, valid_keys=REGISTERED_CONTROLLERS, name="controller")
     controller_cls = REGISTERED_CONTROLLERS[name]
