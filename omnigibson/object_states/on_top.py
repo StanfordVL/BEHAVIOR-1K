@@ -15,15 +15,16 @@ class OnTop(KinematicsMixin, RelativeObjectState, BooleanState):
         return KinematicsMixin.get_dependencies() + RelativeObjectState.get_dependencies() + [Touching, VerticalAdjacency]
 
     def _set_value(self, other, new_value, use_ray_casting_method=False):
+        if not new_value:
+            raise NotImplementedError("OnTop does not support set_value(False)")
+
         state = self._simulator.dump_state(serialized=False)
 
         for _ in range(10):
             sampling_success = sample_kinematics(
-                "onTop", self.obj, other, new_value, use_ray_casting_method=use_ray_casting_method
+                "onTop", self.obj, other, use_ray_casting_method=use_ray_casting_method
             )
             if sampling_success:
-                self.obj.clear_cached_states()
-                other.clear_cached_states()
                 if self.get_value(other) != new_value:
                     sampling_success = False
                 if omnigibson.debug_sampling:
@@ -37,6 +38,10 @@ class OnTop(KinematicsMixin, RelativeObjectState, BooleanState):
         return sampling_success
 
     def _get_value(self, other):
+        touching = self.obj.states[Touching].get_value(other)
+        if not touching:
+            return False
+
         other_prim_paths = set(other.link_prim_paths)
         adjacency = self.obj.states[VerticalAdjacency].get_value()
         return not other_prim_paths.isdisjoint(adjacency.negative_neighbors) and other_prim_paths.isdisjoint(

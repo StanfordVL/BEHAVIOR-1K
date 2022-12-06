@@ -147,7 +147,6 @@ class DatasetObject(USDObject):
         #     mesh.attrib["filename"] = os.path.join(self.model_path, mesh.attrib["filename"])
 
         # Info that will be filled in at runtime
-        self.room_floor = None
         self.supporting_surfaces = None             # Dictionary mapping link names to surfaces represented by links
 
         # Make sure only one of bounding_box and scale are specified
@@ -652,11 +651,6 @@ class DatasetObject(USDObject):
     #     inertial_pos, inertial_orn = dynamics_info[3], dynamics_info[4]
     #     pos, orn = p.multiplyTransforms(pos, orn, inertial_pos, inertial_orn)
     #     self.set_position_orientation(pos, orn)
-
-    # TODO: remove after split floors
-    def set_room_floor(self, room_floor):
-        assert self.category == "floors"
-        self.room_floor = room_floor
 
     @property
     def native_bbox(self):

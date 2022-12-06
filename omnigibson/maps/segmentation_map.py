@@ -150,34 +150,6 @@ class SegmentationMap:
         z = self.floor_heights[floor]
         return floor, np.array([x, y, z])
 
-    # TODO: remove after split floors
-    def get_aabb_by_room_instance(self, room_instance):
-        """
-        Get AABB of the floor by room instance
-        :param room_instance: room instance (e.g. bathroom_1)
-        """
-        if room_instance not in self.room_ins_name_to_ins_id:
-            logging.warning("room_instance [{}] does not exist.".format(room_instance))
-            return None, None
-
-        ins_id = self.room_ins_name_to_ins_id[room_instance]
-        valid_idx = np.array(np.where(self.room_ins_map == ins_id))
-        u_min = np.min(valid_idx[0])
-        u_max = np.max(valid_idx[0])
-        v_min = np.min(valid_idx[1])
-        v_max = np.max(valid_idx[1])
-        x_a, y_a = self.seg_map_to_world(np.array([u_min, v_min]))
-        x_b, y_b = self.seg_map_to_world(np.array([u_max, v_max]))
-        x_min = np.min([x_a, x_b])
-        x_max = np.max([x_a, x_b])
-        y_min = np.min([y_a, y_b])
-        y_max = np.max([y_a, y_b])
-        # assume only 1 floor
-        floor = 0
-        z = self.floor_heights[floor]
-
-        return np.array([x_min, y_min, z]), np.array([x_max, y_max, z])
-
     def seg_map_to_world(self, xy):
         """
         Transforms a 2D point in map reference frame into world (simulator) reference frame

@@ -4,7 +4,7 @@ from omnigibson.macros import create_module_macros
 from omnigibson.object_states.heat_source_or_sink import HeatSourceOrSink
 from omnigibson.object_states.inside import Inside
 from omnigibson.object_states.object_state_base import AbsoluteObjectState
-from omnigibson.object_states.pose import Pose
+from omnigibson.object_states.aabb import AABB
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.python_utils import classproperty
 
@@ -23,7 +23,7 @@ m.TEMPERATURE_DECAY_SPEED = 0.02  # per second. We'll do the conversion to steps
 class Temperature(AbsoluteObjectState):
     @staticmethod
     def get_dependencies():
-        return AbsoluteObjectState.get_dependencies() + [Pose]
+        return AbsoluteObjectState.get_dependencies() + [AABB]
 
     @staticmethod
     def get_optional_dependencies():
@@ -55,11 +55,8 @@ class Temperature(AbsoluteObjectState):
                 # The heat source is toggled on. If it has a position, we check distance.
                 # If not, we check whether we are inside it or not.
                 if heat_source_position is not None:
-                    # Load our Pose. Note that this is cached already by the state.
-                    # Also note that this produces garbage values for fixed objects - but we are
-                    # assuming none of our temperature-enabled objects are fixed.
-                    position, _ = self.obj.states[Pose].get_value()
-
+                    aabb_lower, aabb_upper = self.obj.states[AABB].get_value()
+                    position = (aabb_lower + aabb_upper) / 2.0
                     # Compute distance to heat source from our position.
                     dist = T.l2_distance(heat_source_position, position)
                     if dist > heat_source.distance_threshold:

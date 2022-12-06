@@ -27,6 +27,7 @@ from omnigibson.objects.object_base import BaseObject
 from omnigibson.systems import get_system_from_element_name, get_element_name_from_system
 from omnigibson.renderer_settings.renderer_settings import RendererSettings
 from omnigibson.utils.constants import PrimType, EmitterType
+from omnigibson.utils.usd_utils import BoundingBoxAPI
 from omnigibson.object_states import Saturated
 
 
@@ -467,6 +468,7 @@ class StatefulObject(BaseObject):
             return
         for _, obj_state in self._states.items():
             obj_state.clear_cache()
+        BoundingBoxAPI.clear()
 
     def reset_states(self):
         """

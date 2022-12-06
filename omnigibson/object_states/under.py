@@ -14,13 +14,14 @@ class Under(KinematicsMixin, RelativeObjectState, BooleanState):
         return KinematicsMixin.get_dependencies() + RelativeObjectState.get_dependencies() + [VerticalAdjacency]
 
     def _set_value(self, other, new_value):
+        if not new_value:
+            raise NotImplementedError("Under does not support set_value(False)")
+
         state = self._simulator.dump_state(serialized=False)
 
         for _ in range(10):
-            sampling_success = sample_kinematics("under", self.obj, other, new_value)
+            sampling_success = sample_kinematics("under", self.obj, other)
             if sampling_success:
-                self.obj.clear_cached_states()
-                other.clear_cached_states()
                 if self.get_value(other) != new_value:
                     sampling_success = False
                 if omnigibson.debug_sampling:

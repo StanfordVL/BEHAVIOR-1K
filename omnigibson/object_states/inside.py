@@ -6,7 +6,6 @@ from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.adjacency import HorizontalAdjacency, VerticalAdjacency, flatten_planes
 from omnigibson.object_states.kinematics import KinematicsMixin
 from omnigibson.object_states.object_state_base import BooleanState, RelativeObjectState
-from omnigibson.object_states.pose import Pose
 from omnigibson.utils.object_state_utils import sample_kinematics
 from omnigibson.utils.usd_utils import BoundingBoxAPI
 
@@ -14,18 +13,19 @@ from omnigibson.utils.usd_utils import BoundingBoxAPI
 class Inside(KinematicsMixin, RelativeObjectState, BooleanState):
     @staticmethod
     def get_dependencies():
-        return KinematicsMixin.get_dependencies() + [AABB, Pose, HorizontalAdjacency, VerticalAdjacency]
+        return KinematicsMixin.get_dependencies() + [AABB, HorizontalAdjacency, VerticalAdjacency]
 
     def _set_value(self, other, new_value, use_ray_casting_method=False):
+        if not new_value:
+            raise NotImplementedError("Inside does not support set_value(False)")
+
         state = self._simulator.dump_state(serialized=False)
 
         for _ in range(10):
             sampling_success = sample_kinematics(
-                "inside", self.obj, other, new_value, use_ray_casting_method=use_ray_casting_method
+                "inside", self.obj, other, use_ray_casting_method=use_ray_casting_method
             )
             if sampling_success:
-                self.obj.clear_cached_states()
-                other.clear_cached_states()
                 if self.get_value(other) != new_value:
                     sampling_success = False
                 if omnigibson.debug_sampling:
@@ -43,10 +43,11 @@ class Inside(KinematicsMixin, RelativeObjectState, BooleanState):
         # Since we usually check for a small set of outer objects, this is cheap.
         # Also note that this produces garbage values for fixed objects - but we are
         # assuming none of our inside-checking objects are fixed.
-        inner_object_pos, _ = self.obj.states[Pose].get_value()
-        outer_object_AABB = other.states[AABB].get_value()
+        aabb_lower, aabb_upper = self.obj.states[AABB].get_value()
+        inner_object_pos = (aabb_lower + aabb_upper) / 2.0
+        outer_object_aabb = other.states[AABB].get_value()
 
-        if not BoundingBoxAPI.aabb_contains_point(inner_object_pos, outer_object_AABB):
+        if not BoundingBoxAPI.aabb_contains_point(inner_object_pos, outer_object_aabb):
             return False
 
         # Our definition of inside: an object A is inside an object B if there

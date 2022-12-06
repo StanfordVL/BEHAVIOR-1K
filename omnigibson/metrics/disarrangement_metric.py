@@ -3,9 +3,8 @@ import copy
 import numpy as np
 
 from omnigibson.metrics.metric_base import MetricBase
-from omnigibson.object_states import Inside, NextTo, OnFloor, OnTop, Pose, Touching, Under
+from omnigibson.object_states import Inside, NextTo, OnTop, Pose, Touching, Under
 from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
-from omnigibson.object_states.on_floor import RoomFloor
 from omnigibson.objects.multi_object_wrappers import ObjectMultiplexer
 from omnigibson.robots.robot_base import BaseRobot
 
@@ -145,20 +144,13 @@ class LogicalDisarrangement(MetricBase):
         self.next_state_cache = {}
 
     @staticmethod
-    def cache_single_object(obj_id, obj, room_floors, env):
+    def cache_single_object(obj_id, obj, env):
         obj_cache = {}
         for state_class, state in obj.states.items():
             if not isinstance(state, BooleanState):
                 continue
             if isinstance(state, AbsoluteObjectState):
                 obj_cache[state_class] = state.get_value()
-            # TODO (mjlbach): room floors are not currently proper objects, this means special logic
-            # is needed to handle onFloor until this is fixed
-            elif isinstance(state, OnFloor):
-                relational_state_cache = {}
-                for floor_id, floor in room_floors.items():
-                    relational_state_cache[floor_id] = state.get_value(floor)
-                obj_cache[state_class] = relational_state_cache
             else:
                 relational_state_cache = {}
                 for target_obj_id, target_obj in env.scene.objects_by_name.items():
@@ -175,18 +167,6 @@ class LogicalDisarrangement(MetricBase):
         return obj_cache
 
     def create_object_logical_state_cache(self, env):
-        room_floors = {
-            "room_floor_"
-            + room_inst: RoomFloor(
-                category="room_floor",
-                name="room_floor_" + room_inst,
-                scene=env.scene,
-                room_instance=room_inst,
-                floor_obj=env.scene.objects_by_name["floors"],
-            )
-            for room_inst in env.scene.room_ins_name_to_ins_id.keys()
-        }
-
         state_cache = {}
         for obj_id, obj in env.scene.objects_by_name.items():
             if isinstance(obj, BaseRobot):
@@ -194,16 +174,16 @@ class LogicalDisarrangement(MetricBase):
             state_cache[obj_id] = {}
             if type(obj) == ObjectMultiplexer:
                 if obj.current_index == 0:
-                    cache_base = self.cache_single_object(obj_id, obj._multiplexed_objects[0], room_floors, env)
+                    cache_base = self.cache_single_object(obj_id, obj._multiplexed_objects[0], env)
                     cache_part_1 = None
                     cache_part_2 = None
                 else:
                     cache_base = None
                     cache_part_1 = self.cache_single_object(
-                        obj_id, obj._multiplexed_objects[1].objects[0], room_floors, env.task
+                        obj_id, obj._multiplexed_objects[1].objects[0], env.task
                     )
                     cache_part_2 = self.cache_single_object(
-                        obj_id, obj._multiplexed_objects[1].objects[1], room_floors, env.task
+                        obj_id, obj._multiplexed_objects[1].objects[1], env.task
                     )
                 state_cache[obj_id] = {
                     "base_states": cache_base,
@@ -212,7 +192,7 @@ class LogicalDisarrangement(MetricBase):
                     "type": "multiplexer",
                 }
             else:
-                cache_base = self.cache_single_object(obj_id, obj, room_floors, env.task)
+                cache_base = self.cache_single_object(obj_id, obj, env.task)
                 state_cache[obj_id] = {
                     "base_states": cache_base,
                     "type": "standard",
@@ -226,7 +206,7 @@ class LogicalDisarrangement(MetricBase):
         for state in obj_1_states:
             total_states += 1
             if obj_1_states[state] != obj_2_states[state]:
-                if state in [Inside, Under, OnTop, Touching, OnFloor]:
+                if state in [Inside, Under, OnTop, Touching]:
                     kinematic_edits = 1
                 elif state in [NextTo]:
                     pass

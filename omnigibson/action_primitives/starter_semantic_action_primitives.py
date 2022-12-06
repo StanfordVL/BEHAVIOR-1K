@@ -19,8 +19,7 @@ from scipy.spatial.transform import Rotation
 from omnigibson import object_states
 from omnigibson.action_primitives.action_primitive_set_base import ActionPrimitiveError, BaseActionPrimitiveSet
 # from omnigibson.external.pybullet_tools.utils import set_joint_position
-from omnigibson.object_states.on_floor import RoomFloor
-from omnigibson.utils.object_state_utils import get_center_extent, sample_kinematics
+from omnigibson.utils.object_state_utils import sample_kinematics
 # from omnigibson.objects.articulated_object import URDFObject
 # from omnigibson.objects.object_base import BaseObject
 # from omnigibson.robots import BaseRobot, behavior_robot
@@ -207,7 +206,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             self.addressable_objects = [
                 item
                 for item in self.task.object_scope.values()
-                if isinstance(item, URDFObject) or isinstance(item, RoomFloor)
+                if isinstance(item, URDFObject)
             ]
         else:
             self.addressable_objects = set(self.scene.objects_by_name.values())
@@ -629,12 +628,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         yield from self._navigate_to_obj(obj, pos_on_obj=pos_on_obj, **kwargs)
 
     def _navigate_to_obj(self, obj, pos_on_obj=None, **kwargs):
-        if isinstance(obj, RoomFloor):
-            # TODO(lowprio-MP): Pos-on-obj for the room navigation?
-            pose = self._sample_pose_in_room(obj.room_instance)
-        else:
-            pose = self._sample_pose_near_object(obj, pos_on_obj=pos_on_obj, **kwargs)
-
+        pose = self._sample_pose_near_object(obj, pos_on_obj=pos_on_obj, **kwargs)
         yield from self._navigate_to_pose(pose)
 
     def _navigate_to_pose_direct(self, pose_2d, low_precision=False):
@@ -688,7 +682,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
     @staticmethod
     def _sample_position_on_aabb_face(target_obj):
-        aabb_center, aabb_extent = get_center_extent(target_obj.states)
+        aabb_lower, aabb_upper = target_obj.states[object_states.AABB].get_value()
+        aabb_center, aabb_extent = (aabb_lower + aabb_upper) / 2.0, aabb_upper - aabb_lower
         # We want to sample only from the side-facing faces.
         face_normal_axis = random.choice([0, 1])
         face_normal_direction = random.choice([-1, 1])
