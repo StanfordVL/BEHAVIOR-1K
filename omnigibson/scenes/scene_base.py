@@ -38,15 +38,6 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         super().__init__()
 
     @property
-    def stage(self) -> Usd.Stage:
-        """[summary]
-
-        Returns:
-            Usd.Stage: [description]
-        """
-        return get_current_stage()
-
-    @property
     def registry(self):
         """
         Returns:

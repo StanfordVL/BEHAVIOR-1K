@@ -124,7 +124,6 @@ class InteractiveTraversableScene(TraversableScene):
         self.load_object_categories = None
         self.not_load_object_categories = None
         self.load_room_instances = None
-        self._stage = None
 
         # self.scene_tree = ET.parse(self.scene_file)
         # self.pybullet_filename = pybullet_filename
@@ -701,7 +700,6 @@ class InteractiveTraversableScene(TraversableScene):
         self.initialize_systems(simulator)
 
         # Store stage reference and refresh world prim reference
-        self._stage = simulator.stage
         self._world_prim = simulator.world_prim
 
         # Check if current stage is a template based on ig:isTemplate value, and set the value to False if it does not exist
