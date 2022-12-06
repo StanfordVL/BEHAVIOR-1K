@@ -3,7 +3,7 @@ from collections import namedtuple
 import numpy as np
 
 from omnigibson.macros import create_module_macros
-from omnigibson.object_states.object_state_base import CachingEnabledObjectState
+from omnigibson.object_states.object_state_base import AbsoluteObjectState
 from omnigibson.object_states.pose import Pose
 from omnigibson.utils.sampling_utils import raytest_batch
 
@@ -126,12 +126,12 @@ def compute_adjacencies(obj, axes, max_distance):
     return bodies_by_axis
 
 
-class VerticalAdjacency(CachingEnabledObjectState):
+class VerticalAdjacency(AbsoluteObjectState):
     """State representing the object's vertical adjacencies.
     Value is a AxisAdjacencyList object.
     """
 
-    def _compute_value(self):
+    def _get_value(self):
         # Call the adjacency computation with th Z axis.
         bodies_by_axis = compute_adjacencies(self.obj, np.array([[0, 0, 1]]), m.MAX_DISTANCE_VERTICAL)
 
@@ -143,12 +143,12 @@ class VerticalAdjacency(CachingEnabledObjectState):
 
     @staticmethod
     def get_dependencies():
-        return CachingEnabledObjectState.get_dependencies() + [Pose]
+        return AbsoluteObjectState.get_dependencies() + [Pose]
 
     # Nothing needs to be done to save/load adjacency since it will happen due to pose caching.
 
 
-class HorizontalAdjacency(CachingEnabledObjectState):
+class HorizontalAdjacency(AbsoluteObjectState):
     """State representing the object's horizontal adjacencies in a preset number of directions.
 
     The HorizontalAdjacency state returns adjacency lists for equally spaced coordinate planes.
@@ -167,7 +167,7 @@ class HorizontalAdjacency(CachingEnabledObjectState):
     2 * m.HORIZONTAL_AXIS_COUNT directions.
     """
 
-    def _compute_value(self):
+    def _get_value(self):
         coordinate_planes = get_equidistant_coordinate_planes(m.HORIZONTAL_AXIS_COUNT)
 
         # Flatten the axis dimension and input into compute_adjacencies.
@@ -184,6 +184,6 @@ class HorizontalAdjacency(CachingEnabledObjectState):
 
     @staticmethod
     def get_dependencies():
-        return CachingEnabledObjectState.get_dependencies() + [Pose]
+        return AbsoluteObjectState.get_dependencies() + [Pose]
 
     # Nothing needs to be done to save/load adjacency since it will happen due to pose caching.

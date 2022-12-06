@@ -134,9 +134,6 @@ class Attached(RelativeObjectState, BooleanState, ContactSubscribedStateMixin):
             body1=f"{self.obj.prim_path}/base_link",
         )
 
-        # We need to step rendering once to auto-fill the local pose before overwriting it.
-        og.sim.render()
-
         # Set the local pose of the attachment joint.
         parent_pos, parent_quat = other.get_position_orientation()
         child_pos, child_quat = self.obj.get_position_orientation()

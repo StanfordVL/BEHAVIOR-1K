@@ -10,7 +10,7 @@ from omnigibson.systems.particle_system_base import BaseParticleSystem
 from omnigibson.utils.constants import SemanticClass
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
 from omnigibson.utils.python_utils import classproperty, assert_valid_key, subclass_factory
-from omnigibson.utils.sampling_utils import sample_cuboid_on_object_symmetric_bimodal_distribution
+from omnigibson.utils.sampling_utils import sample_cuboid_on_object_full_grid_topdown
 from omnigibson.utils.usd_utils import create_joint, array_to_vtarray
 from omnigibson.utils.ui_utils import disclaimer
 from omnigibson.utils.physx_utils import create_physx_particle_system, create_physx_particleset_pointinstancer, \
@@ -405,6 +405,9 @@ class MicroParticleSystem(BaseParticleSystem):
     # Material -- either a MaterialPrim or None if no material is used for this particle system
     _material = None
 
+    # Color associated with this system (NOTE: external queries should call cls.color)
+    _color = None
+
     # Scaling factor to sample from when generating a new particle
     min_scale = None                # (x,y,z) scaling
     max_scale = None                # (x,y,z) scaling
@@ -531,18 +534,22 @@ class MicroParticleSystem(BaseParticleSystem):
             # We also modify the grid smoothing radius to avoid "blobby" appearances
             cls.prim.GetAttribute("physxParticleIsosurface:gridSmoothingRadius").Set(0.0001)
 
-        # # Create dummy
-        # create_physx_particleset_pointinstancer(
-        #     name="dummy",
-        #     particle_system_path=cls.prim_path,
-        #     particle_group=0,
-        #     positions=np.zeros((1, 3)),
-        #     fluid=cls.is_fluid,
-        #     particle_mass=0.001,
-        #     particle_density=None,#cls.particle_density,
-        #     prototype_prim_paths=[pp.GetPrimPath().pathString for pp in cls.particle_prototypes],
-        #     enabled=not cls.visual_only,
-        # )
+        # Set the color for this system
+        if cls._material is not None:
+            base_color_weight = cls._material.diffuse_reflection_weight
+            transmission_weight = cls._material.enable_specular_transmission * cls._material.specular_transmission_weight
+            total_weight = base_color_weight + transmission_weight
+            if total_weight == 0.0:
+                # If the fluid doesn't have any color, we add a "blue" tint by default
+                color = np.array([0.0, 0.0, 1.0])
+            else:
+                base_color_weight /= total_weight
+                transmission_weight /= total_weight
+                # Weighted sum of base color and transmission color
+                color = base_color_weight * cls._material.diffuse_reflection_color + \
+                        transmission_weight * (0.5 * cls._material.specular_transmission_color + \
+                                               0.5 * cls._material.specular_transmission_scattering_color)
+            cls._color = color
 
     @classmethod
     def reset(cls):
@@ -567,6 +574,10 @@ class MicroParticleSystem(BaseParticleSystem):
                 system already on the stage
         """
         return is_prim_path_valid(cls.prim_path)
+
+    @classproperty
+    def color(cls):
+        return cls._color
 
     @classproperty
     def is_fluid(cls):
@@ -973,6 +984,80 @@ class MicroParticleSystem(BaseParticleSystem):
         )
 
     @classmethod
+    def generate_particle_instancer_on_object(
+            cls,
+            obj,
+            idn=None,
+            particle_group=0,
+            sampling_distance=None,
+            max_samples=5e5,
+            self_collision=True,
+            prototype_indices_choices=None,
+    ):
+        """
+        Generates @n_particles new particle objects and samples their locations on the top surface of object @obj
+
+        Args:
+            obj (BaseObject): Object on which to generate a particle instancer with sampled particles on the object's
+                top surface
+            idn (None or int): Unique identification number to assign to this particle instancer. This is used to
+                deterministically reproduce individual particle instancer states dynamically, even if we
+                delete / add additional ones at runtime during simulation. If None, this system will generate a unique
+                identifier automatically.
+            particle_group (int): ID for this particle set. Particles from different groups will automatically collide
+            sampling_distance (None or float): If specified, sets the distance between sampled particles. If None,
+                a simulator autocomputed value will be used
+            max_samples (int): Maximum number of particles to sample
+            self_collision (bool): Whether to enable particle-particle collision within the set
+                (as defined by @particle_group) or not
+            prototype_indices_choices (None or int or list of int): If specified, should specify which prototype(s)
+                should be used for each particle. If None, will use all 0s (i.e.: the first prototype created). If a
+                single number, will use that prototype ID for all sampled particles. If a list of int, will uniformly
+                sample from those IDs for each particle.
+
+        Returns:
+            PhysxParticleInstancer: Generated particle instancer
+        """
+        # We densely sample a grid of points by ray-casting from top to bottom to find the valid positions
+        radius = cls.particle_radius
+        results = sample_cuboid_on_object_full_grid_topdown(
+            obj,
+            # the grid is fully dense - particles are sitting next to each other
+            ray_spacing=radius * 2 if sampling_distance is None else sampling_distance,
+            # assume the particles are extremely small - sample cuboids of size 0 for better performance
+            cuboid_dimensions=np.zeros(3),
+            # raycast start inside the aabb in x-y plane and outside the aabb in the z-axis
+            aabb_offset=np.array([-radius, -radius, radius]),
+            # bottom padding should be the same as the particle radius
+            cuboid_bottom_padding=radius,
+            # undo_cuboid_bottom_padding should be False - the sampled positions are above the surface by its radius
+            undo_cuboid_bottom_padding=False,
+        )
+        particle_positions = np.array([result[0] for result in results if result[0] is not None])
+        # Also potentially sub-sample if we're past our limit
+        if len(particle_positions) > max_samples:
+            particle_positions = particle_positions[np.random.choice(len(particle_positions), size=(max_samples,), replace=False)]
+
+        # Get information about our sampled points
+        n_particles = len(particle_positions)
+        if prototype_indices_choices is not None:
+            prototype_indices = np.ones(n_particles, dtype=int) * prototype_indices_choices if \
+                isinstance(prototype_indices_choices, int) else \
+                np.random.choice(prototype_indices_choices, size=(n_particles,))
+        else:
+            prototype_indices = None
+
+        # Spawn the particles at the valid positions
+        cls.generate_particle_instancer(
+            n_particles=n_particles,
+            positions=particle_positions,
+            idn=idn,
+            particle_group=particle_group,
+            self_collision=self_collision,
+            prototype_indices=prototype_indices,
+        )
+
+    @classmethod
     def remove_particle_instancer(cls, name):
         """
         Removes particle instancer with name @name from this system.
@@ -1169,34 +1254,55 @@ class MicroParticleSystem(BaseParticleSystem):
 
         Currently, state_cache includes the following entries:
 
-        "particle_contacts": {
+        "obj_particle_contacts": {
             obj0: {
                 inst0: {particle_idx0, ...},
                 inst1: {...},
                 ...
             },
             obj1: ...,
-        }
+        },
+
+        where obji is an instance of BaseObject
+
+        "link_particle_contacts": {
+            link0: {
+                inst0: {particle_idx0, ...},
+                inst1: {...},
+                ...
+            },
+            link1: ...,
+        },
+
+        where linki is a string representing the link's (rigid body's) prim path
 
         """
-        particle_contacts = defaultdict(lambda: defaultdict(set))
+        obj_particle_contacts = defaultdict(lambda: defaultdict(set))
+        link_particle_contacts = defaultdict(lambda: defaultdict(set))
 
         particle_instancer = None
         particle_idx = 0
 
         def report_hit(hit):
-            base = "/".join(hit.rigid_body.split("/")[:-1])
+            base, body = "/".join(hit.rigid_body.split("/")[:-1]), hit.rigid_body.split("/")[-1]
             obj = cls.simulator.scene.object_registry("prim_path", base)
-            particle_contacts[obj][particle_instancer].add(particle_idx)
+            if obj is not None:
+                link = obj.links[body]
+                obj_particle_contacts[obj][particle_instancer].add(particle_idx)
+                link_particle_contacts[link][particle_instancer].add(particle_idx)
             return True
 
         for inst_name, inst in cls.particle_instancers.items():
+            visibilities = inst.particle_visibilities
             for idx, pos in enumerate(inst.particle_positions):
                 particle_idx = idx
                 particle_instancer = inst
-                get_physx_scene_query_interface().overlap_sphere(cls.particle_contact_offset, pos, report_hit, False)
+                # Only run the scene query if the particle is not hidden
+                if visibilities[idx]:
+                    get_physx_scene_query_interface().overlap_sphere(cls.particle_contact_offset, pos, report_hit, False)
 
-        cls.state_cache["particle_contacts"] = particle_contacts
+        cls.state_cache["obj_particle_contacts"] = obj_particle_contacts
+        cls.state_cache["link_particle_contacts"] = link_particle_contacts
 
 
 class FluidSystem(MicroParticleSystem):
@@ -1246,9 +1352,10 @@ class FluidSystem(MicroParticleSystem):
     def update(cls):
         # For each particle instance, garbage collect particles if the number of visible particles
         # is below the garbage collection threshold (m.GC_THRESHOLD)
-        for instancer, value in cls.particle_instancers.items(): # type: ignore
-            if np.mean(value.particle_visibilities) <= m.GC_THRESHOLD:
-                cls.remove_particle_instancer(instancer)
+        instancer_names = list(cls.particle_instancers.keys())
+        for inst_name in instancer_names: # type: ignore
+            if np.mean(cls.particle_instancers[inst_name].particle_visibilities) <= m.GC_THRESHOLD:
+                cls.remove_particle_instancer(inst_name)
 
     @classmethod
     def _create_particle_material_template(cls):

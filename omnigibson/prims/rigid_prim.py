@@ -107,35 +107,7 @@ class RigidPrim(XFormPrim):
         # Store references to owned visual / collision meshes
         # We iterate over all children of this object's prim,
         # and grab any that are presumed to be meshes
-        self._collision_meshes, self._visual_meshes = OrderedDict(), OrderedDict()
-        prims_to_check = []
-        coms, vols = [], []
-        for prim in self._prim.GetChildren():
-            prims_to_check.append(prim)
-            for child in prim.GetChildren():
-                prims_to_check.append(child)
-        for prim in prims_to_check:
-            if prim.GetPrimTypeInfo().GetTypeName() in GEOM_TYPES:
-                mesh_name, mesh_path = prim.GetName(), prim.GetPrimPath().__str__()
-                mesh = get_prim_at_path(prim_path=mesh_path)
-                mesh_kwargs = {"prim_path": mesh_path, "name": f"{self._name}:{mesh_name}"}
-                if mesh.HasAPI(UsdPhysics.CollisionAPI):
-                    self._collision_meshes[mesh_name] = CollisionGeomPrim(**mesh_kwargs)
-                    # We construct a trimesh object from this mesh in order to infer its center-of-mass and volume
-                    # TODO: Cleaner way to aggregate this information? Right now we just skip if we encounter a primitive
-                    mesh_vertices = mesh.GetAttribute("points").Get()
-                    if mesh_vertices is not None and len(mesh_vertices) >= 4:
-                        msh = mesh_prim_to_trimesh_mesh(mesh)
-                        coms.append(msh.center_mass)
-                        vols.append(msh.volume)
-                else:
-                    self._visual_meshes[mesh_name] = VisualGeomPrim(**mesh_kwargs)
-
-        # If we have any collision meshes, we aggregate their center of mass and volume values to set the center of mass
-        # for this link
-        if len(coms) > 0:
-            com = (np.array(coms) * np.array(vols).reshape(-1, 1)).sum(axis=0) / np.sum(vols)
-            self.set_attribute("physics:centerOfMass", Gf.Vec3f(*com))
+        self.update_meshes()
 
         # Set the visual-only attribute
         # This automatically handles setting collisions / gravity appropriately
@@ -179,6 +151,41 @@ class RigidPrim(XFormPrim):
             linear_velocity=lin_vel,
             angular_velocity=ang_vel,
         )
+
+    def update_meshes(self):
+        """
+        Helper function to refresh owned visual and collision meshes. Useful for synchronizing internal data if
+        additional bodies are added manually
+        """
+        self._collision_meshes, self._visual_meshes = OrderedDict(), OrderedDict()
+        prims_to_check = []
+        coms, vols = [], []
+        for prim in self._prim.GetChildren():
+            prims_to_check.append(prim)
+            for child in prim.GetChildren():
+                prims_to_check.append(child)
+        for prim in prims_to_check:
+            if prim.GetPrimTypeInfo().GetTypeName() in GEOM_TYPES:
+                mesh_name, mesh_path = prim.GetName(), prim.GetPrimPath().__str__()
+                mesh = get_prim_at_path(prim_path=mesh_path)
+                mesh_kwargs = {"prim_path": mesh_path, "name": f"{self._name}:{mesh_name}"}
+                if mesh.HasAPI(UsdPhysics.CollisionAPI):
+                    self._collision_meshes[mesh_name] = CollisionGeomPrim(**mesh_kwargs)
+                    # We construct a trimesh object from this mesh in order to infer its center-of-mass and volume
+                    # TODO: Cleaner way to aggregate this information? Right now we just skip if we encounter a primitive
+                    mesh_vertices = mesh.GetAttribute("points").Get()
+                    if mesh_vertices is not None and len(mesh_vertices) >= 4:
+                        msh = mesh_prim_to_trimesh_mesh(mesh)
+                        coms.append(msh.center_mass)
+                        vols.append(msh.volume)
+                else:
+                    self._visual_meshes[mesh_name] = VisualGeomPrim(**mesh_kwargs)
+
+        # If we have any collision meshes, we aggregate their center of mass and volume values to set the center of mass
+        # for this link
+        if len(coms) > 0:
+            com = (np.array(coms) * np.array(vols).reshape(-1, 1)).sum(axis=0) / np.sum(vols)
+            self.set_attribute("physics:centerOfMass", Gf.Vec3f(*com))
 
     # def _create_contact_sensor(self):
     #     """

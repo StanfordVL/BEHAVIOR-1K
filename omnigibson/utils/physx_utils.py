@@ -250,6 +250,6 @@ def create_physx_particleset_pointinstancer(
         # TODO: Follow-up / cleanup with omni team to see if this is expected BEHAVIOR
         og.sim.step_physics()
         with og.sim.paused():
-            og.sim.step()
+            og.app.update()
 
     return instancer_prim

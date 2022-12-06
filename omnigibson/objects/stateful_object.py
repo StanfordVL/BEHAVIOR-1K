@@ -20,14 +20,14 @@ from omnigibson.object_states.factory import (
     get_steam_states,
     get_texture_change_priority,
 )
-from omnigibson.object_states.object_state_base import REGISTERED_OBJECT_STATES, CachingEnabledObjectState
+from omnigibson.object_states.object_state_base import REGISTERED_OBJECT_STATES
 from omnigibson.object_states.heat_source_or_sink import HeatSourceOrSink
 from omnigibson.object_states.heated import Heated
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.systems import get_system_from_element_name, get_element_name_from_system
 from omnigibson.renderer_settings.renderer_settings import RendererSettings
 from omnigibson.utils.constants import PrimType, EmitterType
-from omnigibson.object_states import Soaked
+from omnigibson.object_states import Saturated
 
 
 # Optionally import bddl for object taxonomy.
@@ -139,12 +139,6 @@ class StatefulObject(BaseObject):
         for state in self._states.values():
             state.initialize(self._simulator)
 
-    def initialize_states(self):
-        """
-        Initializes states for this object, and also clears any states that were existing beforehand.
-        """
-        self._states = OrderedDict()
-
     def add_state(self, state):
         """
         Adds state @state with name @name to self.states.
@@ -196,7 +190,7 @@ class StatefulObject(BaseObject):
                     state_types_and_params.append((dependency, {}))
 
         # Now generate the states in topological order.
-        self.initialize_states()
+        self._states = OrderedDict()
         for state_type, params in reversed(state_types_and_params):
             self._states[state_type] = get_object_state_instance(state_type, self, params)
 
@@ -208,7 +202,6 @@ class StatefulObject(BaseObject):
 
         if len(set(self.states) & set(get_fire_states())) > 0 and self.states[HeatSourceOrSink].get_state_link_name() in self._links:
             self._create_emitter_apis(EmitterType.FIRE)
-
 
     def _create_emitter_apis(self, emitter_type):
         """
@@ -336,7 +329,7 @@ class StatefulObject(BaseObject):
         emitter_enabled = defaultdict(bool)
         for state_type, state in self.states.items():
             if state_type in get_texture_change_states():
-                if state_type == Soaked:
+                if state_type == Saturated:
                     for fluid_system in state.absorbed_particle_system_count.keys():
                         if state.get_value(fluid_system):
                             texture_change_states.append(state)
@@ -393,6 +386,21 @@ class StatefulObject(BaseObject):
 
         if not np.allclose(material.diffuse_tint, diffuse_tint):
             material.diffuse_tint = diffuse_tint
+
+    def remove(self, simulator=None):
+        """
+        Removes this prim from omniverse stage
+
+        Args:
+            simulator (None or SimulationContext): If specified, should be simulator into which this prim will be
+                removed. Otherwise, it will be removed from the default stage
+        """
+        # Iterate over all states and run their remove call
+        for state_instance in self._states.values():
+            state_instance.remove()
+
+        # Run super
+        super().remove(simulator=simulator)
 
     def _dump_state(self):
         # Grab state from super class
@@ -451,12 +459,31 @@ class StatefulObject(BaseObject):
         return state_dic, idx
 
     def clear_cached_states(self):
+        """
+        Clears the internal cache from all owned states
+        """
         # Check self._states just in case states have not been initialized yet.
         if not self._states:
             return
         for _, obj_state in self._states.items():
-            if isinstance(obj_state, CachingEnabledObjectState):
-                obj_state.clear_cached_value()
+            obj_state.clear_cache()
+
+    def reset_states(self):
+        """
+        Resets all object states' internal values
+        """
+        # Check self._states just in case states have not been initialized yet.
+        if not self._states:
+            return
+        for _, obj_state in self._states.items():
+            obj_state.reset()
+
+    def reset(self):
+        # Call super first
+        super().reset()
+
+        # Reset all states
+        self.reset_states()
 
     def set_position_orientation(self, position=None, orientation=None):
         super().set_position_orientation(position=position, orientation=orientation)

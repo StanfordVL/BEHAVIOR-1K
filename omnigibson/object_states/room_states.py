@@ -1,12 +1,12 @@
 import numpy as np
 
-from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanState, CachingEnabledObjectState
+from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
 
 
-class InsideRoomTypes(CachingEnabledObjectState):
+class InsideRoomTypes(AbsoluteObjectState):
     """The value of this state is the list of rooms that the object currently is in."""
 
-    def _compute_value(self):
+    def _get_value(self):
         if hasattr(self.obj, "fixed_base") and self.obj.fixed_base:
             # For fixed objects, we can use the in_rooms attribute.
             if hasattr(self.obj, "in_rooms") and self.obj.in_rooms:
@@ -28,7 +28,7 @@ class IsInRoomTemplate(AbsoluteObjectState, BooleanState):
 
     @staticmethod
     def get_dependencies():
-        return CachingEnabledObjectState.get_dependencies() + [InsideRoomTypes]
+        return AbsoluteObjectState.get_dependencies() + [InsideRoomTypes]
 
     def _get_value(self):
         assert self.ROOM_TYPE, "IsInRoomTemplate should only be used through subclasses."

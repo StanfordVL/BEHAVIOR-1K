@@ -192,6 +192,9 @@ def create_joint(prim_path, joint_type, body0=None, body1=None, enabled=True, st
     # Possibly (un-/)enable this joint
     joint_prim.GetAttribute("physics:jointEnabled").Set(enabled)
 
+    # We need to step rendering once to auto-fill the local pose before overwriting it.
+    og.sim.render()
+
     # Return this joint
     return joint_prim
 

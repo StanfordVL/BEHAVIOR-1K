@@ -1,7 +1,7 @@
 import numpy as np
 
 from omnigibson.macros import create_module_macros
-from omnigibson.object_states.object_state_base import BooleanState, CachingEnabledObjectState
+from omnigibson.object_states.object_state_base import BooleanState, AbsoluteObjectState
 from omnigibson.object_states.pose import Pose
 from omnigibson.object_states.room_states import InsideRoomTypes
 from omnigibson.utils.constants import MAX_INSTANCE_COUNT
@@ -25,12 +25,12 @@ def _get_robot(simulator):
     return valid_robots[0]
 
 
-class InReachOfRobot(CachingEnabledObjectState, BooleanState):
+class InReachOfRobot(AbsoluteObjectState, BooleanState):
     @staticmethod
     def get_dependencies():
-        return CachingEnabledObjectState.get_dependencies() + [Pose]
+        return AbsoluteObjectState.get_dependencies() + [Pose]
 
-    def _compute_value(self):
+    def _get_value(self):
         robot = _get_robot(self._simulator)
         if not robot:
             return False
@@ -43,12 +43,12 @@ class InReachOfRobot(CachingEnabledObjectState, BooleanState):
         raise NotImplementedError("InReachOfRobot state currently does not support setting.")
 
 
-class InSameRoomAsRobot(CachingEnabledObjectState, BooleanState):
+class InSameRoomAsRobot(AbsoluteObjectState, BooleanState):
     @staticmethod
     def get_dependencies():
-        return CachingEnabledObjectState.get_dependencies() + [Pose, InsideRoomTypes]
+        return AbsoluteObjectState.get_dependencies() + [Pose, InsideRoomTypes]
 
-    def _compute_value(self):
+    def _get_value(self):
         robot = _get_robot(self._simulator)
         if not robot:
             return False
@@ -67,8 +67,8 @@ class InSameRoomAsRobot(CachingEnabledObjectState, BooleanState):
         raise NotImplementedError("InSameRoomAsRobot state currently does not support setting.")
 
 
-class InHandOfRobot(CachingEnabledObjectState, BooleanState):
-    def _compute_value(self):
+class InHandOfRobot(AbsoluteObjectState, BooleanState):
+    def _get_value(self):
         robot = _get_robot(self._simulator)
         if not robot:
             return False
@@ -86,12 +86,12 @@ class InHandOfRobot(CachingEnabledObjectState, BooleanState):
         raise NotImplementedError("InHandOfRobot state currently does not support setting.")
 
 
-class InFOVOfRobot(CachingEnabledObjectState, BooleanState):
+class InFOVOfRobot(AbsoluteObjectState, BooleanState):
     @staticmethod
     def get_optional_dependencies():
-        return CachingEnabledObjectState.get_optional_dependencies() + [ObjectsInFOVOfRobot]
+        return AbsoluteObjectState.get_optional_dependencies() + [ObjectsInFOVOfRobot]
 
-    def _compute_value(self):
+    def _get_value(self):
         robot = _get_robot(self._simulator)
         if not robot:
             return False
@@ -103,11 +103,11 @@ class InFOVOfRobot(CachingEnabledObjectState, BooleanState):
         raise NotImplementedError("InFOVOfRobot state currently does not support setting.")
 
 
-class ObjectsInFOVOfRobot(CachingEnabledObjectState):
+class ObjectsInFOVOfRobot(AbsoluteObjectState):
     def __init__(self, *args, **kwargs):
-        super(CachingEnabledObjectState, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
-    def _compute_value(self):
+    def _get_value(self):
         # Pass the FOV through the instance-to-body ID mapping.
         seg = self._simulator.renderer.render_single_robot_camera(self.obj, modes="ins_seg")[0][:, :, 0]
         seg = np.round(seg * MAX_INSTANCE_COUNT).astype(int)

@@ -122,7 +122,7 @@ def sample_kinematics(
                     cuboid_dimensions=parallel_bbox_extents,
                     axis_probabilities=[0, 0, 1],
                     refuse_downwards=True,
-                    undo_padding=True,
+                    undo_cuboid_bottom_padding=True,
                     **params,
                 )
 

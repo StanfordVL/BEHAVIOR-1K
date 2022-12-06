@@ -3,6 +3,7 @@ from collections import OrderedDict
 from omnigibson import og_dataset_path
 from omnigibson.macros import create_module_macros
 import omnigibson.utils.transform_utils as T
+from omnigibson.utils.python_utils import classproperty
 from omnigibson.object_states import *
 from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
 
@@ -75,8 +76,8 @@ class Sliced(AbsoluteObjectState, BooleanState):
 
         return True
 
-    @property
-    def stateful(self):
+    @classproperty
+    def stateful(cls):
         return True
 
     def _dump_state(self):

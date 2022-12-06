@@ -33,6 +33,33 @@ def get_particle_positions_in_frame(pos, quat, scale, particle_positions):
     return particle_positions / scale.reshape(1, 3)
 
 
+def get_particle_positions_from_frame(pos, quat, scale, particle_positions):
+    """
+    Transforms particle positions @positions from the frame specified by @pos and @quat with new scale @scale.
+
+    This is similar to @get_particle_positions_in_frame, but does the reverse operation, inverting @pos and @quat
+
+    Args:
+        pos (3-array): (x,y,z) pos of the local frame
+        quat (4-array): (x,y,z,w) quaternion orientation of the local frame
+        scale (3-array): (x,y,z) local scale of the local frame
+        particle_positions ((N, 3) array): positions
+
+    Returns:
+        (N,) array: updated particle positions in the parent coordinate frame
+    """
+    # Scale by the new scale
+    particle_positions = particle_positions * scale.reshape(1, 3)
+
+    # Get pose of origin (global frame) in new_frame
+    origin_in_new_frame = T.pose2mat((pos, quat))
+    # Batch the transforms to get all particle points in the local link frame
+    positions_tensor = np.tile(np.eye(4).reshape(1, 4, 4), (len(particle_positions), 1, 1))  # (N, 4, 4)
+    # Scale by the new scale#
+    positions_tensor[:, :3, 3] = particle_positions
+    return (origin_in_new_frame @ positions_tensor)[:, :3, 3]  # (N, 3)
+
+
 def check_points_in_cube(size, pos, quat, scale, particle_positions):
     """
     Checks which points are within a cube with specified size @size.
@@ -57,6 +84,36 @@ def check_points_in_cube(size, pos, quat, scale, particle_positions):
         particle_positions=particle_positions,
     )
     return ((-size / 2.0 < particle_positions) & (particle_positions < size / 2.0)).sum(axis=-1) == 3
+
+
+def check_points_in_cone(size, pos, quat, scale, particle_positions):
+    """
+    Checks which points are within a cone with specified size @size.
+
+    NOTE: Assumes the cone and positions are
+    expressed in the same coordinate frame such that the cone's height is aligned with the z-axis
+
+    Args:
+        size (2-array): (radius, height) dimensions of the cone, specified in its local frame
+        pos (3-array): (x,y,z) local location of the cone
+        quat (4-array): (x,y,z,w) local orientation of the cone
+        scale (3-array): (x,y,z) local scale of the cone, specified in its local frame
+        particle_positions ((N, 3) array): positions to check for whether it is in the cone
+
+    Returns:
+        (N,) array: boolean numpy array specifying whether each point lies in the cone.
+    """
+    particle_positions = get_particle_positions_in_frame(
+        pos=pos,
+        quat=quat,
+        scale=scale,
+        particle_positions=particle_positions,
+    )
+    radius, height = size
+    in_height = (-height / 2.0 < particle_positions[:, -1]) & (particle_positions[:, -1] < height / 2.0)
+    in_radius = np.linalg.norm(particle_positions[:, :-1], axis=-1) < \
+                (radius * (1 - (particle_positions[:, -1] + height / 2.0) / height ))
+    return in_height & in_radius
 
 
 def check_points_in_cylinder(size, pos, quat, scale, particle_positions):
@@ -187,18 +244,16 @@ def generate_points_in_volume_checker_function(obj, volume_link, use_visual_mesh
             where @vol is the total volume being checked (expressed in global scale) aggregated across
             all container sub-volumes
     """
-    # If the object doesn't have scale [1, 1, 1], we make sure the volume link has no relative orientation w.r.t to
+    # If the object doesn't uniform scale, we make sure the volume link has no relative orientation w.r.t to
     # the object (root link) frame
-    # TODO (eric): make this more general: convert particle_positions from 1) global frame -> 2) object frame ->
-    #  3) link frame -> 4) mesh frame.
-    if not np.all(np.isclose(obj.scale, 1, atol=1e-3)):
+    # TODO: Can we remove this restriction in the future? The current paradigm of how scale operates makes this difficult
+    if (obj.scale.max() - obj.scale.min()) > 1e-3:
         volume_link_quat = volume_link.get_orientation()
         object_quat = obj.get_orientation()
         quat_distance = T.quat_distance(volume_link_quat, object_quat)
         assert np.isclose(quat_distance[3], 1, atol=1e-3), \
             f"Volume link must have no relative orientation w.r.t the root link! (i.e.: quat distance [0, 0, 0, 1])! " \
             f"Got quat distance: {quat_distance}"
-
     # Iterate through all visual meshes and keep track of any that are prefixed with container
     container_meshes = []
     meshes = volume_link.visual_meshes if use_visual_meshes else volume_link.collision_meshes
@@ -247,6 +302,15 @@ def generate_points_in_volume_checker_function(obj, volume_link, use_visual_mesh
                 particle_positions=particle_positions,
             )
             vol_fcn = lambda mesh: np.pi * (mesh.GetAttribute("radius").Get() ** 2) * mesh.GetAttribute("height").Get()
+        elif mesh_type == "Cone":
+            fcn = lambda mesh, particle_positions: check_points_in_cone(
+                size=[mesh.GetAttribute("radius").Get(), mesh.GetAttribute("height").Get()],
+                pos=np.array(mesh.GetAttribute("xformOp:translate").Get()),
+                quat=np.array([*(mesh.GetAttribute("xformOp:orient").Get().imaginary), mesh.GetAttribute("xformOp:orient").Get().real]),
+                scale=np.array(mesh.GetAttribute("xformOp:scale").Get()),
+                particle_positions=particle_positions,
+            )
+            vol_fcn = lambda mesh: np.pi * (mesh.GetAttribute("radius").Get() ** 2) * mesh.GetAttribute("height").Get() / 3.0
         elif mesh_type == "Cube":
             fcn = lambda mesh, particle_positions: check_points_in_cube(
                 size=mesh.GetAttribute("size").Get(),
@@ -265,15 +329,14 @@ def generate_points_in_volume_checker_function(obj, volume_link, use_visual_mesh
     # Define the actual volume checker function
     def check_points_in_volumes(particle_positions):
         # Algo
-        # 1. Particles in global frame --> particles in volume link frame
-        # 2. Re-scale particles according to object top-level scale
-        # 3. For each volume checker function, apply volume checking
-        # 4. Aggregate across all functions with OR condition (any volume satisfied for that point)
+        # 1. Particles in global frame --> particles in volume link frame (including scaling)
+        # 2. For each volume checker function, apply volume checking
+        # 3. Aggregate across all functions with OR condition (any volume satisfied for that point)
         ######
 
         n_particles = len(particle_positions)
         # Get pose of origin (global frame) in frame of volume link
-        # TODO (eric): this seems to assume there is no relative scaling between obj and volume link
+        # NOTE: This assumes there is no relative scaling between obj and volume link
         volume_link_pos, volume_link_quat = volume_link.get_position_orientation()
         particle_positions = get_particle_positions_in_frame(
             pos=volume_link_pos,

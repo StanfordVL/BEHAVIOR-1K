@@ -4,8 +4,7 @@ from omnigibson.macros import gm, create_module_macros
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from omnigibson.object_states.object_state_base import RelativeObjectState, BooleanState
 from omnigibson.systems.micro_particle_system import FluidSystem
-import omnigibson.utils.transform_utils as T
-from omnigibson.utils.usd_utils import mesh_prim_to_trimesh_mesh
+from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
 from omnigibson.systems import get_fluid_systems, get_system_from_element_name, get_element_name_from_system
 
@@ -84,8 +83,8 @@ class Filled(RelativeObjectState, BooleanState, LinkBasedStateMixin):
         self.check_in_volume, self.calculate_volume = \
             generate_points_in_volume_checker_function(obj=self.obj, volume_link=self.link, mesh_name_prefixes="container")
 
-    @property
-    def stateful(self):
+    @classproperty
+    def stateful(cls):
         return True
 
     @staticmethod

@@ -3,11 +3,10 @@ import numpy as np
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.adjacency import HorizontalAdjacency, flatten_planes
 from omnigibson.object_states.kinematics import KinematicsMixin
-from omnigibson.object_states.memoization import PositionalValidationMemoizedObjectStateMixin
 from omnigibson.object_states.object_state_base import BooleanState, RelativeObjectState
 
 
-class NextTo(PositionalValidationMemoizedObjectStateMixin, KinematicsMixin, RelativeObjectState, BooleanState):
+class NextTo(KinematicsMixin, RelativeObjectState, BooleanState):
     @staticmethod
     def get_dependencies():
         return KinematicsMixin.get_dependencies() + [HorizontalAdjacency]

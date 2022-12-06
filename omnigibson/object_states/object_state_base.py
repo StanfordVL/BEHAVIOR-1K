@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from collections import OrderedDict
+import omnigibson as og
 from omnigibson.utils.python_utils import classproperty, Serializable, Registerable, Recreatable
 
 
@@ -38,13 +39,15 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
         return []
 
     def __init__(self, obj):
-        super(BaseObjectState, self).__init__()
+        super().__init__()
         self.obj = obj
         self._initialized = False
+        self._cache = None
+        self._changed = None
         self._simulator = None
 
-    @property
-    def stateful(self):
+    @classproperty
+    def stateful(cls):
         """
         Returns:
             bool: True if this object has a state that can be directly dumped / loaded via dump_state() and
@@ -53,6 +56,22 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
         """
         # False by default
         return False
+
+    def reset(self):
+        """
+        Resets this object state. By default, it clears all internal caching data
+        """
+        self._cache = OrderedDict()
+        self._changed = OrderedDict()
+
+    @property
+    def cache(self):
+        """
+        Returns:
+            OrdereDict: Dictionary mapping specific argument combinations from @self.get_value() to cached values and
+                information stored for that specific combination
+        """
+        return self._cache
 
     def _update(self):
         """This function will be called once for every simulator step."""
@@ -65,19 +84,162 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
     def initialize(self, simulator):
         assert not self._initialized, "State is already initialized."
 
-        # Store simulator reference
+        # Store simulator reference and create cache
         self._simulator = simulator
+        self.reset()
 
         self._initialize()
         self._initialized = True
 
     def update(self):
-        assert self._initialized, "Cannot update uninitalized state."
+        """
+        Updates the object state, possibly clearing internal cached information
+        """
+        assert self._initialized, "Cannot update uninitialized state."
+        # Clear all the changed values
+        self._changed = OrderedDict()
         return self._update()
+
+    def clear_cache(self):
+        """
+        Clears the internal cache
+        """
+        # Clear all entries
+        self._cache = OrderedDict()
+
+    def update_cache(self, get_value_args):
+        """
+        Updates the internal cached value based on the evaluation of @self._get_value(*get_value_args)
+
+        Args:
+            get_value_args (tuple): Specific argument combinations (usually tuple of objects) passed into
+                @self.get_value / @self._get_value
+        """
+        t = og.sim.current_time_step_index
+        # Compute value and update cache
+        val = self._get_value(*get_value_args)
+        self._cache[get_value_args] = OrderedDict(value=val, info=self.cache_info(get_value_args=get_value_args), t=t)
+
+    def cache_info(self, get_value_args):
+        """
+        Helper function to cache relevant information at the current timestep.
+        Stores it under @self._cache[<KEY>]["info"]
+
+        Args:
+            get_value_args (tuple): Specific argument combinations (usually tuple of objects) passed into
+                @self.get_value whose caching information should be computed
+
+        Returns:
+            OrderedDict: Any caching information to include at the current timestep when this state's value is computed
+        """
+        # Default is an empty dictionary
+        return OrderedDict()
+
+    def cache_is_valid(self, get_value_args):
+        """
+        Helper function to check whether the current cached value is valid or not at the current timestep.
+        Default is False unless we're at the current timestep.
+
+        Args:
+            get_value_args (tuple): Specific argument combinations (usually tuple of objects) passed into
+                @self.get_value whose cached values should be validated
+
+        Returns:
+            bool: True if the cache is valid, else False
+        """
+        # If t == the current timestep, then our cache is obviously valid otherwise we assume it isn't
+        return True if self._cache[get_value_args]["t"] == og.sim.current_time_step_index else \
+            self._cache_is_valid(get_value_args=get_value_args)
+
+    def _cache_is_valid(self, get_value_args):
+        """
+        Helper function to check whether the current cached value is valid or not at the current timestep.
+        Default is False. Subclasses should implement special logic otherwise.
+
+        Args:
+            get_value_args (tuple): Specific argument combinations (usually tuple of objects) passed into
+                @self.get_value whose cached values should be validated
+
+        Returns:
+            bool: True if the cache is valid, else False
+        """
+        return False
+
+    def has_changed(self, get_value_args, value, info, t):
+        """
+        A helper function to query whether this object state has changed between an arbitrary previous timestep @t with
+        corresponding cached value @value and cache information @info
+        the current timestep.
+
+        Note that this may require some non-trivial compute, so we leverage @t, in addition to @get_value_args,
+        as a unique key into an internal dictionary, such that specific @t will result in a computation conducted
+        exactly once.
+        This is done for performance reasons; so that multiple states relying on the same state dependency can all
+        query whether that state has changed between the same timesteps with only a single computation.
+
+        Args:
+            get_value_args (tuple): Specific argument combinations (usually tuple of objects) passed into
+                @self.get_value
+            value (any): Cached value computed at timestep @t for this object state
+            info (OrderedDict): Information calculated at timestep @t when computing this state's value
+            t (int): Initial timestep to compare against. This should be an index of the steps taken,
+                i.e. a value queried from og.sim.current_time_step_index at some point in time. It is assumed @value
+                and @info were computed at this timestep
+
+        Returns:
+            bool: Whether this object state has changed between @t and the current timestep index for the specific
+                @get_value_args
+        """
+        # Compile t, args, and kwargs deterministically
+        history_key = (t, *get_value_args)
+        # If t == the current timestep, then we obviously haven't changed so our value is False
+        if t == og.sim.current_time_step_index:
+            val = False
+        # Otherwise, check if it already exists in our has changed dictionary; we return that value if so
+        elif history_key in self._changed:
+            val = self._changed[history_key]
+        # Otherwise, we calculate the value and store it in our changed dictionary
+        else:
+            val = self._has_changed(get_value_args=get_value_args, value=value, info=info)
+            self._changed[history_key] = val
+
+        return val
+
+    def _has_changed(self, get_value_args, value, info):
+        """
+        Checks whether the previous value evaluated at time @t has changed with the current timestep.
+        By default, it returns True.
+
+        Any custom checks should be overridden by subclass.
+
+        Args:
+            get_value_args (tuple): Specific argument combinations (usually tuple of objects) passed into
+                @self.get_value
+            value (any): Cached value computed at timestep @t for this object state
+            info (OrderedDict): Information calculated at timestep @t when computing this state's value
+
+        Returns:
+            bool: Whether the value has changed between @value and @info and the coresponding value and info computed
+                at the current timestep
+        """
+        return True
 
     def get_value(self, *args, **kwargs):
         assert self._initialized
-        return self._get_value(*args, **kwargs)
+
+        # Compile args and kwargs deterministically
+        key = (*args, *tuple(kwargs.values()))
+        # We need to see if we need to update our cache -- we do so if and only if one of the following conditions are met:
+        # (a) key is NOT in the cache
+        # (b) Our cache is not valid
+        if key not in self._cache or not self.cache_is_valid(get_value_args=key):
+            # Update the cache
+            self.update_cache(get_value_args=key)
+
+        # Value is the cached value
+        val = self._cache[key]["value"]
+
+        return val
 
     def _get_value(self, *args, **kwargs):
         raise NotImplementedError
@@ -88,6 +250,12 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
 
     def _set_value(self, *args, **kwargs):
         raise NotImplementedError
+
+    def remove(self):
+        """
+        Any cleanup functionality to deploy when @self.obj is removed from the simulator
+        """
+        pass
 
     def dump_state(self, serialized=False):
         assert self._initialized
@@ -127,48 +295,6 @@ class AbsoluteObjectState(BaseObjectState):
         # Don't register this class since it's an abstract template
         classes = super()._do_not_register_classes
         classes.add("AbsoluteObjectState")
-        return classes
-
-
-class CachingEnabledObjectState(AbsoluteObjectState):
-    """
-    This class is used to track absolute states that are expensive to compute. It adds out-of-the-box support for
-    caching the results for each simulator step.
-    """
-
-    def __init__(self, obj):
-        super(CachingEnabledObjectState, self).__init__(obj)
-        self.value = None
-
-    @abstractmethod
-    def _compute_value(self):
-        """
-        This function should compute the value of the state and return it. It should not set self.value.
-
-        :return: The computed value.
-        """
-        raise NotImplementedError()
-
-    def _get_value(self):
-        # If we don't have a value cached, compute it now.
-        if self.value is None:
-            self.value = self._compute_value()
-
-        return self.value
-
-    def clear_cached_value(self):
-        self.value = None
-
-    def _update(self):
-        # Reset the cached state value on Simulator step.
-        super(CachingEnabledObjectState, self)._update()
-        self.clear_cached_value()
-
-    @classproperty
-    def _do_not_register_classes(cls):
-        # Don't register this class since it's an abstract template
-        classes = super()._do_not_register_classes
-        classes.add("CachingEnabledObjectState")
         return classes
 
 

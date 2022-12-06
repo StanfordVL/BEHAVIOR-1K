@@ -2,7 +2,7 @@ import numpy as np
 from scipy.spatial import ConvexHull, distance_matrix
 
 from omnigibson.macros import create_module_macros
-from omnigibson.object_states.object_state_base import BooleanState, CachingEnabledObjectState
+from omnigibson.object_states.object_state_base import BooleanState, AbsoluteObjectState
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -20,7 +20,7 @@ m.NORMAL_Z_PERCENTAGE = 0.5
 m.NORMAL_Z_ANGLE_DIFF = np.deg2rad(30.0)
 
 
-class Folded(CachingEnabledObjectState, BooleanState):
+class Folded(AbsoluteObjectState, BooleanState):
 
     def calculate_projection_area_and_diagonal(self, dims):
         """
@@ -109,7 +109,7 @@ class Folded(CachingEnabledObjectState, BooleanState):
     def _initialize(self):
         self.area_unfolded, self.diagonal_unfolded = self.calculate_projection_area_and_diagonal_unfolded()
 
-    def _compute_value(self):
+    def _get_value(self):
         # Check the smoothness of the cloth
         flag_smoothness = self.check_smoothness()
 

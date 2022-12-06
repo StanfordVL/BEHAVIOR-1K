@@ -11,6 +11,7 @@ from omnigibson.utils.python_utils import classproperty, Serializable, Registera
 from omnigibson.utils.registry_utils import SerializableRegistry
 from omnigibson.utils.config_utils import NumpyEncoder
 from omnigibson.objects.object_base import BaseObject
+from omnigibson.objects.stateful_object import StatefulObject
 from omnigibson.systems import SYSTEMS_REGISTRY
 from omnigibson.robots.robot_base import BaseRobot
 
@@ -380,6 +381,14 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # Reset all systems
         for system in self.systems:
             system.reset()
+
+        # Reset all object and robot states
+        for obj in self.objects:
+            if isinstance(obj, StatefulObject):
+                obj.reset_states()
+
+        for robot in self.robots:
+            robot.reset_states()
 
         # Reset the pose and joint configuration of all scene objects.
         if self._initial_state is not None:

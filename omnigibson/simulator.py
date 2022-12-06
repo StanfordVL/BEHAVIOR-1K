@@ -412,6 +412,7 @@ class Simulator(SimulationContext, Serializable):
         """
         Complete any non-physics steps such as state updates.
         """
+        assert not self.is_stopped(), f"Simulator must not be stopped in order to run non physics step!"
         # Check to see if any objects should be initialized (only done IF we're playing)
         if len(self._objects_to_initialize) > 0 and self.is_playing():
             for obj in self._objects_to_initialize:
@@ -449,6 +450,10 @@ class Simulator(SimulationContext, Serializable):
                 if isinstance(obj, StatefulObject) and obj.initialized:
                     obj.update_visuals()
 
+    def _omni_update_step(self):
+        """
+        Step any omni-related things
+        """
         # Clear the bounding box cache so that it gets updated during the next time it's called
         BoundingBoxAPI.clear()
 
@@ -578,9 +583,11 @@ class Simulator(SimulationContext, Serializable):
 
         # Additionally run non physics things if we have a valid scene
         if self._scene is not None:
-            self._non_physics_step()
-            if self.is_playing() and gm.ENABLE_TRANSITION_RULES:
-                self._transition_rule_step()
+            self._omni_update_step()
+            if self.is_playing():
+                self._non_physics_step()
+                if gm.ENABLE_TRANSITION_RULES:
+                    self._transition_rule_step()
 
         # TODO (eric): After stage changes (e.g. pose, texture change), it will take two super().step(render=True) for
         #  the result to propagate to the rendering. We could have called super().render() here but it will introduce

@@ -1,5 +1,6 @@
 from omnigibson.object_states.object_state_base import AbsoluteObjectState
 from omnigibson.object_states.temperature import Temperature
+from omnigibson.utils.python_utils import classproperty
 import numpy as np
 from collections import OrderedDict
 
@@ -28,8 +29,8 @@ class MaxTemperature(AbsoluteObjectState):
     def _update(self):
         self.value = max(self.obj.states[Temperature].get_value(), self.value)
 
-    @property
-    def stateful(self):
+    @classproperty
+    def stateful(cls):
         return True
 
     def _dump_state(self):
