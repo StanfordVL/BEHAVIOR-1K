@@ -63,14 +63,6 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         return self._registry(key="name", value="object_registry")
 
     @property
-    def robot_registry(self):
-        """
-        Returns:
-            SerializableRegistry: Robot registry containing all active robots in the scene
-        """
-        return self._registry(key="name", value="robot_registry")
-
-    @property
     def system_registry(self):
         """
         Returns:
@@ -97,7 +89,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Returns:
             list of BaseRobot: Robot(s) that are currently in this scene
         """
-        return self.robot_registry.objects
+        return list(self.object_registry("category", "agent", []))
 
     @property
     def systems(self):
@@ -243,15 +235,6 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             group_keys=self.object_registry_group_keys,
         ))
 
-        # Add registry for robots
-        registry.add(obj=SerializableRegistry(
-            name="robot_registry",
-            class_types=BaseRobot,
-            default_key="name",
-            unique_keys=self.object_registry_unique_keys,
-            group_keys=["model_name"] + self.object_registry_group_keys,
-        ))
-
         return registry
 
     # TODO: Refactor
@@ -276,7 +259,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         :param state: state of the objects to get
         :return: a set of objects with the given state
         """
-        return self.object_registry("states", state, set()).union(self.robot_registry("states", state, set()))
+        return self.object_registry("states", state, set())
 
     def _add_object(self, obj):
         """
@@ -317,10 +300,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
         # Add this object to our registry based on its type, if we want to register it
         if register:
-            if isinstance(obj, BaseRobot):
-                self.robot_registry.add(obj)
-            else:
-                self.object_registry.add(obj)
+            self.object_registry.add(obj)
 
             # Run any additional scene-specific logic with the created object
             self._add_object(obj)
@@ -335,10 +315,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
     def remove_object(self, obj, simulator):
         # Remove from the appropriate registry
-        if isinstance(obj, BaseRobot):
-            self.robot_registry.remove(obj)
-        else:
-            self.object_registry.remove(obj)
+        self.object_registry.remove(obj)
 
         # Remove from omni stage
         obj.remove(simulator=simulator)
@@ -511,8 +488,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # Save relevant information
 
         # Iterate over all objects and save their init info
-        init_info = {obj.name: obj.get_init_info() for registry in (self.object_registry, self.robot_registry)
-                     for obj in registry.objects}
+        init_info = {obj.name: obj.get_init_info() for obj in self.object_registry.objects}
 
         # Save initial object state info
         init_state_info = self._initial_state
