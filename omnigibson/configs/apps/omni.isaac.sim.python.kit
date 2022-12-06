@@ -19,6 +19,7 @@ app.version = "2022.1.0"
 "omni.kit.menu.create" = {}
 "omni.kit.menu.common" = {}
 
+"omni.kit.window.title" = {}
 "omni.kit.window.viewport" = {}
 "omni.kit.window.toolbar" = {}
 "omni.hydra.rtx" = {}
@@ -29,11 +30,9 @@ app.version = "2022.1.0"
 "omni.syntheticdata" = {}
 
 # OmniGraph
-"omni.graph" = {}
-# "omni.graph.action" = {}
-# "omni.graph.nodes" = {}
-# "omni.graph.window.action" = {}
-# "omni.graph.bundle.action" = {}
+"omni.graph.bundle.action" = {}
+"omni.graph.window.generic" = {}
+"omni.graph.visualization.nodes" = {}
 
 # Status Bar
 "omni.kit.window.status_bar" = {}
@@ -57,6 +56,7 @@ app.version = "2022.1.0"
 "omni.kit.widget.layers" = {}
 "omni.kit.property.bundle" = {}
 
+
 [settings]
 # MGPU is always on, you can turn it from the settings, and force this off to save even more resource if you
 # only want to use a single GPU on your MGPU system
@@ -64,6 +64,7 @@ renderer.multiGpu.enabled = true
 
 # Improve determinism with physics and camera movement
 app.asyncRendering = false
+app.asyncRenderingLowLatency = false
 app.hydraEngine.waitIdle = true
 app.hydra.aperture.conform = 4 # Don't modify camera prim, stretch the image so it fits
 
@@ -90,6 +91,7 @@ app.file.ignoreUnsavedOnExit = true # prevents save dialog when exiting
 [settings.app.settings]
 persistent = false
 dev_build = false
+flatCacheStageFrameHistoryCount = 3 # needed for omni.syntheticdata
 
 [settings.app.window]
 title = "OmniGibson"
@@ -105,15 +107,10 @@ size = 16
 # Extensions
 ###############################
 [settings.exts."omni.kit.registry.nucleus"]
-# FOR DEVELOPMENT #
-registries = [
-    { name = "kit/default", url = "omniverse://kit-extensions.ov.nvidia.com/exts/kit/default" },
-]
 postToSlack = false
-# # FOR PRODUCTION #
-# registries = [
-#    { name = "kit/public", url = "https://kit-103-0-public-extensions.s3.amazonaws.com/public"}
-# ]
+registries = [
+   { name = "kit/public", url = "https://kit-103-0-public-extensions.s3.amazonaws.com/public"}
+]
 
 [settings.app.extensions]
 skipPublishVerification = false
@@ -128,6 +125,12 @@ sleepMsOutOfFocus = 0
 resolution.width=1280
 resolution.height=720
 
+# default camera position in meters
+[settings.app.viewport]
+defaultCamPos.x = 5
+defaultCamPos.y = 5
+defaultCamPos.z = 5
+
 [settings.rtx]
 raytracing.fractionalCutoutOpacity = false
 hydra.enableSemanticSchema = true
@@ -138,15 +141,19 @@ hydra.enableSemanticSchema = true
 app.stage.upAxis = "Z"
 app.viewport.displayOptions = 3094 # This hides everything
 app.viewport.pickingMode = "models"
+app.viewport.grid.scale = 1.0
 app.window.uiStyle = "NvidiaDark"
 app.primCreation.DefaultXformOpType = "Scale, Orient, Translate"
 app.primCreation.DefaultXformOpOrder="xformOp:translate, xformOp:orient, xformOp:scale"
 simulation.minFrameRate = 15
+simulation.defaultMetersPerUnit = 1.0
+omnigraph.updateToUsd = false
 physics.updateToUsd = true
 physics.updateVelocitiesToUsd = true
 physics.useFastCache = false
 physics.visualizationDisplayJoints = false
 #physics.overrideGPUSettings = -1 # force CPU physx
+physics.useActiveCudaContext = true
 
 # Misc Settings
 ###############################
@@ -159,12 +166,6 @@ app.file.ignoreUnsavedOnExit = true # prevents save dialog when exiting
 [settings.ngx]
 enabled=true # Enable this for DLSS
 
-[settings]
-# FOR DEVELOPMENT #
-persistent.isaac.nucleus.default = "omniverse://ov-isaac-dev.nvidia.com"
-# # FOR PRODUCTION #
-# persistent.isaac.nucleus.default = "omniverse://localhost"
-
 # Register extension folder from this repo in kit
 [settings.app.exts]
 folders.'++' = ["${app}/../exts" ]
@@ -172,29 +173,34 @@ folders.'++' = ["${app}/../exts" ]
 # Isaac Sim Extensions
 ###############################
 [dependencies]
-"omni.isaac.core_archive" = {}
-"omni.isaac.ml_archive" = {}
-"omni.isaac.urdf" = {}
-"omni.isaac.utils" = {}
-#"omni.isaac.surface_gripper" = {}
-"omni.isaac.range_sensor" = {}
-"omni.isaac.isaac_sensor" = {}
-"omni.isaac.debug_draw" = {}
-"omni.isaac.dynamic_control" = {}
-"omni.isaac.kit" = {}
 "omni.isaac.core" = {}
 "omni.isaac.core_nodes" = {}
-#"omni.isaac.jetbot" = {}
-#"omni.isaac.kaya" = {}
-"omni.isaac.synthetic_utils" = {}
-#"omni.isaac.dr" = {}
-"omni.kit.loop-isaac" = {}
-#"omni.physx.flatcache" = {}
-
-[dependencies."filter:platform"."linux-x86_64"]
-#"omni.isaac.universal_robots" = {}
-#"omni.isaac.dofbot" = {}
-#"omni.isaac.franka" = {}
+"omni.isaac.core_archive" = {}
+"omni.isaac.debug_draw" = {}
+"omni.isaac.dofbot" = {}
+"omni.isaac.dynamic_control" = {}
+"omni.isaac.franka" = {}
+"omni.isaac.isaac_sensor" = {}
+"omni.isaac.kit" = {}
+"omni.isaac.ml_archive" = {}
 "omni.isaac.motion_planning" = {}
 "omni.isaac.motion_generation" = {}
+"omni.isaac.range_sensor" = {}
+"omni.isaac.surface_gripper" = {}
+"omni.isaac.synthetic_utils" = {}
+"omni.isaac.universal_robots" = {}
+"omni.isaac.urdf" = {}
+"omni.isaac.utils" = {}
+"omni.isaac.wheeled_robots" = {}
+"omni.kit.loop-isaac" = {}
+"omni.particle.system.bundle" = {}
+"omni.kit.mesh.raycast" = {}
+
+[dependencies."filter:platform"."linux-x86_64"]
 "omni.isaac.occupancy_map" = {}
+
+# Non Isaac Sim Extensions
+######################
+[dependencies]
+"semantics.schema.editor" = {}
+"omni.replicator.core" = {}
