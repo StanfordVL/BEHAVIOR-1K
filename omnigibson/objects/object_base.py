@@ -159,6 +159,10 @@ class BaseObject(EntityPrim, metaclass=ABCMeta):
                 joint_type="FixedJoint",
                 body1=f"{self._prim_path}/{self._root_link_name}",
             )
+            # Also set the articulation root to be the object head if it doesn't already exist
+            if not self._prim.HasAPI(UsdPhysics.ArticulationRootAPI):
+                UsdPhysics.ArticulationRootAPI.Apply(self.prim)
+                PhysxSchema.PhysxArticulationAPI.Apply(self.prim)
         else:
             if self._prim.HasAPI(UsdPhysics.ArticulationRootAPI):
                 # If we only have a link, remove the articulation root API

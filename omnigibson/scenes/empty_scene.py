@@ -5,6 +5,7 @@ import numpy as np
 from omnigibson.scenes.scene_base import Scene
 from omnigibson.objects.primitive_object import PrimitiveObject
 import omnigibson.utils.transform_utils as T
+from pxr import PhysxSchema, UsdPhysics
 
 
 class EmptyScene(Scene):
@@ -36,7 +37,7 @@ class EmptyScene(Scene):
             primitive_type="Cube",
             category="floors",
             model="ground_plane",
-            scale=[2500, 2500, 0.05],
+            scale=[2500, 2500, 1e-5],
             visible=self.floor_plane_visible,
             fixed_base=True,
             rgba=[*self.floor_plane_color, 1.0],
@@ -44,6 +45,11 @@ class EmptyScene(Scene):
 
         simulator.import_object(self.ground_plane)
         self.ground_plane.set_position([0, 0, -self.ground_plane.scale[2] / 2.0])
+
+        # We also add an extra ground plane geom for more stability
+        plane_prim = PhysxSchema.Plane.Define(simulator.stage, f"{self.ground_plane.root_link.prim_path}/collisionPlane").GetPrim()
+        UsdPhysics.CollisionAPI.Apply(plane_prim)
+        PhysxSchema.PhysxCollisionAPI.Apply(plane_prim)
 
     def get_random_point(self, floor=None):
         """
