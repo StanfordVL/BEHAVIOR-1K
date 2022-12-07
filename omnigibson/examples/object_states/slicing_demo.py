@@ -106,7 +106,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     input("The knife will fall on the apple and slice it. Press [ENTER] to continue.")
 
     # Notify user of disclaimer
-    if gm.ENABLE_OMNI_PARTICLES:
+    if gm.USE_GPU_DYNAMICS:
         disclaimer(
             f"Omniverse currently has a bug when using GPU dynamics where physics tends to break for no clear reason "
             f"when we import objects at runtime (that is, when the simulator is playing).\n"

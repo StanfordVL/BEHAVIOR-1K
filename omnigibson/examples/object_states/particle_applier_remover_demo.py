@@ -31,7 +31,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Make sure object states and omni particlesare enabled
     assert gm.ENABLE_OBJECT_STATES, f"Object states must be enabled in macros.py in order to use this demo!"
-    assert gm.ENABLE_OMNI_PARTICLES, f"Omni particles must be enabled in macros.py in order to use this demo!"
+    assert gm.USE_GPU_DYNAMICS, f"GPU dynamics must be enabled in macros.py in order to use this demo!"
 
     # Choose what configuration to load
     modifier_type = choose_from_options(
@@ -153,7 +153,15 @@ def main(random_selection=False, headless=False, short_exec=False):
         local_area_quat = np.array([0, 0.707, 0, 0.707])    # Needs to rotated so the metalink points downwards from cloth
         joint_prim.GetAttribute("physics:localRot0").Set(Gf.Quatf(*(local_area_quat[[3, 0, 1, 2]])))
 
-    # Load in the particle modifier object
+    # # Load in the particle modifier object
+    # abilities["saturable"] = {}
+    # abilities["particleRemover"] = {
+    #     "method": ParticleModifyMethod.ADJACENCY,
+    #     "conditions": {
+    #         particle_system: [lambda: False],
+    #     },
+    #     "projection_mesh_params": None,
+    # }
     modifier = DatasetObject(
         prim_path=modifier_path,
         name="modifier",
@@ -163,11 +171,15 @@ def main(random_selection=False, headless=False, short_exec=False):
         visual_only=True,
         abilities=abilities,
     )
+    # from omnigibson.object_states import ParticleApplier, Saturated
+    # modifier.states[ParticleApplier].conditions[particle_system] = [lambda: modifier.states[Saturated].get_value(WaterSystem)] + modifier.states[ParticleApplier].conditions[particle_system]
     og.sim.import_object(modifier)
     modifier.set_position(np.array([0, 0, 5.0]))
 
     # Take a step to make sure all objects are properly initialized
     env.step(np.array([]))
+
+    # modifier.states[Saturated].set_value(WaterSystem, True)
 
     # If we're removing particles, set the table's covered state to be True
     if modifier_type == "particleRemover":

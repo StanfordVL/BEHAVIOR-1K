@@ -19,7 +19,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
 
     assert gm.ENABLE_OBJECT_STATES, f"Object states must be enabled in macros.py in order to use this demo!"
-    assert gm.ENABLE_OMNI_PARTICLES, f"Particles must be enabled in macros.py in order to use this demo!"
+    assert gm.USE_GPU_DYNAMICS, f"GPU dynamics must be enabled in macros.py in order to use this demo!"
 
     # Create the scene config to load -- empty scene
     cfg = {

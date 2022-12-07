@@ -232,7 +232,7 @@ class Simulator(SimulationContext, Serializable):
         self._physics_context.enable_flatcache(gm.ENABLE_FLATCACHE)
 
         # Enable GPU dynamics based on whether we need omni particles feature
-        if gm.ENABLE_OMNI_PARTICLES:
+        if gm.USE_GPU_DYNAMICS:
             self._physics_context.enable_gpu_dynamics(True)
             self._physics_context.set_broadphase_type("GPU")
         else:
