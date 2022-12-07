@@ -31,6 +31,6 @@ class CollisionReward(BaseRewardFunction):
         # Ignore floors and potentially robot's own prims as well
         floors = list(env.scene.object_registry("category", "floors", []))
         ignore_objs = floors if self._ignore_self_collisions is None else floors + [robot]
-        in_contact = len(env.robots[self._robot_idn].states[ContactBodies].get_value(tuple(ignore_objs))) > 0
+        in_contact = len(env.robots[self._robot_idn].states[ContactBodies].get_value(ignore_objs=tuple(ignore_objs))) > 0
         reward = float(in_contact) * -self._r_collision
         return reward, {}

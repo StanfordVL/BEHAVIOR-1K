@@ -171,8 +171,8 @@ class BaseTransitionRule(metaclass=ABCMeta):
         """
         should_transition = self.condition(individual_objects=individual_objects, group_objects=group_objects)
         return should_transition, \
-               self.transition(individual_objects=individual_objects, group_objects=group_objects) \
-                   if should_transition else None
+            self.transition(individual_objects=individual_objects, group_objects=group_objects) \
+            if should_transition else None
 
     @property
     def requires_individual_filters(self):
@@ -260,26 +260,16 @@ class SlicingRule(BaseTransitionRule):
 
         contact_list = slicer_obj.states[ContactBodies].get_value()
         sliced_link_paths = {link.prim_path for link in sliced_obj.links.values()}
-        sliced_c = None
+        hit_obj = False
         for c in contact_list:
-            if c.body0 in sliced_link_paths or c.body1 in sliced_link_paths:
-                sliced_c = c
+            if not set(c).isdisjoint(sliced_link_paths):
+                hit_obj = True
                 break
-        if not sliced_c:
+        if not hit_obj:
             return False
 
-        # Calculate the normal force applied to the contact object.
-        # TODO: Fix this -- dt is 0.0 for some reason, so we get a divide by zero error
-        normal_force = np.dot(sliced_c.impulse, sliced_c.normal) / sliced_c.dt
-        if Sliced in sliced_obj.states:
-            if (
-                not sliced_obj.states[Sliced].get_value()
-                and normal_force > sliced_obj.states[Sliced].slice_force
-            ):
-                # Slicer may contact the same body in multiple points, so
-                # cut once since removing the object from the simulator
-                return True
-        return False
+        # Slicer may contact the same body in multiple points, so cut once since removing the object from the simulator
+        return Sliced in sliced_obj.states and not sliced_obj.states[Sliced].get_value()
 
     def transition(self, individual_objects, group_objects):
         slicer_obj, sliced_obj = individual_objects["slicer"], individual_objects["sliceable"]

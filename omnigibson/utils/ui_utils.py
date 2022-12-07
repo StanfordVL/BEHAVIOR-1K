@@ -90,8 +90,8 @@ def disclaimer(msg):
     if gm.SHOW_DISCLAIMERS:
         print("****** DISCLAIMER ******")
         print("Isaac Sim / Omniverse has some significant limitations and bugs in its current release.")
-        print("This message has popped up because a potential feature in OmniGibson relies upon a feature in Omniverse that"
-              "is yet to be released publically. Currently, the expected behavior may not be fully functional, but"
+        print("This message has popped up because a potential feature in OmniGibson relies upon a feature in Omniverse that "
+              "is yet to be released publically. Currently, the expected behavior may not be fully functional, but "
               "should be resolved by the next Isaac Sim release.")
         print(f"Exact Limitation: {msg}")
         print("************************")
