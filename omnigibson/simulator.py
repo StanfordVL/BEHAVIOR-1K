@@ -596,7 +596,7 @@ class Simulator(SimulationContext, Serializable):
             super().step(render=True)
         else:
             for i in range(self.n_physics_timesteps_per_render):
-                super.step(render=False)
+                super().step(render=False)
 
         # Additionally run non physics things if we have a valid scene
         if self._scene is not None:
@@ -1017,13 +1017,6 @@ class Simulator(SimulationContext, Serializable):
         # We need to make sure the simulator is playing since joint states only get updated when playing
         assert self.is_playing()
 
-        # If we're using GPU, we have to do a super stupid workaround to avoid physx crashing
-        # For some reason, trying to load large states after n >= 3 steps are taken after the simulator starts playing
-        # results in a crash. So, since we are resetting the entire sim state anyways, we will stop and start the
-        # simulator to reset the frame count
-        if gm.ENABLE_OMNI_PARTICLES:
-            self.stop()
-            self.play()
         # Run super
         super().load_state(state=state, serialized=serialized)
 
