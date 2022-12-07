@@ -83,10 +83,6 @@ class Filled(RelativeObjectState, BooleanState, LinkBasedStateMixin):
         self.check_in_volume, self.calculate_volume = \
             generate_points_in_volume_checker_function(obj=self.obj, volume_link=self.link, mesh_name_prefixes="container")
 
-    @classproperty
-    def stateful(cls):
-        return True
-
     @staticmethod
     def get_state_link_name():
         # Should be implemented by subclass

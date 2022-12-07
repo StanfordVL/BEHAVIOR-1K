@@ -502,10 +502,6 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin):
         """
         raise NotImplementedError()
 
-    @classproperty
-    def stateful(cls):
-        return True
-
     @property
     def state_size(self):
         # One entry per system plus the current_step

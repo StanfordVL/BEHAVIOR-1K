@@ -35,10 +35,6 @@ class Covered(RelativeObjectState, BooleanState):
         # AABB needed for sampling visual particles on an object
         return RelativeObjectState.get_dependencies() + [AABB]
 
-    @classproperty
-    def stateful(cls):
-        return True
-
     def _initialize(self):
         # Create the visual particle groups
         self._visual_particle_groups = OrderedDict((get_element_name_from_system(system), system.create_attachment_group(obj=self.obj))

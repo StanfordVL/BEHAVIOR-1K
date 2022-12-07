@@ -86,10 +86,6 @@ class ToggledOn(AbsoluteObjectState, BooleanState, LinkBasedStateMixin):
         diffuse_tint = (1.0, 1.0, 1.0)
         return albedo_add, diffuse_tint
 
-    @classproperty
-    def stateful(cls):
-        return True
-
     @property
     def state_size(self):
         return 2

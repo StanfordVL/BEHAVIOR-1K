@@ -29,9 +29,9 @@ class MaxTemperature(AbsoluteObjectState):
     def _update(self):
         self.value = max(self.obj.states[Temperature].get_value(), self.value)
 
-    @classproperty
-    def stateful(cls):
-        return True
+    @property
+    def state_size(self):
+        return 1
 
     def _dump_state(self):
         return OrderedDict(temperature=self.value)
@@ -44,7 +44,3 @@ class MaxTemperature(AbsoluteObjectState):
 
     def _deserialize(self, state):
         return OrderedDict(temperature=state[0]), 1
-
-    @property
-    def state_size(self):
-        return 1

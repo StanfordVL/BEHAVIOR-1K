@@ -8,7 +8,7 @@ from collections import OrderedDict
 import numpy as np
 
 import omnigibson as og
-from omnigibson.macros import create_module_macros
+from omnigibson.macros import create_module_macros, gm
 import omnigibson.utils.transform_utils as T
 from omnigibson.object_states.contact_subscribed_state_mixin import ContactSubscribedStateMixin
 from omnigibson.object_states.object_state_base import BooleanState, RelativeObjectState
@@ -97,6 +97,14 @@ class Attached(RelativeObjectState, BooleanState, ContactSubscribedStateMixin):
 
                 # Wake up objects so that passive forces like gravity can be applied.
                 self.obj.wake()
+
+                # TODO: Fix this hacky workaround once omni's GPU bug is fixed!!
+                # We have to take a physics step otherwise we get cuda crashes...
+                if gm.USE_GPU_DYNAMICS:
+                    # Slow sim to mitigate the physics leakage
+                    with og.sim.slowed(dt=1e-3):
+                        og.sim.step_physics()
+
                 other.wake()
 
             return True

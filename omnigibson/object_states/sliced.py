@@ -25,9 +25,9 @@ class Sliced(AbsoluteObjectState, BooleanState):
 
         return True
 
-    @classproperty
-    def stateful(cls):
-        return True
+    @property
+    def state_size(self):
+        return 1
 
     def _dump_state(self):
         return OrderedDict(sliced=self.value)
