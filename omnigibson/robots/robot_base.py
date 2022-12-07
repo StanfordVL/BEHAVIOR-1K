@@ -29,7 +29,7 @@ m = create_module_macros(module_path=__file__)
 m.ROBOT_CATEGORY = "agent"
 
 
-class BaseRobot(USDObject, ControllableObject, GymObservable, Registerable):
+class BaseRobot(USDObject, ControllableObject, GymObservable):
     """
     Base class for USD-based robot agents.
 
@@ -458,6 +458,6 @@ class BaseRobot(USDObject, ControllableObject, GymObservable, Registerable):
 
     @classproperty
     def _cls_registry(cls):
-        # Global robot registry
+        # Global robot registry -- override super registry
         global REGISTERED_ROBOTS
         return REGISTERED_ROBOTS

@@ -4,6 +4,7 @@ from collections import OrderedDict
 
 import omnigibson as og
 from omnigibson.macros import gm, create_module_macros
+from omnigibson.objects import REGISTERED_OBJECTS
 from omnigibson.robots import REGISTERED_ROBOTS
 from omnigibson.tasks import REGISTERED_TASKS
 from omnigibson.scenes import REGISTERED_SCENES
@@ -231,6 +232,30 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 # Import the robot into the simulator
                 og.sim.import_object(robot)
 
+    def _load_objects(self):
+        """
+        Load any additional custom objects into the scene
+        """
+        for i, obj_config in enumerate(self.objects_config):
+            # Add a name for the object if necessary
+            if "name" not in obj_config:
+                obj_config["name"] = f"obj{i}"
+            # Set prim path if not specified
+            if "prim_path" not in obj_config:
+                obj_config["prim_path"] = f"/World/{obj_config['name']}"
+            # Pop the desired position and orientation
+            position, orientation = obj_config.pop("position", None), obj_config.pop("orientation", None)
+            # Make sure robot exists, grab its corresponding kwargs, and create / import the robot
+            obj = create_class_from_registry_and_config(
+                cls_name=obj_config["type"],
+                cls_registry=REGISTERED_OBJECTS,
+                cfg=obj_config,
+                cls_type_descriptor="object",
+            )
+            # Import the robot into the simulator and set the pose
+            og.sim.import_object(obj)
+            obj.set_position_orientation(position=position, orientation=orientation)
+
     def _load_observation_space(self):
         # Grab robot(s) and task obs spaces
         obs_space = OrderedDict()
@@ -262,6 +287,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         # Load the scene, robots, and task
         self._load_scene()
         self._load_robots()
+        self._load_objects()
         self._load_task()
 
         og.sim.play()
@@ -522,6 +548,14 @@ class Environment(gym.Env, GymObservable, Recreatable):
         return self.config["robots"]
 
     @property
+    def objects_config(self):
+        """
+        Returns:
+            dict: Object-specific configuration kwargs
+        """
+        return self.config["objects"]
+
+    @property
     def task_config(self):
         """
         Returns:
@@ -566,6 +600,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
             # Robot kwargs
             "robots": [],   # no robots by default
+
+            # Object kwargs
+            "objects": [],  # no objects by default
 
             # Task kwargs
             "task": {

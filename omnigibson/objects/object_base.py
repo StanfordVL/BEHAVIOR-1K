@@ -14,10 +14,14 @@ from omnigibson.utils.usd_utils import get_prim_nested_children, create_joint, C
 from omnigibson.prims.entity_prim import EntityPrim
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.prims.rigid_prim import RigidPrim
+from omnigibson.utils.python_utils import Registerable, classproperty
 from omnigibson.utils.constants import PrimType, CLASS_NAME_TO_CLASS_ID
 
 from omni.isaac.core.utils.semantics import add_update_semantics
 from pxr import Gf
+
+# Global dicts that will contain mappings
+REGISTERED_OBJECTS = OrderedDict()
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -27,7 +31,7 @@ m.HIGHLIGHT_RGB = [1.0, 0.1, 0.92]          # Default highlighting (R,G,B) color
 m.HIGHLIGHT_INTENSITY = 10000.0             # Highlight intensity to apply, range [0, 10000)
 
 
-class BaseObject(EntityPrim, metaclass=ABCMeta):
+class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
     """This is the interface that all OmniGibson objects must implement."""
 
     def __init__(
@@ -325,9 +329,16 @@ class BaseObject(EntityPrim, metaclass=ABCMeta):
             rendering_params=self.rendering_params,
         )
 
-    def update(self):
-        """
-        Runs any relevant updates for this object. This should occur once per simulation step.
-        """
-        pass
+    @classproperty
+    def _do_not_register_classes(cls):
+        # Don't register this class since it's an abstract template
+        classes = super()._do_not_register_classes
+        classes.add("BaseObject")
+        return classes
+
+    @classproperty
+    def _cls_registry(cls):
+        # Global robot registry
+        global REGISTERED_OBJECTS
+        return REGISTERED_OBJECTS
 

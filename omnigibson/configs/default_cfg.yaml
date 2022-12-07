@@ -10,5 +10,7 @@ scene:
 
 robots: []
 
+objects: []
+
 task:
   type: DummyTask

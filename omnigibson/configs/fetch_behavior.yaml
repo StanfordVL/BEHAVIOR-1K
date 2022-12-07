@@ -57,6 +57,8 @@ robots:
         name: JointController
         use_delta_commands: False
 
+objects: []
+
 task:
   type: BehaviorTask
   activity_name: putting_away_Halloween_decorations

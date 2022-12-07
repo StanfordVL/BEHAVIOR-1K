@@ -118,6 +118,7 @@ omni.kit.widget.stage.context_menu.ContextMenu.save_prim = print_save_usd_warnin
 # Import any remaining items we want to access directly from the main omnigibson import
 from omnigibson.envs import Environment
 from omnigibson.scenes import REGISTERED_SCENES
+from omnigibson.objects import REGISTERED_OBJECTS
 from omnigibson.robots import REGISTERED_ROBOTS
 from omnigibson.controllers import REGISTERED_CONTROLLERS
 from omnigibson.tasks import REGISTERED_TASKS

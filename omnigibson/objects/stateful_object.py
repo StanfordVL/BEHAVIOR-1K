@@ -28,6 +28,7 @@ from omnigibson.systems import get_system_from_element_name, get_element_name_fr
 from omnigibson.renderer_settings.renderer_settings import RendererSettings
 from omnigibson.utils.constants import PrimType, EmitterType
 from omnigibson.utils.usd_utils import BoundingBoxAPI
+from omnigibson.utils.python_utils import classproperty
 from omnigibson.object_states import Saturated
 
 
@@ -495,3 +496,10 @@ class StatefulObject(BaseObject):
     def set_base_link_position_orientation(self, position, orientation):
         super().set_position_orientation(position=position, orientation=orientation)
         self.clear_cached_states()
+
+    @classproperty
+    def _do_not_register_classes(cls):
+        # Don't register this class since it's an abstract template
+        classes = super()._do_not_register_classes
+        classes.add("StatefulObject")
+        return classes

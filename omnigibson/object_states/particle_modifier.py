@@ -516,8 +516,8 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin):
         return state
 
     def _load_state(self, state):
-        for system_name, val in state.items():
-            self.modified_particle_count[get_system_from_element_name(system_name)] = val
+        for system in self.supported_systems:
+            self.modified_particle_count[system] = state[get_element_name_from_system(system)]
         # Set current step
         self._current_step = state["current_step"]
 
@@ -544,14 +544,16 @@ class ParticleRemover(ParticleModifier):
             return
         # Check the system
         if issubclass(system, VisualParticleSystem):
-            # Iterate over all particles and remove any that are within the relaxed AABB of the remover volume
-            particle_names = list(system.particles.keys())
-            particle_positions = np.array([particle.get_position() for particle in system.particles.values()])
-            inbound_idxs = self._check_in_mesh(particle_positions).nonzero()[0]
-            max_particle_absorbed = self.visual_particle_modification_limit - self.modified_particle_count[system]
-            for idx in inbound_idxs[:max_particle_absorbed]:
-                system.remove_particle(particle_names[idx])
-            self.modified_particle_count[system] += min(len(inbound_idxs), max_particle_absorbed)
+            # Only modify particles if there are any that exist
+            if system.n_particles > 0:
+                # Iterate over all particles and remove any that are within the relaxed AABB of the remover volume
+                particle_names = list(system.particles.keys())
+                particle_positions = np.array([particle.get_position() for particle in system.particles.values()])
+                inbound_idxs = self._check_in_mesh(particle_positions).nonzero()[0]
+                max_particle_absorbed = self.visual_particle_modification_limit - self.modified_particle_count[system]
+                for idx in inbound_idxs[:max_particle_absorbed]:
+                    system.remove_particle(particle_names[idx])
+                self.modified_particle_count[system] += min(len(inbound_idxs), max_particle_absorbed)
 
         elif issubclass(system, FluidSystem):
             instancer_to_particle_idxs = {}

@@ -33,6 +33,8 @@ robots:
       base:
         name: DifferentialDriveController
 
+objects: []
+
 task:
   type: PointNavigationTask
   robot_idn: 0

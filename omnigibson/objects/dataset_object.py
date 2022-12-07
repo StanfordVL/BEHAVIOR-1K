@@ -613,8 +613,8 @@ class DatasetObject(USDObject):
                 if material.diffuse_texture != target_texture_path:
                     material.diffuse_texture = target_texture_path
             else:
-                print(f"Warning: DatasetObject [{self.prim_path}] does not have texture map: "
-                      f"[{target_texture_path}]. Falling back to directly updating albedo value.")
+                # print(f"Warning: DatasetObject [{self.prim_path}] does not have texture map: "
+                #       f"[{target_texture_path}]. Falling back to directly updating albedo value.")
                 self._update_albedo_value(object_state, material)
 
     def set_bbox_center_position_orientation(self, pos, orn):

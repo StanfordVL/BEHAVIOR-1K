@@ -5,6 +5,7 @@ import omnigibson as og
 from omnigibson import object_states
 from omnigibson.macros import gm
 from omnigibson.objects import PrimitiveObject
+from omnigibson.systems import DustSystem, StainSystem
 
 
 def main(random_selection=False, headless=False, short_exec=False):
@@ -42,17 +43,17 @@ def main(random_selection=False, headless=False, short_exec=False):
     block.set_position([-1.4, 3.0, 1.5])
 
     # Set everything that can go dirty and activate the water sources
-    dusty_objects = env.scene.get_objects_with_state(object_states.Dusty)
-    stained_objects = env.scene.get_objects_with_state(object_states.Stained)
+    dusty_objects = env.scene.object_registry("category", "breakfast_table")
+    stained_objects = env.scene.object_registry("category", "bottom_cabinet")
     water_source_objects = env.scene.get_objects_with_state(object_states.WaterSource)
 
     for obj in dusty_objects:
         logging.info(f"Setting object {obj.name} to be Dusty")
-        obj.states[object_states.Dusty].set_value(True)
+        obj.states[object_states.Covered].set_value(DustSystem, True)
 
     for obj in stained_objects:
         logging.info(f"Setting object {obj.name} to be Stained")
-        obj.states[object_states.Stained].set_value(True)
+        obj.states[object_states.Covered].set_value(StainSystem, True)
 
     for obj in water_source_objects:
         if object_states.ToggledOn in obj.states:
