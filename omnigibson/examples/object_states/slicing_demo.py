@@ -20,12 +20,6 @@ def main(random_selection=False, headless=False, short_exec=False):
     assert gm.ENABLE_OBJECT_STATES, f"Object states must be enabled in macros.py in order to use this demo!"
     assert gm.ENABLE_GLOBAL_CONTACT_REPORTING, f"Global contact reporting must be enabled in macros.py in order to use this demo!"
     assert gm.ENABLE_TRANSITION_RULES, f"Transition rules must be enabled in macros.py in order to use this demo!"
-    assert not gm.ENABLE_OMNI_PARTICLES, f"Cannot use GPU dynamics with slicing demo due to an NVIDIA bug!"
-    disclaimer(f"We are attempting to showcase Slicer / Sliceable object states, which requires deleting objects from "
-               f"the simulator at runtime.\n"
-               f"Currently, Omniverse has a bug when using GPU dynamics where a segfault will occur if an object in "
-               f"contact with another object is attempted to be removed.\n"
-               f"This bug should be fixed by the next Omniverse release.\n")
 
     # Create the scene config to load -- empty scene
     cfg = {
@@ -53,7 +47,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         scale=0.9,
     )
     og.sim.import_object(table)
-    table.set_position([0, 0, 0.598])
+    table.set_position([0, 0, 0.532])
     env.step(np.array([]))
 
     apple = DatasetObject(
@@ -75,12 +69,12 @@ def main(random_selection=False, headless=False, short_exec=False):
         prim_path="/World/knife",
         name="knife",
         category="table_knife",
-        model="1",
+        model="4",
         scale=2.5,
     )
     og.sim.import_object(knife)
     knife.set_position_orientation(
-        position=apple_pos + np.array([-0.15, 0, 0.2]),
+        position=apple_pos + np.array([-0.15, 0.0, 0.2]),
         orientation=T.euler2quat([-np.pi / 2, 0, 0]),
     )
     env.step(np.array([]))
@@ -106,13 +100,24 @@ def main(random_selection=False, headless=False, short_exec=False):
     og.sim.import_object(light1)
     light1.set_position(np.array([-1.217, 0.848, 1.388]))
 
-    for _ in range(10):
+    for _ in range(3):
         env.step(np.array([]))
 
     input("The knife will fall on the apple and slice it. Press [ENTER] to continue.")
 
+    # Notify user of disclaimer
+    if gm.ENABLE_OMNI_PARTICLES:
+        disclaimer(
+            f"Omniverse currently has a bug when using GPU dynamics where physics tends to break for no clear reason "
+            f"when we import objects at runtime (that is, when the simulator is playing).\n"
+            f"As a hacky workaround, we cycle the simulator (stop, step, play) to avoid this issue."
+        )
+        og.sim.stop()
+        og.sim.step()
+        og.sim.play()
+
     # Step simulation for a bit so that apple is sliced
-    for i in range(500):
+    for i in range(1000):
         env.step(np.array([]))
 
     input("Apple has been sliced! Press [ENTER] to terminate the demo.")

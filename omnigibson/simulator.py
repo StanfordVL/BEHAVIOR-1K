@@ -52,6 +52,7 @@ m = create_module_macros(module_path=__file__)
 
 m.DEFAULT_VIEWER_CAMERA_POS = (-0.201028, -2.72566 ,  1.0654)
 m.DEFAULT_VIEWER_CAMERA_QUAT = (0.68196617, -0.00155408, -0.00166678,  0.73138017)
+m.OBJECT_GRAVEYARD_POS = (100.0, 100.0, 100.0)
 
 
 class Simulator(SimulationContext, Serializable):
@@ -514,13 +515,26 @@ class Simulator(SimulationContext, Serializable):
                     removed_objs.extend(transition_output.remove)
 
         # Process all transition results.
+        if len(removed_objs) > 0:
+            disclaimer(
+                f"We are attempting to remove objects during the transition rule phase of the simulator step.\n"
+                f"However, Omniverse currently has a bug when using GPU dynamics where a segfault will occur if an "
+                f"object in contact with another object is attempted to be removed.\n"
+                f"This bug should be fixed by the next Omniverse release.\n"
+                f"In the meantime, we instead teleport these objects to a graveyard location located far outside of "
+                f"the scene."
+            )
+        for i, removed_obj in enumerate(removed_objs):
+            # TODO: Ideally we want to remove objects, but because of Omniverse's bug on GPU physics, we simply move
+            # the objects into a graveyard for now
+            # self.remove_object(removed_obj)
+            removed_obj.set_position(np.array(m.OBJECT_GRAVEYARD_POS) + np.ones(3) * i)
+
         for added_obj_attr in added_obj_attrs:
             new_obj = added_obj_attr.obj
             self.import_object(added_obj_attr.obj)
             pos, orn = added_obj_attr.pos, added_obj_attr.orn
             new_obj.set_position_orientation(position=pos, orientation=orn)
-        for removed_obj in removed_objs:
-            self.remove_object(removed_obj)
 
     def reset_scene(self):
         """
@@ -557,6 +571,9 @@ class Simulator(SimulationContext, Serializable):
     def n_physics_timesteps_per_render(self):
         """
         Number of physics timesteps per rendering timestep. rendering_dt has to be a multiple of physics_dt.
+
+        Returns:
+            int: Discrete number of physics timesteps to take per step
         """
         n_physics_timesteps_per_render = self.get_rendering_dt() / self.get_physics_dt()
         assert n_physics_timesteps_per_render.is_integer(), "render_timestep must be a multiple of physics_timestep"
@@ -596,7 +613,6 @@ class Simulator(SimulationContext, Serializable):
     def step_physics(self):
         """
         Step the physics a single step.
-
         """
         self._physics_context._step(current_time=self.current_time)
 

@@ -315,7 +315,7 @@ class SlicingRule(BaseTransitionRule):
 
         # Delete original object from stage.
         t_results.remove.append(sliced_obj)
-        print(f"Applied {SlicingRule.__name__} to {sliced_obj}")
+
         return t_results
 
 
@@ -545,14 +545,12 @@ class BlenderRule(BaseTransitionRule):
         return True
 
     def transition(self, individual_objects, group_objects):
+        t_results = TransitionResults()
         blender = individual_objects["blender"]
         # For every object in group_objects, we remove them from the simulator
-        # TODO: Removing them crashes the sim, so we simply move them out of the scene for now into a virtual graveyard
-        offset = 0
         for i, (obj_category, objs) in enumerate(group_objects.items()):
             for j, obj in enumerate(objs):
-                obj.set_position(np.array([100., 100., 1.0 * offset]))
-                offset += 1.0
+                t_results.remove.append(obj)
 
         # Hide all fluid particles that are inside the blender
         for system in self.fluid_requirements.keys():
@@ -565,6 +563,8 @@ class BlenderRule(BaseTransitionRule):
 
         # Spawn in blended fluid!
         blender.states[Filled].set_value(self.output_fluid, True)
+
+        return t_results
 
 
 """See the following example for writing simple rules.

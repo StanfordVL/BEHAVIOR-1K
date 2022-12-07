@@ -1,14 +1,12 @@
 import numpy as np
 from collections import OrderedDict
 from omnigibson.utils.python_utils import classproperty
-from omnigibson.object_states import *
 from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
 
 
 class Sliced(AbsoluteObjectState, BooleanState):
-    def __init__(self, obj, slice_force=m.DEFAULT_SLICE_FORCE):
-        super(Sliced, self).__init__(obj)
-        self.slice_force = slice_force
+    def __init__(self, obj):
+        super().__init__(obj)
         self.value = False
 
     def _get_value(self):
