@@ -32,8 +32,6 @@ def main(random_selection=False, headless=False, short_exec=False):
         env.reset()
         for i in range(100):
             action = env.action_space.sample()
-            import numpy as np
-            action = np.zeros(env.robots[0].action_dim)
             state, reward, done, info = env.step(action)
             if done:
                 logging.info("Episode finished after {} timesteps".format(i + 1))

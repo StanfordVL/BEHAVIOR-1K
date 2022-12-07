@@ -29,7 +29,7 @@ Note that due to the sparsity of the reward, this training code will not converg
 This only serves as a starting point that users can further build upon.
 """
 
-#
+
 class CustomCombinedExtractor(BaseFeaturesExtractor):
     def __init__(self, observation_space: gym.spaces.Dict):
         # We do not know features-dim here before going over all the items,
