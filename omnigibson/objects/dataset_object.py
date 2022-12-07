@@ -552,18 +552,23 @@ class DatasetObject(USDObject):
 
         # Assign realistic density and mass based on average object category spec
         if self.avg_obj_dims is not None:
-            v_ratio = (np.product(self.native_bbox) * np.product(self.scale)) / np.product(self.avg_obj_dims["size"])
-            mass = self.avg_obj_dims["mass"] * v_ratio
             if self._prim_type == PrimType.RIGID:
                 # Assume each link has the same density
-                density = mass / self.volume
+                density = self.avg_obj_dims["density"]
                 for link in self._links.values():
-                    # Overwrite the original, inaccurate mass value
-                    link.mass = 0.0
-                    link.density = density
+                    if bool(link.prim.GetAttribute("ig:is_metalink").Get()):
+                        # This is a metalink; we set a negligible value
+                        link.mass = 1e-6
+                        link.density = 0.0
+                    else:
+                        # Otherwise overwrite the original, inaccurate mass value
+                        link.mass = 0.0
+                        link.density = density
 
             elif self._prim_type == PrimType.CLOTH:
                 # Cloth cannot set density. Internally omni evenly distributes the mass to each particle
+                v_ratio = (np.product(self.native_bbox) * np.product(self.scale)) / np.product(self.avg_obj_dims["size"])
+                mass = self.avg_obj_dims["mass"] * v_ratio
                 self._links["base_link"].mass = mass
 
         # Lastly, after post loading (which includes loading / registering the links internally)
