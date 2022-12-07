@@ -157,6 +157,16 @@ class RigidPrim(XFormPrim):
         Helper function to refresh owned visual and collision meshes. Useful for synchronizing internal data if
         additional bodies are added manually
         """
+        # Make sure to clean up all pre-existing names for all collision_meshes
+        if self._collision_meshes is not None:
+            for collision_mesh in self._collision_meshes.values():
+                collision_mesh.remove_names()
+
+        # Make sure to clean up all pre-existing names for all visual_meshes
+        if self._visual_meshes is not None:
+            for visual_mesh in self._visual_meshes.values():
+                visual_mesh.remove_names()
+
         self._collision_meshes, self._visual_meshes = OrderedDict(), OrderedDict()
         prims_to_check = []
         coms, vols = [], []
