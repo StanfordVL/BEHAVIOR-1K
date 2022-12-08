@@ -71,7 +71,7 @@ class LogWrapper(BaseWrapper):
 
         # Reload the log writer
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        vr_log_path = os.path.join(
+        log_path = os.path.join(
             self.episode_save_dir,
             "{}_ep{}_{}.hdf5".format(
                 self.task.name,
@@ -82,7 +82,7 @@ class LogWrapper(BaseWrapper):
         self.log_writer = IGLogWriter(
             self.simulator,
             frames_before_write=200,
-            log_filepath=vr_log_path,
+            log_filepath=log_path,
             task=self,
             store_vr=False,
             vr_robot=self.robots[0],
