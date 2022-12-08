@@ -250,7 +250,11 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
 
     def set_value(self, *args, **kwargs):
         assert self._initialized
-        return self._set_value(*args, **kwargs)
+        # Clear cache because the state may be changed
+        self.clear_cache()
+        # Set the value
+        val = self._set_value(*args, **kwargs)
+        return val
 
     def _set_value(self, *args, **kwargs):
         raise NotImplementedError
