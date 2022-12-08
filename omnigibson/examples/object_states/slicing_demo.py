@@ -1,5 +1,6 @@
 import logging
 import numpy as np
+from collections import OrderedDict
 
 import omnigibson as og
 from omnigibson.macros import gm
@@ -21,16 +22,65 @@ def main(random_selection=False, headless=False, short_exec=False):
     assert gm.ENABLE_GLOBAL_CONTACT_REPORTING, f"Global contact reporting must be enabled in macros.py in order to use this demo!"
     assert gm.ENABLE_TRANSITION_RULES, f"Transition rules must be enabled in macros.py in order to use this demo!"
 
-    # Create the scene config to load -- empty scene
+    # Create the scene config to load -- empty scene with table, knife, and apple
+    table_cfg = OrderedDict(
+        type="DatasetObject",
+        name="table",
+        category="breakfast_table",
+        model="19203",
+        scale=0.9,
+        position=[0, 0, 0.532],
+    )
+
+    apple_cfg = OrderedDict(
+        type="DatasetObject",
+        name="apple",
+        category="apple",
+        model="00_0",
+        scale=1.5,
+        position=[0.085, 0,  0.90],
+    )
+
+    knife_cfg = OrderedDict(
+        type="DatasetObject",
+        name="knife",
+        category="table_knife",
+        model="4",
+        scale=2.5,
+        position=[0, 0, 10.0],
+    )
+
+    light0_cfg = OrderedDict(
+        type="LightObject",
+        name="light0",
+        light_type="Sphere",
+        radius=0.01,
+        intensity=4000.0,
+        position=[1.217, -0.848, 1.388],
+    )
+
+    light1_cfg = OrderedDict(
+        type="LightObject",
+        name="light1",
+        light_type="Sphere",
+        radius=0.01,
+        intensity=4000.0,
+        position=[-1.217, 0.848, 1.388],
+    )
+
     cfg = {
         "scene": {
             "type": "EmptyScene",
-        }
+        },
+        "objects": [table_cfg, apple_cfg, knife_cfg, light0_cfg, light1_cfg]
     }
 
     # Create the environment
     env = og.Environment(configs=cfg, action_timestep=1/60., physics_timestep=1/60.)
-    env.step(np.array([]))
+
+    # Grab reference to apple and knife
+    apple = env.scene.object_registry("name", "apple")
+    knife = env.scene.object_registry("name", "knife")
 
     # Update the simulator's viewer camera's pose so it points towards the table
     og.sim.viewer_camera.set_position_orientation(
@@ -38,83 +88,17 @@ def main(random_selection=False, headless=False, short_exec=False):
         orientation=np.array([0.54757518, 0.27792802, 0.35721896, 0.70378409]),
     )
 
-    # Create a table, knife, and apple
-    table = DatasetObject(
-        prim_path="/World/table",
-        name="table",
-        category="breakfast_table",
-        model="19203",
-        scale=0.9,
-    )
-    og.sim.import_object(table)
-    table.set_position([0, 0, 0.532])
-    env.step(np.array([]))
-
-    apple = DatasetObject(
-        prim_path="/World/apple",
-        name="apple",
-        category="apple",
-        model="00_0",
-        scale=1.5,
-    )
-    og.sim.import_object(apple)
-    apple_pos = np.array([0.085, 0,  0.90])
-    apple.set_position(apple_pos)
-
     # Let apple settle
     for _ in range(50):
         env.step(np.array([]))
 
-    knife = DatasetObject(
-        prim_path="/World/knife",
-        name="knife",
-        category="table_knife",
-        model="4",
-        scale=2.5,
-    )
-    og.sim.import_object(knife)
+    knife.keep_still()
     knife.set_position_orientation(
-        position=apple_pos + np.array([-0.15, 0.0, 0.2]),
+        position=apple.get_position() + np.array([-0.15, 0.0, 0.2]),
         orientation=T.euler2quat([-np.pi / 2, 0, 0]),
     )
-    env.step(np.array([]))
-
-    # Create lights
-    light0 = LightObject(
-        prim_path="/World/light0",
-        name="light0",
-        light_type="Sphere",
-        radius=0.01,
-        intensity=4000.0,
-    )
-    og.sim.import_object(light0)
-    light0.set_position(np.array([1.217, -0.848, 1.388]))
-
-    light1 = LightObject(
-        prim_path="/World/light1",
-        name="light1",
-        light_type="Sphere",
-        radius=0.01,
-        intensity=4000.0,
-    )
-    og.sim.import_object(light1)
-    light1.set_position(np.array([-1.217, 0.848, 1.388]))
-
-    for _ in range(3):
-        env.step(np.array([]))
 
     input("The knife will fall on the apple and slice it. Press [ENTER] to continue.")
-
-    # Notify user of disclaimer
-    if gm.USE_GPU_DYNAMICS:
-        disclaimer(
-            f"Omniverse currently has a bug when using GPU dynamics where physics tends to break for no clear reason "
-            f"when we import objects at runtime (that is, when the simulator is playing).\n"
-            f"As a hacky workaround, we cycle the simulator (stop, step, play) to avoid this issue."
-        )
-        og.sim.stop()
-        og.sim.step()
-        og.sim.play()
 
     # Step simulation for a bit so that apple is sliced
     for i in range(1000):

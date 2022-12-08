@@ -21,59 +21,52 @@ def main(random_selection=False, headless=False, short_exec=False):
     assert gm.ENABLE_OBJECT_STATES, f"Object states must be enabled in macros.py in order to use this demo!"
     assert gm.USE_GPU_DYNAMICS, f"GPU dynamics must be enabled in macros.py in order to use this demo!"
 
-    # Create the scene config to load -- empty scene
+    # Create the scene config to load -- empty scene + custom cloth object
     cfg = {
         "scene": {
             "type": "EmptyScene",
-        }
+        },
+        "objects": [
+            {
+                "type": "DatasetObject",
+                "name": "carpet",
+                "category": "carpet",
+                "model": "carpet_0",
+                "prim_type": PrimType.CLOTH,
+                "abilities": {"foldable": {}},
+                "position": [0, 0, 0.5],
+            },
+            {
+                "type": "DatasetObject",
+                "name": "dishtowel",
+                "category": "dishtowel",
+                "model": "Tag_Dishtowel_Basket_Weave_Red",
+                "prim_type": PrimType.CLOTH,
+                "scale": 5.0,
+                "abilities": {"foldable": {}},
+                "position": [1, 1, 0.5],
+            },
+            {
+                "type": "DatasetObject",
+                "name": "shirt",
+                "category": "t-shirt",
+                "model": "t-shirt_000",
+                "prim_type": PrimType.CLOTH,
+                "scale": 0.05,
+                "abilities": {"foldable": {}},
+                "position": [-1, 1, 0.5],
+                "orientation": [0.7071, 0., 0.7071, 0.],
+            },
+        ],
     }
 
+    # Create the environment
     env = og.Environment(configs=cfg, action_timestep=1 / 60., physics_timestep=1 / 60.)
-    og.sim.stop()
 
-    scale_carpet = np.ones(3) * 1.0
-    pos_carpet = np.array([0., 0., 0.5])
-    quat_carpet = np.array([0., 0., 0., 1.])
-
-    carpet = DatasetObject(
-        prim_path="/World/ClothCarpet",
-        usd_path=os.path.join(og_dataset_path, "objects", "carpet", "carpet_0", "usd", "carpet_0.usd"),
-        scale=scale_carpet,
-        prim_type=PrimType.CLOTH,
-        abilities={"foldable": {}},
-    )
-    og.sim.import_object(carpet)
-    carpet.set_position_orientation(position=pos_carpet, orientation=quat_carpet)
-
-    scale_dishtowel = np.ones(3) * 5.0
-    pos_dishtowel = np.array([1.0, 1.0, 0.5])
-    quat_dishtowel = np.array([0., 0., 0., 1.])
-
-    dishtowel= DatasetObject(
-        prim_path="/World/DishTowel_Red",
-        usd_path=os.path.join(og_dataset_path, "objects", "dishtowel", "Tag_Dishtowel_Basket_Weave_Red", "usd", "Tag_Dishtowel_Basket_Weave_Red.usd"),
-        scale=scale_dishtowel,
-        prim_type=PrimType.CLOTH,
-        abilities={"foldable": {}},
-    )
-    og.sim.import_object(dishtowel)
-    dishtowel.set_position_orientation(position=pos_dishtowel, orientation=quat_dishtowel)
-
-    scale_tshirt = np.ones(3) * 0.05
-    pos_tshirt = np.array([-1., 1., 0.5])
-    quat_tshirt = np.array([0.7071, 0., 0.7071, 0.])
-
-    tshirt = DatasetObject(
-        prim_path="/World/ClothTShirt",
-        usd_path=os.path.join(og_dataset_path, "objects", "t-shirt", "t-shirt_000", "usd", "t-shirt_000.usd"),
-        scale=scale_tshirt,
-        prim_type=PrimType.CLOTH,
-        abilities={"foldable": {}},
-    )
-    og.sim.import_object(tshirt)
-    tshirt.set_position_orientation(position=pos_tshirt, orientation=quat_tshirt)
-
-    og.sim.play()
+    # Grab object references
+    carpet = env.scene.object_registry("name", "carpet")
+    dishtowel = env.scene.object_registry("name", "dishtowel")
+    shirt = env.scene.object_registry("name", "shirt")
 
     max_steps = 100 if short_exec else -1
     steps = 0
@@ -94,14 +87,15 @@ def main(random_selection=False, headless=False, short_exec=False):
         folded = flag_area_reduction and flag_diagonal_reduction and flag_smoothness
         info += " || dishtowel: [folded] %d [A] %d [D] %d [S] %d" % (folded, flag_area_reduction, flag_diagonal_reduction, flag_smoothness)
 
-        flag_area_reduction, flag_diagonal_reduction = tshirt.states[Folded].check_projection_area_and_diagonal()
-        flag_smoothness = tshirt.states[Folded].check_smoothness()
+        flag_area_reduction, flag_diagonal_reduction = shirt.states[Folded].check_projection_area_and_diagonal()
+        flag_smoothness = shirt.states[Folded].check_smoothness()
         folded = flag_area_reduction and flag_diagonal_reduction and flag_smoothness
         info += " || tshirt: [folded] %d [A] %d [D] %d [S] %d" % (folded, flag_area_reduction, flag_diagonal_reduction, flag_smoothness)
 
         print(info)
         steps += 1
 
+    # Shut down env at the end
     env.close()
 
 

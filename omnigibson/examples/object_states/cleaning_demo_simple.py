@@ -39,6 +39,9 @@ def main(random_selection=False, headless=False, short_exec=False):
         position=[-0.7, 0, 0.53],
     )
 
+    def check_water_saturation(obj):
+        return obj.states[object_states.Saturated].get_value(WaterSystem)
+
     brush_cfg = OrderedDict(
         type="DatasetObject",
         name="brush",
@@ -55,9 +58,11 @@ def main(random_selection=False, headless=False, short_exec=False):
                     # For a specific particle system, this specifies what conditions are required in order for the
                     # particle applier / remover to apply / remover particles associated with that system
                     # The list should contain functions with signature condition() --> bool,
-                    # where True means the condition is satisified
-                    StainSystem: [],
-                    DustSystem: [],
+                    # where True means the condition is satisfied
+                    # In this case, we only allow our cleaning tool to remove stains and dust particles if
+                    # the object is saturated with water, i.e.: it's "soaked" with water particles
+                    StainSystem: [check_water_saturation],
+                    DustSystem: [check_water_saturation],
                     WaterSystem: [],
                 },
             },

@@ -2,7 +2,7 @@ import logging
 import numpy as np
 import omnigibson as og
 from omnigibson.object_states import Covered
-from omnigibson.objects import DatasetObject, LightObject
+from omnigibson.objects import DatasetObject
 from omnigibson.macros import gm, macros
 from omnigibson.systems import *
 from omnigibson.utils.usd_utils import create_joint
@@ -95,15 +95,41 @@ def main(random_selection=False, headless=False, short_exec=False):
         }
     }
 
-    # Create the scene config to load -- empty scene
+    # Define objects to load: a light, table, and cloth
+    light_cfg = OrderedDict(
+        type="LightObject",
+        name="light",
+        light_type="Sphere",
+        radius=0.01,
+        intensity=1e5,
+        position=[-2.0, -2.0, 2.0],
+    )
+
+    table_cfg = OrderedDict(
+        type="DatasetObject",
+        name="table",
+        category="breakfast_table",
+        model="265851637a59eb2f882f822c83877cbc",
+        scale=[4.0, 4.0, 4.0],
+        position=[0, 0, 0.7],
+    )
+
+    # Create the scene config to load -- empty scene with a light and table
     cfg = {
         "scene": {
             "type": "EmptyScene",
         },
+        "objects": [light_cfg, table_cfg],
     }
+
+    # Sanity check inputs: Remover + Adjacency + Fluid will not work because we are using a visual_only
+    # object, so contacts will not be triggered with this object
 
     # Load the environment
     env = og.Environment(configs=cfg, action_timestep=1/60., physics_timestep=1/60.)
+
+    # Grab references to table
+    table = env.scene.object_registry("name", "table")
 
     # Set the viewer camera appropriately
     og.sim.viewer_camera.set_position_orientation(
@@ -111,27 +137,9 @@ def main(random_selection=False, headless=False, short_exec=False):
         orientation=np.array([ 0.44662832, -0.17829795, -0.32506992,  0.81428652]),
     )
 
-    # Load in a light
-    light = LightObject(
-        prim_path="/World/sphere_light",
-        light_type="Sphere",
-        name="sphere_light",
-        radius=0.01,
-        intensity=1e5,
-    )
-    og.sim.import_object(light)
-    light.set_position(np.array([-2.0, -2.0, 2.0]))
-
-    # Load in the table
-    table = DatasetObject(
-        prim_path="/World/table",
-        name="table",
-        category="breakfast_table",
-        model="265851637a59eb2f882f822c83877cbc",
-        scale=[4.0, 4.0, 4.0],
-    )
-    og.sim.import_object(table)
-    table.set_position(np.array([0, 0, 0.5]))
+    # Let objects settle first
+    for _ in range(10):
+        env.step(np.array([]))
 
     # If we're using a projection volume, we manually add in the required metalink required in order to use the volume
     modifier_path = "/World/modifier"
@@ -153,53 +161,54 @@ def main(random_selection=False, headless=False, short_exec=False):
         local_area_quat = np.array([0, 0.707, 0, 0.707])    # Needs to rotated so the metalink points downwards from cloth
         joint_prim.GetAttribute("physics:localRot0").Set(Gf.Quatf(*(local_area_quat[[3, 0, 1, 2]])))
 
-    # # Load in the particle modifier object
-    # abilities["saturable"] = {}
-    # abilities["particleRemover"] = {
-    #     "method": ParticleModifyMethod.ADJACENCY,
-    #     "conditions": {
-    #         particle_system: [lambda: False],
-    #     },
-    #     "projection_mesh_params": None,
-    # }
     modifier = DatasetObject(
         prim_path=modifier_path,
         name="modifier",
         category="dishtowel",
         model="Tag_Dishtowel_Basket_Weave_Red",
         scale=np.ones(3) * 2.0,
-        visual_only=True,
+        visual_only=method_type == "Projection" or particle_system == StainSystem,  # Fluid + adjacency requires the object to have collision geoms active
         abilities=abilities,
     )
-    # from omnigibson.object_states import ParticleApplier, Saturated
-    # modifier.states[ParticleApplier].conditions[particle_system] = [lambda: modifier.states[Saturated].get_value(WaterSystem)] + modifier.states[ParticleApplier].conditions[particle_system]
     og.sim.import_object(modifier)
     modifier.set_position(np.array([0, 0, 5.0]))
 
     # Take a step to make sure all objects are properly initialized
-    env.step(np.array([]))
-
-    # modifier.states[Saturated].set_value(WaterSystem, True)
+    for _ in range(25):
+        env.step(np.array([]))
 
     # If we're removing particles, set the table's covered state to be True
     if modifier_type == "particleRemover":
         table.states[Covered].set_value(particle_system, True)
 
+        # Take a few steps to let particles settle
+        for _ in range(25):
+            env.step(np.array([]))
+
     # Enable camera teleoperation for convenience
     og.sim.enable_viewer_camera_teleoperation()
 
-    # Take a few steps to let objects settle
-    for i in range(25):
-        env.step(np.array([]))
-
     # Set the modifier object to be in position to modify particles
-    modifier.set_position(np.array([0, 0.3, 1.85 if method_type == "Projection" else 1.175]))
+    if method_type == "Projection":
+        # Higher z to showcase projection volume at work
+        z = 1.85
+    elif particle_system == StainSystem:
+        # Lower z needed to allow for adjacency bounding box to overlap properly
+        z = 1.175
+    else:
+        # Higher z needed for actual physical interaction to accomodate non-negligible particle radius
+        z = 1.22
+    modifier.keep_still()
+    modifier.set_position_orientation(
+        position=np.array([0, 0.3, z]),
+        orientation=np.array([0, 0, 0, 1.0]),
+    )
 
     # Move object in square around table
     deltas = [
-        [200, np.array([-0.01, 0, 0])],
+        [150, np.array([-0.01, 0, 0])],
         [60, np.array([0, -0.01, 0])],
-        [200, np.array([0.01, 0, 0])],
+        [150, np.array([0.01, 0, 0])],
         [60, np.array([0, 0.01, 0])],
     ]
     for t, delta in deltas:
