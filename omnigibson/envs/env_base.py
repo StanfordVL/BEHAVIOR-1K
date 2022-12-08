@@ -39,7 +39,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 If multiple configs are specified, they will be merged sequentially in the order specified.
                 This allows procedural generation of a "full" config from small sub-configs.
             action_timestep (float): environment executes action per action_timestep second
-            physics_timestep: physics timestep for pybullet
+            physics_timestep: physics timestep for physx
             device (None or str): specifies the device to be used if running on the gpu with torch backend
             automatic_reset (bool): whether to automatic reset after an episode finishes
         """

@@ -12,7 +12,6 @@ from omnigibson.utils.constants import ParticleModifyMethod
 def main(random_selection=False, headless=False, short_exec=False):
     """
     Demo of a cleaning task that resets after everything has been cleaned
-    To save/load state it combines pybullet save/load functionality and additional iG functions for the extended states
     Loads an empty scene with a sink, a dusty table and a dirty and stained bowl, and a cleaning tool
     If everything is cleaned, or after N steps, the scene resets to the initial state
     """
