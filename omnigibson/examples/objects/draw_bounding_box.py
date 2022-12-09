@@ -1,9 +1,9 @@
 import logging
 import matplotlib.pyplot as plt
+from collections import OrderedDict
 
 import numpy as np
 import omnigibson as og
-from omnigibson.objects import DatasetObject
 from omni.isaac.synthetic_utils.visualization import colorize_bboxes
 
 
@@ -20,11 +20,33 @@ def main(random_selection=False, headless=False, short_exec=False):
     """
     logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
 
-    # Create the scene config to load -- empty scene
+    # Specify objects to load
+
+    banana_cfg = OrderedDict(
+        type="DatasetObject",
+        name="banana",
+        category="banana",
+        model="09_0",
+        scale=[3.0, 5.0, 2.0],
+        position=[-0.906661, -0.545106,  0.136824],
+        orientation=[0, 0, 0.76040583, -0.6494482 ],
+    )
+
+    door_cfg = OrderedDict(
+        type="DatasetObject",
+        name="door",
+        category="door",
+        model="8930",
+        position=[-2.0, 0, 0.70000001],
+        orientation=[0, 0, -0.38268343,  0.92387953],
+    )
+
+    # Create the scene config to load -- empty scene with a few objects
     cfg = {
         "scene": {
-            "type": "EmptyScene",
-        }
+            "type": "Scene",
+        },
+        "objects": [banana_cfg, door_cfg],
     }
 
     # Create the environment
@@ -41,32 +63,6 @@ def main(random_selection=False, headless=False, short_exec=False):
     bbox_modalities = ["bbox_3d", "bbox_2d_loose", "bbox_2d_tight"]
     for bbox_modality in bbox_modalities:
         cam.add_modality(bbox_modality)
-
-    # Add banana and door objects
-    banana = DatasetObject(
-        prim_path=f"/World/banana",
-        name="banana",
-        category="banana",
-        model="09_0",
-        scale=[3.0, 5.0, 2.0],
-    )
-    og.sim.import_object(banana)
-    banana.set_position_orientation(
-        position=np.array([-0.906661, -0.545106,  0.136824]),
-        orientation=np.array([0, 0, 0.76040583, -0.6494482 ]),
-    )
-
-    door = DatasetObject(
-        prim_path=f"/World/door",
-        name="door",
-        category="door",
-        model="8930",
-    )
-    og.sim.import_object(door)
-    door.set_position_orientation(
-        position=np.array([-2.0, 0, 0.70000001]),
-        orientation=np.array([0, 0, -0.38268343,  0.92387953]),
-    )
 
     # Take a few steps to let objects settle
     for i in range(100):
