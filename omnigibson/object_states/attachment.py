@@ -97,14 +97,6 @@ class Attached(RelativeObjectState, BooleanState, ContactSubscribedStateMixin):
 
                 # Wake up objects so that passive forces like gravity can be applied.
                 self.obj.wake()
-
-                # TODO: Fix this hacky workaround once omni's GPU bug is fixed!!
-                # We have to take a physics step otherwise we get cuda crashes...
-                if gm.USE_GPU_DYNAMICS:
-                    # Slow sim to mitigate the physics leakage
-                    with og.sim.slowed(dt=1e-3):
-                        og.sim.step_physics()
-
                 other.wake()
 
             return True

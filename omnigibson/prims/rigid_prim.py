@@ -197,28 +197,6 @@ class RigidPrim(XFormPrim):
             com = (np.array(coms) * np.array(vols).reshape(-1, 1)).sum(axis=0) / np.sum(vols)
             self.set_attribute("physics:centerOfMass", Gf.Vec3f(*com))
 
-    # def _create_contact_sensor(self):
-    #     """
-    #     Creates a full-body contact sensor to detect collisions with this rigid body
-    #     """
-    #     props = _contact_sensor.SensorProperties()
-    #     props.radius = -1.0       # Negative value implies full body sensor
-    #     props.minThreshold = 0          # Minimum force to detect
-    #     props.maxThreshold = 100000000  # Maximum force to detect
-    #     props.sensorPeriod = 0.0            # Zero means in sync with the simulation period
-    #
-    #     # TODO: Uncomment later, but this significantly slows down everything
-    #     # Create sensor
-    #     self._contact_handle = self._cs.add_sensor_on_body(self._prim_path, props)
-
-
-
-    # def _remove_contact_sensor(self):
-    #     """
-    #     remove the contact sensor owned by this body
-    #     """
-    #     self._cs.remove_sensor(self._contact_handle)
-
     def enable_collisions(self):
         """
         Enable collisions for this RigidPrim

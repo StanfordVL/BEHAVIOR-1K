@@ -18,7 +18,14 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.utils.usd_utils import BoundingBoxAPI
 from omnigibson.utils.asset_utils import decrypt_file
 from omnigibson.utils.constants import PrimType
-from omnigibson.macros import gm
+from omnigibson.macros import gm, create_module_macros
+
+
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
+
+# A lower bound is needed in order to consistently trigger contacts
+m.MIN_OBJ_MASS = 0.4
 
 
 class DatasetObject(USDObject):
@@ -265,7 +272,7 @@ class DatasetObject(USDObject):
                         link.density = 0.0
                     else:
                         # Otherwise overwrite the original, inaccurate mass value
-                        link.mass = 0.0
+                        link.mass = max(link.volume * density, m.MIN_OBJ_MASS * link.volume / self.volume)
                         link.density = density
 
             elif self._prim_type == PrimType.CLOTH:
@@ -430,7 +437,6 @@ class DatasetObject(USDObject):
                         # The location of the joint frame is scaled using the scale in the parent frame
                         quat0 = gf_quat_to_np_array(prim.GetAttribute("physics:localRot0").Get())[[1, 2, 3, 0]]
                         quat1 = gf_quat_to_np_array(prim.GetAttribute("physics:localRot1").Get())[[1, 2, 3, 0]]
-
                         # Invert the child link relationship, and multiply the two rotations together to get the final rotation
                         local_ori = T.quat_multiply(quaternion1=T.quat_inverse(quat1), quaternion0=quat0)
                         jnt_frame_rot = T.quat2mat(local_ori)
