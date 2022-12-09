@@ -103,10 +103,8 @@ class InteractiveTraversableScene(TraversableScene):
 
     def get_scene_loading_info(self, scene_model, scene_instance=None):
         """
-        Gets scene loading info to know what single USD file to load, either specified indirectly via @usd_file or
-        directly by the fpath from @json_path. Note that if both are specified, @json_path takes precidence.
-        If neither are specified, then a file will automatically be chosen based on self.scene_model and
-        self.object_randomization
+        Gets scene loading info to know what single USD file to load, specified indirectly via @scene_instance if it
+        is specified, otherwise, will grab the "best" scene file to load.
 
         Args:
             scene_model (str): Name of the scene to load, e.g, Rs_int, etc.

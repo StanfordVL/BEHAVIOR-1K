@@ -151,16 +151,16 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
         # If we're using a BehaviorTask, we may load a pre-cached scene configuration
         if self.task_config["type"] == "BehaviorTask":
-            usd_file, usd_path = self.scene_config["usd_file"], self.scene_config["usd_path"]
-            if usd_path is None and usd_file is None and not self.task_config["online_object_sampling"]:
-                usd_file = "{}_task_{}_{}_{}_fixed_furniture_template".format(
+            scene_instance, scene_file = self.scene_config["scene_instance"], self.scene_config["scene_file"]
+            if scene_file is None and scene_instance is None and not self.task_config["online_object_sampling"]:
+                scene_instance = "{}_task_{}_{}_{}_fixed_furniture_template".format(
                     self.scene_config["scene_model"],
                     self.task_config["activity_name"],
                     self.task_config["activity_definition_id"],
                     self.task_config["activity_instance_id"],
                 )
             # Update the value in the scene config
-            self.scene_config["usd_file"] = usd_file
+            self.scene_config["scene_instance"] = scene_instance
 
         # - Additionally run some sanity checks on these values -
 
@@ -580,8 +580,8 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 "trav_map_resolution": 0.1,
                 "trav_map_erosion": 2,
                 "trav_map_with_objects": True,
-                "usd_file": None,
-                "usd_path": None,
+                "scene_instance": None,
+                "scene_file": None,
             },
 
             # Robot kwargs
