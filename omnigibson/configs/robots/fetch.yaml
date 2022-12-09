@@ -15,7 +15,6 @@ robot:
   base_name: null
   scale: 1.0
   self_collision: true
-  rendering_params: null
   grasping_mode: physical
   rigid_trunk: false
   default_trunk_offset: 0.365

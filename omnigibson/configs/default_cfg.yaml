@@ -6,7 +6,7 @@ render:
   vertical_fov: 90
 
 scene:
-  type: EmptyScene
+  type: Scene
 
 robots: []
 
