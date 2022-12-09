@@ -1012,7 +1012,7 @@ DustSystem = VisualParticleSystem.create(
         visible=False,
         fixed_base=False,
         visual_only=True,
-        include_default_state=False,
+        include_default_states=False,
     )
 )
 
@@ -1028,7 +1028,7 @@ StainSystem = VisualParticleSystem.create(
         visible=False,
         fixed_base=False,
         visual_only=True,
-        include_default_state=False,
+        include_default_states=False,
     ),
     # Default parameters for sampling particle sizes based on attachment group object size
     _BOUNDING_BOX_LOWER_LIMIT_FRACTION_OF_AABB=0.06,
@@ -1054,7 +1054,7 @@ GrassSystem = VisualParticleSystem.create(
         visible=False,
         fixed_base=False,
         visual_only=True,
-        include_default_state=False,
+        include_default_states=False,
     ),
     # Also need to override how we sample particles, since grass should only point upwards and placed on "top"
     # parts of surfaces!
