@@ -14,9 +14,6 @@ class Locobot(TwoWheelRobot):
 
     @property
     def model_name(self):
-        """
-        :return str: robot model name
-        """
         return "Locobot"
 
     @property
@@ -30,7 +27,8 @@ class Locobot(TwoWheelRobot):
     @property
     def base_control_idx(self):
         """
-        :return Array[int]: Indices in low-level control vector corresponding to [Left, Right] wheel joints.
+        Returns:
+            n-array: Indices in low-level control vector corresponding to [Left, Right] wheel joints.
         """
         return np.array([1, 0])
 

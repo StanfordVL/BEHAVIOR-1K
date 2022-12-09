@@ -110,7 +110,8 @@ class ActiveCameraRobot(BaseRobot):
     @abstractmethod
     def camera_control_idx(self):
         """
-        :return Array[int]: Indices in low-level control vector corresponding to camera joints.
+        Returns:
+            n-array: Indices in low-level control vector corresponding to camera joints.
         """
         raise NotImplementedError
 

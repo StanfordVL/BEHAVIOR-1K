@@ -1,5 +1,3 @@
-import inspect
-import logging
 from abc import abstractmethod
 from copy import deepcopy
 from collections import OrderedDict
@@ -10,9 +8,8 @@ from omnigibson.sensors import create_sensor, SENSOR_PRIMS_TO_SENSOR_CLS, ALL_SE
 from omnigibson.objects.usd_object import USDObject
 from omnigibson.objects.controllable_object import ControllableObject
 from omnigibson.utils.gym_utils import GymObservable
-from omnigibson.utils.python_utils import Registerable, classproperty
+from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.vision_utils import segmentation_to_rgb
-import omnigibson.utils.transform_utils as T
 from omnigibson.utils.constants import PrimType
 from pxr import PhysxSchema
 
@@ -44,7 +41,6 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         class_id=None,
         uuid=None,
         scale=None,
-        rendering_params=None,
         visible=True,
         fixed_base=False,
         visual_only=False,
@@ -68,40 +64,46 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         **kwargs,
     ):
         """
-        @param prim_path: str, global path in the stage to this object
-        @param name: Name for the object. Names need to be unique per scene. If no name is set, a name will be generated
-            at the time the object is added to the scene, using the object's category.
-        @param class_id: What class ID the object should be assigned in semantic segmentation rendering mode.
-        @param uuid: Unique unsigned-integer identifier to assign to this object (max 8-numbers).
-            If None is specified, then it will be auto-generated
-        @param scale: float or 3-array, sets the scale for this object. A single number corresponds to uniform scaling
-            along the x,y,z axes, whereas a 3-array specifies per-axis scaling.
-        @param rendering_params: Any relevant rendering settings for this object.
-        @param visible: bool, whether to render this object or not in the stage
-        @param fixed_base: bool, whether to fix the base of this object or not
-        visual_only (bool): Whether this object should be visual only (and not collide with any other objects)
-        self_collisions (bool): Whether to enable self collisions for this object
-        load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
-            loading this prim at runtime.
-        @param abilities: dict in the form of {ability: {param: value}} containing
-            robot abilities and parameters.
-        :param control_freq: float, control frequency (in Hz) at which to control the robot. If set to be None,
-            simulator.import_object will automatically set the control frequency to be 1 / render_timestep by default.
-        :param controller_config: None or Dict[str, ...], nested dictionary mapping controller name(s) to specific
-            controller configurations for this object. This will override any default values specified by this class.
-        :param action_type: str, one of {discrete, continuous} - what type of action space to use
-        :param action_normalize: bool, whether to normalize inputted actions. This will override any default values
-         specified by this class.
-        obs_modalities (str or list of str): Observation modalities to use for this robot. Default is "all", which
-            corresponds to all modalities being used.
-            Otherwise, valid options should be part of omnigibson.sensors.ALL_SENSOR_MODALITIES.
-        :param proprio_obs: str or tuple of str, proprioception observation key(s) to use for generating proprioceptive
-            observations. If str, should be exactly "default" -- this results in the default proprioception observations
-            being used, as defined by self.default_proprio_obs. See self._get_proprioception_dict for valid key choices
-        :param reset_joint_pos: None or Array[float], if specified, should be the joint positions that the robot should
-            be set to during a reset. If None (default), self.default_joint_pos will be used instead.
-        kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
-            for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
+        Args:
+            prim_path (str): global path in the stage to this object
+            name (None or str): Name for the object. Names need to be unique per scene. If None, a name will be
+                generated at the time the object is added to the scene, using the object's category.
+            category (str): Category for the object. Defaults to "object".
+            class_id (None or int): What class ID the object should be assigned in semantic segmentation rendering mode.
+                If None, the ID will be inferred from this object's category.
+            uuid (None or int): Unique unsigned-integer identifier to assign to this object (max 8-numbers).
+                If None is specified, then it will be auto-generated
+            scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
+                for this object. A single number corresponds to uniform scaling along the x,y,z axes, whereas a
+                3-array specifies per-axis scaling.
+            visible (bool): whether to render this object or not in the stage
+            fixed_base (bool): whether to fix the base of this object or not
+            visual_only (bool): Whether this object should be visual only (and not collide with any other objects)
+            self_collisions (bool): Whether to enable self collisions for this object
+            prim_type (PrimType): Which type of prim the object is, Valid options are: {PrimType.RIGID, PrimType.CLOTH}
+            load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
+                loading this prim at runtime.
+            abilities (None or dict): If specified, manually adds specific object states to this object. It should be
+                a dict in the form of {ability: {param: value}} containing object abilities and parameters to pass to
+                the object state instance constructor.
+            control_freq (float): control frequency (in Hz) at which to control the object. If set to be None,
+                simulator.import_object will automatically set the control frequency to be 1 / render_timestep by default.
+            controller_config (None or dict): nested dictionary mapping controller name(s) to specific controller
+                configurations for this object. This will override any default values specified by this class.
+            action_type (str): one of {discrete, continuous} - what type of action space to use
+            action_normalize (bool): whether to normalize inputted actions. This will override any default values
+                specified by this class.
+            reset_joint_pos (None or n-array): if specified, should be the joint positions that the object should
+                be set to during a reset. If None (default), self.default_joint_pos will be used instead.
+            obs_modalities (str or list of str): Observation modalities to use for this robot. Default is "all", which
+                corresponds to all modalities being used.
+                Otherwise, valid options should be part of omnigibson.sensors.ALL_SENSOR_MODALITIES.
+            proprio_obs (str or list of str): proprioception observation key(s) to use for generating proprioceptive
+                observations. If str, should be exactly "default" -- this results in the default proprioception
+                observations being used, as defined by self.default_proprio_obs. See self._get_proprioception_dict
+                for valid key choices
+            kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
+                for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
         """
         # Store inputs
         self._obs_modalities = obs_modalities if obs_modalities == "all" else \
@@ -124,13 +126,12 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             class_id=class_id,
             uuid=uuid,
             scale=scale,
-            rendering_params=rendering_params,
             visible=visible,
             fixed_base=fixed_base,
             visual_only=visual_only,
             self_collisions=self_collisions,
             prim_type=PrimType.RIGID,
-            include_default_state=True,
+            include_default_states=True,
             load_config=load_config,
             abilities=abilities,
             control_freq=control_freq,
@@ -206,12 +207,14 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         point corresponding to a toggle marker
         by default, we assume robot cannot toggle toggle markers
 
-        :param toggle_position: Array[float], (x,y,z) cartesian position values as a reference point for evaluating
-            whether a toggle can occur
-        :param toggle_distance_threshold: float, distance value below which a toggle is allowed
+        Args:
+            toggle_position (3-array): (x,y,z) cartesian position values as a reference point for evaluating
+                whether a toggle can occur
+            toggle_distance_threshold (float): distance value below which a toggle is allowed
 
-        :return bool: True if the part of the robot that can toggle a toggleable is within the given range of a
-            point corresponding to a toggle marker. By default, we assume robot cannot toggle toggle markers
+        Returns:
+            bool: True if the part of the robot that can toggle a toggleable is within the given range of a
+                point corresponding to a toggle marker. By default, we assume robot cannot toggle toggle markers
         """
         return False
 
@@ -240,38 +243,32 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
 
     def get_proprioception(self):
         """
-        :return Array[float]: numpy array of all robot-specific proprioceptive observations.
+        Returns:
+            n-array: numpy array of all robot-specific proprioceptive observations.
         """
         proprio_dict = self._get_proprioception_dict()
         return np.concatenate([proprio_dict[obs] for obs in self._proprio_obs])
 
-    def dump_config(self):
-        # Grab running config
-        cfg = super().dump_config()
-
-        # Add relevant robot params
-        cfg["proprio_obs"] = self._proprio_obs
-
-        return cfg
-
     def _get_proprioception_dict(self):
         """
-        :return dict: keyword-mapped proprioception observations available for this robot. Can be extended by subclasses
+        Returns:
+            OrderedDict: keyword-mapped proprioception observations available for this robot.
+                Can be extended by subclasses
         """
         joints_state = self.get_joints_state(normalized=False)
         pos, ori = self.get_position(), self.get_rpy()
-        return {
-            "joint_qpos": joints_state.positions,
-            "joint_qpos_sin": np.sin(joints_state.positions),
-            "joint_qpos_cos": np.cos(joints_state.positions),
-            "joint_qvel": joints_state.velocities,
-            "joint_qeffort": joints_state.efforts,
-            "robot_pos": pos,
-            "robot_ori_cos": np.cos(ori),
-            "robot_ori_sin": np.sin(ori),
-            "robot_lin_vel": self.get_linear_velocity(),
-            "robot_ang_vel": self.get_angular_velocity(),
-        }
+        return OrderedDict(
+            joint_qpos=joints_state.positions,
+            joint_qpos_sin=np.sin(joints_state.positions),
+            joint_qpos_cos=np.cos(joints_state.positions),
+            joint_qvel=joints_state.velocities,
+            joint_qeffort=joints_state.efforts,
+            robot_pos=pos,
+            robot_ori_cos=np.cos(ori),
+            robot_ori_sin=np.sin(ori),
+            robot_lin_vel=self.get_linear_velocity(),
+            robot_ang_vel=self.get_angular_velocity(),
+        )
 
     def _load_observation_space(self):
         # We compile observation spaces from our sensors
@@ -375,7 +372,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
                     axes[i].set_title(modality)
                     axes[i].set_axis_off()
                 # Set title
-                fog.suptitle(sensor_name)
+                fig.suptitle(sensor_name)
                 plt.show(block=False)
 
         # One final plot show so all the figures get rendered
@@ -401,29 +398,16 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
     @property
     def proprioception_dim(self):
         """
-        :return int: Size of self.get_proprioception() vector
+        Returns:
+            int: Size of self.get_proprioception() vector
         """
         return len(self.get_proprioception())
-
-    # TODO: Bake-in camera into this link
-    # # TODO!! Maybe create a camera prim? cf. Alan
-    # @property
-    # def eyes(self):
-    #     """
-    #     Returns the RobotLink corresponding to the robot's camera. Assumes that there is a link
-    #     with name "eyes" in the underlying robot model. If not, an error will be raised.
-    #
-    #     :return RobotLink: link containing the robot's camera
-    #     """
-    #     assert "eyes" in self._links, "Cannot find 'eyes' in links, current link names are: {}".format(
-    #         list(self._links.keys())
-    #     )
-    #     return self._links["eyes"]
 
     @property
     def default_proprio_obs(self):
         """
-        :return Array[str]: Default proprioception observations to use
+        Returns:
+            list of str: Default proprioception observations to use
         """
         return []
 
