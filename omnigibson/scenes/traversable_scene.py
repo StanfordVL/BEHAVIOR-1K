@@ -1,5 +1,4 @@
 import logging
-from abc import ABC
 
 from omnigibson.scenes.scene_base import Scene
 from omnigibson.maps.traversable_map import TraversableMap
@@ -15,25 +14,33 @@ class TraversableScene(Scene):
     def __init__(
         self,
         scene_model,
+        scene_file=None,
         trav_map_resolution=0.1,
         trav_map_erosion=2,
         trav_map_with_objects=True,
         build_graph=True,
         num_waypoints=10,
         waypoint_resolution=0.2,
+        use_floor_plane=True,
+        floor_plane_visible=True,
+        floor_plane_color=(1.0, 1.0, 1.0),
     ):
         """
-        Load a traversable scene and compute traversability
-
-        :param scene_model: Scene model
-        :param trav_map_resolution: traversability map resolution
-        :param trav_map_erosion: erosion radius of traversability areas, should be robot footprint radius
-        :param trav_map_with_objects: whether to use objects or not when constructing graph
-        :param build_graph: build connectivity graph
-        :param num_waypoints: number of way points returned
-        :param waypoint_resolution: resolution of adjacent way points
+        Args:
+            scene_model (str): Scene model name, e.g.: Adrian or Rs_int
+            scene_file (None or str): If specified, full path of JSON file to load (with .json).
+                None results in no additional objects being loaded into the scene
+            trav_map_resolution (float): traversability map resolution
+            trav_map_erosion (float): erosion radius of traversability areas, should be robot footprint radius
+            trav_map_with_objects (bool): whether to use objects or not when constructing graph
+            build_graph (bool): build connectivity graph
+            num_waypoints (int): number of way points returned
+            waypoint_resolution (float): resolution of adjacent way points
+            use_floor_plane (bool): whether to load a flat floor plane into the simulator
+            floor_plane_visible (bool): whether to render the additionally added floor plane
+            floor_plane_color (3-array): if @floor_plane_visible is True, this determines the (R,G,B) color assigned
+                to the generated floor plane
         """
-        super().__init__()
         logging.info("TraversableScene model: {}".format(scene_model))
         self.scene_model = scene_model
 
@@ -45,6 +52,13 @@ class TraversableScene(Scene):
             build_graph=build_graph,
             num_waypoints=num_waypoints,
             waypoint_resolution=waypoint_resolution,
+        )
+        # Run super init
+        super().__init__(
+            scene_file=scene_file,
+            use_floor_plane=use_floor_plane,
+            floor_plane_visible=floor_plane_visible,
+            floor_plane_color=floor_plane_color,
         )
 
     @property
@@ -61,26 +75,9 @@ class TraversableScene(Scene):
         return self._trav_map.build_graph
 
     def get_random_point(self, floor=None):
-        """
-        Sample a random point on the given floor number. If not given, sample a random floor number.
-
-        :param floor: floor number
-        :return floor: floor number
-        :return point: randomly sampled point in [x, y, z]
-        """
         return self._trav_map.get_random_point(floor=floor)
 
     def get_shortest_path(self, floor, source_world, target_world, entire_path=False):
-        """
-        Get the shortest path from one point to another point.
-        If any of the given point is not in the graph, add it to the graph and
-        create an edge between it to its closest node.
-
-        :param floor: floor number
-        :param source_world: 2D source location in world reference frame (metric)
-        :param target_world: 2D target location in world reference frame (metric)
-        :param entire_path: whether to return the entire path
-        """
         assert self._trav_map.build_graph, "cannot get shortest path without building the graph"
 
         return self._trav_map.get_shortest_path(
@@ -89,10 +86,3 @@ class TraversableScene(Scene):
             target_world=target_world,
             entire_path=entire_path,
         )
-
-    @classproperty
-    def _do_not_register_classes(cls):
-        # Don't register this class since it's an abstract template
-        classes = super()._do_not_register_classes
-        classes.add("TraversableScene")
-        return classes

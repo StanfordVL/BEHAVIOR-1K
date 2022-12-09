@@ -6,13 +6,11 @@ import numpy as np
 
 ##### SET THIS ######
 SCENE_ID = "Rs_int"
-USD_TEMPLATE_FILE = f"{og.og_dataset_path}/scenes/{SCENE_ID}/usd/{SCENE_ID}_best_template.usd"
 #### YOU DONT NEED TO TOUCH ANYTHING BELOW HERE IDEALLY :) #####
 
 # Load scene
 scene = InteractiveTraversableScene(
     scene_model=SCENE_ID,
-    usd_path=USD_TEMPLATE_FILE,
 )
 
 # Import scene

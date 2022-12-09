@@ -69,6 +69,7 @@ class TraversableMap:
         self.floor_graph = []
         for floor in range(len(self.floor_heights)):
             if self.trav_map_with_objects:
+                # TODO: Shouldn't this be generated dynamically?
                 trav_map = np.array(Image.open(os.path.join(maps_path, "floor_trav_{}.png".format(floor))))
             else:
                 trav_map = np.array(Image.open(os.path.join(maps_path, "floor_trav_no_obj_{}.png".format(floor))))
@@ -158,12 +159,15 @@ class TraversableMap:
 
     def get_random_point(self, floor=None):
         """
-        Sample a random point on the given floor number. If not given, sample a random floor number (assumes @n_floors
-        is then specified).
+        Sample a random point on the given floor number. If not given, sample a random floor number.
 
-        :param floor: floor number
-        :return floor: floor number
-        :return point: randomly sampled point in [x, y, z]
+        Args:
+            floor (None or int): floor number. None means the floor is randomly sampled
+
+        Returns:
+            2-tuple:
+                - int: floor number. This is the sampled floor number if @floor is None
+                - 3-array: (x,y,z) randomly sampled point
         """
         if floor is None:
             floor = np.random.randint(0, self.n_floors)
@@ -211,10 +215,16 @@ class TraversableMap:
         If any of the given point is not in the graph, add it to the graph and
         create an edge between it to its closest node.
 
-        :param floor: floor number
-        :param source_world: 2D source location in world reference frame (metric)
-        :param target_world: 2D target location in world reference frame (metric)
-        :param entire_path: whether to return the entire path
+        Args:
+            floor (int): floor number
+            source_world (2-array): (x,y) 2D source location in world reference frame (metric)
+            target_world (2-array): (x,y) 2D target location in world reference frame (metric)
+            entire_path (bool): whether to return the entire path
+
+        Returns:
+            2-tuple:
+                - (N, 2) array: array of path waypoints, where N is the number of generated waypoints
+                - float: geodesic distance of the path
         """
         assert self.build_graph, "cannot get shortest path without building the graph"
         source_map = tuple(self.world_to_map(source_world))

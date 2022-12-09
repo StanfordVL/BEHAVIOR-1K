@@ -1,13 +1,15 @@
 import json
 from abc import ABC, abstractmethod
 from collections import OrderedDict
+from itertools import combinations
 from omni.isaac.core.objects.ground_plane import GroundPlane
 from pxr import Usd, UsdGeom
 import numpy as np
 from omni.isaac.core.utils.stage import get_current_stage
-from omnigibson import app
+import omnigibson as og
 from omnigibson.prims.xform_prim import XFormPrim
-from omnigibson.utils.python_utils import classproperty, Serializable, Registerable, Recreatable
+from omnigibson.utils.python_utils import classproperty, Serializable, Registerable, Recreatable, \
+    create_object_from_init_info
 from omnigibson.utils.registry_utils import SerializableRegistry
 from omnigibson.utils.config_utils import NumpyEncoder
 from omnigibson.objects.object_base import BaseObject
@@ -22,16 +24,35 @@ REGISTERED_SCENES = OrderedDict()
 class Scene(Serializable, Registerable, Recreatable, ABC):
     """
     Base class for all Scene objects.
-    Contains the base functionalities and the functions that all derived classes need to implement.
+    Contains the base functionalities for an arbitary scene with an arbitrary set of added objects
     """
-
-    def __init__(self):
+    def __init__(
+            self,
+            scene_file=None,
+            use_floor_plane=True,
+            floor_plane_visible=True,
+            floor_plane_color=(1.0, 1.0, 1.0),
+    ):
+        """
+        Args:
+            scene_file (None or str): If specified, full path of JSON file to load (with .json).
+                None results in no additional objects being loaded into the scene
+            use_floor_plane (bool): whether to load a flat floor plane into the simulator
+            floor_plane_visible (bool): whether to render the additionally added floor plane
+            floor_plane_color (3-array): if @floor_plane_visible is True, this determines the (R,G,B) color assigned
+                to the generated floor plane
+        """
         # Store internal variables
+        self.scene_file = scene_file
         self._loaded = False                    # Whether this scene exists in the stage or not
         self._initialized = False               # Whether this scene has its internal handles / info initialized or not (occurs AFTER and INDEPENDENTLY from loading!)
         self._registry = None
         self._world_prim = None
         self._initial_state = None
+        self._objects_info = None                       # Information associated with this scene
+        self._use_floor_plane = use_floor_plane
+        self._floor_plane_visible = floor_plane_visible
+        self._floor_plane_color = floor_plane_color
         self._floor_plane = None
 
         # Call super init
@@ -108,7 +129,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             list of str: Keys with which to index into the object registry. These should be valid public attributes of
                 prims that we can use as grouping IDs to reference prims, e.g., prim.in_rooms
         """
-        return ["prim_type", "states", "category"]
+        return ["prim_type", "states", "category", "fixed_base", "in_rooms", "states"]
 
     @property
     def loaded(self):
@@ -118,23 +139,74 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
     def initialized(self):
         return self._initialized
 
-    @abstractmethod
     def _load(self, simulator):
         """
         Load the scene into simulator
         The elements to load may include: floor, building, objects, etc.
 
-        :param simulator: the simulator to load the scene into
-        :return: a list of pybullet ids of elements composing the scene, including floors, buildings and objects
+        Args:
+            simulator (Simulator): the simulator to load the scene into
         """
-        raise NotImplementedError()
+        # We just add a ground plane if requested
+        if self._use_floor_plane:
+            self.add_ground_plane(color=self._floor_plane_color, visible=self._floor_plane_visible)
+
+    def _load_objects_from_scene_file(self, simulator):
+        """
+        Loads scene objects based on metadata information found in the current USD stage's scene info
+        (information stored in the world prim's CustomData)
+        """
+        # Grab objects info from the scene file
+        with open(self.scene_file, "r") as f:
+            scene_info = json.load(f)
+        init_info = scene_info["objects_info"]["init_info"]
+        init_state = scene_info["state"]["object_registry"]
+
+        # Iterate over all scene info, and instantiate object classes linked to the objects found on the stage
+        # accordingly
+        for obj_name, obj_info in init_info.items():
+            # Check whether we should load the object or not
+            if not self._should_load_object(obj_info=obj_info):
+                continue
+            # Create object class instance
+            obj = create_object_from_init_info(obj_info)
+            # Import into the simulator
+            simulator.import_object(obj)
+            # Set the init pose accordingly
+            obj.set_position_orientation(
+                position=init_state[obj_name]["root_link"]["pos"],
+                orientation=init_state[obj_name]["root_link"]["ori"],
+            )
+
+        # disable collision between the fixed links of the fixed objects
+        fixed_objs = self.object_registry("fixed_base", True, default_val=[])
+        if len(fixed_objs) > 1:
+            # We iterate over all pairwise combinations of fixed objects
+            for obj_a, obj_b in combinations(fixed_objs, 2):
+                obj_a.root_link.add_filtered_collision_pair(obj_b.root_link)
+
+    def _should_load_object(self, obj_info):
+        """
+        Helper function to check whether we should load an object given its init_info. Useful for potentially filtering
+        objects based on, e.g., their category, size, etc.
+
+        Subclasses can implement additional logic. By default, this returns True
+
+        Args:
+            obj_info (dict): Dictionary of object kwargs that will be used to load the object
+
+        Returns:
+            bool: Whether this object should be loaded or not
+        """
+        return True
 
     def load(self, simulator):
         """
         Load the scene into simulator
         The elements to load may include: floor, building, objects, etc.
 
-        :param simulator: the simulator to load the scene into
+        Args:
+            simulator (Simulator): the simulator to load the scene into
         """
         # Make sure simulator is stopped
         assert simulator.is_stopped(), "Simulator should be stopped when loading this scene!"
@@ -153,13 +225,16 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         self.clear_systems()
 
         self._load(simulator)
-        self._loaded = True
 
-        # TODO (eric): make scene have _post_load() function that calls obj._post_load() for each object in the scene.
-        # Then we should be able to sandwich self.initialize_systems() between self._load() and self._post_load()
-        # The systems should be initialized internally within self._load
-        for system in self.systems:
-            assert system.initialized, f"System not initialized: {system.name}"
+        # Initialize systems
+        self.initialize_systems(simulator)
+
+        # If we have any scene file specified, use it to load the objects within it
+        if self.scene_file is not None:
+            self._load_objects_from_scene_file(simulator)
+
+        # We're now loaded
+        self._loaded = True
 
         # Always stop the sim if we started it internally
         if not simulator.is_stopped():
@@ -191,12 +266,24 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         """
         assert not self._initialized, "Scene can only be initialized once! (It is already initialized)"
         self._initialize()
+
+        # Grab relevant objects info and re-initialize object registry by handle since now handles are populated
+        self.update_objects_info()
+        self.object_registry.update(keys="root_handle")
+        self.wake_scene_objects()
+
         self._initialized = True
 
-        # Store object states
-        scene_info = self.get_scene_info()
-        self._initial_state = self.dump_state(serialized=False) if scene_info is None else \
-            scene_info["init_state"]
+        # Store initial state, which may be loaded from a scene file if specified
+        if self.scene_file is None:
+            init_state = self.dump_state(serialized=False)
+        else:
+            with open(self.scene_file, "r") as f:
+                scene_info = json.load(f)
+            init_state = scene_info["state"]
+            og.sim.load_state(init_state, serialized=False)
+
+        self._initial_state = init_state
 
     def _create_registry(self):
         """
@@ -226,27 +313,22 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
         return registry
 
-    # TODO: Refactor
-    def object_exists(self, name: str) -> bool:
-        """[summary]
-
-        Args:
-            name (str): [description]
-
-        Returns:
-            XFormPrim: [description]
+    def wake_scene_objects(self):
         """
-        if self._scene_registry.name_exists(name):
-            return True
-        else:
-            return False
+        Force wakeup sleeping objects
+        """
+        for obj in self.objects:
+            obj.wake()
 
     def get_objects_with_state(self, state):
         """
         Get the objects with a given state in the scene.
 
-        :param state: state of the objects to get
-        :return: a set of objects with the given state
+        Args:
+            state (BaseObjectState): state of the objects to get
+
+        Returns:
+            set: all objects with the given state
         """
         return self.object_registry("states", state, set())
 
@@ -257,7 +339,8 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Note that if the scene is not loaded, it should load this added object alongside its other objects when
         scene.load() is called. The object should also be accessible through scene.objects.
 
-        :param obj: the object to load
+        Args:
+            obj (BaseObject): the object to load into the simulator
         """
         pass
 
@@ -268,20 +351,19 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Note that calling add_object to an already loaded scene should only be done by the simulator's import_object()
         function.
 
-        :param obj: the object to load
-        :param simulator: the simulator to add the object to
-        :param register: whether to track this object internally in the scene registry
-        :param _is_call_from_simulator: whether the caller is the simulator. This should
+        Args:
+            obj (BaseObject): the object to load
+            simulator (Simulator): the simulator to add the object to
+            register (bool): whether to track this object internally in the scene registry
+            _is_call_from_simulator (bool): whether the caller is the simulator. This should
             **not** be set by any callers that are not the Simulator class
-        :return: the prim of the loaded object if the scene was already loaded, or None if the scene is not loaded
-            (in that case, the object is stored to be loaded together with the scene)
+
+        Returns:
+            Usd.Prim: the prim of the loaded object if the scene was already loaded, or None if the scene is not loaded
+                (in that case, the object is stored to be loaded together with the scene)
         """
         # Make sure the simulator is the one calling this function
         assert _is_call_from_simulator, "Use import_object() for adding objects to a simulator and scene!"
-
-        # TODO
-        # if isinstance(obj, VisualMarker) or isinstance(obj, Particle):
-        #     raise ValueError("VisualMarker and Particle objects and subclasses should be added directly to simulator.")
 
         # If the scene is already loaded, we need to load this object separately. Otherwise, don't do anything now,
         # let scene._load() load the object when called later on.
@@ -296,49 +378,19 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
         return prim
 
-    # def clear(self):
-    #     """
-    #     Clears all scene data from this scene
-    #     """
-    #     # Remove all object, robot, system info
-
     def remove_object(self, obj, simulator):
+        """
+        Method to remove an object from the simulator
+
+        Args:
+            obj (BaseObject): Object to remove
+            simulator (Simulator): current simulation context
+        """
         # Remove from the appropriate registry
         self.object_registry.remove(obj)
 
         # Remove from omni stage
         obj.remove(simulator=simulator)
-
-    # TODO: Integrate good features of this
-    #
-    # def add(self, obj: XFormPrim) -> XFormPrim:
-    #     """[summary]
-    #
-    #     Args:
-    #         obj (XFormPrim): [description]
-    #
-    #     Raises:
-    #         Exception: [description]
-    #         Exception: [description]
-    #
-    #     Returns:
-    #         XFormPrim: [description]
-    #     """
-    #     if self._scene_registry.name_exists(obj.name):
-    #         raise Exception("Cannot add the object {} to the scene since its name is not unique".format(obj.name))
-    #     if isinstance(obj, RigidPrim):
-    #         self._scene_registry.add_rigid_object(name=obj.name, rigid_object=obj)
-    #     elif isinstance(obj, GeometryPrim):
-    #         self._scene_registry.add_geometry_object(name=obj.name, geometry_object=obj)
-    #     elif isinstance(obj, Robot):
-    #         self._scene_registry.add_robot(name=obj.name, robot=obj)
-    #     elif isinstance(obj, Articulation):
-    #         self._scene_registry.add_articulated_system(name=obj.name, articulated_system=obj)
-    #     elif isinstance(obj, XFormPrim):
-    #         self._scene_registry.add_xform(name=obj.name, xform=obj)
-    #     else:
-    #         raise Exception("object type is not supported yet")
-    #     return obj
 
     def reset(self):
         """
@@ -353,25 +405,13 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             if isinstance(obj, StatefulObject):
                 obj.reset_states()
 
-        for robot in self.robots:
-            robot.reset_states()
-
         # Reset the pose and joint configuration of all scene objects.
         if self._initial_state is not None:
             self.load_state(self._initial_state)
-            app.update()
+            og.app.update()
 
     @property
-    def has_connectivity_graph(self):
-        """
-        Returns:
-            bool: Whether this scene has a connectivity graph
-        """
-        # Default is no connectivity graph
-        return False
-
-    @property
-    def num_floors(self):
+    def n_floors(self):
         """
         Returns:
             int: Number of floors in this scene
@@ -379,43 +419,74 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # Default is a single floor
         return 1
 
+    @property
+    def n_objects(self):
+        """
+        Returns:
+            int: number of objects
+        """
+        return len(self.objects)
+
+    @property
+    def fixed_objects(self):
+        """
+        Returns:
+            dict: Keyword-mapped objects that are fixed in the scene. Maps object name to their object class instances
+                (DatasetObject)
+        """
+        return {obj.name: obj for obj in self.object_registry("fixed_base", True)}
+
     def get_random_floor(self):
         """
         Sample a random floor among all existing floor_heights in the scene.
-        While Gibson v1 scenes can have several floor_heights, the EmptyScene, StadiumScene and scenes from OmniGibson
-        have only a single floor.
+        Most scenes in OmniGibson only have a single floor.
 
-        :return: an integer between 0 and NumberOfFloors-1
+        Returns:
+            int: an integer between 0 and self.n_floors-1
         """
-        return np.random.randint(0, self.num_floors)
+        return np.random.randint(0, self.n_floors)
 
     def get_random_point(self, floor=None):
         """
-        Sample a random valid location in the given floor.
+        Sample a random point on the given floor number. If not given, sample a random floor number.
+        Should be implemented by subclass.
 
-        :param floor: integer indicating the floor, or None if randomly sampled
-        :return: a tuple of random floor and random valid point (3D) in that floor
+        Args:
+            floor (None or int): floor number. None means the floor is randomly sampled
+
+        Returns:
+            2-tuple:
+                - int: floor number. This is the sampled floor number if @floor is None
+                - 3-array: (x,y,z) randomly sampled point
         """
         raise NotImplementedError()
 
     def get_shortest_path(self, floor, source_world, target_world, entire_path=False):
         """
-        Query the shortest path between two points in the given floor.
+        Get the shortest path from one point to another point.
 
-        :param floor: floor to compute shortest path in
-        :param source_world: initial location in world reference frame
-        :param target_world: target location in world reference frame
-        :param entire_path: flag indicating if the function should return the entire shortest path or not
-        :return: a tuple of path (if indicated) as a list of points, and geodesic distance (lenght of the path)
+        Args:
+            floor (int): floor number
+            source_world (2-array): (x,y) 2D source location in world reference frame (metric)
+            target_world (2-array): (x,y) 2D target location in world reference frame (metric)
+            entire_path (bool): whether to return the entire path
+
+        Returns:
+            2-tuple:
+                - (N, 2) array: array of path waypoints, where N is the number of generated waypoints
+                - float: geodesic distance of the path
         """
         raise NotImplementedError()
 
     def get_floor_height(self, floor=0):
         """
-        Get the height of the given floor.
+        Get the height of the given floor. Default is 0.0, since we only have a single floor
 
-        :param floor: an integer identifying the floor
-        :return: height of the given floor
+        Args:
+            floor: an integer identifying the floor
+
+        Returns:
+            int: height of the given floor
         """
         return 0.0
 
@@ -431,17 +502,18 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         color=None,
         visible=True,
     ):
-        """[summary]
+        """
+        Generate a ground plane into the simulator
 
         Args:
-            size (Optional[float], optional): [description]. Defaults to None.
-            z_position (float, optional): [description]. Defaults to 0.
-            name (str, optional): [description]. Defaults to "ground_plane".
-            prim_path (str, optional): [description]. Defaults to "/World/groundPlane".
-            static_friction (float, optional): [description]. Defaults to 0.5.
-            dynamic_friction (float, optional): [description]. Defaults to 0.5.
-            restitution (float, optional): [description]. Defaults to 0.8.
-            color (Optional[np.ndarray], optional): [description]. Defaults to None.
+            size (None or float): If specified, sets the (x,y) size of the generated plane
+            z_position (float): Z position of the generated plane
+            name (str): Name to assign to the generated plane
+            prim_path (str): Prim path for the generated plane
+            static_friction (float): Static friction of the generated plane
+            dynamic_friction (float): Dynamics friction of the generated plane
+            restitution (float): Restitution of the generated plane
+            color (None or 3-array): If specified, sets the (R,G,B) color of the generated plane
             visible (bool): Whether the plane should be visible or not
         """
         plane = GroundPlane(
@@ -469,7 +541,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         """
         self._initial_state = self.dump_state(serialized=False)
 
-    def update_scene_info(self):
+    def update_objects_info(self):
         """
         Updates the scene-relevant information and saves it to the active USD. Useful for reloading a scene directly
         from a saved USD in this format.
@@ -479,15 +551,10 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # Iterate over all objects and save their init info
         init_info = {obj.name: obj.get_init_info() for obj in self.object_registry.objects}
 
-        # Save initial object state info
-        init_state_info = self._initial_state
+        # Compose as single dictionary and store internally
+        self._objects_info = OrderedDict(init_info=init_info)
 
-        # Compose as single dictionary and dump into custom data field in world prim
-        scene_info = {"init_info": init_info, "init_state": init_state_info}
-        scene_info_str = json.dumps(scene_info, cls=NumpyEncoder)
-        self._world_prim.SetCustomDataByKey("scene_info", scene_info_str)
-
-    def get_scene_info(self):
+    def get_objects_info(self):
         """
         Stored information, if any, for this scene. Structure is:
 
@@ -496,14 +563,11 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 ...
                 "<robot0>": <robot0> init kw/args
                 ...
-            "init_state":
-                dict: State of the scene upon episode initialization; output from self.dump_state(serialized=False)
 
         Returns:
-            None or dict: If it exists, nested dictionary of relevant scene information
+            None or dict: If it exists, nested dictionary of relevant objects' information
         """
-        scene_info_str = self._world_prim.GetCustomDataByKey("scene_info")
-        return None if scene_info_str is None else json.loads(scene_info_str)
+        return self._objects_info
 
     @property
     def state_size(self):
@@ -528,13 +592,6 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # as we're deserializing
         state_dict = self._registry.deserialize(state=state)
         return state_dict, self._registry.state_size
-
-    @classproperty
-    def _do_not_register_classes(cls):
-        # Don't register this class since it's an abstract template
-        classes = super()._do_not_register_classes
-        classes.add("Scene")
-        return classes
 
     @classproperty
     def _cls_registry(cls):

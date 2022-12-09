@@ -324,7 +324,7 @@ class XFormPrim(BasePrim):
         """
         properties = self.prim.GetPropertyNames()
         if translation is not None:
-            translation = Gf.Vec3d(*translation.tolist())
+            translation = Gf.Vec3d(*translation)
             if "xformOp:translate" not in properties:
                 carb.log_error(
                     "Translate property needs to be set for {} before setting its position".format(self.name)
@@ -338,9 +338,9 @@ class XFormPrim(BasePrim):
                 )
             xform_op = self._prim.GetAttribute("xformOp:orient")
             if xform_op.GetTypeName() == "quatf":
-                rotq = Gf.Quatf(*orientation.tolist())
+                rotq = Gf.Quatf(*orientation)
             else:
-                rotq = Gf.Quatd(*orientation.tolist())
+                rotq = Gf.Quatd(*orientation)
             xform_op.Set(rotq)
         return
 
