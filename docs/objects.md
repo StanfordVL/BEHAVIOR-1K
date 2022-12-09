@@ -108,7 +108,7 @@ from omnigibson.objects.ycb_object import YCBObject
 from omnigibson.render.mesh_renderer.mesh_renderer_cpu import MeshRendererSettings
 from omnigibson.render.profiler import Profiler
 from omnigibson.robots.turtlebot import Turtlebot
-from omnigibson.scenes.empty_scene import EmptyScene
+from omnigibson.scenes.scene_base import Scene
 from omnigibson.scenes.gibson_indoor_scene import StaticIndoorScene
 from omnigibson.simulator import Simulator
 from omnigibson.utils.asset_utils import get_og_avg_category_specs, get_og_category_path, get_og_model_path
@@ -132,7 +132,7 @@ def main():
         config = parse_config(os.path.join(omnigibson.example_config_path, "turtlebot_static_nav.yaml"))
         settings = MeshRendererSettings(enable_shadow=False, msaa=False, texture_scale=0.5)
         s = Simulator(mode="gui_interactive", image_width=512, image_height=512, rendering_settings=settings)
-        scene = EmptyScene(render_floor_plane=True, floor_plane_rgba=[0.6, 0.6, 0.6, 1])
+        scene = Scene(render_floor_plane=True, floor_plane_rgba=[0.6, 0.6, 0.6, 1])
         # scene.load_object_categories(benchmark_names)
         s.import_scene(scene)
         robot_config = config["robot"]

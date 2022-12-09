@@ -20,7 +20,7 @@
 # )
 # from omnigibson.render.mesh_renderer.mesh_renderer_settings import MeshRendererSettings
 # from omnigibson.robots.behavior_robot import BehaviorRobot
-# from omnigibson.scenes.empty_scene import EmptyScene
+# from omnigibson.scenes.scene_base import Scene
 # from omnigibson.simulator import Simulator
 # from omnigibson.utils.config_utils import parse_config
 #
@@ -219,7 +219,7 @@
 #         mode="gui_interactive", use_pb_gui=True, image_width=256, image_height=256, rendering_settings=settings
 #     )
 #
-#     scene = EmptyScene()
+#     scene = Scene()
 #     scene.objects_by_id = {}
 #     s.import_scene(scene)
 #

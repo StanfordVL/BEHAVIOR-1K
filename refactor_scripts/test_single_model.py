@@ -1,5 +1,5 @@
 from omnigibson import app, og_dataset_path, Simulator
-from omnigibson.scenes.empty_scene import EmptyScene
+from omnigibson.scenes.scene_base import Scene
 import omni
 from omni.isaac.core.utils.stage import add_reference_to_stage
 import xml.etree.ElementTree as ET
@@ -27,7 +27,7 @@ names = ["cabinet", "fridge"]
 #### YOU DONT NEED TO TOUCH ANYTHING BELOW HERE IDEALLY :) #####
 
 sim = Simulator()
-scene = EmptyScene(floor_plane_visible=True)
+scene = Scene(floor_plane_visible=True)
 sim.import_scene(scene)
 
 # sim = Simulator(stage_units_in_meters=1.0)

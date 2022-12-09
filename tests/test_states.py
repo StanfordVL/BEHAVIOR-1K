@@ -11,7 +11,7 @@ from omnigibson import object_states, app, og_dataset_path
 from omnigibson.object_states.factory import get_state_dependency_graph, get_states_by_dependency_order
 from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.objects.primitive_object import PrimitiveObject
-from omnigibson.scenes.empty_scene import EmptyScene
+from omnigibson.scenes.scene_base import Scene
 from omnigibson.sensors.vision_sensor import VisionSensor
 from omnigibson.simulator import Simulator
 from omnigibson.utils.asset_utils import download_assets, get_og_model_path
@@ -26,7 +26,7 @@ def test_on_top():
     s = Simulator(mode="headless")
 
     try:
-        scene = EmptyScene()
+        scene = Scene()
         s.import_scene(scene)
 
         cabinet_0007 = os.path.join(omnigibson.assets_path, "models/cabinet2/usd/cabinet_0007.usd")
@@ -65,7 +65,7 @@ def test_inside():
     s = Simulator(mode="headless")
 
     try:
-        scene = EmptyScene()
+        scene = Scene()
         s.import_scene(scene)
 
         cabinet_0007 = os.path.join(omnigibson.assets_path, "models/cabinet2/usd/cabinet_0007.usd")
@@ -119,7 +119,7 @@ def test_open():
     s = Simulator(mode="headless")
 
     try:
-        scene = EmptyScene()
+        scene = Scene()
         s.import_scene(scene)
 
         model_path = os.path.join(omnigibson.og_dataset_path, "objects/microwave/7128/usd/7128.usd")
@@ -205,7 +205,7 @@ def test_toggle():
         name = "sink"
 
         sim = Simulator()
-        scene = EmptyScene()
+        scene = Scene()
         sim.import_scene(scene)
 
         model_root_path = f"{og_dataset_path}/objects/{obj_category}/{obj_model}"
@@ -249,7 +249,7 @@ def test_dirty():
         name = "sink"
 
         sim = Simulator()
-        scene = EmptyScene()
+        scene = Scene()
         sim.import_scene(scene)
 
         model_root_path = f"{og_dataset_path}/objects/{obj_category}/{obj_model}"
@@ -282,7 +282,7 @@ def test_burnt():
         name = "sink"
 
         sim = Simulator()
-        scene = EmptyScene()
+        scene = Scene()
         sim.import_scene(scene)
 
         model_root_path = f"{og_dataset_path}/objects/{obj_category}/{obj_model}"
@@ -314,7 +314,7 @@ def test_cooked():
         name = "sink"
 
         sim = Simulator()
-        scene = EmptyScene()
+        scene = Scene()
         sim.import_scene(scene)
 
         model_root_path = f"{og_dataset_path}/objects/{obj_category}/{obj_model}"
@@ -347,7 +347,7 @@ def test_frozen():
         name = "sink"
 
         sim = Simulator()
-        scene = EmptyScene()
+        scene = Scene()
         sim.import_scene(scene)
 
         model_root_path = f"{og_dataset_path}/objects/{obj_category}/{obj_model}"
@@ -380,7 +380,7 @@ def test_vertical_adjacency():
         name = "sink"
 
         sim = Simulator()
-        scene = EmptyScene()
+        scene = Scene()
         sim.import_scene(scene)
 
         model_root_path = f"{og_dataset_path}/objects/{obj_category}/{obj_model}"
@@ -458,7 +458,7 @@ def test_horizontal_adjacency():
         name = "sink"
 
         sim = Simulator()
-        scene = EmptyScene()
+        scene = Scene()
         sim.import_scene(scene)
 
         model_root_path = f"{og_dataset_path}/objects/{obj_category}/{obj_model}"
@@ -536,7 +536,7 @@ def test_inside():
         name = "sink"
 
         sim = Simulator()
-        scene = EmptyScene()
+        scene = Scene()
         sim.import_scene(scene)
 
         model_root_path = f"{og_dataset_path}/objects/{obj_category}/{obj_model}"
@@ -592,7 +592,7 @@ def test_heat_source():
         name = "stove"
 
         sim = Simulator()
-        scene = EmptyScene()
+        scene = Scene()
         sim.import_scene(scene)
 
         model_root_path = f"{og_dataset_path}/objects/{obj_category}/{obj_model}"
@@ -635,7 +635,7 @@ def test_temperature():
         name = "apple"
 
         sim = Simulator()
-        scene = EmptyScene()
+        scene = Scene()
         sim.import_scene(scene)
 
         model_root_path = f"{og_dataset_path}/objects/{obj_category}/{obj_model}"
@@ -675,7 +675,7 @@ def test_touching():
         name = "apple"
 
         sim = Simulator()
-        scene = EmptyScene()
+        scene = Scene()
         sim.import_scene(scene)
 
         model_root_path = f"{og_dataset_path}/objects/{obj_category}/{obj_model}"
@@ -735,7 +735,7 @@ def test_open():
         name = "microwave"
 
         sim = Simulator()
-        scene = EmptyScene()
+        scene = Scene()
         sim.import_scene(scene)
 
         model_root_path = f"{og_dataset_path}/objects/{obj_category}/{obj_model}"
@@ -778,7 +778,7 @@ def test_open():
 def test_demo():
     try:
         sim = Simulator()
-        scene = EmptyScene()
+        scene = Scene()
         sim.import_scene(scene)
 
         obj_category = "apple"
@@ -865,7 +865,7 @@ def test_sliced():
         name = "apple"
 
         sim = Simulator()
-        scene = EmptyScene()
+        scene = Scene()
         sim.import_scene(scene)
 
         model_root_path = f"{og_dataset_path}/objects/{obj_category}/{obj_model}"
@@ -924,7 +924,7 @@ def test_slicer():
         name = "apple"
 
         sim = Simulator()
-        scene = EmptyScene()
+        scene = Scene()
         sim.import_scene(scene)
 
         model_root_path = f"{og_dataset_path}/objects/{obj_category}/{obj_model}"
@@ -982,7 +982,7 @@ def test_water_source_sink():
         name = "sink"
 
         sim = Simulator()
-        scene = EmptyScene()
+        scene = Scene()
         sim.import_scene(scene)
 
         # Overwrite physics
@@ -1052,7 +1052,7 @@ def test_water_filled():
         name = "cup"
 
         sim = Simulator()
-        scene = EmptyScene(floor_plane_visible=True)
+        scene = Scene(floor_plane_visible=True)
         sim.import_scene(scene)
 
         # Overwrite physics
@@ -1189,7 +1189,7 @@ def test_attachment():
         name = "apple"
 
         sim = Simulator()
-        scene = EmptyScene()
+        scene = Scene()
         sim.import_scene(scene)
 
         model_root_path = f"{og_dataset_path}/objects/{obj_category}/{obj_model}"

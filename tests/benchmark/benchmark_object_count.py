@@ -8,7 +8,7 @@ import numpy as np
 
 from omnigibson import app, Simulator
 from omnigibson.objects.primitive_object import PrimitiveObject
-from omnigibson.scenes.empty_scene import EmptyScene
+from omnigibson.scenes.scene_base import Scene
 from omnigibson.utils.asset_utils import get_og_assets_version
 
 
@@ -41,7 +41,7 @@ def benchmark_scene(sim):
     assets_version = get_og_assets_version()
     print("assets_version", assets_version)
 
-    scene = EmptyScene(floor_plane_visible=True)
+    scene = Scene(floor_plane_visible=True)
     sim.import_scene(scene)
     sim.play()
 
