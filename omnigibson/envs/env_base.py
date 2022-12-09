@@ -387,20 +387,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
         # Run simulation step
         og.sim.step()
 
-        # Grab collisions and store internally
-        if gm.ENABLE_GLOBAL_CONTACT_REPORTING:
-            collision_objects = self.scene.objects + self.robots
-        elif gm.ENABLE_ROBOT_CONTACT_REPORTING:
-            collision_objects = self.robots
-        else:
-            collision_objects = []
-
-        # Update current collisions and corresponding count
-        self._current_collisions = self._filter_collisions(collisions=get_collisions(prims=collision_objects))
-
-        # Update the collision count
-        self._collision_step += int(len(self._current_collisions) > 0)
-
         # Grab observations
         obs = self.get_obs()
 
