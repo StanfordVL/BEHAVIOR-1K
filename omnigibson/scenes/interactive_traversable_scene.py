@@ -67,8 +67,13 @@ class InteractiveTraversableScene(TraversableScene):
         self.scene_source = scene_source
         self.include_robots = include_robots
 
+        # Infer scene directory
+        # TODO: Extend once we support the other scene sources
+        assert self.scene_source == "OG", "Currently, only OG interactive traversable scenes are supported!"
+        assert self.scene_source in SCENE_SOURCE_PATHS, f"Unsupported scene source: {self.scene_source}"
+        self.scene_dir = SCENE_SOURCE_PATHS[self.scene_source](scene_model)
+
         # Other values that will be loaded at runtime
-        self.scene_dir = None
         self.load_object_categories = None
         self.not_load_object_categories = None
         self.load_room_instances = None
@@ -114,12 +119,6 @@ class InteractiveTraversableScene(TraversableScene):
         Returns:
             str: Absolute path to the desired scene file (.json) to load
         """
-        # Grab scene source path
-        # TODO: Extend once we support the other scene sources
-        assert self.scene_source == "OG", "Currently, only OG interactive traversable scenes are supported!"
-        assert self.scene_source in SCENE_SOURCE_PATHS, f"Unsupported scene source: {self.scene_source}"
-        self.scene_dir = SCENE_SOURCE_PATHS[self.scene_source](scene_model)
-
         # Infer scene file from model and directory
         fname = "{}_best".format(scene_model) if scene_instance is None else scene_instance
         return os.path.join(self.scene_dir, "json", "{}.json".format(fname))
@@ -175,8 +174,8 @@ class InteractiveTraversableScene(TraversableScene):
             self._trav_map.load_trav_map(maps_path)
 
     def _should_load_object(self, obj_info):
-        category = obj_info["args"]["category"]
-        in_rooms = obj_info["args"]["in_rooms"]
+        category = obj_info["args"].get("category", "object")
+        in_rooms = obj_info["args"].get("in_rooms", [])
 
         # Do not load these object categories (can blacklist building structures as well)
         not_blacklisted = self.not_load_object_categories is None or category not in self.not_load_object_categories
@@ -200,3 +199,15 @@ class InteractiveTraversableScene(TraversableScene):
             SegmentationMap: Map for segmenting this scene
         """
         return self._seg_map
+
+    @classmethod
+    def modify_init_info_for_restoring(cls, init_info):
+        # Run super first
+        super().modify_init_info_for_restoring(init_info=init_info)
+
+        # We also make sure we load in any robots, and also pop any filters that were stored
+        init_info["args"]["include_robots"] = True
+        init_info["args"]["load_object_categories"] = None
+        init_info["args"]["not_load_object_categories"] = None
+        init_info["args"]["load_room_types"] = None
+        init_info["args"]["load_room_instances"] = None

@@ -837,7 +837,10 @@ class Simulator(SimulationContext, Serializable):
         state = scene_info["state"]
 
         # Override the init info with our json path
-        init_info["args"]["json_path"] = json_path
+        init_info["args"]["scene_file"] = json_path
+
+        # Also make sure we have any additional modifications necessary from the specific scene
+        og.REGISTERED_SCENES[init_info["class_name"]].modify_init_info_for_restoring(init_info=init_info)
 
         # Clear the current environment and delete any currently loaded scene.
         self.clear()

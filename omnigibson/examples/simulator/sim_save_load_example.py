@@ -55,11 +55,11 @@ def main(random_selection=False, headless=False, short_exec=False):
         env.step(np.random.uniform(-1, 1, env.robots[0].action_dim))
 
     print("Completed scene modification, saving scene...")
-    save_path = os.path.join(TEST_OUT_PATH, "saved_stage.usd")
-    og.sim.save(usd_path=save_path)
+    save_path = os.path.join(TEST_OUT_PATH, "saved_stage.json")
+    og.sim.save(json_path=save_path)
 
     print("Re-loading scene...")
-    og.sim.restore(usd_path=save_path)
+    og.sim.restore(json_path=save_path)
 
     # Take a sim step and play
     og.sim.step()

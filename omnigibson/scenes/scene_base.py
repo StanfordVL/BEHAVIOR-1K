@@ -598,3 +598,15 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # Global registry
         global REGISTERED_SCENES
         return REGISTERED_SCENES
+
+    @classmethod
+    def modify_init_info_for_restoring(cls, init_info):
+        """
+        Helper function to modify a given init info for restoring a scene from corresponding scene info.
+        Note that this function modifies IN-PLACE!
+
+        Args:
+            init_info (dict): Information for this scene from @self.get_init_info()
+        """
+        # Default is pass
+        pass
