@@ -1,24 +1,20 @@
-from abc import ABCMeta, abstractmethod
-from collections import Iterable, OrderedDict
+from abc import ABCMeta
+from collections import OrderedDict
 import logging
 
 from omnigibson.macros import create_module_macros
 from omnigibson.utils.constants import (
-    ALL_COLLISION_GROUPS_MASK,
     DEFAULT_COLLISION_GROUP,
     SPECIAL_COLLISION_GROUPS,
     SemanticClass,
 )
 from pxr import UsdPhysics, PhysxSchema
-from omnigibson.utils.usd_utils import get_prim_nested_children, create_joint, CollisionAPI
+from omnigibson.utils.usd_utils import create_joint, CollisionAPI
 from omnigibson.prims.entity_prim import EntityPrim
-from omnigibson.prims.xform_prim import XFormPrim
-from omnigibson.prims.rigid_prim import RigidPrim
 from omnigibson.utils.python_utils import Registerable, classproperty
 from omnigibson.utils.constants import PrimType, CLASS_NAME_TO_CLASS_ID
 
 from omni.isaac.core.utils.semantics import add_update_semantics
-from pxr import Gf
 
 # Global dicts that will contain mappings
 REGISTERED_OBJECTS = OrderedDict()
@@ -42,7 +38,6 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             class_id=None,
             uuid=None,
             scale=None,
-            rendering_params=None,
             visible=True,
             fixed_base=False,
             visual_only=False,
@@ -52,29 +47,29 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             **kwargs,
     ):
         """
-        Create an object instance with the minimum information of class ID and rendering parameters.
-
-        @param prim_path: str, global path in the stage to this object
-        @param name: Name for the object. Names need to be unique per scene. If no name is set, a name will be generated
-            at the time the object is added to the scene, using the object's category.
-        @param category: Category for the object. Defaults to "object".
-        @param class_id: What class ID the object should be assigned in semantic segmentation rendering mode.
-        @param uuid: Unique unsigned-integer identifier to assign to this object (max 8-numbers).
-            If None is specified, then it will be auto-generated
-        @param scale: float or 3-array, sets the scale for this object. A single number corresponds to uniform scaling
-            along the x,y,z axes, whereas a 3-array specifies per-axis scaling.
-        @param rendering_params: Any relevant rendering settings for this object.
-        @param visible: bool, whether to render this object or not in the stage
-        @param fixed_base: bool, whether to fix the base of this object or not
-        visual_only (bool): Whether this object should be visual only (and not collide with any other objects)
-        self_collisions (bool): Whether to enable self collisions for this object
-        prim_type (PrimType): Which type of prim the object is, Valid options are: {PrimType.RIGID, PrimType.CLOTH}
-        load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
-            loading this prim at runtime.
-        kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
-            for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
-            Note that this base object does NOT pass kwargs down into the Prim-type super() classes, and we assume
-            that kwargs are only shared between all SUBclasses (children), not SUPERclasses (parents).
+        Args:
+            prim_path (str): global path in the stage to this object
+            name (None or str): Name for the object. Names need to be unique per scene. If None, a name will be
+                generated at the time the object is added to the scene, using the object's category.
+            category (str): Category for the object. Defaults to "object".
+            class_id (None or int): What class ID the object should be assigned in semantic segmentation rendering mode.
+                If None, the ID will be inferred from this object's category.
+            uuid (None or int): Unique unsigned-integer identifier to assign to this object (max 8-numbers).
+                If None is specified, then it will be auto-generated
+            scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
+                for this object. A single number corresponds to uniform scaling along the x,y,z axes, whereas a
+                3-array specifies per-axis scaling.
+            visible (bool): whether to render this object or not in the stage
+            fixed_base (bool): whether to fix the base of this object or not
+            visual_only (bool): Whether this object should be visual only (and not collide with any other objects)
+            self_collisions (bool): Whether to enable self collisions for this object
+            prim_type (PrimType): Which type of prim the object is, Valid options are: {PrimType.RIGID, PrimType.CLOTH}
+            load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
+                loading this prim at runtime.
+            kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
+                for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
+                Note that this base object does NOT pass kwargs down into the Prim-type super() classes, and we assume
+                that kwargs are only shared between all SUBclasses (children), not SUPERclasses (parents).
         """
         # Generate a name if necessary. Note that the generation order & set of these names is not deterministic.
         if name is None:
@@ -89,28 +84,14 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
 
         logging.info(f"Category: {self.category}")
 
-        # TODO
         # This sets the collision group of the object. In omnigibson, objects are only permitted to be part of a single
         # collision group, e.g. collisions are only enabled within a single group
         self.collision_group = SPECIAL_COLLISION_GROUPS.get(self.category, DEFAULT_COLLISION_GROUP)
 
-        # category_based_rendering_params = {}
-        # if category in ["walls", "floors", "ceilings"]:
-        #     category_based_rendering_params["use_pbr"] = False
-        #     category_based_rendering_params["use_pbr_mapping"] = False
-        # if category == "ceilings":
-        #     category_based_rendering_params["shadow_caster"] = False
-        #
-        # if rendering_params:  # Use the input rendering params as an override.
-        #     category_based_rendering_params.update(rendering_params)
-
+        # Infer class ID if not specified
         if class_id is None:
             class_id = CLASS_NAME_TO_CLASS_ID.get(category, SemanticClass.USER_ADDED_OBJS)
-
         self.class_id = class_id
-        self.rendering_params = rendering_params
-        # self._rendering_params = dict(self.DEFAULT_RENDERING_PARAMS)
-        # self._rendering_params.update(category_based_rendering_params)
 
         # Values to be created at runtime
         self._simulator = None
@@ -301,32 +282,6 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
 
         # Update internal value
         self._highlighted = enabled
-
-    def get_velocities(self):
-        """Get this object's root body velocity in the format of Tuple[Array[vx, vy, vz], Array[wx, wy, wz]]"""
-        return self.get_linear_velocity(), self.get_angular_velocity()
-
-    def set_velocities(self, velocities):
-        """Set this object's root body velocity in the format of Tuple[Array[vx, vy, vz], Array[wx, wy, wz]]"""
-        lin_vel, ang_vel = velocities
-
-        self.set_linear_velocity(velocity=lin_vel)
-        self.set_angular_velocity(velocity=ang_vel)
-
-    def dump_config(self):
-        """
-        Dumps relevant configuration for this object.
-
-        Returns:
-            OrderedDict: Object configuration.
-        """
-        return OrderedDict(
-            category=self.category,
-            class_id=self.class_id,
-            scale=self.scale,
-            self_collisions=self.self_collisions,
-            rendering_params=self.rendering_params,
-        )
 
     @classproperty
     def _do_not_register_classes(cls):

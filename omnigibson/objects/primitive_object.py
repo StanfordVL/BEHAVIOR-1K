@@ -3,14 +3,11 @@ import numpy as np
 from omnigibson.objects.stateful_object import StatefulObject
 from omnigibson.utils.python_utils import assert_valid_key
 
-from pxr import Gf, Usd, Sdf, Vt, UsdGeom, UsdPhysics, PhysxSchema, UsdShade
-from omni.isaac.core.utils.prims import get_prim_at_path
+from pxr import Gf, Vt, UsdPhysics, PhysxSchema
 from omnigibson.utils.constants import PrimType, PRIMITIVE_MESH_TYPES
 from omnigibson.utils.usd_utils import create_primitive_mesh
 from omnigibson.utils.render_utils import create_pbr_material
 from omnigibson.utils.physx_utils import bind_material
-import omni
-import carb
 
 
 # Define valid objects that can be created
@@ -33,15 +30,14 @@ class PrimitiveObject(StatefulObject):
         class_id=None,
         uuid=None,
         scale=None,
-        rendering_params=None,
         visible=True,
         fixed_base=False,
         visual_only=False,
         self_collisions=False,
         prim_type=PrimType.RIGID,
-        include_default_state=True,
         load_config=None,
         abilities=None,
+        include_default_states=True,
         rgba=(0.5, 0.5, 0.5, 1.0),
         radius=None,
         height=None,
@@ -49,45 +45,39 @@ class PrimitiveObject(StatefulObject):
         **kwargs,
     ):
         """
-        @param prim_path: str, global path in the stage to this object
-        @param primitive_type: str, type of primitive object to create. Should be one of:
-            {"Cone", "Cube", "Cylinder", "Disk", "Plane", "Sphere", "Torus"}
-        @param name: Name for the object. Names need to be unique per scene. If no name is set, a name will be generated
-            at the time the object is added to the scene, using the object's category.
-        @param category: Category for the object. Defaults to "object".
-        @param class_id: What class ID the object should be assigned in semantic segmentation rendering mode.
-        @param uuid: Unique unsigned-integer identifier to assign to this object (max 8-numbers).
-            If None is specified, then it will be auto-generated
-        @param scale: float or 3-array, sets the scale for this object. A single number corresponds to uniform scaling
-            along the x,y,z axes, whereas a 3-array specifies per-axis scaling.
-        @param rendering_params: Any relevant rendering settings for this object.
-        @param visible: bool, whether to render this object or not in the stage
-        @param fixed_base: bool, whether to fix the base of this object or not
-        @param visual_only: whether this object should be a visual-only (i.e.: not affected by collisions / gravity)
-            object or not
-        self_collisions (bool): Whether to enable self collisions for this object
-        prim_type (PrimType): Which type of prim the object is, Valid options are: {PrimType.RIGID, PrimType.CLOTH}
-        @param include_default_state: bool, whether to include the default states from @get_default_states
-        load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
-            loading this prim at runtime.
-
-            Can specify:
-                scale (None or float or 3-array): If specified, sets the scale for this object. A single number
-                    corresponds
-                    to uniform scaling along the x,y,z axes, whereas a 3-array specifies per-axis scaling.
-                mass (None or float): If specified, mass of this body in kg
-
-        @param abilities: dict in the form of {ability: {param: value}} containing
-            object abilities and parameters.
-        rgba (4-array): (R, G, B, A) values to set for this object
-        radius (None or float): If specified, sets the radius for this object. This value is scaled by @scale
-            Note: Should only be specified if the @primitive_type is one of {"Cone", "Cylinder", "Disk", "Sphere"}
-        height (None or float): If specified, sets the height for this object. This value is scaled by @scale
-            Note: Should only be specified if the @primitive_type is one of {"Cone", "Cylinder"}
-        size (None or float): If specified, sets the size for this object. This value is scaled by @scale
-            Note: Should only be specified if the @primitive_type is one of {"Cube", "Torus"}
-        kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
-            for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
+        Args:
+            prim_path (str): global path in the stage to this object
+            primitive_type (str): type of primitive object to create. Should be one of:
+                {"Cone", "Cube", "Cylinder", "Disk", "Plane", "Sphere", "Torus"}
+            name (None or str): Name for the object. Names need to be unique per scene. If None, a name will be
+                generated at the time the object is added to the scene, using the object's category.
+            category (str): Category for the object. Defaults to "object".
+            class_id (None or int): What class ID the object should be assigned in semantic segmentation rendering mode.
+                If None, the ID will be inferred from this object's category.
+            uuid (None or int): Unique unsigned-integer identifier to assign to this object (max 8-numbers).
+                If None is specified, then it will be auto-generated
+            scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
+                for this object. A single number corresponds to uniform scaling along the x,y,z axes, whereas a
+                3-array specifies per-axis scaling.
+            visible (bool): whether to render this object or not in the stage
+            fixed_base (bool): whether to fix the base of this object or not
+            visual_only (bool): Whether this object should be visual only (and not collide with any other objects)
+            self_collisions (bool): Whether to enable self collisions for this object
+            prim_type (PrimType): Which type of prim the object is, Valid options are: {PrimType.RIGID, PrimType.CLOTH}
+            load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
+                loading this prim at runtime.
+            abilities (None or dict): If specified, manually adds specific object states to this object. It should be
+                a dict in the form of {ability: {param: value}} containing object abilities and parameters to pass to
+                the object state instance constructor.rgba (4-array): (R, G, B, A) values to set for this object
+            include_default_states (bool): whether to include the default object states from @get_default_states
+            radius (None or float): If specified, sets the radius for this object. This value is scaled by @scale
+                Note: Should only be specified if the @primitive_type is one of {"Cone", "Cylinder", "Disk", "Sphere"}
+            height (None or float): If specified, sets the height for this object. This value is scaled by @scale
+                Note: Should only be specified if the @primitive_type is one of {"Cone", "Cylinder"}
+            size (None or float): If specified, sets the size for this object. This value is scaled by @scale
+                Note: Should only be specified if the @primitive_type is one of {"Cube", "Torus"}
+            kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
+                for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
         """
         # Compose load config and add rgba values
         load_config = dict() if load_config is None else load_config
@@ -113,22 +103,18 @@ class PrimitiveObject(StatefulObject):
             class_id=class_id,
             uuid=uuid,
             scale=scale,
-            rendering_params=rendering_params,
             visible=visible,
             fixed_base=fixed_base,
             visual_only=visual_only,
             self_collisions=self_collisions,
             prim_type=prim_type,
-            include_default_state=include_default_state,
+            include_default_states=include_default_states,
             load_config=load_config,
             abilities=abilities,
             **kwargs,
         )
 
     def _load(self, simulator=None):
-        """
-        Load the object into pybullet and set it to the correct pose
-        """
         logging.info(f"Loading the following primitive: {self._primitive_type}")
 
         # Define an Xform at the specified path
@@ -328,7 +314,6 @@ class PrimitiveObject(StatefulObject):
             category=self.category,
             class_id=self.class_id,
             scale=self.scale,
-            rendering_params=self.rendering_params,
             visible=self.visible,
             fixed_base=self.fixed_base,
             prim_type=self._prim_type,
