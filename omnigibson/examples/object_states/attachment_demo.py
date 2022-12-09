@@ -46,7 +46,7 @@ def setup_scene_for_abilities(abilities1, abilities2):
     cfg["objects"] = [light_cfg, apple_cfg, fridge_cfg]
 
     # Recreate the environment (this will automatically override the old environment instance)
-    # We load the default config, which is simply an EmptyScene with no objects loaded in by default
+    # We load the default config, which is simply an Scene with no objects loaded in by default
     env = og.Environment(configs=cfg)
 
     # Grab apple and fridge

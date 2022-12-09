@@ -11,7 +11,7 @@ def main():
     # Create the scene config to load -- empty scene with a stove object added
     cfg = {
         "scene": {
-            "type": "EmptyScene",
+            "type": "Scene",
         },
         "objects": [
             {

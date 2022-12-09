@@ -23,7 +23,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     # Create the scene config to load -- empty scene
     cfg = {
         "scene": {
-            "type": "EmptyScene",
+            "type": "Scene",
         }
     }
 

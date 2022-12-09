@@ -117,7 +117,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     # Create the scene config to load -- empty scene with a light and table
     cfg = {
         "scene": {
-            "type": "EmptyScene",
+            "type": "Scene",
         },
         "objects": [light_cfg, table_cfg],
     }

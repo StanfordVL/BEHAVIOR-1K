@@ -21,7 +21,6 @@ def main(random_selection=False, headless=False, short_exec=False):
     logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
 
     # Specify objects to load
-
     banana_cfg = OrderedDict(
         type="DatasetObject",
         name="banana",

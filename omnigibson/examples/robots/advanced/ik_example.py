@@ -3,18 +3,15 @@ import logging
 import time
 
 import numpy as np
-from collections import OrderedDict
 
 import omnigibson as og
 from omnigibson.objects import PrimitiveObject
 from omnigibson.robots import Fetch
-from omnigibson.scenes import EmptyScene
-from omnigibson.sensors import VisionSensor
+from omnigibson.scenes import Scene
 from omnigibson.utils.control_utils import IKSolver
 
 import carb
 import omni
-from pxr import Gf
 
 
 def main(random_selection=False, headless=False, short_exec=False):
@@ -44,7 +41,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         programmatic_pos = True
 
     # Import scene and robot (Fetch)
-    scene = EmptyScene()
+    scene = Scene()
     og.sim.import_scene(scene)
 
     # Update the viewer camera's pose so that it points towards the robot

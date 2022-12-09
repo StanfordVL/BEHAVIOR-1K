@@ -70,7 +70,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     cfg = {
         "scene": {
-            "type": "EmptyScene",
+            "type": "Scene",
         },
         "objects": [table_cfg, apple_cfg, knife_cfg, light0_cfg, light1_cfg]
     }

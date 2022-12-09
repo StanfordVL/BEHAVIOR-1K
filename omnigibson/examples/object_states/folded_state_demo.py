@@ -1,5 +1,5 @@
 from omnigibson import og_dataset_path
-from omnigibson.scenes.empty_scene import EmptyScene
+from omnigibson.scenes.scene_base import Scene
 from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.utils.constants import PrimType
 from omnigibson.object_states import Folded
@@ -24,7 +24,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     # Create the scene config to load -- empty scene + custom cloth object
     cfg = {
         "scene": {
-            "type": "EmptyScene",
+            "type": "Scene",
         },
         "objects": [
             {

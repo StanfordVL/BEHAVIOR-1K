@@ -35,7 +35,7 @@ def main():
     # Create the scene config to load -- empty scene with light object and bowls
     cfg = {
         "scene": {
-            "type": "EmptyScene",
+            "type": "Scene",
         },
         "objects": obj_configs,
     }

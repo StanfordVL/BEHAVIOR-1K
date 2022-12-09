@@ -13,7 +13,7 @@ def main():
     # Create the scene config to load -- empty scene plus a light and a cabinet
     cfg = {
         "scene": {
-            "type": "EmptyScene",
+            "type": "Scene",
             "floor_plane_visible": True,
         },
         "objects": [
