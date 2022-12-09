@@ -143,11 +143,25 @@ class CameraMover:
     def __init__(self, cam, delta=0.25):
         self.cam = cam
         self.delta = delta
+        self.light_val = 5e5
 
         self._appwindow = omni.appwindow.get_default_app_window()
         self._input = carb.input.acquire_input_interface()
         self._keyboard = self._appwindow.get_keyboard()
         self._sub_keyboard = self._input.subscribe_to_keyboard_events(self._keyboard, self._sub_keyboard_event)
+
+    def change_light(self, delta):
+        self.light_val += delta
+        self.set_lights(self.light_val)
+
+    def set_lights(self, intensity):
+        from omni.isaac.core.utils.prims import get_prim_at_path
+        world = get_prim_at_path("/World")
+        for prim in world.GetChildren():
+            for prim_child in prim.GetChildren():
+                for prim_child_child in prim_child.GetChildren():
+                    if "Light" in prim_child_child.GetPrimTypeInfo().GetTypeName():
+                        prim_child_child.GetAttribute("intensity").Set(intensity)
 
     def print_info(self):
         """
@@ -160,6 +174,7 @@ class CameraMover:
         print(f"\t W / S : Move camera forward / backward")
         print(f"\t A / D : Move camera left / right")
         print(f"\t T / G : Move camera up / down")
+        print(f"\t 9 / 0 : Increase / decrease the lights")
         print(f"\t P : Print current camera pose")
 
     def print_cam_pose(self):
@@ -194,6 +209,8 @@ class CameraMover:
         """
         return {
             carb.input.KeyboardInput.P: lambda: self.print_cam_pose(),
+            carb.input.KeyboardInput.KEY_9: lambda: self.change_light(delta=2e4),
+            carb.input.KeyboardInput.KEY_0: lambda: self.change_light(delta=-2e4),
         }
 
     @property
