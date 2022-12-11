@@ -842,9 +842,6 @@ class Simulator(SimulationContext, Serializable):
         # Also make sure we have any additional modifications necessary from the specific scene
         og.REGISTERED_SCENES[init_info["class_name"]].modify_init_info_for_restoring(init_info=init_info)
 
-        # Clear the current environment and delete any currently loaded scene.
-        self.clear()
-
         # Recreate and import the saved scene
         recreated_scene = create_object_from_init_info(init_info)
         self.import_scene(scene=recreated_scene)
