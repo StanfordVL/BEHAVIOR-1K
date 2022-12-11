@@ -187,7 +187,7 @@ def sample_origin_positions(mins, maxes, count, bimodal_mean_fraction, bimodal_s
     return results
 
 
-def raytest_batch(start_points, end_points, hit_number=0, ignore_bodies=None, ignore_collisions=None):
+def raytest_batch(start_points, end_points, closest=True, ignore_bodies=None, ignore_collisions=None):
     """
     Computes raytest collisions for a set of rays cast from @start_points to @end_points.
 
@@ -196,15 +196,16 @@ def raytest_batch(start_points, end_points, hit_number=0, ignore_bodies=None, ig
             start location of the ray
         end_points (list of 3-array): Array of end locations to cast rays, where each is (x,y,z) global
             end location of the ray
-        hit_number (int): Report the nth collision detected (default is the closest, i.e.: 0th)
+        closest (bool): Whether we report the first (closest) hit from the ray or grab all hits
         ignore_bodies (None or list of str): If specified, specifies absolute USD paths to rigid bodies
             whose collisions should be ignored
         ignore_collisions (None or list of str): If specified, specifies absolute USD paths to collision geoms
             whose collisions should be ignored
 
     Returns:
-        list of dict: Results for all rays, where each entry corresponds to the result for the ith ray cast. Each
-            dict is composed of:
+        list of dict or list of list of dict: Results for all rays, where each entry corresponds to the result for the
+            ith ray cast. If @closest=True, each entry in the list is the closest hit. Otherwise, each entry is its own
+            (unordered) list of hits for that ray. Each dict is composed of:
 
             "hit" (bool): Whether an object was hit or not
             "position" (3-array): Location of the hit position
@@ -221,7 +222,7 @@ def raytest_batch(start_points, end_points, hit_number=0, ignore_bodies=None, ig
         results.append(raytest(
             start_point=start_point,
             end_point=end_point,
-            hit_number=hit_number,
+            closest=closest,
             ignore_bodies=ignore_bodies,
             ignore_collisions=ignore_collisions,
         ))
@@ -232,7 +233,7 @@ def raytest_batch(start_points, end_points, hit_number=0, ignore_bodies=None, ig
 def raytest(
     start_point,
     end_point,
-    hit_number=0,
+    closest=True,
     ignore_bodies=None,
     ignore_collisions=None,
 ):
@@ -242,14 +243,17 @@ def raytest(
     Args:
         start_point (3-array): (x,y,z) global start location of the ray
         end_point (3-array): (x,y,z) global end location of the ray
-        hit_number (int): Report the nth collision detected (default is the closest, i.e.: 0th)
+        closest (bool): Whether we report the first (closest) hit from the ray or grab all hits
         ignore_bodies (None or list of str): If specified, specifies absolute USD paths to rigid bodies
             whose collisions should be ignored
         ignore_collisions (None or list of str): If specified, specifies absolute USD paths to collision geoms
             whose collisions should be ignored
 
     Returns:
-        dict:
+        dict or list of dict: Results for this raytest. If @closest=True, then we only return the information from the
+            closest hit. Otherwise, we return an (unordered) list of information for all hits encountered.
+            Each dict is composed of:
+
             "hit" (bool): Whether an object was hit or not
             "position" (3-array): Location of the hit position
             "normal" (3-array): normal vector of the face hit
@@ -266,7 +270,7 @@ def raytest(
     direction = point_diff / distance
 
     # For efficiency's sake, we handle special case of no ignore_bodies, ignore_collisions, and closest_hit
-    if hit_number == 0 and ignore_bodies is None and ignore_collisions is None:
+    if closest and ignore_bodies is None and ignore_collisions is None:
         return get_physx_scene_query_interface().raycast_closest(
             origin=start_point,
             dir=direction,
@@ -289,10 +293,8 @@ def raytest(
                     "collision": hit.collision,
                     "rigidBody": hit.rigid_body,
                 })
-            # If we haven't hit enough objects with this ray, continue traversal
-            # True means contiue traversing; False means stop
-            return len(hits) <= hit_number
-
+            # We always want to continue traversing to collect all hits
+            return True
 
         # Grab all collisions
         get_physx_scene_query_interface().raycast_all(
@@ -302,8 +304,13 @@ def raytest(
             reportFn=callback,
         )
 
-        # Grab the nth collision if it exists, else return no hits
-        return hits[hit_number] if len(hits) > hit_number else {"hit": False}
+        # If we only want the closest, we need to sort these hits, otherwise we return them all
+        if closest:
+            # Return the empty hit dictionary if our ray did not hit anything, otherwise we return the closest
+            return {"hit": False} if len(hits) == 0 else sorted(hits, key=lambda hit: hit["distance"])[0]
+        else:
+            # Return all hits (list)
+            return hits
 
 
 def sample_raytest_start_end_symmetric_bimodal_distribution(
