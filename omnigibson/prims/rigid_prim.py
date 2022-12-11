@@ -157,6 +157,16 @@ class RigidPrim(XFormPrim):
         Helper function to refresh owned visual and collision meshes. Useful for synchronizing internal data if
         additional bodies are added manually
         """
+        # Make sure to clean up all pre-existing names for all collision_meshes
+        if self._collision_meshes is not None:
+            for collision_mesh in self._collision_meshes.values():
+                collision_mesh.remove_names()
+
+        # Make sure to clean up all pre-existing names for all visual_meshes
+        if self._visual_meshes is not None:
+            for visual_mesh in self._visual_meshes.values():
+                visual_mesh.remove_names()
+
         self._collision_meshes, self._visual_meshes = OrderedDict(), OrderedDict()
         prims_to_check = []
         coms, vols = [], []
@@ -186,28 +196,6 @@ class RigidPrim(XFormPrim):
         if len(coms) > 0:
             com = (np.array(coms) * np.array(vols).reshape(-1, 1)).sum(axis=0) / np.sum(vols)
             self.set_attribute("physics:centerOfMass", Gf.Vec3f(*com))
-
-    # def _create_contact_sensor(self):
-    #     """
-    #     Creates a full-body contact sensor to detect collisions with this rigid body
-    #     """
-    #     props = _contact_sensor.SensorProperties()
-    #     props.radius = -1.0       # Negative value implies full body sensor
-    #     props.minThreshold = 0          # Minimum force to detect
-    #     props.maxThreshold = 100000000  # Maximum force to detect
-    #     props.sensorPeriod = 0.0            # Zero means in sync with the simulation period
-    #
-    #     # TODO: Uncomment later, but this significantly slows down everything
-    #     # Create sensor
-    #     self._contact_handle = self._cs.add_sensor_on_body(self._prim_path, props)
-
-
-
-    # def _remove_contact_sensor(self):
-    #     """
-    #     remove the contact sensor owned by this body
-    #     """
-    #     self._cs.remove_sensor(self._contact_handle)
 
     def enable_collisions(self):
         """

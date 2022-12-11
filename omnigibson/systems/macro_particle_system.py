@@ -750,7 +750,8 @@ class VisualParticleSystem(MacroParticleSystem):
         Synchronizes the particle groups based on desired identification numbers @group_idns
 
         Args:
-            group_objects (list of BaseObject): Desired unique group objects that should be active for this particle system
+            group_objects (list of None or BaseObject): Desired unique group objects that should be active for
+            this particle system. Any objects that aren't found will be skipped over
             particle_idns (list of list of int): Per-group unique id numbers for the particles assigned to that group.
                 List should be same length as @group_idns with sub-entries corresponding to the desired number of
                 particles assigned to that group
@@ -766,10 +767,10 @@ class VisualParticleSystem(MacroParticleSystem):
             "link_names": link_names,
         }
             for obj, p_idns, link_names in
-            zip(group_objects, particle_idns, particle_attached_link_names)}
+            zip(group_objects, particle_idns, particle_attached_link_names) if obj is not None}
 
         current_group_names = cls.groups
-        desired_group_names = set(obj.name for obj in group_objects)
+        desired_group_names = set(obj.name for obj in group_objects if obj is not None)
         groups_to_delete = current_group_names - desired_group_names
         groups_to_create = desired_group_names - current_group_names
         common_groups = current_group_names.intersection(desired_group_names)
@@ -903,7 +904,7 @@ class VisualParticleSystem(MacroParticleSystem):
 
         # Synchronize particle groups
         cls._sync_particle_groups(
-            group_objects=[cls.simulator.scene.object_registry("uuid", info["particle_attached_obj_uuid"])
+            group_objects=[cls.simulator.scene.object_registry("uuid", info["particle_attached_obj_uuid"], None)
                            for info in state["groups"].values()],
             particle_idns=[info["particle_idns"] for info in state["groups"].values()],
             particle_attached_link_names=[info["particle_attached_link_names"] for info in state["groups"].values()],
@@ -1012,7 +1013,7 @@ DustSystem = VisualParticleSystem.create(
         visible=False,
         fixed_base=False,
         visual_only=True,
-        include_default_state=False,
+        include_default_states=False,
     )
 )
 
@@ -1028,7 +1029,7 @@ StainSystem = VisualParticleSystem.create(
         visible=False,
         fixed_base=False,
         visual_only=True,
-        include_default_state=False,
+        include_default_states=False,
     ),
     # Default parameters for sampling particle sizes based on attachment group object size
     _BOUNDING_BOX_LOWER_LIMIT_FRACTION_OF_AABB=0.06,
@@ -1054,7 +1055,7 @@ GrassSystem = VisualParticleSystem.create(
         visible=False,
         fixed_base=False,
         visual_only=True,
-        include_default_state=False,
+        include_default_states=False,
     ),
     # Also need to override how we sample particles, since grass should only point upwards and placed on "top"
     # parts of surfaces!

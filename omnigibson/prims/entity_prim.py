@@ -79,7 +79,6 @@ class EntityPrim(XFormPrim):
             load_config=load_config,
         )
 
-
     def _initialize(self):
         # Run super method
         super()._initialize()
@@ -90,60 +89,11 @@ class EntityPrim(XFormPrim):
         for link in self._links.values():
             link.initialize()
 
-        # Initialize joints dictionary
-        self._joints = OrderedDict()
-
         # Get dynamic control info
         self._dc = _dynamic_control.acquire_dynamic_control_interface()
-        self.update_handles()
 
-        # Handle case separately based on whether the handle is valid (i.e.: whether we are actually articulated or not)
-        if self._handle != _dynamic_control.INVALID_HANDLE:
-            root_prim = get_prim_at_path(self._dc.get_rigid_body_path(self._root_handle))
-            n_dof = self._dc.get_articulation_dof_count(self._handle)
-
-            # Additionally grab DOF info if we have non-fixed joints
-            if n_dof > 0:
-                self._dofs_infos = OrderedDict()
-                # Grab DOF info
-                for index in range(n_dof):
-                    dof_handle = self._dc.get_articulation_dof(self._handle, index)
-                    dof_name = self._dc.get_dof_name(dof_handle)
-                    # add dof to list
-                    prim_path = self._dc.get_dof_path(dof_handle)
-                    self._dofs_infos[dof_name] = DOFInfo(prim_path=prim_path, handle=dof_handle, prim=self.prim, index=index)
-
-                for i in range(self._dc.get_articulation_joint_count(self._handle)):
-                    joint_handle = self._dc.get_articulation_joint(self._handle, i)
-                    joint_name = self._dc.get_joint_name(joint_handle)
-                    joint_path = self._dc.get_joint_path(joint_handle)
-                    joint_prim = get_prim_at_path(joint_path)
-                    # Only add the joint if it's not fixed (i.e.: it has DOFs > 0)
-                    if self._dc.get_joint_dof_count(joint_handle) > 0:
-                        joint = JointPrim(
-                            prim_path=joint_path,
-                            name=f"{self._name}:joint_{joint_name}",
-                            articulation=self._handle,
-                        )
-                        joint.initialize()
-                        self._joints[joint_name] = joint
-
-                # Default joints state is our current state for now
-                self._default_joints_state = self.get_joints_state()
-        else:
-            # TODO: May need to extend to clusters of rigid bodies, that aren't exactly joined
-            # We assume this object contains a single rigid body
-            body_path = f"{self._prim_path}/{self.root_link_name}"
-            root_prim = get_prim_at_path(body_path)
-            n_dof = 0
-
-        # Make sure root prim stored is the same as the one found during initialization
-        assert self.root_prim == root_prim, \
-            f"Mismatch in root prims! Original was {self.root_prim.GetPrimPath()}, " \
-            f"initialized is {root_prim.GetPrimPath()}!"
-
-        # Store values internally
-        self._n_dof = n_dof
+        # Update joint information
+        self.update_joints()
 
     def _load(self, simulator=None):
         # By default, this prim cannot be instantiated from scratch!
@@ -151,6 +101,37 @@ class EntityPrim(XFormPrim):
 
     def _post_load(self):
         # Setup links info FIRST before running any other post loading behavior
+        self.update_links()
+
+        # Set visual only flag
+        # This automatically handles setting collisions / gravity appropriately per-link
+        self.visual_only = self._load_config["visual_only"] if \
+            "visual_only" in self._load_config and self._load_config["visual_only"] is not None else False
+
+        if self._prim_type == PrimType.CLOTH:
+            assert not self._visual_only, "Cloth cannot be visual-only."
+            assert len(self._links) == 1, f"Cloth entity prim can only have one link; got: {len(self._links)}"
+            if gm.AG_CLOTH:
+                self.create_attachment_point_link()
+
+        # Disable any requested collision pairs
+        for a_name, b_name in self.disabled_collision_pairs:
+            link_a, link_b = self._links[a_name], self._links[b_name]
+            link_a.add_filtered_collision_pair(prim=link_b)
+
+        # Run super
+        super()._post_load()
+
+    def update_links(self):
+        """
+        Helper function to refresh owned joints. Useful for synchronizing internal data if
+        additional bodies are added manually
+        """
+        # Make sure to clean up all pre-existing names for all links
+        if self._links is not None:
+            for link in self._links.values():
+                link.remove_names()
+
         # We iterate over all children of this object's prim,
         # and grab any that are presumed to be rigid bodies (i.e.: other Xforms)
         self._links = OrderedDict()
@@ -193,24 +174,68 @@ class EntityPrim(XFormPrim):
         #                                    f"but found multiple instead: {valid_root_links}"
         self._root_link_name = valid_root_links[0] if len(valid_root_links) == 1 else "base_link"
 
-        # Set visual only flag
-        # This automatically handles setting collisions / gravity appropriately per-link
-        self.visual_only = self._load_config["visual_only"] if \
-            "visual_only" in self._load_config and self._load_config["visual_only"] is not None else False
+    def update_joints(self):
+        """
+        Helper function to refresh owned joints. Useful for synchronizing internal data if
+        additional bodies are added manually
+        """
+        # Make sure to clean up all pre-existing names for all joints
+        if self._joints is not None:
+            for joint in self._joints.values():
+                joint.remove_names()
 
-        if self._prim_type == PrimType.CLOTH:
-            assert not self._visual_only, "Cloth cannot be visual-only."
-            assert len(self._links) == 1, f"Cloth entity prim can only have one link; got: {len(self._links)}"
-            if gm.AG_CLOTH:
-                self.create_attachment_point_link()
+        # Initialize joints dictionary
+        self._joints = OrderedDict()
+        self.update_handles()
 
-        # Disable any requested collision pairs
-        for a_name, b_name in self.disabled_collision_pairs:
-            link_a, link_b = self._links[a_name], self._links[b_name]
-            link_a.add_filtered_collision_pair(prim=link_b)
+        # Handle case separately based on whether the handle is valid (i.e.: whether we are actually articulated or not)
+        if self._handle != _dynamic_control.INVALID_HANDLE:
+            root_prim = get_prim_at_path(self._dc.get_rigid_body_path(self._root_handle))
+            n_dof = self._dc.get_articulation_dof_count(self._handle)
 
-        # Run super
-        super()._post_load()
+            # Additionally grab DOF info if we have non-fixed joints
+            if n_dof > 0:
+                self._dofs_infos = OrderedDict()
+                # Grab DOF info
+                for index in range(n_dof):
+                    dof_handle = self._dc.get_articulation_dof(self._handle, index)
+                    dof_name = self._dc.get_dof_name(dof_handle)
+                    # add dof to list
+                    prim_path = self._dc.get_dof_path(dof_handle)
+                    self._dofs_infos[dof_name] = DOFInfo(prim_path=prim_path, handle=dof_handle, prim=self.prim,
+                                                         index=index)
+
+                for i in range(self._dc.get_articulation_joint_count(self._handle)):
+                    joint_handle = self._dc.get_articulation_joint(self._handle, i)
+                    joint_name = self._dc.get_joint_name(joint_handle)
+                    joint_path = self._dc.get_joint_path(joint_handle)
+                    joint_prim = get_prim_at_path(joint_path)
+                    # Only add the joint if it's not fixed (i.e.: it has DOFs > 0)
+                    if self._dc.get_joint_dof_count(joint_handle) > 0:
+                        joint = JointPrim(
+                            prim_path=joint_path,
+                            name=f"{self._name}:joint_{joint_name}",
+                            articulation=self._handle,
+                        )
+                        joint.initialize()
+                        self._joints[joint_name] = joint
+
+                # Default joints state is our current state for now
+                self._default_joints_state = self.get_joints_state()
+        else:
+            # TODO: May need to extend to clusters of rigid bodies, that aren't exactly joined
+            # We assume this object contains a single rigid body
+            body_path = f"{self._prim_path}/{self.root_link_name}"
+            root_prim = get_prim_at_path(body_path)
+            n_dof = 0
+
+        # Make sure root prim stored is the same as the one found during initialization
+        assert self.root_prim == root_prim, \
+            f"Mismatch in root prims! Original was {self.root_prim.GetPrimPath()}, " \
+            f"initialized is {root_prim.GetPrimPath()}!"
+
+        # Store values internally
+        self._n_dof = n_dof
 
     @property
     def prim_type(self):
@@ -707,9 +732,13 @@ class EntityPrim(XFormPrim):
 
         # Update all links and joints as well
         for link in self._links.values():
+            if not link.initialized:
+                link.initialize()
             link.update_handles()
 
         for joint in self._joints.values():
+            if not joint.initialized:
+                joint.initialize()
             joint.update_handles()
 
     def update_default_state(self):

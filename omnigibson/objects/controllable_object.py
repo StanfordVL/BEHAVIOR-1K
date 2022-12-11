@@ -8,6 +8,7 @@ from omnigibson.objects.object_base import BaseObject
 from omnigibson.controllers import create_controller
 from omnigibson.controllers.controller_base import ControlType
 from omnigibson.utils.python_utils import assert_valid_key, merge_nested_dicts
+from omnigibson.utils.constants import PrimType
 
 
 class ControllableObject(BaseObject):
@@ -24,11 +25,11 @@ class ControllableObject(BaseObject):
         class_id=None,
         uuid=None,
         scale=None,
-        rendering_params=None,
         visible=True,
         fixed_base=False,
         visual_only=False,
         self_collisions=False,
+        prim_type=PrimType.RIGID,
         load_config=None,
         control_freq=None,
         controller_config=None,
@@ -38,35 +39,36 @@ class ControllableObject(BaseObject):
         **kwargs,
     ):
         """
-        Create an object instance with the minimum information of class ID and rendering parameters.
-
-        @param prim_path: str, global path in the stage to this object
-        @param name: Name for the object. Names need to be unique per scene. If no name is set, a name will be generated
-            at the time the object is added to the scene, using the object's category.
-        @param category: Category for the object. Defaults to "object".
-        @param class_id: What class ID the object should be assigned in semantic segmentation rendering mode.
-        @param uuid: Unique unsigned-integer identifier to assign to this object (max 8-numbers).
-            If None is specified, then it will be auto-generated
-        @param scale: float or 3-array, sets the scale for this object. A single number corresponds to uniform scaling
-            along the x,y,z axes, whereas a 3-array specifies per-axis scaling.
-        @param rendering_params: Any relevant rendering settings for this object.
-        @param visible: bool, whether to render this object or not in the stage
-        @param fixed_base: bool, whether to fix the base of this object or not
-        visual_only (bool): Whether this object should be visual only (and not collide with any other objects)
-        self_collisions (bool): Whether to enable self collisions for this object
-        load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
-            loading this prim at runtime.
-        :param control_freq: float, control frequency (in Hz) at which to control the object. If set to be None,
-            simulator.import_object will automatically set the control frequency to be 1 / render_timestep by default.
-        :param controller_config: None or Dict[str, ...], nested dictionary mapping controller name(s) to specific
-            controller configurations for this object. This will override any default values specified by this class.
-        :param action_type: str, one of {discrete, continuous} - what type of action space to use
-        :param action_normalize: bool, whether to normalize inputted actions. This will override any default values
-         specified by this class.
-        :param reset_joint_pos: None or Array[float], if specified, should be the joint positions that the object should
-            be set to during a reset. If None (default), self.default_joint_pos will be used instead.
-        kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
-            for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
+        Args:
+            prim_path (str): global path in the stage to this object
+            name (None or str): Name for the object. Names need to be unique per scene. If None, a name will be
+                generated at the time the object is added to the scene, using the object's category.
+            category (str): Category for the object. Defaults to "object".
+            class_id (None or int): What class ID the object should be assigned in semantic segmentation rendering mode.
+                If None, the ID will be inferred from this object's category.
+            uuid (None or int): Unique unsigned-integer identifier to assign to this object (max 8-numbers).
+                If None is specified, then it will be auto-generated
+            scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
+                for this object. A single number corresponds to uniform scaling along the x,y,z axes, whereas a
+                3-array specifies per-axis scaling.
+            visible (bool): whether to render this object or not in the stage
+            fixed_base (bool): whether to fix the base of this object or not
+            visual_only (bool): Whether this object should be visual only (and not collide with any other objects)
+            self_collisions (bool): Whether to enable self collisions for this object
+            prim_type (PrimType): Which type of prim the object is, Valid options are: {PrimType.RIGID, PrimType.CLOTH}
+            load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
+                loading this prim at runtime.
+            control_freq (float): control frequency (in Hz) at which to control the object. If set to be None,
+                simulator.import_object will automatically set the control frequency to be 1 / render_timestep by default.
+            controller_config (None or dict): nested dictionary mapping controller name(s) to specific controller
+                configurations for this object. This will override any default values specified by this class.
+            action_type (str): one of {discrete, continuous} - what type of action space to use
+            action_normalize (bool): whether to normalize inputted actions. This will override any default values
+                specified by this class.
+            reset_joint_pos (None or n-array): if specified, should be the joint positions that the object should
+                be set to during a reset. If None (default), self.default_joint_pos will be used instead.
+            kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
+                for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
         """
         # Store inputs
         self._control_freq = control_freq
@@ -92,11 +94,11 @@ class ControllableObject(BaseObject):
             class_id=class_id,
             uuid=uuid,
             scale=scale,
-            rendering_params=rendering_params,
             visible=visible,
             fixed_base=fixed_base,
             visual_only=visual_only,
             self_collisions=self_collisions,
+            prim_type=prim_type,
             load_config=load_config,
             **kwargs,
         )
@@ -155,10 +157,6 @@ class ControllableObject(BaseObject):
         self._controller_config = self._generate_controller_config(custom_config=self._controller_config)
 
         # Store dof idx mapping to dof name
-
-        # TODO: Verify that this modification has no side effects
-        # dof_names_ordered = [self._dc.get_dof_name(self._dc.get_articulation_dof(self._handle, i))
-        #                      for i in range(self.n_dof)]
         self.dof_names_ordered = list(self._joints.keys())
 
         # Initialize controllers to create
@@ -176,6 +174,9 @@ class ControllableObject(BaseObject):
         self._update_controller_mode()
 
     def _update_controller_mode(self):
+        """
+        Helper function to force the joints to use the internal specified control mode and gains
+        """
         # Update the control modes of each joint based on the outputted control from the controllers
         for name in self._controllers:
             for dof in self._controllers[name].dof_idx:
@@ -258,7 +259,8 @@ class ControllableObject(BaseObject):
         Create a discrete action space for this object. Should be implemented by the subclass (if a subclass does not
         support this type of action space, it should raise an error).
 
-        :return gym.space: Object-specific discrete action space
+        Returns:
+            gym.space: Object-specific discrete action space
         """
         raise NotImplementedError
 
@@ -269,7 +271,8 @@ class ControllableObject(BaseObject):
         Any custom behavior should be implemented by the subclass (e.g.: if a subclass does not
         support this type of action space, it should raise an error).
 
-        :return gym.space.Box: Object-specific continuous action space
+        Returns:
+            gym.space.Box: Object-specific continuous action space
         """
         # Action space is ordered according to the order in _default_controller_config control
         low, high = [], []
@@ -287,7 +290,8 @@ class ControllableObject(BaseObject):
 
         Converts inputted actions into low-level control signals and deploys them on the object
 
-        :param action: Array[float], n-DOF length array of actions to convert and deploy on the object
+        Args:
+            n_array: n-DOF length array of actions to convert and deploy on the object
         """
         # Store last action as the current action being applied
         self._last_action = action
@@ -313,9 +317,13 @@ class ControllableObject(BaseObject):
         This returns two arrays: the converted low level control signals and an array corresponding
         to the specific ControlType for each signal.
 
-        :param action: Array[float], n-DOF length array of actions to convert and deploy on the object
-        :return Tuple[Array[float], Array[ControlType]]: The (1) raw control signals to send to the object's joints
-            and (2) control types for each joint
+        Args:
+            action (n-array): n-DOF length array of actions to convert and deploy on the object
+
+        Returns:
+            2-tuple:
+                - n-array: raw control signals to send to the object's joints
+                - list: control types for each joint
         """
         # First, loop over all controllers, and calculate the computed control
         control = OrderedDict()
@@ -438,14 +446,15 @@ class ControllableObject(BaseObject):
         """
         Grabs all relevant information that should be passed to each controller during each controller step.
 
-        :return Dict[str, Array[float]]: Keyword-mapped control values for this object.
-            By default, returns the following:
+        Returns:
+            dict: Keyword-mapped control values for this object, mapping names to n-arrays.
+                By default, returns the following:
 
-            - joint_position: (n_dof,) joint positions
-            - joint_velocity: (n_dof,) joint velocities
-            - joint_effort: (n_dof,) joint efforts
-            - root_pos: (3,) (x,y,z) global cartesian position of the object's root link
-            - root_quat: (4,) (x,y,z,w) global cartesian orientation of ths object's root link
+                - joint_position: (n_dof,) joint positions
+                - joint_velocity: (n_dof,) joint velocities
+                - joint_effort: (n_dof,) joint efforts
+                - root_pos: (3,) (x,y,z) global cartesian position of the object's root link
+                - root_quat: (4,) (x,y,z,w) global cartesian orientation of ths object's root link
         """
         joints_state = self.get_joints_state(normalized=False)
         pos, ori = self.get_position_orientation()
@@ -458,26 +467,10 @@ class ControllableObject(BaseObject):
         )
 
     def dump_action(self):
-        """Dump the last action applied to this object. For use in demo collection."""
+        """
+        Dump the last action applied to this object. For use in demo collection.
+        """
         return self._last_action
-
-    def dump_config(self):
-        """
-        Dumps relevant configuration for this object.
-
-        Returns:
-            OrderedDict: Object configuration.
-        """
-        # Grab running config
-        cfg = super().dump_config()
-
-        # Add relevant params
-        cfg["control_freq"] = self._control_freq,
-        cfg["action_type"] = self._action_type,
-        cfg["action_normalize"] = self._action_normalize,
-        cfg["controller_config"] = self._controller_config,
-
-        return cfg
 
     @property
     def state_size(self):
@@ -537,8 +530,9 @@ class ControllableObject(BaseObject):
     @property
     def action_dim(self):
         """
-        :return int: Dimension of action space for this object. By default,
-            is the sum over all controller action dimensions
+        Returns:
+            int: Dimension of action space for this object. By default,
+                is the sum over all controller action dimensions
         """
         return sum([controller.command_dim for controller in self._controllers.values()])
 
@@ -547,7 +541,8 @@ class ControllableObject(BaseObject):
         """
         Action space for this object.
 
-        :return gym.space: Action space, either discrete (Discrete) or continuous (Box)
+        Returns:
+            gym.space: Action space, either discrete (Discrete) or continuous (Box)
         """
         return deepcopy(self._action_space)
 
@@ -575,17 +570,19 @@ class ControllableObject(BaseObject):
     @abstractmethod
     def controller_order(self):
         """
-        :return Tuple[str]: Ordering of the actions, corresponding to the controllers. e.g., ["base", "arm", "gripper"],
-            to denote that the action vector should be interpreted as first the base action, then arm command, then
-            gripper command
+        Returns:
+            list: Ordering of the actions, corresponding to the controllers. e.g., ["base", "arm", "gripper"],
+                to denote that the action vector should be interpreted as first the base action, then arm command, then
+                gripper command
         """
         raise NotImplementedError
 
     @property
     def controller_action_idx(self):
         """
-        :return: Dict[str, Array[int]]: Mapping from controller names (e.g.: head, base, arm, etc.) to corresponding
-            indices in the action vector
+        Returns:
+            dict: Mapping from controller names (e.g.: head, base, arm, etc.) to corresponding
+                indices (list) in the action vector
         """
         dic = {}
         idx = 0
@@ -599,8 +596,9 @@ class ControllableObject(BaseObject):
     @property
     def controller_joint_idx(self):
         """
-        :return: Dict[str, Array[int]]: Mapping from controller names (e.g.: head, base, arm, etc.) to corresponding
-            indices of the joint state vector controlled by each controller
+        Returns:
+            dict: Mapping from controller names (e.g.: head, base, arm, etc.) to corresponding
+                indices (list) of the joint state vector controlled by each controller
         """
         dic = {}
         for controller in self.controller_order:
@@ -611,12 +609,13 @@ class ControllableObject(BaseObject):
     @property
     def control_limits(self):
         """
-        :return: Dict[str, Any]: Keyword-mapped limits for this object. Dict contains:
-            position: (min, max) joint limits, where min and max are N-DOF arrays
-            velocity: (min, max) joint velocity limits, where min and max are N-DOF arrays
-            effort: (min, max) joint effort limits, where min and max are N-DOF arrays
-            has_limit: (n_dof,) array where each element is True if that corresponding joint has a position limit
-                (otherwise, joint is assumed to be limitless)
+        Returns:
+            dict: Keyword-mapped limits for this object. Dict contains:
+                position: (min, max) joint limits, where min and max are N-DOF arrays
+                velocity: (min, max) joint velocity limits, where min and max are N-DOF arrays
+                effort: (min, max) joint effort limits, where min and max are N-DOF arrays
+                has_limit: (n_dof,) array where each element is True if that corresponding joint has a position limit
+                    (otherwise, joint is assumed to be limitless)
         """
         return {
             "position": (self.joint_lower_limits, self.joint_upper_limits),
@@ -647,7 +646,8 @@ class ControllableObject(BaseObject):
     @abstractmethod
     def default_joint_pos(self):
         """
-        :return Array[float]: Default joint positions for this robot
+        Returns:
+            n-array: Default joint positions for this robot
         """
         raise NotImplementedError
 
@@ -655,23 +655,25 @@ class ControllableObject(BaseObject):
     @abstractmethod
     def _default_controller_config(self):
         """
-        :return Dict[str, Any]: default nested dictionary mapping controller name(s) to specific controller
-            configurations for this object. Note that the order specifies the sequence of actions to be received
-            from the environment.
+        Returns:
+            dict: default nested dictionary mapping controller name(s) to specific controller
+                configurations for this object. Note that the order specifies the sequence of actions to be received
+                from the environment.
 
-            Expected structure is as follows:
-                group1:
-                    controller_name1:
-                        controller_name1_params
+                Expected structure is as follows:
+                    group1:
+                        controller_name1:
+                            controller_name1_params
+                            ...
+                        controller_name2:
+                            ...
+                    group2:
                         ...
-                    controller_name2:
-                        ...
-                group2:
-                    ...
 
-            The @group keys specify the control type for various aspects of the object, e.g.: "head", "arm", "base", etc.
-            @controller_name keys specify the supported controllers for that group. A default specification MUST be
-            specified for each controller_name. e.g.: IKController, DifferentialDriveController, JointController, etc.
+                The @group keys specify the control type for various aspects of the object,
+                e.g.: "head", "arm", "base", etc. @controller_name keys specify the supported controllers for
+                that group. A default specification MUST be specified for each controller_name.
+                e.g.: IKController, DifferentialDriveController, JointController, etc.
         """
         return {}
 
@@ -679,7 +681,8 @@ class ControllableObject(BaseObject):
     @abstractmethod
     def _default_controllers(self):
         """
-        :return Dict[str, str]: Maps object group (e.g. base, arm, etc.) to default controller class name to use
+        Returns:
+            dict: Maps object group (e.g. base, arm, etc.) to default controller class name to use
             (e.g. IKController, JointController, etc.)
         """
         return {}

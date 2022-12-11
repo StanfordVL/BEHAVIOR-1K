@@ -10,6 +10,8 @@ from collections import defaultdict
 import itertools
 import logging
 import contextlib
+import os
+from pathlib import Path
 
 import numpy as np
 import json
@@ -33,7 +35,7 @@ from omnigibson.macros import gm, create_module_macros
 from omnigibson.robots.robot_base import BaseRobot
 from omnigibson.utils.config_utils import NumpyEncoder
 from omnigibson.utils.python_utils import clear as clear_pu, create_object_from_init_info, Serializable
-from omnigibson.utils.usd_utils import clear as clear_uu, BoundingBoxAPI, get_usd_metadata, update_usd_metadata
+from omnigibson.utils.usd_utils import clear as clear_uu, BoundingBoxAPI
 from omnigibson.utils.asset_utils import get_og_avg_category_specs
 from omnigibson.utils.ui_utils import CameraMover, disclaimer
 from omnigibson.scenes import Scene
@@ -52,6 +54,7 @@ m = create_module_macros(module_path=__file__)
 
 m.DEFAULT_VIEWER_CAMERA_POS = (-0.201028, -2.72566 ,  1.0654)
 m.DEFAULT_VIEWER_CAMERA_QUAT = (0.68196617, -0.00155408, -0.00166678,  0.73138017)
+m.OBJECT_GRAVEYARD_POS = (100.0, 100.0, 100.0)
 
 
 class Simulator(SimulationContext, Serializable):
@@ -231,7 +234,7 @@ class Simulator(SimulationContext, Serializable):
         self._physics_context.enable_flatcache(gm.ENABLE_FLATCACHE)
 
         # Enable GPU dynamics based on whether we need omni particles feature
-        if gm.ENABLE_OMNI_PARTICLES:
+        if gm.USE_GPU_DYNAMICS:
             self._physics_context.enable_gpu_dynamics(True)
             self._physics_context.set_broadphase_type("GPU")
         else:
@@ -514,13 +517,26 @@ class Simulator(SimulationContext, Serializable):
                     removed_objs.extend(transition_output.remove)
 
         # Process all transition results.
+        if len(removed_objs) > 0:
+            disclaimer(
+                f"We are attempting to remove objects during the transition rule phase of the simulator step.\n"
+                f"However, Omniverse currently has a bug when using GPU dynamics where a segfault will occur if an "
+                f"object in contact with another object is attempted to be removed.\n"
+                f"This bug should be fixed by the next Omniverse release.\n"
+                f"In the meantime, we instead teleport these objects to a graveyard location located far outside of "
+                f"the scene."
+            )
+        for i, removed_obj in enumerate(removed_objs):
+            # TODO: Ideally we want to remove objects, but because of Omniverse's bug on GPU physics, we simply move
+            # the objects into a graveyard for now
+            # self.remove_object(removed_obj)
+            removed_obj.set_position(np.array(m.OBJECT_GRAVEYARD_POS) + np.ones(3) * i)
+
         for added_obj_attr in added_obj_attrs:
             new_obj = added_obj_attr.obj
             self.import_object(added_obj_attr.obj)
             pos, orn = added_obj_attr.pos, added_obj_attr.orn
             new_obj.set_position_orientation(position=pos, orientation=orn)
-        for removed_obj in removed_objs:
-            self.remove_object(removed_obj)
 
     def reset_scene(self):
         """
@@ -557,6 +573,9 @@ class Simulator(SimulationContext, Serializable):
     def n_physics_timesteps_per_render(self):
         """
         Number of physics timesteps per rendering timestep. rendering_dt has to be a multiple of physics_dt.
+
+        Returns:
+            int: Discrete number of physics timesteps to take per step
         """
         n_physics_timesteps_per_render = self.get_rendering_dt() / self.get_physics_dt()
         assert n_physics_timesteps_per_render.is_integer(), "render_timestep must be a multiple of physics_timestep"
@@ -579,7 +598,7 @@ class Simulator(SimulationContext, Serializable):
             super().step(render=True)
         else:
             for i in range(self.n_physics_timesteps_per_render):
-                super.step(render=False)
+                super().step(render=False)
 
         # Additionally run non physics things if we have a valid scene
         if self._scene is not None:
@@ -596,7 +615,6 @@ class Simulator(SimulationContext, Serializable):
     def step_physics(self):
         """
         Step the physics a single step.
-
         """
         self._physics_context._step(current_time=self.current_time)
 
@@ -797,95 +815,82 @@ class Simulator(SimulationContext, Serializable):
         # Load dummy stage, but don't clear sim to prevent circular loops
         self.load_stage(usd_path=f"{og.assets_path}/models/misc/clear_stage.usd")
 
-    def restore(self, usd_path):
+    def restore(self, json_path):
         """
-        Restore a simulation environment from @usd_path.
+        Restore a simulation environment from @json_path.
 
         Args:
-            usd_path (str): Full path of USD file to load, which contains information
+            json_path (str): Full path of JSON file to load, which contains information
                 to recreate a scene.
         """
-        if not usd_path.endswith(".usd"):
-            logging.error(f"You have to define the full usd_path to load from. Got: {usd_path}")
+        if not json_path.endswith(".json"):
+            logging.error(f"You have to define the full json_path to load from. Got: {json_path}")
             return
 
-        # Load saved stage to get saved_info.
-        self.load_stage(usd_path)
-
-        # TODO: Save / loading emptyscene fails because we're not loading the saved USD (no usd_path arg to pass into the scene constructor)
-        # TODO: Really need to iron this out in a cleaner way -- how to reload scene robustly?
-
-        # Load saved info
-        scene_state = json.loads(self.world_prim.GetCustomDataByKey("scene_state"))
-        scene_init_info = json.loads(self.world_prim.GetCustomDataByKey("scene_init_info"))
-        # Overwrite the usd with our desired usd file
-        scene_init_info["args"]["usd_path"] = usd_path
-        # Clear the current environment and delete any currently loaded scene.
+        # Clear the current stage
         self.clear()
 
+        # Load the info from the json
+        with open(json_path, "r") as f:
+            scene_info = json.load(f)
+        init_info = scene_info["init_info"]
+        state = scene_info["state"]
+
+        # Override the init info with our json path
+        init_info["args"]["scene_file"] = json_path
+
+        # Also make sure we have any additional modifications necessary from the specific scene
+        og.REGISTERED_SCENES[init_info["class_name"]].modify_init_info_for_restoring(init_info=init_info)
+
         # Recreate and import the saved scene
-        recreated_scene = create_object_from_init_info(scene_init_info)
+        recreated_scene = create_object_from_init_info(init_info)
         self.import_scene(scene=recreated_scene)
 
         # Start the simulation and restore the dynamic state of the scene and then pause again
         self.play()
-        self._scene.load_state(scene_state, serialized=False)
-        self.app.update()
-        self.pause()
+        self.load_state(state, serialized=False)
 
         logging.info("The saved simulation environment loaded.")
 
         return
 
-    def save(self, usd_path):
+    def save(self, json_path):
         """
-        Saves the current simulation environment to @usd_path.
+        Saves the current simulation environment to @json_path.
 
         Args:
-            usd_path (str): Full path of USD file to load, which contains information
+            json_path (str): Full path of JSON file to save (should end with .json), which contains information
                 to recreate the current scene.
         """
         # Make sure the sim is not stopped, since we need to grab joint states
         assert not self.is_stopped(), "Simulator cannot be stopped when saving to USD!"
-        # TODO: Make sure all objects have been initialized
 
+        # Make sure there are no objects in the initialization queue, if not, terminate early and notify user
+        # Also run other sanity checks before saving
+        if len(self._objects_to_initialize) > 0:
+            logging.error("There are still objects to initialize! Please take one additional sim step and then save.")
+            return
         if not self.scene:
             logging.warning("Scene has not been loaded. Nothing to save.")
             return
-        if not usd_path.endswith(".usd"):
-            logging.error(f"You have to define the full usd_path to save the scene to. Got: {usd_path}")
+        if not json_path.endswith(".json"):
+            logging.error(f"You have to define the full json_path to save the scene to. Got: {json_path}")
             return
 
         # Update scene info
-        self.scene.update_scene_info()
+        self.scene.update_objects_info()
 
         # Dump saved current state and also scene init info
-        saved_state_str = json.dumps(self.scene.dump_state(serialized=False), cls=NumpyEncoder)
-        self.world_prim.SetCustomDataByKey("scene_state", saved_state_str)
+        scene_info = {
+            "state": self.scene.dump_state(serialized=False),
+            "init_info": self.scene.get_init_info(),
+            "objects_info": self.scene.get_objects_info(),
+        }
 
-        scene_init_info = self.scene.get_init_info()
-        scene_init_info_str = json.dumps(scene_init_info, cls=NumpyEncoder)
-        self.world_prim.SetCustomDataByKey("scene_init_info", scene_init_info_str)
-
-        # Update USD Metadata -- we need this info in order to, e.g., update material filepaths appropriately
-        # in case this USD is opened on another machine
-        update_usd_metadata()
-
-        # Save stage. This needs to happen at the end since some objects may get reset after sim.stop().
-        # We also need to reset the Synthetic Data Utilities, so that we can re-initialize it when we reload the USD
-        # Otherwise when we try to reload the USD and init Synthetic Data again we will run into an error since the
-        # Synthetic Data interface had already existed when we had saved the USD beforehand
-        self.stop()
-        SyntheticData.Reset()
-
-        self.stage.Export(usd_path)
-
-        # Re-initialize the synthetic data and re-initialize all sensors
-        # This is needed because we destroyed and recreated the synthetic data interface, and so the specific sensor
-        # modalities need to be initialized again within the Synthetic Data interface
-        SyntheticData.Initialize()
-        for sensor in VisionSensor.SENSORS.values():
-            sensor.initialize_sensors(names=sensor.modalities)
+        # Write this to the json file
+        Path(os.path.dirname(json_path)).mkdir(parents=True, exist_ok=True)
+        with open(json_path, "w+") as f:
+            json.dump(scene_info, f, cls=NumpyEncoder, indent=4)
 
         logging.info("The current simulation environment saved.")
 
@@ -1001,13 +1006,6 @@ class Simulator(SimulationContext, Serializable):
         # We need to make sure the simulator is playing since joint states only get updated when playing
         assert self.is_playing()
 
-        # If we're using GPU, we have to do a super stupid workaround to avoid physx crashing
-        # For some reason, trying to load large states after n >= 3 steps are taken after the simulator starts playing
-        # results in a crash. So, since we are resetting the entire sim state anyways, we will stop and start the
-        # simulator to reset the frame count
-        if gm.ENABLE_OMNI_PARTICLES:
-            self.stop()
-            self.play()
         # Run super
         super().load_state(state=state, serialized=serialized)
 

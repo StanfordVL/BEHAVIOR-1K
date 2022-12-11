@@ -72,8 +72,9 @@ class LocomotionRobot(BaseRobot):
     @property
     def _default_base_joint_controller_config(self):
         """
-        :return: Dict[str, Any] Default base joint controller config to control this robot's base. Uses velocity
-            control by default.
+        Returns:
+            dict: Default base joint controller config to control this robot's base. Uses velocity
+                control by default.
         """
         return {
             "name": "JointController",
@@ -88,8 +89,8 @@ class LocomotionRobot(BaseRobot):
     @property
     def _default_base_null_joint_controller_config(self):
         """
-        :return: Dict[str, Any] Default null joint controller config
-            to control this robot's base i.e. dummy controller
+        Returns:
+            dict: Default null joint controller config to control this robot's base i.e. dummy controller
         """
         return {
             "name": "NullJointController",
@@ -116,7 +117,8 @@ class LocomotionRobot(BaseRobot):
         """
         Move robot base without physics simulation
 
-        :param delta: Array[float], (x,y,z) cartesian delta base position
+        Args:
+            delta (float):float], (x,y,z) cartesian delta base position
         """
         new_pos = np.array(delta) + self.get_position()
         self.set_position(position=new_pos)
@@ -125,7 +127,8 @@ class LocomotionRobot(BaseRobot):
         """
         Move robot base forward without physics simulation
 
-        :param delta: float, delta base position forward
+        Args:
+            delta (float): delta base position forward
         """
         self.move_by(quat2mat(self.get_orientation()).dot(np.array([delta, 0, 0])))
 
@@ -133,7 +136,8 @@ class LocomotionRobot(BaseRobot):
         """
         Move robot base backward without physics simulation
 
-        :param delta: float, delta base position backward
+        Args:
+            delta (float): delta base position backward
         """
         self.move_by(quat2mat(self.get_orientation()).dot(np.array([-delta, 0, 0])))
 
@@ -141,7 +145,8 @@ class LocomotionRobot(BaseRobot):
         """
         Move robot base left without physics simulation
 
-        :param delta: float, delta base position left
+        Args:
+            delta (float): delta base position left
         """
         self.move_by(quat2mat(self.get_orientation()).dot(np.array([0, -delta, 0])))
 
@@ -149,7 +154,8 @@ class LocomotionRobot(BaseRobot):
         """
         Move robot base right without physics simulation
 
-        :param delta: float, delta base position right
+        Args:
+            delta (float): delta base position right
         """
         self.move_by(quat2mat(self.get_orientation()).dot(np.array([0, delta, 0])))
 
@@ -157,7 +163,8 @@ class LocomotionRobot(BaseRobot):
         """
         Rotate robot base left without physics simulation
 
-        :param delta: float, delta angle to rotate the base left
+        Args:
+            delta (float): delta angle to rotate the base left
         """
         quat = self.get_orientation()
         quat = qmult((euler2quat(-delta, 0, 0)), quat)
@@ -167,7 +174,8 @@ class LocomotionRobot(BaseRobot):
         """
         Rotate robot base right without physics simulation
 
-        :param delta: delta angle to rotate the base right
+        Args:
+            delta (float): angle to rotate the base right
         """
         quat = self.get_orientation()
         quat = qmult((euler2quat(delta, 0, 0)), quat)
@@ -177,7 +185,8 @@ class LocomotionRobot(BaseRobot):
     @abstractmethod
     def base_control_idx(self):
         """
-        :return Array[int]: Indices in low-level control vector corresponding to base joints.
+        Returns:
+            n-array: Indices in low-level control vector corresponding to base joints.
         """
         raise NotImplementedError
 

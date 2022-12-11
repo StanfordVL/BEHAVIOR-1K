@@ -11,7 +11,6 @@ import omnigibson as og
 from omnigibson import app, assets_path, og_dataset_path
 from omnigibson.utils.physx_utils import bind_material
 from omnigibson.prims.prim_base import BasePrim
-from omnigibson.utils.usd_utils import get_usd_metadata
 
 
 class MaterialPrim(BasePrim):
@@ -93,46 +92,6 @@ class MaterialPrim(BasePrim):
         """
         assert self._shader is not None
         asyncio.run(self._load_mdl_parameters())
-
-    def shader_update_asset_paths(self):
-        """
-        Updates material shader paths appropriately so that a material can verifiably be used given the current machine setup.
-
-        Omni does NOT export materials when saving a USD, so if a USD is saved on one machine and ported to another one,
-        it will break unless we update the material paths to point to the new correct paths on the new machine.
-        """
-        # Update the material paths so that it's correct w.r.t. to the local machine / directory setup that
-        # this prim and USD is being loaded on
-        for inp_name in self.shader_input_names_by_type("SdfAssetPath"):
-            inp = self.get_input(inp_name)
-            # If the input doesn't have any path, skip
-            if inp is None:
-                continue
-
-            original_path = inp.path if inp.resolvedPath == "" else inp.resolvedPath
-            # If the input has an empty path, skip
-            if original_path == "":
-                continue
-
-            # If the input already has the correct, current machine's root path, skip
-            if og_dataset_path in original_path or assets_path in original_path:
-                continue
-
-            usd_metadata = get_usd_metadata()
-            source_asset_path = usd_metadata["source_og_asset_path"]
-            source_og_dataset_path = usd_metadata["source_og_dataset_path"]
-
-            # If the input doesn't contain the source root path, skip. We fail to update the asset paths automatically
-            # External user needs to call @shader_update_asset_paths_with_root_path with an explicit root path
-            if source_asset_path not in original_path and source_og_dataset_path not in original_path:
-                continue
-
-            if source_asset_path in original_path:
-                new_path = f"{assets_path}{original_path.split(source_asset_path)[-1]}"
-            else:
-                new_path = f"{og_dataset_path}{original_path.split(source_og_dataset_path)[-1]}"
-
-            self.set_input(inp_name, new_path)
 
     def shader_update_asset_paths_with_root_path(self, root_path):
         """

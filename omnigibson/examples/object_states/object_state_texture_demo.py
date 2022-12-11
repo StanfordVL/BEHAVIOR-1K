@@ -1,21 +1,60 @@
 import numpy as np
 import omnigibson as og
 from omnigibson import object_states
-from omnigibson.objects import DatasetObject, LightObject
 from omnigibson.macros import gm, macros
 from omnigibson.systems import WaterSystem
+from omnigibson.utils.constants import ParticleModifyMethod
 
 
 def main():
     # Make sure object states are enabled
     assert gm.ENABLE_OBJECT_STATES, f"Object states must be enabled in macros.py in order to use this demo!"
 
-    # Create the scene config to load -- empty scene
+    # Create the scene config to load -- empty scene plus a light and a cabinet
     cfg = {
         "scene": {
-            "type": "EmptyScene",
+            "type": "Scene",
             "floor_plane_visible": True,
-        }
+        },
+        "objects": [
+            {
+                "type": "LightObject",
+                "name": "light",
+                "light_type": "Sphere",
+                "radius": 0.01,
+                "intensity": 1e5,
+                "position": [-2.0, -2.0, 1.0],
+            },
+            {
+                "type": "DatasetObject",
+                "name": "cabinet",
+                "category": "bottom_cabinet",
+                "model": "45087",
+                "abilities": {
+                    "freezable": {},
+                    "cookable": {},
+                    "burnable": {},
+                    "saturable": {},
+                    "toggleable": {},
+                    "particleRemover": {
+                        "method": ParticleModifyMethod.ADJACENCY,
+                        "conditions": {
+                            # For a specific particle system, this specifies what conditions are required in order for the
+                            # particle applier / remover to apply / remover particles associated with that system
+                            # The list should contain functions with signature condition() --> bool,
+                            # where True means the condition is satisfied
+                            # In this case, we only allow our cabinet to absorb water, with no conditions needed.
+                            # This is needed for the Saturated ("saturable") state so that we can modify the texture
+                            # according to the water.
+                            # NOTE: This will only change color if gm.ENABLE_HQ_RENDERING and gm.USE_GPU_DYNAMICS is
+                            # enabled!
+                            WaterSystem: [],
+                        },
+            },
+                },
+                "position": [0, 0, 0.55],
+            },
+        ],
     }
 
     # Create the environment
@@ -27,38 +66,15 @@ def main():
         orientation=np.array([0.57065614, 0.20331904, 0.267029  , 0.74947212]),
     )
 
-    # Create a light object
-    light = LightObject(
-        prim_path="/World/sphere_light",
-        light_type="Sphere",
-        name="sphere_light",
-        radius=0.01,
-        intensity=1e5,
-    )
-    og.sim.import_object(light)
-    light.set_position(np.array([-2.0, -2.0, 1.0]))
-    env.step(np.array([]))
-
-    # Add a cabinet object
-    obj = DatasetObject(
-        prim_path="/World/cabinet",
-        name="cabinet",
-        category="bottom_cabinet",
-        model="45087",
-        abilities={"freezable": {}, "cookable": {}, "burnable": {}, "soakable": {}, "toggleable": {}},
-    )
+    # Grab reference to object of interest
+    obj = env.scene.object_registry("name", "cabinet")
 
     # Make sure all the appropriate states are in the object
     assert object_states.Frozen in obj.states
     assert object_states.Cooked in obj.states
     assert object_states.Burnt in obj.states
-    assert object_states.Soaked in obj.states
+    assert object_states.Saturated in obj.states
     assert object_states.ToggledOn in obj.states
-
-    # Add the object and take a step to make sure the cabinet is fully initialized
-    og.sim.import_object(obj)
-    obj.set_position(np.array([0, 0, 0.55]))
-    env.step(np.array([]))
 
     def report_states():
         # Make sure states are propagated before printing
@@ -70,7 +86,7 @@ def main():
         print("obj is frozen:", obj.states[object_states.Frozen].get_value())
         print("obj is cooked:", obj.states[object_states.Cooked].get_value())
         print("obj is burnt:", obj.states[object_states.Burnt].get_value())
-        print("obj is soaked:", obj.states[object_states.Soaked].get_value(WaterSystem))
+        print("obj is soaked:", obj.states[object_states.Saturated].get_value(WaterSystem))
         print("obj is toggledon:", obj.states[object_states.ToggledOn].get_value())
         print("obj textures:", obj.get_textures())
 
@@ -100,13 +116,13 @@ def main():
     report_states()
 
     # Notify user that we're about to soak the object, and then soak the object
-    input("\nObject will be soaked. Press ENTER to continue.")
-    obj.states[object_states.Soaked].set_value(WaterSystem, True)
+    input("\nObject will be saturated with water. Press ENTER to continue.")
+    obj.states[object_states.Saturated].set_value(WaterSystem, True)
     report_states()
 
     # Notify user that we're about to unsoak the object, and then unsoak the object
-    input("\nObject will be unsoaked. Press ENTER to continue.")
-    obj.states[object_states.Soaked].set_value(WaterSystem, False)
+    input("\nObject will be unsaturated with water. Press ENTER to continue.")
+    obj.states[object_states.Saturated].set_value(WaterSystem, False)
     report_states()
 
     # Notify user that we're about to toggle on the object, and then toggle on the object

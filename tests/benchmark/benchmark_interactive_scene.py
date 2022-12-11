@@ -85,7 +85,7 @@ def benchmark_scene(sim, scene_name, optimized=False, import_robot=True):
     ax.set_xlabel("Render fps")
     ax.set_title(
         "Scene {} version {}\noptimized {} num_obj {}\n import_robot {}".format(
-            scene_name, assets_version, optimized, scene.get_num_objects(), import_robot
+            scene_name, assets_version, optimized, scene.n_objects, import_robot
         )
     )
     ax = plt.subplot(5, 1, 2)

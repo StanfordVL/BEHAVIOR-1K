@@ -32,33 +32,6 @@ def test_turtlebot():
     assert nbody == 5
 
 
-def test_jr2():
-    s = Simulator(mode="headless")
-    scene = StadiumScene()
-    s.import_scene(scene)
-    jr2 = REGISTERED_ROBOTS["JR2"]()
-    s.import_object(jr2)
-    nbody = p.getNumBodies()
-    s.disconnect()
-    assert nbody == 5
-
-
-def test_ant():
-    s = Simulator(mode="headless")
-    scene = StadiumScene()
-    s.import_scene(scene)
-    ant = REGISTERED_ROBOTS["Ant"]()
-    s.import_object(ant)
-    ant2 = REGISTERED_ROBOTS["Ant"]()
-    s.import_object(ant2)
-    ant2.set_position([0, 2, 2])
-    nbody = p.getNumBodies()
-    for i in range(100):
-        s.step()
-    s.disconnect()
-    assert nbody == 6
-
-
 def test_husky():
     s = Simulator(mode="headless")
     scene = StadiumScene()
@@ -118,18 +91,6 @@ def show_action_sensor_space():
     turtlebot = REGISTERED_ROBOTS["Turtlebot"]()
     s.import_object(turtlebot)
     turtlebot.set_position([0, 1, 0.5])
-
-    ant = REGISTERED_ROBOTS["Ant"]()
-    s.import_object(ant)
-    ant.set_position([0, 2, 0.5])
-
-    jr = REGISTERED_ROBOTS["JR2"]()
-    s.import_object(jr)
-    jr.set_position([0, 4, 0.5])
-
-    jr2 = REGISTERED_ROBOTS["JR2"]()
-    s.import_object(jr2)
-    jr2.set_position([0, 5, 0.5])
 
     husky = REGISTERED_ROBOTS["Husky"]()
     s.import_object(husky)

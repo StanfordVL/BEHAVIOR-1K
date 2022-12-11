@@ -4,6 +4,8 @@ import logging
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
+from omnigibson.utils.usd_utils import BoundingBoxAPI
+from omni.physx import get_physx_simulation_interface
 
 
 def prims_to_rigid_prim_set(inp_prims):
@@ -21,6 +23,7 @@ def prims_to_rigid_prim_set(inp_prims):
             raise ValueError(f"Inputted prims must be either EntityPrim or RigidPrim instances "
                              f"when getting collisions! Type: {type(prim)}")
     return out
+
 
 def get_collisions(prims=None, prims_check=None, prims_exclude=None, step_physics=False):
     """
@@ -161,7 +164,8 @@ def filter_collisions(collisions, filter_prims):
     Args:
         collisions (set of 2-tuple): Collision pairs that should be filtered
         filter_prims (EntityPrim or RigidPrim or tuple of EntityPrim or RigidPrim): Prim(s) specifying which
-            collisions to filter for
+            collisions to filter for. Any collisions that include prims from this filter
+            set will be removed
 
     Returns:
         set of 2-tuple: Filtered collision pairs
@@ -190,16 +194,15 @@ def place_base_pose(obj, pos, quat=None, z_offset=None):
     # avoid circular dependency
     from omnigibson.object_states import AABB
 
+    # Make sure AABB is up-to-date before grabbing value
+    get_physx_simulation_interface().fetch_results()
+    BoundingBoxAPI.clear()
+    obj.states[AABB].clear_cache()
+
     lower, _ = obj.states[AABB].get_value()
     cur_pos = obj.get_position()
-
     z_diff = cur_pos[2] - lower[2]
-
-    pos[2] += z_diff
-    if z_offset is not None:
-        pos[2] += z_offset
-
-    obj.set_position_orientation(pos, quat)
+    obj.set_position_orientation(pos + np.array([0, 0, z_diff if z_offset is None else z_diff + z_offset]), quat)
 
 
 def test_valid_pose(obj, pos, quat=None, z_offset=None):

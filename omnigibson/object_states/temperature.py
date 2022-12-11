@@ -78,9 +78,9 @@ class Temperature(AbsoluteObjectState):
 
         self.value = new_temperature
 
-    @classproperty
-    def stateful(cls):
-        return True
+    @property
+    def state_size(self):
+        return 1
 
     # For this state, we simply store its value.
     def _dump_state(self):
@@ -94,7 +94,3 @@ class Temperature(AbsoluteObjectState):
 
     def _deserialize(self, state):
         return OrderedDict(temperature=state[0]), 1
-
-    @property
-    def state_size(self):
-        return 1

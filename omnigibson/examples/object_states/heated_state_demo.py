@@ -1,19 +1,43 @@
 import numpy as np
+from collections import OrderedDict
 import omnigibson as og
 from omnigibson import object_states
 from omnigibson.macros import gm
-from omnigibson.objects import DatasetObject, LightObject
 
 
 def main():
     # Make sure object states are enabled
     assert gm.ENABLE_OBJECT_STATES, f"Object states must be enabled in macros.py in order to use this demo!"
 
-    # Create the scene config to load -- empty scene
+    # Define object configurations for objects to load -- we want to load a light and three bowls
+    obj_configs = []
+
+    obj_configs.append(OrderedDict(
+        type="LightObject",
+        light_type="Sphere",
+        name="light",
+        radius=0.01,
+        intensity=1e5,
+        position=[-2.0, -2.0, 1.0],
+    ))
+
+    for i, (scale, x) in enumerate(zip([0.5, 1.0, 2.0], [-0.6, 0, 0.8])):
+        obj_configs.append(OrderedDict(
+            type="DatasetObject",
+            name=f"bowl{i}",
+            category="bowl",
+            model="68_0",
+            scale=scale,
+            abilities={"heatable": {}},
+            position=[x, 0, 0.2],
+        ))
+
+    # Create the scene config to load -- empty scene with light object and bowls
     cfg = {
         "scene": {
-            "type": "EmptyScene",
-        }
+            "type": "Scene",
+        },
+        "objects": obj_configs,
     }
 
     # Create the environment
@@ -25,43 +49,8 @@ def main():
         orientation=np.array([0.77787037, 0.00267566, 0.00216149, 0.62841535]),
     )
 
-    # Create a light object
-    light = LightObject(
-        prim_path="/World/sphere_light",
-        light_type="Sphere",
-        name="sphere_light",
-        radius=0.01,
-        intensity=1e5,
-    )
-    og.sim.import_object(light)
-    light.set_position(np.array([-2.0, -2.0, 1.0]))
-    env.step(np.array([]))
-
-    # Import bowls of varying sizes
-    obj_category = "bowl"
-    obj_model = "68_0"
-    scales = [0.5, 1.0, 2.0]
-    xs = [-0.6, 0, 0.8]
-    objs = []
-
-    for i, (scale, x) in enumerate(zip(scales, xs)):
-        name = f"{obj_category}{i}"
-        obj = DatasetObject(
-            prim_path=f"/World/{name}",
-            name=name,
-            category=obj_category,
-            model=obj_model,
-            scale=scale,
-            abilities={"heatable": {}},
-        )
-        # Make sure the bowls can be heated
-        assert object_states.Heated in obj.states
-        og.sim.import_object(obj)
-        obj.set_position(np.array([x, 0, 0]))
-        objs.append(obj)
-
-    # Take a step to make sure all objects are fully initialized
-    env.step(np.array([]))
+    # Grab reference to objects of relevance
+    objs = list(env.scene.object_registry("category", "bowl"))
 
     def report_states(objs):
         for obj in objs:

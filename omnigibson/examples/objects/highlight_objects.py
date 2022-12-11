@@ -1,5 +1,5 @@
 """
-    Generate example top-down segmentation map via renderer
+Generate example top-down segmentation map via renderer
 """
 import logging
 import numpy as np
@@ -23,7 +23,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     }
 
     # Create the environment
-    env = og.Environment(configs=cfg, action_timestep=1 / 60., physics_timestep=1 / 60.)
+    env = og.Environment(configs=cfg)
 
     # Grab all window objects
     windows = og.sim.scene.object_registry("category", "window")

@@ -171,8 +171,8 @@ class BaseTransitionRule(metaclass=ABCMeta):
         """
         should_transition = self.condition(individual_objects=individual_objects, group_objects=group_objects)
         return should_transition, \
-               self.transition(individual_objects=individual_objects, group_objects=group_objects) \
-                   if should_transition else None
+            self.transition(individual_objects=individual_objects, group_objects=group_objects) \
+            if should_transition else None
 
     @property
     def requires_individual_filters(self):
@@ -260,26 +260,16 @@ class SlicingRule(BaseTransitionRule):
 
         contact_list = slicer_obj.states[ContactBodies].get_value()
         sliced_link_paths = {link.prim_path for link in sliced_obj.links.values()}
-        sliced_c = None
+        hit_obj = False
         for c in contact_list:
-            if c.body0 in sliced_link_paths or c.body1 in sliced_link_paths:
-                sliced_c = c
+            if not set(c).isdisjoint(sliced_link_paths):
+                hit_obj = True
                 break
-        if not sliced_c:
+        if not hit_obj:
             return False
 
-        # Calculate the normal force applied to the contact object.
-        # TODO: Fix this -- dt is 0.0 for some reason, so we get a divide by zero error
-        normal_force = np.dot(sliced_c.impulse, sliced_c.normal) / sliced_c.dt
-        if Sliced in sliced_obj.states:
-            if (
-                not sliced_obj.states[Sliced].get_value()
-                and normal_force > sliced_obj.states[Sliced].slice_force
-            ):
-                # Slicer may contact the same body in multiple points, so
-                # cut once since removing the object from the simulator
-                return True
-        return False
+        # Slicer may contact the same body in multiple points, so cut once since removing the object from the simulator
+        return Sliced in sliced_obj.states and not sliced_obj.states[Sliced].get_value()
 
     def transition(self, individual_objects, group_objects):
         slicer_obj, sliced_obj = individual_objects["slicer"], individual_objects["sliceable"]
@@ -325,7 +315,7 @@ class SlicingRule(BaseTransitionRule):
 
         # Delete original object from stage.
         t_results.remove.append(sliced_obj)
-        print(f"Applied {SlicingRule.__name__} to {sliced_obj}")
+
         return t_results
 
 
@@ -555,14 +545,12 @@ class BlenderRule(BaseTransitionRule):
         return True
 
     def transition(self, individual_objects, group_objects):
+        t_results = TransitionResults()
         blender = individual_objects["blender"]
         # For every object in group_objects, we remove them from the simulator
-        # TODO: Removing them crashes the sim, so we simply move them out of the scene for now into a virtual graveyard
-        offset = 0
         for i, (obj_category, objs) in enumerate(group_objects.items()):
             for j, obj in enumerate(objs):
-                obj.set_position(np.array([100., 100., 1.0 * offset]))
-                offset += 1.0
+                t_results.remove.append(obj)
 
         # Hide all fluid particles that are inside the blender
         for system in self.fluid_requirements.keys():
@@ -575,6 +563,8 @@ class BlenderRule(BaseTransitionRule):
 
         # Spawn in blended fluid!
         blender.states[Filled].set_value(self.output_fluid, True)
+
+        return t_results
 
 
 """See the following example for writing simple rules.

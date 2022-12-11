@@ -72,7 +72,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     # Create the config for generating the environment we want
     scene_cfg = OrderedDict()
     if scene_model == "empty":
-        scene_cfg["type"] = "EmptyScene"
+        scene_cfg["type"] = "Scene"
     else:
         scene_cfg["type"] = "InteractiveTraversableScene"
         scene_cfg["scene_model"] = scene_model

@@ -2,22 +2,37 @@ import numpy as np
 import omnigibson as og
 from omnigibson import object_states
 from omnigibson.macros import gm
-from omnigibson.objects import DatasetObject
 
 
 def main():
     # Make sure object states are enabled
     assert gm.ENABLE_OBJECT_STATES, f"Object states must be enabled in macros.py in order to use this demo!"
 
-    # Create the scene config to load -- empty scene
+    # Create the scene config to load -- empty scene with a stove object added
     cfg = {
         "scene": {
-            "type": "EmptyScene",
-        }
+            "type": "Scene",
+        },
+        "objects": [
+            {
+                "type": "DatasetObject",
+                "name": "stove",
+                "category": "stove",
+                "model": "101908",
+                "abilities": {
+                    "heatSource": {"requires_toggled_on": True},
+                    "toggleable": {},
+                },
+                "position": [0, 0, 0.4],
+            }
+        ],
     }
 
     # Create the environment
     env = og.Environment(configs=cfg, action_timestep=1/60., physics_timestep=1/60.)
+
+    # Get reference to stove object
+    stove = env.scene.object_registry("name", "stove")
 
     # Set camera to appropriate viewing pose
     og.sim.viewer_camera.set_position_orientation(
@@ -25,23 +40,9 @@ def main():
         orientation=np.array([0.54897692, 0.00110359, 0.00168013, 0.83583509]),
     )
 
-    # Load a stove model
-    stove = DatasetObject(
-        prim_path=f"/World/stove",
-        name="stove",
-        category="stove",
-        model="101908",
-        abilities={"heatSource": {"requires_toggled_on": True}, "toggleable": {},},
-    )
-
     # Make sure necessary object states are included with the stove
     assert object_states.HeatSourceOrSink in stove.states
     assert object_states.ToggledOn in stove.states
-
-    # Import this object into the simulator, and take a step to initialize the object
-    og.sim.import_object(stove)
-    stove.set_position(np.array([0, 0, 0.4]))
-    env.step(np.array([]))
 
     # Take a few steps so that visibility propagates
     for _ in range(5):
@@ -55,6 +56,7 @@ def main():
     # Toggle on stove, notify user
     input("Heat source will now turn ON: Press ENTER to continue.")
     stove.states[object_states.ToggledOn].set_value(True)
+
     assert stove.states[object_states.ToggledOn].get_value()
 
     # Need to take a step to update the state.

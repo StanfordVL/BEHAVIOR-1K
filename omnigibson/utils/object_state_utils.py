@@ -52,9 +52,12 @@ def sample_kinematics(
     ):
         use_ray_casting_method = True
 
-    # Wake objects accordingly
+    # Wake objects accordingly and make sure both are kept still
     objA.wake()
     objB.wake()
+
+    objA.keep_still()
+    objB.keep_still()
 
     # Save the state of the simulator
     state = og.sim.dump_state()
@@ -72,6 +75,7 @@ def sample_kinematics(
         # original position might be blocking rays (use_ray_casting_method=True)
         old_pos = np.array([200, 200, 200])
         objA.set_position_orientation(old_pos, orientation)
+        objA.keep_still()
         # We also need to step physics to make sure the pose propagates downstream (e.g.: to Bounding Box computations)
         og.sim.step_physics()
 
@@ -164,6 +168,7 @@ def sample_kinematics(
         else:
             pos[2] += z_offset
             objA.set_position_orientation(pos, orientation)
+            objA.keep_still()
             # Step physics
             og.sim.step_physics()
             success = not objA.in_contact()
@@ -179,6 +184,7 @@ def sample_kinematics(
 
     if success and not skip_falling:
         objA.set_position_orientation(pos, orientation)
+        objA.keep_still()
 
         # Let it fall for 0.2 second
         for _ in range(int(0.2 / og.sim.get_physics_dt())):

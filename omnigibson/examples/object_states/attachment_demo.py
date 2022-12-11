@@ -1,8 +1,9 @@
 import numpy as np
+import yaml
+from collections import OrderedDict
 
 import omnigibson as og
 from omnigibson.macros import gm
-from omnigibson.objects import DatasetObject, LightObject
 from omnigibson.utils.ui_utils import choose_from_options
 from omnigibson.object_states.attachment import AttachmentType
 from omnigibson.object_states import Attached
@@ -12,36 +13,45 @@ def setup_scene_for_abilities(abilities1, abilities2):
     # Make sure simulation is stopped
     og.sim.stop()
 
-    # Recreate the environment (this will automatically override the old environment instance)
-    # We load the default config, which is simply an EmptyScene with no objects loaded in by default
-    env = og.Environment(configs=f"{og.example_config_path}/default_cfg.yaml")
+    cfg = yaml.load(open(f"{og.example_config_path}/default_cfg.yaml", "r"), Loader=yaml.FullLoader)
 
-    objs = [None, None]
-    abilities_arr = [abilities1, abilities2]
-    position_arr = [np.array([0, 0, 0.04]), np.array([2, 0, 0.8])]
-
-    # Add light
-    light = LightObject(
-        prim_path="/World/light",
+    # Add objects that we want to create
+    light_cfg = OrderedDict(
+        type="LightObject",
         name="light",
         light_type="Sphere",
         radius=0.01,
         intensity=5000,
+        position=[0, 0, 1.0],
     )
-    og.sim.import_object(light)
-    light.set_position(np.array([0, 0, 1.0]))
 
-    for idx, (obj_category, obj_model) in enumerate((("apple", "00_0"), ("fridge", "12252"))):
-        name = obj_category
-        objs[idx] = DatasetObject(
-            prim_path=f"/World/{name}",
-            category=obj_category,
-            model=obj_model,
-            name=f"{name}",
-            abilities=abilities_arr[idx],
-        )
-        og.sim.import_object(objs[idx])
-        objs[idx].set_position_orientation(position=position_arr[idx])
+    apple_cfg = OrderedDict(
+        type="DatasetObject",
+        name="apple",
+        category="apple",
+        model="00_0",
+        abilities=abilities1,
+        position=[0, 0, 0.04],
+    )
+
+    fridge_cfg = OrderedDict(
+        type="DatasetObject",
+        name="fridge",
+        category="fridge",
+        model="12252",
+        abilities=abilities2,
+        position=[2, 0, 0.8],
+    )
+
+    cfg["objects"] = [light_cfg, apple_cfg, fridge_cfg]
+
+    # Recreate the environment (this will automatically override the old environment instance)
+    # We load the default config, which is simply an Scene with no objects loaded in by default
+    env = og.Environment(configs=cfg)
+
+    # Grab apple and fridge
+    apple = env.scene.object_registry("name", "apple")
+    fridge = env.scene.object_registry("name", "fridge")
 
     # Set viewer camera pose
     og.sim.viewer_camera.set_position_orientation(
@@ -53,7 +63,7 @@ def setup_scene_for_abilities(abilities1, abilities2):
     for _ in range(5):
         env.step(np.array([]))  # empty action array since action space is 0 (no robots in the env)
 
-    return env, objs[0], objs[1]
+    return env, apple, fridge
 
 
 def demo_sticky_attachment():

@@ -1,11 +1,8 @@
 import logging
-import os
 import sys
 from collections import OrderedDict, defaultdict
 
 import numpy as np
-import omni
-from omni.isaac.core.utils.prims import get_prim_at_path
 from pxr.Sdf import ValueTypeNames as VT
 from pxr import Sdf, Gf
 
@@ -22,12 +19,11 @@ from omnigibson.object_states.factory import (
 )
 from omnigibson.object_states.object_state_base import REGISTERED_OBJECT_STATES
 from omnigibson.object_states.heat_source_or_sink import HeatSourceOrSink
-from omnigibson.object_states.heated import Heated
 from omnigibson.objects.object_base import BaseObject
-from omnigibson.systems import get_system_from_element_name, get_element_name_from_system
 from omnigibson.renderer_settings.renderer_settings import RendererSettings
 from omnigibson.utils.constants import PrimType, EmitterType
 from omnigibson.utils.usd_utils import BoundingBoxAPI
+from omnigibson.utils.python_utils import classproperty
 from omnigibson.object_states import Saturated
 
 
@@ -60,7 +56,6 @@ class StatefulObject(BaseObject):
             class_id=None,
             uuid=None,
             scale=None,
-            rendering_params=None,
             visible=True,
             fixed_base=False,
             visual_only=False,
@@ -68,34 +63,35 @@ class StatefulObject(BaseObject):
             prim_type=PrimType.RIGID,
             load_config=None,
             abilities=None,
-            include_default_state=True,
+            include_default_states=True,
             **kwargs,
     ):
         """
-        @param prim_path: str, global path in the stage to this object
-        @param name: Name for the object. Names need to be unique per scene. If no name is set, a name will be generated
-            at the time the object is added to the scene, using the object's category.
-        @param category: Category for the object. Defaults to "object".
-        @param class_id: What class ID the object should be assigned in semantic segmentation rendering mode.
-        @param uuid: Unique unsigned-integer identifier to assign to this object (max 8-numbers).
-            If None is specified, then it will be auto-generated
-        @param scale: float or 3-array, sets the scale for this object. A single number corresponds to uniform scaling
-            along the x,y,z axes, whereas a 3-array specifies per-axis scaling.
-        @param rendering_params: Any relevant rendering settings for this object.
-        @param visible: bool, whether to render this object or not in the stage
-        @param fixed_base: bool, whether to fix the base of this object or not
-        visual_only (bool): Whether this object should be visual only (and not collide with any other objects)
-        self_collisions (bool): Whether to enable self collisions for this object
-        prim_type (PrimType): Which type of prim the object is, Valid options are: {PrimType.RIGID, PrimType.CLOTH}
-        load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
-            loading this prim at runtime.
-        @param abilities: dict in the form of {ability: {param: value}} containing
-            object abilities and parameters.
-        @param include_default_state: bool, whether to include the default states from @get_default_states
-        kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
-            for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
-            Note that this base object does NOT pass kwargs down into the Prim-type super() classes, and we assume
-            that kwargs are only shared between all SUBclasses (children), not SUPERclasses (parents).
+        Args:
+            prim_path (str): global path in the stage to this object
+            name (None or str): Name for the object. Names need to be unique per scene. If None, a name will be
+                generated at the time the object is added to the scene, using the object's category.
+            category (str): Category for the object. Defaults to "object".
+            class_id (None or int): What class ID the object should be assigned in semantic segmentation rendering mode.
+                If None, the ID will be inferred from this object's category.
+            uuid (None or int): Unique unsigned-integer identifier to assign to this object (max 8-numbers).
+                If None is specified, then it will be auto-generated
+            scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
+                for this object. A single number corresponds to uniform scaling along the x,y,z axes, whereas a
+                3-array specifies per-axis scaling.
+            visible (bool): whether to render this object or not in the stage
+            fixed_base (bool): whether to fix the base of this object or not
+            visual_only (bool): Whether this object should be visual only (and not collide with any other objects)
+            self_collisions (bool): Whether to enable self collisions for this object
+            prim_type (PrimType): Which type of prim the object is, Valid options are: {PrimType.RIGID, PrimType.CLOTH}
+            load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
+                loading this prim at runtime.
+            abilities (None or dict): If specified, manually adds specific object states to this object. It should be
+                a dict in the form of {ability: {param: value}} containing object abilities and parameters to pass to
+                the object state instance constructor.
+            include_default_states (bool): whether to include the default object states from @get_default_states
+            kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
+                for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
         """
         # Values that will be filled later
         self._states = None
@@ -112,7 +108,7 @@ class StatefulObject(BaseObject):
         assert isinstance(abilities, dict), "Object abilities must be in dictionary form."
 
         self._abilities = abilities
-        self.prepare_object_states(abilities=abilities, include_default_state=include_default_state)
+        self.prepare_object_states(abilities=abilities, include_default_states=include_default_states)
 
         # Run super init
         super().__init__(
@@ -122,7 +118,6 @@ class StatefulObject(BaseObject):
             class_id=class_id,
             uuid=uuid,
             scale=scale,
-            rendering_params=rendering_params,
             visible=visible,
             fixed_base=fixed_base,
             visual_only=visual_only,
@@ -162,7 +157,7 @@ class StatefulObject(BaseObject):
         """
         return self._states
 
-    def prepare_object_states(self, abilities=None, include_default_state=True):
+    def prepare_object_states(self, abilities=None, include_default_states=True):
         """
         Prepare the state dictionary for an object by generating the appropriate
         object state instances.
@@ -170,14 +165,15 @@ class StatefulObject(BaseObject):
         This uses the abilities of the object and the state dependency graph to
         find & instantiate all relevant states.
 
-        :param abilities: dict in the form of {ability: {param: value}} containing
-            object abilities and parameters.
-        @param include_default_state: bool, whether to include the default states from @get_default_states
+        Args:
+            abilities (None or dict): If specified, dict in the form of {ability: {param: value}} containing
+                object abilities and parameters.
+            include_default_states (bool): whether to include the default object states from @get_default_states
         """
         if abilities is None:
             abilities = {}
 
-        state_types_and_params = [(state, {}) for state in get_default_states()] if include_default_state else []
+        state_types_and_params = [(state, {}) for state in get_default_states()] if include_default_states else []
 
         # Map the ability params to the states immediately imported by the abilities
         for ability, params in abilities.items():
@@ -314,10 +310,11 @@ class StatefulObject(BaseObject):
             self._emitters[emitter_type].GetAttribute("enabled").Set(value)
 
     def get_textures(self):
-        """Gets prim's texture files.
+        """
+        Gets prim's texture files.
 
         Returns:
-            list of (str): List of texture file paths
+            list of str: List of texture file paths
         """
         return [material.diffuse_texture for material in self.materials if material.diffuse_texture is not None]
 
@@ -444,7 +441,6 @@ class StatefulObject(BaseObject):
         return np.concatenate([state_flat, non_kin_state_flat]).astype(float)
 
     def _deserialize(self, state):
-        # TODO: Need to check that self._state_size is accurate at the end of initialize()
         # Call super method first
         state_dic, idx = super()._deserialize(state=state)
 
@@ -491,7 +487,9 @@ class StatefulObject(BaseObject):
         super().set_position_orientation(position=position, orientation=orientation)
         self.clear_cached_states()
 
-    # TODO: Redundant?
-    def set_base_link_position_orientation(self, position, orientation):
-        super().set_position_orientation(position=position, orientation=orientation)
-        self.clear_cached_states()
+    @classproperty
+    def _do_not_register_classes(cls):
+        # Don't register this class since it's an abstract template
+        classes = super()._do_not_register_classes
+        classes.add("StatefulObject")
+        return classes

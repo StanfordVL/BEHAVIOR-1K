@@ -53,7 +53,8 @@ def main(random_selection=False, headless=False, short_exec=False):
     env = og.Environment(configs=cfg)
 
     # Allow user to move camera more easily
-    og.sim.enable_viewer_camera_teleoperation()
+    if not headless:
+        og.sim.enable_viewer_camera_teleoperation()
 
     # Run a simple loop and reset periodically
     max_iterations = 10 if not short_exec else 1

@@ -46,16 +46,20 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
         self._changed = None
         self._simulator = None
 
-    @classproperty
-    def stateful(cls):
+    @property
+    def stateful(self):
         """
         Returns:
             bool: True if this object has a state that can be directly dumped / loaded via dump_state() and
                 load_state(), otherwise, returns False. Note that any sub object states that are NOT stateful do
                 not need to implement any of _dump_state(), _load_state(), _serialize(), or _deserialize()!
         """
-        # False by default
-        return False
+        # Default is whether state size > 0
+        return self.state_size > 0
+
+    @property
+    def state_size(self):
+        return 0
 
     def reset(self):
         """
@@ -246,7 +250,11 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
 
     def set_value(self, *args, **kwargs):
         assert self._initialized
-        return self._set_value(*args, **kwargs)
+        # Clear cache because the state may be changed
+        self.clear_cache()
+        # Set the value
+        val = self._set_value(*args, **kwargs)
+        return val
 
     def _set_value(self, *args, **kwargs):
         raise NotImplementedError

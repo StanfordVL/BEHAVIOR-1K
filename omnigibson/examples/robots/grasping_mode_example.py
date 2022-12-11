@@ -2,23 +2,15 @@
 Example script demo'ing robot manipulation control with grasping.
 """
 import logging
-import os
-import platform
-import random
-import sys
-import time
 from collections import OrderedDict
 
 import numpy as np
 
 import omnigibson as og
-from omnigibson.objects import DatasetObject, PrimitiveObject
-from omnigibson.utils.asset_utils import get_og_avg_category_specs, get_og_category_path, get_og_model_path
 from omnigibson.utils.ui_utils import choose_from_options, KeyboardRobotController
 
 GRASPING_MODES = OrderedDict(
     sticky="Sticky Mitten - Objects are magnetized when they touch the fingers and a CLOSE command is given",
-    # assisted="Assisted Grasping - Objects are fixed when they touch virtual rays cast between each finger and a CLOSE command is given",  # TODO: Not supported in OG yet
     physical="Physical Grasping - No additional grasping assistance applied",
 )
 
@@ -34,7 +26,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     grasping_mode = choose_from_options(options=GRASPING_MODES, name="grasping mode", random_selection=random_selection)
 
     # Create environment configuration to use
-    scene_cfg = OrderedDict(type="EmptyScene")
+    scene_cfg = OrderedDict(type="Scene")
     robot0_cfg = OrderedDict(
         type="Fetch",
         obs_modalities=["rgb"],     # we're just doing a grasping demo so we don't need all observation modalities
@@ -43,64 +35,45 @@ def main(random_selection=False, headless=False, short_exec=False):
         grasping_mode=grasping_mode,
     )
 
-    # Compile config
-    cfg = OrderedDict(scene=scene_cfg, robots=[robot0_cfg])
+    # Define objects to load
+    table_cfg = OrderedDict(
+        type="DatasetObject",
+        name="table",
+        category="breakfast_table",
+        model="1b4e6f9dd22a8c628ef9d976af675b86",
+        bounding_box=[0.5, 0.5, 0.8],
+        fit_avg_dim_volume=False,
+        fixed_base=True,
+        position=[0.7, -0.1, 0.6],
+        orientation=[0, 0, 0.707, 0.707],
+    )
 
-    # Create the environment
-    env = og.Environment(configs=cfg, action_timestep=1/60., physics_timestep=1/60.)
+    chair_cfg = OrderedDict(
+        type="DatasetObject",
+        name="chair",
+        category="straight_chair",
+        model="2a8d87523e23a01d5f40874aec1ee3a6",
+        bounding_box=None,
+        fit_avg_dim_volume=True,
+        fixed_base=False,
+        position=[0.45, 0.65, 0.425],
+        orientation=[0, 0, -0.9990215, -0.0442276],
+    )
 
-    # Load objects (1 table)
-    objects_to_load = {
-        "table_1": {
-            "init_kwargs": {
-                "category": "breakfast_table",
-                "model": "1b4e6f9dd22a8c628ef9d976af675b86",
-                "bounding_box": (0.5, 0.5, 0.8),
-                "fit_avg_dim_volume": False,
-                "fixed_base": True,
-            },
-            "init_pose": {
-                "position": (0.7, -0.1, 0.6),
-                "orientation": (0, 0, 0.707, 0.707),
-            },
-        },
-        "chair_2": {
-            "init_kwargs": {
-                "category": "straight_chair",
-                "model": "2a8d87523e23a01d5f40874aec1ee3a6",
-                "bounding_box": None,
-                "fit_avg_dim_volume": True,
-                "fixed_base": False,
-            },
-            "init_pose": {
-                "position": (0.45, 0.65, 0.425),
-                "orientation": (0, 0, -0.9990215, -0.0442276),
-            },
-        },
-    }
-
-    # Load the furniture objects into the simulator
-    for obj_name, obj_cfg in objects_to_load.items():
-        obj = DatasetObject(
-            prim_path=f"/World/{obj_name}",
-            name=obj_name,
-            **obj_cfg["init_kwargs"],
-        )
-        og.sim.import_object(obj)
-        obj.set_position_orientation(**obj_cfg["init_pose"])
-        og.sim.step_physics()
-
-    # Now load a box on the table
-    box = PrimitiveObject(
-        prim_path=f"/World/box",
+    box_cfg = OrderedDict(
+        type="PrimitiveObject",
         name="box",
         primitive_type="Cube",
         rgba=[1.0, 0, 0, 1.0],
         size=0.05,
+        position=[0.53, -0.1, 0.97],
     )
-    og.sim.import_object(box)
-    box.set_position(np.array([0.53, -0.1, 0.97]))
-    og.sim.step_physics()
+
+    # Compile config
+    cfg = OrderedDict(scene=scene_cfg, robots=[robot0_cfg], objects=[table_cfg, chair_cfg, box_cfg])
+
+    # Create the environment
+    env = og.Environment(configs=cfg, action_timestep=1/60., physics_timestep=1/60.)
 
     # Reset the robot
     robot = env.robots[0]

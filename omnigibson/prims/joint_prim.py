@@ -42,6 +42,9 @@ m.DEFAULT_MAX_POS = 1000.0
 m.DEFAULT_MAX_PRISMATIC_VEL = 1.0
 m.DEFAULT_MAX_REVOLUTE_VEL = 15.0
 m.DEFAULT_MAX_EFFORT = 100.0
+m.INF_POS_THRESHOLD = 1e5
+m.INF_VEL_THRESHOLD = 1e5
+m.INF_EFFORT_THRESHOLD = 1e10
 m.COMPONENT_SUFFIXES = ["x", "y", "z", "rx", "ry", "rz"]
 
 # TODO: Split into non-articulated / articulated Joint Prim classes?
@@ -411,7 +414,7 @@ class JointPrim(BasePrim):
         # We either return the raw value or a default value if there is no max specified
         raw_vel = self._dof_properties[0].max_velocity
         default_max_vel = m.DEFAULT_MAX_REVOLUTE_VEL if self.joint_type == "RevoluteJoint" else m.DEFAULT_MAX_PRISMATIC_VEL
-        return default_max_vel if raw_vel in {None, np.inf} else raw_vel
+        return default_max_vel if raw_vel is None or np.abs(raw_vel) > m.INF_VEL_THRESHOLD else raw_vel
 
     @max_velocity.setter
     def max_velocity(self, vel):
@@ -438,7 +441,7 @@ class JointPrim(BasePrim):
         assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
         # We either return the raw value or a default value if there is no max specified
         raw_force = self._dof_properties[0].max_effort
-        return m.DEFAULT_MAX_EFFORT if raw_force in {None, np.inf} else raw_force
+        return m.DEFAULT_MAX_EFFORT if raw_force is None or np.abs(raw_force) > m.INF_EFFORT_THRESHOLD else raw_force
 
     @max_force.setter
     def max_force(self, force):
@@ -535,8 +538,10 @@ class JointPrim(BasePrim):
         # Only support revolute and prismatic joints for now
         assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
         # We either return the raw value or a default value if there is no max specified
-        raw_pos = self._dof_properties[0].lower
-        return -m.DEFAULT_MAX_POS if raw_pos in {None, -np.inf} else raw_pos
+        raw_pos_lower, raw_pos_upper = self._dof_properties[0].lower, self._dof_properties[0].upper
+        return -m.DEFAULT_MAX_POS \
+            if raw_pos_lower is None or raw_pos_lower == raw_pos_upper or np.abs(raw_pos_lower) > m.INF_POS_THRESHOLD \
+            else raw_pos_lower
 
     @lower_limit.setter
     def lower_limit(self, lower_limit):
@@ -561,8 +566,10 @@ class JointPrim(BasePrim):
         # Only support revolute and prismatic joints for now
         assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
         # We either return the raw value or a default value if there is no max specified
-        raw_pos = self._dof_properties[0].upper
-        return m.DEFAULT_MAX_POS if raw_pos in {None, np.inf} else raw_pos
+        raw_pos_lower, raw_pos_upper = self._dof_properties[0].lower, self._dof_properties[0].upper
+        return m.DEFAULT_MAX_POS \
+            if raw_pos_upper is None or raw_pos_lower == raw_pos_upper or np.abs(raw_pos_upper) > m.INF_POS_THRESHOLD \
+            else raw_pos_upper
 
     @upper_limit.setter
     def upper_limit(self, upper_limit):

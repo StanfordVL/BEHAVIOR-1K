@@ -1,7 +1,7 @@
 import logging
 import numpy as np
+from collections import OrderedDict
 import omnigibson as og
-from omnigibson.objects import DatasetObject
 from omnigibson.utils.asset_utils import (
     get_all_object_categories,
     get_og_avg_category_specs,
@@ -19,21 +19,10 @@ def main(random_selection=False, headless=False, short_exec=False):
     and executing actions
     """
     logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
-    scene_options = ["EmptyScene", "InteractiveTraversableScene", "StaticTraversableScene"]
+    scene_options = ["Scene", "InteractiveTraversableScene", "StaticTraversableScene"]
     scene_type = choose_from_options(options=scene_options, name="scene type", random_selection=random_selection)
 
-    cfg = {
-        "scene": {
-            "type": scene_type,
-        }
-    }
-    if scene_type == "InteractiveTraversableScene":
-        cfg["scene"]["scene_model"] = "Rs_int"
-    elif scene_type == "StaticTraversableScene":
-        cfg["scene"]["scene_model"] = "Adrian"
-
-    # Create the environment
-    env = og.Environment(configs=cfg, action_timestep=1 / 60., physics_timestep=1 / 60.)
+    # -- Choose the object to load --
 
     # Select a category to load
     available_obj_categories = get_all_object_categories()
@@ -47,16 +36,29 @@ def main(random_selection=False, headless=False, short_exec=False):
     avg_category_spec = get_og_avg_category_specs()
 
     # Create and load this object into the simulator
-    obj = DatasetObject(
-        prim_path="/World/obj",
+    obj_cfg = OrderedDict(
+        type="DatasetObject",
         name="obj",
         category=obj_category,
         model=obj_model,
         bounding_box=avg_category_spec.get(obj_category),
         fit_avg_dim_volume=True,
+        position=[0.5, -0.5, 1.01],
     )
-    og.sim.import_object(obj)
-    obj.set_position(np.array([0.5, -0.5, 1.01]))
+
+    cfg = {
+        "scene": {
+            "type": scene_type,
+        },
+        "objects": [obj_cfg],
+    }
+    if scene_type == "InteractiveTraversableScene":
+        cfg["scene"]["scene_model"] = "Rs_int"
+    elif scene_type == "StaticTraversableScene":
+        cfg["scene"]["scene_model"] = "Adrian"
+
+    # Create the environment
+    env = og.Environment(configs=cfg, action_timestep=1 / 60., physics_timestep=1 / 60.)
 
     # Step through the environment
     max_steps = 100 if short_exec else 10000

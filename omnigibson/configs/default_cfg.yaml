@@ -6,9 +6,11 @@ render:
   vertical_fov: 90
 
 scene:
-  type: EmptyScene
+  type: Scene
 
 robots: []
+
+objects: []
 
 task:
   type: DummyTask

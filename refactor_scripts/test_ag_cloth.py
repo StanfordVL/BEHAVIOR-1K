@@ -1,5 +1,5 @@
 from omnigibson import app, og_dataset_path, Simulator
-from omnigibson.scenes.empty_scene import EmptyScene
+from omnigibson.scenes.scene_base import Scene
 from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.robots.tiago import Tiago
 from omnigibson.utils.constants import PrimType
@@ -14,7 +14,7 @@ DIST_THRESHOLD = 0.15
 sim = Simulator()
 
 # Load scene
-scene = EmptyScene(floor_plane_visible=True)
+scene = Scene(floor_plane_visible=True)
 sim.import_scene(scene)
 
 robot = Tiago("/World/Tiago", grasping_mode="sticky", obs_modalities=[])

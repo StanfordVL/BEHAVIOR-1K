@@ -15,9 +15,6 @@ class Freight(TwoWheelRobot):
 
     @property
     def model_name(self):
-        """
-        :return str: robot model name
-        """
         return "Freight"
 
     @property
@@ -31,7 +28,8 @@ class Freight(TwoWheelRobot):
     @property
     def base_control_idx(self):
         """
-        :return Array[int]: Indices in low-level control vector corresponding to [Left, Right] wheel joints.
+        Returns:
+            n-array: Indices in low-level control vector corresponding to [Left, Right] wheel joints.
         """
         return np.array([0, 1])
 

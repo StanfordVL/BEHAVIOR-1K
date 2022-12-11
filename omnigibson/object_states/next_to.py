@@ -42,11 +42,10 @@ class NextTo(KinematicsMixin, RelativeObjectState, BooleanState):
 
         # Otherwise, check if the other object shows up in the adjacency list.
         adjacency_this = self.obj.states[HorizontalAdjacency].get_value()
-        other_prim_paths = set(other.link_prim_paths)
         in_any_horizontal_adjacency_of_this = any(
             (
-                not other_prim_paths.isdisjoint(adjacency_list.positive_neighbors)
-                or not other_prim_paths.isdisjoint(adjacency_list.negative_neighbors)
+                other in adjacency_list.positive_neighbors or
+                other in adjacency_list.negative_neighbors
             )
             for adjacency_list in flatten_planes(adjacency_this)
         )
@@ -55,11 +54,10 @@ class NextTo(KinematicsMixin, RelativeObjectState, BooleanState):
 
         # If not, check in the adjacency lists of `other`. Maybe it's shorter than us etc.
         adjacency_other = other.states[HorizontalAdjacency].get_value()
-        this_prim_paths = set(self.obj.link_prim_paths)
         in_any_horizontal_adjacency_of_other = any(
             (
-                not this_prim_paths.isdisjoint(adjacency_list.positive_neighbors)
-                or not this_prim_paths.isdisjoint(adjacency_list.negative_neighbors)
+                self.obj in adjacency_list.positive_neighbors or
+                self.obj in adjacency_list.negative_neighbors
             )
             for adjacency_list in flatten_planes(adjacency_other)
         )

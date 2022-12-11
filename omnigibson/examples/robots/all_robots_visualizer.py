@@ -4,7 +4,7 @@ import numpy as np
 
 import omnigibson as og
 from omnigibson.robots import REGISTERED_ROBOTS
-from omnigibson.scenes import EmptyScene
+from omnigibson.scenes import Scene
 
 
 def main(random_selection=False, headless=False, short_exec=False):
@@ -16,7 +16,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     # Create empty scene with no robots in it initially
     cfg = {
         "scene": {
-            "type": "EmptyScene",
+            "type": "Scene",
         }
     }
 
@@ -41,15 +41,17 @@ def main(random_selection=False, headless=False, short_exec=False):
         robot.keep_still()
 
         # Log information
-        logging.info("Loaded " + robot_name)
-        logging.info("Moving " + robot_name)
+        logging.info(f"Loaded {robot_name}")
+        logging.info(f"Moving {robot_name}")
 
         if not headless:
             # Set viewer in front facing robot
             og.sim.viewer_camera.set_position_orientation(
-                position=np.array([4.32248, -5.74338, 6.85436]),
-                orientation=np.array([0.39592, 0.13485, 0.29286, 0.85982]),
+                position=np.array([ 2.69918369, -3.63686664,  4.57894564]),
+                orientation=np.array([0.39592411, 0.1348514 , 0.29286304, 0.85982   ]),
             )
+
+        og.sim.enable_viewer_camera_teleoperation()
 
         # Hold still briefly so viewer can see robot
         for _ in range(100):
@@ -63,7 +65,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
         # Re-import the scene
         og.sim.stop()
-        og.sim.import_scene(EmptyScene())
+        og.sim.import_scene(Scene())
 
     # Always shut down the environment cleanly at the end
     env.close()

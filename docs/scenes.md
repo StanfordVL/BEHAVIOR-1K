@@ -2,7 +2,7 @@
 
 ### Overview
 We provide four types of scenes.
-- `EmptyScene` and `StadiumScene`: they are simple scenes with flat grounds and no obstacles, useful for debugging purposes.
+- `Scene` and `StadiumScene`: they are simple scenes with flat grounds and no obstacles, useful for debugging purposes.
 - `StaticIndoorScene`: it loads static 3D scenes from `omnigibson.g_dataset_path`.
 - `InteractiveIndoorScene`: it loads fully interactive 3D scenes from `omnigibson.og_dataset_path`.
 

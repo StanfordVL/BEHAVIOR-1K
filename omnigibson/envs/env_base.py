@@ -4,14 +4,14 @@ from collections import OrderedDict
 
 import omnigibson as og
 from omnigibson.macros import gm, create_module_macros
+from omnigibson.objects import REGISTERED_OBJECTS
 from omnigibson.robots import REGISTERED_ROBOTS
 from omnigibson.tasks import REGISTERED_TASKS
 from omnigibson.scenes import REGISTERED_SCENES
 from omnigibson.utils.gym_utils import GymObservable
-from omnigibson.utils.sim_utils import get_collisions
 from omnigibson.utils.config_utils import parse_config
 from omnigibson.utils.python_utils import assert_valid_key, merge_nested_dicts, create_class_from_registry_and_config,\
-    Serializable, Recreatable
+    Recreatable
 
 
 # Create settings for this module
@@ -28,19 +28,20 @@ class Environment(gym.Env, GymObservable, Recreatable):
     def __init__(
         self,
         configs,
-        action_timestep=1 / 10.0,
-        physics_timestep=1 / 240.0,
+        action_timestep=1 / 60.0,
+        physics_timestep=1 / 60.0,
         device=None,
         automatic_reset=False,
     ):
         """
-        :param configs (str or dict or list of str or dict): config_file path(s) or raw config dictionaries.
-            If multiple configs are specified, they will be merged sequentially in the order specified.
-            This allows procedural generation of a "full" config from small sub-configs.
-        :param action_timestep: environment executes action per action_timestep second
-        :param physics_timestep: physics timestep for pybullet
-        :param device: None or str, specifies the device to be used if running on the gpu with torch backend
-        :param automatic_reset: whether to automatic reset after an episode finishes
+        Args:
+            configs (str or dict or list of str or dict): config_file path(s) or raw config dictionaries.
+                If multiple configs are specified, they will be merged sequentially in the order specified.
+                This allows procedural generation of a "full" config from small sub-configs.
+            action_timestep (float): environment executes action per action_timestep second
+            physics_timestep: physics timestep for physx
+            device (None or str): specifies the device to be used if running on the gpu with torch backend
+            automatic_reset (bool): whether to automatic reset after an episode finishes
         """
         # Call super first
         super().__init__()
@@ -52,8 +53,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self.action_timestep = action_timestep
 
         # Initialize other placeholders that will be filled in later
-        self._ignore_robot_object_collisions = None         # This will be a list of len(scene.robots) containing sets of objects to ignore collisions for
-        self._ignore_robot_self_collisions = None           # This will be a list of len(scene.robots) containing sets of RigidPrims (robot's links) to ignore collisions for
         self._initial_pos_z_offset = None                   # how high to offset object placement to account for one action step of dropping
         self._texture_randomization_freq = None
         self._object_randomization_freq = None
@@ -62,9 +61,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self._current_episode = 0
 
         # Variables reset at the beginning of each episode
-        self._current_collisions = None
         self._current_step = 0
-        self._collision_step = 0
 
         # Convert config file(s) into a single parsed dict
         configs = configs if isinstance(configs, list) or isinstance(configs, tuple) else [configs]
@@ -85,58 +82,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
         # Load this environment
         self.load()
-
-    def add_ignore_robot_object_collision(self, robot_idn, obj):
-        """
-        Add a new robot-object pair to ignore collisions for
-
-        NOTE: This ignores collisions for the purpose of COUNTING collisions, NOT for the purpose of disabling
-            the actual, physical, collision
-
-        Args:
-            robot_idn (int): Which robot to ignore a collision for
-            obj (BaseObject): Which object to ignore a collision for
-        """
-        self._ignore_robot_object_collisions[robot_idn].add(obj)
-
-    def add_ignore_robot_self_collision(self, robot_idn, link):
-        """
-        Add a new robot-link self pair to ignore collisions for
-
-        NOTE: This ignores collisions for the purpose of COUNTING collisions, NOT for the purpose of disabling
-            the actual, physical, collision
-
-        Args:
-            robot_idn (int): Which robot to ignore a collision for
-            link (RigidPrim): Which robot link to ignore a collision for
-        """
-        self._ignore_robot_self_collisions[robot_idn].add(link)
-
-    def remove_ignore_robot_object_collision(self, robot_idn, obj):
-        """
-        Remove a robot-object pair to ignore collisions for
-
-        NOTE: This ignores collisions for the purpose of COUNTING collisions, NOT for the purpose of disabling
-            the actual, physical, collision
-
-        Args:
-            robot_idn (int): Which robot to ignore a collision for
-            obj (BaseObject): Which object to no longer ignore a collision for
-        """
-        self._ignore_robot_object_collisions[robot_idn].discard(obj)
-
-    def remove_ignore_robot_self_collision(self, robot_idn, link):
-        """
-        Remove a robot-link self pair to ignore collisions for
-
-        NOTE: This ignores collisions for the purpose of COUNTING collisions, NOT for the purpose of disabling
-            the actual, physical, collision
-
-        Args:
-            robot_idn (int): Which robot to ignore a collision for
-            link (RigidPrim): Which robot link to no longer ignore a collision for
-        """
-        self._ignore_robot_self_collisions[robot_idn].discard(link)
 
     def reload(self, configs, overwrite_old=True):
         """
@@ -175,7 +120,8 @@ class Environment(gym.Env, GymObservable, Recreatable):
         Reload another scene model.
         This allows one to change the scene on the fly.
 
-        :param scene_model: new scene model to load (eg.: Rs_int)
+        Args:
+            scene_model (str): new scene model to load (eg.: Rs_int)
         """
         self.scene_config["model"] = scene_model
         self.load()
@@ -205,16 +151,16 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
         # If we're using a BehaviorTask, we may load a pre-cached scene configuration
         if self.task_config["type"] == "BehaviorTask":
-            usd_file, usd_path = self.scene_config["usd_file"], self.scene_config["usd_path"]
-            if usd_path is None and usd_file is None and not self.task_config["online_object_sampling"]:
-                usd_file = "{}_task_{}_{}_{}_fixed_furniture_template".format(
+            scene_instance, scene_file = self.scene_config["scene_instance"], self.scene_config["scene_file"]
+            if scene_file is None and scene_instance is None and not self.task_config["online_object_sampling"]:
+                scene_instance = "{}_task_{}_{}_{}_fixed_furniture_template".format(
                     self.scene_config["scene_model"],
                     self.task_config["activity_name"],
                     self.task_config["activity_definition_id"],
                     self.task_config["activity_instance_id"],
                 )
             # Update the value in the scene config
-            self.scene_config["usd_file"] = usd_file
+            self.scene_config["scene_instance"] = scene_instance
 
         # - Additionally run some sanity checks on these values -
 
@@ -286,6 +232,30 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 # Import the robot into the simulator
                 og.sim.import_object(robot)
 
+    def _load_objects(self):
+        """
+        Load any additional custom objects into the scene
+        """
+        for i, obj_config in enumerate(self.objects_config):
+            # Add a name for the object if necessary
+            if "name" not in obj_config:
+                obj_config["name"] = f"obj{i}"
+            # Set prim path if not specified
+            if "prim_path" not in obj_config:
+                obj_config["prim_path"] = f"/World/{obj_config['name']}"
+            # Pop the desired position and orientation
+            position, orientation = obj_config.pop("position", None), obj_config.pop("orientation", None)
+            # Make sure robot exists, grab its corresponding kwargs, and create / import the robot
+            obj = create_class_from_registry_and_config(
+                cls_name=obj_config["type"],
+                cls_registry=REGISTERED_OBJECTS,
+                cfg=obj_config,
+                cls_type_descriptor="object",
+            )
+            # Import the robot into the simulator and set the pose
+            og.sim.import_object(obj)
+            obj.set_position_orientation(position=position, orientation=orientation)
+
     def _load_observation_space(self):
         # Grab robot(s) and task obs spaces
         obs_space = OrderedDict()
@@ -317,6 +287,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         # Load the scene, robots, and task
         self._load_scene()
         self._load_robots()
+        self._load_objects()
         self._load_task()
 
         og.sim.play()
@@ -368,51 +339,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
         return obs
 
-    def _filter_collisions(self, collisions):
-        """
-        Filter out collisions that should be ignored, based on self._ignore_robot_[object/self]_collisions
-
-        Args:
-            collisions (set of 2-tuple): Unique collision pairs occurring in the simulation at the current timestep,
-                represented by their prim_paths
-
-        Returns:
-            set of 2-tuple: Filtered collision pairs occurring in the simulation at the current timestep,
-                represented by their prim_paths
-        """
-        # Iterate over all robots
-        new_collisions = set()
-        for robot, filtered_links, filtered_objs in zip(
-                self.robots, self._ignore_robot_self_collisions, self._ignore_robot_object_collisions
-        ):
-            # Grab all link prim paths owned by the robot
-            robot_prims = {link.prim_path for link in robot.links.values()}
-            # Loop over all filtered links and compose them
-            filtered_link_prims = {link.prim_path for link in filtered_links}
-            # Loop over all filtered objects and compose them
-            filtered_obj_prims = {link.prim_path for obj in filtered_objs for link in obj.links.values()}
-            # Iterate over all collision pairs
-            for col_pair in collisions:
-                # First check for self_collision -- we check by first subtracting all filtered links from the col_pair
-                # set and making sure the length is < 2, and then subtracting all robot_prims and making sure that the
-                # length is 0. If both conditions are met, then we know this is a filtered collision!
-                col_pair_set = set(col_pair)
-                if len(col_pair_set - filtered_link_prims) < 2 and len(col_pair_set - robot_prims) == 0:
-                    # Filter this collision
-                    continue
-                # Check for object filtering -- we check by first subtracting all robot links from the col_pair
-                # set and making sure the length is < 2, and then subtracting all filtered_obj_prims and making sure
-                # that the length is < 2. If both conditions are met, this means that this was a collision between
-                # the robot and a filtered object, so we know this is a filtered collision!
-                elif len(col_pair_set - robot_prims) < 2 and len(col_pair_set - filtered_obj_prims) < 2:
-                    # Filter this collision
-                    continue
-                else:
-                    # Add this collision
-                    new_collisions.add(col_pair)
-
-        return new_collisions
-
     def _populate_info(self, info):
         """
         Populate info dictionary with any useful information.
@@ -424,18 +350,23 @@ class Environment(gym.Env, GymObservable, Recreatable):
             dict: Information dictionary with added info
         """
         info["episode_length"] = self._current_step
-        info["collision_step"] = self._collision_step
 
     def step(self, action):
         """
         Apply robot's action and return the next state, reward, done and info,
         following OpenAI Gym's convention
 
-        :param action: gym.spaces.Dict, dict, np.array, robot actions
-        :return: state: next observation
-        :return: reward: reward of this time step
-        :return: done: whether the episode is terminated
-        :return: info: info dictionary with any useful information
+        Args:
+            action (gym.spaces.Dict or dict or np.array): robot actions. If a dict is specified, each entry should
+                map robot name to corresponding action. If a np.array, it should be the flattened, concatenated set
+                of actions
+
+        Returns:
+            4-tuple:
+                - OrderedDict: state, i.e. next observation
+                - float: reward, i.e. reward at this current timestep
+                - bool: done, i.e. whether this episode is terminated
+                - OrderedDict: info, i.e. dictionary with any useful information
         """
         # If the action is not a dictionary, convert into a dictionary
         if not isinstance(action, dict) and not isinstance(action, gym.spaces.Dict):
@@ -455,20 +386,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
         # Run simulation step
         og.sim.step()
-
-        # Grab collisions and store internally
-        if gm.ENABLE_GLOBAL_CONTACT_REPORTING:
-            collision_objects = self.scene.objects + self.robots
-        elif gm.ENABLE_ROBOT_CONTACT_REPORTING:
-            collision_objects = self.robots
-        else:
-            collision_objects = []
-
-        # Update current collisions and corresponding count
-        self._current_collisions = self._filter_collisions(collisions=get_collisions(prims=collision_objects))
-
-        # Update the collision count
-        self._collision_step += int(len(self._current_collisions) > 0)
 
         # Grab observations
         obs = self.get_obs()
@@ -505,9 +422,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         Reset bookkeeping variables for the next new episode.
         """
         self._current_episode += 1
-        self._current_collisions = None
         self._current_step = 0
-        self._collision_step = 0
 
     # TODO: Match super class signature?
     def reset(self):
@@ -520,10 +435,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
         # Do any domain randomization
         self.randomize_domain()
-
-        # # Move all robots away from the scene since the task will place the robots anyways
-        # for robot in self.robots:
-        #     robot.set_position(np.array([100.0, 100.0, 100.0]))
 
         # Reset the task
         self.task.reset(self)
@@ -557,22 +468,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
             int: Current number of steps in episode
         """
         return self._current_step
-
-    @property
-    def episode_collisions(self):
-        """
-        Returns:
-            int: Total number of collisions in current episode
-        """
-        return self._collision_step
-
-    @property
-    def current_collisions(self):
-        """
-        Returns:
-            set of 2-tuple: Cached collision pairs from the last time self.update_collisions() was called
-        """
-        return self._current_collisions
 
     @property
     def initial_pos_z_offset(self):
@@ -628,7 +523,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
         Returns:
             dict: Scene-specific configuration kwargs
         """
-        print(self.config["scene"])
         return self.config["scene"]
 
     @property
@@ -638,6 +532,14 @@ class Environment(gym.Env, GymObservable, Recreatable):
             dict: Robot-specific configuration kwargs
         """
         return self.config["robots"]
+
+    @property
+    def objects_config(self):
+        """
+        Returns:
+            dict: Object-specific configuration kwargs
+        """
+        return self.config["objects"]
 
     @property
     def task_config(self):
@@ -667,7 +569,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 "viewer_width": 1280,
                 "viewer_height": 720,
                 "vertical_fov": 90,
-                # "optimized_renderer": True,
             },
 
             # Scene kwargs
@@ -679,12 +580,15 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 "trav_map_resolution": 0.1,
                 "trav_map_erosion": 2,
                 "trav_map_with_objects": True,
-                "usd_file": None,
-                "usd_path": None,
+                "scene_instance": None,
+                "scene_file": None,
             },
 
             # Robot kwargs
-            "robots": [], # no robots by default
+            "robots": [],   # no robots by default
+
+            # Object kwargs
+            "objects": [],  # no objects by default
 
             # Task kwargs
             "task": {

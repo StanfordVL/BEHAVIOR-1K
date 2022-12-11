@@ -35,8 +35,5 @@ class Under(KinematicsMixin, RelativeObjectState, BooleanState):
         return sampling_success
 
     def _get_value(self, other):
-        other_prim_paths = set(other.link_prim_paths)
         adjacency = self.obj.states[VerticalAdjacency].get_value()
-        return not other_prim_paths.isdisjoint(adjacency.positive_neighbors) and other_prim_paths.isdisjoint(
-            adjacency.negative_neighbors
-        )
+        return other not in adjacency.negative_neighbors and other in adjacency.positive_neighbors

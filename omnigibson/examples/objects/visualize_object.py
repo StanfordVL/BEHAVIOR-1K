@@ -1,10 +1,9 @@
 import argparse
 import logging
-
+from collections import OrderedDict
 import numpy as np
 
 import omnigibson as og
-from omnigibson.objects import USDObject, LightObject
 from omnigibson.utils.asset_utils import (
     get_all_object_categories,
     get_object_models_of_category,
@@ -33,16 +32,58 @@ def main(random_selection=False, headless=False, short_exec=False):
         args = parser.parse_args()
         usd_path = args.usd_path
 
+    # Define objects to load
+    light0_cfg = OrderedDict(
+        type="LightObject",
+        light_type="Sphere",
+        name="sphere_light0",
+        radius=0.01,
+        intensity=1e5,
+        position=[-2.0, -2.0, 2.0],
+    )
+
+    light1_cfg = OrderedDict(
+        type="LightObject",
+        light_type="Sphere",
+        name="sphere_light1",
+        radius=0.01,
+        intensity=1e5,
+        position=[-2.0, 2.0, 2.0],
+    )
+
+    # Make sure we have a valid usd path
+    if usd_path is None:
+        # Select a category to load
+        available_obj_categories = get_all_object_categories()
+        obj_category = choose_from_options(options=available_obj_categories, name="object category",
+                                           random_selection=random_selection)
+
+        # Select a model to load
+        available_obj_models = get_object_models_of_category(obj_category)
+        obj_model = choose_from_options(options=available_obj_models, name="object model",
+                                        random_selection=random_selection)
+
+        usd_path = f"{og.og_dataset_path}/objects/{obj_category}/{obj_model}/usd/{obj_model}.usd"
+
+    # Import the desired object
+    obj_cfg = OrderedDict(
+        type="USDObject",
+        name="obj",
+        usd_path=usd_path,
+        visual_only=True,
+        position=[0, 0, 10.0],
+    )
+
     # Create the scene config to load -- empty scene
     cfg = {
         "scene": {
-            "type": "EmptyScene",
-            # "floor_plane_visible": False,
-        }
+            "type": "Scene",
+        },
+        "objects": [light0_cfg, light1_cfg, obj_cfg],
     }
 
     # Create the environment
-    env = og.Environment(configs=cfg, action_timestep=1/60., physics_timestep=1/60.)
+    env = og.Environment(configs=cfg)
 
     # Set camera to appropriate viewing pose
     og.sim.viewer_camera.set_position_orientation(
@@ -50,66 +91,37 @@ def main(random_selection=False, headless=False, short_exec=False):
         orientation=np.array([0.6350064 , 0.        , 0.        , 0.77250687]),
     )
 
-    # Create a light object
-    light0 = LightObject(
-        prim_path="/World/sphere_light0",
-        light_type="Sphere",
-        name="sphere_light0",
-        radius=0.01,
-        intensity=1e5,
-    )
-    og.sim.import_object(light0)
-    light0.set_position(np.array([-2.0, -2.0, 2.0]))
+    # Grab the object references
+    obj = env.scene.object_registry("name", "obj")
 
-    light1 = LightObject(
-        prim_path="/World/sphere_light1",
-        light_type="Sphere",
-        name="sphere_light1",
-        radius=0.01,
-        intensity=1e5,
-    )
-    og.sim.import_object(light1)
-    light1.set_position(np.array([-2.0, 2.0, 2.0]))
-
-    # Make sure we have a valid usd path
-    if usd_path is None:
-        # Select a category to load
-        available_obj_categories = get_all_object_categories()
-        obj_category = choose_from_options(options=available_obj_categories, name="object category", random_selection=random_selection)
-
-        # Select a model to load
-        available_obj_models = get_object_models_of_category(obj_category)
-        obj_model = choose_from_options(options=available_obj_models, name="object model", random_selection=random_selection)
-
-        usd_path = f"{og.og_dataset_path}/objects/{obj_category}/{obj_model}/usd/{obj_model}.usd"
-
-    # Import the desired object
-    obj = USDObject(
-        prim_path="/World/obj",
-        name="obj",
-        usd_path=usd_path,
-        visual_only=True,
-    )
-    og.sim.import_object(obj)
-
-    # Standardize the scale of the object so it fits in a [1,1,1] box
+    # Standardize the scale of the object so it fits in a [1,1,1] box -- note that we have to stop the simulator
+    # in order to set the scale
     extents = obj.aabb_extent
+    og.sim.stop()
     obj.scale = (np.ones(3) / extents).min()
+    og.sim.play()
     env.step(np.array([]))
 
     # Move the object so that its center is at [0, 0, 1]
-    center_offset = -obj.aabb_center + np.array([0, 0, 1.0])
+    center_offset = obj.aabb_center - obj.get_position() + np.array([0, 0, 1.0])
     obj.set_position(center_offset)
 
     # Allow the user to easily move the camera around
     og.sim.enable_viewer_camera_teleoperation()
 
     # Rotate the object in place
+    steps_per_rotate = 360
+    steps_per_joint = steps_per_rotate / 10
     max_steps = 100 if short_exec else 10000
     for i in range(max_steps):
-        z_angle = (2 * np.pi * (i % 200) / 200)
+        z_angle = (2 * np.pi * (i % steps_per_rotate) / steps_per_rotate)
         quat = T.euler2quat(np.array([0, 0, z_angle]))
         pos = T.quat2mat(quat) @ center_offset
+        if obj.n_dof > 0:
+            frac = (i % steps_per_joint) / steps_per_joint
+            j_frac = -1.0 + 2.0 * frac if (i // steps_per_joint) % 2 == 0 else 1.0 - 2.0 * frac
+            obj.set_joint_positions(positions=j_frac * np.ones(obj.n_dof), normalized=True, target=False)
+            obj.keep_still()
         obj.set_position_orientation(position=pos, orientation=quat)
         env.step(np.array([]))
 

@@ -30,8 +30,13 @@ def main(random_selection=False, headless=False, short_exec=False):
     config_filename = os.path.join(og.example_config_path, config_id)
     config = yaml.load(open(config_filename, "r"), Loader=yaml.FullLoader)
 
-    # Uncomment the following line to accelerate loading with only the building
-    # config["scene"]["load_object_categories"] = ["floors", "walls", "ceilings"]
+    load_options = {
+        "Quick": "Only load the building assets (i.e.: the floors, walls, ceilings)",
+        "Full": "Load all interactive objects in the scene",
+    }
+    load_mode = choose_from_options(options=load_options, name="load mode", random_selection=random_selection)
+    if load_mode == "Quick":
+        config["scene"]["load_object_categories"] = ["floors", "walls", "ceilings"]
 
     # Load the environment
     env = og.Environment(configs=config)

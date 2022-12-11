@@ -26,7 +26,7 @@ class Filled(RelativeObjectState, BooleanState, LinkBasedStateMixin):
         assert issubclass(fluid_system, FluidSystem), "Can only get Filled state with a valid FluidSystem!"
         # Check what volume is filled
         if len(fluid_system.particle_instancers) > 0:
-            particle_positions = np.concatenate([inst.particle_positions for inst in fluid_system.particle_instancers.values()], axis=0)
+            particle_positions = np.concatenate([inst.particle_positions[inst.particle_visibilities.nonzero()[0]] for inst in fluid_system.particle_instancers.values()], axis=0)
             particles_in_volume = self.check_in_volume(particle_positions)
             particle_volume = 4 / 3 * np.pi * (fluid_system.particle_radius ** 3)
             prop_filled = particle_volume * particles_in_volume.sum() / self.calculate_volume()
@@ -82,10 +82,6 @@ class Filled(RelativeObjectState, BooleanState, LinkBasedStateMixin):
         # Generate volume checker function for this object
         self.check_in_volume, self.calculate_volume = \
             generate_points_in_volume_checker_function(obj=self.obj, volume_link=self.link, mesh_name_prefixes="container")
-
-    @classproperty
-    def stateful(cls):
-        return True
 
     @staticmethod
     def get_state_link_name():

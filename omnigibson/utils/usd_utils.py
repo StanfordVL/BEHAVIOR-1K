@@ -483,33 +483,3 @@ def get_world_prim():
         Usd.Prim: Active world prim in the current stage
     """
     return get_prim_at_path("/World")
-
-
-def get_usd_metadata():
-    """
-    Grabs the USD's metadata
-
-    Returns:
-        dict:
-            "source_og_asset_path": Maps to absolute path string to asset_path that the USD was ORIGINALLY generated on
-            "source_og_dataset_path": Maps to absolute path string to the og_dataset_path that USD was ORIGINALLY
-                generated on
-    """
-    usd_metadata = get_world_prim().GetCustomDataByKey("usd_metadata")
-    usd_metadata = dict() if usd_metadata is None else usd_metadata
-
-    return OrderedDict(
-        source_og_asset_path=usd_metadata.get("source_og_asset_path", assets_path),
-        source_og_dataset_path=usd_metadata.get("source_og_dataset_path", og_dataset_path),
-    )
-
-
-def update_usd_metadata():
-    """
-    Updates the internal USD metadata
-    """
-    usd_metadata = {
-        "source_og_asset_path": assets_path,
-        "source_og_dataset_path": og_dataset_path,
-    }
-    get_world_prim().SetCustomDataByKey("usd_metadata", usd_metadata)

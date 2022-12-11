@@ -1,9 +1,5 @@
 env:
-  online_sampling: true
   initial_pos_z_offset: 0.1
-  texture_randomization_freq: null
-  object_randomization_freq: null
-  usd_file: null
 
 render:
   viewer_width: 1280
@@ -19,18 +15,12 @@ scene:
   build_graph: true
   num_waypoints: 1
   waypoint_resolution: 0.2
-  texture_randomization: false
-  object_randomization: false
-  link_collision_tolerance: 0.03
-  predefined_object_randomization_idx: null
-  should_open_all_doors: true
   load_object_categories: null
   not_load_object_categories: null
   load_room_types: null
   load_room_instances: null
   seg_map_resolution: 0.1
-  scene_source: IG
-  rendering_params: null
+  scene_source: OG
   include_robots: true
 
 robots:
@@ -38,12 +28,13 @@ robots:
     obs_modalities: [scan, rgb, depth]
     scale: 1.0
     self_collision: false
-    rendering_params: null
     action_normalize: true
     action_type: continuous
     controller_config:
       base:
         name: DifferentialDriveController
+
+objects: []
 
 task:
   type: PointNavigationTask

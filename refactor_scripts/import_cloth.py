@@ -1,12 +1,12 @@
 from omnigibson import app, og_dataset_path, Simulator
-from omnigibson.scenes.empty_scene import EmptyScene
+from omnigibson.scenes.scene_base import Scene
 from omnigibson.objects.primitive_object import PrimitiveObject
 from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.utils.constants import PrimType
 import os
 
 sim = Simulator()
-scene = EmptyScene(floor_plane_visible=True)
+scene = Scene(floor_plane_visible=True)
 sim.import_scene(scene=scene)
 
 cube1 = PrimitiveObject(prim_path="/World/RigidCube", primitive_type="Cube", prim_type=PrimType.RIGID)

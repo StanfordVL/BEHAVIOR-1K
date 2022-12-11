@@ -1,29 +1,4 @@
-# Copyright (c) 2021, NVIDIA CORPORATION.  All rights reserved.
-#
-# NVIDIA CORPORATION and its licensors retain all intellectual property
-# and proprietary rights in and to this software, related documentation
-# and any modifications thereto.  Any use, reproduction, disclosure or
-# distribution of this software and related documentation without an express
-# license agreement from NVIDIA CORPORATION is strictly prohibited.
-#
-from collections import Iterable, OrderedDict
-from typing import Optional, Tuple
-from pxr import Gf, Usd, UsdGeom, UsdShade, UsdPhysics, UsdLux
-from omni.isaac.core.utils.types import XFormPrimState
-from omni.isaac.core.materials import PreviewSurface, OmniGlass, OmniPBR, VisualMaterial
-from omni.isaac.core.utils.rotations import gf_quat_to_np_array
-from omni.isaac.core.utils.transformations import tf_matrix_from_pose
-from omni.isaac.core.utils.prims import (
-    get_prim_at_path,
-    move_prim,
-    query_parent_path,
-    is_prim_path_valid,
-    define_prim,
-    get_prim_parent,
-    get_prim_object_type,
-)
-import numpy as np
-import carb
+from pxr import UsdLux
 import logging
 from omni.isaac.core.utils.stage import get_current_stage
 from omnigibson.objects.stateful_object import StatefulObject
@@ -46,30 +21,6 @@ class LightObject(StatefulObject):
         "Sphere",
     }
 
-    """
-    Args:
-        prim_path (str): prim path of the Prim to encapsulate or create.
-        light_type (str): Type of light to create. Valid options are LIGHT_TYPES
-        name (str): Name for the object. Names need to be unique per scene.
-        category (str): Category for the object. Defaults to "object".
-        class_id (str): What class ID the object should be assigned in semantic segmentation rendering mode.
-        @param uuid: Unique unsigned-integer identifier to assign to this object (max 8-numbers).
-            If None is specified, then it will be auto-generated
-        scale (None or float or 3-array): If specified, sets the scale for this object.
-            A single number corresponds to uniform scaling along the x,y,z axes, whereas a 3-array 
-            specifies per-axis scaling.
-        rendering_params (dict): Any relevant rendering settings for this object.
-        load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
-            loading this prim at runtime. For this xform prim, the below values can be specified
-        @param include_default_state: bool, whether to include the default states from @get_default_states
-        abilities (dict): dict in the form of {ability: {param: value}} containing
-            object abilities and parameters.
-        radius (float): Radius for this light.
-        intensity (float): Intensity for this light.
-        kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
-            for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
-    """
-
     def __init__(
         self,
         prim_path,
@@ -79,14 +30,44 @@ class LightObject(StatefulObject):
         class_id=None,
         uuid=None,
         scale=None,
-        rendering_params=None,
         load_config=None,
-        include_default_state=True,
         abilities=None,
+        include_default_states=True,
         radius=1.0,
         intensity=50000.0,
         **kwargs,
     ):
+
+        """
+        Args:
+            prim_path (str): global path in the stage to this object
+            light_type (str): Type of light to create. Valid options are LIGHT_TYPES
+            name (None or str): Name for the object. Names need to be unique per scene. If None, a name will be
+                generated at the time the object is added to the scene, using the object's category.
+            category (str): Category for the object. Defaults to "object".
+            class_id (None or int): What class ID the object should be assigned in semantic segmentation rendering mode.
+                If None, the ID will be inferred from this object's category.
+            uuid (None or int): Unique unsigned-integer identifier to assign to this object (max 8-numbers).
+                If None is specified, then it will be auto-generated
+            scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
+                for this object. A single number corresponds to uniform scaling along the x,y,z axes, whereas a
+                3-array specifies per-axis scaling.
+            visible (bool): whether to render this object or not in the stage
+            fixed_base (bool): whether to fix the base of this object or not
+            visual_only (bool): Whether this object should be visual only (and not collide with any other objects)
+            self_collisions (bool): Whether to enable self collisions for this object
+            prim_type (PrimType): Which type of prim the object is, Valid options are: {PrimType.RIGID, PrimType.CLOTH}
+            load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
+                loading this prim at runtime.
+            abilities (None or dict): If specified, manually adds specific object states to this object. It should be
+                a dict in the form of {ability: {param: value}} containing object abilities and parameters to pass to
+                the object state instance constructor.
+            include_default_states (bool): whether to include the default object states from @get_default_states
+            radius (float): Radius for this light.
+            intensity (float): Intensity for this light.
+            kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
+                for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
+        """
         # Compose load config and add rgba values
         load_config = dict() if load_config is None else load_config
         load_config["scale"] = scale
@@ -108,13 +89,12 @@ class LightObject(StatefulObject):
             class_id=class_id,
             uuid=uuid,
             scale=scale,
-            rendering_params=rendering_params,
             visible=True,
             fixed_base=False,
             visual_only=True,
             self_collisions=False,
             prim_type=PrimType.RIGID,
-            include_default_state=include_default_state,
+            include_default_states=include_default_states,
             load_config=load_config,
             abilities=abilities,
             **kwargs,

@@ -1,7 +1,5 @@
 from abc import abstractmethod
-
 import gym
-import numpy as np
 
 from omnigibson.robots.locomotion_robot import LocomotionRobot
 from omnigibson.utils.python_utils import classproperty
@@ -99,7 +97,8 @@ class TwoWheelRobot(LocomotionRobot):
     @property
     def _default_base_differential_drive_controller_config(self):
         """
-        :return: Dict[str, Any] Default differential drive controller config to
+         Returns:
+             dict: Default differential drive controller config to
             control this robot's base.
         """
         return {
@@ -127,7 +126,8 @@ class TwoWheelRobot(LocomotionRobot):
     @abstractmethod
     def wheel_radius(self):
         """
-        :return: float, radius of each wheel at the base, in metric units
+        Returns:
+            float: radius of each wheel at the base, in metric units
         """
         raise NotImplementedError
 
@@ -135,7 +135,8 @@ class TwoWheelRobot(LocomotionRobot):
     @abstractmethod
     def wheel_axle_length(self):
         """
-        :return: float, perpendicular distance between the robot's two wheels, in metric units
+        Returns:
+            float: perpendicular distance between the robot's two wheels, in metric units
         """
         raise NotImplementedError
 

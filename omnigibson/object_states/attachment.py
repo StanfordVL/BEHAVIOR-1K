@@ -8,7 +8,7 @@ from collections import OrderedDict
 import numpy as np
 
 import omnigibson as og
-from omnigibson.macros import create_module_macros
+from omnigibson.macros import create_module_macros, gm
 import omnigibson.utils.transform_utils as T
 from omnigibson.object_states.contact_subscribed_state_mixin import ContactSubscribedStateMixin
 from omnigibson.object_states.object_state_base import BooleanState, RelativeObjectState

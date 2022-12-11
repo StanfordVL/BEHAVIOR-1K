@@ -162,8 +162,9 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin):
             modify particles belonging to @ParticleSystem. Each condition should be a function, whose signature
             is as follows:
 
-                def condition() --> bool
+                def condition(obj) --> bool
 
+            Where @obj is the specific object that this ParticleModifier state belongs to.
             For a given ParticleSystem, if all of its conditions evaluate to True and particles are detected within
             this particle modifier area, then we potentially modify those particles
         projection_mesh_params (None or dict): If specified and @method is ParticleModifyMethod.PROJECTION,
@@ -364,13 +365,14 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin):
              system (ParticleSystem): Particle system for which to generate a limit checker function
 
         Returns:
-            function: Limit checker function, with signature condition() --> bool
+            function: Limit checker function, with signature condition(obj) --> bool, where @obj is the specific object
+                that this ParticleModifier state belongs to
         """
         if issubclass(system, VisualParticleSystem):
-            def condition():
+            def condition(obj):
                 return self.modified_particle_count[system] < self.visual_particle_modification_limit
         elif issubclass(system, FluidSystem):
-            def condition():
+            def condition(obj):
                 return self.modified_particle_count[system] < self.fluid_particle_modification_limit
         else:
             self.unsupported_system_error(system=system)
@@ -383,9 +385,9 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin):
             # Iterate over all owned systems for this particle modifier
             for system, conditions in self.conditions.items():
                 # Check if all conditions are met
-                if issubclass(system, VisualParticleSystem):
+                if issubclass(system, FluidSystem):
                     print(f"{system.name} limited: {self.check_at_limit(system=system)}")
-                if np.all([condition() for condition in conditions]):
+                if np.all([condition(self.obj) for condition in conditions]):
                     # Sanity check for oversaturation
                     self.check_at_limit(system=system, verify_not_over_limit=True)
                     # Potentially modify particles within the volume
@@ -502,10 +504,6 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin):
         """
         raise NotImplementedError()
 
-    @classproperty
-    def stateful(cls):
-        return True
-
     @property
     def state_size(self):
         # One entry per system plus the current_step
@@ -520,8 +518,8 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin):
         return state
 
     def _load_state(self, state):
-        for system_name, val in state.items():
-            self.modified_particle_count[get_system_from_element_name(system_name)] = val
+        for system in self.supported_systems:
+            self.modified_particle_count[system] = state[get_element_name_from_system(system)]
         # Set current step
         self._current_step = state["current_step"]
 
@@ -548,14 +546,16 @@ class ParticleRemover(ParticleModifier):
             return
         # Check the system
         if issubclass(system, VisualParticleSystem):
-            # Iterate over all particles and remove any that are within the relaxed AABB of the remover volume
-            particle_names = list(system.particles.keys())
-            particle_positions = np.array([particle.get_position() for particle in system.particles.values()])
-            inbound_idxs = self._check_in_mesh(particle_positions).nonzero()[0]
-            max_particle_absorbed = self.visual_particle_modification_limit - self.modified_particle_count[system]
-            for idx in inbound_idxs[:max_particle_absorbed]:
-                system.remove_particle(particle_names[idx])
-            self.modified_particle_count[system] += min(len(inbound_idxs), max_particle_absorbed)
+            # Only modify particles if there are any that exist
+            if system.n_particles > 0:
+                # Iterate over all particles and remove any that are within the relaxed AABB of the remover volume
+                particle_names = list(system.particles.keys())
+                particle_positions = np.array([particle.get_position() for particle in system.particles.values()])
+                inbound_idxs = self._check_in_mesh(particle_positions).nonzero()[0]
+                max_particle_absorbed = self.visual_particle_modification_limit - self.modified_particle_count[system]
+                for idx in inbound_idxs[:max_particle_absorbed]:
+                    system.remove_particle(particle_names[idx])
+                self.modified_particle_count[system] += min(len(inbound_idxs), max_particle_absorbed)
 
         elif issubclass(system, FluidSystem):
             instancer_to_particle_idxs = {}
@@ -565,7 +565,7 @@ class ParticleRemover(ParticleModifier):
             # We'll check for if the fluid particles are within this relaxed AABB
             if self.obj.prim_type == PrimType.CLOTH or self.method == ParticleModifyMethod.PROJECTION:
                 for inst in system.particle_instancers.values():
-                    inbound_idxs = self._check_in_mesh(inst.particle_positions).nonzero()[0]
+                    inbound_idxs = (self._check_in_mesh(inst.particle_positions) & inst.particle_visibilities > 0).nonzero()[0]
                     instancer_to_particle_idxs[inst] = inbound_idxs
             # Otherwise, we can simply use the contact cached information for each particle
             else:

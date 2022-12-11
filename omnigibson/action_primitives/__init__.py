@@ -1,3 +1,0 @@
-from omnigibson.action_primitives.action_primitive_set_base import BaseActionPrimitiveSet, REGISTERED_PRIMITIVE_SETS
-from omnigibson.action_primitives.behavior_discrete_action_primitives import BehaviorActionPrimitives
-# from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitives

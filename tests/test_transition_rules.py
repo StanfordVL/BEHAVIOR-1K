@@ -2,7 +2,7 @@ import numpy as np
 
 from omnigibson import object_states, app, og_dataset_path
 from omnigibson.objects.dataset_object import DatasetObject
-from omnigibson.scenes.empty_scene import EmptyScene
+from omnigibson.scenes.scene_base import Scene
 from omnigibson.simulator import Simulator
 import omnigibson.transition_rules as transition_rules
 
@@ -26,7 +26,7 @@ def create_dataset_object(category, model, name, scale, abilities=dict()):
 def test_apple_slicing():
     try:
         sim = Simulator(apply_transitions=True)
-        scene = EmptyScene()
+        scene = Scene()
         sim.import_scene(scene)
 
         apple_obj = create_dataset_object(
@@ -59,7 +59,7 @@ def test_apple_slicing():
 def test_container():
     try:
         sim = Simulator(apply_transitions=True)
-        scene = EmptyScene()
+        scene = Scene()
         sim.import_scene(scene)
 
         tea_bag_obj = create_dataset_object(
@@ -101,7 +101,7 @@ def test_container():
 def test_container_garbage():
     try:
         sim = Simulator(apply_transitions=True)
-        scene = EmptyScene()
+        scene = Scene()
         sim.import_scene(scene)
 
         tea_bag_obj = create_dataset_object(

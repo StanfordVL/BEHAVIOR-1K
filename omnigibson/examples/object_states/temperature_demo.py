@@ -1,5 +1,5 @@
 import logging
-
+from collections import OrderedDict
 import numpy as np
 
 import omnigibson as og
@@ -20,79 +20,60 @@ def main(random_selection=False, headless=False, short_exec=False):
     # Make sure object states are enabled
     assert gm.ENABLE_OBJECT_STATES, f"Object states must be enabled in macros.py in order to use this demo!"
 
-    # Create the scene config to load -- empty scene
-    cfg = {
-        "scene": {
-            "type": "EmptyScene",
-            "floor_plane_visible": True,
-        }
-    }
+    # Define specific objects we want to load in with the scene directly
+    obj_configs = []
 
-    # Create the environment
-    env = og.Environment(configs=cfg, action_timestep=1 / 60., physics_timestep=1 / 60.)
-
-    # Set camera to appropriate viewing pose
-    og.sim.viewer_camera.set_position_orientation(
-        position=np.array([ 0.46938863, -3.97887141,  1.64106008]),
-        orientation=np.array([0.63311689, 0.00127259, 0.00155577, 0.77405359]),
-    )
-
-    # Create a light object
-    light = LightObject(
-        prim_path="/World/sphere_light",
+    # Light
+    obj_configs.append(OrderedDict(
+        type="LightObject",
         light_type="Sphere",
-        name="sphere_light",
+        name="light",
         radius=0.01,
         intensity=1e5,
-    )
-    og.sim.import_object(light)
-    light.set_position(np.array([-2.0, -2.0, 1.0]))
+        position=[-2.0, -2.0, 1.0],
+    ))
 
-    # Load stove ON
-    stove = DatasetObject(
-        prim_path="/World/stove",
+    # Stove
+    obj_configs.append(OrderedDict(
+        type="DatasetObject",
         name="stove",
         category="stove",
         model="101943",
-    )
-    og.sim.import_object(stove)
-    stove.set_position([0, 0, 0.65])
+        position=[0, 0, 0.65],
+    ))
 
-    # Load microwave ON
-    microwave = DatasetObject(
-        prim_path="/World/microwave",
+    # Microwave
+    obj_configs.append(OrderedDict(
+        type="DatasetObject",
         name="microwave",
         category="microwave",
         model="7128",
         scale=0.25,
-    )
-    og.sim.import_object(microwave)
-    microwave.set_position([2.5, 0, 0.094])
+        position=[2.5, 0, 0.094],
+    ))
 
-    # Load oven ON
-    oven = DatasetObject(
-        prim_path="/World/oven",
+    # Oven
+    obj_configs.append(OrderedDict(
+        type="DatasetObject",
         name="oven",
         category="oven",
         model="7120",
-    )
-    og.sim.import_object(oven)
-    oven.set_position([-1.25, 0, 0.80])
+        position=[-1.25, 0, 0.80],
+    ))
 
-    # Load tray
-    tray = DatasetObject(
-        prim_path="/World/tray",
+    # Tray
+    obj_configs.append(OrderedDict(
+        type="DatasetObject",
         name="tray",
         category="tray",
         model="tray_000",
         scale=0.15,
-    )
-    og.sim.import_object(tray)
-    tray.set_position([0, 0, 1.24])
+        position=[0, 0, 1.24],
+    ))
 
-    # Load fridge
-    fridge = DatasetObject(
-        prim_path="/World/fridge",
+    # Fridge
+    obj_configs.append(OrderedDict(
+        type="DatasetObject",
         name="fridge",
         category="fridge",
         model="12252",
@@ -102,25 +83,47 @@ def main(random_selection=False, headless=False, short_exec=False):
                 "requires_inside": True,
             }
         },
-    )
-    og.sim.import_object(fridge)
-    fridge.set_position([1.25, 0, 0.80])
+        position=[1.25, 0, 0.90],
+    ))
 
-    # Load 5 apples
-    apples = []
+    # 5 Apples
     for i in range(5):
-        apple = DatasetObject(
-            prim_path=f"/World/apple{i}",
+        obj_configs.append(OrderedDict(
+            type="DatasetObject",
             name=f"apple{i}",
             category="apple",
             model="00_0",
-        )
-        og.sim.import_object(apple)
-        apple.set_position([0, i * 0.05, 1.65])
-        apples.append(apple)
+            position=[0, i * 0.05, 1.65],
+        ))
 
-    # Take an environment step so that all objects are initialized properly
-    env.step(np.array([]))
+    # Create the scene config to load -- empty scene with desired objects
+    cfg = {
+        "scene": {
+            "type": "Scene",
+        },
+        "objects": obj_configs,
+    }
+
+    # Create the environment
+    env = og.Environment(configs=cfg, action_timestep=1 / 60., physics_timestep=1 / 60.)
+
+    # Get reference to relevant objects
+    stove = env.scene.object_registry("name", "stove")
+    microwave = env.scene.object_registry("name", "microwave")
+    oven = env.scene.object_registry("name", "oven")
+    tray = env.scene.object_registry("name", "tray")
+    fridge = env.scene.object_registry("name", "fridge")
+    apples = list(env.scene.object_registry("category", "apple"))
+
+    # Set camera to appropriate viewing pose
+    og.sim.viewer_camera.set_position_orientation(
+        position=np.array([ 0.46938863, -3.97887141,  1.64106008]),
+        orientation=np.array([0.63311689, 0.00127259, 0.00155577, 0.77405359]),
+    )
+
+    # Let objects settle
+    for _ in range(25):
+        env.step(np.array([]))
 
     # Turn on all scene objects
     stove.states[object_states.ToggledOn].set_value(True)

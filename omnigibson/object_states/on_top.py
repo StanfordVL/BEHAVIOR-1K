@@ -42,8 +42,5 @@ class OnTop(KinematicsMixin, RelativeObjectState, BooleanState):
         if not touching:
             return False
 
-        other_prim_paths = set(other.link_prim_paths)
         adjacency = self.obj.states[VerticalAdjacency].get_value()
-        return not other_prim_paths.isdisjoint(adjacency.negative_neighbors) and other_prim_paths.isdisjoint(
-            adjacency.positive_neighbors
-        )
+        return other in adjacency.negative_neighbors and other not in adjacency.positive_neighbors

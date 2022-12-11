@@ -1,9 +1,5 @@
 env:
-  online_sampling: true
   initial_pos_z_offset: 0.1
-  texture_randomization_freq: null
-  object_randomization_freq: null
-  usd_file: null
 
 render:
   viewer_width: 1280
@@ -26,12 +22,13 @@ robots:
     obs_modalities: [scan, rgb, depth]
     scale: 1.0
     self_collision: false
-    rendering_params: null
     action_normalize: true
     action_type: continuous
     controller_config:
       base:
         name: DifferentialDriveController
+
+objects: []
 
 task:
   type: PointNavigationTask
