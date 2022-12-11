@@ -849,8 +849,6 @@ class Simulator(SimulationContext, Serializable):
         # Start the simulation and restore the dynamic state of the scene and then pause again
         self.play()
         self.load_state(state, serialized=False)
-        self.app.update()
-        self.pause()
 
         logging.info("The saved simulation environment loaded.")
 
