@@ -2,6 +2,7 @@ from collections import namedtuple
 
 import numpy as np
 
+import omnigibson as og
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.object_state_base import AbsoluteObjectState
@@ -10,7 +11,6 @@ from omnigibson.utils.sampling_utils import raytest_batch
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
-m.MAX_ITERATIONS = 10
 m.MAX_DISTANCE_VERTICAL = 5.0
 m.MAX_DISTANCE_HORIZONTAL = 5.0
 
@@ -73,10 +73,6 @@ def compute_adjacencies(obj, axes, max_distance):
     directions[0::2] = axes
     directions[1::2] = -axes
 
-    # For now, we keep our result in the dimensionality of (direction, hit_object_order).
-    finalized = np.zeros(directions.shape[0], dtype=bool)
-    bodies_by_direction = [[] for _ in directions]
-
     # Prepare this object's info for ray casting.
     # Use AABB center instead of position because we cannot get valid position
     # for fixed objects if fixed links are merged.
@@ -84,47 +80,40 @@ def compute_adjacencies(obj, axes, max_distance):
     object_position = (aabb_lower + aabb_higher) / 2.0
     prim_paths = obj.link_prim_paths
 
-    # Cast rays repeatedly until the max number of casting is reached
-    for i in range(m.MAX_ITERATIONS):
-        # Find which directions still need ray casting
-        unfinished_directions = np.nonzero(finalized != True)[0]
-        num_directions_to_cast = unfinished_directions.shape[0]
+    # Prepare the rays to cast.
+    ray_starts = np.tile(object_position, (len(directions), 1))
+    ray_endpoints = ray_starts + (directions * max_distance)
 
-        # If all directions are ready, stop.
-        if num_directions_to_cast == 0:
-            break
+    # Cast time.
+    ray_results = raytest_batch(
+        ray_starts,
+        ray_endpoints,
+        only_closest=False,
+        ignore_bodies=prim_paths,
+        ignore_collisions=prim_paths
+    )
 
-        # Prepare the rays to cast.
-        ray_directions = directions[unfinished_directions, :]
-        ray_starts = np.tile(object_position, (num_directions_to_cast, 1))
-        ray_endpoints = ray_starts + (ray_directions * max_distance)
-
-        # Cast time.
-        ray_results = raytest_batch(
-            ray_starts,
-            ray_endpoints,
-            hit_number=i,
-            ignore_bodies=prim_paths,
-            ignore_collisions=prim_paths
-        )
-
-        # Add the results to the appropriate lists
-        for idx, result in enumerate(ray_results):
-            axis_idx = unfinished_directions[idx]
-            if result["hit"]:
-                if result["rigidBody"] not in prim_paths:
-                    bodies_by_direction[axis_idx].append(result["rigidBody"])
-            else:
-                # Set the finalization status of no-hit directions
-                finalized[axis_idx] = True
+    # Add the results to the appropriate lists
+    # For now, we keep our result in the dimensionality of (direction, hit_object_order).
+    # We convert the hit link into unique objects encountered
+    objs_by_direction = []
+    for results in ray_results:
+        unique_objs = set()
+        for result in results:
+            # Check if the inferred hit object is not None, we add it to our set
+            obj_prim_path = "/".join(result["rigidBody"].split("/")[:-1])
+            obj = og.sim.scene.object_registry("prim_path", obj_prim_path, None)
+            if obj is not None:
+                unique_objs.add(obj)
+        objs_by_direction.append(unique_objs)
 
     # Reshape so that these have the following indices:
     # (axis_idx, direction-one-or-zero, hit_idx)
-    bodies_by_axis = [
+    objs_by_axis = [
         AxisAdjacencyList(positive_neighbors, negative_neighbors)
-        for positive_neighbors, negative_neighbors in zip(bodies_by_direction[::2], bodies_by_direction[1::2])
+        for positive_neighbors, negative_neighbors in zip(objs_by_direction[::2], objs_by_direction[1::2])
     ]
-    return bodies_by_axis
+    return objs_by_axis
 
 
 class VerticalAdjacency(AbsoluteObjectState):
