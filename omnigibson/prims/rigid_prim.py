@@ -16,7 +16,7 @@ import numpy as np
 from omni.isaac.dynamic_control import _dynamic_control
 import carb
 
-from omnigibson.macros import gm
+from omnigibson.macros import gm, create_module_macros
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.prims.geom_prim import CollisionGeomPrim, VisualGeomPrim
 from omnigibson.utils.constants import GEOM_TYPES
@@ -25,6 +25,13 @@ from omnigibson.utils.usd_utils import mesh_prim_to_trimesh_mesh
 
 # Import omni sensor based on type
 from omni.isaac.isaac_sensor import _isaac_sensor as _s
+
+
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
+
+m.DEFAULT_CONTACT_OFFSET = 0.001
+m.DEFAULT_REST_OFFSET = 0.0
 
 
 class RigidPrim(XFormPrim):
@@ -177,15 +184,20 @@ class RigidPrim(XFormPrim):
         for prim in prims_to_check:
             if prim.GetPrimTypeInfo().GetTypeName() in GEOM_TYPES:
                 mesh_name, mesh_path = prim.GetName(), prim.GetPrimPath().__str__()
-                mesh = get_prim_at_path(prim_path=mesh_path)
+                mesh_prim = get_prim_at_path(prim_path=mesh_path)
                 mesh_kwargs = {"prim_path": mesh_path, "name": f"{self._name}:{mesh_name}"}
-                if mesh.HasAPI(UsdPhysics.CollisionAPI):
-                    self._collision_meshes[mesh_name] = CollisionGeomPrim(**mesh_kwargs)
+                if mesh_prim.HasAPI(UsdPhysics.CollisionAPI):
+                    mesh = CollisionGeomPrim(**mesh_kwargs)
+                    # We also modify the collision mesh's contact and rest offsets, since omni's default values result
+                    # in lightweight objects sometimes not triggering contacts correctly
+                    mesh.set_contact_offset(m.DEFAULT_CONTACT_OFFSET)
+                    mesh.set_rest_offset(m.DEFAULT_REST_OFFSET)
+                    self._collision_meshes[mesh_name] = mesh
                     # We construct a trimesh object from this mesh in order to infer its center-of-mass and volume
                     # TODO: Cleaner way to aggregate this information? Right now we just skip if we encounter a primitive
-                    mesh_vertices = mesh.GetAttribute("points").Get()
+                    mesh_vertices = mesh_prim.GetAttribute("points").Get()
                     if mesh_vertices is not None and len(mesh_vertices) >= 4:
-                        msh = mesh_prim_to_trimesh_mesh(mesh)
+                        msh = mesh_prim_to_trimesh_mesh(mesh_prim)
                         coms.append(msh.center_mass)
                         vols.append(msh.volume)
                 else:
