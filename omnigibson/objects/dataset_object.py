@@ -101,8 +101,8 @@ class DatasetObject(USDObject):
                 for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
         """
         # Store variables
-        self.in_rooms = in_rooms
-        self.bddl_object_scope = bddl_object_scope
+        self._in_rooms = in_rooms
+        self._bddl_object_scope = bddl_object_scope
 
         # Info that will be filled in at runtime
         self.supporting_surfaces = None             # Dictionary mapping link names to surfaces represented by links
@@ -344,6 +344,46 @@ class DatasetObject(USDObject):
                                               self.scaled_bbox_center_in_base_frame, [0, 0, 0, 1])[0]
             position = position + rotated_offset
         self.set_position_orientation(position, orientation)
+
+    @property
+    def in_rooms(self):
+        """
+        Returns:
+            None or list of str: If specified, room(s) that this object should belong to
+        """
+        return self._in_rooms
+
+    @in_rooms.setter
+    def in_rooms(self, rooms):
+        """
+        Sets which room(s) this object should belong to. If no rooms, then should set to None
+
+        Args:
+            rooms (None or list of str): If specified, the room(s) this object should belong to
+        """
+        # Store the value to the internal variable and also update the init kwargs accordingly
+        self._init_info["args"]["in_rooms"] = rooms
+        self._in_rooms = rooms
+
+    @property
+    def bddl_object_scope(self):
+        """
+        Returns:
+            None or str: If specified, BDDL object scope name (e.g. chip.n.04_2) to assign to this object
+        """
+        return self._bddl_object_scope
+
+    @bddl_object_scope.setter
+    def bddl_object_scope(self, name):
+        """
+        Sets which BDDL object scope name for this object. If no name, then should set to None
+
+        Args:
+            name (None or str): If specified, BDDL object scope name (e.g. chip.n.04_2) to assign to this object
+        """
+        # Store the value to the internal variable and also update the init kwargs accordingly
+        self._init_info["args"]["bddl_object_scope"] = name
+        self._bddl_object_scope = name
 
     @property
     def native_bbox(self):
