@@ -57,7 +57,6 @@ def main():
     input("Heat source will now turn ON: Press ENTER to continue.")
     stove.states[object_states.ToggledOn].set_value(True)
 
-    from IPython import embed; embed()
     assert stove.states[object_states.ToggledOn].get_value()
 
     # Need to take a step to update the state.
