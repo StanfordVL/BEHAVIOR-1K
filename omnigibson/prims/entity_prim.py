@@ -1,13 +1,4 @@
-# Copyright (c) 2021, NVIDIA CORPORATION.  All rights reserved.
-#
-# NVIDIA CORPORATION and its licensors retain all intellectual property
-# and proprietary rights in and to this software, related documentation
-# and any modifications thereto.  Any use, reproduction, disclosure or
-# distribution of this software and related documentation without an express
-# license agreement from NVIDIA CORPORATION is strictly prohibited.
-#
-from collections import Iterable, OrderedDict
-from typing import Optional, Tuple
+from collections import OrderedDict
 
 import numpy as np
 
@@ -17,7 +8,6 @@ from omni.isaac.core.utils.types import DOFInfo
 from omni.isaac.dynamic_control import _dynamic_control
 from omni.isaac.core.utils.stage import get_current_stage
 from pxr import Gf, Usd, UsdGeom, UsdPhysics, PhysxSchema
-from omni.isaac.core.controllers.articulation_controller import ArticulationController
 import omni
 
 from omni.isaac.core.utils.prims import get_prim_property, set_prim_property, \
@@ -297,10 +287,10 @@ class EntityPrim(XFormPrim):
 
     @property
     def handle(self):
-        """[summary]
-
+        """
         Returns:
-            int: [description]
+            int: ID (articulation) handle assigned to this prim from dynamic_control interface. Note that
+                if this prim is not an articulation, it is assigned _dynamic_control.INVALID_HANDLE
         """
         return self._handle
 
@@ -312,16 +302,15 @@ class EntityPrim(XFormPrim):
             always be non-zero (i.e.: valid) if this object is initialized!
 
         Returns:
-            int: [description]
+            int: ID handle assigned to this prim's root prim from dynamic_control interface
         """
         return self._root_handle
 
     @property
     def n_dof(self):
         """
-        Return the number of DoFs of the object
         Returns:
-            int: dofs
+            int: number of DoFs of the object
         """
         return self._n_dof
 
@@ -361,6 +350,7 @@ class EntityPrim(XFormPrim):
     def materials(self):
         """
         Loop through each link and their visual meshes to gather all the materials that belong to this object
+
         Returns:
             materials: a list of MaterialPrim that belongs to this object
         """
@@ -377,10 +367,9 @@ class EntityPrim(XFormPrim):
 
     @property
     def dof_properties(self):
-        """[summary]
-
+        """
         Returns:
-            np.ndarray: [description]
+            n-array: Array of DOF properties assigned to this articulation's DoFs.
         """
         return self._dc.get_articulation_dof_properties(self._handle)
 
@@ -448,50 +437,16 @@ class EntityPrim(XFormPrim):
         """
         return check_collision(prims=self, prims_check=prims, step_physics=False)
 
-    def get_dof_index(self, dof_name: str) -> int:
-        """[summary]
-
-        Args:
-            dof_name (str): [description]
-
-        Returns:
-            int: [description]
-        """
-        return self._dofs_infos[dof_name].index
-
-    def read_kinematic_hierarchy(self) -> None:
-        """[summary]
-        """
-        print("Articulation handle: {self._handle}")
-        print("--- Hierarchy:\n", self._read_kinematic_hierarchy())
-        return
-
-    def _read_kinematic_hierarchy(self, body_index: Optional[int] = None, indent_level: int = 0) -> str:
-        # Only can be called if this is articulated
-        self.assert_articulated()
-
-        if body_index is None:
-            body_index = self._dc.get_articulation_root_body(self._handle)
-        indent = "|" + "-" * indent_level
-        body_name = self._dc.get_rigid_body_name(body_index)
-        str_output = f"{indent}Body: {body_name}\n", "blue"
-        for i in range(self._dc.get_rigid_body_child_joint_count(body_index)):
-            joint = self._dc.get_rigid_body_child_joint(body_index, i)
-            joint_name = self._dc.get_joint_name(joint)
-            child = self._dc.get_joint_child_body(joint)
-            child_name = self._dc.get_rigid_body_name(child)
-            str_output += f"{indent}>>Joint: {joint_name} -> {child_name}\n", "green"
-            str_output += self._read_kinematic_hierarchy(child, indent_level + 4)
-        return str_output
-
     def enable_gravity(self) -> None:
-        """[summary]
+        """
+        Enables gravity for this entity
         """
         for link in self._links.values():
             link.enable_gravity()
 
     def disable_gravity(self) -> None:
-        """[summary]
+        """
+        Disables gravity for this entity
         """
         for link in self._links.values():
             link.disable_gravity()
@@ -741,13 +696,6 @@ class EntityPrim(XFormPrim):
                 joint.initialize()
             joint.update_handles()
 
-    def update_default_state(self):
-        # Iterate over all links and joints and update their default states
-        for link in self._links.values():
-            link.update_default_state()
-        for joint in self._joints.values():
-            joint.update_default_state()
-
     def get_joint_positions(self, normalized=False):
         """
         Grabs this entity's joint positions
@@ -805,30 +753,6 @@ class EntityPrim(XFormPrim):
         # Possibly normalize values when returning
         return self._normalize_efforts(efforts=joint_efforts) if normalized else joint_efforts
 
-    def set_joints_default_state(
-        self,
-        positions: Optional[np.ndarray] = None,
-        velocities: Optional[np.ndarray] = None,
-        efforts: Optional[np.ndarray] = None,
-    ) -> None:
-        """[summary]
-
-        Args:
-            positions (Optional[np.ndarray], optional): [description]. Defaults to None.
-            velocities (Optional[np.ndarray], optional): [description]. Defaults to None.
-            efforts (Optional[np.ndarray], optional): [description]. Defaults to None.
-        """
-        # Only can be called if this is articulated
-        self.assert_articulated()
-
-        if positions is not None:
-            self._default_joints_state.positions = positions
-        if velocities is not None:
-            self._default_joints_state.velocities = velocities
-        if efforts is not None:
-            self._default_joints_state.efforts = efforts
-        return
-
     def get_joints_state(self, normalized=False):
         """
         Grabs the current joints state of this entity
@@ -864,61 +788,34 @@ class EntityPrim(XFormPrim):
         if state.efforts is not None:
             self.set_joint_efforts(efforts=state.efforts, normalized=normalized)
 
-    def reset(self):
-        # # Run super reset first to reset this articulation's pose
-        # super().reset()
-
-        # Reset joint state if we're articulated
-        if self.articulated:
-            self.reset_joint_states()
-
-    def reset_joint_states(self):
-        """
-        Resets the joint state based on self._default_joints_state
-        """
-        # Only can be called if this is articulated
-        self.assert_articulated()
-
-        # Reset state
-        self.set_joint_positions(self._default_joints_state.positions)
-        self.set_joint_velocities(self._default_joints_state.velocities)
-        self.set_joint_efforts(self._default_joints_state.efforts)
-
-    def get_articulation_controller(self) -> ArticulationController:
-        """
-        Returns:
-            ArticulationController: PD Controller of all degrees of freedom of an articulation, can apply position targets, velocity targets and efforts.
-        """
-        # Only can be called if this is articulated
-        self.assert_articulated()
-
-        return self._articulation_controller
-
     def set_linear_velocity(self, velocity: np.ndarray):
-        """Sets the linear velocity of the root prim in stage.
+        """
+        Sets the linear velocity of the root prim in stage.
 
         Args:
             velocity (np.ndarray): linear velocity to set the rigid prim to, in the world frame. Shape (3,).
         """
         self.root_link.set_linear_velocity(velocity)
 
-    def get_linear_velocity(self) -> np.ndarray:
-        """Gets the linear velocity of the root prim in stage.
+    def get_linear_velocity(self):
+        """
+        Gets the linear velocity of the root prim in stage.
 
         Returns:
             velocity (np.ndarray): linear velocity to set the rigid prim to, in the world frame. Shape (3,).
         """
         return self.root_link.get_linear_velocity()
 
-    def set_angular_velocity(self, velocity: np.ndarray) -> None:
-        """Sets the angular velocity of the root prim in stage.
+    def set_angular_velocity(self, velocity):
+        """
+        Sets the angular velocity of the root prim in stage.
 
         Args:
             velocity (np.ndarray): angular velocity to set the rigid prim to, in the world frame. Shape (3,).
         """
         self.root_link.set_angular_velocity(velocity)
 
-    def get_angular_velocity(self) -> np.ndarray:
+    def get_angular_velocity(self):
         """Gets the angular velocity of the root prim in stage.
 
         Returns:
@@ -926,16 +823,7 @@ class EntityPrim(XFormPrim):
         """
         return self.root_link.get_angular_velocity()
 
-    def set_position_orientation(self, position: Optional[np.ndarray] = None, orientation: Optional[np.ndarray] = None) -> None:
-        """Sets prim's pose with respect to the world's frame.
-
-        Args:
-            position (Optional[np.ndarray], optional): position in the world frame of the prim. shape is (3, ).
-                                                       Defaults to None, which means left unchanged.
-            orientation (Optional[np.ndarray], optional): quaternion orientation in the world frame of the prim.
-                                                          quaternion is scalar-last (x, y, z, w). shape is (4, ).
-                                                          Defaults to None, which means left unchanged.
-        """
+    def set_position_orientation(self, position=None, orientation=None):
         current_position, current_orientation = self.get_position_orientation()
         if position is None:
             position = current_position
@@ -957,14 +845,7 @@ class EntityPrim(XFormPrim):
             else:
                 super().set_position_orientation(position=position, orientation=orientation)
 
-    def get_position_orientation(self) -> Tuple[np.ndarray, np.ndarray]:
-        """Gets prim's pose with respect to the world's frame.
-
-        Returns:
-            Tuple[np.ndarray, np.ndarray]: first index is position in the world frame of the prim. shape is (3, ).
-                                           second index is quaternion orientation in the world frame of the prim.
-                                           quaternion is scalar-last (x, y, z, w). shape is (4, ).
-        """
+    def get_position_orientation(self):
         if self._prim_type == PrimType.CLOTH:
             if self._dc is not None and self._dc.is_simulating():
                 return self.root_link.get_position_orientation()
@@ -978,18 +859,15 @@ class EntityPrim(XFormPrim):
             else:
                 return super().get_position_orientation()
 
-    def _set_local_pose_when_simulating(
-        self, translation: Optional[np.ndarray] = None, orientation: Optional[np.ndarray] = None
-    ) -> None:
-        """Sets prim's pose with respect to the local frame (the prim's parent frame) when sumulation is running.
+    def _set_local_pose_when_simulating(self, translation=None, orientation=None):
+        """
+        Sets prim's pose with respect to the local frame (the prim's parent frame) when simulation is running.
 
         Args:
-            translation (Optional[np.ndarray], optional): translation in the local frame of the prim
-                                                          (with respect to its parent prim). shape is (3, ).
-                                                          Defaults to None, which means left unchanged.
-            orientation (Optional[np.ndarray], optional): quaternion orientation in the world frame of the prim.
-                                                          quaternion is scalar-last (x, y, z, w). shape is (4, ).
-                                                          Defaults to None, which means left unchanged.
+            translation (None or 3-array): if specified, (x,y,z) translation in the local frame of the prim
+                (with respect to its parent prim). Default is None, which means left unchanged.
+            orientation (None or 4-array): if specified, (x,y,z,w) quaternion orientation in the local frame of the prim
+                (with respect to its parent prim). Default is None, which means left unchanged.
         """
         current_translation, current_orientation = self.get_local_pose()
         if translation is None:
@@ -1011,19 +889,7 @@ class EntityPrim(XFormPrim):
             orientation=gf_quat_to_np_array(calculated_orientation)[[1, 2, 3, 0]],
         )
 
-    def set_local_pose(
-        self, translation: Optional[np.ndarray] = None, orientation: Optional[np.ndarray] = None
-    ) -> None:
-        """Sets prim's pose with respect to the local frame (the prim's parent frame).
-
-        Args:
-            translation (Optional[np.ndarray], optional): translation in the local frame of the prim
-                                                          (with respect to its parent prim). shape is (3, ).
-                                                          Defaults to None, which means left unchanged.
-            orientation (Optional[np.ndarray], optional): quaternion orientation in the world frame of the prim.
-                                                          quaternion is scalar-last (x, y, z, w). shape is (4, ).
-                                                          Defaults to None, which means left unchanged.
-        """
+    def set_local_pose(self, translation=None, orientation=None):
         if self._prim_type == PrimType.CLOTH:
             if self._dc is not None and self._dc.is_simulating():
                 self._set_local_pose_when_simulating(translation=translation, orientation=orientation)
@@ -1036,13 +902,14 @@ class EntityPrim(XFormPrim):
             else:
                 super().set_local_pose(translation=translation, orientation=orientation)
 
-    def _get_local_pose_when_simulating(self) -> Tuple[np.ndarray, np.ndarray]:
-        """Gets prim's pose with respect to the local frame (the prim's parent frame) when simulation is running.
+    def _get_local_pose_when_simulating(self):
+        """
+        Gets prim's pose with respect to the prim's local frame (it's parent frame) when simulation is running
 
         Returns:
-            Tuple[np.ndarray, np.ndarray]: first index is position in the local frame of the prim. shape is (3, ).
-                                           second index is quaternion orientation in the local frame of the prim.
-                                           quaternion is scalar-last (x, y, z, w). shape is (4, ).
+            2-tuple:
+                - 3-array: (x,y,z) position in the local frame
+                - 4-array: (x,y,z,w) quaternion orientation in the local frame
         """
         parent_world_tf = UsdGeom.Xformable(get_prim_parent(self._prim)).ComputeLocalToWorldTransform(
             Usd.TimeCode.Default()
@@ -1057,14 +924,7 @@ class EntityPrim(XFormPrim):
         calculated_orientation = transform.GetRotation().GetQuat()
         return np.array(calculated_translation), gf_quat_to_np_array(calculated_orientation)[[1, 2, 3, 0]]
 
-    def get_local_pose(self) -> Tuple[np.ndarray, np.ndarray]:
-        """Gets prim's pose with respect to the local frame (the prim's parent frame).
-
-        Returns:
-            Tuple[np.ndarray, np.ndarray]: first index is position in the local frame of the prim. shape is (3, ).
-                                           second index is quaternion orientation in the local frame of the prim.
-                                           quaternion is scalar-last (x, y, z, w). shape is (4, ).
-        """
+    def get_local_pose(self):
         if self._prim_type == PrimType.CLOTH:
             if self._dc is not None and self._dc.is_simulating():
                 return self._get_local_pose_when_simulating()
@@ -1081,80 +941,97 @@ class EntityPrim(XFormPrim):
     @property
     def joint_damping(self):
         """
-        :return: Array[float], joint damping values for this prim
+        Returns:
+            n-array: joint damping values for this prim
         """
         return np.concatenate([joint.damping for joint in self._joints.values()])
 
     @property
     def joint_lower_limits(self):
         """
-        :return: Array[float], minimum values for this robot's joints. If joint does not have a range, returns -1000
-            for that joint
+        Returns:
+            n-array: minimum values for this robot's joints. If joint does not have a range, returns -1000
+                for that joint
         """
         return np.array([joint.lower_limit for joint in self._joints.values()])
 
     @property
     def joint_upper_limits(self):
         """
-        :return: Array[float], maximum values for this robot's joints. If joint does not have a range, returns 1000
-            for that joint
+        Returns:
+            n-array: maximum values for this robot's joints. If joint does not have a range, returns 1000
+                for that joint
         """
         return np.array([joint.upper_limit for joint in self._joints.values()])
 
     @property
     def joint_range(self):
         """
-        :return: Array[float], joint range values for this robot's joints
+        Returns:
+            n-array: joint range values for this robot's joints
         """
         return self.joint_upper_limits - self.joint_lower_limits
 
     @property
     def max_joint_velocities(self):
         """
-        :return: Array[float], maximum velocities for this robot's joints
+        Returns:
+            n-array: maximum velocities for this robot's joints
         """
         return np.array([joint.max_velocity for joint in self._joints.values()])
 
     @property
     def max_joint_efforts(self):
         """
-        :return: Array[float], maximum efforts for this robot's joints
+        Returns:
+            n-array: maximum efforts for this robot's joints
         """
         return np.array([joint.max_force for joint in self._joints.values()])
 
     @property
     def joint_position_limits(self):
         """
-        :return Tuple[Array[float], Array[float]]: (min, max) joint position limits, where each is an n-DOF length array
+        Returns:
+            2-tuple:
+                - n-array: min joint position limits, where each is an n-DOF length array
+                - n-array: max joint position limits, where each is an n-DOF length array
         """
         return self.joint_lower_limits, self.joint_upper_limits
 
     @property
     def joint_velocity_limits(self):
         """
-        :return Tuple[Array[float], Array[float]]: (min, max) joint velocity limits, where each is an n-DOF length array
+        Returns:
+            2-tuple:
+                - n-array: min joint velocity limits, where each is an n-DOF length array
+                - n-array: max joint velocity limits, where each is an n-DOF length array
         """
         return -self.max_joint_velocities, self.max_joint_velocities
 
     @property
     def joint_effort_limits(self):
         """
-        :return Tuple[Array[float], Array[float]]: (min, max) joint effort limits, where each is an n-DOF length array
+        Returns:
+            2-tuple:
+                - n-array: min joint effort limits, where each is an n-DOF length array
+                - n-array: max joint effort limits, where each is an n-DOF length array
         """
         return -self.max_joint_efforts, self.max_joint_efforts
 
     @property
     def joint_at_limits(self):
         """
-        :return Array[float]: n-DOF length array specifying whether joint is at its limit,
-            with 1.0 --> at limit, otherwise 0.0
+        Returns:
+            n-array: n-DOF length array specifying whether joint is at its limit,
+                with 1.0 --> at limit, otherwise 0.0
         """
         return 1.0 * (np.abs(self.get_joint_positions(normalized=True)) > 0.99)
 
     @property
     def joint_has_limits(self):
         """
-        :return Array[bool]: n-DOF length array specifying whether joint has a limit or not
+        Returns:
+            n-array: n-DOF length array specifying whether joint has a limit or not
         """
         return np.array([j.has_limit for j in self._joints.values()])
 
@@ -1181,96 +1058,96 @@ class EntityPrim(XFormPrim):
             link.scale = scale
 
     @property
-    def solver_position_iteration_count(self) -> int:
-        """[summary]
-
+    def solver_position_iteration_count(self):
+        """
         Returns:
-            int: [description]
+            int: How many position iterations to take per physics step by the physx solver
         """
         return get_prim_property(self.articulation_root_path, "physxArticulation:solverPositionIterationCount")
 
     @solver_position_iteration_count.setter
-    def solver_position_iteration_count(self, count: int) -> None:
-        """[summary]
+    def solver_position_iteration_count(self, count):
+        """
+        Sets how many position iterations to take per physics step by the physx solver
 
         Args:
-            count (int): [description]
+            count (int): How many position iterations to take per physics step by the physx solver
         """
         set_prim_property(self.articulation_root_path, "physxArticulation:solverPositionIterationCount", count)
         return
 
     @property
-    def solver_velocity_iteration_count(self) -> int:
-        """[summary]
-
+    def solver_velocity_iteration_count(self):
+        """
         Returns:
-            int: [description]
+            int: How many velocity iterations to take per physics step by the physx solver
         """
         return get_prim_property(self.articulation_root_path, "physxArticulation:solverVelocityIterationCount")
 
     @solver_velocity_iteration_count.setter
-    def solver_velocity_iteration_count(self, count: int):
-        """[summary]
+    def solver_velocity_iteration_count(self, count):
+        """
+        Sets how many velocity iterations to take per physics step by the physx solver
 
         Args:
-            count (int): [description]
+            count (int): How many velocity iterations to take per physics step by the physx solver
         """
         set_prim_property(self.articulation_root_path, "physxArticulation:solverVelocityIterationCount", count)
         return
 
     @property
-    def stabilization_threshold(self) -> float:
-        """[summary]
-
+    def stabilization_threshold(self):
+        """
         Returns:
-            float: [description]
+            float: threshold for stabilizing this articulation
         """
         return get_prim_property(self.articulation_root_path, "physxArticulation:stabilizationThreshold")
 
     @stabilization_threshold.setter
-    def stabilization_threshold(self, threshold: float) -> None:
-        """[summary]
+    def stabilization_threshold(self, threshold):
+        """
+        Sets threshold for stabilizing this articulation
 
         Args:
-            threshold (float): [description]
+            threshold (float): Stabilization threshold
         """
         set_prim_property(self.articulation_root_path, "physxArticulation:stabilizationThreshold", threshold)
         return
 
     @property
-    def self_collisions(self) -> bool:
-        """[summary]
-
+    def self_collisions(self):
+        """
         Returns:
-            bool: [description]
+            bool: Whether self-collisions are enabled for this prim or not
         """
         return get_prim_property(self.articulation_root_path, "physxArticulation:enabledSelfCollisions")
 
     @self_collisions.setter
-    def self_collisions(self, flag: bool) -> None:
-        """[summary]
+    def self_collisions(self, flag):
+        """
+        Sets whether self-collisions are enabled for this prim or not
 
         Args:
-            flag (bool): [description]
+            flag (bool): Whether self collisions are enabled for this prim or not
         """
         set_prim_property(self.articulation_root_path, "physxArticulation:enabledSelfCollisions", flag)
         return
 
     @property
-    def sleep_threshold(self) -> float:
-        """[summary]
-
+    def sleep_threshold(self):
+        """
         Returns:
-            float: [description]
+            float: threshold for sleeping this articulation
         """
         return get_prim_property(self.articulation_root_path, "physxArticulation:sleepThreshold")
 
     @sleep_threshold.setter
-    def sleep_threshold(self, threshold: float) -> None:
-        """[summary]
+    def sleep_threshold(self, threshold):
+        """
+        Sets threshold for sleeping this articulation
 
         Args:
-            threshold (float): [description]
+            threshold (float): Sleeping threshold
         """
         set_prim_property(self.articulation_root_path, "physxArticulation:sleepThreshold", threshold)
         return
@@ -1308,7 +1185,6 @@ class EntityPrim(XFormPrim):
         """
         Create a collision-free, invisible attachment point link for the cloth object, and create an attachment between
         the ClothPrim and this attachment point link (RigidPrim).
-
 
         One use case for this is that we can create a fixed joint between this link and the world to enable AG fo cloth.
         During simulation, this joint will move and match the robot gripper frame, which will then drive the cloth.

@@ -200,6 +200,12 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
                 "emissive_intensity": material.emissive_intensity,
             }
 
+    def reset(self):
+        """
+        Runs any necessary resetting functionality for this object. Default is pass-through
+        """
+        pass
+
     @property
     def articulation_root_path(self):
         # We override this because omniverse is buggy ):

@@ -1,18 +1,7 @@
-# Copyright (c) 2021, NVIDIA CORPORATION.  All rights reserved.
-#
-# NVIDIA CORPORATION and its licensors retain all intellectual property
-# and proprietary rights in and to this software, related documentation
-# and any modifications thereto.  Any use, reproduction, disclosure or
-# distribution of this software and related documentation without an express
-# license agreement from NVIDIA CORPORATION is strictly prohibited.
-#
 from collections import Iterable, OrderedDict
-from typing import Optional, Tuple
 from pxr import Gf, Usd, Sdf, UsdGeom, UsdShade, UsdPhysics, PhysxSchema
 from omni.isaac.dynamic_control import _dynamic_control
-from omni.isaac.core.materials import PreviewSurface, OmniGlass, OmniPBR, VisualMaterial
 from omni.isaac.core.utils.rotations import gf_quat_to_np_array
-from omni.isaac.core.utils.transformations import tf_matrix_from_pose
 from omni.isaac.core.utils.prims import (
     get_prim_at_path,
     move_prim,
@@ -23,12 +12,10 @@ from omni.isaac.core.utils.prims import (
     get_prim_object_type,
 )
 import numpy as np
-import carb
 from omni.isaac.core.utils.stage import get_current_stage
 from omnigibson.macros import create_module_macros
 from omnigibson.prims.prim_base import BasePrim
 from omnigibson.utils.usd_utils import create_joint
-from omnigibson.utils.omni_types import JointsState
 from omnigibson.utils.constants import JointType
 from omnigibson.utils.python_utils import assert_valid_key
 import omnigibson.utils.transform_utils as T
@@ -59,29 +46,29 @@ class JointPrim(BasePrim):
     If there is an joint prim present at the path, it will use it. Otherwise, a new joint prim at
     the specified prim path will be created when self.load(...) is called.
 
-        Note: the prim will have "xformOp:orient", "xformOp:translate" and "xformOp:scale" only post init,
-                unless it is a non-root articulation link.
+    Note: the prim will have "xformOp:orient", "xformOp:translate" and "xformOp:scale" only post init,
+            unless it is a non-root articulation link.
 
-        Args:
-            prim_path (str): prim path of the Prim to encapsulate or create.
-            name (str): Name for the object. Names need to be unique per scene.
-            load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
-                loading this prim at runtime. For this joint prim, the below values can be specified:
+    Args:
+        prim_path (str): prim path of the Prim to encapsulate or create.
+        name (str): Name for the object. Names need to be unique per scene.
+        load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
+            loading this prim at runtime. For this joint prim, the below values can be specified:
 
-                joint_type (str): If specified, should be the joint type to create. Valid options are:
-                    {"Joint", "FixedJoint", "PrismaticJoint", "RevoluteJoint", "SphericalJoint"}
-                    (equivalently, one of JointType)
-                body0 (None or str): If specified, should be the absolute prim path to the parent body that this joint
-                    is connected to. None can also be valid, which corresponds to cases where only a single body may be
-                    specified (e.g.: fixed joints)
-                body1 (None or str): If specified, should be the absolute prim path to the child body that this joint
-                    is connected to. None can also be valid, which corresponds to cases where only a single body may be
-                    specified (e.g.: fixed joints)
+            joint_type (str): If specified, should be the joint type to create. Valid options are:
+                {"Joint", "FixedJoint", "PrismaticJoint", "RevoluteJoint", "SphericalJoint"}
+                (equivalently, one of JointType)
+            body0 (None or str): If specified, should be the absolute prim path to the parent body that this joint
+                is connected to. None can also be valid, which corresponds to cases where only a single body may be
+                specified (e.g.: fixed joints)
+            body1 (None or str): If specified, should be the absolute prim path to the child body that this joint
+                is connected to. None can also be valid, which corresponds to cases where only a single body may be
+                specified (e.g.: fixed joints)
 
-            articulation (None or int): if specified, should be handle to pre-existing articulation. This will enable
-                additional features for this joint prim, e.g.: polling / setting this joint's state. Note that in this
-                case, the joint must already exist prior to this class instance. Default is None,
-                which corresponds to a non-articulated joint.
+        articulation (None or int): if specified, should be handle to pre-existing articulation. This will enable
+            additional features for this joint prim, e.g.: polling / setting this joint's state. Note that in this
+            case, the joint must already exist prior to this class instance. Default is None,
+            which corresponds to a non-articulated joint.
     """
 
     def __init__(
@@ -105,7 +92,6 @@ class JointPrim(BasePrim):
         self._n_dof = None
         self._joint_name = None
         self._dof_handles = None
-        self._default_state = None
 
         # Run super method
         super().__init__(
@@ -181,20 +167,6 @@ class JointPrim(BasePrim):
             assert len(set(control_types)) == 1, f"Got multiple control types for this single joint: {control_types}"
             self._control_type = control_types[0]
 
-            # Grab default state
-            default_pos, default_vel, default_effort = self.get_state()
-            self._default_state = JointsState(positions=default_pos, velocities=default_vel, efforts=default_effort)
-
-    # def reset(self):
-    #     """
-    #     Resets the prim to its default state (position and orientation).
-    #     """
-    #     if self.articulated:
-    #         # TODO: Do we also need to reset targets here?
-    #         self.set_pos(pos=self._default_state.positions, target=False)
-    #         self.set_vel(vel=self._default_state.velocities, target=False)
-    #         self.set_effort(effort=self._default_state.efforts)
-
     def update_handles(self):
         """
         Updates all internal handles for this prim, in case they change since initialization
@@ -207,41 +179,6 @@ class JointPrim(BasePrim):
             if joint_path == self._prim_path:
                 self._handle = joint_handle
                 break
-
-    def get_default_state(self):
-        """
-        Returns:
-            JointsState: returns the default state of the joint prim (positions, velocities, efforts)
-                that is used after each reset.
-        """
-        self.assert_articulated()
-        return self._default_state
-
-    def set_default_state(self, positions=None, velocities=None, efforts=None):
-        """
-        Sets the default state of the joint prim (positions, velocities, efforts), that will be used after each reset.
-
-        Args:
-            positions (None or n-array): positions for all DOFs corresponding to this joint. Should be
-                an n-array if specified, where n is the number of DOF for this joint. Defaults to None,
-                which means left unchanged.
-            velocities (None or n-array): velocities for all DOFs corresponding to this joint. Should be
-                an n-array if specified, where n is the number of DOF for this joint. Defaults to None,
-                which means left unchanged.
-            efforts (None or n-array): efforts for all DOFs corresponding to this joint. Should be
-                an n-array if specified, where n is the number of DOF for this joint. Defaults to None,
-                which means left unchanged.
-        """
-        self.assert_articulated()
-        if positions is not None:
-            self._default_state.positions = np.array(positions)
-        if velocities is not None:
-            self._default_state.velocities = np.array(velocities)
-        if efforts is not None:
-            self._default_state.efforts = np.array(efforts)
-
-    def update_default_state(self):
-        self.set_default_state(*self.get_state())
 
     def set_control_type(self, control_type, kp=None, kd=None):
         """
@@ -642,7 +579,7 @@ class JointPrim(BasePrim):
                 are in range [-1, 1].
 
         Returns:
-            Tuple:
+            3-tuple:
                 - n-array: position of this joint, where n = number of DOF for this joint
                 - n-array: velocity of this joint, where n = number of DOF for this joint
                 - n-array: effort of this joint, where n = number of DOF for this joint
@@ -672,7 +609,7 @@ class JointPrim(BasePrim):
             normalized (bool): If True, will return normalized target of this joint
 
         Returns:
-            Tuple:
+            2-tuple:
                 - n-array: target position of this joint, where n = number of DOF for this joint
                 - n-array: target velocity of this joint, where n = number of DOF for this joint
         """

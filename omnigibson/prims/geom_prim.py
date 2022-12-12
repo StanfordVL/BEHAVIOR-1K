@@ -1,17 +1,7 @@
-# Copyright (c) 2021, NVIDIA CORPORATION.  All rights reserved.
-#
-# NVIDIA CORPORATION and its licensors retain all intellectual property
-# and proprietary rights in and to this software, related documentation
-# and any modifications thereto.  Any use, reproduction, disclosure or
-# distribution of this software and related documentation without an express
-# license agreement from NVIDIA CORPORATION is strictly prohibited.
-#
 from collections import OrderedDict
 from pxr import UsdShade, UsdPhysics, PhysxSchema
-from omni.isaac.core.utils.prims import get_prim_at_path
 import numpy as np
 from omni.isaac.core.materials import PhysicsMaterial
-from omni.usd import get_shader_from_material
 import omnigibson as og
 from omnigibson.macros import gm
 from omnigibson.prims.xform_prim import XFormPrim
@@ -23,11 +13,11 @@ class GeomPrim(XFormPrim):
     If there is an geom prim present at the path, it will use it. By default, a geom prim cannot be directly
     created from scratch.at
 
-        Args:
-            prim_path (str): prim path of the Prim to encapsulate or create.
-            name (str): Name for the object. Names need to be unique per scene.
-            load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
-                loading this prim at runtime. For this mesh prim, the below values can be specified:
+    Args:
+        prim_path (str): prim path of the Prim to encapsulate or create.
+        name (str): Name for the object. Names need to be unique per scene.
+        load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
+            loading this prim at runtime. For this mesh prim, the below values can be specified:
     """
 
     def __init__(
@@ -156,6 +146,7 @@ class CollisionGeomPrim(GeomPrim):
         self._collision_api = None
         self._mesh_collision_api = None
         self._physx_collision_api = None
+        self._applied_physics_material = None
 
         # Run super method
         super().__init__(
@@ -269,7 +260,6 @@ class CollisionGeomPrim(GeomPrim):
 
     def set_collision_approximation(self, approximation_type):
         """
-
         Args:
             approximation_type (str): approximation used for collision, could be "none", "convexHull" or "convexDecomposition"
         """
@@ -286,7 +276,8 @@ class CollisionGeomPrim(GeomPrim):
         return self._mesh_collision_api.GetApproximationAttr().Get()
 
     def apply_physics_material(self, physics_material, weaker_than_descendants=False):
-        """Used to apply physics material to the held prim and optionally its descendants.
+        """
+        Used to apply physics material to the held prim and optionally its descendants.
 
         Args:
             physics_material (PhysicsMaterial): physics material to be applied to the held prim. This where you want to
@@ -316,7 +307,8 @@ class CollisionGeomPrim(GeomPrim):
         return
 
     def get_applied_physics_material(self):
-        """Returns the current applied physics material in case it was applied using apply_physics_material or not.
+        """
+        Returns the current applied physics material in case it was applied using apply_physics_material or not.
 
         Returns:
             PhysicsMaterial: the current applied physics material.

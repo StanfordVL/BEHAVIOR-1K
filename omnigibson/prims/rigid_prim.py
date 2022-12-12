@@ -1,12 +1,3 @@
-# Copyright (c) 2021, NVIDIA CORPORATION.  All rights reserved.
-#
-# NVIDIA CORPORATION and its licensors retain all intellectual property
-# and proprietary rights in and to this software, related documentation
-# and any modifications thereto.  Any use, reproduction, disclosure or
-# distribution of this software and related documentation without an express
-# license agreement from NVIDIA CORPORATION is strictly prohibited.
-#
-from typing import Optional, Tuple
 from collections import OrderedDict
 from omni.isaac.core.utils.prims import get_prim_at_path, get_prim_parent
 from omni.isaac.core.utils.transformations import tf_matrix_from_pose
@@ -14,7 +5,6 @@ from omni.isaac.core.utils.rotations import gf_quat_to_np_array
 from pxr import Gf, UsdPhysics, Usd, UsdGeom, PhysxSchema
 import numpy as np
 from omni.isaac.dynamic_control import _dynamic_control
-import carb
 
 from omnigibson.macros import gm, create_module_macros
 from omnigibson.prims.xform_prim import XFormPrim
@@ -44,19 +34,19 @@ class RigidPrim(XFormPrim):
         it will apply it.
 
     Args:
-            prim_path (str): prim path of the Prim to encapsulate or create.
-            name (str): Name for the object. Names need to be unique per scene.
-            load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
-                loading this prim at runtime. Note that this is only needed if the prim does not already exist at
-                @prim_path -- it will be ignored if it already exists. For this joint prim, the below values can be
-                specified:
+        prim_path (str): prim path of the Prim to encapsulate or create.
+        name (str): Name for the object. Names need to be unique per scene.
+        load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
+            loading this prim at runtime. Note that this is only needed if the prim does not already exist at
+            @prim_path -- it will be ignored if it already exists. For this joint prim, the below values can be
+            specified:
 
-                scale (None or float or 3-array): If specified, sets the scale for this object. A single number corresponds
-                    to uniform scaling along the x,y,z axes, whereas a 3-array specifies per-axis scaling.
-                mass (None or float): If specified, mass of this body in kg
-                density (None or float): If specified, density of this body in kg / m^3
-                visual_only (None or bool): If specified, whether this prim should include collisions or not.
-                    Default is True.
+            scale (None or float or 3-array): If specified, sets the scale for this object. A single number corresponds
+                to uniform scaling along the x,y,z axes, whereas a 3-array specifies per-axis scaling.
+            mass (None or float): If specified, mass of this body in kg
+            density (None or float): If specified, density of this body in kg / m^3
+            visual_only (None or bool): If specified, whether this prim should include collisions or not.
+                Default is True.
     """
 
     def __init__(
@@ -75,7 +65,7 @@ class RigidPrim(XFormPrim):
         self._physx_rigid_api = None
         self._physx_contact_report_api = None
         self._mass_api = None
-        self._default_state = None
+
         self._visual_only = None
         self._collision_meshes = None
         self._visual_meshes = None
@@ -147,17 +137,6 @@ class RigidPrim(XFormPrim):
         # Grab handle to this rigid body and get name
         self.update_handles()
         self._body_name = self._dc.get_rigid_body_name(self._handle)
-
-        # Set the default state
-        pos, ori = self.get_position_orientation()
-        lin_vel = self.get_linear_velocity()
-        ang_vel = self.get_angular_velocity()
-        self._default_state = DynamicState(
-            position=pos,
-            orientation=ori,
-            linear_velocity=lin_vel,
-            angular_velocity=ang_vel,
-        )
 
     def update_meshes(self):
         """
@@ -256,7 +235,8 @@ class RigidPrim(XFormPrim):
         return contacts
 
     def set_linear_velocity(self, velocity):
-        """Sets the linear velocity of the prim in stage.
+        """
+        Sets the linear velocity of the prim in stage.
 
         Args:
             velocity (np.ndarray): linear velocity to set the rigid prim to. Shape (3,).
@@ -279,7 +259,8 @@ class RigidPrim(XFormPrim):
         return np.array(lin_vel)
 
     def set_angular_velocity(self, velocity):
-        """Sets the angular velocity of the prim in stage.
+        """
+        Sets the angular velocity of the prim in stage.
 
         Args:
             velocity (np.ndarray): angular velocity to set the rigid prim to. Shape (3,).
@@ -301,16 +282,6 @@ class RigidPrim(XFormPrim):
             return np.array(self._rigid_api.GetAngularVelocityAttr().Get())
 
     def set_position_orientation(self, position=None, orientation=None):
-        """
-        Sets prim's pose with respect to the world's frame.
-
-        Args:
-            position (Optional[np.ndarray], optional): position in the world frame of the prim. shape is (3, ).
-                                                       Defaults to None, which means left unchanged.
-            orientation (Optional[np.ndarray], optional): quaternion orientation in the world frame of the prim.
-                                                          quaternion is scalar-last (x, y, z, w). shape is (4, ).
-                                                          Defaults to None, which means left unchanged.
-        """
         if self.dc_is_accessible:
             current_position, current_orientation = self.get_position_orientation()
             if position is None:
@@ -324,14 +295,6 @@ class RigidPrim(XFormPrim):
             super().set_position_orientation(position=position, orientation=orientation)
 
     def get_position_orientation(self):
-        """
-        Gets prim's pose with respect to the world's frame.
-
-        Returns:
-            Tuple[np.ndarray, np.ndarray]: first index is position in the world frame of the prim. shape is (3, ).
-                                           second index is quaternion orientation in the world frame of the prim.
-                                           quaternion is scalar-last (x, y, z, w). shape is (4, ).
-        """
         if self.dc_is_accessible:
             pose = self._dc.get_rigid_body_pose(self._handle)
             pos, ori = np.asarray(pose.p), np.asarray(pose.r)
@@ -342,17 +305,6 @@ class RigidPrim(XFormPrim):
         return np.array(pos), np.array(ori)
 
     def set_local_pose(self, translation=None, orientation=None):
-        """
-        Sets prim's pose with respect to the local frame (the prim's parent frame).
-
-        Args:
-            translation (Optional[np.ndarray], optional): translation in the local frame of the prim
-                                                          (with respect to its parent prim). shape is (3, ).
-                                                          Defaults to None, which means left unchanged.
-            orientation (Optional[np.ndarray], optional): quaternion orientation in the world frame of the prim.
-                                                          quaternion is scalar-last (x, y, z, w). shape is (4, ).
-                                                          Defaults to None, which means left unchanged.
-        """
         if self.dc_is_accessible:
             current_translation, current_orientation = self.get_local_pose()
             translation = current_translation if translation is None else translation
@@ -375,14 +327,6 @@ class RigidPrim(XFormPrim):
             super().set_local_pose(translation=translation, orientation=orientation)
 
     def get_local_pose(self):
-        """
-        Gets prim's pose with respect to the local frame (the prim's parent frame).
-
-        Returns:
-            Tuple[np.ndarray, np.ndarray]: first index is position in the local frame of the prim. shape is (3, ).
-                                           second index is quaternion orientation in the local frame of the prim.
-                                           quaternion is scalar-last (x, y, z, w). shape is (4, ).
-        """
         if self.dc_is_accessible:
             parent_world_tf = UsdGeom.Xformable(get_prim_parent(self._prim)).ComputeLocalToWorldTransform(
                 Usd.TimeCode.Default()
@@ -404,10 +348,11 @@ class RigidPrim(XFormPrim):
 
     @property
     def handle(self):
-        """[summary]
+        """
+        Handle used by Isaac Sim's dynamic control module to reference this rigid prim
 
         Returns:
-            int: [description]
+            int: ID handle assigned to this prim from dynamic_control interface
         """
         return self._handle
 
@@ -468,6 +413,7 @@ class RigidPrim(XFormPrim):
     def volume(self):
         """
         Note: Currently it doesn't support Capsule type yet
+
         Returns:
             float: total volume of all the collision meshes of the rigid body in m^3.
         """
@@ -598,84 +544,16 @@ class RigidPrim(XFormPrim):
         """
         return self._handle is not None and self._dc.is_simulating()
 
-    # def reset(self):
-    #     """
-    #     Resets the prim to its default state.
-    #     """
-    #     # Call super method to reset pose
-    #     super().reset()
-    #
-    #     # Also reset the velocity values
-    #     self.set_linear_velocity(velocity=self._default_state.linear_velocity)
-    #     self.set_angular_velocity(velocity=self._default_state.angular_velocity)
-
-    def get_default_state(self):
-        """
-        Returns:
-            DynamicState: returns the default state of the prim (position, orientation, linear_velocity and
-                          angular_velocity) that is used after each reset.
-        """
-        return self._default_state
-
-    def set_default_state(
-        self,
-        position=None,
-        orientation=None,
-        linear_velocity=None,
-        angular_velocity=None,
-    ):
-        """Sets the default state of the prim, that will be used after each reset.
-
-        Args:
-            position (np.ndarray): position in the world frame of the prim. shape is (3, ).
-                                   Defaults to None, which means left unchanged.
-            orientation (np.ndarray): quaternion orientation in the world frame of the prim.
-                                      quaternion is scalar-last (x, y, z, w). shape is (4, ).
-                                      Defaults to None, which means left unchanged.
-            linear_velocity (np.ndarray): linear velocity to set the rigid prim to. Shape (3,).
-            angular_velocity (np.ndarray): angular velocity to set the rigid prim to. Shape (3,).
-        """
-        if position is not None:
-            self._default_state.position = position
-        if orientation is not None:
-            self._default_state.orientation = orientation
-        if linear_velocity is not None:
-            self._default_state.linear_velocity = linear_velocity
-        if angular_velocity is not None:
-            self._default_state.angular_velocity = angular_velocity
-        return
-
-    def update_default_state(self):
-        pos, ori = self.get_position_orientation()
-        self.set_default_state(
-            position=pos,
-            orientation=ori,
-            linear_velocity=self.get_linear_velocity(),
-            angular_velocity=self.get_angular_velocity(),
-        )
-
-    def get_current_dynamic_state(self):
-        """
-        Returns:
-            DynamicState: the dynamic state of the rigid body including position, orientation, linear_velocity and
-                angular_velocity.
-        """
-        position, orientation = self.get_position_orientation()
-        return DynamicState(
-            position=position,
-            orientation=orientation,
-            linear_velocity=self.get_linear_velocity(),
-            angular_velocity=self.get_angular_velocity(),
-        )
-
     def enable_gravity(self):
-        """[summary]
+        """
+        Enables gravity for this rigid body
         """
         self.set_attribute("physxRigidBody:disableGravity", False)
         # self._dc.set_rigid_body_disable_gravity(self._handle, False)
 
     def disable_gravity(self):
-        """[summary]
+        """
+        Disables gravity for this rigid body
         """
         self.set_attribute("physxRigidBody:disableGravity", True)
         # self._dc.set_rigid_body_disable_gravity(self._handle, True)
