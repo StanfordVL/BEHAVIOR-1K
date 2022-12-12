@@ -6,13 +6,11 @@ import time
 import matplotlib.pyplot as plt
 import numpy as np
 
-import omnigibson
-from omnigibson import app, og_dataset_path
+import omnigibson as og
 from omnigibson.robots.turtlebot import Turtlebot
 from omnigibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
 from omnigibson.simulator import Simulator
 from omnigibson.utils.asset_utils import get_og_assets_version
-from omnigibson.utils.config_utils import parse_config
 
 
 # Params to be set as needed.
@@ -36,37 +34,33 @@ NUM_STEPS = 2000
 #           "Wainscott_1_int"]
 
 
-def benchmark_scene(sim, scene_name, optimized=False, import_robot=True):
+def benchmark_scene(scene_name, optimized=False, import_robot=True):
     assets_version = get_og_assets_version()
     print("assets_version", assets_version)
-    scene_path = f"{og_dataset_path}/scenes/{scene_name}/urdf/{scene_name}_best_template.usd"
-    scene = InteractiveTraversableScene(
-        scene_name, usd_path=scene_path, texture_randomization=False, object_randomization=False)
+    scene = InteractiveTraversableScene(scene_name)
     start = time.time()
-    sim.import_scene(scene)
-    sim.play()
+    og.sim.import_scene(scene)
+    og.sim.play()
     print(time.time() - start)
 
     if import_robot:
         turtlebot = Turtlebot(prim_path="/World/robot", name="agent")
-        sim.import_object(turtlebot, auto_initialize=True)
-        sim.step()
+        og.sim.import_object(turtlebot, auto_initialize=True)
+        og.sim.step()
 
     fps = []
     physics_fps = []
     render_fps = []
     obj_awake = []
     for i in range(NUM_STEPS):
-        # if i % 100 == 0:
-        #     scene.randomize_texture()
         start = time.time()
         if import_robot:
             # Apply random actions.
             turtlebot.apply_action(turtlebot.action_space.sample())
-        sim.step(render=False)
+        og.sim.step(render=False)
         physics_end = time.time()
 
-        sim.render()
+        og.sim.render()
         end = time.time()
 
         if i % 100 == 0:
@@ -102,7 +96,7 @@ def benchmark_scene(sim, scene_name, optimized=False, import_robot=True):
     plt.plot(physics_fps)
     ax.set_xlabel("Physics fps with time, converge to {}".format(np.mean(physics_fps[-100:])))
     ax.set_ylabel("fps")
-    # TODO! Objs awake not implemented yet in simulator.py
+    # TODO! Reading objects' wake state not available yet from omniverse
     # ax = plt.subplot(6, 1, 6)
     # plt.plot(obj_awake)
     # ax.set_xlabel("Num object links awake, converge to {}".format(np.mean(obj_awake[-100:])))
@@ -118,11 +112,11 @@ def main():
             viewer_width=512,
             viewer_height=512,
         )
-        benchmark_scene(sim, scene, optimized=True, import_robot=True)
+        benchmark_scene(scene, optimized=True, import_robot=True)
         sim.stop()
-        benchmark_scene(sim, scene, optimized=True, import_robot=False)
+        benchmark_scene(scene, optimized=True, import_robot=False)
 
-    app.close()
+    og.shutdown()
 
 
 if __name__ == "__main__":

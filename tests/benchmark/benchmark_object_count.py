@@ -1,4 +1,6 @@
-"""Script to benchmark speed vs. no. of objects in the scene."""
+"""
+Script to benchmark speed vs. no. of objects in the scene.
+"""
 
 import os
 import time
