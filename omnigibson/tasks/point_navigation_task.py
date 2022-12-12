@@ -147,7 +147,7 @@ class PointNavigationTask(BaseTask):
         Load visualization, such as initial and target position, shortest path, etc
 
         Args:
-            env (BaseEnv): Active environment instance
+            env (Environment): Active environment instance
         """
         cyl_size = np.array([self._goal_tolerance, self._goal_tolerance, self._marker_height])
         self._initial_pos_marker = PrimitiveObject(
@@ -203,7 +203,7 @@ class PointNavigationTask(BaseTask):
         during this task initialization.
 
         Args:
-            env (BaseEnv): Environment instance
+            env (Environment): Environment instance
             max_trials (int): Number of trials to attempt to sample valid poses and positions
 
         Returns:
@@ -250,8 +250,11 @@ class PointNavigationTask(BaseTask):
         """
         Get potential based on geodesic distance
 
-        :param env: environment instance
-        :return: geodesic distance to the target position
+        Args:
+            env: environment instance
+
+        Returns:
+            float: geodesic distance to the target position
         """
         _, geodesic_dist = self.get_shortest_path_to_goal(env=env)
         return geodesic_dist
@@ -260,8 +263,11 @@ class PointNavigationTask(BaseTask):
         """
         Get potential based on L2 distance
 
-        :param env: environment instance
-        :return: L2 distance to the target position
+        Args:
+            env: environment instance
+
+        Returns:
+            float: L2 distance to the target position
         """
         return T.l2_distance(env.robots[self._robot_idn].get_position()[:2], self._goal_pos[:2])
 
@@ -270,7 +276,7 @@ class PointNavigationTask(BaseTask):
         Compute task-specific potential: distance to the goal
 
         Args:
-            env (BaseEnv): Environment instance
+            env (Environment): Environment instance
 
         Returns:
             float: Computed potential
@@ -355,10 +361,6 @@ class PointNavigationTask(BaseTask):
 
         Returns:
             3-array: (x,y,z) position in self._robot_idn agent's local frame
-
-        :param env: environment instance
-        :param pos: a 3D point in global frame
-        :return: the same 3D point in agent's local frame
         """
         delta_pos_global = np.array(pos) - env.robots[self._robot_idn].get_position()
         return T.quat2mat(env.robots[self._robot_idn].get_orientation()).T @ delta_pos_global
@@ -426,7 +428,7 @@ class PointNavigationTask(BaseTask):
         Step visualization
 
         Args:
-            env (BaseEnv): Environment instance
+            env (Environment): Environment instance
         """
         if env.scene.trav_map.build_graph and self._visualize_path:
             shortest_path, _ = self.get_shortest_path_to_goal(env=env, entire_path=True)

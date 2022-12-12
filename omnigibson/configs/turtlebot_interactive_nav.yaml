@@ -41,7 +41,7 @@ task:
   robot_idn: 0
   floor: 0
   initial_pos: null
-  initial_ori: null
+  initial_quat: null
   goal_pos: null
   goal_tolerance: 0.36    # turtlebot bodywidth
   goal_in_polar: false

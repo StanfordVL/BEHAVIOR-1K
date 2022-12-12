@@ -12,7 +12,7 @@ class PotentialReward(BaseRewardFunction):
 
             potential = potential_fcn(env)
 
-            where @env is a BaseEnv instance, and @potential is a float value representing the calculated potential
+            where @env is a Environment instance, and @potential is a float value representing the calculated potential
 
         r_potential (float): Reward weighting to give proportional to the potential difference calculated
             in between env timesteps
