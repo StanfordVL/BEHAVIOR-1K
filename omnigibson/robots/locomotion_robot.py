@@ -39,13 +39,14 @@ class LocomotionRobot(BaseRobot):
     def _get_proprioception_dict(self):
         dic = super()._get_proprioception_dict()
 
-        joints_state = self.get_joints_state(normalized=False)
+        joint_positions = self.get_joint_positions(normalized=False)
+        joint_velocities = self.get_joint_velocities(normalized=False)
 
         # Add base info
-        dic["base_qpos"] = joints_state.positions[self.base_control_idx]
-        dic["base_qpos_sin"] = np.sin(joints_state.positions[self.base_control_idx])
-        dic["base_qpos_cos"] = np.cos(joints_state.positions[self.base_control_idx])
-        dic["base_qvel"] = joints_state.velocities[self.base_control_idx]
+        dic["base_qpos"] = joint_positions[self.base_control_idx]
+        dic["base_qpos_sin"] = np.sin(joint_positions[self.base_control_idx])
+        dic["base_qpos_cos"] = np.cos(joint_positions[self.base_control_idx])
+        dic["base_qvel"] = joint_velocities[self.base_control_idx]
 
         return dic
 

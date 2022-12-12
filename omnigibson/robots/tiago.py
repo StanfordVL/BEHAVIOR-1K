@@ -333,9 +333,10 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         dic = super()._get_proprioception_dict()
 
         # Add trunk info
-        joints_state = self.get_joints_state(normalized=False)
-        dic["trunk_qpos"] = joints_state.positions[self.trunk_control_idx]
-        dic["trunk_qvel"] = joints_state.velocities[self.trunk_control_idx]
+        joint_positions = self.get_joint_positions(normalized=False)
+        joint_velocities = self.get_joint_velocities(normalized=False)
+        dic["trunk_qpos"] = joint_positions[self.trunk_control_idx]
+        dic["trunk_qvel"] = joint_velocities[self.trunk_control_idx]
 
         return dic
 

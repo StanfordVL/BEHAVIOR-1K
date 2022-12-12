@@ -411,13 +411,14 @@ class ManipulationRobot(BaseRobot):
         dic = super()._get_proprioception_dict()
 
         # Loop over all arms to grab proprio info
-        joints_state = self.get_joints_state(normalized=False)
+        joint_positions = self.get_joint_positions(normalized=False)
+        joint_velocities = self.get_joint_velocities(normalized=False)
         for arm in self.arm_names:
             # Add arm info
-            dic["arm_{}_qpos".format(arm)] = joints_state.positions[self.arm_control_idx[arm]]
-            dic["arm_{}_qpos_sin".format(arm)] = np.sin(joints_state.positions[self.arm_control_idx[arm]])
-            dic["arm_{}_qpos_cos".format(arm)] = np.cos(joints_state.positions[self.arm_control_idx[arm]])
-            dic["arm_{}_qvel".format(arm)] = joints_state.velocities[self.arm_control_idx[arm]]
+            dic["arm_{}_qpos".format(arm)] = joint_positions[self.arm_control_idx[arm]]
+            dic["arm_{}_qpos_sin".format(arm)] = np.sin(joint_positions[self.arm_control_idx[arm]])
+            dic["arm_{}_qpos_cos".format(arm)] = np.cos(joint_positions[self.arm_control_idx[arm]])
+            dic["arm_{}_qvel".format(arm)] = joint_velocities[self.arm_control_idx[arm]]
 
             # Add eef and grasping info
             dic["eef_{}_pos_global".format(arm)] = self.get_eef_position(arm)
@@ -425,8 +426,8 @@ class ManipulationRobot(BaseRobot):
             dic["eef_{}_pos".format(arm)] = self.get_relative_eef_position(arm)
             dic["eef_{}_quat".format(arm)] = self.get_relative_eef_orientation(arm)
             dic["grasp_{}".format(arm)] = np.array([self.is_grasping(arm)])
-            dic["gripper_{}_qpos".format(arm)] = joints_state.positions[self.gripper_control_idx[arm]]
-            dic["gripper_{}_qvel".format(arm)] = joints_state.velocities[self.gripper_control_idx[arm]]
+            dic["gripper_{}_qpos".format(arm)] = joint_positions[self.gripper_control_idx[arm]]
+            dic["gripper_{}_qvel".format(arm)] = joint_velocities[self.gripper_control_idx[arm]]
 
         return dic
 

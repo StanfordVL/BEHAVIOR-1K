@@ -53,7 +53,6 @@ class EntityPrim(XFormPrim):
         self._root_link_name = None             # Name of the root link
         self._dofs_infos = None
         self._n_dof = None                      # dof with dynamic control
-        self._default_joints_state = None
         self._links = None
         self._joints = None
         self._visual_only = None
@@ -208,9 +207,6 @@ class EntityPrim(XFormPrim):
                         )
                         joint.initialize()
                         self._joints[joint_name] = joint
-
-                # Default joints state is our current state for now
-                self._default_joints_state = self.get_joints_state()
         else:
             # TODO: May need to extend to clusters of rigid bodies, that aren't exactly joined
             # We assume this object contains a single rigid body

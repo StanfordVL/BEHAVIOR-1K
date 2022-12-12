@@ -78,9 +78,6 @@ class Simulator(SimulationContext, Serializable):
             stage_units_in_meters=stage_units_in_meters,
             device=device,
         )
-        if self._world_initialized:
-            return
-        Simulator._world_initialized = True
         self._dc_interface = _dynamic_control.acquire_dynamic_control_interface()
         set_camera_view()
         self._data_logger = DataLogger()
@@ -637,17 +634,6 @@ class Simulator(SimulationContext, Serializable):
         self.set_simulation_dt(physics_dt=dt, rendering_dt=dt)
         yield
         self.set_simulation_dt(physics_dt=physics_dt, rendering_dt=rendering_dt)
-
-    @classmethod
-    def clear_instance(cls):
-        SimulationContext.clear_instance()
-        Simulator._world_initialized = None
-        return
-
-    def __del__(self):
-        SimulationContext.__del__(self)
-        Simulator._world_initialized = None
-        return
 
     @property
     def dc(self):

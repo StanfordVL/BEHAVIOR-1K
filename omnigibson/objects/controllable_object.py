@@ -456,12 +456,11 @@ class ControllableObject(BaseObject):
                 - root_pos: (3,) (x,y,z) global cartesian position of the object's root link
                 - root_quat: (4,) (x,y,z,w) global cartesian orientation of ths object's root link
         """
-        joints_state = self.get_joints_state(normalized=False)
         pos, ori = self.get_position_orientation()
         return OrderedDict(
-            joint_position=joints_state.positions,
-            joint_velocity=joints_state.velocities,
-            joint_effort=joints_state.efforts,
+            joint_position=self.get_joint_positions(normalized=False),
+            joint_velocity=self.get_joint_velocities(normalized=False),
+            joint_effort=self.get_joint_efforts(normalized=False),
             root_pos=pos,
             root_quat=ori,
         )

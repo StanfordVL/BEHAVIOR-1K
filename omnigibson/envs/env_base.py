@@ -77,7 +77,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
         og.sim.set_simulation_dt(physics_dt=physics_timestep, rendering_dt=action_timestep)
         og.sim.viewer_width = self.render_config["viewer_width"]
         og.sim.viewer_height = self.render_config["viewer_height"]
-        og.sim.vertical_fov = self.render_config["vertical_fov"]
         og.sim.device = device
 
         # Load this environment
