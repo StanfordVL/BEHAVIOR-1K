@@ -95,7 +95,7 @@ class StaticTraversableScene(TraversableScene):
         self._scene_mesh.add_filtered_collision_pair(prim=self._floor_plane)
 
         # Load the traversability map
-        self._trav_map.load_trav_map(get_scene_path(self.scene_model))
+        self._trav_map.load_map(get_scene_path(self.scene_model))
 
     def move_floor_plane(self, floor=0, additional_elevation=0.02, height=None):
         """
