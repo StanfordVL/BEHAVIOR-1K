@@ -19,7 +19,7 @@ class PointReachingTask(PointNavigationTask):
         floor (int): Which floor to navigate on
         initial_pos (None or 3-array): If specified, should be (x,y,z) global initial position to place the robot
             at the start of each task episode. If None, a collision-free value will be randomly sampled
-        initial_ori (None or 3-array): If specified, should be (r,p,y) global euler orientation to place the robot
+        initial_quat (None or 3-array): If specified, should be (r,p,y) global euler orientation to place the robot
             at the start of each task episode. If None, a value will be randomly sampled about the z-axis
         goal_pos (None or 3-array): If specified, should be (x,y,z) global goal position to reach for the given task
             episode. If None, a collision-free value will be randomly sampled
@@ -51,7 +51,7 @@ class PointReachingTask(PointNavigationTask):
             robot_idn=0,
             floor=0,
             initial_pos=None,
-            initial_ori=None,
+            initial_quat=None,
             goal_pos=None,
             goal_tolerance=0.1,
             goal_in_polar=False,
@@ -73,7 +73,7 @@ class PointReachingTask(PointNavigationTask):
             robot_idn=robot_idn,
             floor=floor,
             initial_pos=initial_pos,
-            initial_ori=initial_ori,
+            initial_quat=initial_quat,
             goal_pos=goal_pos,
             goal_tolerance=goal_tolerance,
             goal_in_polar=goal_in_polar,

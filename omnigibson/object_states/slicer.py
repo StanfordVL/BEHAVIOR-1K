@@ -1,4 +1,3 @@
-import numpy as np
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states import ContactBodies
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin

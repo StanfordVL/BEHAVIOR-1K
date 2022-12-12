@@ -50,20 +50,22 @@ def ewma_vectorized(data, alpha, offset=None, dtype=None, order="C", out=None):
     """
     Calculates the exponential moving average over a vector.
     Will fail for large inputs.
-    :param data: Input data
-    :param alpha: scalar float in range (0,1)
-        The alpha parameter for the moving average.
-    :param offset: optional
-        The offset for the moving average, scalar. Defaults to data[0].
-    :param dtype: optional
-        Data type used for calculations. Defaults to float64 unless
-        data.dtype is float32, then it will use float32.
-    :param order: {'C', 'F', 'A'}, optional
-        Order to use when flattening the data. Defaults to 'C'.
-    :param out: ndarray, or None, optional
-        A location into which the result is stored. If provided, it must have
-        the same shape as the input. If not provided or `None`,
-        a freshly-allocated array is returned.
+
+    Args:
+        data (Iterable): Input data
+        alpha (float): scalar in range (0,1)
+            The alpha parameter for the moving average.
+        offset (None or float): If specified, the offset for the moving average. None defaults to data[0].
+        dtype (None or type): Data type used for calculations. If None, defaults to float64 unless
+            data.dtype is float32, then it will use float32.
+        order (None or str): Order to use when flattening the data. Valid options are {'C', 'F', 'A'}.
+            None defaults to 'C'.
+        out (None or np.array): If specified, the location into which the result is stored. If provided, it must have
+            the same shape as the input. If not provided or `None`,
+            a freshly-allocated array is returned.
+
+    Returns:
+        np.array: Exponential moving average from @data
     """
     data = np.array(data, copy=False)
 

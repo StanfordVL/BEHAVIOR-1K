@@ -1,6 +1,5 @@
 from abc import abstractmethod
 from collections import namedtuple
-
 import numpy as np
 
 from omnigibson import app

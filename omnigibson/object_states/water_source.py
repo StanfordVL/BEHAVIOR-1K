@@ -1,4 +1,3 @@
-from omnigibson.macros import gm
 from omnigibson.object_states.fluid_source import FluidSource
 from omnigibson.systems.micro_particle_system import WaterSystem
 
@@ -19,4 +18,4 @@ class WaterSource(FluidSource):
 
     @staticmethod
     def get_state_link_name():
-        return "water_source_link"
+        return "watersource_link"

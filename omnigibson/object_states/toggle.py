@@ -6,7 +6,6 @@ from omnigibson.prims.geom_prim import VisualGeomPrim
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
 from omnigibson.utils.usd_utils import create_primitive_mesh
-from omnigibson.utils.python_utils import classproperty
 from omni.isaac.core.utils.prims import get_prim_at_path
 
 
@@ -14,7 +13,7 @@ from omni.isaac.core.utils.prims import get_prim_at_path
 m = create_module_macros(module_path=__file__)
 
 m.TOGGLE_DISTANCE_THRESHOLD = 0.1
-m.TOGGLE_LINK_NAME = "toggle_button_link"
+m.TOGGLE_LINK_NAME = "togglebutton_link"
 m.TOGGLE_BUTTON_SCALE = 0.05
 m.CAN_TOGGLE_STEPS = 5
 

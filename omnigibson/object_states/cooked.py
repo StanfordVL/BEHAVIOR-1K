@@ -1,7 +1,6 @@
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.max_temperature import MaxTemperature
 from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
-import numpy as np
 
 
 # Create settings for this module

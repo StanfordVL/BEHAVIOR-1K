@@ -1,5 +1,4 @@
 from abc import abstractmethod
-
 import numpy as np
 
 from omnigibson.robots.robot_base import BaseRobot
@@ -67,7 +66,8 @@ class ActiveCameraRobot(BaseRobot):
     @property
     def _default_camera_joint_controller_config(self):
         """
-        :return: Dict[str, Any] Default camera joint controller config to control this robot's camera
+        Returns:
+            dict: Default camera joint controller config to control this robot's camera
         """
         return {
             "name": "JointController",
@@ -82,8 +82,8 @@ class ActiveCameraRobot(BaseRobot):
     @property
     def _default_camera_null_joint_controller_config(self):
         """
-        :return: Dict[str, Any] Default null joint controller config
-            to control this robot's camera i.e. dummy controller
+        Returns:
+            dict: Default null joint controller config to control this robot's camera i.e. dummy controller
         """
         return {
             "name": "NullJointController",

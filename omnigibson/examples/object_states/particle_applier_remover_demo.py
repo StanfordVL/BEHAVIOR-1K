@@ -9,6 +9,7 @@ from omnigibson.utils.usd_utils import create_joint
 from omnigibson.utils.ui_utils import choose_from_options
 from omnigibson.utils.constants import ParticleModifyMethod
 from omni.isaac.core.utils.stage import add_reference_to_stage
+from pxr import Gf
 
 # Set macros for this example
 macros.object_states.particle_modifier.VISUAL_PARTICLES_REMOVAL_LIMIT = 1000
@@ -44,8 +45,8 @@ def main(random_selection=False, headless=False, short_exec=False):
     )
 
     modification_metalink = {
-        "particleApplier": "particle_application_area",
-        "particleRemover": "particle_remover_area",
+        "particleApplier": "particleapplication_link",
+        "particleRemover": "particleremover_link",
     }
 
     particle_mapping = {system.name: system for system in [StainSystem, WaterSystem]}

@@ -1,7 +1,5 @@
 import os
-
 import numpy as np
-
 
 import omnigibson
 from omnigibson.controllers import ControlType

@@ -1,8 +1,3 @@
-import os
-
-import numpy as np
-
-
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.inside import Inside
@@ -15,7 +10,7 @@ from omnigibson.object_states.toggle import ToggledOn
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
-m.HEATING_ELEMENT_LINK_NAME = "heat_source_link"
+m.HEATING_ELEMENT_LINK_NAME = "heatsource_link"
 
 m.HEATING_ELEMENT_MARKER_SCALE = [1.0] * 3
 # m.HEATING_ELEMENT_MARKER_FILENAME = os.path.join(omnigibson.assets_path, "models/fire/fire.obj")
@@ -48,23 +43,22 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin):
         requires_inside=False,
     ):
         """
-        Initialize a heat source state.
-
-        :param obj: The object with the heat source ability.
-        :param temperature: The temperature of the heat source.
-        :param heating_rate: Fraction of the temperature difference with the
-            heat source temperature should be received every step, per second.
-        :param distance_threshold: The distance threshold which an object needs
-            to be closer than in order to receive heat from this heat source.
-        :param requires_toggled_on: Whether the heat source object needs to be
-            toggled on to emit heat. Requires toggleable ability if set to True.
-        :param requires_closed: Whether the heat source object needs to be
-            closed (e.g. in terms of the joints) to emit heat. Requires openable
-            ability if set to True.
-        :param requires_inside: Whether an object needs to be `inside` the
-            heat source to receive heat. See the Inside state for details. This
-            will mean that the "heating element" link for the object will be
-            ignored.
+        Args:
+            obj (StatefulObject): The object with the heat source ability.
+            temperature (float): The temperature of the heat source.
+            heating_rate (float): Fraction in [0, 1] of the temperature difference with the
+                heat source temperature should be received every step, per second.
+            distance_threshold (float): The distance threshold which an object needs
+                to be closer than in order to receive heat from this heat source.
+            requires_toggled_on (bool): Whether the heat source object needs to be
+                toggled on to emit heat. Requires toggleable ability if set to True.
+            requires_closed (bool): Whether the heat source object needs to be
+                closed (e.g. in terms of the joints) to emit heat. Requires openable
+                ability if set to True.
+            requires_inside (bool): Whether an object needs to be `inside` the
+                heat source to receive heat. See the Inside state for details. This
+                will mean that the "heating element" link for the object will be
+                ignored.
         """
         super(HeatSourceOrSink, self).__init__(obj)
         self.temperature = temperature
@@ -126,34 +120,8 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin):
         super()._initialize()
         self.initialize_link_mixin()
 
-        # Load visual markers
-
-        # TODO: Make fire effect from omni flow instead of loading in an explicit asset
-        # # Import at runtime to prevent circular imports
-        # from omnigibson.objects.usd_object import USDObject
-        # self.marker = USDObject(
-        #     prim_path=f"{self.obj.prim_path}/heat_source_marker",
-        #     usd_path=m.HEATING_ELEMENT_MARKER_FILENAME,
-        #     name=f"{self.obj.name}_heat_source_marker",
-        #     class_id=SemanticClass.HEAT_SOURCE_MARKER,
-        #     scale=m.HEATING_ELEMENT_MARKER_SCALE,
-        #     visible=False,
-        #     fixed_base=False,
-        #     visual_only=True,
-        # )
-        # # Import marker into simulator
-        # self._simulator.import_object(self.marker, register=False, auto_initialize=True)
-
     def _update(self):
         self.status, self.position = self._compute_state_and_position()
-
-        # TODO: Toggle fire effect
-        # # Move the marker.
-        # if self.position is not None:
-        #     self.marker.set_position(self.position)
-        #     self.marker.visible = True
-        # else:
-        #     self.marker.visible = False
 
     def _get_value(self):
         return self.status, self.position

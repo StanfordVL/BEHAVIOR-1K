@@ -33,7 +33,7 @@ class BaseTerminationCondition(Registerable, metaclass=ABCMeta):
 
         Args:
             task (BaseTask): Task instance
-            env (BaseEnv): Environment instance
+            env (Environment): Environment instance
             action (n-array): 1D flattened array of actions executed by all agents in the environment
 
         Returns:
@@ -47,7 +47,7 @@ class BaseTerminationCondition(Registerable, metaclass=ABCMeta):
 
         Args:
             task (BaseTask): Task instance
-            env (BaseEnv): Environment instance
+            env (Environment): Environment instance
             action (n-array): 1D flattened array of actions executed by all agents in the environment
 
         Returns:
@@ -69,7 +69,7 @@ class BaseTerminationCondition(Registerable, metaclass=ABCMeta):
 
         Args:
             task (BaseTask): Task instance
-            env (BaseEnv): Environment instance
+            env (Environment): Environment instance
         """
         # Reset internal vars
         self._done = None

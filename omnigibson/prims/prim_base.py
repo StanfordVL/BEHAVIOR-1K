@@ -1,16 +1,6 @@
-# Copyright (c) 2021, NVIDIA CORPORATION.  All rights reserved.
-#
-# NVIDIA CORPORATION and its licensors retain all intellectual property
-# and proprietary rights in and to this software, related documentation
-# and any modifications thereto.  Any use, reproduction, disclosure or
-# distribution of this software and related documentation without an express
-# license agreement from NVIDIA CORPORATION is strictly prohibited.
-#
 import logging
 from abc import ABC, abstractmethod
 from pxr import Gf, Usd, UsdGeom, UsdShade
-from omni.isaac.core.utils.rotations import gf_quat_to_np_array
-from omni.isaac.core.utils.transformations import tf_matrix_from_pose
 from omni.isaac.core.utils.prims import (
     get_prim_at_path,
     move_prim,
@@ -20,7 +10,6 @@ from omni.isaac.core.utils.prims import (
     get_prim_parent,
     get_prim_object_type,
 )
-from omni.isaac.core.utils.stage import get_current_stage
 from omni.isaac.core.utils.prims import delete_prim
 from omnigibson.utils.python_utils import Serializable, UniquelyNamed, Recreatable
 
@@ -28,19 +17,19 @@ from omnigibson.utils.python_utils import Serializable, UniquelyNamed, Recreatab
 class BasePrim(Serializable, UniquelyNamed, Recreatable, ABC):
     """
     Provides high level functions to deal with a basic prim and its attributes/ properties.
-        If there is an Xform prim present at the path, it will use it. Otherwise, a new XForm prim at
-        the specified prim path will be created.
+    If there is an Xform prim present at the path, it will use it. Otherwise, a new XForm prim at
+    the specified prim path will be created.
 
-        Note: the prim will have "xformOp:orient", "xformOp:translate" and "xformOp:scale" only post init,
-                unless it is a non-root articulation link.
+    Note: the prim will have "xformOp:orient", "xformOp:translate" and "xformOp:scale" only post init,
+        unless it is a non-root articulation link.
 
-        Args:
-            prim_path (str): prim path of the Prim to encapsulate or create.
-            name (str): Name for the object. Names need to be unique per scene.
-            load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
-                loading this prim at runtime. Note that this is only needed if the prim does not already exist at
-                @prim_path -- it will be ignored if it already exists. Subclasses should define the exact keys expected
-                for their class.
+    Args:
+        prim_path (str): prim path of the Prim to encapsulate or create.
+        name (str): Name for the object. Names need to be unique per scene.
+        load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
+            loading this prim at runtime. Note that this is only needed if the prim does not already exist at
+            @prim_path -- it will be ignored if it already exists. Subclasses should define the exact keys expected
+            for their class.
     """
 
     def __init__(
@@ -88,9 +77,6 @@ class BasePrim(Serializable, UniquelyNamed, Recreatable, ABC):
             f"Prim {self.name} at prim_path {self._prim_path} can only be initialized once! (It is already initialized)"
         self._initialize()
 
-        # # Update defaults
-        # self.update_default_state()
-
         # Cache state size
         self._state_size = len(self.dump_state(serialized=True))
 
@@ -105,7 +91,8 @@ class BasePrim(Serializable, UniquelyNamed, Recreatable, ABC):
             simulator (None or SimulationContext): If specified, should be simulator into which this prim will be
                 loaded. Otherwise, it will be loaded into the default stage
 
-        :return Usd.Prim: Prim object loaded into the simulator
+        Returns:
+            Usd.Prim: Prim object loaded into the simulator
         """
         if self._loaded:
             raise ValueError("Cannot load a single prim multiple times.")
@@ -184,7 +171,7 @@ class BasePrim(Serializable, UniquelyNamed, Recreatable, ABC):
         return self._name
 
     @property
-    def prim(self) -> Usd.Prim:
+    def prim(self):
         """
         Returns:
             Usd.Prim: USD Prim object that this object holds.
@@ -222,15 +209,16 @@ class BasePrim(Serializable, UniquelyNamed, Recreatable, ABC):
             imageable.MakeInvisible()
         return
 
-    def is_valid(self) -> bool:
+    def is_valid(self):
         """
         Returns:
             bool: True is the current prim path corresponds to a valid prim in stage. False otherwise.
         """
         return is_prim_path_valid(self.prim_path)
 
-    def change_prim_path(self, new_prim_path: str) -> None:
-        """Moves prim from the old path to a new one.
+    def change_prim_path(self, new_prim_path):
+        """
+        Moves prim from the old path to a new one.
 
         Args:
             new_prim_path (str): new path of the prim to be moved to.
@@ -284,15 +272,11 @@ class BasePrim(Serializable, UniquelyNamed, Recreatable, ABC):
     def get_custom_data(self):
         """
         Get custom data associated with this prim
-        :return dict: Dictionary of any custom information
+
+        Returns:
+            dict: Dictionary of any custom information
         """
         return self._prim.GetCustomData()
-
-    def update_default_state(self):
-        """
-        Updates default state based on current state
-        """
-        raise NotImplementedError()
 
     def _create_prim_with_same_kwargs(self, prim_path, name, load_config):
         """

@@ -1,3 +1,4 @@
+import logging
 import numpy as np
 
 import omnigibson as og
@@ -128,7 +129,7 @@ class PointNavigationObstacleTask(PointNavigationTask):
                     break
 
             if not success:
-                print("WARNING: Failed to reset interactive obj without collision")
+                logging.warning("WARNING: Failed to reset interactive obj without collision")
 
             land_object(obj, pos, ori, env.initial_pos_z_offset)
 

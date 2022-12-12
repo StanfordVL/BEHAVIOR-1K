@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 
+
 class ContactSubscribedStateMixin(ABC):
     """
     Handles contact events (including CONTACT_FOUND, CONTACT_PERSIST, and CONTACT_LOST).

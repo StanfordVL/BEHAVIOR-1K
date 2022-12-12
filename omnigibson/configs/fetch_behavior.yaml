@@ -4,7 +4,6 @@ env:
 render:
   viewer_width: 1280
   viewer_height: 720
-  vertical_fov: 90
 
 scene:
   type: InteractiveTraversableScene
@@ -54,7 +53,6 @@ task:
   activity_definition_id: 0
   activity_instance_id: 0
   predefined_problem: null
-  load_clutter: false
   online_object_sampling: false
   debug_object_sampling: null
   highlight_task_relevant_objects: false

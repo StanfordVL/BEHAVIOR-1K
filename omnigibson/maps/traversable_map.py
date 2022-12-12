@@ -8,10 +8,11 @@ import networkx as nx
 import numpy as np
 from PIL import Image
 
+from omnigibson.maps.map_base import BaseMap
 import omnigibson.utils.transform_utils as T
 
 
-class TraversableMap:
+class TraversableMap(BaseMap):
     """
     Traversable scene class.
     Contains the functionalities for navigation such as shortest path computation
@@ -19,7 +20,7 @@ class TraversableMap:
 
     def __init__(
         self,
-        trav_map_resolution=0.1,
+        map_resolution=0.1,
         trav_map_erosion=2,
         trav_map_with_objects=True,
         build_graph=True,
@@ -27,23 +28,21 @@ class TraversableMap:
         waypoint_resolution=0.2,
     ):
         """
-        Load a traversable scene and compute traversability
-
-        :param trav_map_resolution: traversability map resolution
-        :param trav_map_erosion: erosion radius of traversability areas, should be robot footprint radius
-        :param trav_map_with_objects: whether to use objects or not when constructing graph
-        :param build_graph: build connectivity graph
-        :param num_waypoints: number of way points returned
-        :param waypoint_resolution: resolution of adjacent way points
+        Args:
+            map_resolution (float): map resolution
+            trav_map_erosion (float): erosion radius of traversability areas, should be robot footprint radius
+            trav_map_with_objects (bool): whether to use objects or not when constructing graph
+            build_graph (bool): build connectivity graph
+            num_waypoints (int): number of way points returned
+            waypoint_resolution (float): resolution of adjacent way points
         """
         # Set internal values
-        self.trav_map_default_resolution = 0.01  # each pixel represents 0.01m
-        self.trav_map_resolution = trav_map_resolution
+        self.map_default_resolution = 0.01  # each pixel represents 0.01m
         self.trav_map_erosion = trav_map_erosion
         self.trav_map_with_objects = trav_map_with_objects
         self.build_graph = build_graph
         self.num_waypoints = num_waypoints
-        self.waypoint_interval = int(waypoint_resolution / trav_map_resolution)
+        self.waypoint_interval = int(waypoint_resolution / map_resolution)
 
         # Values loaded at runtime
         self.trav_map_original_size = None
@@ -53,12 +52,19 @@ class TraversableMap:
         self.floor_map = None
         self.floor_graph = None
 
-    def load_trav_map(self, maps_path, floor_heights=(0.0,)):
+        # Run super method
+        super().__init__(map_resolution=map_resolution)
+
+    def _load_map(self, maps_path, floor_heights=(0.0,)):
         """
         Loads the traversability maps for all floors
 
-        :param maps_path: String with the path to the folder containing the traversability maps
-        :param floor_heights: Height(s) of the floors for this map
+        Args:
+            maps_path (str): Path to the folder containing the traversability maps
+            floor_heights (n-array): Height(s) of the floors for this map
+
+        Returns:
+            int: Size of the loaded map
         """
         if not os.path.exists(maps_path):
             logging.warning("trav map does not exist: {}".format(maps_path))
@@ -66,7 +72,7 @@ class TraversableMap:
 
         self.floor_heights = floor_heights
         self.floor_map = []
-        self.floor_graph = []
+        map_size = None
         for floor in range(len(self.floor_heights)):
             if self.trav_map_with_objects:
                 # TODO: Shouldn't this be generated dynamically?
@@ -81,12 +87,12 @@ class TraversableMap:
                 height, width = trav_map.shape
                 assert height == width, "trav map is not a square"
                 self.trav_map_original_size = height
-                self.trav_map_size = int(
-                    self.trav_map_original_size * self.trav_map_default_resolution / self.trav_map_resolution
+                map_size = int(
+                    self.trav_map_original_size * self.map_default_resolution / self.map_resolution
                 )
 
             # We resize the traversability map to the new size computed before
-            trav_map = cv2.resize(trav_map, (self.trav_map_size, self.trav_map_size))
+            trav_map = cv2.resize(trav_map, (map_size, map_size))
 
             # We then erode the image. This is needed because the code that computes shortest path uses the global map
             # and a point robot
@@ -98,19 +104,26 @@ class TraversableMap:
 
             # We search for the largest connected areas
             if self.build_graph:
-                self.build_trav_graph(maps_path, floor, trav_map)
+                # Directly set map siz
+                self.floor_graph = self.build_trav_graph(map_size, maps_path, floor, trav_map)
 
             self.floor_map.append(trav_map)
 
+        return map_size
+
     # TODO: refactor into C++ for speedup
-    def build_trav_graph(self, maps_path, floor, trav_map):
+    @staticmethod
+    def build_trav_graph(map_size, maps_path, floor, trav_map):
         """
         Build traversibility graph and only take the largest connected component
 
-        :param maps_path: String with the path to the folder containing the traversability maps
-        :param floor: floor number
-        :param trav_map: traversability map
+        Args:
+            map_size (int): Size of the map being generated
+            maps_path (str): Path to the folder containing the traversability maps
+            floor (int): floor number
+            trav_map ((H, W)-array): traversability map in image form
         """
+        floor_graph = []
         graph_file = os.path.join(
             maps_path, "floor_trav_{}_py{}{}.p".format(floor, sys.version_info.major, sys.version_info.minor)
         )
@@ -121,8 +134,8 @@ class TraversableMap:
         else:
             logging.info("Building traversable graph")
             g = nx.Graph()
-            for i in range(self.trav_map_size):
-                for j in range(self.trav_map_size):
+            for i in range(map_size):
+                for j in range(map_size):
                     if trav_map[i, j] == 0:
                         continue
                     g.add_node((i, j))
@@ -130,8 +143,8 @@ class TraversableMap:
                     neighbors = [(i - 1, j - 1), (i, j - 1), (i + 1, j - 1), (i - 1, j)]
                     for n in neighbors:
                         if (
-                            0 <= n[0] < self.trav_map_size
-                            and 0 <= n[1] < self.trav_map_size
+                            0 <= n[0] < map_size
+                            and 0 <= n[1] < map_size
                             and trav_map[n[0], n[1]] > 0
                         ):
                             g.add_edge(n, (i, j), weight=T.l2_distance(n, (i, j)))
@@ -142,7 +155,7 @@ class TraversableMap:
             with open(graph_file, "wb") as pfile:
                 pickle.dump(g, pfile)
 
-        self.floor_graph.append(g)
+        floor_graph.append(g)
 
         # update trav_map accordingly
         # This overwrites the traversability map loaded before
@@ -153,8 +166,14 @@ class TraversableMap:
         for node in g.nodes:
             trav_map[node[0], node[1]] = 255
 
+        return floor_graph
+
     @property
     def n_floors(self):
+        """
+        Returns:
+            int: Number of floors belonging to this map's associated scene
+        """
         return len(self.floor_heights)
 
     def get_random_point(self, floor=None):
@@ -179,31 +198,12 @@ class TraversableMap:
         z = self.floor_heights[floor]
         return floor, np.array([x, y, z])
 
-    def map_to_world(self, xy):
-        """
-        Transforms a 2D point in map reference frame into world (simulator) reference frame
-
-        :param xy: 2D location in map reference frame (image)
-        :return: 2D location in world reference frame (metric)
-        """
-        axis = 0 if len(xy.shape) == 1 else 1
-        return np.flip((xy - self.trav_map_size / 2.0) * self.trav_map_resolution, axis=axis)
-
-    def world_to_map(self, xy):
-        """
-        Transforms a 2D point in world (simulator) reference frame into map reference frame
-
-        :param xy: 2D location in world reference frame (metric)
-        :return: 2D location in map reference frame (image)
-        """
-        return np.flip((np.array(xy) / self.trav_map_resolution + self.trav_map_size / 2.0)).astype(np.int)
-
     def has_node(self, floor, world_xy):
         """
         Return whether the traversability graph contains a point
 
-        :param floor: floor number
-        :param world_xy: 2D location in world reference frame (metric)
+            floor: floor number
+            world_xy: 2D location in world reference frame (metric)
         """
         map_xy = tuple(self.world_to_map(world_xy))
         g = self.floor_graph[floor]

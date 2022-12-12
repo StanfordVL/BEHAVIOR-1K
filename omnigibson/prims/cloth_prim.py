@@ -10,15 +10,24 @@ from omnigibson.utils.usd_utils import array_to_vtarray
 from pxr import UsdPhysics, Gf
 from pxr.Sdf import ValueTypeNames as VT
 
-from omni.isaac.core.utils.prims import get_prim_at_path
 from omni.isaac.core.utils.stage import get_current_stage
-from omni.usd import get_shader_from_material
 from omni.physx.scripts import particleUtils
 
+from omnigibson.macros import create_module_macros
 from omnigibson.prims.geom_prim import GeomPrim
 import omnigibson.utils.transform_utils as T
 
 import numpy as np
+
+
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
+
+# TODO: Tune these default values!
+m.CLOTH_STRETCH_STIFFNESS = 10000.0
+m.CLOTH_BEND_STIFFNESS = 200.0
+m.CLOTH_SHEAR_STIFFNESS = 100.0
+m.CLOTH_DAMPING = 0.2
 
 
 class ClothPrim(GeomPrim):
@@ -31,16 +40,16 @@ class ClothPrim(GeomPrim):
         it will apply it.
 
     Args:
-            prim_path (str): prim path of the Prim to encapsulate or create.
-            name (str): Name for the object. Names need to be unique per scene.
-            load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
-                loading this prim at runtime. Note that this is only needed if the prim does not already exist at
-                @prim_path -- it will be ignored if it already exists. For this joint prim, the below values can be
-                specified:
+        prim_path (str): prim path of the Prim to encapsulate or create.
+        name (str): Name for the object. Names need to be unique per scene.
+        load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
+            loading this prim at runtime. Note that this is only needed if the prim does not already exist at
+            @prim_path -- it will be ignored if it already exists. For this joint prim, the below values can be
+            specified:
 
-                scale (None or float or 3-array): If specified, sets the scale for this object. A single number corresponds
-                    to uniform scaling along the x,y,z axes, whereas a 3-array specifies per-axis scaling.
-                mass (None or float): If specified, mass of this body in kg
+            scale (None or float or 3-array): If specified, sets the scale for this object. A single number corresponds
+                to uniform scaling along the x,y,z axes, whereas a 3-array specifies per-axis scaling.
+            mass (None or float): If specified, mass of this body in kg
     """
 
     def __init__(
@@ -67,20 +76,15 @@ class ClothPrim(GeomPrim):
         if "mass" in self._load_config and self._load_config["mass"] is not None:
             self.mass = self._load_config["mass"]
 
-        # TODO (eric): customize stiffness
-        stretch_stiffness = 10000.0
-        bend_stiffness = 200.0
-        shear_stiffness = 100.0
-        damping = 0.2
         particleUtils.add_physx_particle_cloth(
             stage=get_current_stage(),
             path=self._prim.GetPath(),
             dynamic_mesh_path=None,
             particle_system_path=f"/World/ClothSystem",
-            spring_stretch_stiffness=stretch_stiffness,
-            spring_bend_stiffness=bend_stiffness,
-            spring_shear_stiffness=shear_stiffness,
-            spring_damping=damping,
+            spring_stretch_stiffness=m.CLOTH_STRETCH_STIFFNESS,
+            spring_bend_stiffness=m.CLOTH_BEND_STIFFNESS,
+            spring_shear_stiffness=m.CLOTH_SHEAR_STIFFNESS,
+            spring_damping=m.CLOTH_DAMPING,
             self_collision=True,
             self_collision_filter=True,
         )
@@ -127,9 +131,7 @@ class ClothPrim(GeomPrim):
         self.set_attribute(attr="points", val=array_to_vtarray(arr=p_local, element_type=Gf.Vec3f))
 
     def update_handles(self):
-        """
-        Updates all internal handles for this prim, in case they change since initialization
-        """
+        # no handles to update
         pass
 
     @property
@@ -146,6 +148,7 @@ class ClothPrim(GeomPrim):
         Returns:
             float: mass of the rigid body in kg.
         """
+        # We have to read the mass directly in the cloth prim
         return self._mass_api.GetMassAttr().Get()
 
     @mass.setter
@@ -154,6 +157,7 @@ class ClothPrim(GeomPrim):
         Args:
             mass (float): mass of the rigid body in kg.
         """
+        # We have to set the mass directly in the cloth prim
         self._mass_api.GetMassAttr().Set(mass)
 
     @property
@@ -165,26 +169,13 @@ class ClothPrim(GeomPrim):
         raise NotImplementedError("Cannot set density for ClothPrim")
 
     def set_linear_velocity(self, velocity):
-        """Sets the linear velocity of the prim in stage.
-
-        Args:
-            velocity (np.ndarray): linear velocity to set the rigid prim to. Shape (3,).
-        """
         # TODO (eric): Just a pass through for now.
         return
 
     def set_angular_velocity(self, velocity):
-        """Sets the angular velocity of the prim in stage.
-
-        Args:
-            velocity (np.ndarray): angular velocity to set the rigid prim to. Shape (3,).
-        """
         # TODO (eric): Just a pass through for now.
         return
 
     def wake(self):
-        """
-        Enable physics for this rigid body
-        """
         # TODO (eric): Just a pass through for now.
         return

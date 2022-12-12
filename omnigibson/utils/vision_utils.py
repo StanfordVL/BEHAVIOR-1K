@@ -3,16 +3,14 @@ import random
 
 import numpy as np
 from PIL import Image
-import os
 
-from omnigibson import app, assets_path
+from omnigibson import app
 
 # Make sure synthetic data extension is enabled
 ext_manager = app.app.get_extension_manager()
 ext_manager.set_extension_enabled("omni.syntheticdata", True)
 
 # Continue with omni synethic data imports afterwards
-from omni.syntheticdata import sensors as sensors_util
 import omni.syntheticdata._syntheticdata as sd
 sensor_types = sd.SensorType
 
@@ -25,13 +23,17 @@ except ImportError:
 class RandomScale:
     """Rescale the input PIL.Image to the given size.
     Args:
-    size (sequence or int): Desired output size. If size is a sequence like
-    (w, h), output size will be matched to this. If size is an int,
-    smaller edge of the image will be matched to this number.
-    i.e, if height > width, then image will be rescaled to
-    (size * height / width, size)
-    interpolation (int, optional): Desired interpolation. Default is
-    ``PIL.Image.BILINEAR``
+        minsize (sequence or int): Desired min output size. If size is a sequence like
+            (w, h), output size will be matched to this. If size is an int,
+            smaller edge of the image will be matched to this number.
+            i.e, if height > width, then image will be rescaled to
+            (size * height / width, size)
+        maxsize (sequence or int): Desired max output size. If size is a sequence like
+            (w, h), output size will be matched to this. If size is an int,
+            smaller edge of the image will be matched to this number.
+            i.e, if height > width, then image will be rescaled to
+            (size * height / width, size)
+        interpolation (int, optional): Desired interpolation. Default is ``PIL.Image.BILINEAR``
     """
 
     def __init__(self, minsize, maxsize, interpolation=Image.BILINEAR):
@@ -44,9 +46,10 @@ class RandomScale:
     def __call__(self, img):
         """
         Args:
-        img (PIL.Image): Image to be scaled.
+            img (PIL.Image): Image to be scaled.
+
         Returns:
-        PIL.Image: Rescaled image.
+            PIL.Image: Rescaled image.
         """
 
         size = random.randint(self.minsize, self.maxsize)
@@ -73,6 +76,12 @@ def randomize_colors(N, bright=True):
     Generate random colors.
     To get visually distinct colors, generate them in HSV space then
     convert to RGB.
+
+    Args:
+        N (int): Number of colors to generate
+
+    Returns:
+        bright (bool): whether to increase the brightness of the colors or not
     """
     brightness = 1.0 if bright else 0.5
     hsv = [(1.0 * i / N, 1, brightness) for i in range(N)]
@@ -88,6 +97,12 @@ def segmentation_to_rgb(seg_im, N, colors=None):
     Helper function to visualize segmentations as RGB frames.
     NOTE: assumes that geom IDs go up to N at most - if not,
     multiple geoms might be assigned to the same color.
+
+    Args:
+        seg_im ((W, H)-array): Segmentation image
+        N (int): Maximum segmentation ID from @seg_im
+        colors (None or list of 3-array): If specified, colors to apply
+            to different segmentation IDs. Otherwise, will be generated randomly
     """
     # ensure all values lie within [0, N]
     seg_im = np.mod(seg_im, N)

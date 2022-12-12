@@ -133,8 +133,10 @@ def get_texture_change_priority():
 def get_default_states():
     return _DEFAULT_STATE_SET
 
+
 def get_fluid_source_states():
     return [state for state in _ALL_STATES if issubclass(state, FluidSource)]
+
 
 def get_all_states():
     return _ALL_STATES
@@ -162,11 +164,13 @@ def get_object_state_instance(state_class, obj, params=None):
     The parameters passed in as a dictionary through params are passed as
     kwargs to the object state class constructor.
 
-    :param state_class: The state name from the state name dictionary.
-    :param obj: The object for which the state is being constructed.
-    :param params: Dict of {param: value} corresponding to the state's params.
-    :return: The constructed state object, an instance of a child of
-        BaseObjectState.
+    Args:
+        state_class (BaseObjectState): The state name from the state name dictionary.
+        obj (StatefulObject): The object for which the state is being constructed.
+        params (dict): Dictionary of {param: value} corresponding to the state's params.
+
+    Returns:
+        BaseObjectState: The constructed state object
     """
     if not issubclass(state_class, BaseObjectState):
         assert False, "unknown state class: {}".format(state_class)
@@ -179,7 +183,8 @@ def get_object_state_instance(state_class, obj, params=None):
 
 def get_state_dependency_graph():
     """
-    Produce dependency graph of supported object states.
+    Returns:
+        nx.DiGraph: State dependency graph of supported object states
     """
     dependencies = {state: state.get_dependencies() + state.get_optional_dependencies() for state in get_all_states()}
     return nx.DiGraph(dependencies)
@@ -187,6 +192,7 @@ def get_state_dependency_graph():
 
 def get_states_by_dependency_order():
     """
-    Produce a list of all states in topological order of dependency.
+    Returns:
+        list: all states in topological order of dependency
     """
     return list(reversed(list(nx.algorithms.topological_sort(get_state_dependency_graph()))))

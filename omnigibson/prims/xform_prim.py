@@ -1,15 +1,5 @@
-# Copyright (c) 2021, NVIDIA CORPORATION.  All rights reserved.
-#
-# NVIDIA CORPORATION and its licensors retain all intellectual property
-# and proprietary rights in and to this software, related documentation
-# and any modifications thereto.  Any use, reproduction, disclosure or
-# distribution of this software and related documentation without an express
-# license agreement from NVIDIA CORPORATION is strictly prohibited.
-#
 from collections import Iterable, OrderedDict
-from typing import Optional, Tuple
 from pxr import Gf, Usd, UsdGeom, UsdShade, UsdPhysics
-from omni.isaac.core.utils.types import XFormPrimState
 from omni.isaac.core.utils.rotations import gf_quat_to_np_array
 from omni.isaac.core.utils.prims import (
     get_prim_at_path,
@@ -32,17 +22,17 @@ class XFormPrim(BasePrim):
     If there is an Xform prim present at the path, it will use it. Otherwise, a new XForm prim at
     the specified prim path will be created when self.load(...) is called.
 
-        Note: the prim will have "xformOp:orient", "xformOp:translate" and "xformOp:scale" only post init,
-                unless it is a non-root articulation link.
+    Note: the prim will have "xformOp:orient", "xformOp:translate" and "xformOp:scale" only post init,
+        unless it is a non-root articulation link.
 
-        Args:
-            prim_path (str): prim path of the Prim to encapsulate or create.
-            name (str): Name for the object. Names need to be unique per scene.
-            load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
-                loading this prim at runtime. For this xform prim, the below values can be specified:
+    Args:
+        prim_path (str): prim path of the Prim to encapsulate or create.
+        name (str): Name for the object. Names need to be unique per scene.
+        load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
+            loading this prim at runtime. For this xform prim, the below values can be specified:
 
-                scale (None or float or 3-array): If specified, sets the scale for this object. A single number corresponds
-                    to uniform scaling along the x,y,z axes, whereas a 3-array specifies per-axis scaling.
+            scale (None or float or 3-array): If specified, sets the scale for this object. A single number corresponds
+                to uniform scaling along the x,y,z axes, whereas a 3-array specifies per-axis scaling.
     """
 
     def __init__(
@@ -52,7 +42,6 @@ class XFormPrim(BasePrim):
         load_config=None,
     ):
         # Other values that will be filled in at runtime
-        self._default_state = None
         self._binding_api = None
         self._material = None
         self._collision_filter_api = None
@@ -78,13 +67,6 @@ class XFormPrim(BasePrim):
         # Make sure all xforms have pose and scaling info
         self._set_xform_properties()
 
-        # # We need to set the properties if this is not a root link
-        # non_root_link_flag = query_parent_path(
-        #     prim_path=self._prim_path, predicate=lambda a: get_prim_object_type(a) == "articulation"
-        # )
-        # if not non_root_link_flag:
-        #     self._set_xform_properties()
-
         # Create collision filter API
         self._collision_filter_api = UsdPhysics.FilteredPairsAPI(self._prim) if \
             self._prim.HasAPI(UsdPhysics.FilteredPairsAPI) else UsdPhysics.FilteredPairsAPI.Apply(self._prim)
@@ -103,14 +85,6 @@ class XFormPrim(BasePrim):
         # Optionally set the scale and visibility
         if "scale" in self._load_config and self._load_config["scale"] is not None:
             self.scale = self._load_config["scale"]
-
-    def _initialize(self):
-        # Always run super first
-        super()._initialize()
-
-        # Grab default state
-        default_pos, default_ori = self.get_position_orientation()
-        self._default_state = XFormPrimState(position=default_pos, orientation=default_ori)
 
     def _set_xform_properties(self):
         current_position, current_orientation = self.get_position_orientation()
@@ -161,38 +135,6 @@ class XFormPrim(BasePrim):
             f"{self.prim_path}: old_pos: {current_position}, new_pos: {new_position}, " \
             f"old_orn: {current_orientation}, new_orn: {new_orientation}"
 
-    # def reset(self):
-    #     """
-    #     Resets the prim to its default state (position and orientation).
-    #     """
-    #     self.set_position_orientation(self._default_state.position, self._default_state.orientation)
-
-    def get_default_state(self):
-        """
-        Returns:
-            XFormPrimState: returns the default state of the prim (position and orientation) that is used after each reset.
-        """
-        return self._default_state
-
-    def set_default_state(self, position=None, orientation=None):
-        """Sets the default state of the prim (position and orientation), that will be used after each reset.
-
-        Args:
-            position (Optional[np.ndarray], optional): position in the world frame of the prim. shape is (3, ).
-                                                       Defaults to None, which means left unchanged.
-            orientation (Optional[np.ndarray], optional): quaternion orientation in the world frame of the prim.
-                                                          quaternion is scalar-first (w, x, y, z). shape is (4, ).
-                                                          Defaults to None, which means left unchanged.
-        """
-        if position is not None:
-            self._default_state.position = position
-        if orientation is not None:
-            self._default_state.orientation = orientation
-        return
-
-    def update_default_state(self):
-        self.set_default_state(*self.get_position_orientation())
-
     def has_material(self):
         """
         Returns:
@@ -203,14 +145,13 @@ class XFormPrim(BasePrim):
 
     def set_position_orientation(self, position=None, orientation=None):
         """
-        Sets prim's pose with respect to the world's frame.
+        Sets prim's pose with respect to the world frame
 
         Args:
-            position (Optional[np.ndarray], optional): position in the world frame of the prim. shape is (3, ).
-                                                       Defaults to None, which means left unchanged.
-            orientation (Optional[np.ndarray], optional): quaternion orientation in the world frame of the prim.
-                                                          quaternion is scalar-last (x, y, z, w). shape is (4, ).
-                                                          Defaults to None, which means left unchanged.
+            position (None or 3-array): if specified, (x,y,z) position in the world frame
+                Default is None, which means left unchanged.
+            orientation (None or 4-array): if specified, (x,y,z,w) quaternion orientation in the world frame.
+                Default is None, which means left unchanged.
         """
         current_position, current_orientation = self.get_position_orientation()
         position = current_position if position is None else np.array(position)
@@ -218,8 +159,8 @@ class XFormPrim(BasePrim):
         orientation = orientation[[3, 0, 1, 2]]     # Flip from x,y,z,w to w,x,y,z
 
         mat = Gf.Transform()
-        mat.SetRotation(Gf.Rotation(Gf.Quatd(*orientation.tolist())))
-        mat.SetTranslation(Gf.Vec3d(*position.tolist()))
+        mat.SetRotation(Gf.Rotation(Gf.Quatd(*orientation)))
+        mat.SetTranslation(Gf.Vec3d(*position))
 
         # mat.SetScale(Gf.Vec3d(*(self.get_world_scale() / self.scale)))
         # TODO (eric): understand why this (mat.setScale) works - this works empirically but it's unclear why.
@@ -243,9 +184,9 @@ class XFormPrim(BasePrim):
         Gets prim's pose with respect to the world's frame.
 
         Returns:
-            Tuple[np.ndarray, np.ndarray]: first index is position in the world frame of the prim. shape is (3, ).
-                                           second index is quaternion orientation in the world frame of the prim.
-                                           quaternion is scalar-last (x, y, z, w). shape is (4, ).
+            2-tuple:
+                - 3-array: (x,y,z) position in the world frame
+                - 4-array: (x,y,z,w) quaternion orientation in the world frame
         """
         prim_tf = UsdGeom.Xformable(self._prim).ComputeLocalToWorldTransform(Usd.TimeCode.Default())
         transform = Gf.Transform()
@@ -300,27 +241,27 @@ class XFormPrim(BasePrim):
         return mat2euler(quat2mat(self.get_orientation()))
 
     def get_local_pose(self):
-        """Gets prim's pose with respect to the local frame (the prim's parent frame).
+        """
+        Gets prim's pose with respect to the prim's local frame (it's parent frame)
 
         Returns:
-            Tuple[np.ndarray, np.ndarray]: first index is position in the local frame of the prim. shape is (3, ).
-                                           second index is quaternion orientation in the local frame of the prim.
-                                           quaternion is scalar-last (x, y, z, w). shape is (4, ).
+            2-tuple:
+                - 3-array: (x,y,z) position in the local frame
+                - 4-array: (x,y,z,w) quaternion orientation in the local frame
         """
         xform_translate_op = self.get_attribute("xformOp:translate")
         xform_orient_op = self.get_attribute("xformOp:orient")
         return np.array(xform_translate_op), gf_quat_to_np_array(xform_orient_op)[[1, 2, 3, 0]]
 
     def set_local_pose(self, translation=None, orientation=None):
-        """Sets prim's pose with respect to the local frame (the prim's parent frame).
+        """
+        Sets prim's pose with respect to the local frame (the prim's parent frame).
 
         Args:
-            translation (Optional[np.ndarray], optional): translation in the local frame of the prim
-                                                          (with respect to its parent prim). shape is (3, ).
-                                                          Defaults to None, which means left unchanged.
-            orientation (Optional[np.ndarray], optional): quaternion orientation in the world frame of the prim.
-                                                          quaternion is scalar-last (x, y, z, w). shape is (4, ).
-                                                          Defaults to None, which means left unchanged.
+            translation (None or 3-array): if specified, (x,y,z) translation in the local frame of the prim
+                (with respect to its parent prim). Default is None, which means left unchanged.
+            orientation (None or 4-array): if specified, (x,y,z,w) quaternion orientation in the local frame of the prim
+                (with respect to its parent prim). Default is None, which means left unchanged.
         """
         properties = self.prim.GetPropertyNames()
         if translation is not None:
@@ -345,7 +286,8 @@ class XFormPrim(BasePrim):
         return
 
     def get_world_scale(self):
-        """Gets prim's scale with respect to the world's frame.
+        """
+        Gets prim's scale with respect to the world's frame.
 
         Returns:
             np.ndarray: scale applied to the prim's dimensions in the world frame. shape is (3, ).
@@ -357,7 +299,8 @@ class XFormPrim(BasePrim):
 
     @property
     def scale(self):
-        """Gets prim's scale with respect to the local frame (the parent's frame).
+        """
+        Gets prim's scale with respect to the local frame (the parent's frame).
 
         Returns:
             np.ndarray: scale applied to the prim's dimensions in the local frame. shape is (3, ).
@@ -366,14 +309,15 @@ class XFormPrim(BasePrim):
 
     @scale.setter
     def scale(self, scale):
-        """Sets prim's scale with respect to the local frame (the prim's parent frame).
+        """
+        Sets prim's scale with respect to the local frame (the prim's parent frame).
 
         Args:
             scale (float or np.ndarray): scale to be applied to the prim's dimensions. shape is (3, ).
                                           Defaults to None, which means left unchanged.
         """
         scale = np.array(scale) if isinstance(scale, Iterable) else np.ones(3) * scale
-        scale = Gf.Vec3d(*scale.tolist())
+        scale = Gf.Vec3d(*scale)
         properties = self.prim.GetPropertyNames()
         if "xformOp:scale" not in properties:
             carb.log_error("Scale property needs to be set for {} before setting its scale".format(self.name))

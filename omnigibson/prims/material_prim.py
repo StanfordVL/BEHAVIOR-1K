@@ -8,7 +8,6 @@ from omni.isaac.core.utils.prims import get_prim_at_path
 from omni.usd import get_shader_from_material
 
 import omnigibson as og
-from omnigibson import app, assets_path, og_dataset_path
 from omnigibson.utils.physx_utils import bind_material
 from omnigibson.prims.prim_base import BasePrim
 
@@ -17,21 +16,21 @@ class MaterialPrim(BasePrim):
     """
     Provides high level functions to deal with a material prim and its attributes/ properties.
 
-        If there is a material prim present at the path, it will use it. Otherwise, a new material prim at
-        the specified prim path will be created.
+    If there is a material prim present at the path, it will use it. Otherwise, a new material prim at
+    the specified prim path will be created.
 
-        Args:
-            prim_path (str): prim path of the Prim to encapsulate or create.
-            name (str): Name for the object. Names need to be unique per scene.
-            load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
-                loading this prim at runtime. Note that this is only needed if the prim does not already exist at
-                @prim_path -- it will be ignored if it already exists. Subclasses should define the exact keys expected
-                for their class. For this material prim, the below values can be specified:
+    Args:
+        prim_path (str): prim path of the Prim to encapsulate or create.
+        name (str): Name for the object. Names need to be unique per scene.
+        load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
+            loading this prim at runtime. Note that this is only needed if the prim does not already exist at
+            @prim_path -- it will be ignored if it already exists. Subclasses should define the exact keys expected
+            for their class. For this material prim, the below values can be specified:
 
-                mdl_name (None or str): If specified, should be the name of the mdl preset to load (including .mdl).
-                    None results in default, "OmniPBR.mdl"
-                mtl_name (None or str): If specified, should be the name of the mtl preset to load.
-                    None results in default, "OmniPBR"
+            mdl_name (None or str): If specified, should be the name of the mdl preset to load (including .mdl).
+                None results in default, "OmniPBR.mdl"
+            mtl_name (None or str): If specified, should be the name of the mtl preset to load.
+                None results in default, "OmniPBR"
     """
     def __init__(
         self,
@@ -83,6 +82,9 @@ class MaterialPrim(BasePrim):
         bind_material(prim_path=target_prim_path, material_path=self.prim_path)
 
     async def _load_mdl_parameters(self):
+        """
+        Loads MDL parameters internally so they can be accessed by our class instance
+        """
         og.sim.render()
         await omni.usd.get_context().load_mdl_parameters_for_prim_async(self._shader)
 

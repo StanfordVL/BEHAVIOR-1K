@@ -1,8 +1,8 @@
 from abc import abstractmethod
-from collections import namedtuple, Sized, OrderedDict, defaultdict
+from collections import OrderedDict, defaultdict
 import numpy as np
 import omnigibson as og
-from omnigibson.macros import gm, create_module_macros, macros
+from omnigibson.macros import create_module_macros, macros
 from omnigibson.prims.geom_prim import VisualGeomPrim
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.contact_bodies import ContactBodies
@@ -10,8 +10,7 @@ from omnigibson.object_states.covered import Covered
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from omnigibson.object_states.object_state_base import AbsoluteObjectState
 from omnigibson.object_states.toggle import ToggledOn
-from omnigibson.utils.usd_utils import BoundingBoxAPI
-from omnigibson.systems.system_base import get_system_from_element_name, get_element_name_from_system
+from omnigibson.systems.system_base import get_element_name_from_system
 from omnigibson.systems.macro_particle_system import VisualParticleSystem, get_visual_particle_systems
 from omnigibson.systems.micro_particle_system import FluidSystem, get_fluid_systems
 from omnigibson.utils.constants import ParticleModifyMethod, PrimType
@@ -29,8 +28,8 @@ from pxr import PhysicsSchemaTools, UsdGeom, Gf, Sdf
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
-m.APPLICATION_LINK_NAME = "particle_application_area"
-m.REMOVAL_LINK_NAME = "particle_remover_area"
+m.APPLICATION_LINK_NAME = "particleapplication_link"
+m.REMOVAL_LINK_NAME = "particleremover_link"
 
 # How many samples within the application area to generate per update step
 m.MAX_VISUAL_PARTICLES_APPLIED_PER_STEP = 2

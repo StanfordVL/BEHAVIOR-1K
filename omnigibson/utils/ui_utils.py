@@ -1,7 +1,6 @@
 """
 Helper classes and functions for streamlining user interactions
 """
-
 import numpy as np
 import sys
 from collections import OrderedDict
@@ -101,12 +100,14 @@ def choose_from_options(options, name, random_selection=False):
     """
     Prints out options from a list, and returns the requested option.
 
-    :param options: dict or Array, options to choose from. If dict, the value entries are assumed to be docstrings
-        explaining the individual options
-    :param name: str, name of the options
-    :param random_selection: bool, if the selection is random (for automatic demo execution). Default False
+    Args:
+        options (dict or list): options to choose from. If dict, the value entries are assumed to be docstrings
+            explaining the individual options
+        name (str): name of the options
+        random_selection (bool): if the selection is random (for automatic demo execution). Default False
 
-    :return str: Requested option
+    Returns:
+        str: Requested option
     """
     # Select robot
     print("\nHere is a list of available {}s:\n".format(name))
@@ -260,7 +261,8 @@ class KeyboardRobotController:
 
     def __init__(self, robot):
         """
-        :param robot: BaseRobot, robot to control
+        Args:
+            robot (BaseRobot): robot to control
         """
         # Store relevant info from robot
         self.robot = robot
@@ -446,13 +448,15 @@ class KeyboardRobotController:
 
     def get_random_action(self):
         """
-        :return Array: Generated random action vector (normalized)
+        Returns:
+            n-array: Generated random action vector (normalized)
         """
         return np.random.uniform(-1, 1, self.action_dim)
 
     def get_teleop_action(self):
         """
-        :return Array: Generated action vector based on received user inputs from the keyboard
+        Returns:
+            n-array: Generated action vector based on received user inputs from the keyboard
         """
         action = np.zeros(self.action_dim)
 

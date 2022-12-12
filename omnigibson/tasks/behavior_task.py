@@ -1,9 +1,7 @@
-import datetime
 import logging
 from collections import OrderedDict
 import os
 import numpy as np
-import json
 
 import networkx as nx
 
@@ -23,30 +21,21 @@ from bddl.object_taxonomy import ObjectTaxonomy
 
 import omnigibson as og
 from omnigibson.objects.dataset_object import DatasetObject
-# from omnigibson.objects.multi_object_wrappers import ObjectGrouper, ObjectMultiplexer
 from omnigibson.reward_functions.potential_reward import PotentialReward
 from omnigibson.robots.robot_base import BaseRobot
 from omnigibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
-from omnigibson.tasks.bddl_backend import IGibsonBDDLBackend
+from omnigibson.tasks.bddl_backend import OmniGibsonBDDLBackend
 from omnigibson.tasks.task_base import BaseTask
 from omnigibson.termination_conditions.predicate_goal import PredicateGoal
 from omnigibson.termination_conditions.timeout import Timeout
 from omnigibson.utils.asset_utils import get_og_avg_category_specs, get_og_model_path, get_object_models_of_category
-# from omnigibson.utils.checkpoint_utils import load_checkpoint
 from omnigibson.utils.constants import (
-    AGENT_POSE_DIM,
-    FLOOR_SYNSET,
-    MAX_TASK_RELEVANT_OBJS,
     NON_SAMPLEABLE_OBJECTS,
-    TASK_RELEVANT_OBJS_OBS_DIM,
     KINEMATICS_STATES,
 )
-from omnigibson.utils.log_utils import IGLogWriter
 from omnigibson.utils.python_utils import classproperty, assert_valid_key
-import omnigibson.utils.transform_utils as T
 
 
-# TODO! WIP
 class BehaviorTask(BaseTask):
     """
     Task for BEHAVIOR
@@ -60,14 +49,9 @@ class BehaviorTask(BaseTask):
             will be used only if @online_object_sampling is False.
         predefined_problem (None or str): If specified, specifies the raw string definition of the Behavior Task to
             load. This will automatically override @activity_name and @activity_definition_id.
-        load_clutter (bool): whether to clutter the task scene or not (i.e.: load non-task relevant objects into
-            the scene)
         online_object_sampling (bool): whether to sample object locations online at runtime or not
         debug_object_sampling (None or str): if specified, should be the object name to debug for placement functionality
         highlight_task_relevant_objects (bool): whether to overlay task-relevant objects in the scene with a colored mask
-        reset_checkpoint_idx (int): TODO
-        reset_checkpoint_dir (None or str): TODO
-        episode_save_dir (None or str): TODO
         termination_config (None or dict): Keyword-mapped configuration to use to generate termination conditions. This
             should be specific to the task class. Default is None, which corresponds to a default config being usd.
             Note that any keyword required by a specific task class but not specified in the config will automatically
@@ -83,7 +67,6 @@ class BehaviorTask(BaseTask):
             activity_definition_id=0,
             activity_instance_id=0,
             predefined_problem=None,
-            load_clutter=True,
             online_object_sampling=False,
             debug_object_sampling=None,
             highlight_task_relevant_objects=False,
@@ -98,7 +81,7 @@ class BehaviorTask(BaseTask):
         # Initialize relevant variables
 
         # BDDL
-        self.backend = IGibsonBDDLBackend()
+        self.backend = OmniGibsonBDDLBackend()
 
         # Activity info
         self.activity_name = None
@@ -115,7 +98,6 @@ class BehaviorTask(BaseTask):
 
         # Object info
         self.object_taxonomy = ObjectTaxonomy()
-        self.load_clutter = load_clutter
         self.debug_object_sampling = debug_object_sampling
         self.online_object_sampling = online_object_sampling
         self.highlight_task_relevant_objs = highlight_task_relevant_objects
@@ -129,9 +111,6 @@ class BehaviorTask(BaseTask):
         self.object_sampling_orders = None
         self.sampled_objects = None
         self.sampleable_object_conditions = None
-
-        # We infer where to reset the agent based on the cached value
-        self.agent_init_poses = json.loads(og.sim.world_prim.GetCustomDataByKey("agent_poses")) if not self.online_object_sampling else None
 
         # Logic-tracking info
         self.currently_viewed_index = None
@@ -185,14 +164,6 @@ class BehaviorTask(BaseTask):
         # No non-low dim observations so we return an empty dict
         return OrderedDict()
 
-    def _reset_agent(self, env):
-        # TODO: Add option for online sampling
-        for i, robot in enumerate(env.robots):
-            if not self.online_object_sampling:
-                robot.set_position_orientation(**self.agent_init_poses[i])
-            robot.reset()
-            robot.keep_still()
-
     def update_activity(self, activity_name, activity_definition_id, predefined_problem=None):
         """
         Update the active Behavior activity being deployed
@@ -244,7 +215,7 @@ class BehaviorTask(BaseTask):
         Compute task-specific potential: distance to the goal
 
         Args:
-            env (BaseEnv): Environment instance
+            env (Environment): Current active environment instance
 
         Returns:
             float: Computed potential
@@ -257,6 +228,17 @@ class BehaviorTask(BaseTask):
         return -success_score
 
     def initialize_activity(self, env):
+        """
+        Initializes the desired activity in the current environment @env
+
+        Args:
+            env (Environment): Current active environment instance
+
+        Returns:
+            2-tuple:
+                - bool: Whether the generated scene activity should be accepted or not
+                - dict: Any feedback from the sampling / initialization process
+        """
         accept_scene = True
         feedback = None
 
@@ -270,10 +252,6 @@ class BehaviorTask(BaseTask):
             accept_scene, feedback = self.sample(env)
             if not accept_scene:
                 return accept_scene, feedback
-
-            if self.load_clutter:
-                # Add clutter objects into the scenes
-                self.clutter_scene(env)
         else:
             # Load existing scene cache and assign object scope accordingly
             self.assign_object_scope_with_cache(env)
@@ -287,9 +265,10 @@ class BehaviorTask(BaseTask):
 
     def parse_non_sampleable_object_room_assignment(self, env):
         """
+        Infers which rooms each object is assigned to
 
-        :param env:
-        :return:
+        Args:
+            env (Environment): Current active environment instance
         """
         self.room_type_to_object_instance = OrderedDict()
         self.non_sampleable_object_instances = set()
@@ -330,6 +309,9 @@ class BehaviorTask(BaseTask):
         Sampling orders is a list of lists: [[batch_1_inst_1, ... batch_1_inst_N], [batch_2_inst_1, batch_2_inst_M], ...]
         Sampling should happen for batch 1 first, then batch 2, so on and so forth
         Example: OnTop(plate, table) should belong to batch 1, and OnTop(apple, plate) should belong to batch 2
+
+        Args:
+            env (Environment): Current active environment instance
         """
         self.object_sampling_orders = []
         cur_batch = self.non_sampleable_object_instances
@@ -370,6 +352,9 @@ class BehaviorTask(BaseTask):
                 },
             }
         }
+
+        Args:
+            env (Environment): Current active environment instance
         """
         room_type_to_scene_objs = {}
         for room_type in self.room_type_to_object_instance:
@@ -397,6 +382,12 @@ class BehaviorTask(BaseTask):
         self.non_sampleable_object_scope = room_type_to_scene_objs
 
     def import_sampleable_objects(self, env):
+        """
+        Import all objects that can be sampled
+
+        Args:
+            env (Environment): Current active environment instance
+        """
         self.sampled_objects = set()
         num_new_obj = 0
         # Only populate self.object_scope for sampleable objects
@@ -456,7 +447,6 @@ class BehaviorTask(BaseTask):
                     name=obj_name,
                     category=category,
                     fit_avg_dim_volume=True,
-                    texture_randomization=False,
                 )
                 num_new_obj += 1
 
@@ -474,6 +464,17 @@ class BehaviorTask(BaseTask):
         og.sim.step()
 
     def check_scene(self, env):
+        """
+        Runs sanity checks for the current scene for the given BEHAVIOR task
+
+        Args:
+            env (Environment): Current active environment instance
+
+        Returns:
+            2-tuple:
+                - bool: Whether the generated scene activity should be accepted or not
+                - dict: Any feedback from the sampling / initialization process
+        """
         error_msg = self.parse_non_sampleable_object_room_assignment(env)
         if error_msg:
             logging.warning(error_msg)
@@ -499,19 +500,34 @@ class BehaviorTask(BaseTask):
         return True, None
 
     def get_agent(self, env):
+        """
+        Grab the 0th agent from @env
+
+        Args:
+            env (Environment): Current active environment instance
+
+        Returns:
+            BaseRobot: The 0th robot from the environment instance
+        """
         # We assume the relevant agent is the first agent in the scene
         return env.robots[0]
 
     def assign_object_scope_with_cache(self, env):
+        """
+        Assigns objects within the current object scope
+
+        Args:
+            env (Environment): Current active environment instance
+        """
         # Assign object_scope based on a cached scene
         for obj_inst in self.object_scope:
             matched_sim_obj = None
             if obj_inst == "agent.n.01_1":
                 matched_sim_obj = self.get_agent(env)
             else:
-                print(f"checking objects...")
+                logging.info(f"checking objects...")
                 for sim_obj in og.sim.scene.objects:
-                    print(f"checking bddl obj scope for obj: {sim_obj.name}")
+                    logging.info(f"checking bddl obj scope for obj: {sim_obj.name}")
                     if hasattr(sim_obj, "bddl_object_scope") and sim_obj.bddl_object_scope == obj_inst:
                         matched_sim_obj = sim_obj
                         break
@@ -519,6 +535,17 @@ class BehaviorTask(BaseTask):
             self.object_scope[obj_inst] = matched_sim_obj
 
     def process_single_condition(self, condition):
+        """
+        Processes a single BDDL condition
+
+        Args:
+            condition (Condition): Condition to process
+
+        Returns:
+            2-tuple:
+                - Expression: Condition's expression
+                - bool: Whether this evaluated condition is positive or negative
+        """
         if not isinstance(condition.children[0], Negation) and not isinstance(condition.children[0], AtomicFormula):
             logging.warning(("Skipping over sampling of predicate that is not a negation or an atomic formula"))
             return None, None
@@ -542,7 +569,8 @@ class BehaviorTask(BaseTask):
 
         Sampleable objects are objects that need to be additionally imported into the scene.
 
-        :return:
+        Returns:
+            None or str: None if successful, otherwise failure string
         """
         self.non_sampleable_object_conditions = []
         self.sampleable_object_conditions = []
@@ -574,6 +602,19 @@ class BehaviorTask(BaseTask):
                 self.sampleable_object_conditions.append((condition, positive))
 
     def filter_object_scope(self, input_object_scope, conditions, condition_type):
+        """
+        Filters the object scope based on given @input_object_scope, @conditions, and @condition_type
+
+        Args:
+            input_object_scope (dict):
+            conditions (list): List of conditions to filter scope with, where each list entry is
+                a tuple of (condition, positive), where @positive is True if the condition has a positive
+                evaluation.
+            condition_type (str): What type of condition to sample, e.g., "initial"
+
+        Returns:
+            dict: Filtered object scope
+        """
         filtered_object_scope = {}
         for room_type in input_object_scope:
             filtered_object_scope[room_type] = {}
@@ -594,16 +635,6 @@ class BehaviorTask(BaseTask):
                                 # Use pybullet GUI for debugging
                                 if self.debug_object_sampling is not None and self.debug_object_sampling == condition.body[0]:
                                     og.debug_sampling = True
-                                    obj_pos = obj.get_position()
-
-                                    # TODO - set viewer camera
-                                    # # Set the camera to have a bird's eye view of the sampling process
-                                    # p.resetDebugVisualizerCamera(
-                                    #     cameraDistance=3.0,
-                                    #     cameraYaw=0,
-                                    #     cameraPitch=-89.99999,
-                                    #     cameraTargetPosition=obj_pos,
-                                    # )
 
                                 success = condition.sample(binary_state=positive)
                                 log_msg = " ".join(
@@ -635,6 +666,13 @@ class BehaviorTask(BaseTask):
         return filtered_object_scope
 
     def consolidate_room_instance(self, filtered_object_scope, condition_type):
+        """
+        Consolidates room instances
+
+        Args:
+            filtered_object_scope (dict): Filtered object scope
+            condition_type (str): What type of condition to sample, e.g., "initial"
+        """
         for room_type in filtered_object_scope:
             # For each room_type, filter in room_inst that has successful
             # sampling options for all obj_inst in this room_type
@@ -664,6 +702,17 @@ class BehaviorTask(BaseTask):
                 }
 
     def maximum_bipartite_matching(self, filtered_object_scope, condition_type):
+        """
+        Matches objects from @filtered_object_scope to specific room instances it can be
+        sampled from
+
+        Args:
+            filtered_object_scope (dict): Filtered object scope
+            condition_type (str): What type of condition to sample, e.g., "initial"
+
+        Returns:
+            None or str: If successful, returns None. Otherwise, returns an error message
+        """
         # For each room instance, perform maximum bipartite matching between object instance in scope to simulator objects
         # Left nodes: a list of object instance in scope
         # Right nodes: a list of simulator objects
@@ -707,6 +756,19 @@ class BehaviorTask(BaseTask):
                 )
 
     def sample_conditions(self, input_object_scope, conditions, condition_type):
+        """
+        Sample conditions
+
+        Args:
+            input_object_scope (dict):
+            conditions (list): List of conditions to filter scope with, where each list entry is
+                a tuple of (condition, positive), where @positive is True if the condition has a positive
+                evaluation.
+            condition_type (str): What type of condition to sample, e.g., "initial"
+
+        Returns:
+            None or str: If successful, returns None. Otherwise, returns an error message
+        """
         filtered_object_scope = self.filter_object_scope(input_object_scope, conditions, condition_type)
         error_msg = self.consolidate_room_instance(filtered_object_scope, condition_type)
         if error_msg:
@@ -714,12 +776,24 @@ class BehaviorTask(BaseTask):
         return self.maximum_bipartite_matching(filtered_object_scope, condition_type), filtered_object_scope
 
     def sample_initial_conditions(self):
+        """
+        Sample initial conditions
+
+        Returns:
+            None or str: If successful, returns None. Otherwise, returns an error message
+        """
         error_msg, self.non_sampleable_object_scope_filtered_initial = self.sample_conditions(
             self.non_sampleable_object_scope, self.non_sampleable_object_conditions, "initial"
         )
         return error_msg
 
     def sample_goal_conditions(self):
+        """
+        Sample goal conditions
+
+        Returns:
+            None or str: If successful, returns None. Otherwise, returns an error message
+        """
         np.random.shuffle(self.ground_goal_state_options)
         logging.warning(("number of ground_goal_state_options", len(self.ground_goal_state_options)))
         num_goal_condition_set_to_test = 10
@@ -746,6 +820,12 @@ class BehaviorTask(BaseTask):
             return error_msg
 
     def sample_initial_conditions_final(self):
+        """
+        Sample final initial conditions
+
+        Returns:
+            None or str: If successful, returns None. Otherwise, returns an error message
+        """
         # Do the final round of sampling with object scope fixed
         for condition, positive in self.non_sampleable_object_conditions:
             num_trials = 10
@@ -795,6 +875,18 @@ class BehaviorTask(BaseTask):
                             return "Sampleable object conditions failed: {}".format(condition.body)
 
     def sample(self, env, validate_goal=True):
+        """
+        Run sampling for this BEHAVIOR task
+
+        Args:
+            env (Environment): Current active environment instance
+            validate_goal (bool): Whether the goal should be validated or not
+
+        Returns:
+            2-tuple:
+                - bool: Whether sampling was successful or not
+                - None or str: None if successful, otherwise the associated error message
+        """
         # Before sampling, set robot to be far away
         env.robots[0].set_position_orientation([300, 300, 300], [0, 0, 0, 1])
         # We need to step physics once to make sure the bounding boxes get updated correctly
@@ -821,106 +913,6 @@ class BehaviorTask(BaseTask):
             return False, error_msg
 
         return True, None
-
-    # TODO after clutter is refactored
-    def import_non_colliding_objects(self, env, clutter_scene, existing_objects=[], min_distance=0.5):
-        """
-        Loads objects into the scene such that they don't collide with existing objects.
-
-        :param env: OmniGibsonEnv
-        :param clutter_scene: A clutter scene to load new clutter objects from
-        :param existing_objects: A list of objects that needs to be kept min_distance away when loading the new objects
-        :param min_distance: A minimum distance to require for objects to load
-        """
-        state = og.sim.dump_state(serialized=True)
-        objects_to_add = []
-
-        for obj_name, obj in clutter_scene.objects_by_name.items():
-            # Do not allow duplicate object categories
-            if obj.category in og.sim.scene.object_registry.get_ids(key="category"):
-                continue
-
-            bbox_center_pos, bbox_center_orn = clutter_scene.object_states[obj_name]["bbox_center_pose"]
-            pose = T.pose_transform(
-                np.array([0, 0, 0]), bbox_center_orn,
-                obj.scaled_bbxc_in_blf, np.array([0, 0, 0, 1])
-            )
-            rotated_offset = p.multiplyTransforms()[0]
-            base_link_pos, base_link_orn = bbox_center_pos + rotated_offset, bbox_center_orn
-
-            add = True
-            body_ids = []
-            for i, urdf_path in enumerate(obj.urdf_paths):
-                # Load the object only into pybullet
-                body_id = p.loadURDF(obj.urdf_paths[i])
-                body_ids.append(body_id)
-                sub_urdf_pos, sub_urdf_orn = p.multiplyTransforms(
-                    base_link_pos, base_link_orn, *obj.local_transforms[i]
-                )
-                # Convert to CoM frame
-                dynamics_info = p.getDynamicsInfo(body_id, -1)
-                inertial_pos, inertial_orn = dynamics_info[3], dynamics_info[4]
-                sub_urdf_pos, sub_urdf_orn = p.multiplyTransforms(
-                    sub_urdf_pos, sub_urdf_orn, inertial_pos, inertial_orn
-                )
-                sub_urdf_pos = np.array(sub_urdf_pos)
-                sub_urdf_pos[2] += 0.01  # slighly above to not touch furniture
-                p.resetBasePositionAndOrientation(body_id, sub_urdf_pos, sub_urdf_orn)
-                for existing_object in existing_objects:
-                    # If a sliced obj is an existing_object, get_position will not work
-                    if isinstance(existing_object, ObjectMultiplexer) and isinstance(
-                        existing_object.current_selection(), ObjectGrouper
-                    ):
-                        obj_pos = np.array([obj.get_position() for obj in existing_object.objects]).mean(axis=0)
-                    else:
-                        obj_pos = existing_object.get_position()
-                    distance = np.linalg.norm(np.array(sub_urdf_pos) - np.array(obj_pos))
-                    if distance < min_distance:
-                        add = False
-                        break
-                if not add:
-                    break
-
-            # Filter based on collisions with any existing object
-            if add:
-                p.stepSimulation()
-                for body_id in body_ids:
-                    if len(p.getContactPoints(body_id)) > 0:
-                        add = False
-                        break
-
-            if add:
-                objects_to_add.append(obj)
-
-            # Always remove all the body ids for this object
-            for body_id in body_ids:
-                p.removeBody(body_id)
-
-            restoreState(state_id)
-
-        p.removeState(state_id)
-
-        # Actually load the object into the simulator
-        for obj in objects_to_add:
-            og.sim.import_object(obj)
-
-        # Restore clutter objects to their correct poses
-        clutter_scene.restore_object_states(clutter_scene.object_states)
-
-    # TODO
-    def clutter_scene(self, env):
-        """
-        Load clutter objects into the scene from a random clutter scene
-        """
-        raise NotImplementedError("Clutter scene needs to be implemented after unifying clutter generation schema")
-        scene_id = self.scene.scene_id
-        clutter_ids = [""] + list(range(2, 5))
-        clutter_id = np.random.choice(clutter_ids)
-        clutter_scene = InteractiveIndoorScene(scene_id, "{}_clutter{}".format(scene_id, clutter_id))
-        existing_objects = [value for key, value in self.object_scope.items() if "floor.n.01" not in key]
-        self.import_non_colliding_objects(
-            env=env, clutter_scene=clutter_scene, existing_objects=existing_objects, min_distance=0.5
-        )
 
     def _get_obs(self, env):
         low_dim_obs = OrderedDict()
@@ -953,6 +945,15 @@ class BehaviorTask(BaseTask):
         return done, info
 
     def show_instruction(self):
+        """
+        Get current instruction for user
+
+        Returns:
+            3-tuple:
+                - str: Current goal condition in natural language
+                - 3-tuple: (R,G,B) color to assign to text
+                - list of BaseObject: Relevant objects for the current instruction
+        """
         satisfied = self.currently_viewed_instruction in self._termination_conditions["predicate"].goal_status["satisfied"]
         natural_language_condition = self.activity_natural_language_goal_conditions[self.currently_viewed_instruction]
         objects = self.activity_goal_conditions[self.currently_viewed_instruction].get_relevant_objects()
@@ -963,6 +964,9 @@ class BehaviorTask(BaseTask):
         return natural_language_condition, text_color, objects
 
     def iterate_instruction(self):
+        """
+        Increment the instruction
+        """
         self.currently_viewed_index = (self.currently_viewed_index + 1) % len(self.activity_conditions.parsed_goal_conditions)
         self.currently_viewed_instruction = self.instruction_order[self.currently_viewed_index]
 

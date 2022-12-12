@@ -1,11 +1,8 @@
 """
 A set of utility functions slated to be deprecated once Omniverse bugs are fixed
 """
-import asyncio
 import carb
-import functools
-from typing import Callable, List
-import omni.kit as ok
+from typing import Callable
 import omni.usd as ou
 from omni.particle.system.core.scripts.core import Core as OmniCore
 from omni.particle.system.core.scripts.utils import Utils as OmniUtils

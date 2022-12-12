@@ -429,7 +429,8 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
     @property
     def urdf_path(self):
         """
-        :return: str, file path to the robot urdf file.
+        Returns:
+            str: file path to the robot urdf file.
         """
         raise NotImplementedError
 

@@ -93,7 +93,7 @@ class FurnitureClosingTask(BaseTask):
         Compute task-specific potential: furniture joint positions
 
         Args:
-            env (BaseEnv): Environment instance
+            env (Environment): Environment instance
         """
         task_potential = 0.0
         for obj in self._opened_objects:

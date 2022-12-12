@@ -97,9 +97,9 @@ class TwoWheelRobot(LocomotionRobot):
     @property
     def _default_base_differential_drive_controller_config(self):
         """
-         Returns:
-             dict: Default differential drive controller config to
-            control this robot's base.
+        Returns:
+            dict: Default differential drive controller config to
+                control this robot's base.
         """
         return {
             "name": "DifferentialDriveController",

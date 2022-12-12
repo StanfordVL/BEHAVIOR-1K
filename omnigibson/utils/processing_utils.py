@@ -7,12 +7,15 @@ class Filter(Serializable):
     """
     A base class for filtering a noisy data stream in an online fashion.
     """
-
     def estimate(self, observation):
         """
         Takes an observation and returns a de-noised estimate.
-        :param observation: A current observation.
-        :return: De-noised estimate.
+
+        Args:
+            observation (n-array): A current observation.
+
+        Returns:
+            n-array: De-noised estimate.
         """
         raise NotImplementedError
 
@@ -49,11 +52,12 @@ class MovingAverageFilter(Filter):
     This class uses a moving average to de-noise a noisy data stream in an online fashion.
     This is a FIR filter.
     """
-
     def __init__(self, obs_dim, filter_width):
         """
-        :param obs_dim: The dimension of the points to filter.
-        :param filter_width: The number of past samples to take the moving average over.
+
+        Args:
+            obs_dim (int): The dimension of the points to filter.
+            filter_width (int): The number of past samples to take the moving average over.
         """
         self.obs_dim = obs_dim
         assert filter_width > 0, f"MovingAverageFilter must have a non-zero size! Got: {filter_width}"
@@ -67,8 +71,12 @@ class MovingAverageFilter(Filter):
     def estimate(self, observation):
         """
         Do an online hold for state estimation given a recent observation.
-        :param observation: New observation to hold internal estimate of state.
-        :return: New estimate of state.
+
+        Args:
+            observation (n-array): New observation to hold internal estimate of state.
+
+        Returns:
+            n-array: New estimate of state.
         """
         # Write the newest observation at the appropriate index
         self.past_samples[self.current_idx, :] = np.array(observation)
@@ -150,8 +158,10 @@ class ExponentialAverageFilter(Filter):
 
     def __init__(self, obs_dim, alpha=0.9):
         """
-        :param obs_dim: The dimension of the points to filter.
-        :param alpha: The relative weighting of new samples relative to older samples
+
+        Args:
+            obs_dim (int): The dimension of the points to filter.
+            alpha (float): The relative weighting of new samples relative to older samples
         """
         self.obs_dim = obs_dim
         self.avg = np.zeros(obs_dim)
@@ -163,8 +173,12 @@ class ExponentialAverageFilter(Filter):
     def estimate(self, observation):
         """
         Do an online hold for state estimation given a recent observation.
-        :param observation: New observation to hold internal estimate of state.
-        :return: New estimate of state.
+
+        Args:
+            observation (n-array): New observation to hold internal estimate of state.
+
+        Returns:
+            n-array: New estimate of state.
         """
         self.avg = self.alpha * observation + (1.0 - self.alpha) * self.avg
         self.num_samples += 1
@@ -229,8 +243,12 @@ class Subsampler:
         """
         Takes an observation and returns the observation, or None, which
         corresponds to deleting the observation.
-        :param observation: A current observation.
-        :return: The observation, or None.
+
+        Args:
+            observation (n-array): A current observation.
+
+        Returns:
+            None or n-array: No observation if subsampled, otherwise the observation
         """
         raise NotImplementedError
 
@@ -239,10 +257,10 @@ class UniformSubsampler(Subsampler):
     """
     A class for subsampling a data stream uniformly in time in an online fashion.
     """
-
     def __init__(self, T):
         """
-        :param T: Pick one every T observations.
+        Args:
+            T (int): Pick one every T observations.
         """
         self.T = T
         self.counter = 0
@@ -252,8 +270,12 @@ class UniformSubsampler(Subsampler):
     def subsample(self, observation):
         """
         Returns an observation once every T observations, None otherwise.
-        :param observation: A current observation.
-        :return: The observation, or None.
+
+        Args:
+            observation (n-array): A current observation.
+            
+        Returns:
+            None or n-array: The observation, or None.
         """
         self.counter += 1
         if self.counter == self.T:

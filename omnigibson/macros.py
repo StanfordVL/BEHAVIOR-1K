@@ -60,10 +60,6 @@ gm.ENABLE_TRANSITION_RULES = True
 gm.DEFAULT_VIEWER_WIDTH = 1280
 gm.DEFAULT_VIEWER_HEIGHT = 720
 
-# Whether the public version of IsaacSim is being used
-# TODO: Remove this once we unify omni version being used
-gm.IS_PUBLIC_ISAACSIM = True
-
 # Whether to use encrypted assets
 gm.USE_ENCRYPTED_ASSETS = True
 

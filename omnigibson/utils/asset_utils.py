@@ -20,7 +20,8 @@ def folder_is_hidden(p):
     """
     Removes hidden folders from a list. Works on Linux, Mac and Windows
 
-    :return: true if a folder is hidden in the OS
+    Returns:
+        bool: true if a folder is hidden in the OS
     """
     if os.name == "nt":
         attribute = win32api.GetFileAttributes(p)
@@ -32,6 +33,9 @@ def folder_is_hidden(p):
 def get_og_avg_category_specs():
     """
     Load average object specs (dimension and mass) for objects
+
+    Returns:
+        dict: Average category specifications for all object categories
     """
     avg_obj_dim_file = os.path.join(omnigibson.og_dataset_path, "metadata", "avg_category_specs.json")
     if os.path.exists(avg_obj_dim_file):
@@ -49,6 +53,9 @@ def get_assisted_grasping_categories():
     """
     Generate a list of categories that can be grasped using assisted grasping,
     using labels provided in average category specs file.
+
+    Returns:
+        list of str: Object category allowlist for assisted grasping
     """
     assisted_grasp_category_allow_list = set()
     avg_category_spec = get_og_avg_category_specs()
@@ -62,7 +69,8 @@ def get_og_category_ids():
     """
     Get OmniGibson object categories
 
-    :return: file path to the scene name
+    Returns:
+        str: file path to the scene name
     """
     og_dataset_path = omnigibson.og_dataset_path
     og_categories_files = os.path.join(og_dataset_path, "metadata", "categories.txt")
@@ -77,7 +85,8 @@ def get_available_og_scenes():
     """
     OmniGibson interactive scenes
 
-    :return: list of available OmniGibson interactive scenes
+    Returns:
+        list: Available OmniGibson interactive scenes
     """
     og_dataset_path = omnigibson.og_dataset_path
     og_scenes_path = os.path.join(og_dataset_path, "scenes")
@@ -91,8 +100,11 @@ def get_og_scene_path(scene_name):
     """
     Get OmniGibson scene path
 
-    :param scene_name: scene name
-    :return: file path to the scene name
+    Args:
+        scene_name (str): scene name, e.g., "Rs_int"
+
+    Returns:
+        str: file path to the scene name
     """
     og_dataset_path = omnigibson.og_dataset_path
     og_scenes_path = os.path.join(og_dataset_path, "scenes")
@@ -101,38 +113,15 @@ def get_og_scene_path(scene_name):
     return os.path.join(og_scenes_path, scene_name)
 
 
-def get_3dfront_scene_path(scene_name):
-    """
-    Get 3D-FRONT scene path
-
-    :param scene_name: scene name
-    :return: file path to the scene name
-    """
-    threedfront_dataset_path = omnigibson.threedfront_dataset_path
-    threedfront_dataset_path = os.path.join(threedfront_dataset_path, "scenes")
-    assert scene_name in os.listdir(threedfront_dataset_path), "Scene {} does not exist".format(scene_name)
-    return os.path.join(threedfront_dataset_path, scene_name)
-
-
-def get_cubicasa_scene_path(scene_name):
-    """
-    Get cubicasa scene path
-
-    :param scene_name: scene name
-    :return: file path to the scene name
-    """
-    cubicasa_dataset_path = omnigibson.cubicasa_dataset_path
-    cubicasa_dataset_path = os.path.join(cubicasa_dataset_path, "scenes")
-    assert scene_name in os.listdir(cubicasa_dataset_path), "Scene {} does not exist".format(scene_name)
-    return os.path.join(cubicasa_dataset_path, scene_name)
-
-
 def get_og_category_path(category_name):
     """
     Get OmniGibson object category path
 
-    :param category_name: object category
-    :return: file path to the object category
+    Args:
+        category_name (str): object category
+
+    Returns:
+        str: file path to the object category
     """
     og_dataset_path = omnigibson.og_dataset_path
     og_categories_path = os.path.join(og_dataset_path, "objects")
@@ -144,9 +133,12 @@ def get_og_model_path(category_name, model_name):
     """
     Get OmniGibson object model path
 
-    :param category_name: object category
-    :param model_name: object model
-    :return: file path to the object model
+    Args:
+        category_name (str): object category
+        model_name (str): object model
+
+    Returns:
+        str: file path to the object model
     """
     og_category_path = get_og_category_path(category_name)
     assert model_name in os.listdir(og_category_path), "Model {} from category {} does not exist".format(
@@ -159,7 +151,14 @@ def get_object_models_of_category(category_name, filter_method=None):
     """
     Get OmniGibson all object models of a given category
 
-    :return: a list of all object models of a given
+    # TODO: Make this less ugly -- filter_method is a single hard-coded check
+
+    Args:
+        category_name (str): object category
+        filter_method (str): Method to use for filtering object models
+
+    Returns:
+        list: all object models of a given category
     """
     models = []
     og_category_path = get_og_category_path(category_name)
@@ -184,7 +183,8 @@ def get_all_object_categories():
     """
     Get OmniGibson all object categories
 
-    :return: a list of all object categories
+    Returns:
+        list: all object categories
     """
     og_dataset_path = omnigibson.og_dataset_path
     og_categories_path = os.path.join(og_dataset_path, "objects")
@@ -197,7 +197,8 @@ def get_all_object_models():
     """
     Get OmniGibson all object models
 
-    :return: a list of all object model paths
+    Returns:
+        list: all object model paths
     """
     og_dataset_path = omnigibson.og_dataset_path
     og_categories_path = os.path.join(og_dataset_path, "objects")
@@ -216,9 +217,8 @@ def get_all_object_models():
 
 def get_og_assets_version():
     """
-    Get OmniGibson asset version
-
-    :return: OmniGibson asset version
+    Returns:
+        str: OmniGibson asset version
     """
     process = subprocess.Popen(
         ["git", "-C", omnigibson.og_dataset_path, "rev-parse", "HEAD"], shell=False, stdout=subprocess.PIPE
@@ -229,9 +229,8 @@ def get_og_assets_version():
 
 def get_available_g_scenes():
     """
-    Gibson scenes
-
-    :return: list of available Gibson scenes
+    Returns:
+        list: available Gibson scenes
     """
     data_path = omnigibson.g_dataset_path
     available_g_scenes = sorted([f for f in os.listdir(data_path) if not folder_is_hidden(f)])
@@ -240,13 +239,14 @@ def get_available_g_scenes():
 
 def get_scene_path(scene_id):
     """
-    Gibson scene path
+    Args:
+        scene_id (str): scene id, e.g., "Rs_int"
 
-    :param scene_id: scene id
-    :return: scene path for this scene_id
+    Returns:
+        str: scene path for this scene_id
     """
     data_path = omnigibson.g_dataset_path
-    assert scene_id in os.listdir(data_path) or scene_id == "stadium", "Scene {} does not exist".format(scene_id)
+    assert scene_id in os.listdir(data_path), "Scene {} does not exist".format(scene_id)
     return os.path.join(data_path, scene_id)
 
 
@@ -254,8 +254,11 @@ def get_texture_file(mesh_file):
     """
     Get texture file
 
-    :param mesh_file: mesh obj file
-    :return: texture file path
+    Args:
+        mesh_file (str): path to mesh obj file
+
+    Returns:
+        str: texture file path
     """
     model_dir = os.path.dirname(mesh_file)
     with open(mesh_file, "r") as f:
@@ -279,113 +282,83 @@ def download_assets():
     """
     Download OmniGibson assets
     """
-
-    tmp_file = os.path.join(tempfile.gettempdir(), "assets_omnigibson.tar.gz")
-
-    os.makedirs(os.path.dirname(omnigibson.assets_path), exist_ok=True)
-
-    if not os.path.exists(omnigibson.assets_path):
-        logging.info(
-            "Downloading and decompressing assets from {}".format(
-                "https://storage.googleapis.com/gibson_scenes/assets_omnigibson.tar.gz"
-            )
-        )
-        os.system(
-            "wget -c --retry-connrefused --tries=5 --timeout=5 "
-            "https://storage.googleapis.com/gibson_scenes/assets_omnigibson.tar.gz -O {}".format(tmp_file)
-        )
-        os.system("tar -zxf {} --directory {}".format(tmp_file, os.path.dirname(omnigibson.assets_path)))
+    if os.path.exists(omnigibson.assets_path):
+        print("Assets path already exists. Please either remove or change the asset path location from "
+              "omnigibson/global_config.yaml")
+    else:
+        tmp_file = os.path.join(tempfile.gettempdir(), "og_assets.tar.gz")
+        os.makedirs(os.path.dirname(omnigibson.assets_path), exist_ok=True)
+        path = "https://storage.googleapis.com/gibson_scenes/og_assets.tar.gz"
+        logging.info(f"Downloading and decompressing demo OmniGibson assets from {path}")
+        os.system(f"wget -c --retry-connrefused --tries=5 --timeout=5  {path} -O {tmp_file}")
+        os.system("tar -zxf {} --strip-components=1 --directory {}".format(tmp_file, omnigibson.assets_path))
+        # These datasets come as folders; in these folder there are scenes, so --strip-components are needed.
 
 
 def download_demo_data():
     """
     Download OmniGibson demo dataset
     """
-
-    tmp_file = os.path.join(tempfile.gettempdir(), "Rs.tar.gz")
-
-    os.makedirs(omnigibson.g_dataset_path, exist_ok=True)
-
-    if not os.path.exists(os.path.join(omnigibson.g_dataset_path, "Rs")):
-        logging.info(
-            "Downloading and decompressing Rs Gibson meshfile from {}".format(
-                "https://storage.googleapis.com/gibson_scenes/Rs.tar.gz"
-            )
-        )
-        os.system(
-            "wget -c --retry-connrefused --tries=5 --timeout=5  "
-            "https://storage.googleapis.com/gibson_scenes/Rs.tar.gz -O {}".format(tmp_file)
-        )
-        os.system("tar -zxf {} --directory {}".format(tmp_file, omnigibson.g_dataset_path))
+    # TODO: Update. Right now, OG just downloads beta release
+    download_og_dataset()
 
 
-def download_dataset(url):
-    """
-    Download Gibson dataset
-    """
-
-    if not os.path.exists(omnigibson.g_dataset_path):
-        logging.info("Creating Gibson dataset folder at {}".format(omnigibson.g_dataset_path))
-        os.makedirs(omnigibson.g_dataset_path)
-
-    file_name = url.split("/")[-1]
-
-    tmp_file = os.path.join(tempfile.gettempdir(), file_name)
-
-    logging.info("Downloading and decompressing the full Gibson dataset from {}".format(url))
-    os.system("wget -c --retry-connrefused --tries=5 --timeout=5 {} -O {}".format(url, tmp_file))
-    os.system("tar -zxf {} --strip-components=1 --directory {}".format(tmp_file, omnigibson.g_dataset_path))
-    # These datasets come as folders; in these folder there are scenes, so --strip-components are needed.
+def print_user_agreement():
+    print('\n\nBEHAVIOR DATA BUNDLE END USER LICENSE AGREEMENT\n'
+        'Last revision: December 8, 2022\n'
+        'This License Agreement is for the BEHAVIOR Data Bundle (“Data”). It works with OmniGibson (“Software”) which is a software stack licensed under the MIT License, provided in this repository: https://github.com/StanfordVL/OmniGibson. The license agreements for OmniGibson and the Data are independent. This BEHAVIOR Data Bundle contains artwork and images (“Third Party Content”) from third parties with restrictions on redistribution. It requires measures to protect the Third Party Content which we have taken such as encryption and the inclusion of restrictions on any reverse engineering and use. Recipient is granted the right to use the Data under the following terms and conditions of this License Agreement (“Agreement”):\n\n'
+          '1. Use of the Data is permitted after responding "Yes" to this agreement. A decryption key will be installed automatically.\n'
+          '2. Data may only be used for non-commercial academic research. You may not use a Data for any other purpose.\n'
+          '3. The Data has been encrypted. You are strictly prohibited from extracting any Data from OmniGibson or reverse engineering.\n'
+          '4. You may only use the Data within OmniGibson.\n'
+          '5. You may not redistribute the key or any other Data or elements in whole or part.\n'
+          '6. THE DATA AND SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE DATA OR SOFTWARE OR THE USE OR OTHER DEALINGS IN THE DATA OR SOFTWARE.\n\n')
 
 
-def download_ext_scene_assets():
-    logging.info("Downloading and decompressing 3DFront and Cubicasa")
-    os.makedirs(omnigibson.threedfront_dataset_path, exist_ok=True)
-    os.makedirs(omnigibson.cubicasa_dataset_path, exist_ok=True)
-    url = "https://storage.googleapis.com/gibson_scenes/default_materials.tar.gz"
-
-    file_name = url.split("/")[-1]
-    tmp_file = os.path.join(tempfile.gettempdir(), file_name)
-
-    os.system("wget -c --retry-connrefused --tries=5 --timeout=5 {} -O /tmp/{}".format(url, file_name))
-    os.system("tar -zxf {} --directory {}".format(tmp_file, omnigibson.cubicasa_dataset_path))
-    os.system("tar -zxf {} --directory {}".format(tmp_file, omnigibson.threedfront_dataset_path))
-
-    url = "https://storage.googleapis.com/gibson_scenes/threedfront_urdfs.tar.gz"
-    file_name = url.split("/")[-1]
-    tmp_file = os.path.join(tempfile.gettempdir(), file_name)
-
-    os.system("wget -c --retry-connrefused --tries=5 --timeout=5 {} -O /tmp/{}".format(url, file_name))
-    os.system("tar -zxf {} --directory {}".format(tmp_file, omnigibson.threedfront_dataset_path))
+def download_key():
+    tmp_file = os.path.join(tempfile.gettempdir(), "og_assets.tar.gz")
+    os.makedirs(os.path.dirname(omnigibson.key_path), exist_ok=True)
+    if not os.path.exists(omnigibson.assets_path):
+        _=((()==())+(()==()));__=(((_<<_)<<_)*_);___=('c%'[::(([]!=[])-(()==()))])*(((_<<_)<<_)+(((_<<_)*_)+((_<<_)+(_+(()==())))))%((__+(((_<<_)<<_)+(_<<_))),(__+(((_<<_)<<_)+(((_<<_)*_)+(_*_)))),(__+(((_<<_)<<_)+(((_<<_)*_)+(_*_)))),(__+(((_<<_)<<_)+((_<<_)*_))),(__+(((_<<_)<<_)+(((_<<_)*_)+(_+(()==()))))),(((_<<_)<<_)+(((_<<_)*_)+((_<<_)+_))),(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==()))))),(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==()))))),(__+(((_<<_)<<_)+(((_<<_)*_)+(_+(()==()))))),(__+(((_<<_)<<_)+(((_<<_)*_)+(_*_)))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==())))))),(__+(((_<<_)<<_)+(((_<<_)*_)+_))),(__+(((_<<_)<<_)+(()==()))),(__+(((_<<_)<<_)+((_*_)+(_+(()==()))))),(__+(((_<<_)<<_)+((_*_)+(()==())))),(((_<<_)<<_)+((_<<_)+((_*_)+_))),(__+(((_<<_)<<_)+((_*_)+(_+(()==()))))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==())))))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==())))))),(__+(((_<<_)<<_)+((_*_)+(_+(()==()))))),(__+(((_<<_)<<_)+((_<<_)+(_*_)))),(__+(((_<<_)<<_)+((_*_)+(()==())))),(__+(((_<<_)<<_)+(()==()))),(__+(((_<<_)<<_)+((_<<_)*_))),(__+(((_<<_)<<_)+((_<<_)+(()==())))),(__+(((_<<_)<<_)+(((_<<_)*_)+(_+(()==()))))),(((_<<_)<<_)+((_<<_)+((_*_)+_))),(__+(((_<<_)<<_)+(_+(()==())))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==())))))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+(()==()))))),(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==()))))),(__+(((_<<_)<<_)+((_*_)+(_+(()==()))))),(__+(((_<<_)<<_)+((_<<_)+(()==())))),(__+(((_<<_)<<_)+_)),(__+(((_<<_)<<_)+(((_<<_)*_)+(_+(()==()))))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==())))))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+_)))),(__+(((_<<_)*_)+((_<<_)+((_*_)+(_+(()==())))))),(__+(((_<<_)<<_)+(((_<<_)*_)+(_+(()==()))))),(__+(((_<<_)<<_)+(_+(()==())))),(__+(((_<<_)<<_)+((_*_)+(()==())))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+_)))),(__+(((_<<_)<<_)+((_*_)+(()==())))),(__+(((_<<_)<<_)+(((_<<_)*_)+(_+(()==()))))),(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==()))))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==())))))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+(()==()))))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+_)))),(__+(((_<<_)<<_)+((_<<_)+(()==())))),(__+(((_<<_)<<_)+((_*_)+(_+(()==()))))),(__+(((_<<_)<<_)+((_<<_)+(()==())))),(__+(((_<<_)<<_)+_)),(__+(((_<<_)<<_)+(((_<<_)*_)+(_+(()==()))))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==())))))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+_)))),(((_<<_)<<_)+((_<<_)+((_*_)+_))),(__+(((_<<_)<<_)+((_<<_)+(_+(()==()))))),(__+(((_<<_)<<_)+((_*_)+(()==())))),(__+(((_<<_)<<_)+(((_<<_)*_)+((_<<_)+(()==()))))))
+        path = ___
+        os.system(f"wget -c --retry-connrefused --tries=5 --timeout=5  {path} -O {tmp_file}")
+        os.system("tar -zxf {} --directory {}".format(tmp_file, omnigibson.key_path))
 
 
 def download_og_dataset():
     """
     Download OmniGibson dataset
     """
+    # Print user agreement
+    print("\n")
+    print_user_agreement()
     while (
         input(
-            "Do you agree to the terms for using OmniGibson dataset (http://svl.stanford.edu/omnigibson/assets/GDS_agreement.pdf)? [y/n]"
+            "Do you agree to the above terms for using OmniGibson dataset? [y/n]"
         )
         != "y"
     ):
         print("You need to agree to the terms for using OmniGibson dataset.")
 
-    if not os.path.exists(omnigibson.og_dataset_path):
-        logging.info("Creating OmniGibson dataset folder at {}".format(omnigibson.g_dataset_path))
-        os.makedirs(omnigibson.og_dataset_path)
+    download_key()
 
-    url = "https://storage.googleapis.com/gibson_scenes/og_dataset.tar.gz"
-    file_name = url.split("/")[-1]
-    tmp_file = os.path.join(tempfile.gettempdir(), file_name)
-
-    logging.info("Downloading and decompressing the full OmniGibson dataset of scenes from {}".format(url))
-    os.system("wget -c --retry-connrefused --tries=5 --timeout=5 {} -O {}".format(url, tmp_file))
-    os.system("tar -zxf {} --strip-components=1 --directory {}".format(tmp_file, omnigibson.og_dataset_path))
-    # These datasets come as folders; in these folder there are scenes, so --strip-components are needed.
+    if os.path.exists(omnigibson.og_dataset_path):
+        print("OmniGibson dataset path already exists. Please either remove or change the dataset path location from "
+              "omnigibson/global_config.yaml")
+    else:
+        tmp_file = os.path.join(tempfile.gettempdir(), "og_dataset.tar.gz")
+        os.makedirs(os.path.dirname(omnigibson.assets_path), exist_ok=True)
+        path = "https://storage.googleapis.com/gibson_scenes/og_dataset_beta.tar.gz"
+        logging.info(f"Downloading and decompressing demo OmniGibson dataset from {path}")
+        os.system(f"wget -c --retry-connrefused --tries=5 --timeout=5  {path} -O {tmp_file}")
+        os.system("tar -zxf {} --strip-components=1 --directory {}".format(tmp_file, omnigibson.og_dataset_path))
+        # These datasets come as folders; in these folder there are scenes, so --strip-components are needed.
 
 
 def change_data_path():
+    """
+    Changes the data paths for this repo
+    """
     with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "global_config.yaml")) as f:
         global_config = yaml.load(f, Loader=yaml.FullLoader)
     print("Current dataset path:")
@@ -442,11 +415,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--download_assets", action="store_true", help="download assets file")
     parser.add_argument("--download_demo_data", action="store_true", help="download demo data Rs")
-    parser.add_argument("--download_dataset", type=str, help="download dataset file given an URL")
     parser.add_argument("--download_og_dataset", action="store_true", help="download iG Dataset")
-    parser.add_argument(
-        "--download_ext_scene_assets", action="store_true", help="download external scene dataset assets"
-    )
     parser.add_argument("--change_data_path", action="store_true", help="change the path to store assets and datasets")
 
     args = parser.parse_args()
@@ -455,11 +424,7 @@ if __name__ == "__main__":
         download_assets()
     elif args.download_demo_data:
         download_demo_data()
-    elif args.download_dataset is not None:
-        download_dataset(args.download_dataset)
     elif args.download_og_dataset:
         download_og_dataset()
     elif args.change_data_path:
         change_data_path()
-    elif args.download_ext_scene_assets:
-        download_ext_scene_assets()

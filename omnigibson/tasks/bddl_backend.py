@@ -58,6 +58,6 @@ SUPPORTED_PREDICATES = {
 }
 
 
-class IGibsonBDDLBackend(BDDLBackend):
+class OmniGibsonBDDLBackend(BDDLBackend):
     def get_predicate_class(self, predicate_name):
         return SUPPORTED_PREDICATES[predicate_name]

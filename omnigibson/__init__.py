@@ -15,7 +15,7 @@ builtins.ISAAC_LAUNCHED_FROM_JUPYTER = (
 import nest_asyncio
 nest_asyncio.apply()
 
-__version__ = "3.0.0"
+__version__ = "0.0.1"
 
 logging.getLogger().setLevel(logging.INFO)
 
@@ -35,23 +35,11 @@ else:
     g_dataset_path = global_config["g_dataset_path"]
 g_dataset_path = os.path.expanduser(g_dataset_path)
 
-if "IGIBSON_DATASET_PATH" in os.environ:
-    og_dataset_path = os.environ["IGIBSON_DATASET_PATH"]
+if "OMNIGIBSON_DATASET_PATH" in os.environ:
+    og_dataset_path = os.environ["OMNIGIBSON_DATASET_PATH"]
 else:
     og_dataset_path = global_config["og_dataset_path"]
 og_dataset_path = os.path.expanduser(og_dataset_path)
-
-if "3DFRONT_DATASET_PATH" in os.environ:
-    threedfront_dataset_path = os.environ["3DFRONT_DATASET_PATH"]
-else:
-    threedfront_dataset_path = global_config["threedfront_dataset_path"]
-threedfront_dataset_path = os.path.expanduser(threedfront_dataset_path)
-
-if "CUBICASA_DATASET_PATH" in os.environ:
-    cubicasa_dataset_path = os.environ["CUBICASA_DATASET_PATH"]
-else:
-    cubicasa_dataset_path = global_config["cubicasa_dataset_path"]
-cubicasa_dataset_path = os.path.expanduser(cubicasa_dataset_path)
 
 if "KEY_PATH" in os.environ:
     key_path = os.environ["KEY_PATH"]
@@ -67,19 +55,13 @@ if not os.path.isabs(g_dataset_path):
     g_dataset_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), g_dataset_path)
 if not os.path.isabs(og_dataset_path):
     og_dataset_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), og_dataset_path)
-if not os.path.isabs(threedfront_dataset_path):
-    threedfront_dataset_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), threedfront_dataset_path)
-if not os.path.isabs(cubicasa_dataset_path):
-    cubicasa_dataset_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), cubicasa_dataset_path)
 if not os.path.isabs(key_path):
     key_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), key_path)
 
 logging.info("Importing OmniGibson (omnigibson module)")
 logging.info("Assets path: {}".format(assets_path))
 logging.info("Gibson Dataset path: {}".format(g_dataset_path))
-logging.info("iG Dataset path: {}".format(og_dataset_path))
-logging.info("3D-FRONT Dataset path: {}".format(threedfront_dataset_path))
-logging.info("CubiCasa5K Dataset path: {}".format(cubicasa_dataset_path))
+logging.info("OmniGibson Dataset path: {}".format(og_dataset_path))
 logging.info("OmniGibson Key path: {}".format(key_path))
 
 example_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "examples")
@@ -122,6 +104,33 @@ from omnigibson.objects import REGISTERED_OBJECTS
 from omnigibson.robots import REGISTERED_ROBOTS
 from omnigibson.controllers import REGISTERED_CONTROLLERS
 from omnigibson.tasks import REGISTERED_TASKS
+from omnigibson.utils.asset_utils import download_demo_data, download_og_dataset, download_assets
+from omnigibson.utils.ui_utils import choose_from_options
+
+
+def setup():
+    """
+    Helper function to setup this OmniGibson repository. Configures environment and downloads assets
+    """
+    # Ask user which dataset to install
+    print("Welcome to OmniGibson!")
+    print()
+    print("Downloading dataset...")
+    dataset_options = {
+        "Demo": "Download the demo OmniGibson dataset",
+        "Full": "Download the full OmniGibson dataset",
+    }
+    dataset = choose_from_options(options=dataset_options, name="dataset")
+    if dataset == "Demo":
+        download_demo_data()
+    else:
+        download_og_dataset()
+
+    print("Downloading assets...")
+    download_assets()
+
+    print("\nOmniGibson setup completed!\n")
+
 
 # Define convenience function for shutting down OmniGibson cleanly
 def shutdown():
