@@ -3,17 +3,7 @@ import os
 from omnigibson.robots.robot_base import m as robot_macros
 from omnigibson.scenes.traversable_scene import TraversableScene
 from omnigibson.maps.segmentation_map import SegmentationMap
-from omnigibson.utils.asset_utils import (
-    get_3dfront_scene_path,
-    get_cubicasa_scene_path,
-    get_og_scene_path,
-)
-
-SCENE_SOURCE_PATHS = {
-    "OG": get_og_scene_path,
-    "CUBICASA": get_cubicasa_scene_path,
-    "THREEDFRONT": get_3dfront_scene_path,
-}
+from omnigibson.utils.asset_utils import get_og_scene_path
 
 
 class InteractiveTraversableScene(TraversableScene):
@@ -38,7 +28,6 @@ class InteractiveTraversableScene(TraversableScene):
         load_room_types=None,
         load_room_instances=None,
         seg_map_resolution=0.1,
-        scene_source="OG",
         include_robots=True,
     ):
         """
@@ -59,19 +48,14 @@ class InteractiveTraversableScene(TraversableScene):
             load_room_types (None or list): only load objects in these room types into the scene
             load_room_instances (None or list): if specified, only load objects in these room instances into the scene
             seg_map_resolution (float): room segmentation map resolution
-            scene_source (str): source of scene data; options are: {OG, CUBICASA, THREEDFRONT}
             include_robots (bool): whether to also include the robot(s) defined in the scene
         """
 
         # Store attributes from inputs
-        self.scene_source = scene_source
         self.include_robots = include_robots
 
         # Infer scene directory
-        # TODO: Extend once we support the other scene sources
-        assert self.scene_source == "OG", "Currently, only OG interactive traversable scenes are supported!"
-        assert self.scene_source in SCENE_SOURCE_PATHS, f"Unsupported scene source: {self.scene_source}"
-        self.scene_dir = SCENE_SOURCE_PATHS[self.scene_source](scene_model)
+        self.scene_dir = get_og_scene_path(scene_model)
 
         # Other values that will be loaded at runtime
         self.load_object_categories = None
@@ -86,7 +70,7 @@ class InteractiveTraversableScene(TraversableScene):
             )
 
         # Load room semantic and instance segmentation map (must occur AFTER inferring scene directory)
-        self._seg_map = SegmentationMap(scene_dir=self.scene_dir, seg_map_resolution=seg_map_resolution)
+        self._seg_map = SegmentationMap(scene_dir=self.scene_dir, map_resolution=seg_map_resolution)
 
         # Decide which room(s) and object categories to load
         self.filter_rooms_and_object_categories(

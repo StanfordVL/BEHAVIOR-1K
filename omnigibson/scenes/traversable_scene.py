@@ -46,7 +46,7 @@ class TraversableScene(Scene):
 
         # Create traversable map
         self._trav_map = TraversableMap(
-            trav_map_resolution=trav_map_resolution,
+            map_resolution=trav_map_resolution,
             trav_map_erosion=trav_map_erosion,
             trav_map_with_objects=trav_map_with_objects,
             build_graph=build_graph,

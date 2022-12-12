@@ -5,21 +5,11 @@ import numpy as np
 
 from PIL import Image
 
-import omnigibson
-from omnigibson.utils.asset_utils import (
-    get_3dfront_scene_path,
-    get_cubicasa_scene_path,
-    get_og_scene_path,
-)
-
-SCENE_SOURCE_PATHS = {
-    "IG": get_og_scene_path,
-    "CUBICASA": get_cubicasa_scene_path,
-    "THREEDFRONT": get_3dfront_scene_path,
-}
+import omnigibson as og
+from omnigibson.maps.map_base import BaseMap
 
 
-class SegmentationMap:
+class SegmentationMap(BaseMap):
     """
     Segmentation map for computing connectivity within the scene
     """
@@ -27,22 +17,21 @@ class SegmentationMap:
     def __init__(
         self,
         scene_dir,
-        seg_map_resolution=0.1,
+        map_resolution=0.1,
         floor_heights=(0.0,),
     ):
         """
-        :param scene_dir: str, path to the scene directory from which segmentation info will be extracted
-        :param seg_map_resolution: room segmentation map resolution
-        :param floor_heights: heights of the floors for this segmentation map
+        Args:
+            scene_dir (str): path to the scene directory from which segmentation info will be extracted
+            map_resolution (float): map resolution
+            floor_heights (list of float): heights of the floors for this segmentation map
         """
         # Store internal values
         self.scene_dir = scene_dir
-        self.seg_map_default_resolution = 0.01
-        self.seg_map_resolution = seg_map_resolution
+        self.map_default_resolution = 0.01
         self.floor_heights = floor_heights
 
         # Other values that will be loaded at runtime
-        self.seg_map_size = None
         self.room_sem_name_to_sem_id = None
         self.room_sem_id_to_sem_name = None
         self.room_ins_name_to_ins_id = None
@@ -51,13 +40,13 @@ class SegmentationMap:
         self.room_ins_map = None
         self.room_sem_map = None
 
-        # Load the map
-        self.load_room_sem_ins_seg_map()
+        # Run super call
+        super().__init__(map_resolution=map_resolution)
 
-    def load_room_sem_ins_seg_map(self):
-        """
-        Load room segmentation map
-        """
+        # Load the map
+        self.load_map()
+
+    def _load_map(self):
         layout_dir = os.path.join(self.scene_dir, "layout")
         room_seg_imgs = os.path.join(layout_dir, "floor_insseg_0.png")
         img_ins = Image.open(room_seg_imgs)
@@ -66,11 +55,11 @@ class SegmentationMap:
         height, width = img_ins.size
         assert height == width, "room seg map is not a square"
         assert img_ins.size == img_sem.size, "semantic and instance seg maps have different sizes"
-        self.seg_map_size = int(height * self.seg_map_default_resolution / self.seg_map_resolution)
-        img_ins = np.array(img_ins.resize((self.seg_map_size, self.seg_map_size), Image.NEAREST))
-        img_sem = np.array(img_sem.resize((self.seg_map_size, self.seg_map_size), Image.NEAREST))
+        map_size = int(height * self.map_default_resolution / self.map_resolution)
+        img_ins = np.array(img_ins.resize((map_size, map_size), Image.NEAREST))
+        img_sem = np.array(img_sem.resize((map_size, map_size), Image.NEAREST))
 
-        room_categories = os.path.join(omnigibson.og_dataset_path, "metadata", "room_categories.txt")
+        room_categories = os.path.join(og.og_dataset_path, "metadata", "room_categories.txt")
         with open(room_categories, "r") as fp:
             room_cats = [line.rstrip() for line in fp.readlines()]
 
@@ -108,12 +97,19 @@ class SegmentationMap:
         self.room_ins_map = img_ins
         self.room_sem_map = img_sem
 
+        return map_size
+
     def get_random_point_by_room_type(self, room_type):
         """
-        Sample a random point by room type
+        Sample a random point on the given a specific room type @room_type.
 
-        :param room_type: room type (e.g. bathroom)
-        :return: floor (always 0), a randomly sampled point in [x, y, z]
+        Args:
+            room_type (str): Room type to sample random point (e.g.: "bathroom")
+
+        Returns:
+            2-tuple:
+                - int: floor number. This is always 0
+                - 3-array: (x,y,z) randomly sampled point in a room of type @room_type
         """
         if room_type not in self.room_sem_name_to_sem_id:
             logging.warning("room_type [{}] does not exist.".format(room_type))
@@ -123,7 +119,7 @@ class SegmentationMap:
         valid_idx = np.array(np.where(self.room_sem_map == sem_id))
         random_point_map = valid_idx[:, np.random.randint(valid_idx.shape[1])]
 
-        x, y = self.seg_map_to_world(random_point_map)
+        x, y = self.map_to_world(random_point_map)
         # assume only 1 floor
         floor = 0
         z = self.floor_heights[floor]
@@ -131,10 +127,15 @@ class SegmentationMap:
 
     def get_random_point_by_room_instance(self, room_instance):
         """
-        Sample a random point by room instance
+        Sample a random point on the given a specific room instance @room_instance.
 
-        :param room_instance: room instance (e.g. bathroom_1)
-        :return: floor (always 0), a randomly sampled point in [x, y, z]
+        Args:
+            room_instance (str): Room instance to sample random point (e.g.: "bathroom_1")
+
+        Returns:
+            2-tuple:
+                - int: floor number. This is always 0
+                - 3-array: (x,y,z) randomly sampled point in room @room_instance
         """
         if room_instance not in self.room_ins_name_to_ins_id:
             logging.warning("room_instance [{}] does not exist.".format(room_instance))
@@ -144,39 +145,23 @@ class SegmentationMap:
         valid_idx = np.array(np.where(self.room_ins_map == ins_id))
         random_point_map = valid_idx[:, np.random.randint(valid_idx.shape[1])]
 
-        x, y = self.seg_map_to_world(random_point_map)
+        x, y = self.map_to_world(random_point_map)
         # assume only 1 floor
         floor = 0
         z = self.floor_heights[floor]
         return floor, np.array([x, y, z])
 
-    def seg_map_to_world(self, xy):
-        """
-        Transforms a 2D point in map reference frame into world (simulator) reference frame
-
-        :param xy: 2D location in seg map reference frame (image)
-        :return: 2D location in world reference frame (metric)
-        """
-        axis = 0 if len(xy.shape) == 1 else 1
-        return np.flip((xy - self.seg_map_size / 2.0) * self.seg_map_resolution, axis=axis)
-
-    def world_to_seg_map(self, xy):
-        """
-        Transforms a 2D point in world (simulator) reference frame into map reference frame
-
-        :param xy: 2D location in world reference frame (metric)
-        :return: 2D location in seg map reference frame (image)
-        """
-        return np.flip((xy / self.seg_map_resolution + self.seg_map_size / 2.0)).astype(np.int)
-
     def get_room_type_by_point(self, xy):
         """
         Return the room type given a point
 
-        :param xy: 2D location in world reference frame (metric)
-        :return: room type that this point is in or None, if this point is not on the room segmentation map
+        Args:
+            xy (2-array): 2D location in world reference frame (in metric space)
+
+        Returns:
+            None or str: room type that this point is in or None, if this point is not on the room segmentation map
         """
-        x, y = self.world_to_seg_map(xy)
+        x, y = self.world_to_map(xy)
         if x < 0 or x >= self.room_sem_map.shape[0] or y < 0 or y >= self.room_sem_map.shape[1]:
             return None
         sem_id = self.room_sem_map[x, y]
@@ -188,13 +173,15 @@ class SegmentationMap:
 
     def get_room_instance_by_point(self, xy):
         """
-        Return the room instance given a point
+        Return the room type given a point
 
-        :param xy: 2D location in world reference frame (metric)
-        :return: room instance that this point is in or None, if this point is not on the room segmentation map
+        Args:
+            xy (2-array): 2D location in world reference frame (in metric space)
+
+        Returns:
+            None or str: room instance that this point is in or None, if this point is not on the room segmentation map
         """
-
-        x, y = self.world_to_seg_map(xy)
+        x, y = self.world_to_map(xy)
         if x < 0 or x >= self.room_ins_map.shape[0] or y < 0 or y >= self.room_ins_map.shape[1]:
             return None
         ins_id = self.room_ins_map[x, y]
