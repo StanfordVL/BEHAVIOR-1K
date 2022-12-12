@@ -96,6 +96,7 @@ class StatefulObject(BaseObject):
         # Values that will be filled later
         self._states = None
         self._emitters = OrderedDict()
+        self._current_texture_state = None
 
         # Load abilities from taxonomy if needed & possible
         if abilities is None:
@@ -347,7 +348,11 @@ class StatefulObject(BaseObject):
 
         texture_change_states.sort(key=lambda s: get_texture_change_priority()[s.__class__])
         object_state = texture_change_states[-1] if len(texture_change_states) > 0 else None
-        self._update_texture_change(object_state)
+
+        # Only update our texture change if it's a different object state than the one we already have
+        if object_state != self._current_texture_state:
+            self._update_texture_change(object_state)
+            self._current_texture_state = object_state
 
     def _update_texture_change(self, object_state):
         """
