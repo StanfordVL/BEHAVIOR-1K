@@ -10,9 +10,9 @@ class PotentialReward(BaseRewardFunction):
     Args:
         potential_fcn (method): function for calculating potential. Function signature should be:
 
-                potential = potential_fcn(env)
+            potential = potential_fcn(env)
 
-                where @env is a BaseEnv instance, and @potential is a float value representing the calculated potential
+            where @env is a BaseEnv instance, and @potential is a float value representing the calculated potential
 
         r_potential (float): Reward weighting to give proportional to the potential difference calculated
             in between env timesteps
