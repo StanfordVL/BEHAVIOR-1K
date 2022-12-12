@@ -40,7 +40,6 @@ def benchmark_scene(scene_name, optimized=False, import_robot=True):
     scene = InteractiveTraversableScene(scene_name)
     start = time.time()
     og.sim.import_scene(scene)
-    og.sim.play()
     print(time.time() - start)
 
     if import_robot:
@@ -48,6 +47,7 @@ def benchmark_scene(scene_name, optimized=False, import_robot=True):
         og.sim.import_object(turtlebot, auto_initialize=True)
         og.sim.step()
 
+    og.sim.play()
     fps = []
     physics_fps = []
     render_fps = []
@@ -108,12 +108,8 @@ def benchmark_scene(scene_name, optimized=False, import_robot=True):
 
 def main():
     for scene in SCENES:
-        sim = Simulator(
-            viewer_width=512,
-            viewer_height=512,
-        )
         benchmark_scene(scene, optimized=True, import_robot=True)
-        sim.stop()
+        og.sim.stop()
         benchmark_scene(scene, optimized=True, import_robot=False)
 
     og.shutdown()
