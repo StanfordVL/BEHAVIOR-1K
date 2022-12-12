@@ -1,3 +1,4 @@
+import logging
 import os
 import matplotlib.pyplot as plt
 import omni
@@ -5,7 +6,6 @@ from omni.isaac.core.utils.prims import get_prim_at_path
 
 import omnigibson.objects
 from omnigibson import og_dataset_path, assets_path
-from omnigibson.utils.usd_utils import create_joint
 from omnigibson.systems.system_base import SYSTEMS_REGISTRY
 from omnigibson.systems.particle_system_base import BaseParticleSystem
 from omnigibson.utils.constants import SemanticClass
@@ -15,8 +15,6 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.prims.geom_prim import VisualGeomPrim
 from collections import OrderedDict
 import numpy as np
-from pxr import Gf
-import logging
 
 
 def get_visual_particle_systems():
@@ -707,8 +705,6 @@ class VisualParticleSystem(MacroParticleSystem):
             refuse_downwards=True,
         )
 
-        print(f"RESULTS: \n{results}")
-
         # Use sampled points
         positions, orientations, particle_scales, link_prim_paths = [], [], [], []
         for result, scale in zip(results, scales):
@@ -776,22 +772,20 @@ class VisualParticleSystem(MacroParticleSystem):
         common_groups = current_group_names.intersection(desired_group_names)
 
         # Sanity check the common groups, we will recreate any where there is a mismatch
-        # print(f"common: {common_groups}")
         for name in common_groups:
             info = name_to_info_mapping[name]
             if cls.num_group_particles(group=name) != info["n_particles"]:
-                print(f"Got mismatch in particle group {name} when syncing, deleting and recreating group now.")
+                logging.debug(f"Got mismatch in particle group {name} when syncing, "
+                                f"deleting and recreating group now.")
                 # Add this group to both the delete and creation pile
                 groups_to_delete.add(name)
                 groups_to_create.add(name)
 
         # Delete any groups we no longer want
-        # print(f"del: {groups_to_delete}")
         for name in groups_to_delete:
             cls.remove_attachment_group(group=name)
 
         # Create any groups we don't already have
-        # print(f"create: {groups_to_create}")
         for name in groups_to_create:
             obj = cls.simulator.scene.object_registry("name", name)
             info = name_to_info_mapping[name]
@@ -956,7 +950,7 @@ class VisualParticleSystem(MacroParticleSystem):
                 particle_attached_link_names=[group_obj_id2link[int(idn)] for idn in state[idx + 2 + n_particles : idx + 2 + n_particles * 2]],
             )
             idx += 2 + n_particles * 2
-        print(f"Syncing {cls.name} particles with {n_groups} groups..")
+        logging.debug(f"Syncing {cls.name} particles with {n_groups} groups..")
         cls._sync_particle_groups(
             group_objects=group_objs,
             particle_idns=[group_info["particle_idns"] for group_info in groups_dict.values()],

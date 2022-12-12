@@ -1,4 +1,4 @@
-import os
+import logging
 import time
 
 import omnigibson as og
@@ -7,14 +7,13 @@ from omnigibson.prims.prim_base import BasePrim
 from omnigibson.prims.material_prim import MaterialPrim
 from omnigibson.systems.system_base import SYSTEMS_REGISTRY
 from omnigibson.systems.particle_system_base import BaseParticleSystem
-from omnigibson.utils.constants import SemanticClass
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
 from omnigibson.utils.python_utils import classproperty, assert_valid_key, subclass_factory
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object_full_grid_topdown
-from omnigibson.utils.usd_utils import create_joint, array_to_vtarray
+from omnigibson.utils.usd_utils import array_to_vtarray
 from omnigibson.utils.ui_utils import disclaimer
 from omnigibson.utils.physx_utils import create_physx_particle_system, create_physx_particleset_pointinstancer, \
-    bind_material, get_prototype_path_from_particle_system_path
+    get_prototype_path_from_particle_system_path
 import omni
 from omni.isaac.core.utils.prims import get_prim_at_path, is_prim_path_valid
 from omni.physx.scripts import particleUtils
@@ -22,7 +21,6 @@ from omni.physx import get_physx_scene_query_interface
 from collections import OrderedDict
 import numpy as np
 from pxr import Gf, Vt, UsdShade, UsdGeom, PhysxSchema
-from omni.isaac.core.utils.stage import get_current_stage
 from collections import defaultdict
 
 
@@ -123,9 +121,6 @@ class PhysxParticleInstancer(BasePrim):
     def _initialize(self):
         # Run super first
         super()._initialize()
-
-    def update_default_state(self):
-        pass
 
     @property
     def n_particles(self):
@@ -1117,24 +1112,21 @@ class MicroParticleSystem(BaseParticleSystem):
         common_instancers = current_instancer_names.intersection(desired_instancer_names)
 
         # Sanity check the common instancers, we will recreate any where there is a mismatch
-        # print(f"common: {common_instancers}")
         for name in common_instancers:
             idn = cls.particle_instancer_name_to_idn(name=name)
             info = idn_to_info_mapping[idn]
             instancer = cls.particle_instancers[name]
             if instancer.particle_group != info["group"] or instancer.n_particles != info["count"]:
-                print(f"Got mismatch in particle instancer {name} when syncing, deleting and recreating instancer now.")
+                logging.debug(f"Got mismatch in particle instancer {name} when syncing, deleting and recreating instancer now.")
                 # Add this instancer to both the delete and creation pile
                 instancers_to_delete.add(name)
                 instancers_to_create.add(name)
 
         # Delete any instancers we no longer want
-        # print(f"del: {instancers_to_delete}")
         for name in instancers_to_delete:
             cls.remove_particle_instancer(name=name)
 
         # Create any instancers we don't already have
-        # print(f"create: {instancers_to_create}")
         for name in instancers_to_create:
             idn = cls.particle_instancer_name_to_idn(name=name)
             info = idn_to_info_mapping[idn]
@@ -1199,7 +1191,7 @@ class MicroParticleSystem(BaseParticleSystem):
         for info_name in ("instancer_idns", "instancer_particle_groups", "instancer_particle_counts"):
             instancer_info[info_name] = state[idx: idx + n_instancers].astype(int).tolist()
             idx += n_instancers
-        print(f"Syncing {cls.name} particles with {n_instancers} instancers..")
+        logging.debug(f"Syncing {cls.name} particles with {n_instancers} instancers..")
         cls._sync_particle_instancers(
             idns=instancer_info["instancer_idns"],
             particle_groups=instancer_info["instancer_particle_groups"],
@@ -1208,12 +1200,9 @@ class MicroParticleSystem(BaseParticleSystem):
 
         # Procedurally deserialize the particle states
         particle_states = OrderedDict()
-        print(f"total state size: {len(state)}")
         for idn in instancer_info["instancer_idns"]:
-            print(f"Deserializing {idn}...")
             name = cls.particle_instancer_idn_to_name(idn=idn)
             state_size = cls.particle_instancers[name].state_size
-            print(f"state size: {state_size}")
             particle_states[name] = cls.particle_instancers[name].deserialize(state[idx: idx + state_size])
             idx += state_size
 
