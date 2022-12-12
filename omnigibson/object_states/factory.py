@@ -98,9 +98,10 @@ _STEAM_STATE_SET = frozenset(
 
 _TEXTURE_CHANGE_STATE_SET = frozenset(
     [
+        Frozen,
         Burnt,
         Cooked,
-        Frozen,
+        Saturated,
         ToggledOn,
     ]
 )
