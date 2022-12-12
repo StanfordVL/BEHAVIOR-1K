@@ -13,7 +13,7 @@ from omni.isaac.core.utils.prims import get_prim_at_path
 m = create_module_macros(module_path=__file__)
 
 m.TOGGLE_DISTANCE_THRESHOLD = 0.1
-m.TOGGLE_LINK_NAME = "toggle_button_link"
+m.TOGGLE_LINK_NAME = "togglebutton_link"
 m.TOGGLE_BUTTON_SCALE = 0.05
 m.CAN_TOGGLE_STEPS = 5
 

@@ -28,8 +28,8 @@ from pxr import PhysicsSchemaTools, UsdGeom, Gf, Sdf
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
-m.APPLICATION_LINK_NAME = "particle_application_area"
-m.REMOVAL_LINK_NAME = "particle_remover_area"
+m.APPLICATION_LINK_NAME = "particleapplication_link"
+m.REMOVAL_LINK_NAME = "particleremover_link"
 
 # How many samples within the application area to generate per update step
 m.MAX_VISUAL_PARTICLES_APPLIED_PER_STEP = 2

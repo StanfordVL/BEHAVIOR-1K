@@ -10,4 +10,4 @@ class WaterSink(FluidSink):
 
     @staticmethod
     def get_state_link_name():
-        return "water_sink_link"
+        return "watersink_link"

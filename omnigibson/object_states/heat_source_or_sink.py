@@ -10,7 +10,7 @@ from omnigibson.object_states.toggle import ToggledOn
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
-m.HEATING_ELEMENT_LINK_NAME = "heat_source_link"
+m.HEATING_ELEMENT_LINK_NAME = "heatsource_link"
 
 m.HEATING_ELEMENT_MARKER_SCALE = [1.0] * 3
 # m.HEATING_ELEMENT_MARKER_FILENAME = os.path.join(omnigibson.assets_path, "models/fire/fire.obj")

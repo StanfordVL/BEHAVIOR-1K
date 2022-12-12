@@ -18,4 +18,4 @@ class WaterSource(FluidSource):
 
     @staticmethod
     def get_state_link_name():
-        return "water_source_link"
+        return "watersource_link"
