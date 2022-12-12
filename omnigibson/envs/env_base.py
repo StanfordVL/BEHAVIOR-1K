@@ -568,7 +568,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
             "render": {
                 "viewer_width": 1280,
                 "viewer_height": 720,
-                "vertical_fov": 90,
             },
 
             # Scene kwargs

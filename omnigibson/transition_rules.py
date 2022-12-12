@@ -1,10 +1,5 @@
 from abc import ABCMeta, abstractmethod
-from collections import namedtuple, OrderedDict
-
-import numpy as np
-
-import omnigibson as og
-from omnigibson import og_dataset_path
+from collections import namedtuple
 from omnigibson.systems import *
 from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.object_states import *
@@ -105,11 +100,14 @@ class AndFilter(BaseFilter):
 
 
 class BaseTransitionRule(metaclass=ABCMeta):
-    """Defines a set of categories of objects and how to transition their states."""
+    """
+    Defines a set of categories of objects and how to transition their states.
+    """
 
     @abstractmethod
     def __init__(self, individual_filters=None, group_filters=None):
-        """TransitionRule ctor.
+        """
+        TransitionRule ctor.
 
         Args:
             individual_filters (None or dict): Individual object filters that this filter cares about.
@@ -228,7 +226,9 @@ class BaseTransitionRule(metaclass=ABCMeta):
 
 
 class GenericTransitionRule(BaseTransitionRule):
-    """A generic transition rule template used typically for simple rules."""
+    """
+    A generic transition rule template used typically for simple rules.
+    """
 
     def __init__(self, individual_filters, group_filters, condition_fn, transition_fn):
         super(GenericTransitionRule, self).__init__(individual_filters, group_filters)
@@ -243,7 +243,9 @@ class GenericTransitionRule(BaseTransitionRule):
 
 
 class SlicingRule(BaseTransitionRule):
-    """Transition rule to apply to sliced / slicer object pairs."""
+    """
+    Transition rule to apply to sliced / slicer object pairs.
+    """
 
     def __init__(self):
         # Define an individual filter dictionary so we can track all valid combos of slicer - sliceable
@@ -321,7 +323,16 @@ class SlicingRule(BaseTransitionRule):
 
 # TODO: Replace with a more standard API when available.
 def _contained_objects(scene, container_obj):
-    """Returns a list of all objects ``inside'' the container object."""
+    """
+    Computes all objects from @scene contained with @container_obj
+
+    Args:
+        scene (Scene): Current active scene
+        container_obj (BaseObject): Object to find contained objects for
+
+    Returns:
+        list of BaseObject: All objects ``inside'' the container object, as defined by its AABB.
+    """
     bbox = BoundingBoxAPI.compute_aabb(container_obj.prim_path)
     contained_objs = []
     for obj in scene.objects:
@@ -333,7 +344,9 @@ def _contained_objects(scene, container_obj):
 
 
 class ContainerRule(BaseTransitionRule):
-    """Rule to apply to a container and a set of objects that may be inside."""
+    """
+    Rule to apply to a container and a set of objects that may be inside.
+    """
 
     def __init__(self, trigger_steps, final_obj_attrs, container_filter, *contained_filters):
         # Should be in this order to have the container object come first.
@@ -404,7 +417,8 @@ class ContainerRule(BaseTransitionRule):
 
 
 class ContainerGarbageRule(BaseTransitionRule):
-    """Rule to apply to a container to turn what remain inside into garbage.
+    """
+    Rule to apply to a container to turn what remain inside into garbage.
 
     This rule is used as a catch-all rule for containers to turn objects inside
     the container that did not match any other legitimate rules all into a
@@ -508,10 +522,7 @@ class BlenderRule(BaseTransitionRule):
         super().__init__(individual_filters=individual_filters, group_filters=group_filters)
 
     def condition(self, individual_objects, group_objects):
-
-
         # TODO: Check blender if both toggled on and lid is closed!
-
 
         blender = individual_objects["blender"]
         # If this blender doesn't exist in our volume checker, we add it

@@ -157,13 +157,6 @@ class OmniApp:
         self._app = omni.kit.app.get_app()
         self._start_app()
 
-        # vp_interface = omni.kit.viewport.acquire_viewport_interface()
-        # vp_window = vp_interface.get_viewport_window()
-        # drawable = vp_window.get_drawable()
-
-        # if drawable is None:
-        #     self._app.update()
-
         # once app starts, we can set / load settings
         from omni.isaac.kit.utils import open_stage, create_new_stage, set_livesync_stage
         self._carb_settings = carb.settings.get_settings()

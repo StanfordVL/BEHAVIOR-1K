@@ -1,11 +1,3 @@
-# Copyright (c) 2021, NVIDIA CORPORATION.  All rights reserved.
-#
-# NVIDIA CORPORATION and its licensors retain all intellectual property
-# and proprietary rights in and to this software, related documentation
-# and any modifications thereto.  Any use, reproduction, disclosure or
-# distribution of this software and related documentation without an express
-# license agreement from NVIDIA CORPORATION is strictly prohibited.
-#
 from collections import defaultdict
 import itertools
 import logging
@@ -18,25 +10,20 @@ import json
 import omni
 import carb
 from omni.isaac.core.simulation_context import SimulationContext
-from omni.isaac.core.tasks import BaseTask
 from omni.isaac.core.utils.prims import is_prim_ancestral, get_prim_type_name, is_prim_no_delete, get_prim_at_path, \
     is_prim_path_valid
 from omni.isaac.core.utils.stage import open_stage
 from omni.isaac.dynamic_control import _dynamic_control
 import omni.kit.loop._loop as omni_loop
-import builtins
 from pxr import Usd, Gf, UsdGeom, Sdf, UsdPhysics, PhysxSchema, PhysicsSchemaTools
 from omni.isaac.core.utils.viewports import set_camera_view
 from omni.isaac.core.loggers import DataLogger
-from typing import Optional, List
 
 import omnigibson as og
 from omnigibson.macros import gm, create_module_macros
-from omnigibson.robots.robot_base import BaseRobot
 from omnigibson.utils.config_utils import NumpyEncoder
 from omnigibson.utils.python_utils import clear as clear_pu, create_object_from_init_info, Serializable
 from omnigibson.utils.usd_utils import clear as clear_uu, BoundingBoxAPI
-from omnigibson.utils.asset_utils import get_og_avg_category_specs
 from omnigibson.utils.ui_utils import CameraMover, disclaimer
 from omnigibson.scenes import Scene
 from omnigibson.objects.object_base import BaseObject
@@ -44,9 +31,8 @@ from omnigibson.objects.stateful_object import StatefulObject
 from omnigibson.object_states.contact_subscribed_state_mixin import ContactSubscribedStateMixin
 from omnigibson.object_states.factory import get_states_by_dependency_order
 from omnigibson.sensors.vision_sensor import VisionSensor
-from omnigibson.transition_rules import DEFAULT_RULES, TransitionResults
+from omnigibson.transition_rules import DEFAULT_RULES
 from omni.kit.viewport_legacy import acquire_viewport_interface
-from omni.syntheticdata import SyntheticData
 
 
 # Create settings for this module
@@ -58,77 +44,50 @@ m.OBJECT_GRAVEYARD_POS = (100.0, 100.0, 100.0)
 
 
 class Simulator(SimulationContext, Serializable):
-    """ This class inherits from SimulationContext which provides the following.
+    """
+    Simulator class for directly interfacing with the physx physics engine.
 
-        SimulationContext provide functions that take care of many time-related events such as
-        perform a physics or a render step for instance. Adding/ removing callback functions that
-        gets triggered with certain events such as a physics step, timeline event
-        (pause or play..etc), stage open/ close..etc.
-
-        It also includes an instance of PhysicsContext which takes care of many physics related
-        settings such as setting physics dt, solver type..etc.
-
-        In addition to what is provided from SimulationContext, this class allows the user to add a
-        task to the world and it contains a scene object.
-
-        To control the default reset state of different objects easily, the object could be added to
-        a Scene. Besides this, the object is bound to a short keyword that facilitates objects retrievals,
-        like in a dict.
-
-        Checkout the required tutorials at
-        https://docs.omniverse.nvidia.com/app_isaacsim/app_isaacsim/overview.html
+    NOTE: This is a monolithic class. All created Simulator() instances will reference the same underlying
+        Simulator object
 
         Args:
-            :param gravity: gravity on z direction.
-            physics_dt (Optional[float], optional): dt between physics steps. Defaults to 1.0 / 60.0.
-            rendering_dt (Optional[float], optional): dt between rendering steps. Note: rendering means
-                                                       rendering a frame of the current application and not
-                                                       only rendering a frame to the viewports/ cameras. So UI
-                                                       elements of Isaac Sim will be refereshed with this dt
-                                                       as well if running non-headless.
-                                                       Defaults to 1.0 / 60.0.
-            stage_units_in_meters (float, optional): The metric units of assets. This will affect gravity value..etc.
-                                                      Defaults to 0.01.
-            :param viewer_width: width of the camera image
-            :param viewer_height: height of the camera image
-            :param vertical_fov: vertical field of view of the camera image in degrees
-            :param device: None or str, specifies the device to be used if running on the gpu with torch backend
+            gravity (float): gravity on z direction.
+            physics_dt (float): dt between physics steps. Defaults to 1.0 / 60.0.
+            rendering_dt (float): dt between rendering steps. Note: rendering means rendering a frame of the current
+                application and not only rendering a frame to the viewports/ cameras. So UI elements of Isaac Sim will
+                be refereshed with this dt as well if running non-headless. Defaults to 1.0 / 60.0.
+            stage_units_in_meters (float): The metric units of assets. This will affect gravity value..etc.
+                Defaults to 0.01.
+            viewer_width (int): width of the camera image, in pixels
+            viewer_height (int): height of the camera image, in pixels
+            device (None or str): specifies the device to be used if running on the gpu with torch backend
         """
-
-    _world_initialized = False
-
     def __init__(
             self,
             gravity=9.81,
-            physics_dt: float = 1.0 / 60.0,
-            rendering_dt: float = 1.0 / 60.0,
-            stage_units_in_meters: float = 1.0,
+            physics_dt=1.0 / 60.0,
+            rendering_dt=1.0 / 60.0,
+            stage_units_in_meters=1.0,
             viewer_width=gm.DEFAULT_VIEWER_WIDTH,
             viewer_height=gm.DEFAULT_VIEWER_HEIGHT,
-            vertical_fov=90,
             device=None,
-    ) -> None:
+    ):
         super().__init__(
             physics_dt=physics_dt,
             rendering_dt=rendering_dt,
             stage_units_in_meters=stage_units_in_meters,
             device=device,
         )
-        if Simulator._world_initialized:
+        if self._world_initialized:
             return
         Simulator._world_initialized = True
-        self._scene_finalized = False
-        # self._current_tasks = dict()
         self._dc_interface = _dynamic_control.acquire_dynamic_control_interface()
-        # if not builtins.ISAAC_LAUNCHED_FROM_TERMINAL:
-        #     self.start_simulation()
         set_camera_view()
         self._data_logger = DataLogger()
         self._contact_callback = self._physics_context._physx_sim_interface.subscribe_contact_report_events(self._on_contact)
 
         # Store other internal vars
         self.gravity = gravity
-        self.vertical_fov = vertical_fov        # TODO: This currently does nothing
 
         # Store other references to variables that will be initialized later
         self._viewer = None
@@ -137,7 +96,6 @@ class Simulator(SimulationContext, Serializable):
         self._scene = None
 
         # Initialize viewer
-        # self._set_physics_engine_settings()
         # TODO: Make this toggleable so we don't always have a viewer if we don't want to
         self._set_viewer_settings()
         self.viewer_width = viewer_width
@@ -146,7 +104,6 @@ class Simulator(SimulationContext, Serializable):
         # List of objects that need to be initialized during whenever the next sim step occurs
         self._objects_to_initialize = []
 
-        # TODO: Fix
         # Set of categories that can be grasped by assisted grasping
         self.object_state_types = get_states_by_dependency_order()
 
@@ -167,26 +124,19 @@ class Simulator(SimulationContext, Serializable):
     def __new__(
         cls,
         gravity=9.81,
-        physics_dt: float = 1.0 / 60.0,
-        rendering_dt: float = 1.0 / 60.0,
-        stage_units_in_meters: float = 1.0,
+        physics_dt=1.0 / 60.0,
+        rendering_dt=1.0 / 60.0,
+        stage_units_in_meters=1.0,
         viewer_width=gm.DEFAULT_VIEWER_WIDTH,
         viewer_height=gm.DEFAULT_VIEWER_HEIGHT,
-        vertical_fov=90,
         device_idx=0,
-    ) -> None:
+    ):
         # Overwrite since we have different kwargs
         if Simulator._instance is None:
             Simulator._instance = object.__new__(cls)
         else:
             carb.log_info("Simulator is defined already, returning the previously defined one")
         return Simulator._instance
-
-    def _reset_variables(self):
-        """
-        Reset state of internal variables
-        """
-        pass
 
     def _set_viewer_camera(self, prim_path="/World/viewer_camera"):
         """
@@ -326,7 +276,8 @@ class Simulator(SimulationContext, Serializable):
         """
         Import a scene into the simulator. A scene could be a synthetic one or a realistic Gibson Environment.
 
-        :param scene: a scene object to load
+        Args:
+            scene (Scene): a scene object to load
         """
         assert self.is_stopped(), "Simulator must be stopped while importing a scene!"
         assert isinstance(scene, Scene), "import_scene can only be called with Scene"
@@ -348,21 +299,6 @@ class Simulator(SimulationContext, Serializable):
         self.step()
         self.stop()
 
-    # # TODO
-    # def import_particle_system(self, particle_system):
-    #     """
-    #     Import a particle system into the simulator. Called by objects owning a particle-system, via reference to the Simulator instance.
-    #
-    #     :param particle_system: a ParticleSystem object to load
-    #     """
-    #
-    #     assert isinstance(
-    #         particle_system, ParticleSystem
-    #     ), "import_particle_system can only be called with ParticleSystem"
-    #
-    #     self.particle_systems.append(particle_system)
-    #     particle_system.initialize(self)
-
     def initialize_object_on_next_sim_step(self, obj):
         """
         Initializes the object upon the next simulation step
@@ -383,12 +319,6 @@ class Simulator(SimulationContext, Serializable):
                 Otherwise, we assume that the object will call initialize() on its own!
         """
         assert isinstance(obj, BaseObject), "import_object can only be called with BaseObject"
-
-        # TODO
-        # if False:#isinstance(obj, VisualMarker) or isinstance(obj, Particle):
-        #     # Marker objects can be imported without a scene.
-        #     obj.load(self)
-        # else:
 
         # Make sure scene is loaded -- objects should not be loaded unless we have a reference to a scene
         assert self.scene is not None, "import_object needs to be called after import_scene"
@@ -461,7 +391,9 @@ class Simulator(SimulationContext, Serializable):
         BoundingBoxAPI.clear()
 
     def _transition_rule_step(self):
-        """Applies all internal non-Omniverse transition rules."""
+        """
+        Applies all internal non-Omniverse transition rules.
+        """
         # Create a dict from rule to filter to objects we care about.
         obj_dict = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
         for obj in self.scene.objects + self.scene.robots:
@@ -641,24 +573,11 @@ class Simulator(SimulationContext, Serializable):
                         continue
                     obj0.states[state_type].on_contact(obj1, contact_header, contact_data)
 
-    # TODO: Do we need this?
-    # def sync(self, force_sync=False):
-    #     """
-    #     Update positions in renderer without stepping the simulation. Usually used in the reset() function.
-    #
-    #     :param force_sync: whether to force sync the objects in renderer
-    #     """
-    #     self.body_links_awake = 0
-    #     for instance in self.renderer.instances:
-    #         if instance.dynamic:
-    #             self.body_links_awake += self.update_position(instance, force_sync=force_sync or self.first_sync)
-    #     if self.viewer is not None:
-    #         self.viewer.update()
-    #     if self.first_sync:
-    #         self.first_sync = False
-
-    def is_paused(self) -> bool:
-        """Returns: True if the simulator is paused."""
+    def is_paused(self):
+        """
+        Returns:
+            bool: True if the simulator is paused, otherwise False
+        """
         return not (self.is_stopped() or self.is_playing())
 
     @contextlib.contextmanager
@@ -731,20 +650,18 @@ class Simulator(SimulationContext, Serializable):
         return
 
     @property
-    def dc_interface(self) -> _dynamic_control.DynamicControl:
-        """[summary]
-
+    def dc(self):
+        """
         Returns:
-            _dynamic_control.DynamicControl: [description]
+            _dynamic_control.DynamicControl: Dynamic control interface
         """
         return self._dc_interface
 
     @property
-    def scene(self) -> Scene:
-        """[summary]
-
+    def scene(self):
+        """
         Returns:
-            Scene: [description]
+            None or Scene: Scene currently loaded in this simulator. If no scene is loaded, returns None
         """
         return self._scene
 
@@ -781,36 +698,14 @@ class Simulator(SimulationContext, Serializable):
         clear_uu()
 
     def clear(self) -> None:
-        """Clears the stage leaving the PhysicsScene only if under /World.
+        """
+        Clears the stage leaving the PhysicsScene only if under /World.
         """
         # Stop the physics
         self.stop()
 
-        # if self.scene is not None:
-        #     self.scene.clear()
-        # self._current_tasks = dict()
-        self._scene_finalized = False
         self._scene = None
         self._data_logger = DataLogger()
-
-        # TODO: Handle edge-case for when we clear sim without loading new scene in. self._scene should be None
-        # but scene.load(sim) requires scene to be defined!
-
-        # def check_deletable_prim(prim_path):
-        #     print(f"checking prim path: {prim_path}")
-        #     if is_prim_no_delete(prim_path):
-        #         return False
-        #     if is_prim_ancestral(prim_path):
-        #         return False
-        #     if get_prim_type_name(prim_path=prim_path) == "PhysicsScene":
-        #         return False
-        #     if prim_path == "/World":
-        #         return False
-        #     if prim_path == "/":
-        #         return False
-        #     return True
-        #
-        # clear_stage(predicate=check_deletable_prim)
 
         # Load dummy stage, but don't clear sim to prevent circular loops
         self.load_stage(usd_path=f"{og.assets_path}/models/misc/clear_stage.usd")
@@ -896,15 +791,15 @@ class Simulator(SimulationContext, Serializable):
 
         return
 
-    def get_data_logger(self) -> DataLogger:
-        """Returns the data logger of the world.
+    def get_data_logger(self):
+        """
+        Returns the data logger of the world.
 
         Returns:
-            DataLogger: [description]
+            DataLogger: Data logger associated with this world
         """
         return self._data_logger
 
-    # TODO: Extend to update internal info
     def load_stage(self, usd_path):
         """
         Open the stage specified by USD file at @usd_path
@@ -969,7 +864,7 @@ class Simulator(SimulationContext, Serializable):
         self._app.shutdown()
 
     @property
-    def device(self) -> str:
+    def device(self):
         """
         Returns:
             device (None or str): Device used in simulation backend

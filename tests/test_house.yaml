@@ -52,7 +52,6 @@ output: [task_obs, rgb, depth, scan]
 fisheye: false
 image_width: 160
 image_height: 120
-vertical_fov: 45
 # depth
 depth_low: 0.8
 depth_high: 3.5
