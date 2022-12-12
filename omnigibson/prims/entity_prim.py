@@ -17,7 +17,6 @@ from omnigibson.prims.cloth_prim import ClothPrim
 from omnigibson.prims.joint_prim import JointPrim
 from omnigibson.prims.rigid_prim import RigidPrim
 from omnigibson.prims.xform_prim import XFormPrim
-from omnigibson.utils.omni_types import JointsState
 from omnigibson.utils.sim_utils import check_collision
 from omnigibson.utils.constants import PrimType, GEOM_TYPES
 from omnigibson.macros import gm
