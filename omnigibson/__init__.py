@@ -15,7 +15,7 @@ builtins.ISAAC_LAUNCHED_FROM_JUPYTER = (
 import nest_asyncio
 nest_asyncio.apply()
 
-__version__ = "3.0.0"
+__version__ = "0.0.1"
 
 logging.getLogger().setLevel(logging.INFO)
 
@@ -35,23 +35,11 @@ else:
     g_dataset_path = global_config["g_dataset_path"]
 g_dataset_path = os.path.expanduser(g_dataset_path)
 
-if "IGIBSON_DATASET_PATH" in os.environ:
-    og_dataset_path = os.environ["IGIBSON_DATASET_PATH"]
+if "OMNIGIBSON_DATASET_PATH" in os.environ:
+    og_dataset_path = os.environ["OMNIGIBSON_DATASET_PATH"]
 else:
     og_dataset_path = global_config["og_dataset_path"]
 og_dataset_path = os.path.expanduser(og_dataset_path)
-
-if "3DFRONT_DATASET_PATH" in os.environ:
-    threedfront_dataset_path = os.environ["3DFRONT_DATASET_PATH"]
-else:
-    threedfront_dataset_path = global_config["threedfront_dataset_path"]
-threedfront_dataset_path = os.path.expanduser(threedfront_dataset_path)
-
-if "CUBICASA_DATASET_PATH" in os.environ:
-    cubicasa_dataset_path = os.environ["CUBICASA_DATASET_PATH"]
-else:
-    cubicasa_dataset_path = global_config["cubicasa_dataset_path"]
-cubicasa_dataset_path = os.path.expanduser(cubicasa_dataset_path)
 
 if "KEY_PATH" in os.environ:
     key_path = os.environ["KEY_PATH"]
