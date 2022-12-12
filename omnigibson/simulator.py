@@ -62,6 +62,8 @@ class Simulator(SimulationContext, Serializable):
             viewer_height (int): height of the camera image, in pixels
             device (None or str): specifies the device to be used if running on the gpu with torch backend
         """
+    _world_initialized = False
+
     def __init__(
             self,
             gravity=9.81,
@@ -78,6 +80,10 @@ class Simulator(SimulationContext, Serializable):
             stage_units_in_meters=stage_units_in_meters,
             device=device,
         )
+
+        if self._world_initialized:
+            return
+        Simulator._world_initialized = True
         self._dc_interface = _dynamic_control.acquire_dynamic_control_interface()
         set_camera_view()
         self._data_logger = DataLogger()
@@ -508,7 +514,7 @@ class Simulator(SimulationContext, Serializable):
         """
         n_physics_timesteps_per_render = self.get_rendering_dt() / self.get_physics_dt()
         assert n_physics_timesteps_per_render.is_integer(), "render_timestep must be a multiple of physics_timestep"
-        return n_physics_timesteps_per_render
+        return int(n_physics_timesteps_per_render)
 
     def step(self, render=True, force_playing=False):
         """
@@ -634,6 +640,17 @@ class Simulator(SimulationContext, Serializable):
         self.set_simulation_dt(physics_dt=dt, rendering_dt=dt)
         yield
         self.set_simulation_dt(physics_dt=physics_dt, rendering_dt=rendering_dt)
+
+    @classmethod
+    def clear_instance(cls):
+        SimulationContext.clear_instance()
+        Simulator._world_initialized = None
+        return
+
+    def __del__(self):
+        SimulationContext.__del__(self)
+        Simulator._world_initialized = None
+        return
 
     @property
     def dc(self):
