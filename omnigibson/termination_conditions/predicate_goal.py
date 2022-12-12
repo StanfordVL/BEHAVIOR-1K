@@ -11,9 +11,9 @@ class PredicateGoal(SuccessCondition):
     Args:
         goal_fcn (method): function for calculating goal(s). Function signature should be:
 
-                goals = goal_fcn()
+            goals = goal_fcn()
 
-                where @goals is a list of bddl.condition_evaluation.HEAD -- compiled BDDL goal conditions
+            where @goals is a list of bddl.condition_evaluation.HEAD -- compiled BDDL goal conditions
     """
     def __init__(self, goal_fcn):
         # Store internal vars
