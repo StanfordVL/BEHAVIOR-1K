@@ -1,6 +1,7 @@
 import numpy as np
 import logging
 
+
 class LinkBasedStateMixin:
     def __init__(self):
         super().__init__()

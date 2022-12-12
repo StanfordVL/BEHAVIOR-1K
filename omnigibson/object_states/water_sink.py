@@ -1,4 +1,3 @@
-from omnigibson.macros import gm
 from omnigibson.object_states.fluid_sink import FluidSink
 from omnigibson.systems.micro_particle_system import WaterSystem
 

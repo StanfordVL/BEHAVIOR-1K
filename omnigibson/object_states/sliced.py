@@ -1,6 +1,5 @@
 import numpy as np
 from collections import OrderedDict
-from omnigibson.utils.python_utils import classproperty
 from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
 
 

@@ -1,18 +1,8 @@
 import numpy as np
-import matplotlib.pyplot as plt
-from collections import OrderedDict
-from omnigibson.systems.micro_particle_system import get_fluid_systems
-from omnigibson.systems.system_base import get_system_from_element_name, get_element_name_from_system
-from omnigibson.systems.macro_particle_system import VisualParticleSystem
-from omnigibson.systems.micro_particle_system import FluidSystem
-from omnigibson.macros import gm, create_module_macros
+from omnigibson.macros import create_module_macros
 from omnigibson.object_states.object_state_base import RelativeObjectState, BooleanState
-from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.particle_modifier import ParticleRemover
 from omnigibson.utils.python_utils import assert_valid_key
-from omnigibson.utils.constants import PrimType
-from pxr import Sdf
-from omnigibson.systems import SYSTEMS_REGISTRY
 
 
 # Create settings for this module

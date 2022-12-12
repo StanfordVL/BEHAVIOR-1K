@@ -1,6 +1,5 @@
 from omnigibson.object_states.object_state_base import AbsoluteObjectState
 from omnigibson.object_states.temperature import Temperature
-from omnigibson.utils.python_utils import classproperty
 import numpy as np
 from collections import OrderedDict
 

@@ -1,5 +1,4 @@
 import numpy as np
-from collections import OrderedDict
 
 from omnigibson.utils.usd_utils import BoundingBoxAPI
 from omnigibson.object_states.object_state_base import AbsoluteObjectState

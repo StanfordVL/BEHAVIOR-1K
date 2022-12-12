@@ -26,6 +26,13 @@ class Folded(AbsoluteObjectState, BooleanState):
         """
         Calculate the projection area and the diagonal length when projecting to the plane defined by the input dims
         E.g. if dims is [0, 1], the points will be projected onto the x-y plane.
+
+        Args:
+            dims (2-array): Global axes to project area onto. Options are {0, 1, 2}.
+                E.g. if dims is [0, 1], project onto the x-y plane.
+
+        Returns:
+            area (float): 
         """
         cloth = self.obj.links["base_link"]
         points = cloth.particle_positions[:, dims]

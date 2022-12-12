@@ -4,7 +4,9 @@ from omnigibson.object_states.object_state_base import AbsoluteObjectState, Bool
 
 
 class InsideRoomTypes(AbsoluteObjectState):
-    """The value of this state is the list of rooms that the object currently is in."""
+    """
+    The value of this state is the list of rooms that the object currently is in.
+    """
 
     def _get_value(self):
         if hasattr(self.obj, "fixed_base") and self.obj.fixed_base:

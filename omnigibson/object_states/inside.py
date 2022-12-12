@@ -1,4 +1,3 @@
-
 from IPython import embed
 
 import omnigibson

@@ -22,7 +22,8 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
         state, and all dependency states will be processed on *all* objects prior to this state being processed on
         *any* object.
 
-        :return: List of strings corresponding to state keys.
+        Returns:
+            list of str: List of strings corresponding to state keys.
         """
         return []
 
@@ -34,7 +35,8 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
         because of an ability or another state's dependency etc.), they will be processed on *all* objects prior to this
         state being processed on *any* object.
 
-        :return: List of strings corresponding to state keys.
+        Returns:
+            list of str: List of strings corresponding to state keys.
         """
         return []
 
@@ -78,14 +80,21 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
         return self._cache
 
     def _update(self):
-        """This function will be called once for every simulator step."""
+        """
+        This function will be called once for every simulator step.
+        """
         pass
 
     def _initialize(self):
-        """This function will be called once; should be used for any object state-related objects have been loaded."""
+        """
+        This function will be called once; should be used for any object state-related objects have been loaded.
+        """
         pass
 
     def initialize(self, simulator):
+        """
+        Initialize this object state
+        """
         assert not self._initialized, "State is already initialized."
 
         # Store simulator reference and create cache
@@ -229,6 +238,12 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
         return True
 
     def get_value(self, *args, **kwargs):
+        """
+        Get this state's value
+
+        Returns:
+            any: Object state value given input @args and @kwargs
+        """
         assert self._initialized
 
         # Compile args and kwargs deterministically
@@ -249,6 +264,12 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
         raise NotImplementedError
 
     def set_value(self, *args, **kwargs):
+        """
+        Set this state's value
+
+        Returns:
+            bool: True if setting the value was successful, otherwise False
+        """
         assert self._initialized
         # Clear cache because the state may be changed
         self.clear_cache()

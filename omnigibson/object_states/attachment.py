@@ -1,5 +1,3 @@
-from abc import abstractmethod
-
 from pxr import Gf
 from omni.physx.bindings._physx import ContactEventType
 
@@ -106,7 +104,8 @@ class Attached(RelativeObjectState, BooleanState, ContactSubscribedStateMixin):
 
     def _can_attach(self, other):
         """
-        Returns True if self is sticky or self and other have matching attachment type and category
+        Returns:
+            bool: True if self is sticky or self and other have matching attachment type and category
         """
         if self.attachment_type == AttachmentType.STICKY:
             return True

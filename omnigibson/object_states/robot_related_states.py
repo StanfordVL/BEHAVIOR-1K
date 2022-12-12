@@ -1,5 +1,6 @@
 import numpy as np
 
+import omnigibson as og
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.object_state_base import BooleanState, AbsoluteObjectState
 from omnigibson.object_states.pose import Pose
@@ -14,15 +15,21 @@ m.IN_REACH_DISTANCE_THRESHOLD = 2.0
 m.IN_FOV_PIXEL_FRACTION_THRESHOLD = 0.05
 
 
-def _get_robot(simulator):
-    valid_robots = [robot for robot in simulator.scene.robots]
-    if not valid_robots:
+def _get_robot(idn=0):
+    """
+    Grabs the requested @idn'th robot from the simulator
+
+    Args:
+        idn (int): Which robot (the idn'th) to grab from the simulator
+
+    Returns:
+        None or BaseRobot: If found, the @idn'th robot in the simulator
+    """
+    valid_robots = og.sim.scene.robots
+    if len(valid_robots) <= idn:
         return None
 
-    if len(valid_robots) > 1:
-        raise ValueError("Multiple robots found.")
-
-    return valid_robots[0]
+    return valid_robots[idn]
 
 
 class InReachOfRobot(AbsoluteObjectState, BooleanState):
@@ -31,7 +38,7 @@ class InReachOfRobot(AbsoluteObjectState, BooleanState):
         return AbsoluteObjectState.get_dependencies() + [Pose]
 
     def _get_value(self):
-        robot = _get_robot(self._simulator)
+        robot = _get_robot()
         if not robot:
             return False
 
@@ -49,7 +56,7 @@ class InSameRoomAsRobot(AbsoluteObjectState, BooleanState):
         return AbsoluteObjectState.get_dependencies() + [Pose, InsideRoomTypes]
 
     def _get_value(self):
-        robot = _get_robot(self._simulator)
+        robot = _get_robot()
         if not robot:
             return False
 
@@ -69,7 +76,7 @@ class InSameRoomAsRobot(AbsoluteObjectState, BooleanState):
 
 class InHandOfRobot(AbsoluteObjectState, BooleanState):
     def _get_value(self):
-        robot = _get_robot(self._simulator)
+        robot = _get_robot()
         if not robot:
             return False
 
@@ -92,7 +99,7 @@ class InFOVOfRobot(AbsoluteObjectState, BooleanState):
         return AbsoluteObjectState.get_optional_dependencies() + [ObjectsInFOVOfRobot]
 
     def _get_value(self):
-        robot = _get_robot(self._simulator)
+        robot = _get_robot()
         if not robot:
             return False
 

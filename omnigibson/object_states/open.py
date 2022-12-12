@@ -1,5 +1,4 @@
 import random
-import numpy as np
 
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.object_state_base import BooleanState, AbsoluteObjectState
@@ -22,6 +21,22 @@ m.BOTH_SIDES_METADATA_FIELD = "openable_both_sides"
 
 
 def _compute_joint_threshold(joint, joint_direction):
+    """
+    Computes the joint threshold for opening and closing
+
+    Args:
+        joint (JointPrim): Joint to calculate threshold for
+        joint_direction (int): If 1, assumes opening direction is positive angle change. Otherwise,
+            assumes opening direction is negative angle change.
+
+    Returns:
+        3-tuple:
+
+            - float: Joint value at which closed <--> open
+            - float: Extreme joint value for being opened
+            - float: Extreme joint value for being closed
+    """
+    global m
     # Convert fractional threshold to actual joint position.
     f = m.JOINT_THRESHOLD_BY_TYPE[joint.joint_type]
     closed_end = joint.lower_limit if joint_direction == 1 else joint.upper_limit
@@ -31,15 +46,36 @@ def _compute_joint_threshold(joint, joint_direction):
 
 
 def _is_in_range(position, threshold, range_end):
+    """
+    Calculates whether a joint's position @position is in its opening / closing range
+
+    Args:
+        position (float): Joint value
+        threshold (float): Joint value at which closed <--> open
+        range_end (float): Extreme joint value for being opened / closed
+
+    Returns:
+        bool: Whether the joint position is past @threshold in the direction of @range_end
+    """
     # Note that we are unable to do an actual range check here because the joint positions can actually go
     # slightly further than the denoted joint limits.
-    if range_end > threshold:
-        return position > threshold
-    else:
-        return position < threshold
+    return position > threshold if range_end > threshold else position < threshold
 
 
 def _get_relevant_joints(obj):
+    """
+    Grabs the relevant joints for object @obj
+
+    Args:
+        obj (StatefulObject): Object to grab relevant joints for
+
+    Returns:
+        3-tuple:
+            - bool: If True, check open/closed state for objects whose joints can switch positions
+            - list of JointPrim: Relevant joints for determining whether @obj is open or closed
+            - list of int: Joint directions for each corresponding relevant joint
+    """
+    global m
     if not hasattr(obj, "metadata"):
         return None, None, None
 

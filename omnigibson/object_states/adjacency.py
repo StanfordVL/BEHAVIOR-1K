@@ -37,11 +37,14 @@ def get_equidistant_coordinate_planes(n_planes):
     planes will be sampled: the ones where the first axis' positive direction
     is in the first quadrant).
 
-    :param n_planes: number of planes to sample
-    :return np.array of shape (n_planes, 2, 3) where the first dimension
-        is the sampled plane index, the second dimension is the axis index
-        (0/1), and the third dimension is the 3-D world-coordinate vector
-        corresponding to the axis.
+    Args:
+        n_planes (int): number of planes to sample
+
+    Returns:
+        3D-array: (n_planes, 2, 3) array where the first dimension
+            is the sampled plane index, the second dimension is the axis index
+            (0/1), and the third dimension is the 3-D world-coordinate vector
+            corresponding to the axis.
     """
     # Compute the positive directions of the 1st axis of each plane.
     first_axis_angles = np.linspace(0, np.pi / 2, n_planes)
@@ -62,10 +65,13 @@ def compute_adjacencies(obj, axes, max_distance):
     Given an object and a list of axes, find the adjacent objects in the axes'
     positive and negative directions.
 
-    :param obj: The object to check adjacencies of.
-    :param axes: The axes to check in. Note that each axis will be checked in
-        both its positive and negative direction.
-    :return: List[AxisAdjacencyList] of length len(axes) containing the adjacencies.
+    Args:
+        obj (StatefulObject): The object to check adjacencies of.
+        axes (2D-array): (n_axes, 3) array defining the axes to check in.
+            Note that each axis will be checked in both its positive and negative direction.
+
+    Returns:
+        list of AxisAdjacencyList: List of length len(axes) containing the adjacencies.
     """
     # Get vectors for each of the axes' directions.
     # The ordering is axes1+, axis1-, axis2+, axis2- etc.
@@ -117,7 +123,8 @@ def compute_adjacencies(obj, axes, max_distance):
 
 
 class VerticalAdjacency(AbsoluteObjectState):
-    """State representing the object's vertical adjacencies.
+    """
+    State representing the object's vertical adjacencies.
     Value is a AxisAdjacencyList object.
     """
 
@@ -139,7 +146,8 @@ class VerticalAdjacency(AbsoluteObjectState):
 
 
 class HorizontalAdjacency(AbsoluteObjectState):
-    """State representing the object's horizontal adjacencies in a preset number of directions.
+    """
+    State representing the object's horizontal adjacencies in a preset number of directions.
 
     The HorizontalAdjacency state returns adjacency lists for equally spaced coordinate planes.
     Each plane consists of 2 orthogonal axes, and adjacencies are checked for both the positive

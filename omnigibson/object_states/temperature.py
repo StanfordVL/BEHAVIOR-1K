@@ -6,7 +6,6 @@ from omnigibson.object_states.inside import Inside
 from omnigibson.object_states.object_state_base import AbsoluteObjectState
 from omnigibson.object_states.aabb import AABB
 import omnigibson.utils.transform_utils as T
-from omnigibson.utils.python_utils import classproperty
 
 
 # Create settings for this module
