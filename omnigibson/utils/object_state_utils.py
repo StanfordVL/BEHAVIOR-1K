@@ -42,6 +42,23 @@ def sample_kinematics(
     z_offset=0.01,
     skip_falling=False,
 ):
+    """
+    Samples the given @predicate kinematic state for @objA with respect to @objB
+
+    Args:
+        predicate (str): Name of the predicate to sample, e.g.: "onTop"
+        objA (StatefulObject): Object whose state should be sampled. e.g.: for sampling a microwave
+            on a cabinet, @objA is the microwave
+        objB (StatefulObject): Object who is the reference point for @objA's state. e.g.: for sampling
+            a microwave on a cabinet, @objB is the cabinet
+        use_ray_casting_method (bool): Whether to use raycasting for sampling or not
+        max_trials (int): Number of attempts for sampling
+        z_offset (float): Z-offset to apply to the sampled pose
+        skip_falling (bool): Whether to let @objA fall after its position is sampled or not
+
+    Returns:
+        bool: True if successfully sampled, else False
+    """
     # Run import here to avoid circular imports
     # No supporting surface annotation found, fallback to use ray-casting
     from omnigibson.objects.dataset_object import DatasetObject

@@ -753,41 +753,6 @@ class EntityPrim(XFormPrim):
         # Possibly normalize values when returning
         return self._normalize_efforts(efforts=joint_efforts) if normalized else joint_efforts
 
-    def get_joints_state(self, normalized=False):
-        """
-        Grabs the current joints state of this entity
-
-        Args:
-            normalized (bool): Whether to receive normalized states in range [-1, 1] or not
-
-        Returns:
-            JointsState: State of this entity's joints
-        """
-        # Only can be called if this is articulated
-        self.assert_articulated()
-
-        return JointsState(
-            positions=self.get_joint_positions(normalized=normalized),
-            velocities=self.get_joint_velocities(normalized=normalized),
-            efforts=self.get_joint_efforts(normalized=normalized),
-        )
-
-    def set_joints_state(self, state, normalized=False):
-        """
-        Sets the current joints state of this entity
-
-        Args:
-            state (JointsState): Joint state to set. Any values that are not None will be set.
-            normalized (bool): Whether received states are normalized in range [-1, 1] or not
-        """
-        # Possibly set positions, velocities, and efforts based on received state
-        if state.positions is not None:
-            self.set_joint_positions(positions=state.positions, normalized=normalized)
-        if state.velocities is not None:
-            self.set_joint_velocities(velocities=state.velocities, normalized=normalized)
-        if state.efforts is not None:
-            self.set_joint_efforts(efforts=state.efforts, normalized=normalized)
-
     def set_linear_velocity(self, velocity: np.ndarray):
         """
         Sets the linear velocity of the root prim in stage.

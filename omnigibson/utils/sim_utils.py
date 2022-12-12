@@ -1,5 +1,5 @@
 import numpy as np
-from collections import Iterable
+from collections import Iterable, namedtuple
 import logging
 
 import omnigibson as og
@@ -7,8 +7,21 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.utils.usd_utils import BoundingBoxAPI
 from omni.physx import get_physx_simulation_interface
 
+# Raw Body Contact Information
+# See https://docs.omniverse.nvidia.com/py/isaacsim/source/extensions/omni.isaac.contact_sensor/docs/index.html?highlight=contact%20sensor#omni.isaac.contact_sensor._contact_sensor.CsRawData for more info.
+CsRawData = namedtuple("RawBodyData", ["time", "dt", "body0", "body1", "position", "normal", "impulse"])
+
 
 def prims_to_rigid_prim_set(inp_prims):
+    """
+    Converts prims @inp_prims into its corresponding set of rigid prims
+
+    Args:
+        inp_prims (list of RigidPrim or EntityPrim): Arbitrary prims
+
+    Returns:
+        set of RigidPrim: Aggregated set of RigidPrims from @inp_prims
+    """
     # Avoid circular imports
     from omnigibson.prims.entity_prim import EntityPrim
     from omnigibson.prims.rigid_prim import RigidPrim
@@ -40,7 +53,7 @@ def get_collisions(prims=None, prims_check=None, prims_exclude=None, step_physic
 
     Returns:
         set of 2-tuple: Unique collision pairs occurring in the simulation at the current timestep between the
-        specified prim(s), represented by their prim_paths
+            specified prim(s), represented by their prim_paths
     """
     # Make sure sim is playing
     assert og.sim.is_playing(), "Cannot get collisions while sim is not playing!"

@@ -10,7 +10,7 @@ from omnigibson.macros import gm, create_module_macros
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.prims.geom_prim import CollisionGeomPrim, VisualGeomPrim
 from omnigibson.utils.constants import GEOM_TYPES
-from omnigibson.utils.omni_types import DynamicState, CsRawData
+from omnigibson.utils.sim_utils import CsRawData
 from omnigibson.utils.usd_utils import mesh_prim_to_trimesh_mesh
 
 # Import omni sensor based on type

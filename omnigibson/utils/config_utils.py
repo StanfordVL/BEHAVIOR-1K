@@ -1,15 +1,8 @@
 import collections
 import json
 import os
-import random
-
 import numpy as np
-
-import scipy
 import yaml
-from PIL import Image
-from scipy.spatial.transform import Rotation as R
-from transforms3d import quaternions
 
 from omnigibson import example_config_path
 
@@ -17,9 +10,14 @@ from omnigibson import example_config_path
 
 
 def parse_config(config):
-
     """
     Parse OmniGibson config file / object
+
+    Args:
+        config (dict or str): Either config dictionary or path to yaml config to load
+
+    Returns:
+        dict: Parsed config
     """
     if isinstance(config, collections.Mapping):
         return config
@@ -40,6 +38,12 @@ def parse_config(config):
 def parse_str_config(config):
     """
     Parse string config
+
+    Args:
+        config (str): Yaml cfg as a string to load
+
+    Returns:
+        dict: Parsed config
     """
     return yaml.safe_load(config)
 
@@ -47,6 +51,12 @@ def parse_str_config(config):
 def dump_config(config):
     """
     Converts YML config into a string
+
+    Args:
+        config (dict): Config to dump
+
+    Returns:
+        str: Config as a string
     """
     return yaml.dump(config)
 

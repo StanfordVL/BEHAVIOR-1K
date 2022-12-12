@@ -1,12 +1,9 @@
 import math
-import numpy as np
 from collections import Iterable
 import os
 
-from collections import OrderedDict
 import omni.usd
 from omni.isaac.core.utils.prims import get_prim_at_path, get_prim_path, is_prim_path_valid, get_prim_children
-from omni.isaac.core.utils.carb import set_carb_setting
 from omni.isaac.core.utils.stage import get_current_stage, get_stage_units, traverse_stage, add_reference_to_stage
 from omni.isaac.core.utils.bounds import compute_aabb, create_bbox_cache, compute_combined_aabb
 from omni.syntheticdata import helpers
@@ -25,7 +22,6 @@ import trimesh
 
 import omnigibson as og
 from omnigibson.macros import gm
-from omnigibson import assets_path, og_dataset_path
 from omnigibson.utils.constants import JointType, PRIMITIVE_MESH_TYPES
 from omnigibson.utils.python_utils import assert_valid_key
 
@@ -87,9 +83,11 @@ def get_prim_nested_children(prim):
     """
     Grabs all nested prims starting from root @prim via depth-first-search
 
-    :param prim: Usd.Prim, root prim from which to search for nested children prims
+    Args:
+        prim (Usd.Prim): root prim from which to search for nested children prims
 
-    :return: Tuple[Usd.Prim], nested prims
+    Returns:
+        list of Usd.Prim: nested prims
     """
     prims = []
     for child in get_prim_children(prim):
@@ -100,7 +98,8 @@ def get_prim_nested_children(prim):
 
 
 def get_camera_params(viewport):
-    """Get active camera intrinsic and extrinsic parameters.
+    """
+    Get active camera intrinsic and extrinsic parameters.
 
     Returns:
         dict: Keyword-mapped values of the active camera's parameters:
@@ -132,7 +131,8 @@ def get_camera_params(viewport):
 
 
 def get_semantic_objects_pose():
-    """Get pose of all objects with a semantic label.
+    """
+    Get pose of all objects with a semantic label.
     """
     stage = omni.usd.get_context().get_stage()
     mappings = helpers.get_instance_mappings()
@@ -149,17 +149,19 @@ def create_joint(prim_path, joint_type, body0=None, body1=None, enabled=True, st
     """
     Creates a joint between @body0 and @body1 of specified type @joint_type
 
-    :param prim_path: str, absolute path to where the joint will be created
-    :param joint_type: str, type of joint to create. Valid options are:
-        "FixedJoint", "Joint", "PrismaticJoint", "RevoluteJoint", "SphericalJoint"
-                    (equivalently, one of JointType)
-    :param body0: str, absolute path to the first body's prim. At least @body0 or @body1 must be specified.
-    :param body1: str, absolute path to the second body's prim. At least @body0 or @body1 must be specified.
-    :param enabled: bool, whether to enable this joint or not
-    :param stage: Usd.Stage, if specified, should be specific stage to be used to load the joint.
-        Otherwise, the current active stage will be used.
+    Args:
+        prim_path (str): absolute path to where the joint will be created
+        joint_type (str): type of joint to create. Valid options are:
+            "FixedJoint", "Joint", "PrismaticJoint", "RevoluteJoint", "SphericalJoint"
+                        (equivalently, one of JointType)
+        body0 (str): absolute path to the first body's prim. At least @body0 or @body1 must be specified.
+        body1 (str): absolute path to the second body's prim. At least @body0 or @body1 must be specified.
+        enabled (bool): whether to enable this joint or not
+        stage (Usd.Stage): if specified, should be specific stage to be used to load the joint.
+            Otherwise, the current active stage will be used.
 
-    :return Usd.Prim: Created joint prim
+    Returns:
+        Usd.Prim: Created joint prim
     """
     # Make sure we have valid joint_type
     assert JointType.is_valid(joint_type=joint_type), \
@@ -257,7 +259,7 @@ class BoundingBoxAPI:
             prim_path (str): Path to the prim to calculate AABB for
 
         Returns:
-            tuple:
+            2-tuple:
                 - 3-array: start (x,y,z) corner of world-coordinate frame aligned bounding box
                 - 3-array: end (x,y,z) corner of world-coordinate frame aligned bounding box
         """
@@ -285,7 +287,7 @@ class BoundingBoxAPI:
             prim_path (str): Path to the prim to calculate AABB for
 
         Returns:
-            tuple:
+            2-tuple:
                 - 3-array: center position (x,y,z) of world-coordinate frame aligned bounding box
                 - 3-array: end-to-end extent size (x,y,z) of world-coordinate frame aligned bounding box
         """
@@ -310,7 +312,7 @@ class BoundingBoxAPI:
             prim_paths (str): Paths to the prims to calculate union AABB for
 
         Returns:
-            tuple:
+            2-tuple:
                 - 3-array: start (x,y,z) corner of world-coordinate frame aligned bounding box
                 - 3-array: end (x,y,z) corner of world-coordinate frame aligned bounding box
         """
@@ -335,7 +337,7 @@ class BoundingBoxAPI:
                 - 3-array: end (x,y,z) corner of world-coordinate frame aligned bounding box
 
         Returns:
-            bool
+            bool: True if AABB contains @point, otherwise False
         """
         lower, upper = container
         return np.less_equal(lower, point).all() and np.less_equal(point, upper).all()
@@ -400,6 +402,15 @@ def create_mesh_prim_with_default_xform(primitive_type, prim_path, stage=None, u
 
 
 def mesh_prim_to_trimesh_mesh(mesh_prim):
+    """
+    Generates trimesh mesh from @mesh_prim
+
+    Args:
+        mesh_prim (Usd.Prim): Mesh prim to convert into trimesh mesh
+
+    Returns:
+        trimesh.Trimesh: Generated trimesh mesh
+    """
     face_vertex_counts = np.array(mesh_prim.GetAttribute("faceVertexCounts").Get())
     vertices = np.array(mesh_prim.GetAttribute("points").Get())
     face_indices = np.array(mesh_prim.GetAttribute("faceVertexIndices").Get())

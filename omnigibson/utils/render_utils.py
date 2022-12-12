@@ -2,10 +2,8 @@
 
 import omni
 from omni.isaac.core.utils.prims import get_prim_at_path
-import omnigibson as og
 from omnigibson.prims import EntityPrim, RigidPrim, VisualGeomPrim
 from omnigibson.utils.physx_utils import bind_material
-from pxr import UsdShade
 
 
 def make_glass(prim):

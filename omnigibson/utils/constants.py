@@ -1,15 +1,11 @@
 """
 Constant Definitions
 """
-
 import os
-from collections import namedtuple
-from enum import IntEnum, Enum
+from enum import IntEnum
 
 import omnigibson
 from omnigibson.utils.asset_utils import get_og_avg_category_specs
-from pxr import Gf
-from pxr.Sdf import ValueTypeNames as VT
 
 MAX_INSTANCE_COUNT = 1024
 MAX_CLASS_COUNT = 512
@@ -201,7 +197,8 @@ def get_class_name_to_class_id():
     """
     Get mapping from semantic class name to class id
 
-    :param starting_class_id: starting class id for scene objects
+    Returns:
+        dict: starting class id for scene objects
     """
     existing_classes = {item.value for item in SemanticClass}
     category_txt = os.path.join(omnigibson.og_dataset_path, "metadata/categories.txt")
