@@ -1,4 +1,4 @@
-from abc import ABCMeta, abstractmethod
+from abc import ABCMeta
 from collections import OrderedDict
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.python_utils import classproperty, assert_valid_key, Registerable

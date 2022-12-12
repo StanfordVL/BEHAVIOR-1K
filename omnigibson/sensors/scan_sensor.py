@@ -5,10 +5,8 @@ from collections import OrderedDict, Iterable
 from transforms3d.quaternions import quat2mat
 
 from omni.kit.commands import execute
-from omni.isaac.core.utils.stage import get_current_stage
 from omni.isaac.range_sensor import _range_sensor
 
-from omnigibson.sensors.dropout_sensor_noise import DropoutSensorNoise
 from omnigibson.sensors.sensor_base import BaseSensor
 from omnigibson.utils.constants import OccupancyGridState
 from omnigibson.utils.python_utils import classproperty
@@ -158,8 +156,11 @@ class ScanSensor(BaseSensor):
         """
         Get local occupancy grid based on current 1D scan
 
-        :param: 1D LiDAR scan
-        :return: local occupancy grid
+        Args:
+            n-array: 1D LiDAR scan
+
+        Returns:
+            2D-array: (occupancy_grid_resolution, occupancy_grid_resolution)-sized numpy array of the local occupancy grid
         """
         # Run sanity checks first
         assert "occupancy_grid" in self._modalities, "Occupancy grid is not enabled for this range sensor!"
