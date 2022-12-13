@@ -610,8 +610,8 @@ class VisualParticleSystem(MacroParticleSystem):
             positions (np.array): (n_particles, 3) shaped array specifying per-particle (x,y,z) positions
             orientations (None or np.array): (n_particles, 4) shaped array specifying per-particle (x,y,z,w) quaternion
                 orientations. If not specified, all will be set to canonical orientation (0, 0, 0, 1)
-            scales (None or np.array): (n_particles, 3) shaped array specifying per-particle (x,y,z) scaling.
-                If not specified, all we randomly sampled based on @cls.min_scale and @cls.max_scale
+            scales (None or np.array): (n_particles, 3) shaped array specifying per-particle (x,y,z) scaling in its
+                local frame. If not specified, all we randomly sampled based on @cls.min_scale and @cls.max_scale
             link_prim_paths (None or list of str): Determines which link each generated particle will
                 be attached to. If not specified, all will be attached to the group object's root link
         """
@@ -631,18 +631,17 @@ class VisualParticleSystem(MacroParticleSystem):
 
         if scales is None:
             scales = cls.sample_scales(group=group, n=n_particles)
-
-        bbox_extents = [(cls.particle_object.aabb_extent * scale).tolist() for scale in scales]
+        bbox_extents_local = [(cls.particle_object.aabb_extent * scale).tolist() for scale in scales]
 
         # Generate particles
         z_up = np.zeros((3, 1))
         z_up[-1] = 1.0
-        for position, orientation, scale, bbox_extent, link_prim_path in \
-                zip(positions, orientations, scales, bbox_extents, link_prim_paths):
+        for position, orientation, scale, bbox_extent_local, link_prim_path in \
+                zip(positions, orientations, scales, bbox_extents_local, link_prim_paths):
             # Possibly shift the particle slightly away from the object if we're not clipping into objects
             if cls._CLIP_INTO_OBJECTS:
                 # Shift the particle halfway down
-                base_to_center = bbox_extent[2] / 2.0
+                base_to_center = bbox_extent_local[2] / 2.0
                 normal = (T.quat2mat(orientation) @ z_up).flatten()
                 position -= normal * base_to_center
 
@@ -688,14 +687,17 @@ class VisualParticleSystem(MacroParticleSystem):
 
         # Sample scales and corresponding bbox extents
         scales = cls.sample_scales(group=group, n=n_particles)
-        bbox_extents = [(cls.particle_object.aabb_extent * scale).tolist() for scale in scales]
+        # For sampling particle positions, we need the global bbox extents, NOT the local extents
+        # which is what we would get naively if we directly use @scales
+        avg_scale = np.cbrt(np.product(obj.scale))
+        bbox_extents_global = [(cls.particle_object.aabb_extent * scale * avg_scale).tolist() for scale in scales]
 
         # Sample locations for all particles
         # TODO: Does simulation need to play at this point in time? Answer: yes
         results = sample_cuboid_on_object_symmetric_bimodal_distribution(
             obj=obj,
             num_samples=n_particles,
-            cuboid_dimensions=bbox_extents,
+            cuboid_dimensions=bbox_extents_global,
             bimodal_mean_fraction=cls._SAMPLING_BIMODAL_MEAN_FRACTION,
             bimodal_stdev_fraction=cls._SAMPLING_BIMODAL_STDEV_FRACTION,
             axis_probabilities=cls._SAMPLING_AXIS_PROBABILITIES,
