@@ -1,9 +1,14 @@
-"""Set of rendering utility functions when working with Omni"""
-
+"""
+Set of rendering utility functions when working with Omni
+"""
+import numpy as np
+from pxr import Gf
 import omni
 from omni.isaac.core.utils.prims import get_prim_at_path
+import omnigibson as og
 from omnigibson.prims import EntityPrim, RigidPrim, VisualGeomPrim
 from omnigibson.utils.physx_utils import bind_material
+import omnigibson.utils.transform_utils as T
 
 
 def make_glass(prim):
@@ -69,3 +74,24 @@ def create_pbr_material(prim_path):
 
     # Return generated material
     return get_prim_at_path(material_path)
+
+
+def create_skylight(intensity=500, color=(1.0, 1.0, 1.0)):
+    """
+    Creates a skylight object with the requested @color
+
+    Args:
+        intensity (float): Intensity of the generated skylight
+        color (3-array): Desired (R,G,B) color to assign to the skylight
+
+    Returns:
+        LightObject: Generated skylight object
+    """
+    # Avoid circular imports
+    from omnigibson.objects.light_object import LightObject
+    light = LightObject(prim_path="/World/skylight", name="skylight", light_type="Dome", intensity=intensity)
+    og.sim.import_object(light)
+    light.set_orientation(T.euler2quat([0, 0, -np.pi / 4]))
+    light_prim = light.light_link.prim
+    light_prim.GetAttribute("color").Set(Gf.Vec3f(*color))
+    return light
