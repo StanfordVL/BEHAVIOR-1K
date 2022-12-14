@@ -47,20 +47,20 @@ class Simulator(SimulationContext, Serializable):
     """
     Simulator class for directly interfacing with the physx physics engine.
 
-    NOTE: This is a monolithic class. All created Simulator() instances will reference the same underlying
-        Simulator object
+    NOTE: This is a monolithic class.
+        All created Simulator() instances will reference the same underlying Simulator object
 
-        Args:
-            gravity (float): gravity on z direction.
-            physics_dt (float): dt between physics steps. Defaults to 1.0 / 60.0.
-            rendering_dt (float): dt between rendering steps. Note: rendering means rendering a frame of the current
-                application and not only rendering a frame to the viewports/ cameras. So UI elements of Isaac Sim will
-                be refereshed with this dt as well if running non-headless. Defaults to 1.0 / 60.0.
-            stage_units_in_meters (float): The metric units of assets. This will affect gravity value..etc.
-                Defaults to 0.01.
-            viewer_width (int): width of the camera image, in pixels
-            viewer_height (int): height of the camera image, in pixels
-            device (None or str): specifies the device to be used if running on the gpu with torch backend
+    Args:
+        gravity (float): gravity on z direction.
+        physics_dt (float): dt between physics steps. Defaults to 1.0 / 60.0.
+        rendering_dt (float): dt between rendering steps. Note: rendering means rendering a frame of the current
+            application and not only rendering a frame to the viewports/ cameras. So UI elements of Isaac Sim will
+            be refereshed with this dt as well if running non-headless. Defaults to 1.0 / 60.0.
+        stage_units_in_meters (float): The metric units of assets. This will affect gravity value..etc.
+            Defaults to 0.01.
+        viewer_width (int): width of the camera image, in pixels
+        viewer_height (int): height of the camera image, in pixels
+        device (None or str): specifies the device to be used if running on the gpu with torch backend
         """
     _world_initialized = False
 

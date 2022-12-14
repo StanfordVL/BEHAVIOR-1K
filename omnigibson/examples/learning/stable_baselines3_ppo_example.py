@@ -1,3 +1,9 @@
+"""
+Example training code using stable-baselines3 PPO for one BEHAVIOR activity.
+Note that due to the sparsity of the reward, this training code will not converge and achieve task success.
+This only serves as a starting point that users can further build upon.
+"""
+
 import argparse
 import logging
 import os, time, cv2
@@ -21,13 +27,6 @@ try:
 except ModuleNotFoundError:
     log.error("stable-baselines3 is not installed. You would need to do: pip install stable-baselines3")
     exit(1)
-
-
-"""
-Example training code using stable-baselines3 PPO for one BEHAVIOR activity.
-Note that due to the sparsity of the reward, this training code will not converge and achieve task success.
-This only serves as a starting point that users can further build upon.
-"""
 
 
 class CustomCombinedExtractor(BaseFeaturesExtractor):

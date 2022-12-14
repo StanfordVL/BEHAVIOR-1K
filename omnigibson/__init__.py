@@ -104,6 +104,7 @@ from omnigibson.objects import REGISTERED_OBJECTS
 from omnigibson.robots import REGISTERED_ROBOTS
 from omnigibson.controllers import REGISTERED_CONTROLLERS
 from omnigibson.tasks import REGISTERED_TASKS
+from omnigibson.sensors import ALL_SENSOR_MODALITIES
 from omnigibson.utils.asset_utils import download_demo_data, download_og_dataset, download_assets
 from omnigibson.utils.ui_utils import choose_from_options
 

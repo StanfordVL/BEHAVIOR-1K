@@ -118,7 +118,6 @@ class ManipulationRobot(BaseRobot):
             prim_path (str): global path in the stage to this object
             name (None or str): Name for the object. Names need to be unique per scene. If None, a name will be
                 generated at the time the object is added to the scene, using the object's category.
-            category (str): Category for the object. Defaults to "object".
             class_id (None or int): What class ID the object should be assigned in semantic segmentation rendering mode.
                 If None, the ID will be inferred from this object's category.
             uuid (None or int): Unique unsigned-integer identifier to assign to this object (max 8-numbers).
@@ -130,7 +129,6 @@ class ManipulationRobot(BaseRobot):
             fixed_base (bool): whether to fix the base of this object or not
             visual_only (bool): Whether this object should be visual only (and not collide with any other objects)
             self_collisions (bool): Whether to enable self collisions for this object
-            prim_type (PrimType): Which type of prim the object is, Valid options are: {PrimType.RIGID, PrimType.CLOTH}
             load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
                 loading this prim at runtime.
             abilities (None or dict): If specified, manually adds specific object states to this object. It should be
