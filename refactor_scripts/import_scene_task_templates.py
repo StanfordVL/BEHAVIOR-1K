@@ -92,7 +92,7 @@ def import_nested_models_template_from_element(element, model_pose_info):
                 pos = model_pose_info[name]["pos"]
                 quat = model_pose_info[name]["quat"]
                 fixed_jnt = model_pose_info[name]["fixed_jnt"]
-                room = ele.get("room", "")
+                room = ele.get("rooms", "")
                 random_group = ele.get("random_group", None)
                 scale = string_to_array(ele.get("scale")) if "scale" in ele.keys() else None
                 obj_scope = ele.get("object_scope", None)

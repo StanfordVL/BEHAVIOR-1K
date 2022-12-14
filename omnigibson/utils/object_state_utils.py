@@ -38,8 +38,8 @@ def sample_kinematics(
     objA,
     objB,
     use_ray_casting_method=False,
-    max_trials=100,
-    z_offset=0.01,
+    max_trials=10,
+    z_offset=0.05,
     skip_falling=False,
 ):
     """
@@ -59,6 +59,10 @@ def sample_kinematics(
     Returns:
         bool: True if successfully sampled, else False
     """
+
+    assert z_offset > 0.5 * 9.81 * (og.sim.get_physics_dt() ** 2) + 0.02,\
+        f"z_offset {z_offset} is too small for the current physics_dt {og.sim.get_physics_dt()}"
+
     # Run import here to avoid circular imports
     # No supporting surface annotation found, fallback to use ray-casting
     from omnigibson.objects.dataset_object import DatasetObject
@@ -95,6 +99,9 @@ def sample_kinematics(
         objA.keep_still()
         # We also need to step physics to make sure the pose propagates downstream (e.g.: to Bounding Box computations)
         og.sim.step_physics()
+
+        # This would slightly change because of the step_physics call.
+        old_pos, orientation = objA.get_position_orientation()
 
         if use_ray_casting_method:
             if predicate == "onTop":
@@ -186,7 +193,7 @@ def sample_kinematics(
             pos[2] += z_offset
             objA.set_position_orientation(pos, orientation)
             objA.keep_still()
-            # Step physics
+
             og.sim.step_physics()
             success = not objA.in_contact()
 

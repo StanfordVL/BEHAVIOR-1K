@@ -300,33 +300,34 @@ class DatasetObject(USDObject):
         Args:
             object_state (BooleanState or None): the object state that the diffuse color should match to
         """
-        DEFAULT_ALBEDO_MAP_SUFFIX = frozenset({"DIFFUSE", "COMBINED", "albedo"})
-        state_name = object_state.__class__.__name__ if object_state is not None else None
+        # TODO: uncomment these once our dataset has the object state-conditioned texture maps
+        # DEFAULT_ALBEDO_MAP_SUFFIX = frozenset({"DIFFUSE", "COMBINED", "albedo"})
+        # state_name = object_state.__class__.__name__ if object_state is not None else None
         for material in self.materials:
-            texture_path = material.diffuse_texture
-            assert texture_path is not None, f"DatasetObject [{self.prim_path}] has invalid diffuse texture map."
-
-            # Get updated texture file path for state.
-            texture_path_split = texture_path.split("/")
-            filedir, filename = "/".join(texture_path_split[:-1]), texture_path_split[-1]
-            assert filename[-4:] == ".png", f"Texture file {filename} does not end with .png"
-
-            filename_split = filename[:-4].split("_")
-            # Check all three file names for backward compatibility.
-            if len(filename_split) > 0 and filename_split[-1] not in DEFAULT_ALBEDO_MAP_SUFFIX:
-                filename_split.pop()
-            target_texture_path = f"{filedir}/{'_'.join(filename_split)}"
-            target_texture_path += f"_{state_name}.png" if state_name is not None else ".png"
-
-            if os.path.exists(target_texture_path):
-                # Since we are loading a pre-cached texture map, we need to reset the albedo value to the default
-                self._update_albedo_value(None, material)
-                if material.diffuse_texture != target_texture_path:
-                    material.diffuse_texture = target_texture_path
-            else:
-                # print(f"Warning: DatasetObject [{self.prim_path}] does not have texture map: "
-                #       f"[{target_texture_path}]. Falling back to directly updating albedo value.")
-                self._update_albedo_value(object_state, material)
+            # texture_path = material.diffuse_texture
+            # assert texture_path is not None, f"DatasetObject [{self.prim_path}] has invalid diffuse texture map."
+            #
+            # # Get updated texture file path for state.
+            # texture_path_split = texture_path.split("/")
+            # filedir, filename = "/".join(texture_path_split[:-1]), texture_path_split[-1]
+            # assert filename[-4:] == ".png", f"Texture file {filename} does not end with .png"
+            #
+            # filename_split = filename[:-4].split("_")
+            # # Check all three file names for backward compatibility.
+            # if len(filename_split) > 0 and filename_split[-1] not in DEFAULT_ALBEDO_MAP_SUFFIX:
+            #     filename_split.pop()
+            # target_texture_path = f"{filedir}/{'_'.join(filename_split)}"
+            # target_texture_path += f"_{state_name}.png" if state_name is not None else ".png"
+            #
+            # if os.path.exists(target_texture_path):
+            #     # Since we are loading a pre-cached texture map, we need to reset the albedo value to the default
+            #     self._update_albedo_value(None, material)
+            #     if material.diffuse_texture != target_texture_path:
+            #         material.diffuse_texture = target_texture_path
+            # else:
+            #     print(f"Warning: DatasetObject [{self.prim_path}] does not have texture map: "
+            #           f"[{target_texture_path}]. Falling back to directly updating albedo value.")
+            self._update_albedo_value(object_state, material)
 
     def set_bbox_center_position_orientation(self, position=None, orientation=None):
         """
@@ -486,7 +487,7 @@ class DatasetObject(USDObject):
 
         return scales
 
-    def get_base_aligned_bbox(self, link_name=None, visual=False, xy_aligned=False, fallback_to_aabb=False):
+    def get_base_aligned_bbox(self, link_name=None, visual=False, xy_aligned=False, fallback_to_aabb=False, link_bbox_type="axis_aligned"):
         """
         Get a bounding box for this object that's axis-aligned in the object's base frame.
 
@@ -497,6 +498,8 @@ class DatasetObject(USDObject):
             xy_aligned (bool): Whether to align the bounding box to the global XY-plane
             fallback_to_aabb (bool): If set and a link's info is not found, the (global-frame) AABB will be
                 dynamically computed directly from omniverse
+            link_bbox_type (str): Which type of link bbox to use, "axis_aligned" means the bounding box is axis-aligned
+                to the link frame, "oriented" means the bounding box has the minimum volume
 
         Returns:
             4-tuple:
@@ -549,7 +552,7 @@ class DatasetObject(USDObject):
                     continue
 
                 # Get the extent and transform.
-                bb_data = self.native_link_bboxes[link_name][bbox_type]["oriented"]
+                bb_data = self.native_link_bboxes[link_name][bbox_type][link_bbox_type]
                 extent_in_bbox_frame = np.array(bb_data["extent"])
                 bbox_to_link_origin = np.array(bb_data["transform"])
 

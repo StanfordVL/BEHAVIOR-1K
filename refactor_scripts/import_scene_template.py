@@ -17,8 +17,9 @@ from omni.isaac.core.utils.prims import get_prim_at_path, get_prim_path, is_prim
 from omnigibson.utils.constants import JointType
 
 ##### SET THIS ######
-URDF = f"{og_dataset_path}/scenes/Rs_int/urdf/Rs_int_best.urdf"
-USD_TEMPLATE_FILE = f"{og_dataset_path}/scenes/Rs_int/urdf/Rs_int_best_template.usd"
+SCENE_ID = "Beechwood_0_int"
+URDF = f"{og_dataset_path}/scenes/{SCENE_ID}/urdf/{SCENE_ID}_best.urdf"
+USD_TEMPLATE_FILE = f"{og_dataset_path}/scenes/{SCENE_ID}/usd/{SCENE_ID}_best_template.usd"
 #### YOU DONT NEED TO TOUCH ANYTHING BELOW HERE IDEALLY :) #####
 
 sim = None
@@ -86,7 +87,7 @@ def import_nested_models_template_from_element(element, model_pose_info):
                 pos = model_pose_info[name]["pos"]
                 quat = model_pose_info[name]["quat"]
                 fixed_jnt = model_pose_info[name]["fixed_jnt"]
-                room = ele.get("room", "")
+                room = ele.get("rooms", "")
                 random_group = ele.get("random_group", None)
                 scale = string_to_array(ele.get("scale")) if "scale" in ele.keys() else None
                 obj_scope = ele.get("object_scope", None)
