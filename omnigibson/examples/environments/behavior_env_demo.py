@@ -4,6 +4,7 @@ import os
 import yaml
 
 import omnigibson as og
+from omnigibson.utils.ui_utils import choose_from_options
 
 
 def main(random_selection=False, headless=False, short_exec=False):
@@ -15,9 +16,17 @@ def main(random_selection=False, headless=False, short_exec=False):
     """
     logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
 
-    # Load the pre-selected configuration
+    # Ask the user whether they want online object sampling or not
+    sampling_options = {
+        False: "Use a pre-sampled cached BEHAVIOR activity scene",
+        True: "Sample the BEHAVIOR activity in an online fashion",
+    }
+    should_sample = choose_from_options(options=sampling_options, name="online object sampling", random_selection=random_selection)
+
+    # Load the pre-selected configuration and set the online_sampling flag
     config_filename = os.path.join(og.example_config_path, "fetch_behavior.yaml")
     cfg = yaml.load(open(config_filename, "r"), Loader=yaml.FullLoader)
+    cfg["task"]["online_object_sampling"] = should_sample
 
     # Load the environment
     env = og.Environment(configs=cfg)
