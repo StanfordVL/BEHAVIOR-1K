@@ -62,7 +62,7 @@ class DatasetObject(USDObject):
         """
         Args:
             prim_path (str): global path in the stage to this object
-            usd_path(None or str): If specified, global path to the USD file to load. Note that this will override
+            usd_path (None or str): If specified, global path to the USD file to load. Note that this will override
                 @category + @model!
             name (None or str): Name for the object. Names need to be unique per scene. If None, a name will be
                 generated at the time the object is added to the scene, using the object's category.

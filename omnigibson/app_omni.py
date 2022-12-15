@@ -28,9 +28,10 @@ m.DEFAULT_HIDE_WINDOWS = ["Flow", "Semantics Schema Editor"]
 
 
 def set_carb_setting(carb_settings: carb.settings.ISettings, setting: str, value: Any) -> None:
-    """Convenience function to set settings.
+    """
+    Convenience function to set settings.
 
-    Arguments:
+    Args:
         setting (str): Name of setting to change.
         value (Any): New value for the setting.
 
@@ -69,27 +70,7 @@ class OmniApp:
     the Toolkit is already running. Thus, it is necessary to launch the Toolkit first from
     your python application and then import everything else.
 
-    Usage:
-
-    .. code-block:: python
-
-        # At top of your application
-        from omni.isaac.kit import SimulationApp
-        config = {
-             width: "1280",
-             height: "720",
-             headless: False,
-        }
-        simulation_app = SimulationApp(config)
-
-        # Rest of the code follows
-        ...
-        simulation_app.close()
-
-    Note:
-            The settings in :obj:`DEFAULT_LAUNCHER_CONFIG` are overwritten by those in :obj:`config`.
-
-    Arguments:
+    Args:
         config (dict): A dictionary containing the configuration for the app. (default: None)
         experience (str): Path to the application config loaded by the launcher (default: "", will load app/omni.isaac.sim.python.kit if left blank)
     """
