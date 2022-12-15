@@ -62,10 +62,8 @@ Then, simply launch the desired script:
     sudo ./run_docker.sh <DATA_PATH> # (1)!
     ```
 
-    1.  `<DATA_PATH>` specifies where data will be stored on your machine. (1) This needs to be called each time the docker container is run!
-        {.annotate}
+    1.  `<DATA_PATH>` specifies where data will be stored on your machine (if no `<DATA_PATH>` is specified, it defaults to `./omnigibson_data`). This needs to be called each time the docker container is run!
 
-        1. If no `<DATA_PATH>` is specified, it defaults to `~/omnigibson-data` 
 
 === "GUI"
 
@@ -73,10 +71,11 @@ Then, simply launch the desired script:
     sudo ./run_docker_gui.sh <DATA_PATH> # (1)!
     ```
 
-    1.  `<DATA_PATH>` specifies where data will be stored on your machine. (1) This needs to be called each time the docker container is run!
-        {.annotate}
+    1.  `<DATA_PATH>` specifies where data will be stored on your machine (if no `<DATA_PATH>` is specified, it defaults to `./omnigibson_data`). This needs to be called each time the docker container is run!
 
-        1. If no `<DATA_PATH>` is specified, it defaults to `~/omnigibson-data` 
+??? warning annotate "Are you using NFS or AFS?"
+
+    Docker containers are unable to access NFS or AFS drives, so if `run_docker.sh` or `run_docker_gui.sh` are located on an NFS / AFS partition, please set `<DATA_PATH>` to an alternative data directory located on a non-NFS / AFS partition.
 
 ??? example annotate "Advanced: Installing from Source"
 
