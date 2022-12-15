@@ -116,7 +116,7 @@ Then, simply launch the desired script:
 **`OmniGibson`** is now successfully installed! Try exploring some of our new scenes interactively:
 
 ```{.shell .annotate}
-(omnigibson) python -m omnigibson.examples.scenes.scene_selector.py # (1)!
+(omnigibson) python -m omnigibson.examples.scenes.scene_selector # (1)!
 ```
 
 1. This demo lets you choose a scene and interactively move around using your keyboard and mouse. Hold down **`Shift`** and then **`Left-click + Drag`** an object to apply forces!
@@ -124,7 +124,7 @@ Then, simply launch the desired script:
 You can also try teleoperating one of our robots:
 
 ```{.shell .annotate}
-(omnigibson) python -m omnigibson.examples.robots.robot_control_example.py # (1)!
+(omnigibson) python -m omnigibson.examples.robots.robot_control_example # (1)!
 ```
 
 1. This demo lets you choose a scene, robot, and set of controllers, and then teleoperate the robot using your keyboard.

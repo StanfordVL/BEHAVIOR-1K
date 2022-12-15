@@ -34,6 +34,8 @@ setup(
         "h5py",
         "cryptography",
         "bddl>=0.0.3",
+        "opencv-python",
+        "nest_asyncio",
     ],
     tests_require=[],
     python_requires=">=3",

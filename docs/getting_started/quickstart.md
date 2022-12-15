@@ -246,4 +246,4 @@ og.sim.viewer_camera.set_position_orientation(<POSITION>, <ORIENTATION>)
 
 ***
 
-**Next:** Check out some of **`OmniGibson`**'s breadth of features from our [Sandbox](./sandbox.md)!
+**Next:** Check out some of **`OmniGibson`**'s breadth of features from our [Building Block](./building_blocks.md) examples!
