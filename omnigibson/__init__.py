@@ -77,37 +77,38 @@ debug_sampling = False
 from omnigibson.app_omni import OmniApp
 
 # Create app as a global reference so any submodule can access it
-app = OmniApp(
-    {
-        "headless": gm.HEADLESS,
-    },
-    debug=gm.DEBUG,
-)
+if not (os.getenv("OMNIGIBSON_NO_OMNIVERSE", 'False').lower() in ('true', '1', 't')):
+    app = OmniApp(
+        {
+            "headless": gm.HEADLESS,
+        },
+        debug=gm.DEBUG,
+    )
 
-# Next import must be simulator
-sim = None
-from omnigibson.simulator import Simulator
+    # Next import must be simulator
+    sim = None
+    from omnigibson.simulator import Simulator
 
-# Create simulator (this is a singleton so it's okay that it's global)
-sim = Simulator()
+    # Create simulator (this is a singleton so it's okay that it's global)
+    sim = Simulator()
 
-import omni
-def print_save_usd_warning(_):
-    logging.warning("Exporting individual USDs has been disabled in OG due to copyrights.")
+    import omni
+    def print_save_usd_warning(_):
+        logging.warning("Exporting individual USDs has been disabled in OG due to copyrights.")
 
-omni.kit.widget.stage.context_menu.ContextMenu.save_prim = print_save_usd_warning
+    omni.kit.widget.stage.context_menu.ContextMenu.save_prim = print_save_usd_warning
 
-# Import any remaining items we want to access directly from the main omnigibson import
-from omnigibson.envs import Environment
-from omnigibson.scenes import REGISTERED_SCENES
-from omnigibson.objects import REGISTERED_OBJECTS
-from omnigibson.robots import REGISTERED_ROBOTS
-from omnigibson.controllers import REGISTERED_CONTROLLERS
-from omnigibson.tasks import REGISTERED_TASKS
-from omnigibson.sensors import ALL_SENSOR_MODALITIES
+    # Import any remaining items we want to access directly from the main omnigibson import
+    from omnigibson.envs import Environment
+    from omnigibson.scenes import REGISTERED_SCENES
+    from omnigibson.objects import REGISTERED_OBJECTS
+    from omnigibson.robots import REGISTERED_ROBOTS
+    from omnigibson.controllers import REGISTERED_CONTROLLERS
+    from omnigibson.tasks import REGISTERED_TASKS
+    from omnigibson.sensors import ALL_SENSOR_MODALITIES
 
 
-# Define convenience function for shutting down OmniGibson cleanly
-def shutdown():
-    app.close()
-    exit(0)
+    # Define convenience function for shutting down OmniGibson cleanly
+    def shutdown():
+        app.close()
+        exit(0)
