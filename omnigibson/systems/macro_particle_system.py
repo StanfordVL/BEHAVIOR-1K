@@ -1040,21 +1040,21 @@ StainSystem = VisualParticleSystem.create(
 )
 
 
-GrassSystem = VisualParticleSystem.create(
-    particle_name="Grass",
-    n_particles_per_group=20,
-    create_particle_template=lambda prim_path, name: omnigibson.objects.DatasetObject(
-        prim_path=prim_path,
-        name=name,
-        category="grass_patch",
-        model="kqhokv",
-        class_id=SemanticClass.GRASS,
-        visible=False,
-        fixed_base=False,
-        visual_only=True,
-        include_default_states=False,
-    ),
-    # Also need to override how we sample particles, since grass should only point upwards and placed on "top"
-    # parts of surfaces!
-    _SAMPLING_AXIS_PROBABILITIES=(0, 0, 1.0),
-)
+# GrassSystem = VisualParticleSystem.create(
+#     particle_name="Grass",
+#     n_particles_per_group=20,
+#     create_particle_template=lambda prim_path, name: omnigibson.objects.DatasetObject(
+#         prim_path=prim_path,
+#         name=name,
+#         category="grass_patch",
+#         model="kqhokv",
+#         class_id=SemanticClass.GRASS,
+#         visible=False,
+#         fixed_base=False,
+#         visual_only=True,
+#         include_default_states=False,
+#     ),
+#     # Also need to override how we sample particles, since grass should only point upwards and placed on "top"
+#     # parts of surfaces!
+#     _SAMPLING_AXIS_PROBABILITIES=(0, 0, 1.0),
+# )
