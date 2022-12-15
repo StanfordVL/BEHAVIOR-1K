@@ -7,12 +7,17 @@ from collections import OrderedDict
 import numpy as np
 
 import omnigibson as og
+from omnigibson.macros import gm
 from omnigibson.utils.ui_utils import choose_from_options, KeyboardRobotController
 
 GRASPING_MODES = OrderedDict(
     sticky="Sticky Mitten - Objects are magnetized when they touch the fingers and a CLOSE command is given",
     physical="Physical Grasping - No additional grasping assistance applied",
 )
+
+# Don't use GPU dynamics and Use flatcache for performance boost
+gm.USE_GPU_DYNAMICS = False
+gm.ENABLE_FLATCACHE = True
 
 
 def main(random_selection=False, headless=False, short_exec=False):

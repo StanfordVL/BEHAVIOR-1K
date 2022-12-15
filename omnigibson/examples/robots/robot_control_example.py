@@ -9,6 +9,7 @@ from collections import OrderedDict
 import numpy as np
 
 import omnigibson as og
+from omnigibson.macros import gm
 from omnigibson.robots import REGISTERED_ROBOTS
 from omnigibson.utils.ui_utils import choose_from_options, KeyboardRobotController
 
@@ -22,6 +23,10 @@ SCENES = OrderedDict(
     Rs_int="Realistic interactive home environment (default)",
     empty="Empty environment with no objects",
 )
+
+# Don't use GPU dynamics and Use flatcache for performance boost
+gm.USE_GPU_DYNAMICS = False
+gm.ENABLE_FLATCACHE = True
 
 
 def choose_controllers(robot, random_selection=False):

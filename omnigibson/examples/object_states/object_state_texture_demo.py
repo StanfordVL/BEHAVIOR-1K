@@ -5,11 +5,11 @@ from omnigibson.macros import gm, macros
 from omnigibson.systems import WaterSystem
 from omnigibson.utils.constants import ParticleModifyMethod
 
+# Make sure object states are enabled
+gm.ENABLE_OBJECT_STATES = True
+
 
 def main():
-    # Make sure object states are enabled
-    assert gm.ENABLE_OBJECT_STATES, f"Object states must be enabled in macros.py in order to use this demo!"
-
     # Create the scene config to load -- empty scene plus a light and a cabinet
     cfg = {
         "scene": {

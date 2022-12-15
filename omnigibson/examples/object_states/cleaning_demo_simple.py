@@ -8,6 +8,9 @@ from omnigibson.macros import gm
 from omnigibson.systems import DustSystem, StainSystem, WaterSystem
 from omnigibson.utils.constants import ParticleModifyMethod
 
+# Make sure object states are enabled
+gm.ENABLE_OBJECT_STATES = True
+
 
 def main(random_selection=False, headless=False, short_exec=False):
     """
@@ -16,9 +19,6 @@ def main(random_selection=False, headless=False, short_exec=False):
     If everything is cleaned, or after N steps, the scene resets to the initial state
     """
     logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
-
-    # Make sure object states are enabled
-    assert gm.ENABLE_OBJECT_STATES, f"Object states must be enabled in macros.py in order to use this demo!"
 
     # Create the scene config to load -- empty scene
     cfg = {

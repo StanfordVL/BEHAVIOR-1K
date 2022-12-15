@@ -3,11 +3,11 @@ import omnigibson as og
 from omnigibson import object_states
 from omnigibson.macros import gm
 
+# Make sure object states are enabled
+gm.ENABLE_OBJECT_STATES = True
+
 
 def main():
-    # Make sure object states are enabled
-    assert gm.ENABLE_OBJECT_STATES, f"Object states must be enabled in macros.py in order to use this demo!"
-
     # Create the scene config to load -- empty scene with a stove object added
     cfg = {
         "scene": {

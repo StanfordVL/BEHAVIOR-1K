@@ -18,6 +18,10 @@ macros.object_states.particle_modifier.MAX_VISUAL_PARTICLES_APPLIED_PER_STEP = 1
 macros.object_states.particle_modifier.MAX_FLUID_PARTICLES_APPLIED_PER_STEP = 40
 StainSystem._N_PARTICLES_PER_GROUP = 300
 
+# Make sure object states and GPU dynamics are enabled (GPU dynamics needed for fluids)
+gm.ENABLE_OBJECT_STATES = True
+gm.USE_GPU_DYNAMICS = True
+
 
 def main(random_selection=False, headless=False, short_exec=False):
     """
@@ -29,10 +33,6 @@ def main(random_selection=False, headless=False, short_exec=False):
     and allowed to interact with the table, applying / removing particles from the table.
     """
     logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
-
-    # Make sure object states and omni particlesare enabled
-    assert gm.ENABLE_OBJECT_STATES, f"Object states must be enabled in macros.py in order to use this demo!"
-    assert gm.USE_GPU_DYNAMICS, f"GPU dynamics must be enabled in macros.py in order to use this demo!"
 
     # Choose what configuration to load
     modifier_type = choose_from_options(

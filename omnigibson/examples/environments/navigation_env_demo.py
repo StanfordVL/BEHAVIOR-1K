@@ -4,7 +4,12 @@ import os
 import yaml
 
 import omnigibson as og
+from omnigibson.macros import gm
 from omnigibson.utils.ui_utils import choose_from_options
+
+# Use flatcache for performance speedups unless we're using GPU dynamics
+if not gm.USE_GPU_DYNAMICS:
+    gm.ENABLE_FLATCACHE = True
 
 
 def main(random_selection=False, headless=False, short_exec=False):

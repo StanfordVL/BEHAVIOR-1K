@@ -8,6 +8,10 @@ from omnigibson.utils.ui_utils import choose_from_options
 from omnigibson.object_states.attachment import AttachmentType
 from omnigibson.object_states import Attached
 
+# Make sure object states are enabled and global contact reporting is enabled
+gm.ENABLE_OBJECT_STATES = True
+gm.ENABLE_GLOBAL_CONTACT_REPORTING = True
+
 
 def setup_scene_for_abilities(abilities1, abilities2):
     # Make sure simulation is stopped
@@ -319,10 +323,6 @@ demo_names_to_demos = {
 
 
 def main(random_selection=False, headless=False, short_exec=False):
-    # Make sure object states are enabled and global contact reporting is enabled
-    assert gm.ENABLE_OBJECT_STATES, f"Object states must be enabled in macros.py in order to use this demo!"
-    assert gm.ENABLE_GLOBAL_CONTACT_REPORTING, f"Global contact reporting must be enabled in macros.py in order to use this demo!"
-
     # Loop indefinitely and choose different examples to run
     for i in range(len(demo_names_to_demos)):
         demo_name = choose_from_options(options=list(demo_names_to_demos.keys()), name="attachment demo")

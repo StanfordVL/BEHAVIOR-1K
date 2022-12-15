@@ -1,15 +1,13 @@
-from omnigibson import og_dataset_path
-from omnigibson.scenes.scene_base import Scene
-from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.utils.constants import PrimType
 from omnigibson.object_states import Folded
 from omnigibson.macros import gm
-
-import os
-import numpy as np
 import logging
 
 import omnigibson as og
+
+# Make sure object states and GPU dynamics are enabled (GPU dynamics needed for cloth)
+gm.ENABLE_OBJECT_STATES = True
+gm.USE_GPU_DYNAMICS = True
 
 
 def main(random_selection=False, headless=False, short_exec=False):
@@ -17,9 +15,6 @@ def main(random_selection=False, headless=False, short_exec=False):
     Demo of cloth objects that can potentially be folded.
     """
     logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
-
-    assert gm.ENABLE_OBJECT_STATES, f"Object states must be enabled in macros.py in order to use this demo!"
-    assert gm.USE_GPU_DYNAMICS, f"GPU dynamics must be enabled in macros.py in order to use this demo!"
 
     # Create the scene config to load -- empty scene + custom cloth object
     cfg = {
