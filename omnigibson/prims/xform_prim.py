@@ -265,14 +265,14 @@ class XFormPrim(BasePrim):
         """
         properties = self.prim.GetPropertyNames()
         if translation is not None:
-            translation = Gf.Vec3d(*translation)
+            translation = Gf.Vec3d(*np.array(translation, dtype=float))
             if "xformOp:translate" not in properties:
                 carb.log_error(
                     "Translate property needs to be set for {} before setting its position".format(self.name)
                 )
             self.set_attribute("xformOp:translate", translation)
         if orientation is not None:
-            orientation = np.array(orientation)[[3, 0, 1, 2]]
+            orientation = np.array(orientation, dtype=float)[[3, 0, 1, 2]]
             if "xformOp:orient" not in properties:
                 carb.log_error(
                     "Orient property needs to be set for {} before setting its orientation".format(self.name)
