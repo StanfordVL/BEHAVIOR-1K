@@ -2,6 +2,5 @@ include LICENSE
 
 graft omnigibson
 prune omnigibson/data
-prune omnigibson/render/openvr/samples
 
 global-exclude *.py[co]

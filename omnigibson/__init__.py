@@ -23,8 +23,8 @@ with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), "global_conf
     global_config = yaml.load(f, Loader=yaml.FullLoader)
 
 # can override assets_path and dataset_path from environment variable
-if "GIBSON_ASSETS_PATH" in os.environ:
-    assets_path = os.environ["GIBSON_ASSETS_PATH"]
+if "OMNIGIBSON_KEY_PATH" in os.environ:
+    assets_path = os.environ["OMNIGIBSON_KEY_PATH"]
 else:
     assets_path = global_config["assets_path"]
 assets_path = os.path.expanduser(assets_path)
@@ -41,8 +41,8 @@ else:
     og_dataset_path = global_config["og_dataset_path"]
 og_dataset_path = os.path.expanduser(og_dataset_path)
 
-if "KEY_PATH" in os.environ:
-    key_path = os.environ["KEY_PATH"]
+if "OMNIGIBSON_KEY_PATH" in os.environ:
+    key_path = os.environ["OMNIGIBSON_KEY_PATH"]
 else:
     key_path = global_config["key_path"]
 key_path = os.path.expanduser(key_path)

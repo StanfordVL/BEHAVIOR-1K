@@ -4,6 +4,8 @@ Set of macros to use globally for OmniGibson. These are generally magic numbers 
 NOTE: This is generally decentralized -- the monolithic @settings variable is created here with some global values,
 but submodules within OmniGibson may import this dictionary and add to it dynamically
 """
+import os
+
 from addict import Dict
 
 
@@ -12,7 +14,7 @@ macros = Dict()
 gm = macros.globals
 
 # Whether to generate a headless or non-headless application upon OmniGibson startup
-gm.HEADLESS = False
+gm.HEADLESS = (os.getenv("OMNIGIBSON_HEADLESS", 'False').lower() in ('true', '1', 't'))
 
 # Whether to use extra settings (verboseness, extra GUI features) for debugging
 gm.DEBUG = True
