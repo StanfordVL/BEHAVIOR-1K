@@ -27,6 +27,7 @@ while true; do
     esac
 done
 
+docker pull stanfordvl/omnigibson:latest
 docker run \
     --gpus all \
     --privileged \

@@ -28,6 +28,7 @@ while true; do
 done
 
 xhost +local:root
+docker pull stanfordvl/omnigibson:latest
 docker run \
     --gpus all \
     --privileged \
