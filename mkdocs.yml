@@ -18,7 +18,7 @@ theme:
   extra:
     homepage: https://behavior.stanford.edu
 
-  custom_dir: docs_extra #solid #material/.overrides
+  custom_dir: .overrides
 
   # color info
   palette:
