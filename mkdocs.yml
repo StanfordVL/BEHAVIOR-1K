@@ -11,7 +11,6 @@ theme:
     repo: fontawesome/brands/git-alt
 
   features:
-    # - header.autohide
     - navigation.tracking
     - navigation.tabs
 
@@ -85,7 +84,6 @@ plugins:
 nav:
   - Home: index.md
   - Getting Started:
-    # - getting_started/index.md
     - Installation: getting_started/installation.md
     - Quickstart: getting_started/quickstart.md
     - Building Blocks: getting_started/building_blocks.md
