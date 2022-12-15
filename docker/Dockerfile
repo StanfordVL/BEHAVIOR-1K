@@ -4,6 +4,7 @@ FROM nvcr.io/nvidia/isaac-sim:2022.1.1
 RUN apt-get update && apt-get install -y \
   curl \
   git \
+  wget \
   && rm -rf /var/lib/apt/lists/*
 
 RUN echo "bash /isaac-sim/vulkan_check.sh" >> /root/.bashrc
