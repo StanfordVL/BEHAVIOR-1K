@@ -1,6 +1,8 @@
 ![splash](./docs/assets/splash.png)
 
-# <h1><img align="center" height="60" src="https://github.com/StanfordVL/OmniGibson/blob/main/docs/assets/OmniGibson_logo.png"> OmniGibson</h1>
+# <h1><img align="center" height="60" src="https://github.com/StanfordVL/OmniGibson/blob/main/docs/assets/OmniGibson_logo.png"> OmniGibson <a href=”https://behavior.stanford.edu/omnigibson/getting_started/installation.html”>[Get Started]</a></h1>
+
+### 
 
 **`OmniGibson`** is a platform for accelerating Embodied AI research built upon NVIDIA's [Omniverse](https://www.nvidia.com/en-us/omniverse/) platform, featuring:
 
@@ -11,7 +13,7 @@
 * 🤖 Mobile Manipulator Robots with Modular ⚙️ Controllers
 * 🌎 OpenAI Gym Interface
 
-Check out [**`OmniGibson`**'s documentation](https://behavior.stanford.edu/omnigibson/) to get started!
+Check out [**`OmniGibson`**'s documentation](https://behavior.stanford.edu/omnigibson/getting_started/installation.html) to get started!
 
 ### Citation
 If you use **`OmniGibson`** or its assets and models, please cite:

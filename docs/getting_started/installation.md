@@ -122,6 +122,10 @@ Then, simply launch the desired script:
 
 ## 🌎 **Explore `OmniGibson`!**
 
+??? warning annotate "Expect slowdown during first execution"
+
+    Omniverse requires some one-time startup setup (up to ~5 minutes) when **`OmniGibson`** is imported for the first time. This is expected behavior, and should only occur once!
+
 **`OmniGibson`** is now successfully installed! Try exploring some of our new scenes interactively:
 
 ```{.shell .annotate}

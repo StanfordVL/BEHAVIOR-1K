@@ -39,7 +39,7 @@ cfg["objects"] = [ # (1)!
     {
         "type": "USDObject", # (2)!
         "name": "ghost_apple", # (3)!
-        "usd_path": f"{og.og_dataset_path}/objects/apple/TODO/usd/TODO.usd",
+        "usd_path": f"{og.og_dataset_path}/objects/apple/00_0/usd/00_0.usd",
         "category": "apple", # (4)!
         "visual_only": True, # (5)!
         "scale": [2.0, 1.0, 2.0], # (6)!
@@ -50,7 +50,7 @@ cfg["objects"] = [ # (1)!
         "type": "DatasetObject", # (9)!
         "name": "delicious_apple",
         "category": "apple",
-        "model": TODO, # (10)!
+        "model": "00_0", # (10)!
         "position": [0, 0, 1.0],
     },
     {
@@ -163,7 +163,7 @@ obs, rew, done, info = env.step(env.action_space.sample())
         {
             "type": "USDObject",
             "name": "ghost_apple",
-            "usd_path": f"{og.og_dataset_path}/objects/apple/TODO/usd/TODO.usd",
+            "usd_path": f"{og.og_dataset_path}/objects/apple/00_0/usd/00_0.usd",
             "category": "apple",
             "visual_only": True,
             "scale": [2.0, 1.0, 2.0],
@@ -174,7 +174,7 @@ obs, rew, done, info = env.step(env.action_space.sample())
             "type": "DatasetObject",
             "name": "delicious_apple",
             "category": "apple",
-            "model": TODO,
+            "model": "00_0",
             "position": [0, 0, 1.0],
         },
         {
