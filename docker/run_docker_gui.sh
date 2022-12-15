@@ -21,6 +21,6 @@ docker run \
     --privileged \
     -e DISPLAY=${DISPLAY} \
     -v /tmp/.X11-unix:/tmp/.X11-unix \
-    -v DATA_PATH:/data \
+    -v $DATA_PATH:/data \
     --network=host --rm -it stanfordvl/omnigibson:latest
 xhost -local:root

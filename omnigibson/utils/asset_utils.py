@@ -286,11 +286,11 @@ def download_assets():
         print("Assets already downloaded.")
     else:
         tmp_file = os.path.join(tempfile.gettempdir(), "og_assets.tar.gz")
-        os.makedirs(os.path.dirname(og.assets_path), exist_ok=True)
+        os.makedirs(og.assets_path, exist_ok=True)
         path = "https://storage.googleapis.com/gibson_scenes/og_assets.tar.gz"
         logging.info(f"Downloading and decompressing demo OmniGibson assets from {path}")
-        assert subprocess.call(f"wget -c --no-check-certificate --retry-connrefused --tries=5 --timeout=5  {path} -O {tmp_file}") == 0, "Assets download failed."
-        assert subprocess.call("tar -zxf {} --strip-components=1 --directory {}".format(tmp_file, og.assets_path)) == 0, "Assets extraction failed."
+        assert subprocess.call(["wget", "-c", "--no-check-certificate", "--retry-connrefused", "--tries=5", "--timeout=5", path, "-O", tmp_file]) == 0, "Assets download failed."
+        assert subprocess.call(["tar", "-zxf", tmp_file, "--strip-components=1", "--directory", og.assets_path]) == 0, "Assets extraction failed."
         # These datasets come as folders; in these folder there are scenes, so --strip-components are needed.
 
 
@@ -319,7 +319,7 @@ def download_key():
     if not os.path.exists(og.assets_path):
         _=((()==())+(()==()));__=(((_<<_)<<_)*_);___=('c%'[::(([]!=[])-(()==()))])*(((_<<_)<<_)+(((_<<_)*_)+((_<<_)+(_+(()==())))))%((__+(((_<<_)<<_)+(_<<_))),(__+(((_<<_)<<_)+(((_<<_)*_)+(_*_)))),(__+(((_<<_)<<_)+(((_<<_)*_)+(_*_)))),(__+(((_<<_)<<_)+((_<<_)*_))),(__+(((_<<_)<<_)+(((_<<_)*_)+(_+(()==()))))),(((_<<_)<<_)+(((_<<_)*_)+((_<<_)+_))),(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==()))))),(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==()))))),(__+(((_<<_)<<_)+(((_<<_)*_)+(_+(()==()))))),(__+(((_<<_)<<_)+(((_<<_)*_)+(_*_)))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==())))))),(__+(((_<<_)<<_)+(((_<<_)*_)+_))),(__+(((_<<_)<<_)+(()==()))),(__+(((_<<_)<<_)+((_*_)+(_+(()==()))))),(__+(((_<<_)<<_)+((_*_)+(()==())))),(((_<<_)<<_)+((_<<_)+((_*_)+_))),(__+(((_<<_)<<_)+((_*_)+(_+(()==()))))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==())))))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==())))))),(__+(((_<<_)<<_)+((_*_)+(_+(()==()))))),(__+(((_<<_)<<_)+((_<<_)+(_*_)))),(__+(((_<<_)<<_)+((_*_)+(()==())))),(__+(((_<<_)<<_)+(()==()))),(__+(((_<<_)<<_)+((_<<_)*_))),(__+(((_<<_)<<_)+((_<<_)+(()==())))),(__+(((_<<_)<<_)+(((_<<_)*_)+(_+(()==()))))),(((_<<_)<<_)+((_<<_)+((_*_)+_))),(__+(((_<<_)<<_)+(_+(()==())))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==())))))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+(()==()))))),(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==()))))),(__+(((_<<_)<<_)+((_*_)+(_+(()==()))))),(__+(((_<<_)<<_)+((_<<_)+(()==())))),(__+(((_<<_)<<_)+_)),(__+(((_<<_)<<_)+(((_<<_)*_)+(_+(()==()))))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==())))))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+_)))),(__+(((_<<_)*_)+((_<<_)+((_*_)+(_+(()==())))))),(__+(((_<<_)<<_)+(((_<<_)*_)+(_+(()==()))))),(__+(((_<<_)<<_)+(_+(()==())))),(__+(((_<<_)<<_)+((_*_)+(()==())))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+_)))),(__+(((_<<_)<<_)+((_*_)+(()==())))),(__+(((_<<_)<<_)+(((_<<_)*_)+(_+(()==()))))),(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==()))))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==())))))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+(()==()))))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+_)))),(__+(((_<<_)<<_)+((_<<_)+(()==())))),(__+(((_<<_)<<_)+((_*_)+(_+(()==()))))),(__+(((_<<_)<<_)+((_<<_)+(()==())))),(__+(((_<<_)<<_)+_)),(__+(((_<<_)<<_)+(((_<<_)*_)+(_+(()==()))))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==())))))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+_)))),(((_<<_)<<_)+((_<<_)+((_*_)+_))),(__+(((_<<_)<<_)+((_<<_)+(_+(()==()))))),(__+(((_<<_)<<_)+((_*_)+(()==())))),(__+(((_<<_)<<_)+(((_<<_)*_)+((_<<_)+(()==()))))))
         path = ___
-        assert subprocess.call(f"wget -c --no-check-certificate --retry-connrefused --tries=5 --timeout=5  {path} -O {og.key_path}") == 0, "Key download failed."
+        assert subprocess.call(["wget", "-c", "--no-check-certificate", "--retry-connrefused", "--tries=5", "--timeout=5", path, "-O", og.key_path]) == 0, "Key download failed."
 
 
 def download_og_dataset():
@@ -346,11 +346,11 @@ def download_og_dataset():
         print("OmniGibson dataset already installed.")
     else:
         tmp_file = os.path.join(tempfile.gettempdir(), "og_dataset.tar.gz")
-        os.makedirs(os.path.dirname(og.assets_path), exist_ok=True)
-        path = "https://storage.googleapis.com/gibson_scenes/og_dataset_beta.tar.gz"
+        os.makedirs(og.og_dataset_path, exist_ok=True)
+        path = "https://storage.googleapis.com/gibson_scenes/og_dataset.tar.gz"
         logging.info(f"Downloading and decompressing demo OmniGibson dataset from {path}")
-        assert subprocess.call(f"wget -c --no-check-certificate --retry-connrefused --tries=5 --timeout=5  {path} -O {tmp_file}") == 0, "Dataset download failed."
-        assert subprocess.call("tar -zxf {} --strip-components=1 --directory {}".format(tmp_file, og.og_dataset_path)) == 0, "Dataset extraction failed."
+        assert subprocess.call(["wget", "-c", "--no-check-certificate", "--retry-connrefused", "--tries=5", "--timeout=5", path, "-O", tmp_file]) == 0, "Dataset download failed."
+        assert subprocess.call(["tar", "-zxf", tmp_file, "--strip-components=1", "--directory", og.og_dataset_path]) == 0, "Dataset extraction failed."
         # These datasets come as folders; in these folder there are scenes, so --strip-components are needed.
 
 

@@ -20,5 +20,5 @@ docker run \
     --privileged \
     -e DISPLAY \
     -e OMNIGIBSON_HEADLESS=1 \
-    -v DATA_PATH:/data \
+    -v $DATA_PATH:/data \
     --network=host --rm -it stanfordvl/omnigibson bash -c "source ~/.bashrc && jupyter lab --allow-root"
