@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
-DATA_PATH=${1:-'~/omnigibson-data'}
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+DEFAULT_DIR = "${SCRIPT_DIR}/omnigibson_data"
+DATA_PATH=${1:-${DEFAULT_DIR}}
 
 echo "The NVIDIA Omniverse License Agreement (EULA) must be accepted before"
 echo "Omniverse Kit can start. The license terms for this product can be viewed at"
