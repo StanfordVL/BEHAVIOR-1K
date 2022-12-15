@@ -105,32 +105,6 @@ from omnigibson.robots import REGISTERED_ROBOTS
 from omnigibson.controllers import REGISTERED_CONTROLLERS
 from omnigibson.tasks import REGISTERED_TASKS
 from omnigibson.sensors import ALL_SENSOR_MODALITIES
-from omnigibson.utils.asset_utils import download_demo_data, download_og_dataset, download_assets
-from omnigibson.utils.ui_utils import choose_from_options
-
-
-def setup():
-    """
-    Helper function to setup this OmniGibson repository. Configures environment and downloads assets
-    """
-    # Ask user which dataset to install
-    print("Welcome to OmniGibson!")
-    print()
-    print("Downloading dataset...")
-    dataset_options = {
-        "Demo": "Download the demo OmniGibson dataset",
-        "Full": "Download the full OmniGibson dataset",
-    }
-    dataset = choose_from_options(options=dataset_options, name="dataset")
-    if dataset == "Demo":
-        download_demo_data()
-    else:
-        download_og_dataset()
-
-    print("Downloading assets...")
-    download_assets()
-
-    print("\nOmniGibson setup completed!\n")
 
 
 # Define convenience function for shutting down OmniGibson cleanly
