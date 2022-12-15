@@ -327,21 +327,23 @@ def download_og_dataset():
     Download OmniGibson dataset
     """
     # Print user agreement
-    print("\n")
-    print_user_agreement()
-    while (
-        input(
-            "Do you agree to the above terms for using OmniGibson dataset? [y/n]"
-        )
-        != "y"
-    ):
-        print("You need to agree to the terms for using OmniGibson dataset.")
+    if os.path.exists(og.key_path):
+        print("OmniGibson dataset encryption key already installed.")
+    else:
+        print("\n")
+        print_user_agreement()
+        while (
+            input(
+                "Do you agree to the above terms for using OmniGibson dataset? [y/n]"
+            )
+            != "y"
+        ):
+            print("You need to agree to the terms for using OmniGibson dataset.")
 
-    download_key()
+        download_key()
 
     if os.path.exists(og.og_dataset_path):
-        print("OmniGibson dataset path already exists. Please either remove or change the dataset path location from "
-              "omnigibson/global_config.yaml")
+        print("OmniGibson dataset already installed.")
     else:
         tmp_file = os.path.join(tempfile.gettempdir(), "og_dataset.tar.gz")
         os.makedirs(os.path.dirname(og.assets_path), exist_ok=True)
