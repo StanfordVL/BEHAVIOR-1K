@@ -283,8 +283,7 @@ def download_assets():
     Download OmniGibson assets
     """
     if os.path.exists(og.assets_path):
-        print("Assets path already exists. Please either remove or change the asset path location from "
-              "omnigibson/global_config.yaml")
+        print("Assets already downloaded.")
     else:
         tmp_file = os.path.join(tempfile.gettempdir(), "og_assets.tar.gz")
         os.makedirs(os.path.dirname(og.assets_path), exist_ok=True)

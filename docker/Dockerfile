@@ -36,6 +36,7 @@ RUN micromamba install -c conda-forge opencv
 # Install OmniGibson
 RUN pip install -e .
 
+RUN echo "python -m omnigibson.scripts.setup" >> /root/.bashrc
 ENTRYPOINT []
 
 CMD ["/bin/bash"]

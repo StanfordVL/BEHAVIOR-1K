@@ -14,19 +14,17 @@ def main():
     print()
 
     # Only download if the dataset path doesn't exist
-    if os.path.exists(og.og_dataset_path):
-        return
-
-    print("Downloading dataset...")
-    dataset_options = {
-        "Demo": "Download the demo OmniGibson dataset",
-        "Full": "Download the full OmniGibson dataset",
-    }
-    dataset = choose_from_options(options=dataset_options, name="dataset")
-    if dataset == "Demo":
+    if not os.path.exists(og.og_dataset_path):
+        print("Downloading dataset...")
+        # dataset_options = {
+        #     "Demo": "Download the demo OmniGibson dataset",
+        #     "Full": "Download the full OmniGibson dataset",
+        # }
+        # dataset = choose_from_options(options=dataset_options, name="dataset")
+        # if dataset == "Demo":
         download_demo_data()
-    else:
-        download_og_dataset()
+        # else:
+        #     download_og_dataset()
 
     print("Downloading assets...")
     download_assets()
