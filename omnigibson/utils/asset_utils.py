@@ -347,7 +347,7 @@ def download_og_dataset():
     else:
         tmp_file = os.path.join(tempfile.gettempdir(), "og_dataset.tar.gz")
         os.makedirs(os.path.dirname(og.assets_path), exist_ok=True)
-        path = "https://storage.googleapis.com/gibson_scenes/og_dataset_beta.tar.gz"
+        path = "https://storage.googleapis.com/gibson_scenes/og_dataset.tar.gz"
         logging.info(f"Downloading and decompressing demo OmniGibson dataset from {path}")
         assert subprocess.call(["wget", "-c", "--no-check-certificate", "--retry-connrefused", "--tries=5", "--timeout=5", path, "-O", tmp_file]) == 0, "Dataset download failed."
         assert subprocess.call(["tar", "-zxf", tmp_file, "--strip-components=1", "--directory", og.og_dataset_path]) == 0, "Dataset extraction failed."
