@@ -7,7 +7,7 @@ echo "Omniverse Kit can start. The license terms for this product can be viewed 
 echo "https://docs.omniverse.nvidia.com/app_isaacsim/common/NVIDIA_Omniverse_License_Agreement.html"
 
 while true; do
-    read -p "Do you accept the Omniverse EULA? [yn] " yn
+    read -p "Do you accept the Omniverse EULA? [y/n] " yn
     case $yn in
         [Yy]* ) break;;
         [Nn]* ) exit;;

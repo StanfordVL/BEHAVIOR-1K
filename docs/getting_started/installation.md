@@ -94,6 +94,7 @@ Then, simply launch the desired script:
     4. Run the command to setup a virtual conda environment to run **`OmniGibson`**:
 
         ```shell
+        chmod +x setup_conda_env.sh
         ./setup_conda_env.sh
         ```
 

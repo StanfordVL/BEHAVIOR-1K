@@ -4,6 +4,7 @@
 if [ x"${ISAAC_SIM_PATH}" == "x" ]; then
   echo "Please set ISAAC_SIM_PATH!"
   exit
+fi
 
 # First, we prune some packages from Isaac Sim that are outdated relative to what we need in OmniGibson
 rm -r "${ISAAC_SIM_PATH}/exts/omni.isaac.ml_archive/pip_prebundle/gym*"
