@@ -8,8 +8,10 @@ DEFAULT_DATA_DIR="$SCRIPT_DIR/omnigibson_data"
 DATA_PATH=${1:-$DEFAULT_DATA_DIR}
 
 echo -e "${BYellow}IMPORTANT: Saving OmniGibson assets at ${DATA_PATH}."
-echo -e  "You can change this path by providing your desired path as an argument"
-echo -e "to the run_docker script you are using.${Color_Off}"
+echo -e "You can change this path by providing your desired path as an argument"
+echo -e "to the run_docker script you are using. Also note that Docker containers"
+echo -e "are incompatible with AFS/NFS drives, so please make sure that this path"
+echo -e "points to a local filesystem. ${Color_Off}"
 echo ""
 
 echo "The NVIDIA Omniverse License Agreement (EULA) must be accepted before"
