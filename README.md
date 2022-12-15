@@ -1,6 +1,4 @@
-# ![omnigibson_logo](./docs/assets/OmniGibson_logo.png) OmniGibson
-
-# <h1><img align="center" height="30" src="https://github.com/StanfordVL/OmniGibson/blob/main/docs/assets/OmniGibson_logo.png"> OmniGibson</h1>
+# <h1><img align="center" height="60" src="https://github.com/StanfordVL/OmniGibson/blob/main/docs/assets/OmniGibson_logo.png"> OmniGibson</h1>
 
 ### Citation
 If you use OmniGibson or its assets and models, please cite:
