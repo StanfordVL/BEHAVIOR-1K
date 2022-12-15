@@ -1,0 +1,92 @@
+yaml-language-server: $schema=https://squidfunk.github.io/mkdocs-material/schema.json
+
+site_name: OmniGibson Documentation
+repo_name: StanfordVL/OmniGibson
+repo_url: https://github.com/StanfordVL/OmniGibson
+theme: 
+  name: material
+  logo: assets/OmniGibson_logo.png
+  favicon: assets/OmniGibson_logo.png
+  icon:
+    repo: fontawesome/brands/git-alt
+
+  features:
+    # - header.autohide
+    - navigation.tracking
+    - navigation.tabs
+
+  extra:
+    homepage: https://behavior.stanford.edu
+
+  custom_dir: docs_extra #solid #material/.overrides
+
+  # color info
+  palette:
+
+    # Palette toggle for light mode
+    - media: "(prefers-color-scheme: light)"
+      primary: white
+      accent: indigo
+      scheme: default
+      toggle:
+        icon: material/toggle-switch
+        name: Switch to dark mode
+
+    # Palette toggle for dark mode
+    - media: "(prefers-color-scheme: dark)"
+      primary: blue grey
+      accent: indigo
+      scheme: slate
+      toggle:
+        icon: material/toggle-switch-off-outline
+        name: Switch to light mode
+
+extra_css:
+  - stylesheets/extra.css
+
+markdown_extensions:
+  - pymdownx.emoji:
+      emoji_index: !!python/name:materialx.emoji.twemoji
+      emoji_generator: !!python/name:materialx.emoji.to_svg
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets:
+      base_path: docs
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - attr_list
+  - md_in_html
+  - attr_list
+  - md_in_html
+
+# extra plugins
+plugins:
+  - search
+  - autorefs
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [omnigibson]
+  # - social
+  - gen-files:
+      scripts:
+      - docs/gen_ref_pages.py
+  - literate-nav:
+      nav_file: SUMMARY.md
+  - section-index
+  - offline
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    # - getting_started/index.md
+    - Installation: getting_started/installation.md
+    - Quickstart: getting_started/quickstart.md
+    - Building Blocks: getting_started/building_blocks.md
+  - Code Reference: reference/
