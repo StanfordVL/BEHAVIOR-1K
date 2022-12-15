@@ -3,7 +3,6 @@ import logging
 from collections import OrderedDict
 
 import omnigibson as og
-from omnigibson.macros import gm, create_module_macros
 from omnigibson.objects import REGISTERED_OBJECTS
 from omnigibson.robots import REGISTERED_ROBOTS
 from omnigibson.tasks import REGISTERED_TASKS
@@ -12,13 +11,6 @@ from omnigibson.utils.gym_utils import GymObservable
 from omnigibson.utils.config_utils import parse_config
 from omnigibson.utils.python_utils import assert_valid_key, merge_nested_dicts, create_class_from_registry_and_config,\
     Recreatable
-
-
-# Create settings for this module
-m = create_module_macros(module_path=__file__)
-
-# How many predefined randomized scene object configurations we have per scene
-m.N_PREDEFINED_OBJ_RANDOMIZATIONS = 10
 
 
 class Environment(gym.Env, GymObservable, Recreatable):
@@ -48,14 +40,10 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
         # Store settings and other initialized values
         self._automatic_reset = automatic_reset
-        self._predefined_object_randomization_idx = 0
-        self._n_predefined_object_randomizations = m.N_PREDEFINED_OBJ_RANDOMIZATIONS
         self.action_timestep = action_timestep
 
         # Initialize other placeholders that will be filled in later
         self._initial_pos_z_offset = None                   # how high to offset object placement to account for one action step of dropping
-        self._texture_randomization_freq = None
-        self._object_randomization_freq = None
         self._task = None
         self._loaded = None
         self._current_episode = 0
@@ -131,12 +119,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
         """
         # Store additional variables after config has been loaded fully
         self._initial_pos_z_offset = self.env_config["initial_pos_z_offset"]
-        self._texture_randomization_freq = self.env_config["texture_randomization_freq"]
-        self._object_randomization_freq = self.env_config["object_randomization_freq"]
-
-        # Set other values
-        self._ignore_robot_object_collisions = [set() for _ in self.robots_config]
-        self._ignore_robot_self_collisions = [set() for _ in self.robots_config]
 
         # Reset bookkeeping variables
         self._reset_variables()
@@ -299,21 +281,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
         # Denote that the scene is loaded
         self._loaded = True
 
-    def reload_model_object_randomization(self, predefined_object_randomization_idx=None):
-        """
-        Reload the same model, with either @object_randomization_idx seed or the next object randomization random seed.
-
-        Args:
-            predefined_object_randomization_idx (None or int): If set, specifies the specific pre-defined object
-                randomization instance to use. Otherwise, the current seed will be incremented by 1 and used.
-        """
-        assert self._object_randomization_freq is not None, \
-            "object randomization must be active to reload environment with object randomization!"
-        self._predefined_object_randomization_idx = predefined_object_randomization_idx if \
-            predefined_object_randomization_idx is not None else \
-            (self._predefined_object_randomization_idx + 1) % self._n_predefined_object_randomizations
-        self.load()
-
     def close(self):
         """
         Clean up the environment and shut down the simulation.
@@ -403,19 +370,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
         return obs, reward, done, info
 
-    def randomize_domain(self):
-        """
-        Randomize domain.
-        Object randomization loads new object models with the same poses.
-        Texture randomization loads new materials and textures for the same object models.
-        """
-        if self._object_randomization_freq is not None:
-            if self._current_episode % self._object_randomization_freq == 0:
-                self.reload_model_object_randomization()
-        if self._texture_randomization_freq is not None:
-            if self._current_episode % self._texture_randomization_freq == 0:
-                og.sim.scene.randomize_texture()
-
     def _reset_variables(self):
         """
         Reset bookkeeping variables for the next new episode.
@@ -431,9 +385,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
         # Stop and restart the simulation
         og.sim.stop()
         og.sim.play()
-
-        # Do any domain randomization
-        self.randomize_domain()
 
         # Reset the task
         self.task.reset(self)
@@ -559,8 +510,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
             # Environment kwargs
             "env": {
                 "initial_pos_z_offset": 0.1,
-                "texture_randomization_freq": None,
-                "object_randomization_freq": None,
             },
 
             # Rendering kwargs
