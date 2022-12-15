@@ -59,15 +59,25 @@ Then, simply launch the desired script:
 
 === "Headless"
 
-    ```shell
-    sudo ./run_docker.sh
+    ```{.shell .annotate}
+    sudo ./run_docker.sh <DATA_PATH> # (1)!
     ```
+
+    1.  `<DATA_PATH>` specifies where data will be stored on your machine. (1) This needs to be called each time the docker container is run!
+        {.annotate}
+
+        1. If no `<DATA_PATH>` is specified, it defaults to `~/omnigibson-data` 
 
 === "GUI"
 
-    ```shell
-    sudo ./run_docker_gui.sh
+    ```{.shell .annotate}
+    sudo ./run_docker_gui.sh <DATA_PATH> # (1)!
     ```
+
+    1.  `<DATA_PATH>` specifies where data will be stored on your machine. (1) This needs to be called each time the docker container is run!
+        {.annotate}
+
+        1. If no `<DATA_PATH>` is specified, it defaults to `~/omnigibson-data` 
 
 ??? example annotate "Advanced: Installing from Source"
 
