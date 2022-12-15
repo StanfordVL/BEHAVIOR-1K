@@ -286,7 +286,7 @@ def download_assets():
         print("Assets already downloaded.")
     else:
         tmp_file = os.path.join(tempfile.gettempdir(), "og_assets.tar.gz")
-        os.makedirs(os.path.dirname(og.assets_path), exist_ok=True)
+        os.makedirs(og.assets_path, exist_ok=True)
         path = "https://storage.googleapis.com/gibson_scenes/og_assets.tar.gz"
         logging.info(f"Downloading and decompressing demo OmniGibson assets from {path}")
         assert subprocess.call(["wget", "-c", "--no-check-certificate", "--retry-connrefused", "--tries=5", "--timeout=5", path, "-O", tmp_file]) == 0, "Assets download failed."
@@ -346,7 +346,7 @@ def download_og_dataset():
         print("OmniGibson dataset already installed.")
     else:
         tmp_file = os.path.join(tempfile.gettempdir(), "og_dataset.tar.gz")
-        os.makedirs(os.path.dirname(og.og_dataset_path), exist_ok=True)
+        os.makedirs(og.og_dataset_path, exist_ok=True)
         path = "https://storage.googleapis.com/gibson_scenes/og_dataset.tar.gz"
         logging.info(f"Downloading and decompressing demo OmniGibson dataset from {path}")
         assert subprocess.call(["wget", "-c", "--no-check-certificate", "--retry-connrefused", "--tries=5", "--timeout=5", path, "-O", tmp_file]) == 0, "Dataset download failed."
