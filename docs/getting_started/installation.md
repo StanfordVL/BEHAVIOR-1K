@@ -12,7 +12,6 @@ Please make sure your system meets the following specs:
 - [x] **RAM:** 32GB+
 - [x] **GPU:** NVIDIA RTX 2070+
 - [x] **VRAM:** 8GB+
-- [x] **Software:** [Docker]() and [NVIDIA Docker]()
 
 ??? question "Why these specs?"
     
