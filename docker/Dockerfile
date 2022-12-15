@@ -4,6 +4,7 @@ FROM nvcr.io/nvidia/isaac-sim:2022.1.1
 RUN apt-get update && apt-get install -y \
   curl \
   git \
+  wget \
   && rm -rf /var/lib/apt/lists/*
 
 RUN echo "bash /isaac-sim/vulkan_check.sh" >> /root/.bashrc
@@ -36,7 +37,7 @@ RUN micromamba install -c conda-forge opencv
 # Install OmniGibson
 RUN pip install -e .
 
-RUN echo "python -m omnigibson.scripts.setup" >> /root/.bashrc
+RUN echo "OMNIGIBSON_NO_OMNIVERSE=1 python -m omnigibson.scripts.setup" >> /root/.bashrc
 ENTRYPOINT []
 
 CMD ["/bin/bash"]

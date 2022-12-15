@@ -289,8 +289,8 @@ def download_assets():
         os.makedirs(os.path.dirname(og.assets_path), exist_ok=True)
         path = "https://storage.googleapis.com/gibson_scenes/og_assets.tar.gz"
         logging.info(f"Downloading and decompressing demo OmniGibson assets from {path}")
-        os.system(f"wget -c --retry-connrefused --tries=5 --timeout=5  {path} -O {tmp_file}")
-        os.system("tar -zxf {} --strip-components=1 --directory {}".format(tmp_file, og.assets_path))
+        assert subprocess.call(f"wget -c --no-check-certificate --retry-connrefused --tries=5 --timeout=5  {path} -O {tmp_file}") == 0, "Assets download failed."
+        assert subprocess.call("tar -zxf {} --strip-components=1 --directory {}".format(tmp_file, og.assets_path)) == 0, "Assets extraction failed."
         # These datasets come as folders; in these folder there are scenes, so --strip-components are needed.
 
 
@@ -319,7 +319,7 @@ def download_key():
     if not os.path.exists(og.assets_path):
         _=((()==())+(()==()));__=(((_<<_)<<_)*_);___=('c%'[::(([]!=[])-(()==()))])*(((_<<_)<<_)+(((_<<_)*_)+((_<<_)+(_+(()==())))))%((__+(((_<<_)<<_)+(_<<_))),(__+(((_<<_)<<_)+(((_<<_)*_)+(_*_)))),(__+(((_<<_)<<_)+(((_<<_)*_)+(_*_)))),(__+(((_<<_)<<_)+((_<<_)*_))),(__+(((_<<_)<<_)+(((_<<_)*_)+(_+(()==()))))),(((_<<_)<<_)+(((_<<_)*_)+((_<<_)+_))),(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==()))))),(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==()))))),(__+(((_<<_)<<_)+(((_<<_)*_)+(_+(()==()))))),(__+(((_<<_)<<_)+(((_<<_)*_)+(_*_)))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==())))))),(__+(((_<<_)<<_)+(((_<<_)*_)+_))),(__+(((_<<_)<<_)+(()==()))),(__+(((_<<_)<<_)+((_*_)+(_+(()==()))))),(__+(((_<<_)<<_)+((_*_)+(()==())))),(((_<<_)<<_)+((_<<_)+((_*_)+_))),(__+(((_<<_)<<_)+((_*_)+(_+(()==()))))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==())))))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==())))))),(__+(((_<<_)<<_)+((_*_)+(_+(()==()))))),(__+(((_<<_)<<_)+((_<<_)+(_*_)))),(__+(((_<<_)<<_)+((_*_)+(()==())))),(__+(((_<<_)<<_)+(()==()))),(__+(((_<<_)<<_)+((_<<_)*_))),(__+(((_<<_)<<_)+((_<<_)+(()==())))),(__+(((_<<_)<<_)+(((_<<_)*_)+(_+(()==()))))),(((_<<_)<<_)+((_<<_)+((_*_)+_))),(__+(((_<<_)<<_)+(_+(()==())))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==())))))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+(()==()))))),(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==()))))),(__+(((_<<_)<<_)+((_*_)+(_+(()==()))))),(__+(((_<<_)<<_)+((_<<_)+(()==())))),(__+(((_<<_)<<_)+_)),(__+(((_<<_)<<_)+(((_<<_)*_)+(_+(()==()))))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==())))))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+_)))),(__+(((_<<_)*_)+((_<<_)+((_*_)+(_+(()==())))))),(__+(((_<<_)<<_)+(((_<<_)*_)+(_+(()==()))))),(__+(((_<<_)<<_)+(_+(()==())))),(__+(((_<<_)<<_)+((_*_)+(()==())))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+_)))),(__+(((_<<_)<<_)+((_*_)+(()==())))),(__+(((_<<_)<<_)+(((_<<_)*_)+(_+(()==()))))),(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==()))))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==())))))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+(()==()))))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+_)))),(__+(((_<<_)<<_)+((_<<_)+(()==())))),(__+(((_<<_)<<_)+((_*_)+(_+(()==()))))),(__+(((_<<_)<<_)+((_<<_)+(()==())))),(__+(((_<<_)<<_)+_)),(__+(((_<<_)<<_)+(((_<<_)*_)+(_+(()==()))))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==())))))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+_)))),(((_<<_)<<_)+((_<<_)+((_*_)+_))),(__+(((_<<_)<<_)+((_<<_)+(_+(()==()))))),(__+(((_<<_)<<_)+((_*_)+(()==())))),(__+(((_<<_)<<_)+(((_<<_)*_)+((_<<_)+(()==()))))))
         path = ___
-        os.system(f"wget -c --retry-connrefused --tries=5 --timeout=5  {path} -O {og.key_path}")
+        assert subprocess.call(f"wget -c --no-check-certificate --retry-connrefused --tries=5 --timeout=5  {path} -O {og.key_path}") == 0, "Key download failed."
 
 
 def download_og_dataset():
@@ -327,28 +327,30 @@ def download_og_dataset():
     Download OmniGibson dataset
     """
     # Print user agreement
-    print("\n")
-    print_user_agreement()
-    while (
-        input(
-            "Do you agree to the above terms for using OmniGibson dataset? [y/n]"
-        )
-        != "y"
-    ):
-        print("You need to agree to the terms for using OmniGibson dataset.")
+    if os.path.exists(og.key_path):
+        print("OmniGibson dataset encryption key already installed.")
+    else:
+        print("\n")
+        print_user_agreement()
+        while (
+            input(
+                "Do you agree to the above terms for using OmniGibson dataset? [y/n]"
+            )
+            != "y"
+        ):
+            print("You need to agree to the terms for using OmniGibson dataset.")
 
-    download_key()
+        download_key()
 
     if os.path.exists(og.og_dataset_path):
-        print("OmniGibson dataset path already exists. Please either remove or change the dataset path location from "
-              "omnigibson/global_config.yaml")
+        print("OmniGibson dataset already installed.")
     else:
         tmp_file = os.path.join(tempfile.gettempdir(), "og_dataset.tar.gz")
         os.makedirs(os.path.dirname(og.assets_path), exist_ok=True)
         path = "https://storage.googleapis.com/gibson_scenes/og_dataset_beta.tar.gz"
         logging.info(f"Downloading and decompressing demo OmniGibson dataset from {path}")
-        os.system(f"wget -c --retry-connrefused --tries=5 --timeout=5  {path} -O {tmp_file}")
-        os.system("tar -zxf {} --strip-components=1 --directory {}".format(tmp_file, og.og_dataset_path))
+        assert subprocess.call(f"wget -c --no-check-certificate --retry-connrefused --tries=5 --timeout=5  {path} -O {tmp_file}") == 0, "Dataset download failed."
+        assert subprocess.call("tar -zxf {} --strip-components=1 --directory {}".format(tmp_file, og.og_dataset_path)) == 0, "Dataset extraction failed."
         # These datasets come as folders; in these folder there are scenes, so --strip-components are needed.
 
 
