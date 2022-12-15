@@ -88,3 +88,8 @@ nav:
     - Quickstart: getting_started/quickstart.md
     - Building Blocks: getting_started/building_blocks.md
   - Code Reference: reference/
+
+extra:
+  analytics:
+    provider: google
+    property: G-6L1G6GMR63
