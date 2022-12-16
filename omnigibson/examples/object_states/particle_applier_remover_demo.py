@@ -153,7 +153,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         abilities=abilities,
     )
     modifier_root_link_path = f"{modifier.prim_path}/base_link"
-    modifier._load(og.sim)
+    modifier._prim = modifier._load(og.sim)
     if method_type == "Projection":
         metalink_path = f"{modifier.prim_path}/{modification_metalink[modifier_type]}"
         og.sim.stage.DefinePrim(metalink_path, "Xform")
