@@ -154,8 +154,8 @@ class XFormPrim(BasePrim):
                 Default is None, which means left unchanged.
         """
         current_position, current_orientation = self.get_position_orientation()
-        position = current_position if position is None else np.array(position)
-        orientation = current_orientation if orientation is None else np.array(orientation)
+        position = current_position if position is None else np.array(position, dtype=float)
+        orientation = current_orientation if orientation is None else np.array(orientation, dtype=float)
         orientation = orientation[[3, 0, 1, 2]]     # Flip from x,y,z,w to w,x,y,z
 
         mat = Gf.Transform()
@@ -316,7 +316,7 @@ class XFormPrim(BasePrim):
             scale (float or np.ndarray): scale to be applied to the prim's dimensions. shape is (3, ).
                                           Defaults to None, which means left unchanged.
         """
-        scale = np.array(scale) if isinstance(scale, Iterable) else np.ones(3) * scale
+        scale = np.array(scale, dtype=float) if isinstance(scale, Iterable) else np.ones(3) * scale
         scale = Gf.Vec3d(*scale)
         properties = self.prim.GetPropertyNames()
         if "xformOp:scale" not in properties:
