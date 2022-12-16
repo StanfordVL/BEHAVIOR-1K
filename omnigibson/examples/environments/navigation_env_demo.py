@@ -22,25 +22,18 @@ def main(random_selection=False, headless=False, short_exec=False):
     """
     logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
 
-    # Infer which config to load based on the scene selected
-    scene_options = {
-        "InteractiveTraversableScene": "Rs_int scene with fully interactive objects",
-        "StaticTraversableScene": "Adrian scene mesh with no interactive objects",
-    }
-    scene_type = choose_from_options(options=scene_options, name="scene type", random_selection=random_selection)
-    config_name = "turtlebot_nav" if scene_type == "InteractiveTraversableScene" else "turtlebot_static_nav"
-    config_filename = os.path.join(og.example_config_path, f"{config_name}.yaml")
+    # Load the config
+    config_filename = os.path.join(og.example_config_path, f"turtlebot_nav.yaml")
     config = yaml.load(open(config_filename, "r"), Loader=yaml.FullLoader)
 
-    # If the scene type is interactive, also check if we want to quick load or full load the scene
-    if scene_type == "InteractiveTraversableScene":
-        load_options = {
-            "Quick": "Only load the building assets (i.e.: the floors, walls, ceilings)",
-            "Full": "Load all interactive objects in the scene",
-        }
-        load_mode = choose_from_options(options=load_options, name="load mode", random_selection=random_selection)
-        if load_mode == "Quick":
-            config["scene"]["load_object_categories"] = ["floors", "walls", "ceilings"]
+    # check if we want to quick load or full load the scene
+    load_options = {
+        "Quick": "Only load the building assets (i.e.: the floors, walls, ceilings)",
+        "Full": "Load all interactive objects in the scene",
+    }
+    load_mode = choose_from_options(options=load_options, name="load mode", random_selection=random_selection)
+    if load_mode == "Quick":
+        config["scene"]["load_object_categories"] = ["floors", "walls", "ceilings"]
 
     # Load the environment
     env = og.Environment(configs=config)
