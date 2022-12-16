@@ -11,6 +11,7 @@ mkdir docs/src
 cp -r omnigibson/* docs/src
 
 # Update code source references
+rm -r docs/reference
 python docs/gen_ref_pages.py
 
 # Build the docs (written to ./site)
