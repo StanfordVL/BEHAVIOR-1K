@@ -4,6 +4,7 @@ import os
 import yaml
 
 import omnigibson as og
+from omnigibson.macros import gm
 from omnigibson.utils.ui_utils import choose_from_options
 
 
@@ -27,6 +28,10 @@ def main(random_selection=False, headless=False, short_exec=False):
     config_filename = os.path.join(og.example_config_path, "fetch_behavior.yaml")
     cfg = yaml.load(open(config_filename, "r"), Loader=yaml.FullLoader)
     cfg["task"]["online_object_sampling"] = should_sample
+
+    # If we're online sampling, make sure global contacts are enabled so we can accurately detect kinematic changes
+    if should_sample:
+        gm.ENABLE_GLOBAL_CONTACT_REPORTING = True
 
     # Load the environment
     env = og.Environment(configs=cfg)
