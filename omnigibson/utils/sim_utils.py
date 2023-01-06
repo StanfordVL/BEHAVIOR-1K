@@ -12,6 +12,42 @@ from omni.physx import get_physx_simulation_interface
 CsRawData = namedtuple("RawBodyData", ["time", "dt", "body0", "body1", "position", "normal", "impulse"])
 
 
+def set_carb_setting(carb_settings, setting, value):
+    """
+    Convenience function to set settings.
+
+    Args:
+        setting (str): Name of setting to change.
+        value (Any): New value for the setting.
+
+    Raises:
+        TypeError: If the type of value does not match setting type.
+    """
+    if isinstance(value, str):
+        carb_settings.set_string(setting, value)
+    elif isinstance(value, bool):
+        carb_settings.set_bool(setting, value)
+    elif isinstance(value, int):
+        carb_settings.set_int(setting, value)
+    elif isinstance(value, float):
+        carb_settings.set_float(setting, value)
+    elif isinstance(value, Iterable) and not isinstance(value, dict):
+        if len(value) == 0:
+            raise TypeError(f"Array of type {type(value)} must be nonzero.")
+        if isinstance(value[0], str):
+            carb_settings.set_string_array(setting, value)
+        elif isinstance(value[0], bool):
+            carb_settings.set_bool_array(setting, value)
+        elif isinstance(value[0], int):
+            carb_settings.set_int_array(setting, value)
+        elif isinstance(value[0], float):
+            carb_settings.set_float_array(setting, value)
+        else:
+            raise TypeError(f"Value of type {type(value)} is not supported.")
+    else:
+        raise TypeError(f"Value of type {type(value)} is not supported.")
+
+
 def prims_to_rigid_prim_set(inp_prims):
     """
     Converts prims @inp_prims into its corresponding set of rigid prims
@@ -301,7 +337,7 @@ def land_object(obj, pos, quat=None, z_offset=None):
     if not land_success:
         logging.warning(f"Object {obj.name} failed to land.")
 
-    # Make sure robot isn't moving at the end if we're a robot
+    # Make sure object isn't moving at the end if we're a robot
     if is_robot:
         obj.reset()
         obj.keep_still()

@@ -16,7 +16,6 @@ from omni.isaac.core.utils.stage import open_stage
 from omni.isaac.dynamic_control import _dynamic_control
 import omni.kit.loop._loop as omni_loop
 from pxr import Usd, Gf, UsdGeom, Sdf, UsdPhysics, PhysxSchema, PhysicsSchemaTools
-from omni.isaac.core.utils.viewports import set_camera_view
 from omni.isaac.core.loggers import DataLogger
 
 import omnigibson as og
@@ -32,7 +31,6 @@ from omnigibson.object_states.contact_subscribed_state_mixin import ContactSubsc
 from omnigibson.object_states.factory import get_states_by_dependency_order
 from omnigibson.sensors.vision_sensor import VisionSensor
 from omnigibson.transition_rules import DEFAULT_RULES
-from omni.kit.viewport_legacy import acquire_viewport_interface
 
 
 # Create settings for this module
@@ -85,7 +83,6 @@ class Simulator(SimulationContext, Serializable):
             return
         Simulator._world_initialized = True
         self._dc_interface = _dynamic_control.acquire_dynamic_control_interface()
-        set_camera_view()
         self._data_logger = DataLogger()
         self._contact_callback = self._physics_context._physx_sim_interface.subscribe_contact_report_events(self._on_contact)
 
@@ -93,14 +90,16 @@ class Simulator(SimulationContext, Serializable):
         self.gravity = gravity
 
         # Store other references to variables that will be initialized later
-        self._viewer = None
         self._viewer_camera = None
         self._camera_mover = None
         self._scene = None
 
         # Initialize viewer
         # TODO: Make this toggleable so we don't always have a viewer if we don't want to
-        self._set_viewer_settings()
+
+        # Auto-load the dummy stage
+        self.clear()
+
         self.viewer_width = viewer_width
         self.viewer_height = viewer_height
 
@@ -141,23 +140,23 @@ class Simulator(SimulationContext, Serializable):
             carb.log_info("Simulator is defined already, returning the previously defined one")
         return Simulator._instance
 
-    def _set_viewer_camera(self, prim_path="/World/viewer_camera"):
+    def _set_viewer_camera(self, prim_path="/World/viewer_camera", viewport_name="Viewport"):
         """
         Creates a camera prim dedicated for this viewer at @prim_path if it doesn't exist,
         and sets this camera as the active camera for the viewer
 
         Args:
             prim_path (str): Path to check for / create the viewer camera
+            viewport_name (str): Name of the viewport this camera should attach to. Default is "Viewport", which is
+                the default viewport's name in Isaac Sim
         """
-        vp = acquire_viewport_interface()
-        viewers_to_names = {vp.get_viewport_window(h): vp.get_viewport_window_name(h) for h in vp.get_instance_list()}
         self._viewer_camera = VisionSensor(
             prim_path=prim_path,
             name=prim_path.split("/")[-1],                  # Assume name is the lowest-level name in the prim_path
             modalities="rgb",
             image_height=self.viewer_height,
             image_width=self.viewer_width,
-            viewport_name=viewers_to_names[self._viewer],
+            viewport_name=viewport_name,
         )
         if not self._viewer_camera.loaded:
             self._viewer_camera.load(simulator=self)
@@ -255,18 +254,6 @@ class Simulator(SimulationContext, Serializable):
             width (int): viewer width, in pixels
         """
         self._viewer_camera.image_width = width
-
-    def _set_viewer_settings(self):
-        """
-        Initializes a reference to the viewer in the App, and sets the frame size
-        """
-        # Store reference to viewer (see https://docs.omniverse.nvidia.com/app_isaacsim/app_isaacsim/reference_python_snippets.html#get-camera-parameters)
-        viewport = acquire_viewport_interface()
-        viewport_handle = viewport.get_instance("Viewport")
-        self._viewer = viewport.get_viewport_window(viewport_handle)
-
-        # Set viewer camera and frame size
-        self._set_viewer_camera()
 
     def enable_viewer_camera_teleoperation(self):
         """
@@ -669,14 +656,6 @@ class Simulator(SimulationContext, Serializable):
         return self._scene
 
     @property
-    def viewer(self):
-        """
-        Returns:
-            ViewportWindow: Active viewport window instance shown in the omni UI
-        """
-        return self._viewer
-
-    @property
     def viewer_camera(self):
         """
         Returns:
@@ -709,6 +688,9 @@ class Simulator(SimulationContext, Serializable):
 
         self._scene = None
         self._data_logger = DataLogger()
+
+        # Clear all vision sensors
+        VisionSensor.clear()
 
         # Load dummy stage, but don't clear sim to prevent circular loops
         self.load_stage(usd_path=f"{og.assets_path}/models/misc/clear_stage.usd")

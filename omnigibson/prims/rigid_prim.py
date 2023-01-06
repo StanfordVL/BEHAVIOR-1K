@@ -14,7 +14,7 @@ from omnigibson.utils.sim_utils import CsRawData
 from omnigibson.utils.usd_utils import mesh_prim_to_trimesh_mesh
 
 # Import omni sensor based on type
-from omni.isaac.isaac_sensor import _isaac_sensor as _s
+from omni.isaac.sensor import _sensor as _s
 
 
 # Create settings for this module

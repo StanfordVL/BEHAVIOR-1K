@@ -3,26 +3,39 @@ import numpy as np
 import time
 import gym
 
-from omnigibson import app
+import omnigibson as og
 from omnigibson.sensors.sensor_base import BaseSensor
 from omnigibson.utils.constants import MAX_CLASS_COUNT, MAX_INSTANCE_COUNT, MAX_VIEWER_SIZE, VALID_OMNI_CHARS
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
+from omnigibson.utils.sim_utils import set_carb_setting
+from omnigibson.utils.ui_utils import dock_window
 from omnigibson.utils.usd_utils import get_camera_params
 from omnigibson.utils.transform_utils import euler2quat, quat2euler
 
-import carb
+import omni.ui
 from omni.isaac.core.utils.stage import get_current_stage
 from pxr import Gf, UsdGeom
-from omni.kit.viewport_legacy import acquire_viewport_interface
+from omni.kit.viewport.window import get_viewport_window_instances
+from omni.kit.viewport.utility import create_viewport_window
 
 # Make sure synthetic data extension is enabled
-ext_manager = app.app.get_extension_manager()
+ext_manager = og.app.app.get_extension_manager()
 ext_manager.set_extension_enabled("omni.syntheticdata", True)
 
 # Continue with omni synethic data imports afterwards
 from omni.syntheticdata import sensors as sensors_util
 import omni.syntheticdata._syntheticdata as sd
 sensor_types = sd.SensorType
+
+
+# Duplicate of simulator's render method, used so that this can be done before simulator is created!
+def render():
+    """
+    Refreshes the Isaac Sim app rendering components including UI elements and view ports..etc.
+    """
+    set_carb_setting(og.app._carb_settings, "/app/player/playSimulations", False)
+    og.app.update()
+    set_carb_setting(og.app._carb_settings, "/app/player/playSimulations", True)
 
 
 class VisionSensor(BaseSensor):
@@ -135,25 +148,47 @@ class VisionSensor(BaseSensor):
         self._sd = sd.acquire_syntheticdata_interface()
 
         # Create a new viewport to link to this camera or link to a pre-existing one
-        vp = acquire_viewport_interface()
         viewport_name = self._load_config["viewport_name"]
         if viewport_name is not None:
-            vp_names_to_handles = {vp.get_viewport_window_name(h): h for h in vp.get_instance_list()}
+            vp_names_to_handles = {vp.name: vp for vp in get_viewport_window_instances()}
             assert_valid_key(key=viewport_name, valid_keys=vp_names_to_handles, name="viewport name")
-            viewport_handle = vp_names_to_handles[viewport_name]
+            viewport = vp_names_to_handles[viewport_name]
         else:
-            viewport_handle = vp.create_instance()
-        self._viewport = vp.get_viewport_window(viewport_handle)
+            viewport = create_viewport_window()
+            # Take a render step to make sure the viewport is generated before docking it
+            render()
+            # Grab the newly created viewport and dock it to the GUI
+            # The first viewport is always the "main" global camera, and any additional cameras are auxiliary views
+            # These auxiliary views will be stacked in a single column
+            # Thus, the first auxiliary viewport should be generated to the left of the main dockspace, and any
+            # subsequent viewports should be equally spaced according to the number of pre-existing auxiliary views
+            n_auxiliary_sensors = len(self.SENSORS) - 1
+            if n_auxiliary_sensors == 1:
+                # This is the first auxiliary viewport, dock to the left of the main dockspace
+                dock_window(space=omni.ui.Workspace.get_window("DockSpace"), name=viewport.name,
+                            location=omni.ui.DockPosition.LEFT, ratio=0.25)
+            elif n_auxiliary_sensors > 1:
+                # This is any additional auxiliary viewports, dock equally-spaced in the auxiliary column
+                # We also need to re-dock any prior viewports!
+                for i in range(2, n_auxiliary_sensors + 1):
+                    dock_window(space=omni.ui.Workspace.get_window(f"Viewport {i - 1}"), name=f"Viewport {i}",
+                                location=omni.ui.DockPosition.BOTTOM, ratio=(1 + n_auxiliary_sensors - i) / (2 + n_auxiliary_sensors - i))
+
+        self._viewport = viewport
 
         # Link the camera and viewport together
-        self._viewport.set_active_camera(self._prim_path)
+        self._viewport.viewport_api.set_active_camera(self._prim_path)
 
-        # Set the viewer size
-        self._viewport.set_texture_resolution(self._load_config["image_width"], self._load_config["image_height"])
-        self._viewport.set_window_size(self._load_config["image_height"], self._load_config["image_width"])
-        # Requires 3 updates to propagate changes
+        # Requires 3 render updates to propagate changes
         for i in range(3):
-            app.update()
+            render()
+
+        # Set the viewer size (requires taking one render step afterwards)
+        self._viewport.viewport_api.set_texture_resolution((self._load_config["image_width"], self._load_config["image_height"]))
+
+        # Requires 3 render updates to propagate changes
+        for i in range(3):
+            render()
 
     def _initialize(self):
         # Run super first
@@ -181,9 +216,9 @@ class VisionSensor(BaseSensor):
 
         # Initialize sensors
         for name in names:
-            sensors.append(sensors_util.create_or_retrieve_sensor(self._viewport, self._RAW_SENSOR_TYPES[name]))
-        app.update()
-        app.update()  # Extra frame required to prevent access violation error
+            sensors.append(sensors_util.create_or_retrieve_sensor(self._viewport.viewport_api, self._RAW_SENSOR_TYPES[name]))
+        render()
+        render() # Extra frame required to prevent access violation error
 
     def _get_obs(self):
         # Make sure we're initialized
@@ -195,7 +230,7 @@ class VisionSensor(BaseSensor):
         # Process each sensor modality individually
         for modality in self.modalities:
             mod_kwargs = dict()
-            mod_kwargs["viewport"] = self._viewport
+            mod_kwargs["viewport"] = self._viewport.viewport_api
             if modality == "seg_instance":
                 mod_kwargs.update({"parsed": True, "return_mapping": False})
             elif modality == "bbox_3d":
@@ -221,44 +256,6 @@ class VisionSensor(BaseSensor):
         xform_orient_op = self.get_attribute("xformOp:rotateXYZ")
         return np.array(xform_translate_op), euler2quat(np.array(xform_orient_op))
 
-    def set_window_position(self, x, y):
-        """Set the position of the viewport window.
-
-        :param x: x position of the viewport window
-        :param y: y position of the viewport window
-        """
-        self._viewport.set_window_pos(x ,y)
-
-    def set_window_size(self, width, height):
-        """Set the size of the viewport window.
-
-        :param width: width of the viewport window
-        :param height: height of the viewport window
-        """
-        self._viewport.set_window_size(width, height)
-
-    def set_camera_position(self, x, y, z, rotate=True):
-        """Set the position of the active camera.
-
-        :param x: x coordinate of the camera
-        :param y: y coordinate of the camera
-        :param z: z coordinate of the camera
-        :param rotate: set rotate=True to move the camera, but rotate to keep its focus;
-            set rotate=False to move the camera and look at a new point
-        """
-        self._viewport.set_camera_position(self._prim_path, x, y, z, rotate)
-
-    def set_camera_target(self, x, y, z, rotate=True):
-        """Set the target of the active camera.
-
-        :param x: x coordinate of the camera
-        :param y: y coordinate of the camera
-        :param z: z coordinate of the camera
-        :param rotate: rotate=True to rotate the camera to look at the target;
-            set rotate=False to move the camera to look at the target
-        """
-        self._viewport.set_camera_target(self._prim_path, x, y, z, rotate)
-
     def remove(self, simulator=None):
         # Run super first
         super().remove(simulator=simulator)
@@ -272,7 +269,7 @@ class VisionSensor(BaseSensor):
         Returns:
             bool: Whether the viewer is visible or not
         """
-        return self._viewport.is_visible()
+        return self._viewport.visible
 
     @viewer_visibility.setter
     def viewer_visibility(self, visible):
@@ -282,9 +279,9 @@ class VisionSensor(BaseSensor):
         Args:
             visible (bool): Whether the viewer should be visible or not
         """
-        self._viewport.set_visible(visible)
-        # Requires 1 update to propagate changes
-        app.update()
+        self._viewport.visible = visible
+        # Requires 1 render update to propagate changes
+        render()
 
     @property
     def image_height(self):
@@ -292,7 +289,7 @@ class VisionSensor(BaseSensor):
         Returns:
             int: Image height of this sensor, in pixels
         """
-        return self._viewport.get_texture_resolution()[1]
+        return self._viewport.viewport_api.get_texture_resolution()[1]
 
     @image_height.setter
     def image_height(self, height):
@@ -302,11 +299,11 @@ class VisionSensor(BaseSensor):
         Args:
             height (int): Image height of this sensor, in pixels
         """
-        width, _ = self._viewport.get_texture_resolution()
-        self._viewport.set_texture_resolution(width, height)
+        width, _ = self._viewport.viewport_api.get_texture_resolution()
+        self._viewport.viewport_api.set_texture_resolution((width, height))
         # Requires 3 updates to propagate changes
         for i in range(3):
-            app.update()
+            render()
 
     @property
     def image_width(self):
@@ -314,7 +311,7 @@ class VisionSensor(BaseSensor):
         Returns:
             int: Image width of this sensor, in pixels
         """
-        return self._viewport.get_texture_resolution()[0]
+        return self._viewport.viewport_api.get_texture_resolution()[0]
 
     @image_width.setter
     def image_width(self, width):
@@ -324,11 +321,11 @@ class VisionSensor(BaseSensor):
         Args:
             width (int): Image width of this sensor, in pixels
         """
-        _, height = self._viewport.get_texture_resolution()
-        self._viewport.set_texture_resolution(width, height)
+        _, height = self._viewport.viewport_api.get_texture_resolution()
+        self._viewport.viewport_api.set_texture_resolution((width, height))
         # Requires 3 updates to propagate changes
         for i in range(3):
-            app.update()
+            render()
 
     @property
     def clipping_range(self):
@@ -350,7 +347,7 @@ class VisionSensor(BaseSensor):
         # In order for sensor changes to propagate, we must toggle its visibility
         self.visible = False
         # A single update step has to happen here before we toggle visibility for changes to propagate
-        app.update()
+        render()
         self.visible = True
 
     @property
@@ -433,6 +430,14 @@ class VisionSensor(BaseSensor):
         )
 
         return obs_space_mapping
+
+    @classmethod
+    def clear(cls):
+        """
+        Clears all cached sensors that have been generated. Should be used when the simulator is completely reset; i.e.:
+        all objects on the stage are destroyed
+        """
+        cls.SENSORS = OrderedDict()
 
     @classproperty
     def all_modalities(cls):
