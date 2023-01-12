@@ -20,7 +20,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     # Choose the scene type to load
     scene_options = {
         "InteractiveTraversableScene": "Procedurally generated scene with fully interactive objects",
-        "StaticTraversableScene": "Monolithic scene mesh with no interactive objects",
+        # "StaticTraversableScene": "Monolithic scene mesh with no interactive objects",
     }
     scene_type = choose_from_options(options=scene_options, name="scene type", random_selection=random_selection)
 
