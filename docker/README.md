@@ -14,9 +14,9 @@ See [here](https://www.pugetsystems.com/labs/hpc/how-to-setup-nvidia-docker-and-
 2. Build the container. **From the OmniGibson root**, run: `./docker/build_docker.sh`
 
 3. Run the container
-* To get a shell inside a container with GUI: `./docker/run_docker_gui.sh`
-* To get a jupyter notebook: `./docker/run_docker_notebook.sh`
-* To get access to a shell inside a headless container `./docker/run_docker.sh`
+* To get a shell inside a container with GUI: `sudo ./docker/run_docker_gui.sh`
+* To get a jupyter notebook: `sudo ./docker/run_docker_notebook.sh`
+* To get access to a shell inside a headless container `sudo ./docker/run_docker.sh`
 
 # Development
-To push a Docker container, run: `./docker/push_docker.sh`
+To push a Docker container, run: `sudo ./docker/push_docker.sh`

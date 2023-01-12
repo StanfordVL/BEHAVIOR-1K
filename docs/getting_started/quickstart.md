@@ -28,7 +28,7 @@ cfg["scene"] = {
 }
 ```
 
-1. Our configuration gets parsed automatically and generates the appropriate class instance based on `"type"` (the string form of the class name). In this case, we're generating the most basic scene, which only consists of a floor plane. Check out [all of our available `Scene` classes](../reference/scenes/scene_base.md)!
+1. Our configuration gets parsed automatically and generates the appropriate class instance based on `type` (the string form of the class name). In this case, we're generating the most basic scene, which only consists of a floor plane. Check out [all of our available `Scene` classes](../reference/scenes/scene_base.md)!
 2. In addition to specifying `type`, the remaining keyword-arguments get passed directly into the class constructor. So for the base [`Scene`](../reference/scenes/scene_base.md) class, you could optionally specify `"use_floor_plane"` and `"floor_plane_visible"`, whereas for the more powerful [`InteractiveTraversableScene`](../reference/scenes/interactive_traversable_scene.md) class (which loads a curated, preconfigured scene) you can additionally specify options for filtering objects, such as `"load_object_categories"` and `"load_room_types"`. You can see all available keyword-arguments by viewing the individual `Scene` class you'd like to load!
 
 ## 🎾 **Defining objects**
@@ -39,7 +39,7 @@ cfg["objects"] = [ # (1)!
     {
         "type": "USDObject", # (2)!
         "name": "ghost_apple", # (3)!
-        "usd_path": f"{og.og_dataset_path}/objects/apple/TODO/usd/TODO.usd",
+        "usd_path": f"{og.og_dataset_path}/objects/apple/00_0/usd/00_0.usd",
         "category": "apple", # (4)!
         "visual_only": True, # (5)!
         "scale": [2.0, 1.0, 2.0], # (6)!
@@ -50,7 +50,7 @@ cfg["objects"] = [ # (1)!
         "type": "DatasetObject", # (9)!
         "name": "delicious_apple",
         "category": "apple",
-        "model": TODO, # (10)!
+        "model": "00_0", # (10)!
         "position": [0, 0, 1.0],
     },
     {
@@ -163,7 +163,7 @@ obs, rew, done, info = env.step(env.action_space.sample())
         {
             "type": "USDObject",
             "name": "ghost_apple",
-            "usd_path": f"{og.og_dataset_path}/objects/apple/TODO/usd/TODO.usd",
+            "usd_path": f"{og.og_dataset_path}/objects/apple/00_0/usd/00_0.usd",
             "category": "apple",
             "visual_only": True,
             "scale": [2.0, 1.0, 2.0],
@@ -174,7 +174,7 @@ obs, rew, done, info = env.step(env.action_space.sample())
             "type": "DatasetObject",
             "name": "delicious_apple",
             "category": "apple",
-            "model": TODO,
+            "model": "00_0",
             "position": [0, 0, 1.0],
         },
         {
@@ -246,4 +246,4 @@ og.sim.viewer_camera.set_position_orientation(<POSITION>, <ORIENTATION>)
 
 ***
 
-**Next:** Check out some of **`OmniGibson`**'s breadth of features from our [Sandbox](./sandbox.md)!
+**Next:** Check out some of **`OmniGibson`**'s breadth of features from our [Building Block](./building_blocks.md) examples!

@@ -12,7 +12,6 @@ Please make sure your system meets the following specs:
 - [x] **RAM:** 32GB+
 - [x] **GPU:** NVIDIA RTX 2070+
 - [x] **VRAM:** 8GB+
-- [x] **Software:** [Docker]() and [NVIDIA Docker]()
 
 ??? question "Why these specs?"
     
@@ -59,15 +58,24 @@ Then, simply launch the desired script:
 
 === "Headless"
 
-    ```shell
-    ./run_docker.sh
+    ```{.shell .annotate}
+    sudo ./run_docker.sh <DATA_PATH> # (1)!
     ```
+
+    1.  `<DATA_PATH>` specifies where data will be stored on your machine (if no `<DATA_PATH>` is specified, it defaults to `./omnigibson_data`). This needs to be called each time the docker container is run!
+
 
 === "GUI"
 
-    ```shell
-    ./run_docker_gui.sh
+    ```{.shell .annotate}
+    sudo ./run_docker_gui.sh <DATA_PATH> # (1)!
     ```
+
+    1.  `<DATA_PATH>` specifies where data will be stored on your machine (if no `<DATA_PATH>` is specified, it defaults to `./omnigibson_data`). This needs to be called each time the docker container is run!
+
+??? warning annotate "Are you using NFS or AFS?"
+
+    Docker containers are unable to access NFS or AFS drives, so if `run_docker.sh` or `run_docker_gui.sh` are located on an NFS / AFS partition, please set `<DATA_PATH>` to an alternative data directory located on a non-NFS / AFS partition.
 
 ??? example annotate "Advanced: Installing from Source"
 
@@ -94,6 +102,7 @@ Then, simply launch the desired script:
     4. Run the command to setup a virtual conda environment to run **`OmniGibson`**:
 
         ```shell
+        chmod +x setup_conda_env.sh
         ./setup_conda_env.sh
         ```
 
@@ -112,10 +121,14 @@ Then, simply launch the desired script:
 
 ## 🌎 **Explore `OmniGibson`!**
 
+??? warning annotate "Expect slowdown during first execution"
+
+    Omniverse requires some one-time startup setup (up to ~5 minutes) when **`OmniGibson`** is imported for the first time. This is expected behavior, and should only occur once!
+
 **`OmniGibson`** is now successfully installed! Try exploring some of our new scenes interactively:
 
 ```{.shell .annotate}
-(omnigibson) python -m omnigibson.examples.scenes.scene_selector.py # (1)!
+python -m omnigibson.examples.scenes.scene_selector # (1)!
 ```
 
 1. This demo lets you choose a scene and interactively move around using your keyboard and mouse. Hold down **`Shift`** and then **`Left-click + Drag`** an object to apply forces!
@@ -123,7 +136,7 @@ Then, simply launch the desired script:
 You can also try teleoperating one of our robots:
 
 ```{.shell .annotate}
-(omnigibson) python -m omnigibson.examples.robots.robot_control_example.py # (1)!
+python -m omnigibson.examples.robots.robot_control_example # (1)!
 ```
 
 1. This demo lets you choose a scene, robot, and set of controllers, and then teleoperate the robot using your keyboard.

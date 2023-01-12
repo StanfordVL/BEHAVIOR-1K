@@ -5,7 +5,9 @@ import numpy as np
 import omnigibson as og
 from omnigibson import object_states
 from omnigibson.macros import gm
-from omnigibson.objects import DatasetObject, LightObject
+
+# Make sure object states are enabled
+gm.ENABLE_OBJECT_STATES = True
 
 
 def main(random_selection=False, headless=False, short_exec=False):
@@ -16,9 +18,6 @@ def main(random_selection=False, headless=False, short_exec=False):
     This demo also shows how to load objects ToggledOn and how to set the initial temperature of an object
     """
     logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
-
-    # Make sure object states are enabled
-    assert gm.ENABLE_OBJECT_STATES, f"Object states must be enabled in macros.py in order to use this demo!"
 
     # Define specific objects we want to load in with the scene directly
     obj_configs = []

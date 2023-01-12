@@ -4,9 +4,12 @@ from collections import OrderedDict
 
 import omnigibson as og
 from omnigibson.macros import gm
-from omnigibson.objects import DatasetObject, LightObject
 import omnigibson.utils.transform_utils as T
-from omnigibson.utils.ui_utils import disclaimer
+
+# Make sure object states, contact reporting, and transition rules are enabled
+gm.ENABLE_OBJECT_STATES = True
+gm.ENABLE_GLOBAL_CONTACT_REPORTING = True
+gm.ENABLE_TRANSITION_RULES = True
 
 
 def main(random_selection=False, headless=False, short_exec=False):
@@ -16,11 +19,6 @@ def main(random_selection=False, headless=False, short_exec=False):
     Then loads a shelf and cracker boxes inside of it
     """
     logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
-
-    # Make sure object states are enabled
-    assert gm.ENABLE_OBJECT_STATES, f"Object states must be enabled in macros.py in order to use this demo!"
-    assert gm.ENABLE_GLOBAL_CONTACT_REPORTING, f"Global contact reporting must be enabled in macros.py in order to use this demo!"
-    assert gm.ENABLE_TRANSITION_RULES, f"Transition rules must be enabled in macros.py in order to use this demo!"
 
     # Create the scene config to load -- empty scene with table, knife, and apple
     table_cfg = OrderedDict(

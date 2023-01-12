@@ -63,11 +63,20 @@ def main(random_selection=False, headless=False, short_exec=False):
         obj_model = choose_from_options(options=available_obj_models, name="object model",
                                         random_selection=random_selection)
 
-        usd_path = f"{og.og_dataset_path}/objects/{obj_category}/{obj_model}/usd/{obj_model}.usd"
+        kwargs = {
+            "type": "DatasetObject",
+            "category": obj_category,
+            "model": obj_model,
+        }
+    else:
+        kwargs = {
+            "type": "USDObject",
+            "usd_path": usd_path,
+        }
 
     # Import the desired object
     obj_cfg = OrderedDict(
-        type="USDObject",
+        **kwargs,
         name="obj",
         usd_path=usd_path,
         visual_only=True,

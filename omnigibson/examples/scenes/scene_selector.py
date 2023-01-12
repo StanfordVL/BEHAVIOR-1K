@@ -1,7 +1,12 @@
 import logging
 import omnigibson as og
+from omnigibson.macros import gm
 from omnigibson.utils.asset_utils import get_available_g_scenes, get_available_og_scenes
 from omnigibson.utils.ui_utils import choose_from_options
+
+# Don't use GPU dynamics and Use flatcache for performance boost
+gm.USE_GPU_DYNAMICS = False
+gm.ENABLE_FLATCACHE = True
 
 
 def main(random_selection=False, headless=False, short_exec=False):
@@ -15,7 +20,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     # Choose the scene type to load
     scene_options = {
         "InteractiveTraversableScene": "Procedurally generated scene with fully interactive objects",
-        "StaticTraversableScene": "Monolithic scene mesh with no interactive objects",
+        # "StaticTraversableScene": "Monolithic scene mesh with no interactive objects",
     }
     scene_type = choose_from_options(options=scene_options, name="scene type", random_selection=random_selection)
 

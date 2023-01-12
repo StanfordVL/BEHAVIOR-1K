@@ -19,7 +19,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     and executing actions
     """
     logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
-    scene_options = ["Scene", "InteractiveTraversableScene", "StaticTraversableScene"]
+    scene_options = ["Scene", "InteractiveTraversableScene"]
     scene_type = choose_from_options(options=scene_options, name="scene type", random_selection=random_selection)
 
     # -- Choose the object to load --
@@ -54,8 +54,6 @@ def main(random_selection=False, headless=False, short_exec=False):
     }
     if scene_type == "InteractiveTraversableScene":
         cfg["scene"]["scene_model"] = "Rs_int"
-    elif scene_type == "StaticTraversableScene":
-        cfg["scene"]["scene_model"] = "Adrian"
 
     # Create the environment
     env = og.Environment(configs=cfg, action_timestep=1 / 60., physics_timestep=1 / 60.)

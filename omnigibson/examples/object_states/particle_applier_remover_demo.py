@@ -18,6 +18,10 @@ macros.object_states.particle_modifier.MAX_VISUAL_PARTICLES_APPLIED_PER_STEP = 1
 macros.object_states.particle_modifier.MAX_FLUID_PARTICLES_APPLIED_PER_STEP = 40
 StainSystem._N_PARTICLES_PER_GROUP = 300
 
+# Make sure object states and GPU dynamics are enabled (GPU dynamics needed for fluids)
+gm.ENABLE_OBJECT_STATES = True
+gm.USE_GPU_DYNAMICS = True
+
 
 def main(random_selection=False, headless=False, short_exec=False):
     """
@@ -29,10 +33,6 @@ def main(random_selection=False, headless=False, short_exec=False):
     and allowed to interact with the table, applying / removing particles from the table.
     """
     logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
-
-    # Make sure object states and omni particlesare enabled
-    assert gm.ENABLE_OBJECT_STATES, f"Object states must be enabled in macros.py in order to use this demo!"
-    assert gm.USE_GPU_DYNAMICS, f"GPU dynamics must be enabled in macros.py in order to use this demo!"
 
     # Choose what configuration to load
     modifier_type = choose_from_options(
@@ -143,14 +143,19 @@ def main(random_selection=False, headless=False, short_exec=False):
         env.step(np.array([]))
 
     # If we're using a projection volume, we manually add in the required metalink required in order to use the volume
-    modifier_path = "/World/modifier"
-    modifier_root_link_path = f"{modifier_path}/base_link"
-    add_reference_to_stage(
-        f"{og.og_dataset_path}/objects/dishtowel/Tag_Dishtowel_Basket_Weave_Red/usd/Tag_Dishtowel_Basket_Weave_Red.usd",
-        modifier_path,
+    modifier = DatasetObject(
+        prim_path="/World/modifier",
+        name="modifier",
+        category="dishtowel",
+        model="Tag_Dishtowel_Basket_Weave_Red",
+        scale=np.ones(3) * 2.0,
+        visual_only=method_type == "Projection" or particle_system == StainSystem,  # Fluid + adjacency requires the object to have collision geoms active
+        abilities=abilities,
     )
+    modifier_root_link_path = f"{modifier.prim_path}/base_link"
+    modifier._prim = modifier._load(og.sim)
     if method_type == "Projection":
-        metalink_path = f"{modifier_path}/{modification_metalink[modifier_type]}"
+        metalink_path = f"{modifier.prim_path}/{modification_metalink[modifier_type]}"
         og.sim.stage.DefinePrim(metalink_path, "Xform")
         joint_prim = create_joint(
             prim_path=f"{modifier_root_link_path}/{modification_metalink[modifier_type]}_joint",
@@ -161,16 +166,8 @@ def main(random_selection=False, headless=False, short_exec=False):
         )
         local_area_quat = np.array([0, 0.707, 0, 0.707])    # Needs to rotated so the metalink points downwards from cloth
         joint_prim.GetAttribute("physics:localRot0").Set(Gf.Quatf(*(local_area_quat[[3, 0, 1, 2]])))
-
-    modifier = DatasetObject(
-        prim_path=modifier_path,
-        name="modifier",
-        category="dishtowel",
-        model="Tag_Dishtowel_Basket_Weave_Red",
-        scale=np.ones(3) * 2.0,
-        visual_only=method_type == "Projection" or particle_system == StainSystem,  # Fluid + adjacency requires the object to have collision geoms active
-        abilities=abilities,
-    )
+    modifier._post_load()
+    modifier._loaded = True
     og.sim.import_object(modifier)
     modifier.set_position(np.array([0, 0, 5.0]))
 

@@ -9,6 +9,11 @@ from omnigibson.macros import gm
 from omnigibson.objects import DatasetObject
 
 
+# Make sure object states and global contact reporting are enabled
+gm.ENABLE_OBJECT_STATES = True
+gm.ENABLE_GLOBAL_CONTACT_REPORTING = True
+
+
 def main(random_selection=False, headless=False, short_exec=False):
     """
     Demo to use the raycasting-based sampler to load objects onTop and/or inside another
@@ -16,10 +21,6 @@ def main(random_selection=False, headless=False, short_exec=False):
     Then loads a shelf and cracker boxes inside of it
     """
     logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
-
-    # Make sure object states are enabled
-    assert gm.ENABLE_OBJECT_STATES, f"Object states must be enabled in macros.py in order to use this demo!"
-    assert gm.ENABLE_GLOBAL_CONTACT_REPORTING, f"Global contact reporting must be enabled in macros.py in order to use this demo!"
 
     # Create the scene config to load -- empty scene
     cfg = {

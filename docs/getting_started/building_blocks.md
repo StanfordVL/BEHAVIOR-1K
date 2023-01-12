@@ -2,8 +2,8 @@
 icon: octicons/package-16
 ---
 
-# 📦 **Sandbox**
-**`OmniGibson`** ships with many demo scripts highlighting its modularity and diverse feature set intended to empower Embodied AI research. Let's try them out!
+# 🧱 **Building Blocks**
+**`OmniGibson`** ships with many demo scripts highlighting its modularity and diverse feature set intended as a set of building blocks enabling your research. Let's try them out!
 
 ***
 
@@ -41,7 +41,7 @@ These examples showcase the full **`OmniGibson`** stack in use, and the types of
     * Understanding how a pre-defined configuration file is used
 
 ```{.python .annotate}
-python -m omnigibson.examples.environments.behavior_env_demo.py
+python -m omnigibson.examples.environments.behavior_env_demo
 ```
 
 This demo instantiates one of our BEHAVIOR tasks (and optionally sampling object locations online) in a fully-populated scene and loads a `Fetch` robot. The robot executes random actions and the environment is reset periodically.
@@ -59,7 +59,7 @@ This demo instantiates one of our BEHAVIOR tasks (and optionally sampling object
     * Understanding how a pre-defined configuration file is used
 
 ```{.python .annotate}
-python -m omnigibson.examples.environments.navigation_env_demo.py
+python -m omnigibson.examples.environments.navigation_env_demo
 ```
 
 This demo instantiates one of our navigation tasks in a fully-populated scene and loads a `Turtlebot` robot. The robot executes random actions and the environment is reset periodically.
@@ -76,7 +76,7 @@ This demo instantiates one of our navigation tasks in a fully-populated scene an
     * Understanding how pre-defined configuration files are used
 
 ```{.python .annotate}
-python -m omnigibson.examples.environments.config_selector.py
+python -m omnigibson.examples.environments.config_selector
 ```
 
 This demo allows you to choose one of our environment configuration files, loads the environment, and then cycles the environment periodically.
@@ -98,7 +98,7 @@ These examples showcase how **`OmniGibson`** can be used to train embodied AI ag
     * Understanding how to train and evaluate a policy
 
 ```{.python .annotate}
-python -m omnigibson.examples.learning.stable_baselines3_ppo_example.py
+python -m omnigibson.examples.learning.stable_baselines3_ppo_example
 ```
 
 This demo loads a BEHAVIOR task with a `Fetch` robot, and trains / evaluates the agent using [Stable Baseline3](https://stable-baselines3.readthedocs.io/en/master/)'s PPO algorithm.
@@ -119,7 +119,7 @@ These examples showcase how to leverage **`OmniGibson`**'s large-scale, diverse 
     * Accessing all BEHAVIOR dataset scenes
 
 ```{.python .annotate}
-python -m omnigibson.examples.scenes.scene_selector.py
+python -m omnigibson.examples.scenes.scene_selector
 ```
 
 This demo lets you choose a scene from the BEHAVIOR dataset, loads it along with a `Turtlebot` robot, and cycles the resulting environment periodically.
@@ -136,7 +136,7 @@ This demo lets you choose a scene from the BEHAVIOR dataset, loads it along with
     * Understanding how to leverage traversability map information from BEHAVIOR dataset scenes
 
 ```{.python .annotate}
-python -m omnigibson.examples.scenes.traversability_map_example.py
+python -m omnigibson.examples.scenes.traversability_map_example
 ```
 
 This demo lets you choose a scene from the BEHAVIOR dataset, and generates its corresponding traversability map.
@@ -157,7 +157,7 @@ These examples showcase how to leverage objects in **`OmniGibson`**.
     * Accessing all BEHAVIOR dataset asset categories and models
 
 ```{.python .annotate}
-python -m omnigibson.examples.objects.load_object_selector.py
+python -m omnigibson.examples.objects.load_object_selector
 ```
 
 This demo lets you choose a specific object from the BEHAVIOR dataset, and loads the requested object into an environment.
@@ -177,7 +177,7 @@ This demo lets you choose a specific object from the BEHAVIOR dataset, and loads
     * Understanding how to set object poses and joint states
 
 ```{.python .annotate}
-python -m omnigibson.examples.objects.visualize_object.py
+python -m omnigibson.examples.objects.visualize_object
 ```
 
 This demo lets you choose a specific object from the BEHAVIOR dataset, and rotates the object in-place. If the object is articulated, it additionally moves its joints through its full range of motion.
@@ -195,7 +195,7 @@ This demo lets you choose a specific object from the BEHAVIOR dataset, and rotat
     * Understanding how to access groups of objects from the environment
 
 ```{.python .annotate}
-python -m omnigibson.examples.objects.highlight_objects.py
+python -m omnigibson.examples.objects.highlight_objects
 ```
 
 This demo lets you choose a specific object from the BEHAVIOR dataset, and rotates the object in-place. If the object is articulated, it additionally moves its joints through its full range of motion.
@@ -216,7 +216,7 @@ This demo lets you choose a specific object from the BEHAVIOR dataset, and rotat
 1. [`Environment`](../reference/envs/env_base.md), all sensors extending from [`BaseSensor`](../reference/sensors/sensor_base.md), and all objects extending from [`BaseObject`](../reference/objects/object_base.md) (which includes all robots extending from [`BaseRobot`](../reference/robots/robot_base.md)!) are [`GymObservable`](../reference/utils/gym_utils.md#utils.gym_utils.GymObservable) objects!
 
 ```{.python .annotate}
-python -m omnigibson.examples.objects.draw_bounding_box.py
+python -m omnigibson.examples.objects.draw_bounding_box
 ```
 
 This demo loads a door object and banana object, and partially obscures the banana with the door. It generates both "loose" and "tight" bounding boxes (where the latter respects occlusions) for both objects, and dumps them to an image on disk.
@@ -237,7 +237,7 @@ These examples showcase **`OmniGibson`**'s powerful object states functionality,
     * Understanding how to enable objects to be `attachable`
 
 ```{.python .annotate}
-python -m omnigibson.examples.object_states.attachment_demo.py
+python -m omnigibson.examples.object_states.attachment_demo
 ```
 
 This demo loads an apple and a fridge, and showcases how they may or may not be attached upon contact based on their assigned attachment types.
@@ -256,7 +256,7 @@ This demo loads an apple and a fridge, and showcases how they may or may not be 
     * Understanding how particles can be removed via a `ParticleRemover` object
 
 ```{.python .annotate}
-python -m omnigibson.examples.object_states.cleaning_demo.py
+python -m omnigibson.examples.object_states.cleaning_demo
 ```
 
 This demo first loads a basic cube object with the ability to remove particles into fully populated scene, and then spawns dust and stain particles on various objects and turns on the sink. You can then move (1) the cube object around to first absorb water particles so that it's "soaked" with water, and then can drag it across objects with dust or stain particles to remove them.
@@ -278,7 +278,7 @@ This demo first loads a basic cube object with the ability to remove particles i
     * Understanding how particles can be removed via a `ParticleRemover` object
 
 ```{.python .annotate}
-python -m omnigibson.examples.object_states.cleaning_demo_simple.py
+python -m omnigibson.examples.object_states.cleaning_demo_simple
 ```
 
 This demo is similar in functionality to the [full cleaning demo](#cleaning-demo), but instead of loading a fully populated scene only a select few objects are loaded. In this case, the loaded `scrub_brush` object is the `ParticleRemover` object. As before, you can move (1) the brush around to first absorb water particles so that it's "soaked" with water, and then can drag it across objects with dust or stain particles to remove them.
@@ -304,7 +304,7 @@ This demo is similar in functionality to the [full cleaning demo](#cleaning-demo
     Our `Folded` state is still a WIP, and should not be used to accurately capture the full semantics of folding cloth-enabled objects.
 
 ```{.python .annotate}
-python -m omnigibson.examples.object_states.folded_state_demo.py
+python -m omnigibson.examples.object_states.folded_state_demo
 ```
 
 This demo loads in three different cloth objects, and allows you to manipulate them (1) while printing out their `Folded` state status in real-time.
@@ -326,7 +326,7 @@ This demo loads in three different cloth objects, and allows you to manipulate t
     * Understanding how temperature changes are propagated to individual objects from individual heat sources or sinks
 
 ```{.python .annotate}
-python -m omnigibson.examples.object_states.temperature_demo.py
+python -m omnigibson.examples.object_states.temperature_demo
 ```
 
 This demo loads in various heat sources and sinks, and places an apple within close proximity to each of them. As the environment steps, each apple's temperature is printed in real-time, showcasing **`OmniGibson`**'s rudimentary temperature dynamics.
@@ -344,7 +344,7 @@ This demo loads in various heat sources and sinks, and places an apple within cl
     * Understanding how dynamic fire visuals are generated in real-time
 
 ```{.python .annotate}
-python -m omnigibson.examples.object_states.heat_source_or_sink_demo.py
+python -m omnigibson.examples.object_states.heat_source_or_sink_demo
 ```
 
 This demo loads in a stove and toggles its `HeatSource` on and off, showcasing the dynamic fire visuals available in **`OmniGibson`**.
@@ -362,7 +362,7 @@ This demo loads in a stove and toggles its `HeatSource` on and off, showcasing t
     * Understanding how dynamic steam visuals are generated in real-time
 
 ```{.python .annotate}
-python -m omnigibson.examples.object_states.heated_state_demo.py
+python -m omnigibson.examples.object_states.heated_state_demo
 ```
 
 This demo loads in three bowls, and immediately sets their temperatures past their `Heated` threshold. Steam is generated in real-time from these objects, and then disappears once the temperature of the objects drops below their `Heated` threshold.
@@ -381,7 +381,7 @@ This demo loads in three bowls, and immediately sets their temperatures past the
     * Understanding how to dynamically modify object states
 
 ```{.python .annotate}
-python -m omnigibson.examples.object_states.object_state_texture_demo.py
+python -m omnigibson.examples.object_states.object_state_texture_demo
 ```
 
 This demo loads in a single object, and then dynamically modifies its state so that its texture changes with each modification.
@@ -401,7 +401,7 @@ This demo loads in a single object, and then dynamically modifies its state so t
     * Understanding different methods for applying and removing particles via the `ParticleRemover` or `ParticleApplier` object
 
 ```{.python .annotate}
-python -m omnigibson.examples.object_states.particle_applier_remover_demo.py
+python -m omnigibson.examples.object_states.particle_applier_remover_demo
 ```
 
 This demo loads in a washtowel and table and lets you choose the ability configuration to enable the washtowel with. The washtowel will then proceed to either remove and generate particles dynamically on the table while moving.
@@ -419,7 +419,7 @@ This demo loads in a washtowel and table and lets you choose the ability configu
     * Understanding how to import additional objects after the environment is created
 
 ```{.python .annotate}
-python -m omnigibson.examples.object_states.sample_kinematics_demo.py
+python -m omnigibson.examples.object_states.sample_kinematics_demo
 ```
 
 This demo procedurally generates a mini populated scene, spawning in a cabinet and placing boxes in its shelves, and then generating a microwave on a cabinet with a plate and apples sampled both inside and on top of it.
@@ -437,7 +437,7 @@ This demo procedurally generates a mini populated scene, spawning in a cabinet a
     * Understanding how to access individual objects once the environment is created
 
 ```{.python .annotate}
-python -m omnigibson.examples.object_states.slicing_demo.py
+python -m omnigibson.examples.object_states.slicing_demo
 ```
 
 This demo spawns an apple on a table with a knife above it, and lets the knife fall to "cut" the apple in half.
@@ -459,7 +459,7 @@ These examples showcase how to interact and leverage robot objects in **`OmniGib
     * Viewing robots' low-level joint motion
 
 ```{.python .annotate}
-python -m omnigibson.examples.robots.all_robots_visualizer.py
+python -m omnigibson.examples.robots.all_robots_visualizer
 ```
 
 This demo iterates over all robots in **`OmniGibson`**, loading each one into an empty scene and randomly moving its joints for a brief amount of time.
@@ -477,7 +477,7 @@ This demo iterates over all robots in **`OmniGibson`**, loading each one into an
     * Understanding how to teleoperate a robot through external commands
 
 ```{.python .annotate}
-python -m omnigibson.examples.robots.robot_control_example.py
+python -m omnigibson.examples.robots.robot_control_example
 ```
 
 This demo lets you choose a robot and the set of controllers to control the robot, and then lets you teleoperate the robot using your keyboard.
@@ -497,7 +497,7 @@ This demo lets you choose a robot and the set of controllers to control the robo
 1. `physical` means natural friction is required to hold objects, `sticky` means that objects are constrained to the robot's gripper once contact is made
 
 ```{.python .annotate}
-python -m omnigibson.examples.robots.grasping_mode_example.py
+python -m omnigibson.examples.robots.grasping_mode_example
 ```
 
 This demo lets you choose a grasping mode and then loads a `Fetch` robot and a cube on a table. You can then teleoperate the robot to grasp the cube, observing the difference is grasping behavior based on the grasping mode chosen.
@@ -533,7 +533,7 @@ These examples showcase useful functionality from **`OmniGibson`**'s monolithic 
     * Understanding how to restore the simulator state from a given file
 
 ```{.python .annotate}
-python -m omnigibson.examples.simulator.sim_save_load_example.py
+python -m omnigibson.examples.simulator.sim_save_load_example
 ```
 
 This demo loads a stripped-down scene with the `Turtlebot` robot, and lets you interact with objects to modify the scene. The state is then saved, written to a `.json` file, and then restored in the simulation.
