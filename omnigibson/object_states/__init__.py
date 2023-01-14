@@ -61,3 +61,4 @@ from omnigibson.object_states.water_source import WaterSource
 from omnigibson.object_states.water_sink import WaterSink
 from omnigibson.object_states.filled import Filled
 from omnigibson.object_states.folded import Folded
+from omnigibson.object_states.unfolded import Unfolded
