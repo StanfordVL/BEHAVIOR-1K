@@ -12,6 +12,25 @@ import carb
 import random
 
 
+def dock_window(space, name, location, ratio=0.5):
+    """
+    Method for docking a specific GUI window in a specified location within the workspace
+
+    Args:
+        space (WindowHandle): Handle to the docking space to dock the window specified by @name
+        name (str): Name of a window to dock
+        location (omni.ui.DockPosition): docking position for placing the window specified by @name
+        ratio (float): Ratio when splitting the docking space between the pre-existing and newly added window
+
+    Returns:
+        WindowHandle: Handle to the docking space that the window specified by @name was placed in
+    """
+    window = omni.ui.Workspace.get_window(name)
+    if window and space:
+        window.dock_in(space, location, ratio=ratio)
+    return window
+
+
 class KeyboardEventHandler:
     """
     Simple singleton class for handing keyboard events
