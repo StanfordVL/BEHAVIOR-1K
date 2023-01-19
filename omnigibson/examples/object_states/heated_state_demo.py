@@ -3,6 +3,7 @@ from collections import OrderedDict
 import omnigibson as og
 from omnigibson import object_states
 from omnigibson.macros import gm
+from omnigibson.utils.constants import LightingMode
 
 # Make sure object states are enabled
 gm.ENABLE_OBJECT_STATES = True
@@ -48,6 +49,9 @@ def main():
         position=np.array([ 0.182103, -2.07295 ,  0.14017 ]),
         orientation=np.array([0.77787037, 0.00267566, 0.00216149, 0.62841535]),
     )
+
+    # Set the simulator to use the stage lights (i.e.: black background) so we can see the steam better
+    og.sim.set_lighting_mode(LightingMode.STAGE)
 
     # Grab reference to objects of relevance
     objs = list(env.scene.object_registry("category", "bowl"))
