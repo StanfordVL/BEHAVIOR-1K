@@ -6,16 +6,18 @@
 # distribution of this software and related documentation without an express
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 #
-from omnigibson.utils.usd_utils import array_to_vtarray
 from pxr import UsdPhysics, Gf
 from pxr.Sdf import ValueTypeNames as VT
 
 from omni.isaac.core.utils.stage import get_current_stage
 from omni.physx.scripts import particleUtils
+from omni.physx import get_physx_scene_query_interface
 
 from omnigibson.macros import create_module_macros
 from omnigibson.prims.geom_prim import GeomPrim
 import omnigibson.utils.transform_utils as T
+from omnigibson.utils.sim_utils import CsRawData
+from omnigibson.utils.usd_utils import array_to_vtarray
 
 import numpy as np
 
@@ -129,6 +131,36 @@ class ClothPrim(GeomPrim):
 
         p_local = (r.T @ (pos - t).T).T / s
         self.set_attribute(attr="points", val=array_to_vtarray(arr=p_local, element_type=Gf.Vec3f))
+
+    def contact_list(self):
+        """
+        Get list of all current contacts with this cloth body
+
+        Returns:
+            list of CsRawData: raw contact info for this cloth body
+        """
+        contacts = []
+
+        # Avoid circular import
+        from omnigibson.systems.system_base import get_system_from_element_name
+        cloth_system = get_system_from_element_name("Cloth")
+
+        def report_hit(hit):
+            contacts.append(CsRawData(
+                time=0.0,  # dummy value
+                dt=0.0,  # dummy value
+                body0=self.prim_path,
+                body1=hit.rigid_body,
+                position=pos,
+                normal=np.zeros(3),  # dummy value
+                impulse=np.zeros(3),  # dummy value
+            ))
+            return True
+
+        for pos in self.particle_positions:
+            get_physx_scene_query_interface().overlap_sphere(cloth_system.particle_contact_offset, pos, report_hit, False)
+
+        return contacts
 
     def update_handles(self):
         # no handles to update

@@ -14,6 +14,7 @@ from omnigibson.object_states.max_temperature import MaxTemperature
 from omnigibson.object_states.next_to import NextTo
 from omnigibson.object_states.on_top import OnTop
 from omnigibson.object_states.open import Open
+from omnigibson.object_states.overlaid import Overlaid
 from omnigibson.object_states.particle_modifier import ParticleRemover, ParticleApplier
 from omnigibson.object_states.pose import Pose
 from omnigibson.object_states.robot_related_states import (
