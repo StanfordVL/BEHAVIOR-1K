@@ -227,23 +227,29 @@ def sample_kinematics(
 m.DEBUG_CLOTH_PROJ_VIS = False
 m.NORMAL_Z_ANGLE_DIFF = np.deg2rad(30.0)
 
-def calculate_projection_area_and_diagonal_unfolded(obj):
+def calculate_projection_area_and_diagonal_maximum(obj):
     """
-    Calculate the maximum projection area and the diagonal length along different axes in the unfolded state.
-    Should be called in the initialize function. Assume the object's default pose is unfolded.
+    Calculate the maximum projection area and the diagonal length along different axes
+
+    Args:
+        obj (DatasetObject): Must be PrimType.CLOTH
+
+    Returns:
+        area_max (float): area of the convex hull of the projected points
+        diagonal_max (float): diagonal of the convex hull of the projected points
     """
     # use the largest projection area as the unfolded area
-    area_unfolded = 0.0
-    diagonal_unfolded = 0.0
+    area_max = 0.0
+    diagonal_max = 0.0
     dims_list = [[0, 1], [0, 2], [1, 2]]  # x-y plane, x-z plane, y-z plane
 
     for dims in dims_list:
         area, diagonal = calculate_projection_area_and_diagonal(obj, dims)
-        if area > area_unfolded:
-            area_unfolded = area
-            diagonal_unfolded = diagonal
+        if area > area_max:
+            area_max = area
+            diagonal_max = diagonal
 
-    return area_unfolded, diagonal_unfolded
+    return area_max, diagonal_max
 
 def calculate_projection_area_and_diagonal(obj, dims):
     """
@@ -251,18 +257,22 @@ def calculate_projection_area_and_diagonal(obj, dims):
     E.g. if dims is [0, 1], the points will be projected onto the x-y plane.
 
     Args:
-        obj (DatasetObject):
+        obj (DatasetObject): Must be PrimType.CLOTH
         dims (2-array): Global axes to project area onto. Options are {0, 1, 2}.
             E.g. if dims is [0, 1], project onto the x-y plane.
 
     Returns:
-        area (float):
+        area (float): area of the convex hull of the projected points
+        diagonal (float): diagonal of the convex hull of the projected points
     """
     cloth = obj.links["base_link"]
     points = cloth.particle_positions[:, dims]
 
     hull = ConvexHull(points)
 
+    # When input points are 2-dimensional, this is the area of the convex hull.
+    # Ref: https://docs.scipy.org/doc/scipy/reference/generated/scipy.spatial.ConvexHull.html
+    area = hull.volume
     diagonal = distance_matrix(points[hull.vertices], points[hull.vertices]).max()
 
     if m.DEBUG_CLOTH_PROJ_VIS:
@@ -277,7 +287,7 @@ def calculate_projection_area_and_diagonal(obj, dims):
         plt.plot(points[hull.vertices[0], dims[0]], points[hull.vertices[0], dims[1]], 'ro')
         plt.show()
 
-    return hull.area, diagonal
+    return area, diagonal
 
 def calculate_smoothness(obj):
     """
