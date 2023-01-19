@@ -20,6 +20,7 @@ from omni.isaac.core.loggers import DataLogger
 
 import omnigibson as og
 from omnigibson.macros import gm, create_module_macros
+from omnigibson.utils.constants import LightingMode
 from omnigibson.utils.config_utils import NumpyEncoder
 from omnigibson.utils.python_utils import clear as clear_pu, create_object_from_init_info, Serializable
 from omnigibson.utils.usd_utils import clear as clear_uu, BoundingBoxAPI
@@ -254,6 +255,15 @@ class Simulator(SimulationContext, Serializable):
             width (int): viewer width, in pixels
         """
         self._viewer_camera.image_width = width
+
+    def set_lighting_mode(self, mode):
+        """
+        Sets the active lighting mode in the current simulator. Valid options are one of LightingMode
+
+        Args:
+            mode (LightingMode): Lighting mode to set
+        """
+        omni.kit.commands.execute("SetLightingMenuModeCommand", lighting_mode=mode)
 
     def enable_viewer_camera_teleoperation(self):
         """
