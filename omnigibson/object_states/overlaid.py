@@ -17,6 +17,9 @@ m = create_module_macros(module_path=__file__)
 # Percentage of xy-plane of the object's base aligned bbox that needs to covered by the cloth
 m.OVERLAP_AREA_PERCENTAGE = 0.5
 
+# Subsample cloth particle points to fit a convex hull for efficiency purpose
+m.N_POINTS_CONVEX_HULL = 1000
+
 class Overlaid(KinematicsMixin, RelativeObjectState, BooleanState):
     @staticmethod
     def get_dependencies():
@@ -33,7 +36,14 @@ class Overlaid(KinematicsMixin, RelativeObjectState, BooleanState):
         if not touching:
             return False
 
-        cloth_hull = ConvexHull(self.obj.root_link.particle_positions[:, :2])
+        points = self.obj.root_link.particle_positions[:, :2]
+        if points.shape[0] > m.N_POINTS_CONVEX_HULL:
+            # If there are too many points, subsample m.N_POINTS_CONVEX_HULL deterministically for efficiency purpose
+            np.random.seed(0)
+            random_idx = np.random.randint(0, points.shape[0], m.N_POINTS_CONVEX_HULL)
+            points = points[random_idx]
+
+        cloth_hull = ConvexHull(points)
 
         bbox_center, bbox_orn, bbox_extent, _ = other.get_base_aligned_bbox(xy_aligned=True)
         vertices_local = np.array(list(itertools.product((1, -1), repeat=3))) * (bbox_extent / 2)
