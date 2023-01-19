@@ -225,7 +225,10 @@ def sample_kinematics(
 
 # Folded / Unfolded related utils
 m.DEBUG_CLOTH_PROJ_VIS = False
+# Angle threshold for checking smoothness of the cloth; surface normals need to be close enough to the z-axis
 m.NORMAL_Z_ANGLE_DIFF = np.deg2rad(30.0)
+# Subsample cloth particle points to fit a convex hull for efficiency purpose
+m.N_POINTS_CONVEX_HULL = 1000
 
 def calculate_projection_area_and_diagonal_maximum(obj):
     """
@@ -267,6 +270,12 @@ def calculate_projection_area_and_diagonal(obj, dims):
     """
     cloth = obj.links["base_link"]
     points = cloth.particle_positions[:, dims]
+
+    if points.shape[0] > m.N_POINTS_CONVEX_HULL:
+        # If there are too many points, subsample m.N_POINTS_CONVEX_HULL deterministically for efficiency purpose
+        np.random.seed(0)
+        random_idx = np.random.randint(0, points.shape[0], m.N_POINTS_CONVEX_HULL)
+        points = points[random_idx]
 
     hull = ConvexHull(points)
 
