@@ -19,6 +19,7 @@ from omnigibson.object_states.factory import (
 )
 from omnigibson.object_states.object_state_base import REGISTERED_OBJECT_STATES
 from omnigibson.object_states.heat_source_or_sink import HeatSourceOrSink
+from omnigibson.object_states.on_fire import OnFire
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.renderer_settings.renderer_settings import RendererSettings
 from omnigibson.systems.micro_particle_system import get_fluid_systems
@@ -44,6 +45,7 @@ m = create_module_macros(module_path=__file__)
 m.STEAM_EMITTER_SIZE_RATIO = [0.8, 0.8, 0.4]    # (x,y,z) scale of generated steam relative to its object, range [0, inf)
 m.STEAM_EMITTER_DENSITY_CELL_RATIO = 0.1        # scale of steam density relative to its object, range [0, inf)
 m.STEAM_EMITTER_HEIGHT_RATIO = 0.6              # z-height of generated steam relative to its object's native height, range [0, inf)
+m.FIRE_EMITTER_HEIGHT_RATIO = 0.4               # z-height of generated fire relative to its object's native height, range [0, inf)
 
 
 class StatefulObject(BaseObject):
@@ -199,7 +201,7 @@ class StatefulObject(BaseObject):
         if len(set(self.states) & set(get_steam_states())) > 0:
             self._create_emitter_apis(EmitterType.STEAM)
 
-        if len(set(self.states) & set(get_fire_states())) > 0 and self.states[HeatSourceOrSink].get_state_link_name() in self._links:
+        if len(set(self.states) & set(get_fire_states())) > 0:
             self._create_emitter_apis(EmitterType.FIRE)
 
     def _create_emitter_apis(self, emitter_type):
@@ -215,12 +217,25 @@ class StatefulObject(BaseObject):
 
         # Specify emitter config.
         emitter_config = {}
-        link_name = self.root_link_name
+        bbox_extent_local = self.native_bbox if hasattr(self, "native_bbox") else self.aabb_extent / self.scale
         if emitter_type == EmitterType.FIRE:
-            link_name = self.states[HeatSourceOrSink].get_state_link_name()
+            if OnFire in self.states:
+                fire_at_metalink = self.states[OnFire].get_state_link_name() in self._links
+                # Use the heat source link if there exists any (e.g. candle wick), or use the root link (e.g. charcoal).
+                link_name = self.states[OnFire].get_state_link_name() if fire_at_metalink else self.root_link_name
+            elif HeatSourceOrSink in self.states:
+                # Missing the heat source link annotation, return.
+                if self.states[HeatSourceOrSink].get_state_link_name() not in self._links:
+                    return
+                fire_at_metalink = True
+                link_name = self.states[HeatSourceOrSink].get_state_link_name()
+            else:
+                raise ValueError("Unknown fire state")
+
             emitter_config["name"] = "flowEmitterSphere"
             emitter_config["type"] = "FlowEmitterSphere"
-            emitter_config["position"] = (0.0, 0.0, 0.0)
+            emitter_config["position"] = (0.0, 0.0, 0.0) if fire_at_metalink \
+                else (0.0, 0.0, bbox_extent_local[2] * m.FIRE_EMITTER_HEIGHT_RATIO)
             emitter_config["fuel"] = 0.6
             emitter_config["coupleRateFuel"] = 1.2
             emitter_config["buoyancyPerTemp"] = 0.04
@@ -229,7 +244,7 @@ class StatefulObject(BaseObject):
             emitter_config["constantMask"] = 5.0
             emitter_config["attenuation"] = 0.5
         elif emitter_type == EmitterType.STEAM:
-            bbox_extent_local = self.native_bbox if hasattr(self, "native_bbox") else self.aabb_extent / self.scale
+            link_name = self.root_link_name
             emitter_config["name"] = "flowEmitterBox"
             emitter_config["type"] = "FlowEmitterBox"
             emitter_config["position"] = (0.0, 0.0, bbox_extent_local[2] * m.STEAM_EMITTER_HEIGHT_RATIO)
@@ -279,8 +294,15 @@ class StatefulObject(BaseObject):
 
         # Update emitter unique settings.
         if emitter_type == EmitterType.FIRE:
-            # TODO: get radius of heat_source_link from metadata.
-            radius = 0.05
+            # Radius is in the absolute world coordinate even though the fire is under the link frame.
+            # In other words, scaling the object doesn't change the fire radius.
+            if fire_at_metalink:
+                # TODO: get radius of heat_source_link from metadata.
+                radius = 0.05
+            else:
+                bbox_extent_world = self.native_bbox * self.scale if hasattr(self, "native_bbox") else self.aabb_extent
+                # Radius is the average x-y half-extent of the object
+                radius = float(np.mean(bbox_extent_world[:2]) / 2.0)
             emitter.CreateAttribute("radius", VT.Float, False).Set(radius)
             simulate.CreateAttribute("densityCellSize", VT.Float, False).Set(radius*0.2)
             smoke.CreateAttribute("fade", Sdf.ValueTypeNames.Float, False).Set(2.0)
@@ -340,9 +362,7 @@ class StatefulObject(BaseObject):
             if state_type in get_steam_states():
                 emitter_enabled[EmitterType.STEAM] |= state.get_value()
             if state_type in get_fire_states():
-                # Currently, the only state that uses fire is HeatSourceOrSink, whose get_value()
-                # returns (heat_source_state, heat_source_position).
-                emitter_enabled[EmitterType.FIRE] |= state.get_value()[0]
+                emitter_enabled[EmitterType.FIRE] |= state.get_value()
 
             for emitter_type in emitter_enabled:
                 self.set_emitter_enabled(emitter_type, emitter_enabled[emitter_type])

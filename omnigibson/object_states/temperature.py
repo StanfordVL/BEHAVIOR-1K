@@ -6,6 +6,7 @@ from omnigibson.object_states.inside import Inside
 from omnigibson.object_states.object_state_base import AbsoluteObjectState
 from omnigibson.object_states.aabb import AABB
 import omnigibson.utils.transform_utils as T
+import omnigibson as og
 
 
 # Create settings for this module
@@ -26,6 +27,8 @@ class Temperature(AbsoluteObjectState):
 
     @staticmethod
     def get_optional_dependencies():
+        # Note that we don't include OnFire as the optional dependency because OnFire also depends on Temperature.
+        # As a result, the temperature effect of objects that are on fire will have one step delay.
         return AbsoluteObjectState.get_optional_dependencies() + [HeatSourceOrSink]
 
     def __init__(self, obj):
@@ -41,17 +44,30 @@ class Temperature(AbsoluteObjectState):
         return True
 
     def _update(self):
+        # Avoid circular import
+        from omnigibson.object_states.on_fire import OnFire
+
         # Start at the current temperature.
         new_temperature = self.value
 
         # Find all heat source objects.
         affected_by_heat_source = False
-        for obj2 in self._simulator.scene.get_objects_with_state(HeatSourceOrSink):
-            # Obtain heat source position.
-            heat_source = obj2.states[HeatSourceOrSink]
-            heat_source_state, heat_source_position = heat_source.get_value()
+        heat_sources = og.sim.scene.get_objects_with_state(HeatSourceOrSink) | \
+                       og.sim.scene.get_objects_with_state(OnFire)
+        for obj2 in heat_sources:
+            # Only external heat sources will affect the temperature.
+            if obj2 == self.obj:
+                continue
+
+            heat_source = obj2.states[OnFire] if OnFire in obj2.states else obj2.states[HeatSourceOrSink]
+            heat_source_state = heat_source.get_value()
             if heat_source_state:
-                # The heat source is toggled on. If it has a position, we check distance.
+                heat_source_position = heat_source.get_link_position()
+                # If the object is on fire and there is no heat source position annotation, we use the AABB center
+                if OnFire in obj2.states and heat_source_position is None:
+                    aabb_lower, aabb_upper = obj2.states[AABB].get_value()
+                    heat_source_position = (aabb_lower + aabb_upper) / 2.0
+                # The heat source is on and there is a heat source position, we check distance.
                 # If not, we check whether we are inside it or not.
                 if heat_source_position is not None:
                     aabb_lower, aabb_upper = self.obj.states[AABB].get_value()
