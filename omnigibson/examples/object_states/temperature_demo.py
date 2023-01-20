@@ -133,7 +133,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     for apple in apples:
         apple.states[object_states.Temperature].set_value(-50)
     apples[0].states[object_states.Inside].set_value(oven, True, use_ray_casting_method=True)
-    apples[1].set_position(stove.links["heat_source_link"].get_position() + np.array([0, 0, 0.1]))
+    apples[1].set_position(stove.links["heatsource_link"].get_position() + np.array([0, 0, 0.1]))
     apples[2].states[object_states.OnTop].set_value(tray, True, use_ray_casting_method=True)
     apples[3].states[object_states.Inside].set_value(fridge, True, use_ray_casting_method=True)
     apples[4].states[object_states.Inside].set_value(microwave, True, use_ray_casting_method=True)
