@@ -367,9 +367,9 @@ class JointPrim(BasePrim):
         self._dc.set_dof_properties(self._dof_handles[0], self._dof_properties[0])
 
     @property
-    def max_force(self):
+    def max_effort(self):
         """
-        Gets this joint's maximum force
+        Gets this joint's maximum effort
 
         Returns:
             float: maximum force for this joint
@@ -380,10 +380,10 @@ class JointPrim(BasePrim):
         raw_force = self._dof_properties[0].max_effort
         return m.DEFAULT_MAX_EFFORT if raw_force is None or np.abs(raw_force) > m.INF_EFFORT_THRESHOLD else raw_force
 
-    @max_force.setter
-    def max_force(self, force):
+    @max_effort.setter
+    def max_effort(self, force):
         """
-        Sets this joint's maximum force
+        Sets this joint's maximum effort
 
         Args:
             force (float): Force to set
@@ -696,7 +696,7 @@ class JointPrim(BasePrim):
         Returns:
             n-array: n-DOF normalized effort in range [-1, 1]
         """
-        return effort / self.max_force
+        return effort / self.max_effort
 
     def _denormalize_effort(self, effort):
         """
@@ -708,7 +708,7 @@ class JointPrim(BasePrim):
         Returns:
             n-array: n-DOF de-normalized effort
         """
-        return effort * self.max_force
+        return effort * self.max_effort
 
     def set_pos(self, pos, normalized=False, target=False):
         """
