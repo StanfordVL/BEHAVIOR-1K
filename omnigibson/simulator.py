@@ -696,11 +696,16 @@ class Simulator(SimulationContext, Serializable):
         # Stop the physics
         self.stop()
 
+        # Clear any pre-existing scene if it exists
+        if self._scene is not None:
+            self.scene.clear()
         self._scene = None
-        self._data_logger = DataLogger()
 
-        # Clear all vision sensors
+        # Clear all vision sensors and remove the viewer camera
         VisionSensor.clear()
+        self._viewer_camera = None
+
+        self._data_logger = DataLogger()
 
         # Load dummy stage, but don't clear sim to prevent circular loops
         self.load_stage(usd_path=f"{og.assets_path}/models/misc/clear_stage.usd")
