@@ -8,8 +8,9 @@ from omnigibson.macros import gm
 from omnigibson.systems import DustSystem, StainSystem, WaterSystem
 from omnigibson.utils.constants import ParticleModifyMethod
 
-# Make sure object states are enabled
+# Make sure object states are enabled and GPU dynamics are used
 gm.ENABLE_OBJECT_STATES = True
+gm.USE_GPU_DYNAMICS = True
 
 
 def main(random_selection=False, headless=False, short_exec=False):
