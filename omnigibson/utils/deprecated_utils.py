@@ -51,8 +51,7 @@ class Core(OmniCore):
     """
     def __init__(self, popup_callback: Callable[[str], None], particle_system_name: str):
         self._popup_callback = popup_callback
-        # TODO: THIS IS THE ONLY LINE THAT WE CHANGE! ONCE FIXED, REMOVE THIS
-        self.utils = Utils()
+        self.utils = Utils()    # TODO: THIS IS THE ONLY LINE THAT WE CHANGE! ONCE FIXED, REMOVE THIS
         self.context = ou.get_context()
         self.stage = self.context.get_stage()
         self.selection = self.context.get_selection()
