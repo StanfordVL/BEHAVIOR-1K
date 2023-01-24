@@ -261,13 +261,8 @@ class SlicingRule(BaseTransitionRule):
             return False
 
         contact_list = slicer_obj.states[ContactBodies].get_value()
-        sliced_link_paths = {link.prim_path for link in sliced_obj.links.values()}
-        hit_obj = False
-        for c in contact_list:
-            if not set(c).isdisjoint(sliced_link_paths):
-                hit_obj = True
-                break
-        if not hit_obj:
+        sliced_links = set(sliced_obj.links.values())
+        if contact_list.isdisjoint(sliced_links):
             return False
 
         # Slicer may contact the same body in multiple points, so cut once since removing the object from the simulator
