@@ -451,11 +451,12 @@ def create_primitive_mesh(prim_path, primitive_type, extents=1.0, u_patches=None
     mesh = UsdGeom.Mesh.Define(og.sim.stage, prim_path)
 
     # Modify the points and normals attributes so that total extents is the desired
-    # This means multiplying omni's default by extents / 2.0
+    # This means multiplying omni's default by extents * 50.0
     extents = np.ones(3) * extents if isinstance(extents, float) else np.array(extents)
     for attr in (mesh.GetPointsAttr(), mesh.GetNormalsAttr()):
         vals = np.array(attr.Get()).astype(np.float64)
-        attr.Set(Vt.Vec3fArray([Gf.Vec3f(*(val * extents / 2.0)) for val in vals]))
+        attr.Set(Vt.Vec3fArray([Gf.Vec3f(*(val * extents * 50.0)) for val in vals]))
+    mesh.GetExtentAttr().Set(Vt.Vec3fArray([Gf.Vec3f(*(-extents / 2.0)), Gf.Vec3f(*(extents / 2.0))]))
 
     return mesh
 
