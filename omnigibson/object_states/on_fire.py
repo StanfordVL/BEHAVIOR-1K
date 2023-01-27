@@ -45,7 +45,7 @@ class OnFire(HeatSourceOrSink):
         """
         assert fire_temperature > ignition_temperature, "fire temperature should be higher than ignition temperature."
 
-        super(OnFire, self).__init__(
+        super().__init__(
             obj,
             temperature=fire_temperature,
             heating_rate=heating_rate,

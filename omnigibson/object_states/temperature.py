@@ -52,14 +52,14 @@ class Temperature(AbsoluteObjectState):
 
         # Find all heat source objects.
         affected_by_heat_source = False
-        heat_sources = og.sim.scene.get_objects_with_state(HeatSourceOrSink) | \
-                       og.sim.scene.get_objects_with_state(OnFire)
-        for obj2 in heat_sources:
+        heat_source_objs = og.sim.scene.get_objects_with_state_recursive(HeatSourceOrSink)
+        for obj2 in heat_source_objs:
             # Only external heat sources will affect the temperature.
             if obj2 == self.obj:
                 continue
 
-            heat_source = obj2.states[OnFire] if OnFire in obj2.states else obj2.states[HeatSourceOrSink]
+            heat_source = obj2.states.get(OnFire, obj2.states.get(HeatSourceOrSink, None))
+            assert heat_source is not None, "Unknown HeatSourceOrSink subclass"
             heat_source_state = heat_source.get_value()
             if heat_source_state:
                 heat_source_position = heat_source.get_link_position()
