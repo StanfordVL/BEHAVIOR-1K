@@ -58,6 +58,7 @@ m.PROJECTION_VISUALIZATION_CONE_TIP_RADIUS = 0.001
 m.PROJECTION_VISUALIZATION_RATE = 200
 m.PROJECTION_VISUALIZATION_SPEED = 3.0
 m.PROJECTION_VISUALIZATION_ORIENTATION_BIAS = 1e6
+m.PROJECTION_VISUALIZATION_SPREAD_FACTOR = 0.8
 
 
 def create_projection_visualization(
@@ -102,7 +103,7 @@ def create_projection_visualization(
         # Default to close to singular point otherwise
         source_radius = m.PROJECTION_VISUALIZATION_CONE_TIP_RADIUS
         spread_ratio = projection_radius * 2.0 / projection_height
-        spread = np.ones(3) * spread_ratio * 0.8
+        spread = np.ones(3) * spread_ratio * m.PROJECTION_VISUALIZATION_SPREAD_FACTOR
     else:
         raise ValueError(f"Invalid shape specified for projection visualization! Valid options are: [Sphere, Cylinder], got: {shape}")
     # Set the radius
