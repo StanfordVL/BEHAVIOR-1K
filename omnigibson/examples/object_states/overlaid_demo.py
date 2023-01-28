@@ -12,7 +12,10 @@ gm.USE_GPU_DYNAMICS = True
 
 def main(random_selection=False, headless=False, short_exec=False):
     """
-    Demo of cloth objects that can be overlaid on rigid objects
+    Demo of cloth objects that can be overlaid on rigid objects.
+
+    Loads a carpet on top of a table. Initially Overlaid will be True because the carpet largely covers the table.
+    If you drag the carpet off the table or even just fold it into half, Overlaid will become False.
     """
     logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
 
