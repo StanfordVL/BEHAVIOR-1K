@@ -451,7 +451,8 @@ def create_primitive_mesh(prim_path, primitive_type, extents=1.0, u_patches=None
     mesh = UsdGeom.Mesh.Define(og.sim.stage, prim_path)
 
     # Modify the points and normals attributes so that total extents is the desired
-    # This means multiplying omni's default by extents * 50.0
+    # This means multiplying omni's default by extents * 50.0, as the native mesh generated has extents [-0.01, 0.01]
+    # -- i.e.: 2cm-wide mesh
     extents = np.ones(3) * extents if isinstance(extents, float) else np.array(extents)
     for attr in (mesh.GetPointsAttr(), mesh.GetNormalsAttr()):
         vals = np.array(attr.Get()).astype(np.float64)
