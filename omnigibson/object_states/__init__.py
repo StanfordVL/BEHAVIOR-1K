@@ -12,6 +12,7 @@ from omnigibson.object_states.heated import Heated
 from omnigibson.object_states.inside import Inside
 from omnigibson.object_states.max_temperature import MaxTemperature
 from omnigibson.object_states.next_to import NextTo
+from omnigibson.object_states.on_fire import OnFire
 from omnigibson.object_states.on_top import OnTop
 from omnigibson.object_states.open import Open
 from omnigibson.object_states.overlaid import Overlaid

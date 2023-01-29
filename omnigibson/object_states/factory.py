@@ -25,6 +25,7 @@ _ALL_STATES = frozenset(
         MaxTemperature,
         NextTo,
         ObjectsInFOVOfRobot,
+        OnFire,
         OnTop,
         Open,
         Overlaid,
@@ -60,6 +61,7 @@ _ABILITY_TO_STATE_MAPPING = {
     "heatable": [Heated],
     "heatSource": [HeatSourceOrSink],
     "openable": [Open],
+    "flammable": [OnFire],
     "robot": ROOM_STATES + [ObjectsInFOVOfRobot],
     "saturable": [Saturated],
     "sliceable": [Sliced],
@@ -91,6 +93,7 @@ _DEFAULT_STATE_SET = frozenset(
 _FIRE_STATE_SET = frozenset(
     [
         HeatSourceOrSink,
+        OnFire,
     ]
 )
 
