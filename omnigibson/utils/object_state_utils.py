@@ -8,6 +8,7 @@ from scipy.spatial import ConvexHull, distance_matrix
 import omnigibson as og
 from omnigibson.macros import create_module_macros, Dict
 from omnigibson.object_states.aabb import AABB
+from omnigibson.object_states.contact_bodies import ContactBodies
 from omnigibson.utils import sampling_utils
 import omnigibson.utils.transform_utils as T
 
@@ -196,7 +197,7 @@ def sample_kinematics(
             objA.keep_still()
 
             og.sim.step_physics()
-            success = not objA.in_contact()
+            success = len(objA.states[ContactBodies].get_value()) == 0
 
         if og.debug_sampling:
             print("sample_kinematics", success)
@@ -214,7 +215,7 @@ def sample_kinematics(
         # Let it fall for 0.2 second
         for _ in range(int(0.2 / og.sim.get_physics_dt())):
             og.sim.step_physics()
-            if objA.in_contact():
+            if len(objA.states[ContactBodies].get_value()) > 0:
                 break
 
         # Render at the end

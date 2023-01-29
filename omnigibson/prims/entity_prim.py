@@ -403,35 +403,6 @@ class EntityPrim(XFormPrim):
             contacts += link.contact_list()
         return contacts
 
-    def in_contact_links(self):
-        """
-        Get set of unique rigid body prim paths that this object prim is in contact with
-
-        Returns:
-            set: Unique rigid body prim paths that this body is in contact with
-        """
-        contact_list = self.contact_list()
-        link_paths = {link.prim_path for link in self._links.values()}
-        body0_contacts = {c.body0 for c in contact_list if c.body0 not in link_paths}
-        body1_contacts = {c.body1 for c in contact_list if c.body1 not in link_paths}
-        return body0_contacts.union(body1_contacts)
-
-    def in_contact(self, prims=None):
-        """
-        Returns whether this entity is in contact with any prim(s) @prims. If no @prims is specified,
-        then this will check for any contact.
-
-        NOTE: If checking for self-collisions, set prims=self
-
-        Args:
-            prims (None or EntityPrim or RigidPrim or tuple of EntityPrim or RigidPrim): Prim(s) to check for collision.
-            If None, will check against all objects currently in the scene.
-
-        Returns:
-            bool: Whether this object is in contact with the specified prim(s)
-        """
-        return check_collision(prims=self, prims_check=prims, step_physics=False)
-
     def enable_gravity(self) -> None:
         """
         Enables gravity for this entity
