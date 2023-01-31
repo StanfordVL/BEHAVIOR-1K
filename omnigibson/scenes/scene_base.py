@@ -215,18 +215,14 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # Create the registry for tracking all objects in the scene
         self._registry = self._create_registry()
 
-        # Store world prim
+        # Store world prim and load the scene into the simulator
         self._world_prim = simulator.world_prim
-
-        # Clear the systems
-        self.clear_systems()
-
         self._load(simulator)
 
         # Initialize systems
         self.initialize_systems(simulator)
 
-        # If we have any scene file specified, use it to load the objects within it
+        # If we have any scene file specified, use it to load the objects within it and also update the initial state
         if self.scene_file is not None:
             self._load_objects_from_scene_file(simulator)
 
@@ -248,6 +244,13 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         for system in self.systems:
             print(f"Clearing system: {system.name}")
             system.clear()
+
+    def clear(self):
+        """
+        Clears any internal state before the scene is destroyed
+        """
+        # Must clear all systems
+        self.clear_systems()
 
     def _initialize(self):
         """

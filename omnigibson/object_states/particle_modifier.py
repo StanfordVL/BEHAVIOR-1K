@@ -57,7 +57,8 @@ m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN = 0.05
 m.PROJECTION_VISUALIZATION_CONE_TIP_RADIUS = 0.001
 m.PROJECTION_VISUALIZATION_RATE = 200
 m.PROJECTION_VISUALIZATION_SPEED = 3.0
-m.PROJECTION_VISUALIZATION_ORIENTATION_BIAS = 100.0
+m.PROJECTION_VISUALIZATION_ORIENTATION_BIAS = 1e6
+m.PROJECTION_VISUALIZATION_SPREAD_FACTOR = 0.8
 
 
 def create_projection_visualization(
@@ -102,7 +103,7 @@ def create_projection_visualization(
         # Default to close to singular point otherwise
         source_radius = m.PROJECTION_VISUALIZATION_CONE_TIP_RADIUS
         spread_ratio = projection_radius * 2.0 / projection_height
-        spread = np.ones(3) * spread_ratio * m.PROJECTION_VISUALIZATION_ORIENTATION_BIAS
+        spread = np.ones(3) * spread_ratio * m.PROJECTION_VISUALIZATION_SPREAD_FACTOR
     else:
         raise ValueError(f"Invalid shape specified for projection visualization! Valid options are: [Sphere, Cylinder], got: {shape}")
     # Set the radius
@@ -112,7 +113,7 @@ def create_projection_visualization(
     UsdGeom.Imageable(source.GetPrim()).MakeInvisible()
     # Generate the ComputeGraph nodes to render the projection
     core = Core(lambda val: None, particle_system_name=projection_name)
-    system_path, _, emitter_path, instancer_path, sprite_path, mat_path, output_path = core.create_particle_system(display="point_instancer", paths=[prim_path])
+    system_path, _, emitter_path, vis_path, instancer_path, sprite_path, mat_path, output_path = core.create_particle_system(display="point_instancer", paths=[prim_path])
     # Override the prototype with our own sphere with optional material
     prototype_path = "/".join(sprite_path.split("/")[:-1]) + "/prototype"
     create_primitive_mesh(prototype_path, primitive_type="Sphere")
@@ -137,6 +138,7 @@ def create_projection_visualization(
     emitter_prim.GetProperty("inputs:alongAxis").Set(m.PROJECTION_VISUALIZATION_ORIENTATION_BIAS)
     emitter_prim.GetProperty("inputs:scale").Set(Gf.Vec3f(1.0, 1.0, 1.0))
     emitter_prim.GetProperty("inputs:directionRandom").Set(Gf.Vec3f(*spread))
+    emitter_prim.GetProperty("inputs:addSourceVelocity").Set(1.0)
 
     # Move the output path so it moves with the particle system prim
     og.sim.render()
@@ -674,8 +676,6 @@ class ParticleApplier(ParticleModifier):
             system (ParticleSystem): System to apply particles from
             hits (list of dict): Valid hit results from a batched raycast representing locations for sampling particles
         """
-        # Check how many particles we can sample
-        print(f"n hits: {len(hits)}")
         # Check the system
         if issubclass(system, VisualParticleSystem):
             # Sample potential application points

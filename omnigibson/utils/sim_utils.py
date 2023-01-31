@@ -6,6 +6,7 @@ import omnigibson as og
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.usd_utils import BoundingBoxAPI
 from omni.physx import get_physx_simulation_interface
+from omni.isaac.core.utils.prims import is_prim_ancestral, get_prim_type_name, is_prim_no_delete
 
 # Raw Body Contact Information
 # See https://docs.omniverse.nvidia.com/py/isaacsim/source/extensions/omni.isaac.contact_sensor/docs/index.html?highlight=contact%20sensor#omni.isaac.contact_sensor._contact_sensor.CsRawData for more info.
@@ -46,6 +47,32 @@ def set_carb_setting(carb_settings, setting, value):
             raise TypeError(f"Value of type {type(value)} is not supported.")
     else:
         raise TypeError(f"Value of type {type(value)} is not supported.")
+
+
+def check_deletable_prim(prim_path):
+    """
+    Checks whether the prim defined at @prim_path can be deleted.
+
+    Args:
+        prim_path (str): Path defining which prim should be checked for deletion
+
+    Returns:
+        bool: Whether the prim can be deleted or not
+    """
+    if is_prim_no_delete(prim_path):
+        return False
+    if is_prim_ancestral(prim_path):
+        return False
+    if get_prim_type_name(prim_path=prim_path) == "PhysicsScene":
+        return False
+    if prim_path == "/World":
+        return False
+    if prim_path == "/":
+        return False
+    # Don't remove any /Render prims as that can cause crashes
+    if prim_path.startswith("/Render"):
+        return False
+    return True
 
 
 def prims_to_rigid_prim_set(inp_prims):

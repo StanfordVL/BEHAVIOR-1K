@@ -430,6 +430,11 @@ class VisualParticleSystem(MacroParticleSystem):
         # Run super method first
         super().remove_all_particles()
 
+    @classmethod
+    def clear(cls):
+        # Run super method first
+        super().clear()
+
         # Clear all groups as well
         cls._group_particles = OrderedDict()
         cls._group_objects = OrderedDict()
@@ -737,7 +742,7 @@ class VisualParticleSystem(MacroParticleSystem):
         This will raise a ValueError if it doesn't exist.
 
         Args:
-            group: Name of the group to check for
+            group (str): Name of the group to check for
         """
         if group not in cls.groups:
             raise ValueError(f"Particle attachment group {group} does not exist!")

@@ -917,7 +917,7 @@ class EntityPrim(XFormPrim):
         Returns:
             n-array: maximum efforts for this robot's joints
         """
-        return np.array([joint.max_force for joint in self._joints.values()])
+        return np.array([joint.max_effort for joint in self._joints.values()])
 
     @property
     def joint_position_limits(self):

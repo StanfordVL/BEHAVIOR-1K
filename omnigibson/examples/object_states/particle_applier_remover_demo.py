@@ -126,8 +126,9 @@ def main(random_selection=False, headless=False, short_exec=False):
     # Sanity check inputs: Remover + Adjacency + Fluid will not work because we are using a visual_only
     # object, so contacts will not be triggered with this object
 
-    # Load the environment
+    # Load the environment, then immediately stop the simulator since we need to add in the modifier object
     env = og.Environment(configs=cfg, action_timestep=1/60., physics_timestep=1/60.)
+    og.sim.stop()
 
     # Grab references to table
     table = env.scene.object_registry("name", "table")
@@ -137,10 +138,6 @@ def main(random_selection=False, headless=False, short_exec=False):
         position=np.array([-1.11136405, -1.12709412,  1.99587299]),
         orientation=np.array([ 0.44662832, -0.17829795, -0.32506992,  0.81428652]),
     )
-
-    # Let objects settle first
-    for _ in range(10):
-        env.step(np.array([]))
 
     # If we're using a projection volume, we manually add in the required metalink required in order to use the volume
     modifier = DatasetObject(
@@ -171,7 +168,8 @@ def main(random_selection=False, headless=False, short_exec=False):
     og.sim.import_object(modifier)
     modifier.set_position(np.array([0, 0, 5.0]))
 
-    # Take a step to make sure all objects are properly initialized
+    # Play the simulator and take some environment steps to let the objects settle
+    og.sim.play()
     for _ in range(25):
         env.step(np.array([]))
 

@@ -4,7 +4,6 @@ import numpy as np
 
 import omnigibson as og
 from omnigibson.robots import REGISTERED_ROBOTS
-from omnigibson.scenes import Scene
 
 
 def main(random_selection=False, headless=False, short_exec=False):
@@ -63,9 +62,9 @@ def main(random_selection=False, headless=False, short_exec=False):
             for _ in range(10):
                 env.step(action)
 
-        # Re-import the scene
+        # Stop the simulator and remove the robot
         og.sim.stop()
-        og.sim.import_scene(Scene())
+        og.sim.remove_object(obj=robot)
 
     # Always shut down the environment cleanly at the end
     env.close()

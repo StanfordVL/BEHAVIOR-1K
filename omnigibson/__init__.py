@@ -92,14 +92,8 @@ def print_save_usd_warning(_):
 
 def create_app():
     global app
-    from omni.isaac.kit import SimulationApp as OmniApp
-    app = OmniApp(
-        {
-            "headless": gm.HEADLESS,
-        },
-        # experience=os.path.join(os.path.dirname(os.path.realpath(__file__)), "configs", "apps", "omni.isaac.sim.python.kit"),
-        # debug=gm.DEBUG,
-    )
+    from omni.isaac.kit import SimulationApp
+    app = SimulationApp({"headless": gm.HEADLESS})
     import omni
 
     # Possibly hide windows if in debug mode
