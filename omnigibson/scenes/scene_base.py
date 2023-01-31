@@ -332,6 +332,26 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         """
         return self.object_registry("states", state, set())
 
+    def get_objects_with_state_recursive(self, state):
+        """
+        Get the objects with a given state and its subclasses in the scene.
+
+        Args:
+            state (BaseObjectState): state of the objects to get
+
+        Returns:
+            set: all objects with the given state and its subclasses
+        """
+        objs = set()
+        states = {state}
+        while states:
+            next_states = set()
+            for state in states:
+                objs |= self.object_registry("states", state, set())
+                next_states |= set(state.__subclasses__())
+            states = next_states
+        return objs
+
     def _add_object(self, obj):
         """
         Add an object to the scene's internal object tracking mechanisms.

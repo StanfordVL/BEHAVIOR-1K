@@ -81,10 +81,6 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin):
         # we record that for use in the heat transfer process.
         self.requires_inside = requires_inside
 
-        self.marker = None
-        self.status = None
-        self.position = None
-
     @staticmethod
     def get_dependencies():
         return AbsoluteObjectState.get_dependencies() + [AABB, Inside]
@@ -97,37 +93,27 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin):
     def get_state_link_name():
         return m.HEATING_ELEMENT_LINK_NAME
 
-    def _compute_state_and_position(self):
-        # Find the link first. Note that the link is only required
-        # if the object is not in self.requires_inside mode.
-        heating_element_position = self.get_link_position()
-        if not self.requires_inside and heating_element_position is None:
-            return False, None
-
-        # Check the toggle state.
-        if self.requires_toggled_on and not self.obj.states[ToggledOn].get_value():
-            return False, None
-
-        # Check the open state.
-        if self.requires_closed and self.obj.states[Open].get_value():
-            return False, None
-
-        # Return True and the heating element position (or None if not required).
-        return True, (heating_element_position if not self.requires_inside else None)
-
     def _initialize(self):
         # Run super first
         super()._initialize()
         self.initialize_link_mixin()
 
-    def _update(self):
-        self.status, self.position = self._compute_state_and_position()
-
     def _get_value(self):
-        return self.status, self.position
+        # if the object is not in self.requires_inside mode, the link position is required.
+        if not self.requires_inside and self.get_link_position() is None:
+            return False
+
+        # Check the toggle state.
+        if self.requires_toggled_on and not self.obj.states[ToggledOn].get_value():
+            return False
+
+        # Check the open state.
+        if self.requires_closed and self.obj.states[Open].get_value():
+            return False
+
+        return True
 
     def _set_value(self, new_value):
         raise NotImplementedError("Setting heat source capability is not supported.")
 
-    # Nothing needs to be done to save/load HeatSource since it's stateless except for
-    # the marker.
+    # Nothing needs to be done to save/load HeatSource

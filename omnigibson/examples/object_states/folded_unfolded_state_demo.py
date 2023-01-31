@@ -1,5 +1,5 @@
 from omnigibson.utils.constants import PrimType
-from omnigibson.object_states import Folded
+from omnigibson.object_states import Folded, Unfolded
 from omnigibson.macros import gm
 import logging
 
@@ -28,7 +28,7 @@ def main(random_selection=False, headless=False, short_exec=False):
                 "category": "carpet",
                 "model": "carpet_0",
                 "prim_type": PrimType.CLOTH,
-                "abilities": {"foldable": {}},
+                "abilities": {"foldable": {}, "unfoldable": {}},
                 "position": [0, 0, 0.5],
             },
             {
@@ -38,7 +38,7 @@ def main(random_selection=False, headless=False, short_exec=False):
                 "model": "Tag_Dishtowel_Basket_Weave_Red",
                 "prim_type": PrimType.CLOTH,
                 "scale": 5.0,
-                "abilities": {"foldable": {}},
+                "abilities": {"foldable": {}, "unfoldable": {}},
                 "position": [1, 1, 0.5],
             },
             {
@@ -48,7 +48,7 @@ def main(random_selection=False, headless=False, short_exec=False):
                 "model": "t-shirt_000",
                 "prim_type": PrimType.CLOTH,
                 "scale": 0.05,
-                "abilities": {"foldable": {}},
+                "abilities": {"foldable": {}, "unfoldable": {}},
                 "position": [-1, 1, 0.5],
                 "orientation": [0.7071, 0., 0.7071, 0.],
             },
@@ -66,26 +66,20 @@ def main(random_selection=False, headless=False, short_exec=False):
     max_steps = 100 if short_exec else -1
     steps = 0
 
-    # Criterion #1: the area of the convex hull of the projection of points onto the x-y plane should be reduced
-    # Criterion #2: the diagonal of the convex hull of the projection of points onto the x-y plane should be reduced
-    # Criterion #3: the face normals of the cloth should mostly point along the z-axis
     while steps != max_steps:
         og.sim.step()
 
-        flag_area_reduction, flag_diagonal_reduction = carpet.states[Folded].check_projection_area_and_diagonal()
-        flag_smoothness = carpet.states[Folded].check_smoothness()
-        folded = flag_area_reduction and flag_diagonal_reduction and flag_smoothness
-        info = 'carpet: [folded] %d [A] %d [D] %d [S] %d' % (folded, flag_area_reduction, flag_diagonal_reduction, flag_smoothness)
+        folded = carpet.states[Folded].get_value()
+        unfolded = carpet.states[Unfolded].get_value()
+        info = "carpet: [folded] %d [unfolded] %d" % (folded, unfolded)
 
-        flag_area_reduction, flag_diagonal_reduction = dishtowel.states[Folded].check_projection_area_and_diagonal()
-        flag_smoothness = dishtowel.states[Folded].check_smoothness()
-        folded = flag_area_reduction and flag_diagonal_reduction and flag_smoothness
-        info += " || dishtowel: [folded] %d [A] %d [D] %d [S] %d" % (folded, flag_area_reduction, flag_diagonal_reduction, flag_smoothness)
+        folded = dishtowel.states[Folded].get_value()
+        unfolded = dishtowel.states[Unfolded].get_value()
+        info += " || dishtowel: [folded] %d [unfolded] %d" % (folded, unfolded)
 
-        flag_area_reduction, flag_diagonal_reduction = shirt.states[Folded].check_projection_area_and_diagonal()
-        flag_smoothness = shirt.states[Folded].check_smoothness()
-        folded = flag_area_reduction and flag_diagonal_reduction and flag_smoothness
-        info += " || tshirt: [folded] %d [A] %d [D] %d [S] %d" % (folded, flag_area_reduction, flag_diagonal_reduction, flag_smoothness)
+        folded = shirt.states[Folded].get_value()
+        unfolded = shirt.states[Unfolded].get_value()
+        info += " || tshirt: [folded] %d [unfolded] %d" % (folded, unfolded)
 
         print(info)
         steps += 1
