@@ -9,9 +9,7 @@ class Touching(KinematicsMixin, RelativeObjectState, BooleanState):
 
     @staticmethod
     def _check_contact(obj_a, obj_b):
-        link_prim_paths = {link.prim_path for link in obj_a.links.values()}
-        contact_bodies_b = {c[1] for c in obj_b.states[ContactBodies].get_value()}
-        return len(link_prim_paths & contact_bodies_b) > 0
+        return len(set(obj_a.links.values()) & obj_b.states[ContactBodies].get_value()) > 0
 
     def _get_value(self, other):
         if self.obj.prim_type == PrimType.CLOTH and other.prim_type == PrimType.CLOTH:

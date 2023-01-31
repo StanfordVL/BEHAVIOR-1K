@@ -11,11 +11,18 @@ class ContactBodies(AbsoluteObjectState):
         for contact in self.obj.contact_list():
             bodies.update({contact.body0, contact.body1})
         bodies -= set(self.obj.link_prim_paths)
-        bodies = {og.sim.scene.object_registry("prim_path", "/".join(body.split("/")[:-1])).links[body.split("/")[-1]] for body in bodies}
+        rigid_prims = set()
+        for body in bodies:
+            tokens = body.split("/")
+            obj_prim_path = "/".join(tokens[:-1])
+            link_name = tokens[-1]
+            obj = og.sim.scene.object_registry("prim_path", obj_prim_path)
+            if obj is not None:
+                rigid_prims.add(obj.links[link_name])
         # Ignore_objs should either be None or tuple (CANNOT be list because we need to hash these inputs)
         assert ignore_objs is None or isinstance(ignore_objs, tuple), \
             "ignore_objs must either be None or a tuple of objects to ignore!"
-        return bodies if ignore_objs is None else bodies - prims_to_rigid_prim_set(ignore_objs)
+        return rigid_prims if ignore_objs is None else rigid_prims - prims_to_rigid_prim_set(ignore_objs)
 
     def _set_value(self, new_value):
         raise NotImplementedError("ContactBodies state currently does not support setting.")
