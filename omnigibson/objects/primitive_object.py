@@ -165,8 +165,9 @@ class PrimitiveObject(StatefulObject):
         visual_geom_prim.color = self._load_config["color"]
         visual_geom_prim.opacity = self._load_config["opacity"]
 
-        # Update collision approximation
-        self.root_link.collision_meshes["collision"].set_collision_approximation("convexHull")
+        # Set the collision approximation appropriately
+        col_approximation = "boundingSphere" if self._primitive_type == "Sphere" else "convexHull"
+        self.root_link.collision_meshes["collision"].set_collision_approximation(col_approximation)
 
         # Possibly set scalings (only if the scale value is not set)
         if self._load_config["scale"] is not None:
