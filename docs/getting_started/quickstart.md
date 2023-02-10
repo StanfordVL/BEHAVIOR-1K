@@ -192,9 +192,10 @@ obs, rew, done, info = env.step(env.action_space.sample())
             "name": "brilliant_light",
             "light_type": "Sphere",
             "intensity": 50000,
-            "radius": 0.1
+            "radius": 0.1,
             "position": [3.0, 3.0, 4.0],
         },
+    ]
     
     # Define robots
     cfg["robots"] = [

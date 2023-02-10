@@ -138,16 +138,21 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
 
         # Add fixed joint if we're fixing the base
         if self.fixed_base:
-            # Create fixed joint, and set Body0 to be this object's root prim
-            create_joint(
-                prim_path=f"{self._prim_path}/rootJoint",
-                joint_type="FixedJoint",
-                body1=f"{self._prim_path}/{self._root_link_name}",
-            )
-            # Also set the articulation root to be the object head if it doesn't already exist
-            if not self._prim.HasAPI(UsdPhysics.ArticulationRootAPI):
-                UsdPhysics.ArticulationRootAPI.Apply(self.prim)
-                PhysxSchema.PhysxArticulationAPI.Apply(self.prim)
+            # For optimization purposes, if we only have a single rigid body, we assume this
+            # is not an articulated object so we merely set this to be a static collider, i.e.: kinematic-only
+            if self.n_joints == 0:
+                self.kinematic_only = True
+            else:
+                # Create fixed joint, and set Body0 to be this object's root prim
+                create_joint(
+                    prim_path=f"{self._prim_path}/rootJoint",
+                    joint_type="FixedJoint",
+                    body1=f"{self._prim_path}/{self._root_link_name}",
+                )
+                # Also set the articulation root to be the object head if it doesn't already exist
+                if not self._prim.HasAPI(UsdPhysics.ArticulationRootAPI):
+                    UsdPhysics.ArticulationRootAPI.Apply(self.prim)
+                    PhysxSchema.PhysxArticulationAPI.Apply(self.prim)
         else:
             if self._prim.HasAPI(UsdPhysics.ArticulationRootAPI):
                 # If we only have a link, remove the articulation root API
