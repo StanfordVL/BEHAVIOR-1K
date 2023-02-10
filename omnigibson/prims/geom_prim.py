@@ -172,6 +172,8 @@ class CollisionGeomPrim(GeomPrim):
         if self._prim.GetPrimTypeInfo().GetTypeName() == "Mesh":
             self._mesh_collision_api = UsdPhysics.MeshCollisionAPI(self._prim) if \
                 self._prim.HasAPI(UsdPhysics.MeshCollisionAPI) else UsdPhysics.MeshCollisionAPI.Apply(self._prim)
+            # Set the approximation to be convex hull by default
+            self.set_collision_approximation(approximation_type="convexHull")
 
     @property
     def collision_enabled(self):
@@ -276,8 +278,12 @@ class CollisionGeomPrim(GeomPrim):
             PhysxSchema.PhysxTriangleMeshSimplificationCollisionAPI.Apply(self._prim)
         elif approximation_type == "sdf" and not self._prim.HasAPI(PhysxSchema.PhysxSDFMeshCollisionAPI):
             PhysxSchema.PhysxSDFMeshCollisionAPI.Apply(self._prim)
-        elif approximation_type == "none" and not self._prim.HasAPI(PhysxSchema.PhysxTriangleMeshCollisionAPI):
+        elif approximation_type in {"none", None} and not self._prim.HasAPI(PhysxSchema.PhysxTriangleMeshCollisionAPI):
             PhysxSchema.PhysxTriangleMeshCollisionAPI.Apply(self._prim)
+        else:
+            raise ValueError(f"Got invalid collision approximation type: {approximation_type}. "
+                             f"Valid types are: 'convexHull', 'convexDecomposition', 'meshSimplification', 'sdf', "
+                             f"'none', or None")
         self._mesh_collision_api.GetApproximationAttr().Set(approximation_type)
 
     def get_collision_approximation(self):
