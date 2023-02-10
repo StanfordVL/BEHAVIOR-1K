@@ -208,7 +208,7 @@ class RigidPrim(XFormPrim):
         """
         Updates all internal handles for this prim, in case they change since initialization
         """
-        self._handle = self._dc.get_rigid_body(self._prim_path)
+        self._handle = None if self.kinematic_only else self._dc.get_rigid_body(self._prim_path)
 
     def contact_list(self):
         """
@@ -501,6 +501,65 @@ class RigidPrim(XFormPrim):
         self._mass_api.GetDensityAttr().Set(density)
 
     @property
+    def kinematic_only(self):
+        """
+        Returns:
+            bool: Whether this object is a kinematic-only object (otherwise, it is a rigid body). A kinematic-only
+                object is not subject to simulator dynamics, and remains fixed unless the user explicitly sets the
+                body's pose / velocities. See https://docs.omniverse.nvidia.com/app_create/prod_extensions/ext_physics/rigid-bodies.html?highlight=rigid%20body%20enabled#kinematic-rigid-bodies
+                for more information
+        """
+        return self.get_attribute("physics:kinematicEnabled")
+
+    @kinematic_only.setter
+    def kinematic_only(self, val):
+        """
+        Args:
+            val (bool): Whether this object is a kinematic-only object (otherwise, it is a rigid body). A kinematic-only
+                object is not subject to simulator dynamics, and remains fixed unless the user explicitly sets the
+                body's pose / velocities. See https://docs.omniverse.nvidia.com/app_create/prod_extensions/ext_physics/rigid-bodies.html?highlight=rigid%20body%20enabled#kinematic-rigid-bodies
+                for more information
+        """
+        self.set_attribute("physics:kinematicEnabled", val)
+        self.set_attribute("physics:rigidBodyEnabled", not val)
+
+    @property
+    def sleep_threshold(self):
+        """
+        Returns:
+            float: threshold for sleeping this rigid body
+        """
+        return self.get_attribute("physxRigidBody:sleepThreshold")
+
+    @sleep_threshold.setter
+    def sleep_threshold(self, threshold):
+        """
+        Sets threshold for sleeping this rigid body
+
+        Args:
+            threshold (float): Sleeping threshold
+        """
+        self.set_attribute("physxRigidBody:sleepThreshold", threshold)
+
+    @property
+    def stabilization_threshold(self):
+        """
+        Returns:
+            float: threshold for stabilizing this rigid body
+        """
+        return self.get_attribute("physxRigidBody:stabilizationThreshold")
+
+    @stabilization_threshold.setter
+    def stabilization_threshold(self, threshold):
+        """
+        Sets threshold for stabilizing this rigid body
+
+        Args:
+            threshold (float): stabilizing threshold
+        """
+        self.set_attribute("physxRigidBody:stabilizationThreshold", threshold)
+
+    @property
     def ccd_enabled(self):
         """
         Returns:
@@ -542,7 +601,7 @@ class RigidPrim(XFormPrim):
         Returns:
             bool: Whether dc interface can be used or not
         """
-        return self._handle is not None and self._dc.is_simulating()
+        return self._handle is not None and self._dc.is_simulating() and not self.kinematic_only
 
     def enable_gravity(self):
         """
@@ -562,13 +621,15 @@ class RigidPrim(XFormPrim):
         """
         Enable physics for this rigid body
         """
-        self._dc.wake_up_rigid_body(self._handle)
+        if self.dc_is_accessible:
+            self._dc.wake_up_rigid_body(self._handle)
 
     def sleep(self):
         """
         Disable physics for this rigid body
         """
-        self._dc.sleep_rigid_body(self._handle)
+        if self.dc_is_accessible:
+            self._dc.sleep_rigid_body(self._handle)
 
     def _dump_state(self):
         # Grab pose from super class
@@ -582,9 +643,10 @@ class RigidPrim(XFormPrim):
         # Call super first
         super()._load_state(state=state)
 
-        # Set velocities
-        self.set_linear_velocity(np.array(state["lin_vel"]))
-        self.set_angular_velocity(np.array(state["ang_vel"]))
+        # Set velocities if not kinematic
+        if not self.kinematic_only:
+            self.set_linear_velocity(np.array(state["lin_vel"]))
+            self.set_angular_velocity(np.array(state["ang_vel"]))
 
     def _deserialize(self, state):
         # Call supermethod first
