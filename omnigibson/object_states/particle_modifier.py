@@ -6,6 +6,7 @@ from omnigibson.macros import create_module_macros, macros
 from omnigibson.prims.geom_prim import VisualGeomPrim
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.contact_bodies import ContactBodies
+from omnigibson.object_states.contact_fluids import ContactFluids
 from omnigibson.object_states.covered import Covered
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from omnigibson.object_states.object_state_base import AbsoluteObjectState
@@ -386,8 +387,6 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin):
             # Iterate over all owned systems for this particle modifier
             for system, conditions in self.conditions.items():
                 # Check if all conditions are met
-                if issubclass(system, FluidSystem):
-                    print(f"{system.name} limited: {self.check_at_limit(system=system)}")
                 if np.all([condition(self.obj) for condition in conditions]):
                     # Sanity check for oversaturation
                     self.check_at_limit(system=system, verify_not_over_limit=True)
@@ -414,7 +413,7 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin):
 
     @staticmethod
     def get_optional_dependencies():
-        return AbsoluteObjectState.get_optional_dependencies() + [Covered, ToggledOn, ContactBodies]
+        return AbsoluteObjectState.get_optional_dependencies() + [Covered, ToggledOn, ContactBodies, ContactFluids]
 
     def check_at_limit(self, system, verify_not_over_limit=False):
         """
@@ -566,12 +565,11 @@ class ParticleRemover(ParticleModifier):
             # We'll check for if the fluid particles are within this relaxed AABB
             if self.obj.prim_type == PrimType.CLOTH or self.method == ParticleModifyMethod.PROJECTION:
                 for inst in system.particle_instancers.values():
-                    inbound_idxs = (self._check_in_mesh(inst.particle_positions) & inst.particle_visibilities > 0).nonzero()[0]
+                    inbound_idxs = self._check_in_mesh(inst.particle_positions).nonzero()[0]
                     instancer_to_particle_idxs[inst] = inbound_idxs
-            # Otherwise, we can simply use the contact cached information for each particle
+            # Otherwise, we can simply use the ContactFluid state to infer contacts
             else:
-                instancer_to_particle_idxs = system.state_cache["obj_particle_contacts"][self.obj] if \
-                    self.link is None else system.state_cache["link_particle_contacts"][self.link]
+                instancer_to_particle_idxs = self.obj.states[ContactFluids].get_value(system, self.link)
 
             # Iterate over all particles and hide any that are detected to be removed
             for inst, particle_idxs in instancer_to_particle_idxs.items():
@@ -583,10 +581,8 @@ class ParticleRemover(ParticleModifier):
                 particles_to_absorb = min(len(particle_idxs), max_particle_absorbed)
                 particle_idxs_to_absorb = list(particle_idxs)[:particles_to_absorb]
 
-                # Hide particles that have been absorbed
-                visibilities = inst.particle_visibilities
-                visibilities[particle_idxs_to_absorb] = 0
-                inst.particle_visibilities = visibilities
+                # Remove these particles from the instancer
+                inst.remove_particles(idxs=particle_idxs_to_absorb)
 
                 # Keep track of the particles that have been absorbed
                 self.modified_particle_count[system] += particles_to_absorb
@@ -688,7 +684,6 @@ class ParticleApplier(ParticleModifier):
             for hit in hits[:n_particles]:
                 # Infer which object was hit
                 hit_obj = og.sim.scene.object_registry("prim_path", "/".join(hit[3].split("/")[:-1]), None)
-                print(f"hit obj: {hit_obj}")
                 if hit_obj is not None:
                     # Create an attachment group if necessary
                     group = system.get_group_name(obj=hit_obj)
@@ -713,12 +708,9 @@ class ParticleApplier(ParticleModifier):
         elif issubclass(system, FluidSystem):
             # Compile the particle poses to generate and sample the particles
             n_particles = min(len(hits), m.FLUID_PARTICLES_APPLICATION_LIMIT - self.modified_particle_count[system])
-            # Generate particle instancer
+            # Generate particles
             if n_particles > 0:
-                system.generate_particle_instancer(
-                    n_particles=n_particles,
-                    positions=np.array([hit[0] for hit in hits[:n_particles]]),
-                )
+                system.default_particle_instancer.add_particles(positions=np.array([hit[0] for hit in hits[:n_particles]]))
                 # Update our particle count
                 self.modified_particle_count[system] += n_particles
 

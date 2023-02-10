@@ -54,7 +54,7 @@ class Filled(RelativeObjectState, BooleanState, LinkBasedStateMixin):
         if current_state != new_value:
             if new_value:
                 # Going from False --> True, sample volume with particles
-                fluid_system.generate_particle_instancer_from_link(
+                fluid_system.generate_particles_from_link(
                     obj=self.obj,
                     link=self.link,
                     mesh_name_prefixes="container",

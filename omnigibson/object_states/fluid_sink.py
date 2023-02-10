@@ -45,20 +45,18 @@ class FluidSink(AbsoluteObjectState, LinkBasedStateMixin):
             return
 
         # We iterate over all active fluid groups in this sink's corresponding fluid system,
-        # and check to see if the group matches both the (a) distance and (b) fraction criteria in
-        # order to "sink" (delete) it
-        names_to_remove = []
+        # and check to see if each owned particle matches distance criteria in order to "sink" (delete) it
         for name, inst in self.fluid_system.particle_instancers.items():
             # Grab particle positions, shape (N, 3)
             particle_pos = inst.particle_positions
-            # Get distances and check fraction simultaneously
-            frac_in_sink = (np.linalg.norm(particle_pos - fluid_sink_position.reshape(1, 3), axis=-1) < self.max_sink_distance).mean()
-            if frac_in_sink >= m.MIN_GROUP_FRACTION:
-                names_to_remove.append(name)
+            # Get distances
+            idxs_to_remove = np.where(np.linalg.norm(particle_pos - fluid_sink_position.reshape(1, 3),
+                                           axis=-1) < self.max_sink_distance)[0]
+            inst.remove_particles(idxs=idxs_to_remove)
 
-        # Delete all recorded groups
-        for name in names_to_remove:
-            self.fluid_system.remove_particle_instancer(name)
+            # Possibly remove this instancer if there are no particles left and this is not the default instancer
+            if inst.n_particles == 0 and inst != self.fluid_system.default_particle_instancer:
+                self.fluid_system.remove_particle_instancer(name)
 
     def _set_value(self, new_value):
         raise ValueError("set_value not supported for FluidSink.")
