@@ -5,6 +5,7 @@ from omni.isaac.core.materials import PhysicsMaterial
 import omnigibson as og
 from omnigibson.macros import gm
 from omnigibson.prims.xform_prim import XFormPrim
+from omnigibson.utils.python_utils import assert_valid_key
 
 
 class GeomPrim(XFormPrim):
@@ -263,27 +264,34 @@ class CollisionGeomPrim(GeomPrim):
     def set_collision_approximation(self, approximation_type):
         """
         Args:
-            approximation_type (str or None): approximation used for collision.
-                Can be one of: {"none", "convexHull", "convexDecomposition", "meshSimplification", "sdf"}
+            approximation_type (str): approximation used for collision.
+                Can be one of: {"none", "convexHull", "convexDecomposition", "meshSimplification", "sdf",
+                    "boundingSphere", "boundingCube"}
                 If None, the approximation will use the underlying triangle mesh.
         """
         assert self._mesh_collision_api is not None, "collision_approximation only applicable for meshes!"
+        assert_valid_key(
+            key=approximation_type,
+            valid_keys={"none", "convexHull", "convexDecomposition", "meshSimplification", "sdf", "boundingSphere", "boundingCube"},
+            name="collision approximation type",
+        )
 
         # Make sure to add the appropriate API if we're setting certain values
         if approximation_type == "convexHull" and not self._prim.HasAPI(PhysxSchema.PhysxConvexHullCollisionAPI):
-            PhysxSchema.PhysxConvexHullCollisionAPI.Apply(self._prim)
+            pch_api = PhysxSchema.PhysxConvexHullCollisionAPI.Apply(self._prim)
+            # Also make sure the maximum vertex count is 60 (max number compatible with GPU)
+            # https://docs.omniverse.nvidia.com/app_create/prod_extensions/ext_physics/rigid-bodies.html#collision-settings
+            if pch_api.GetHullVertexLimitAttr().Get() is None:
+                pch_api.CreateHullVertexLimitAttr()
+            pch_api.GetHullVertexLimitAttr().Set(60)
         elif approximation_type == "convexDecomposition" and not self._prim.HasAPI(PhysxSchema.PhysxConvexDecompositionCollisionAPI):
             PhysxSchema.PhysxConvexDecompositionCollisionAPI.Apply(self._prim)
         elif approximation_type == "meshSimplification" and not self._prim.HasAPI(PhysxSchema.PhysxTriangleMeshSimplificationCollisionAPI):
             PhysxSchema.PhysxTriangleMeshSimplificationCollisionAPI.Apply(self._prim)
         elif approximation_type == "sdf" and not self._prim.HasAPI(PhysxSchema.PhysxSDFMeshCollisionAPI):
             PhysxSchema.PhysxSDFMeshCollisionAPI.Apply(self._prim)
-        elif approximation_type in {"none", None} and not self._prim.HasAPI(PhysxSchema.PhysxTriangleMeshCollisionAPI):
+        elif approximation_type == "none" and not self._prim.HasAPI(PhysxSchema.PhysxTriangleMeshCollisionAPI):
             PhysxSchema.PhysxTriangleMeshCollisionAPI.Apply(self._prim)
-        else:
-            raise ValueError(f"Got invalid collision approximation type: {approximation_type}. "
-                             f"Valid types are: 'convexHull', 'convexDecomposition', 'meshSimplification', 'sdf', "
-                             f"'none', or None")
         self._mesh_collision_api.GetApproximationAttr().Set(approximation_type)
 
     def get_collision_approximation(self):

@@ -166,7 +166,12 @@ class PrimitiveObject(StatefulObject):
         visual_geom_prim.opacity = self._load_config["opacity"]
 
         # Set the collision approximation appropriately
-        col_approximation = "boundingSphere" if self._primitive_type == "Sphere" else "convexHull"
+        if self._primitive_type == "Sphere":
+            col_approximation = "boundingSphere"
+        elif self._primitive_type == "Cube":
+            col_approximation = "boundingCube"
+        else:
+            col_approximation = "convexHull"
         self.root_link.collision_meshes["collision"].set_collision_approximation(col_approximation)
 
         # Possibly set scalings (only if the scale value is not set)
