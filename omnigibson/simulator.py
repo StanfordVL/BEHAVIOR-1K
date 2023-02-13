@@ -478,28 +478,32 @@ class Simulator(SimulationContext, Serializable):
             self.scene.reset()
 
     def play(self):
-        super().play()
+        if not self.is_playing():
+            # Track whether we're starting the simulator fresh -- i.e.: whether we were stopped previously
+            was_stopped = self.is_stopped()
 
-        # Update all object / robot handles
-        if self.scene is not None and self.scene.initialized:
-            for obj in self.scene.objects:
-                # Only need to update handles if object is already initialized as well
-                if obj.initialized:
-                    obj.update_handles()
+            # Minimize physics leakage by slowing down simulator significantly
+            with self.slowed(dt=1e-3):
+                super().play()
 
-            for robot in self.scene.robots:
-                # Only need to update handles if robot is already initialized as well
-                if robot.initialized:
-                    robot.update_handles()
+            # Update all object handles and spawn poses
+            if self.scene is not None and self.scene.initialized:
+                for obj in self.scene.objects:
+                    # Only need to update if object is already initialized as well
+                    if obj.initialized:
+                        obj.update_handles()
+                        # Only need to update spawn pose if we were stopped
+                        if was_stopped:
+                            obj.update_spawn_position_orientation()
 
-        # Check to see if any objects should be initialized
-        if len(self._objects_to_initialize) > 0:
-            for obj in self._objects_to_initialize:
-                obj.initialize()
-            self._objects_to_initialize = []
-            # Also update the scene registry
-            # TODO: A better place to put this perhaps?
-            self._scene.object_registry.update(keys="root_handle")
+            # Check to see if any objects should be initialized
+            if len(self._objects_to_initialize) > 0:
+                for obj in self._objects_to_initialize:
+                    obj.initialize()
+                self._objects_to_initialize = []
+                # Also update the scene registry
+                # TODO: A better place to put this perhaps?
+                self._scene.object_registry.update(keys="root_handle")
 
     @property
     def n_physics_timesteps_per_render(self):
