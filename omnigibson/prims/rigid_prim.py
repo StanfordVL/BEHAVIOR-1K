@@ -127,16 +127,16 @@ class RigidPrim(XFormPrim):
             for mesh in mesh_group.values():
                 mesh.initialize()
 
-        # Add enabled attribute for the rigid body
-        self._rigid_api.CreateRigidBodyEnabledAttr(True)
-
         # We grab contact info for the first time before setting our internal handle, because this changes the dc handle
         if self.contact_reporting_enabled:
             self._cs.get_rigid_body_raw_data(self._prim_path)
 
         # Grab handle to this rigid body and get name
         self.update_handles()
-        self._body_name = self._dc.get_rigid_body_name(self._handle)
+        self._body_name = self.prim_path.split("/")[-1]
+
+        # Update the spawn pose of this prim now that it's been initialized properly
+        self.update_spawn_position_orientation()
 
     def update_meshes(self):
         """
