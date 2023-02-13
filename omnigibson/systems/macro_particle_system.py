@@ -4,8 +4,9 @@ import matplotlib.pyplot as plt
 import omni
 from omni.isaac.core.utils.prims import get_prim_at_path
 
+import omnigibson as og
 import omnigibson.objects
-from omnigibson import og_dataset_path, assets_path
+from omnigibson.macros import gm
 from omnigibson.systems.system_base import SYSTEMS_REGISTRY
 from omnigibson.systems.particle_system_base import BaseParticleSystem
 from omnigibson.utils.constants import SemanticClass
@@ -362,6 +363,9 @@ class VisualParticleSystem(MacroParticleSystem):
     # Maps group name to the parent object (the object with particles attached to it) of the group
     _group_objects = None
 
+    # Maps particle name to OrderedDict of {obj, link}
+    _particles_info = None
+
     # Default behavior for this class -- whether to clip generated particles halfway into objects when sampling
     # their locations on the surface of the given object
     _CLIP_INTO_OBJECTS = False
@@ -385,6 +389,7 @@ class VisualParticleSystem(MacroParticleSystem):
         # Initialize mutable class variables so they don't automatically get overridden by children classes
         cls._group_particles = OrderedDict()
         cls._group_objects = OrderedDict()
+        cls._particles_info = OrderedDict()
 
     @classproperty
     def groups(cls):
@@ -402,7 +407,7 @@ class VisualParticleSystem(MacroParticleSystem):
         # Additionally, we have n_groups (1), with m_particles for each group (n), attached_obj_uuids (n), and
         # particle ids and corresponding link info for each particle (m * 2)
         return state_size + 1 + 2 * len(cls._group_particles) + \
-               sum([2 * cls.num_group_particles(group) for group in cls.groups])
+               sum(2 * cls.num_group_particles(group) for group in cls.groups)
 
     @classmethod
     def _load_new_particle(cls, prim_path, name):
@@ -438,11 +443,12 @@ class VisualParticleSystem(MacroParticleSystem):
         # Clear all groups as well
         cls._group_particles = OrderedDict()
         cls._group_objects = OrderedDict()
+        cls._particles_info = OrderedDict()
 
     @classmethod
     def remove_particle(cls, name):
         """
-        Remove particle with name @name from both the simulator as well as internally
+        Remove particle with name @name from both the simulator and internal state
 
         Args:
             name (str): Name of the particle to remove
@@ -451,11 +457,8 @@ class VisualParticleSystem(MacroParticleSystem):
         super().remove_particle(name=name)
 
         # Remove this particle from its respective group as well
-        for group in cls._group_particles.values():
-            # Maybe make this better? We have to manually search through the groups for this particle
-            if name in group:
-                group.pop(name)
-                break
+        cls._group_particles[cls._particles_info[name]["obj"].name].pop(name)
+        cls._particles_info.pop(name)
 
     @classmethod
     def remove_all_group_particles(cls, group):
@@ -643,12 +646,23 @@ class VisualParticleSystem(MacroParticleSystem):
         z_up[-1] = 1.0
         for position, orientation, scale, bbox_extent_local, link_prim_path in \
                 zip(positions, orientations, scales, bbox_extents_local, link_prim_paths):
+            link_name = link_prim_path.split("/")[-1]
+            link = obj.links[link_name]
             # Possibly shift the particle slightly away from the object if we're not clipping into objects
             if cls._CLIP_INTO_OBJECTS:
                 # Shift the particle halfway down
                 base_to_center = bbox_extent_local[2] / 2.0
                 normal = (T.quat2mat(orientation) @ z_up).flatten()
                 position -= normal * base_to_center
+
+            if gm.ENABLE_FLATCACHE:
+                # If flatcache is enabled, we need to modify the position we're setting because we're directly writing
+                # to the USD, which is NOT being updated when flatcache is enabled!
+                # So, we need to set the particle w.r.t. the link's initial (i.e.: spawn) pose, NOT the current pose!
+                # We will calculate the transform from the link's current pose to its initial pose, and then apply this
+                # transform to the desired global pose
+                tf = T.pose_inv(T.pose2mat(link.get_position_orientation())) @ T.pose2mat(link.spawn_position_orientation)
+                position, orientation = T.mat2pose(tf @ T.pose2mat((position, orientation)))
 
             # Create particle
             particle = cls.add_particle(
@@ -660,6 +674,7 @@ class VisualParticleSystem(MacroParticleSystem):
 
             # Add to group
             cls._group_particles[group][particle.name] = particle
+            cls._particles_info[particle.name] = OrderedDict(obj=cls._group_objects[group], link=link)
 
     @classmethod
     def generate_group_particles_on_object(cls, group, n_particles=None, min_particles_for_success=1):
@@ -736,6 +751,27 @@ class VisualParticleSystem(MacroParticleSystem):
         return success
 
     @classmethod
+    def get_particle_position_orientation(cls, name):
+        """
+        Compute particle's global position and orientation. This automatically takes into account the relative
+        pose w.r.t. its parent link and the global pose of that parent link.
+
+        Returns:
+            2-tuple:
+                - 3-array: (x,y,z) position in the world frame
+                - 4-array: (x,y,z,w) quaternion orientation in the world frame
+        """
+        # First, get local pose, scale it by the parent link's scale, and then convert into a matrix
+        particle = cls.particles[name]
+        parent_link = cls._particles_info[name]["link"]
+        local_pos, local_quat = particle.get_local_pose()
+        local_mat = T.pose2mat((parent_link.scale * local_pos, local_quat))
+        link_tf = T.pose2mat(parent_link.get_position_orientation())
+
+        # Multiply the local pose by the link's global transform, then return as pos, quat tuple
+        return T.mat2pose(link_tf @ local_mat)
+
+    @classmethod
     def _validate_group(cls, group):
         """
         Checks if particle attachment group @group exists. (If not, can create the group via create_attachment_group).
@@ -805,6 +841,7 @@ class VisualParticleSystem(MacroParticleSystem):
                     idn=int(particle_idn),
                 )
                 cls._group_particles[name][particle.name] = particle
+                cls._particles_info[particle.name] = OrderedDict(obj=obj, link=obj.links[link_name])
 
     @classmethod
     def create(cls, particle_name, n_particles_per_group, create_particle_template, min_scale=None, max_scale=None, **kwargs):
@@ -881,9 +918,9 @@ class VisualParticleSystem(MacroParticleSystem):
         for group_name, group_particles in cls._group_particles.items():
             groups_dict[group_name] = OrderedDict(
                 particle_attached_obj_uuid=cls._group_objects[group_name].uuid,
-                n_particles=len(group_particles),
+                n_particles=cls.num_group_particles(group=group_name),
                 particle_idns=[cls.particle_name2idn(name=name) for name in group_particles.keys()],
-                particle_attached_link_names=[prim.prim_path.split("/")[-2] for prim in group_particles.values()],
+                particle_attached_link_names=[cls._particles_info[name]["link"].prim_path.split("/")[-1] for name in group_particles.keys()],
             )
 
         state["n_groups"] = len(cls._group_particles)
@@ -1024,7 +1061,7 @@ StainSystem = VisualParticleSystem.create(
     n_particles_per_group=20,
     create_particle_template=lambda prim_path, name: omnigibson.objects.USDObject(
         prim_path=prim_path,
-        usd_path=os.path.join(assets_path, "models", "stain", "stain.usd"),
+        usd_path=os.path.join(og.assets_path, "models", "stain", "stain.usd"),
         name=name,
         class_id=SemanticClass.DIRT,
         visible=False,
