@@ -24,6 +24,7 @@ import omnigibson as og
 from omnigibson.macros import gm
 from omnigibson.utils.constants import JointType, PRIMITIVE_MESH_TYPES
 from omnigibson.utils.python_utils import assert_valid_key
+import omnigibson.utils.transform_utils as T
 
 GF_TO_VT_MAPPING = {
     Gf.Vec3d: Vt.Vec3dArray,
@@ -248,12 +249,93 @@ class BoundingBoxAPI:
     """
     Class containing class methods to facilitate bounding box handling
     """
-    CACHE = None
+    # Non-flatcache-compatible cache -- this is a direct omni API-based object
+    CACHE_NON_FLATCACHE = None
+
+    # Flatcache-compatible cache -- this is a dictionary mapping prim paths to corresponding AABBs
+    CACHE_FLATCACHE = dict()
 
     @classmethod
-    def compute_aabb(cls, prim_path):
+    def compute_aabb(cls, prim):
         """
-        Computes the AABB (world-frame oriented) for the prim specified at @prim_path
+        Computes the AABB (world-frame oriented) for @prim.
+
+        NOTE: If @prim is an EntityPrim (i.e.: owns multiple links), then the computed bounding box will be
+        the subsequent aggregate over all the links.
+
+        Args:
+            prim (XFormPrim): Prim to calculate AABB for
+
+        Returns:
+            2-tuple:
+                - 3-array: start (x,y,z) corner of world-coordinate frame aligned bounding box
+                - 3-array: end (x,y,z) corner of world-coordinate frame aligned bounding box
+        """
+        # Use the correct API to calculate AABB based on whether flatcache is enabled or not
+        return cls._compute_flatcache_aabb(prim=prim) if gm.ENABLE_FLATCACHE else \
+            cls._compute_non_flatcache_aabb(prim_path=prim.prim_path)
+
+    @classmethod
+    def _compute_flatcache_aabb(cls, prim):
+        """
+        Computes the AABB (world-frame oriented) for @prim. This an API compatible with flatcache, which manually
+        calculates the global transforms from the native bounding box to the updated values
+
+        NOTE: If @prim is an EntityPrim (i.e.: owns multiple links), then the computed bounding box will be
+        the subsequent aggregate over all the links.
+
+        Args:
+            prim (XFormPrim): Prim to calculate AABB for
+
+        Returns:
+            2-tuple:
+                - 3-array: start (x,y,z) corner of world-coordinate frame aligned bounding box
+                - 3-array: end (x,y,z) corner of world-coordinate frame aligned bounding box
+        """
+        # Run imports here to avoid circular imports
+        from omnigibson.prims import EntityPrim, RigidPrim, XFormPrim
+
+        # Simply grab the AABB if it's already been cached
+        if prim in cls.CACHE_FLATCACHE:
+            return cls.CACHE_FLATCACHE[prim]
+
+        # Next, process the AABB depending on the type of prim it is
+        if isinstance(prim, EntityPrim):
+            # Aggregate all owned points from entity prim
+            points = np.array([cls.compute_aabb(prim=link) for link in prim.links.values() if len(link.visual_meshes) > 0])  # Shape (N, 2, 3)
+            val = np.min(points[:, 0, :], axis=0), np.max(points[:, 1, :], axis=0)
+
+        elif isinstance(prim, XFormPrim):
+            # Simply calculate for this exact prim
+            # We assume the world transform from the USD is accurate at the prim's initial pose
+            val = cls._compute_non_flatcache_aabb(prim_path=prim.prim_path)
+
+            # If the simulation is not stopped and we're a rigid prim, then we need to manually compute the real-time
+            # transform from the prim's initial pose to the current pose
+            if isinstance(prim, RigidPrim) and not og.sim.is_stopped():
+                val = np.stack(
+                    [arr.flatten() for arr in np.meshgrid(*(np.linspace(lo, hi, 2) for lo, hi in zip(*val)))] + [
+                        np.ones(8, )])
+                # tf = T.pose2mat(prim.get_position_orientation()) @ T.pose2mat(prim.spawn_position_orientation)
+                tf = T.pose_inv(T.pose2mat(prim.spawn_position_orientation)) @ T.pose2mat(prim.get_position_orientation())
+                val = (tf @ val)[:-1, :]
+                val = np.min(val, axis=1), np.max(val, axis=1)
+
+        else:
+            raise ValueError(f"Inputted prim must be an instance of EntityPrim, RigidPrim, or XFormPrim "
+                             f"in order to calculate AABB!")
+
+        cls.CACHE_FLATCACHE[prim] = val
+        return val
+
+    @classmethod
+    def _compute_non_flatcache_aabb(cls, prim_path):
+        """
+        Computes the AABB (world-frame oriented) for the prim specified at @prim_path using the underlying omniverse
+        API.
+
+        NOTE: This is NOT compatible with flatcache and will result in incorrect values if flatcache is enabled!! See:
+        https://docs.omniverse.nvidia.com/app_code/prod_extensions/ext_physics.html#physx-short-flatcache-also-known-as-fabric-rename-in-next-release
 
         Args:
             prim_path (str): Path to the prim to calculate AABB for
@@ -263,13 +345,12 @@ class BoundingBoxAPI:
                 - 3-array: start (x,y,z) corner of world-coordinate frame aligned bounding box
                 - 3-array: end (x,y,z) corner of world-coordinate frame aligned bounding box
         """
-        assert not gm.ENABLE_FLATCACHE, f"Cannot compute aabb bounding boxes with flatcache enabled!"
         # Create cache if it doesn't already exist
-        if cls.CACHE is None:
-            cls.CACHE = create_bbox_cache(use_extents_hint=False)
+        if cls.CACHE_NON_FLATCACHE is None:
+            cls.CACHE_NON_FLATCACHE = create_bbox_cache(use_extents_hint=False)
 
         # Grab aabb
-        aabb = compute_aabb(bbox_cache=cls.CACHE, prim_path=prim_path)
+        aabb = compute_aabb(bbox_cache=cls.CACHE_NON_FLATCACHE, prim_path=prim_path)
 
         # Sanity check values
         if np.any(aabb[3:] < aabb[:3]):
@@ -278,21 +359,19 @@ class BoundingBoxAPI:
         return aabb[:3], aabb[3:]
 
     @classmethod
-    def compute_center_extent(cls, prim_path):
+    def compute_center_extent(cls, prim):
         """
-        Computes the AABB (world-frame oriented) for the prim specified at @prim_path, and convert it into the center
-        and extent values
+        Computes the AABB (world-frame oriented) for @prim, and convert it into the center and extent values
 
         Args:
-            prim_path (str): Path to the prim to calculate AABB for
+            prim (XFormPrim): Prim to calculate AABB for
 
         Returns:
             2-tuple:
                 - 3-array: center position (x,y,z) of world-coordinate frame aligned bounding box
                 - 3-array: end-to-end extent size (x,y,z) of world-coordinate frame aligned bounding box
         """
-        assert not gm.ENABLE_FLATCACHE, f"Cannot compute aabb bounding boxes with flatcache enabled!"
-        low, high = cls.compute_aabb(prim_path=prim_path)
+        low, high = cls.compute_aabb(prim=prim)
 
         return (low + high) / 2.0, high - low
 
@@ -301,29 +380,8 @@ class BoundingBoxAPI:
         """
         Clears the internal state of this BoundingBoxAPI
         """
-        cls.CACHE = None
-
-    @classmethod
-    def union(cls, prim_paths):
-        """
-        Computes the union of AABBs (world-frame oriented) for the prims specified at @prim_paths
-
-        Args:
-            prim_paths (str): Paths to the prims to calculate union AABB for
-
-        Returns:
-            2-tuple:
-                - 3-array: start (x,y,z) corner of world-coordinate frame aligned bounding box
-                - 3-array: end (x,y,z) corner of world-coordinate frame aligned bounding box
-        """
-        # Create cache if it doesn't already exist
-        if cls.CACHE is None:
-            cls.CACHE = create_bbox_cache(use_extents_hint=False)
-
-        # Grab aabb
-        aabb = compute_combined_aabb(bbox_cache=cls.CACHE, prim_paths=prim_paths)
-
-        return aabb[:3], aabb[3:]
+        cls.CACHE_NON_FLATCACHE = None
+        cls.CACHE_FLATCACHE = dict()
 
     @classmethod
     def aabb_contains_point(cls, point, container):

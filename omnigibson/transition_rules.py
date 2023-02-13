@@ -328,7 +328,7 @@ def _contained_objects(scene, container_obj):
     Returns:
         list of BaseObject: All objects ``inside'' the container object, as defined by its AABB.
     """
-    bbox = BoundingBoxAPI.compute_aabb(container_obj.prim_path)
+    bbox = BoundingBoxAPI.compute_aabb(container_obj)
     contained_objs = []
     for obj in scene.objects:
         if obj == container_obj:

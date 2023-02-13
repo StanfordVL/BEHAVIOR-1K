@@ -6,7 +6,7 @@ from omnigibson.object_states.object_state_base import AbsoluteObjectState
 
 class AABB(AbsoluteObjectState):
     def _get_value(self):
-        aabb_low, aabb_hi = BoundingBoxAPI.union(self.obj.link_prim_paths)
+        aabb_low, aabb_hi = BoundingBoxAPI.compute_aabb(self.obj)
         return np.array(aabb_low), np.array(aabb_hi)
 
     def _set_value(self, new_value):
