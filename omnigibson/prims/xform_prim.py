@@ -359,7 +359,7 @@ class XFormPrim(BasePrim):
                 - 3-array: (x,y,z) lower corner of the bounding box
                 - 3-array: (x,y,z) upper corner of the bounding box
         """
-        return BoundingBoxAPI.compute_aabb(self.prim_path)
+        return BoundingBoxAPI.compute_aabb(self)
 
     @property
     def aabb_extent(self):
