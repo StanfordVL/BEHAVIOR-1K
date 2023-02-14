@@ -1,9 +1,8 @@
 from abc import ABCMeta, abstractmethod
-from collections import OrderedDict
 from copy import deepcopy
 from omnigibson.utils.python_utils import classproperty, Registerable
 
-REGISTERED_REWARD_FUNCTIONS = OrderedDict()
+REGISTERED_REWARD_FUNCTIONS = dict()
 
 
 class BaseRewardFunction(Registerable, metaclass=ABCMeta):

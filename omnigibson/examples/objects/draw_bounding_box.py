@@ -1,6 +1,5 @@
 import logging
 import matplotlib.pyplot as plt
-from collections import OrderedDict
 
 import numpy as np
 import omnigibson as og
@@ -21,7 +20,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
 
     # Specify objects to load
-    banana_cfg = OrderedDict(
+    banana_cfg = dict(
         type="DatasetObject",
         name="banana",
         category="banana",
@@ -31,7 +30,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         orientation=[0, 0, 0.76040583, -0.6494482 ],
     )
 
-    door_cfg = OrderedDict(
+    door_cfg = dict(
         type="DatasetObject",
         name="door",
         category="door",

@@ -41,7 +41,7 @@ class BaseWrapper:
             action (np.array): action to take in environment
         Returns:
             4-tuple:
-                - (OrderedDict) observations from the environment
+                - (dict) observations from the environment
                 - (float) reward from the environment
                 - (bool) whether the current episode is completed or not
                 - (dict) misc information
@@ -52,7 +52,7 @@ class BaseWrapper:
         """
         By default, run the normal environment reset() function
         Returns:
-            OrderedDict: Environment observation space after reset occurs
+            dict: Environment observation space after reset occurs
         """
         return self.env.reset()
 
@@ -60,7 +60,7 @@ class BaseWrapper:
         """
         By default, grabs the normal environment observation_spec
         Returns:
-            OrderedDict: Observations from the environment
+            dict: Observations from the environment
         """
         return self.env.observation_spec()
 

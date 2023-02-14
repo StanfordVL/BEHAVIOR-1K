@@ -3,7 +3,6 @@ import numpy as np
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from omnigibson.object_states.object_state_base import AbsoluteObjectState
 from omnigibson.object_states.toggle import ToggledOn
-from collections import OrderedDict
 
 
 class FluidSource(AbsoluteObjectState, LinkBasedStateMixin):

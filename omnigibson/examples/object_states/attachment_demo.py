@@ -1,6 +1,5 @@
 import numpy as np
 import yaml
-from collections import OrderedDict
 
 import omnigibson as og
 from omnigibson.macros import gm
@@ -20,7 +19,7 @@ def setup_scene_for_abilities(abilities1, abilities2):
     cfg = yaml.load(open(f"{og.example_config_path}/default_cfg.yaml", "r"), Loader=yaml.FullLoader)
 
     # Add objects that we want to create
-    light_cfg = OrderedDict(
+    light_cfg = dict(
         type="LightObject",
         name="light",
         light_type="Sphere",
@@ -29,7 +28,7 @@ def setup_scene_for_abilities(abilities1, abilities2):
         position=[0, 0, 1.0],
     )
 
-    apple_cfg = OrderedDict(
+    apple_cfg = dict(
         type="DatasetObject",
         name="apple",
         category="apple",
@@ -38,7 +37,7 @@ def setup_scene_for_abilities(abilities1, abilities2):
         position=[0, 0, 0.04],
     )
 
-    fridge_cfg = OrderedDict(
+    fridge_cfg = dict(
         type="DatasetObject",
         name="fridge",
         category="fridge",

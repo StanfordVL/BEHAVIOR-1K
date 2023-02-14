@@ -1,4 +1,3 @@
-from collections import OrderedDict
 from omni.isaac.core.utils.prims import get_prim_at_path, get_prim_parent
 from omni.isaac.core.utils.transformations import tf_matrix_from_pose
 from omni.isaac.core.utils.rotations import gf_quat_to_np_array
@@ -153,7 +152,7 @@ class RigidPrim(XFormPrim):
             for visual_mesh in self._visual_meshes.values():
                 visual_mesh.remove_names()
 
-        self._collision_meshes, self._visual_meshes = OrderedDict(), OrderedDict()
+        self._collision_meshes, self._visual_meshes = dict(), dict()
         prims_to_check = []
         coms, vols = [], []
         for prim in self._prim.GetChildren():
@@ -368,7 +367,7 @@ class RigidPrim(XFormPrim):
     def collision_meshes(self):
         """
         Returns:
-            OrderedDict: Dictionary mapping collision mesh names (str) to mesh prims (CollisionMeshPrim) owned by
+            dict: Dictionary mapping collision mesh names (str) to mesh prims (CollisionMeshPrim) owned by
                 this rigid body
         """
         return self._collision_meshes
@@ -377,7 +376,7 @@ class RigidPrim(XFormPrim):
     def visual_meshes(self):
         """
         Returns:
-            OrderedDict: Dictionary mapping visual mesh names (str) to mesh prims (VisualMeshPrim) owned by
+            dict: Dictionary mapping visual mesh names (str) to mesh prims (VisualMeshPrim) owned by
                 this rigid body
         """
         return self._visual_meshes

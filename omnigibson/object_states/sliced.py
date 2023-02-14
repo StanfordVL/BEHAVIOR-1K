@@ -1,5 +1,4 @@
 import numpy as np
-from collections import OrderedDict
 from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
 
 
@@ -29,7 +28,7 @@ class Sliced(AbsoluteObjectState, BooleanState):
         return 1
 
     def _dump_state(self):
-        return OrderedDict(sliced=self.value)
+        return dict(sliced=self.value)
 
     def _load_state(self, state):
         self.value = state["sliced"]
@@ -38,4 +37,4 @@ class Sliced(AbsoluteObjectState, BooleanState):
         return np.array([state["sliced"]], dtype=float)
 
     def _deserialize(self, state):
-        return OrderedDict(sliced=bool(state[0])), 1
+        return dict(sliced=bool(state[0])), 1

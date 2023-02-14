@@ -18,7 +18,6 @@ import omni
 from omni.isaac.core.utils.prims import get_prim_at_path, is_prim_path_valid
 from omni.physx.scripts import particleUtils
 from omni.physx import get_physx_scene_query_interface
-from collections import OrderedDict
 import numpy as np
 from pxr import Gf, Vt, UsdShade, UsdGeom, PhysxSchema
 from collections import defaultdict
@@ -70,9 +69,9 @@ def set_carb_settings_for_fluid_isosurface():
 def get_fluid_systems():
     """
     Returns:
-        OrderedDict: Mapping from fluid system name to fluid system
+        dict: Mapping from fluid system name to fluid system
     """
-    systems = OrderedDict()
+    systems = dict()
     for system in SYSTEMS_REGISTRY.objects:
         if issubclass(system, FluidSystem):
             systems[system.name] = system
@@ -367,7 +366,7 @@ class PhysxParticleInstancer(BasePrim):
         self.set_attribute(attr="ids", val=visibilities)
 
     def _dump_state(self):
-        return OrderedDict(
+        return dict(
             idn=self._idn,
             particle_group=self.particle_group,
             n_particles=self._n_particles,
@@ -414,7 +413,7 @@ class PhysxParticleInstancer(BasePrim):
 
         # De-compress from 1D array
         n_particles = int(state[2])
-        state_dict = OrderedDict(
+        state_dict = dict(
             idn=int(state[0]),
             particle_group=int(state[1]),
             n_particles=n_particles,
@@ -444,7 +443,7 @@ class MicroParticleSystem(BaseParticleSystem):
     # Particle prototypes -- will be list of mesh prims to use as particle prototypes for this system
     particle_prototypes = None
 
-    # Particle instancers -- maps name to particle instancer prims (OrderedDict)
+    # Particle instancers -- maps name to particle instancer prims (dict)
     particle_instancers = None
 
     # Material -- either a MaterialPrim or None if no material is used for this particle system
@@ -460,7 +459,7 @@ class MicroParticleSystem(BaseParticleSystem):
     # Max particle instancer identification number -- this monotonically increases until reset() is called
     max_instancer_idn = None
 
-    # State cache -- OrderedDict, anything that should be updated exactly once between simulation step calls
+    # State cache -- dict, anything that should be updated exactly once between simulation step calls
     state_cache = None
 
     @classproperty
@@ -509,7 +508,7 @@ class MicroParticleSystem(BaseParticleSystem):
         super().initialize(simulator=simulator)
 
         # Initialize class variables that are mutable so they don't get overridden by children classes
-        cls.particle_instancers = OrderedDict()
+        cls.particle_instancers = dict()
 
         # Set the default scales
         cls.min_scale = np.ones(3)
@@ -519,7 +518,7 @@ class MicroParticleSystem(BaseParticleSystem):
         cls.max_instancer_idn = -1
 
         # Initialize state cache
-        cls.state_cache = OrderedDict()
+        cls.state_cache = dict()
 
         # Create the particle system if it doesn't already exist, otherwise sync with the pre-existing system
         prototype_path = get_prototype_path_from_particle_system_path(particle_system_path=cls.prim_path)
@@ -600,7 +599,7 @@ class MicroParticleSystem(BaseParticleSystem):
     def reset(cls):
         # Reset all internal variables
         cls.remove_all_particle_instancers()
-        cls.state_cache = OrderedDict()
+        cls.state_cache = dict()
 
     @classmethod
     def update_max_instancer_idn(cls):
@@ -1243,12 +1242,12 @@ class MicroParticleSystem(BaseParticleSystem):
 
     @classmethod
     def _dump_state(cls):
-        return OrderedDict(
+        return dict(
             n_particle_instancers=len(cls.particle_instancers),
             instancer_idns=[inst.idn for inst in cls.particle_instancers.values()],
             instancer_particle_groups=[inst.particle_group for inst in cls.particle_instancers.values()],
             instancer_particle_counts=[inst.n_particles for inst in cls.particle_instancers.values()],
-            particle_states=OrderedDict(((name, inst.dump_state(serialized=False))
+            particle_states=dict(((name, inst.dump_state(serialized=False))
                                          for name, inst in cls.particle_instancers.items())),
         )
 
@@ -1295,7 +1294,7 @@ class MicroParticleSystem(BaseParticleSystem):
     def _deserialize(cls, state):
         # Synchronize the particle instancers
         n_instancers = int(state[0])
-        instancer_info = OrderedDict()
+        instancer_info = dict()
         idx = 1
         for info_name in ("instancer_idns", "instancer_particle_groups", "instancer_particle_counts"):
             instancer_info[info_name] = state[idx: idx + n_instancers].astype(int).tolist()
@@ -1308,14 +1307,14 @@ class MicroParticleSystem(BaseParticleSystem):
         )
 
         # Procedurally deserialize the particle states
-        particle_states = OrderedDict()
+        particle_states = dict()
         for idn in instancer_info["instancer_idns"]:
             name = cls.particle_instancer_idn_to_name(idn=idn)
             state_size = cls.particle_instancers[name].state_size
             particle_states[name] = cls.particle_instancers[name].deserialize(state[idx: idx + state_size])
             idx += state_size
 
-        return OrderedDict(
+        return dict(
             n_particle_instancers=n_instancers,
             **instancer_info,
             particle_states=particle_states,

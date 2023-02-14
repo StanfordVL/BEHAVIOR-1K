@@ -1,6 +1,6 @@
 import logging
 import sys
-from collections import OrderedDict, defaultdict
+from collections import defaultdict
 
 import numpy as np
 from pxr.Sdf import ValueTypeNames as VT
@@ -99,7 +99,7 @@ class StatefulObject(BaseObject):
         """
         # Values that will be filled later
         self._states = None
-        self._emitters = OrderedDict()
+        self._emitters = dict()
         self._visual_states = None
         self._current_texture_state = None
 
@@ -159,7 +159,7 @@ class StatefulObject(BaseObject):
         Get the current states of this object.
 
         Returns:
-            OrderedDict: Keyword-mapped states for this object
+            dict: Keyword-mapped states for this object
         """
         return self._states
 
@@ -201,7 +201,7 @@ class StatefulObject(BaseObject):
                     state_types_and_params.append((dependency, {}))
 
         # Now generate the states in topological order.
-        self._states = OrderedDict()
+        self._states = dict()
         for state_type, params in reversed(state_types_and_params):
             self._states[state_type] = get_object_state_instance(state_type, self, params)
 
@@ -449,7 +449,7 @@ class StatefulObject(BaseObject):
         state = super()._dump_state()
 
         # Also add non-kinematic states
-        non_kin_states = OrderedDict()
+        non_kin_states = dict()
         for state_type, state_instance in self._states.items():
             if state_instance.stateful:
                 non_kin_states[get_state_name(state_type)] = state_instance.dump_state(serialized=False)
@@ -489,7 +489,7 @@ class StatefulObject(BaseObject):
         state_dic, idx = super()._deserialize(state=state)
 
         # Iterate over all states and deserialize their states if they're stateful
-        non_kin_state_dic = OrderedDict()
+        non_kin_state_dic = dict()
         for state_type, state_instance in self._states.items():
             state_name = get_state_name(state_type)
             if state_instance.stateful:

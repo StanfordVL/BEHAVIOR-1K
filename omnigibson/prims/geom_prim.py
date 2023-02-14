@@ -1,4 +1,3 @@
-from collections import OrderedDict
 from pxr import UsdShade, UsdPhysics, PhysxSchema
 import numpy as np
 from omni.isaac.core.materials import PhysicsMaterial
@@ -48,7 +47,7 @@ class GeomPrim(XFormPrim):
 
     def _dump_state(self):
         # No state to dump
-        return OrderedDict()
+        return dict()
 
     def _load_state(self, state):
         # No state to load
@@ -60,7 +59,7 @@ class GeomPrim(XFormPrim):
 
     def _deserialize(self, state):
         # No state to deserialize
-        return OrderedDict()
+        return dict()
 
     def duplicate(self, simulator, prim_path):
         # Cannot directly duplicate a mesh prim

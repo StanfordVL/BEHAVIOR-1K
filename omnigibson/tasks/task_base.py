@@ -1,12 +1,11 @@
 from abc import ABCMeta, abstractmethod
-from collections import OrderedDict
 from copy import deepcopy
 import numpy as np
 from omnigibson.utils.python_utils import classproperty, Registerable
 from omnigibson.utils.gym_utils import GymObservable
 
 
-REGISTERED_TASKS = OrderedDict()
+REGISTERED_TASKS = dict()
 
 
 class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
@@ -71,7 +70,7 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
         Loads any non-low dim observation spaces for this task.
 
         Returns:
-            OrderedDict: Keyword-mapped observation space for this object mapping non low dim task observation name to
+            dict: Keyword-mapped observation space for this object mapping non low dim task observation name to
                 observation space
         """
         raise NotImplementedError()
@@ -107,7 +106,7 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
         Creates the termination functions in the environment
 
         Returns:
-            OrderedDict of BaseTerminationCondition: Termination functions created for this task
+            dict of BaseTerminationCondition: Termination functions created for this task
         """
         raise NotImplementedError()
 
@@ -117,7 +116,7 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
         Creates the reward functions in the environment
 
         Returns:
-            OrderedDict of BaseRewardFunction: Reward functions created for this task
+            dict of BaseRewardFunction: Reward functions created for this task
         """
         raise NotImplementedError()
 
@@ -244,8 +243,8 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
 
         Returns:
             2-tuple:
-                - OrderedDict: Keyword-mapped low dimensional observations from this task
-                - OrderedDict: All other keyword-mapped observations from this task
+                - dict: Keyword-mapped low dimensional observations from this task
+                - dict: All other keyword-mapped observations from this task
         """
         raise NotImplementedError()
 
@@ -255,7 +254,7 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
         1D numpy array
 
         Args:
-            obs (OrderedDict): Low-dim observation dictionary where each value is a 1D array
+            obs (dict): Low-dim observation dictionary where each value is a 1D array
 
         Returns:
             n-array: 1D-numpy array of flattened low-dim observations

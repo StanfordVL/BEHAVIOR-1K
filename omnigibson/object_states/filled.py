@@ -1,5 +1,4 @@
 import numpy as np
-from collections import OrderedDict
 from omnigibson.macros import gm, create_module_macros
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from omnigibson.object_states.object_state_base import RelativeObjectState, BooleanState
@@ -97,7 +96,7 @@ class Filled(RelativeObjectState, BooleanState, LinkBasedStateMixin):
 
     def _dump_state(self):
         # Store whether we're filled for each volume or not
-        state = OrderedDict()
+        state = dict()
         for system in get_fluid_systems().values():
             fluid_name = get_element_name_from_system(system)
             state[fluid_name] = self.get_value(system)
@@ -116,7 +115,7 @@ class Filled(RelativeObjectState, BooleanState, LinkBasedStateMixin):
         return np.array(list(state.values()), dtype=float)
 
     def _deserialize(self, state):
-        state_dict = OrderedDict()
+        state_dict = dict()
         for i, fluid_system in enumerate(get_fluid_systems().values()):
             fluid_name = get_element_name_from_system(fluid_system)
             state_dict[fluid_name] = bool(state[i])
