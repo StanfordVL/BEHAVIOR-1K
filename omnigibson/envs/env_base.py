@@ -169,7 +169,10 @@ class Environment(gym.Env, GymObservable, Recreatable):
         assert og.sim.is_stopped(), "sim should be stopped when load_task starts"
         og.sim.play()
 
-        # Load task. Should load additinal task-relevant objects and configure the scene into its default initial state
+        # Load the state from the loaded scene
+        og.sim.reset_scene()
+
+        # Load task. Should load additional task-relevant objects and configure the scene into its default initial state
         self._task.load(env=self)
 
         # Update the initial scene state
