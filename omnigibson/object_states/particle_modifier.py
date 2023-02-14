@@ -2,7 +2,7 @@ from abc import abstractmethod
 from collections import OrderedDict, defaultdict
 import numpy as np
 import omnigibson as og
-from omnigibson.macros import create_module_macros, macros
+from omnigibson.macros import create_module_macros, macros, gm
 from omnigibson.prims.geom_prim import VisualGeomPrim
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.contact_bodies import ContactBodies
@@ -183,6 +183,7 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin):
         # Store internal variables
         self.method = method
         self.conditions = conditions
+        self.projection_source_sphere = None
         self.projection_mesh = None
         self.projection_system = None
         self.projection_emitter = None
@@ -280,12 +281,13 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin):
             # Create the projection visualization if it doesn't already exist, otherwise we reference it directly
             projection_name = f"{self.obj.name}_projection_visualization"
             projection_path = f"/OmniGraph/{projection_name}"
+            projection_visualization_path = f"{self.link.prim_path}/projection_visualization"
             if is_prim_path_valid(projection_path):
                 self.projection_system = get_prim_at_path(projection_path)
                 self.projection_emitter = get_prim_at_path(f"{projection_path}/emitter")
             else:
                 self.projection_system, self.projection_emitter = create_projection_visualization(
-                    prim_path=f"{self.link.prim_path}/projection_visualization",
+                    prim_path=projection_visualization_path,
                     shape=self._projection_mesh_params["type"],
                     projection_name=projection_name,
                     projection_radius=radius,
@@ -293,6 +295,11 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin):
                     particle_radius=particle_radius,
                     material=particle_material,
                 )
+
+            # Create the visual geom instance referencing the generated source mesh prim, and then hide it
+            self.projection_source_sphere = VisualGeomPrim(prim_path=projection_visualization_path, name=f"{self.obj.name}_projection_source_sphere")
+            self.projection_source_sphere.initialize()
+            self.projection_source_sphere.visible = False
 
             # Generate the function for checking whether points are within the projection mesh
             self._check_in_mesh, _ = generate_points_in_volume_checker_function(
@@ -382,6 +389,19 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin):
         return condition
 
     def _update(self):
+        # If we're using projection method and flatcache, we need to manually update the visualization animation pose
+        if self.method == ParticleModifyMethod.PROJECTION and gm.ENABLE_FLATCACHE:
+            # We need to set the relative pose from the link frame to the visualization sphere frame
+            # First, get the transform in the world frame from the projection's spawn point (== link spawn point) to the
+            # current link pose
+            spawn_to_origin_tf = T.pose_inv(T.pose2mat(self.link.spawn_position_orientation))
+            origin_to_link_tf = T.pose2mat(self.link.get_position_orientation())
+            pos, quat = T.mat2pose(origin_to_link_tf @ spawn_to_origin_tf)
+            # Then, convert the transform position from the world frame into the link frame
+            pos = pos / self.link.scale
+            pos = T.quat2mat(self.link.get_local_pose()[1]).T @ pos
+            self.projection_source_sphere.set_local_pose(pos, quat)
+
         # Check if there's any overlap and if we're at the correct step
         if self._current_step == 0 and self._check_overlap():
             # Iterate over all owned systems for this particle modifier
@@ -550,7 +570,7 @@ class ParticleRemover(ParticleModifier):
             if system.n_particles > 0:
                 # Iterate over all particles and remove any that are within the relaxed AABB of the remover volume
                 particle_names = list(system.particles.keys())
-                particle_positions = np.array([particle.get_position() for particle in system.particles.values()])
+                particle_positions = np.array([system.get_particle_position_orientation(name=name) for name in system.particles.keys()])
                 inbound_idxs = self._check_in_mesh(particle_positions).nonzero()[0]
                 max_particle_absorbed = self.visual_particle_modification_limit - self.modified_particle_count[system]
                 for idx in inbound_idxs[:max_particle_absorbed]:
