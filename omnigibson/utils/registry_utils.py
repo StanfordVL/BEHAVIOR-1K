@@ -4,7 +4,7 @@ A set of utility functions for registering and tracking objects
 import logging
 from inspect import isclass
 import numpy as np
-from collections import OrderedDict, Iterable
+from collections import Iterable
 from omnigibson.macros import create_module_macros
 from omnigibson.utils.python_utils import Serializable, SerializableNonInstance, UniquelyNamed
 
@@ -89,9 +89,9 @@ class Registry(UniquelyNamed):
             f"Cannot create registry with unique and group object keys that are the same! " \
             f"Unique keys: {self.unique_keys}, group keys: {self.group_keys}"
 
-        # Create the ordered dicts programmatically
+        # Create the dicts programmatically
         for k in self.unique_keys.union(self.group_keys):
-            self.__setattr__(f"_objects_by_{k}", OrderedDict())
+            self.__setattr__(f"_objects_by_{k}", dict())
 
         # Run super init
         super().__init__()
@@ -189,7 +189,7 @@ class Registry(UniquelyNamed):
         # Delete and re-create all keys mappings
         for k in keys:
             self.__delattr__(f"_objects_by_{k}")
-            self.__setattr__(f"_objects_by_{k}", OrderedDict())
+            self.__setattr__(f"_objects_by_{k}", dict())
 
             # Iterate over all objects and re-populate the mappings
             for obj in objects:
@@ -207,13 +207,13 @@ class Registry(UniquelyNamed):
     def get_dict(self, key):
         """
         Specific mapping dictionary within this registry corresponding to the mappings of @key.
-            e.g.: if key = "name", this will return the ordered dictionary mapping object.name to objects
+            e.g.: if key = "name", this will return the dictionary mapping object.name to objects
 
         Args:
             key (str): Key with which to grab mapping dict from
 
         Returns:
-            OrderedDict: Mapping from identifiers to object(s) based on @key
+            dict: Mapping from identifiers to object(s) based on @key
         """
         return getattr(self, f"_objects_by_{key}")
 
@@ -319,7 +319,7 @@ class SerializableRegistry(Registry, Serializable):
 
     def _dump_state(self):
         # Iterate over all objects and grab their states
-        state = OrderedDict()
+        state = dict()
         for obj in self.objects:
             state[obj.name] = obj.dump_state(serialized=False)
         return state
@@ -338,7 +338,7 @@ class SerializableRegistry(Registry, Serializable):
             len(self.objects) > 0 else np.array([])
 
     def _deserialize(self, state):
-        state_dict = OrderedDict()
+        state_dict = dict()
         # Iterate over all the objects and deserialize their individual states, incrementing the index counter
         # along the way
         idx = 0
