@@ -1,6 +1,5 @@
 import gym
 from abc import ABCMeta, abstractmethod
-from collections import OrderedDict
 
 import numpy as np
 
@@ -30,7 +29,7 @@ class GymObservable(metaclass=ABCMeta):
             kwargs (dict): Any keyword args necessary for grabbing observations
 
         Returns:
-            OrderedDict: Keyword-mapped observations mapping observation names to nested observations
+            dict: Keyword-mapped observations mapping observation names to nested observations
         """
         raise NotImplementedError()
 
@@ -55,7 +54,7 @@ class GymObservable(metaclass=ABCMeta):
         Create the observation space for this object. Should be implemented by subclass
 
         Returns:
-            OrderedDict: Keyword-mapped observation space for this object mapping observation name to observation space
+            dict: Keyword-mapped observation space for this object mapping observation name to observation space
         """
         raise NotImplementedError()
 

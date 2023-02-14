@@ -1,6 +1,5 @@
 import gym
 import logging
-from collections import OrderedDict
 
 import omnigibson as og
 from omnigibson.objects import REGISTERED_OBJECTS
@@ -242,7 +241,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
     def _load_observation_space(self):
         # Grab robot(s) and task obs spaces
-        obs_space = OrderedDict()
+        obs_space = dict()
 
         for robot in self.robots:
             # Load the observation space for the robot
@@ -295,9 +294,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
         Get the current environment observation.
 
         Returns:
-            OrderedDict: Keyword-mapped observations, which are possibly nested
+            dict: Keyword-mapped observations, which are possibly nested
         """
-        obs = OrderedDict()
+        obs = dict()
 
         # Grab all observations from each robot
         for robot in self.robots:
@@ -332,14 +331,14 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
         Returns:
             4-tuple:
-                - OrderedDict: state, i.e. next observation
+                - dict: state, i.e. next observation
                 - float: reward, i.e. reward at this current timestep
                 - bool: done, i.e. whether this episode is terminated
-                - OrderedDict: info, i.e. dictionary with any useful information
+                - dict: info, i.e. dictionary with any useful information
         """
         # If the action is not a dictionary, convert into a dictionary
         if not isinstance(action, dict) and not isinstance(action, gym.spaces.Dict):
-            action_dict = OrderedDict()
+            action_dict = dict()
             idx = 0
             for robot in self.robots:
                 action_dim = robot.action_dim

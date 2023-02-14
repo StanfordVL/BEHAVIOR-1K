@@ -75,7 +75,7 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
     def cache(self):
         """
         Returns:
-            OrdereDict: Dictionary mapping specific argument combinations from @self.get_value() to cached values and
+            dict: Dictionary mapping specific argument combinations from @self.get_value() to cached values and
                 information stored for that specific combination
         """
         return self._cache

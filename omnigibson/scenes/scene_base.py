@@ -1,6 +1,5 @@
 import json
 from abc import ABC
-from collections import OrderedDict
 from itertools import combinations
 from omni.isaac.core.objects.ground_plane import GroundPlane
 import numpy as np
@@ -15,7 +14,7 @@ from omnigibson.systems import SYSTEMS_REGISTRY
 from omnigibson.robots.robot_base import m as robot_macros
 
 # Global dicts that will contain mappings
-REGISTERED_SCENES = OrderedDict()
+REGISTERED_SCENES = dict()
 
 
 class Scene(Serializable, Registerable, Recreatable, ABC):
@@ -572,7 +571,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         init_info = {obj.name: obj.get_init_info() for obj in self.object_registry.objects}
 
         # Compose as single dictionary and store internally
-        self._objects_info = OrderedDict(init_info=init_info)
+        self._objects_info = dict(init_info=init_info)
 
     def get_objects_info(self):
         """

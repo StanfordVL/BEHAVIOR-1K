@@ -1,5 +1,4 @@
 import numpy as np
-from collections import OrderedDict
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.heat_source_or_sink import HeatSourceOrSink
 from omnigibson.object_states.inside import Inside
@@ -99,7 +98,7 @@ class Temperature(AbsoluteObjectState):
 
     # For this state, we simply store its value.
     def _dump_state(self):
-        return OrderedDict(temperature=self.value)
+        return dict(temperature=self.value)
 
     def _load_state(self, state):
         self.value = state["temperature"]
@@ -108,4 +107,4 @@ class Temperature(AbsoluteObjectState):
         return np.array([state["temperature"]], dtype=float)
 
     def _deserialize(self, state):
-        return OrderedDict(temperature=state[0]), 1
+        return dict(temperature=state[0]), 1

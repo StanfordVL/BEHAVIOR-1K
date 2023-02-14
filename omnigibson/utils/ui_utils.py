@@ -3,7 +3,6 @@ Helper classes and functions for streamlining user interactions
 """
 import numpy as np
 import sys
-from collections import OrderedDict
 import omnigibson as og
 from omnigibson.macros import gm
 import omnigibson.utils.transform_utils as T
@@ -36,7 +35,7 @@ class KeyboardEventHandler:
     Simple singleton class for handing keyboard events
     """
     # Global keyboard callbacks
-    KEYBOARD_CALLBACKS = OrderedDict()
+    KEYBOARD_CALLBACKS = dict()
 
     # ID assigned to meta callback method for this class
     _CALLBACK_ID = None
@@ -63,7 +62,7 @@ class KeyboardEventHandler:
         input_interface = carb.input.acquire_input_interface()
         keyboard = appwindow.get_keyboard()
         input_interface.unsubscribe_to_keyboard_events(keyboard, cls._CALLBACK_ID)
-        cls.KEYBOARD_CALLBACKS = OrderedDict()
+        cls.KEYBOARD_CALLBACKS = dict()
         cls._CALLBACK_ID = None
 
     @classmethod
@@ -286,7 +285,7 @@ class KeyboardRobotController:
         # Store relevant info from robot
         self.robot = robot
         self.action_dim = robot.action_dim
-        self.controller_info = OrderedDict()
+        self.controller_info = dict()
         idx = 0
         for name, controller in robot._controllers.items():
             self.controller_info[name] = {

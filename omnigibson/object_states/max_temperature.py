@@ -1,7 +1,6 @@
 from omnigibson.object_states.object_state_base import AbsoluteObjectState
 from omnigibson.object_states.temperature import Temperature
 import numpy as np
-from collections import OrderedDict
 
 
 class MaxTemperature(AbsoluteObjectState):
@@ -33,7 +32,7 @@ class MaxTemperature(AbsoluteObjectState):
         return 1
 
     def _dump_state(self):
-        return OrderedDict(temperature=self.value)
+        return dict(temperature=self.value)
 
     def _load_state(self, state):
         self.value = state["temperature"]
@@ -42,4 +41,4 @@ class MaxTemperature(AbsoluteObjectState):
         return np.array([state["temperature"]], dtype=float)
 
     def _deserialize(self, state):
-        return OrderedDict(temperature=state[0]), 1
+        return dict(temperature=state[0]), 1

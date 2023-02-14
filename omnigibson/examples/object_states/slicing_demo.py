@@ -1,6 +1,5 @@
 import logging
 import numpy as np
-from collections import OrderedDict
 
 import omnigibson as og
 from omnigibson.macros import gm
@@ -21,7 +20,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
 
     # Create the scene config to load -- empty scene with table, knife, and apple
-    table_cfg = OrderedDict(
+    table_cfg = dict(
         type="DatasetObject",
         name="table",
         category="breakfast_table",
@@ -30,7 +29,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         position=[0, 0, 0.532],
     )
 
-    apple_cfg = OrderedDict(
+    apple_cfg = dict(
         type="DatasetObject",
         name="apple",
         category="apple",
@@ -39,7 +38,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         position=[0.085, 0,  0.90],
     )
 
-    knife_cfg = OrderedDict(
+    knife_cfg = dict(
         type="DatasetObject",
         name="knife",
         category="table_knife",
@@ -48,7 +47,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         position=[0, 0, 10.0],
     )
 
-    light0_cfg = OrderedDict(
+    light0_cfg = dict(
         type="LightObject",
         name="light0",
         light_type="Sphere",
@@ -57,7 +56,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         position=[1.217, -0.848, 1.388],
     )
 
-    light1_cfg = OrderedDict(
+    light1_cfg = dict(
         type="LightObject",
         name="light1",
         light_type="Sphere",

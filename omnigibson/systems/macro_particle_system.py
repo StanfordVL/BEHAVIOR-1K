@@ -14,16 +14,15 @@ from omnigibson.utils.python_utils import classproperty, subclass_factory
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object_symmetric_bimodal_distribution
 import omnigibson.utils.transform_utils as T
 from omnigibson.prims.geom_prim import VisualGeomPrim
-from collections import OrderedDict
 import numpy as np
 
 
 def get_visual_particle_systems():
     """
     Returns:
-        OrderedDict: Mapping from fluid system name to fluid system
+        dict: Mapping from fluid system name to fluid system
     """
-    systems = OrderedDict()
+    systems = dict()
     for system in SYSTEMS_REGISTRY.objects:
         if issubclass(system, VisualParticleSystem):
             systems[system.name] = system
@@ -40,7 +39,7 @@ class MacroParticleSystem(BaseParticleSystem):
     # Note that this object is NOT part of the actual particle system itself!
     particle_object = None
 
-    # OrderedDict, array of particle objects, mapped by their prim names
+    # dict, array of particle objects, mapped by their prim names
     particles = None
 
     # Scaling factor to sample from when generating a new particle
@@ -59,7 +58,7 @@ class MacroParticleSystem(BaseParticleSystem):
         super().initialize(simulator=simulator)
 
         # Initialize mutable class variables so they don't automatically get overridden by children classes
-        cls.particles = OrderedDict()
+        cls.particles = dict()
         cls.min_scale = np.ones(3)
         cls.max_scale = np.ones(3)
         cls.max_particle_idn = -1
@@ -116,7 +115,7 @@ class MacroParticleSystem(BaseParticleSystem):
 
     @classmethod
     def _dump_state(cls):
-        return OrderedDict(
+        return dict(
             max_particle_idn=cls.max_particle_idn,
             n_particles=cls.n_particles,
             poses=[particle.get_local_pose() for particle in cls.particles.values()],
@@ -131,7 +130,7 @@ class MacroParticleSystem(BaseParticleSystem):
         Load the internal state to this object as specified by @state. Should be implemented by subclass.
 
         Args:
-            state (OrderedDict): Keyword-mapped states of this object to set
+            state (dict): Keyword-mapped states of this object to set
         """
         # Sanity check loading particles
         assert cls.n_particles == state["n_particles"], f"Inconsistent number of particles found when loading " \
@@ -168,7 +167,7 @@ class MacroParticleSystem(BaseParticleSystem):
     @classmethod
     def _deserialize(cls, state):
         # First index is number of particles, rest are the individual particle poses
-        state_dict = OrderedDict()
+        state_dict = dict()
         state_dict["max_particle_idn"] = state[0]
         n_particles = int(state[1])
         state_dict["n_particles"] = n_particles
@@ -363,7 +362,7 @@ class VisualParticleSystem(MacroParticleSystem):
     # Maps group name to the parent object (the object with particles attached to it) of the group
     _group_objects = None
 
-    # Maps particle name to OrderedDict of {obj, link}
+    # Maps particle name to dict of {obj, link}
     _particles_info = None
 
     # Default behavior for this class -- whether to clip generated particles halfway into objects when sampling
@@ -387,9 +386,9 @@ class VisualParticleSystem(MacroParticleSystem):
         super().initialize(simulator=simulator)
 
         # Initialize mutable class variables so they don't automatically get overridden by children classes
-        cls._group_particles = OrderedDict()
-        cls._group_objects = OrderedDict()
-        cls._particles_info = OrderedDict()
+        cls._group_particles = dict()
+        cls._group_objects = dict()
+        cls._particles_info = dict()
 
     @classproperty
     def groups(cls):
@@ -441,9 +440,9 @@ class VisualParticleSystem(MacroParticleSystem):
         super().clear()
 
         # Clear all groups as well
-        cls._group_particles = OrderedDict()
-        cls._group_objects = OrderedDict()
-        cls._particles_info = OrderedDict()
+        cls._group_particles = dict()
+        cls._group_objects = dict()
+        cls._particles_info = dict()
 
     @classmethod
     def remove_particle(cls, name):
@@ -524,7 +523,7 @@ class VisualParticleSystem(MacroParticleSystem):
             f"Cannot create new attachment group because group with name {group} already exists!"
 
         # Create the group
-        cls._group_particles[group] = OrderedDict()
+        cls._group_particles[group] = dict()
         cls._group_objects[group] = obj
 
         return group
@@ -674,7 +673,7 @@ class VisualParticleSystem(MacroParticleSystem):
 
             # Add to group
             cls._group_particles[group][particle.name] = particle
-            cls._particles_info[particle.name] = OrderedDict(obj=cls._group_objects[group], link=link)
+            cls._particles_info[particle.name] = dict(obj=cls._group_objects[group], link=link)
 
     @classmethod
     def generate_group_particles_on_object(cls, group, n_particles=None, min_particles_for_success=1):
@@ -841,7 +840,7 @@ class VisualParticleSystem(MacroParticleSystem):
                     idn=int(particle_idn),
                 )
                 cls._group_particles[name][particle.name] = particle
-                cls._particles_info[particle.name] = OrderedDict(obj=obj, link=obj.links[link_name])
+                cls._particles_info[particle.name] = dict(obj=obj, link=obj.links[link_name])
 
     @classmethod
     def create(cls, particle_name, n_particles_per_group, create_particle_template, min_scale=None, max_scale=None, **kwargs):
@@ -914,9 +913,9 @@ class VisualParticleSystem(MacroParticleSystem):
         state = super()._dump_state()
 
         # Add in per-group information
-        groups_dict = OrderedDict()
+        groups_dict = dict()
         for group_name, group_particles in cls._group_particles.items():
-            groups_dict[group_name] = OrderedDict(
+            groups_dict[group_name] = dict(
                 particle_attached_obj_uuid=cls._group_objects[group_name].uuid,
                 n_particles=cls.num_group_particles(group=group_name),
                 particle_idns=[cls.particle_name2idn(name=name) for name in group_particles.keys()],
@@ -935,7 +934,7 @@ class VisualParticleSystem(MacroParticleSystem):
         Load the internal state to this object as specified by @state. Should be implemented by subclass.
 
         Args:
-            state (OrderedDict): Keyword-mapped states of this object to set
+            state (dict): Keyword-mapped states of this object to set
         """
         # Make sure max particle index is updated
         cls.max_particle_idn = state["max_particle_idn"]
@@ -978,7 +977,7 @@ class VisualParticleSystem(MacroParticleSystem):
     def _deserialize(cls, state):
         # Synchronize the particle groups
         n_groups = int(state[0])
-        groups_dict = OrderedDict()
+        groups_dict = dict()
         group_objs = []
         # Index starts at 1 because index 0 is n_groups
         idx = 1
@@ -987,7 +986,7 @@ class VisualParticleSystem(MacroParticleSystem):
             obj = cls.simulator.scene.object_registry("uuid", obj_uuid)
             group_obj_id2link = {i: link_name for i, link_name in enumerate(obj.links.keys())}
             group_objs.append(obj)
-            groups_dict[obj.name] = OrderedDict(
+            groups_dict[obj.name] = dict(
                 particle_attached_obj_uuid=obj_uuid,
                 n_particles=n_particles,
                 particle_idns=[int(idn) for idn in state[idx + 2 : idx + 2 + n_particles]], # Idx + 2 because the first two are obj_uuid and n_particles

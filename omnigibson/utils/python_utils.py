@@ -415,7 +415,7 @@ class Registerable:
     def _cls_registry(cls):
         """
         Returns:
-            OrderedDict: Mapping from all registered class names to their classes. This should be a REFERENCE
+            dict: Mapping from all registered class names to their classes. This should be a REFERENCE
                 to some external, global dictionary that will be filled-in at runtime.
         """
         raise NotImplementedError()
@@ -439,7 +439,7 @@ class Serializable:
         Dumps the state of this object in dictionary form (can be empty). Should be implemented by subclass.
 
         Returns:
-            OrderedDict: Keyword-mapped states of this object
+            dict: Keyword-mapped states of this object
         """
         raise NotImplementedError()
 
@@ -452,7 +452,7 @@ class Serializable:
                 a (potentially nested) dictionary of states for this object
 
         Returns:
-            OrderedDict or n-array: Either:
+            dict or n-array: Either:
                 - Keyword-mapped states of this object, or
                 - encoded + serialized, 1D numerical np.array capturing this object's state, where n is @self.state_size
         """
@@ -464,7 +464,7 @@ class Serializable:
         Load the internal state to this object as specified by @state. Should be implemented by subclass.
 
         Args:
-            state (OrderedDict): Keyword-mapped states of this object to set
+            state (dict): Keyword-mapped states of this object to set
         """
         raise NotImplementedError()
 
@@ -473,7 +473,7 @@ class Serializable:
         Deserializes and loads this object's state based on @state
 
         Args:
-            state (OrderedDict or n-array): Either:
+            state (dict or n-array): Either:
                 - Keyword-mapped states of this object, or
                 - encoded + serialized, 1D numerical np.array capturing this object's state, where n is @self.state_size
             serialized (bool): If True, will interpret @state as a 1D numpy array. Otherewise, will assume the input is
@@ -488,7 +488,7 @@ class Serializable:
         Should be implemented by subclass.
 
         Args:
-            state (OrderedDict): Keyword-mapped states of this object to encode. Should match structure of output from
+            state (dict): Keyword-mapped states of this object to encode. Should match structure of output from
                 self._dump_state()
 
         Returns:
@@ -502,7 +502,7 @@ class Serializable:
         Should be implemented by subclass.
 
         Args:
-            state (OrderedDict): Keyword-mapped states of this object to encode. Should match structure of output from
+            state (dict): Keyword-mapped states of this object to encode. Should match structure of output from
                 self._dump_state()
 
         Returns:
@@ -521,7 +521,7 @@ class Serializable:
 
         Returns:
             2-tuple:
-                - OrderedDict: Keyword-mapped states of this object. Should match structure of output from
+                - dict: Keyword-mapped states of this object. Should match structure of output from
                     self._dump_state()
                 - int: current index of the flattened state vector that is left off. This is helpful for subclasses
                     that inherit partial deserializations from parent classes, and need to know where the
@@ -538,7 +538,7 @@ class Serializable:
             state (n-array): encoded + serialized, 1D numerical np.array capturing this object's state
 
         Returns:
-            OrderedDict: Keyword-mapped states of this object. Should match structure of output from
+            dict: Keyword-mapped states of this object. Should match structure of output from
                 self._dump_state()
         """
         # Sanity check the idx with the expected state size
@@ -567,7 +567,7 @@ class SerializableNonInstance:
         Dumps the state of this object in dictionary form (can be empty). Should be implemented by subclass.
 
         Returns:
-            OrderedDict: Keyword-mapped states of this object
+            dict: Keyword-mapped states of this object
         """
         raise NotImplementedError()
 
@@ -581,7 +581,7 @@ class SerializableNonInstance:
                 a (potentially nested) dictionary of states for this object
 
         Returns:
-            OrderedDict or n-array: Either:
+            dict or n-array: Either:
                 - Keyword-mapped states of this object, or
                 - encoded + serialized, 1D numerical np.array capturing this object's state, where n is @self.state_size
         """
@@ -594,7 +594,7 @@ class SerializableNonInstance:
         Load the internal state to this object as specified by @state. Should be implemented by subclass.
 
         Args:
-            state (OrderedDict): Keyword-mapped states of this object to set
+            state (dict): Keyword-mapped states of this object to set
         """
         raise NotImplementedError()
 
@@ -604,7 +604,7 @@ class SerializableNonInstance:
         Deserializes and loads this object's state based on @state
 
         Args:
-            state (OrderedDict or n-array): Either:
+            state (dict or n-array): Either:
                 - Keyword-mapped states of this object, or
                 - encoded + serialized, 1D numerical np.array capturing this object's state, where n is @self.state_size
             serialized (bool): If True, will interpret @state as a 1D numpy array. Otherewise, will assume the input is
@@ -620,7 +620,7 @@ class SerializableNonInstance:
         Should be implemented by subclass.
 
         Args:
-            state (OrderedDict): Keyword-mapped states of this object to encode. Should match structure of output from
+            state (dict): Keyword-mapped states of this object to encode. Should match structure of output from
                 self._dump_state()
 
         Returns:
@@ -635,7 +635,7 @@ class SerializableNonInstance:
         Should be implemented by subclass.
 
         Args:
-            state (OrderedDict): Keyword-mapped states of this object to encode. Should match structure of output from
+            state (dict): Keyword-mapped states of this object to encode. Should match structure of output from
                 self._dump_state()
 
         Returns:
@@ -655,7 +655,7 @@ class SerializableNonInstance:
 
         Returns:
             2-tuple:
-                - OrderedDict: Keyword-mapped states of this object. Should match structure of output from
+                - dict: Keyword-mapped states of this object. Should match structure of output from
                     self._dump_state()
                 - int: current index of the flattened state vector that is left off. This is helpful for subclasses
                     that inherit partial deserializations from parent classes, and need to know where the
@@ -673,7 +673,7 @@ class SerializableNonInstance:
             state (n-array): encoded + serialized, 1D numerical np.array capturing this object's state
 
         Returns:
-            OrderedDict: Keyword-mapped states of this object. Should match structure of output from
+            dict: Keyword-mapped states of this object. Should match structure of output from
                 self._dump_state()
         """
         # Sanity check the idx with the expected state size

@@ -1,6 +1,5 @@
 from abc import abstractmethod
 from copy import deepcopy
-from collections import OrderedDict
 import numpy as np
 import matplotlib.pyplot as plt
 from omnigibson.macros import gm, create_module_macros
@@ -14,7 +13,7 @@ from omnigibson.utils.constants import PrimType
 from pxr import PhysxSchema
 
 # Global dicts that will contain mappings
-REGISTERED_ROBOTS = OrderedDict()
+REGISTERED_ROBOTS = dict()
 
 # Add proprio sensor modality to ALL_SENSOR_MODALITIES
 ALL_SENSOR_MODALITIES.add("proprio")
@@ -154,7 +153,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
                     PhysxSchema.PhysxContactReportAPI.Apply(link.prim)
 
         # Search for any sensors this robot might have attached to any of its links
-        self._sensors = OrderedDict()
+        self._sensors = dict()
         obs_modalities = set()
         for link_name, link in self._links.items():
             # Search through all children prims and see if we find any sensor
@@ -222,12 +221,12 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             (e.g.: proprio, rgb, etc.)
 
         Returns:
-            OrderedDict: Keyword-mapped dictionary mapping observation modality names to
+            dict: Keyword-mapped dictionary mapping observation modality names to
                 observations (usually np arrays)
         """
         # Our sensors already know what observation modalities it has, so we simply iterate over all of them
         # and grab their observations, processing them into a flat dict
-        obs_dict = OrderedDict()
+        obs_dict = dict()
         for sensor_name, sensor in self._sensors.items():
             sensor_obs = sensor.get_obs()
             for obs_modality, obs in sensor_obs.items():
@@ -250,14 +249,14 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
     def _get_proprioception_dict(self):
         """
         Returns:
-            OrderedDict: keyword-mapped proprioception observations available for this robot.
+            dict: keyword-mapped proprioception observations available for this robot.
                 Can be extended by subclasses
         """
         joint_positions = self.get_joint_positions(normalized=False)
         joint_velocities = self.get_joint_velocities(normalized=False)
         joint_efforts = self.get_joint_efforts(normalized=False)
         pos, ori = self.get_position(), self.get_rpy()
-        return OrderedDict(
+        return dict(
             joint_qpos=joint_positions,
             joint_qpos_sin=np.sin(joint_positions),
             joint_qpos_cos=np.cos(joint_positions),
@@ -272,7 +271,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
 
     def _load_observation_space(self):
         # We compile observation spaces from our sensors
-        obs_space = OrderedDict()
+        obs_space = dict()
 
         for sensor_name, sensor in self._sensors.items():
             # Load the sensor observation space
@@ -317,7 +316,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         """
         Renders this robot's key sensors, visualizing them via matplotlib plots
         """
-        frames = OrderedDict()
+        frames = dict()
         remaining_obs_modalities = deepcopy(self.obs_modalities)
         for sensor in self.sensors.values():
             obs = sensor.get_obs()
@@ -390,7 +389,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
     def sensors(self):
         """
         Returns:
-            OrderedDict: Keyword-mapped dictionary mapping sensor names to BaseSensor instances owned by this robot
+            dict: Keyword-mapped dictionary mapping sensor names to BaseSensor instances owned by this robot
         """
         return self._sensors
 

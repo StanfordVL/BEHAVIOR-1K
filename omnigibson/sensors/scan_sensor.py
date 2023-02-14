@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from collections import OrderedDict, Iterable
+from collections import Iterable
 
 from transforms3d.quaternions import quat2mat
 
@@ -145,7 +145,7 @@ class ScanSensor(BaseSensor):
     def _obs_space_mapping(self):
         # Set the remaining modalities' values
         # (obs modality, shape, low, high)
-        obs_space_mapping = OrderedDict(
+        obs_space_mapping = dict(
             scan=((self.n_horizontal_rays, self.n_vertical_rays), 0.0, 1.0, np.float32),
             occupancy_grid=((self.occupancy_grid_resolution, self.occupancy_grid_resolution, 1), 0.0, 1.0, np.float32),
         )

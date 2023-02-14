@@ -1,5 +1,4 @@
 import logging
-from collections import OrderedDict
 
 import numpy as np
 
@@ -65,7 +64,7 @@ class FurnitureClosingTask(BaseTask):
 
     def _create_termination_conditions(self):
         # Initialize termination conditions dict and fill in with MaxCollision, Timeout, and Falling
-        terminations = OrderedDict()
+        terminations = dict()
 
         terminations["max_collision"] = MaxCollision(max_collisions=self._termination_config["max_collisions"])
         terminations["timeout"] = Timeout(max_steps=self._termination_config["max_steps"])
@@ -75,7 +74,7 @@ class FurnitureClosingTask(BaseTask):
 
     def _create_reward_functions(self):
         # Initialize reward functions dict and fill in with Potential reward
-        rewards = OrderedDict()
+        rewards = dict()
 
         rewards["potential"] = PotentialReward(
             potential_fcn=self.get_potential,
@@ -153,11 +152,11 @@ class FurnitureClosingTask(BaseTask):
 
     def _get_obs(self, env):
         # No task-specific obs of any kind
-        return OrderedDict(), OrderedDict()
+        return dict(), dict()
 
     def _load_non_low_dim_observation_space(self):
         # No non-low dim observations so we return an empty dict
-        return OrderedDict()
+        return dict()
 
     @classproperty
     def valid_scene_types(cls):

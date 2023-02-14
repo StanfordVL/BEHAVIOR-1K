@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from collections import OrderedDict, defaultdict
+from collections import defaultdict
 import numpy as np
 import omnigibson as og
 from omnigibson.macros import create_module_macros, macros, gm
@@ -194,7 +194,7 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin):
         self._projection_mesh_params = projection_mesh_params
 
         # Map of system to number of modified particles for this object corresponding to the specific system
-        self.modified_particle_count = OrderedDict([(system, 0) for system in self.supported_systems])
+        self.modified_particle_count = dict([(system, 0) for system in self.supported_systems])
 
         # Standardize the conditions (make sure every system has at least one condition, which to make sure
         # the particle modifier isn't already limited with the specific number of particles)
@@ -530,7 +530,7 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin):
         return len(self.modified_particle_count) + 1
 
     def _dump_state(self):
-        state = OrderedDict()
+        state = dict()
         for system, val in self.modified_particle_count.items():
             state[get_element_name_from_system(system)] = val
         # Add current step
@@ -547,7 +547,7 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin):
         return np.array(list(state.values()), dtype=float)
 
     def _deserialize(self, state):
-        state_dict = OrderedDict()
+        state_dict = dict()
         for i, system in enumerate(self.modified_particle_count.keys()):
             state_dict[get_element_name_from_system(system)] = int(state[i])
         state_dict["current_step"] = int(state[len(self.modified_particle_count)])

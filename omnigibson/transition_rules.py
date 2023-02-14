@@ -29,7 +29,7 @@ class BaseFilter(metaclass=ABCMeta):
         Initializes the cached state for this filter if it doesn't already exist
         """
         if cls.state is None:
-            cls.state = OrderedDict()
+            cls.state = dict()
 
         return super(BaseFilter, cls).__new__(cls)
 
@@ -511,7 +511,7 @@ class BlenderRule(BaseTransitionRule):
         self.obj_requirements = obj_requirements
 
         # Store a cached dictionary to check blender volumes so we don't have to do this later
-        self._check_in_volume = OrderedDict()
+        self._check_in_volume = dict()
 
         # Call super method
         super().__init__(individual_filters=individual_filters, group_filters=group_filters)

@@ -1,4 +1,4 @@
-from collections import Iterable, OrderedDict
+from collections import Iterable
 from enum import IntEnum
 
 import numpy as np
@@ -6,10 +6,10 @@ import numpy as np
 from omnigibson.utils.python_utils import classproperty, assert_valid_key, Serializable, Registerable, Recreatable
 
 # Global dicts that will contain mappings
-REGISTERED_CONTROLLERS = OrderedDict()
-REGISTERED_LOCOMOTION_CONTROLLERS = OrderedDict()
-REGISTERED_MANIPULATION_CONTROLLERS = OrderedDict()
-REGISTERED_GRIPPER_CONTROLLERS = OrderedDict()
+REGISTERED_CONTROLLERS = dict()
+REGISTERED_LOCOMOTION_CONTROLLERS = dict()
+REGISTERED_MANIPULATION_CONTROLLERS = dict()
+REGISTERED_GRIPPER_CONTROLLERS = dict()
 
 
 def register_locomotion_controller(cls):
@@ -240,7 +240,7 @@ class BaseController(Serializable, Registerable, Recreatable):
 
     def _dump_state(self):
         # Default is no state (empty dict)
-        return OrderedDict()
+        return dict()
 
     def _load_state(self, state):
         # Default is no state (empty dict), so this is a no-op
@@ -252,7 +252,7 @@ class BaseController(Serializable, Registerable, Recreatable):
 
     def _deserialize(self, state):
         # Default is no state, so do nothing
-        return OrderedDict(), 0
+        return dict(), 0
 
     def _command_to_control(self, command, control_dict):
         """

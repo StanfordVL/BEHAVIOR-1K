@@ -3,7 +3,7 @@ from copy import deepcopy
 import numpy as np
 import logging
 import gym
-from collections import Iterable, OrderedDict
+from collections import Iterable
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.controllers import create_controller
 from omnigibson.controllers.controller_base import ControlType
@@ -81,7 +81,7 @@ class ControllableObject(BaseObject):
         self._action_normalize = action_normalize
 
         # Store internal placeholders that will be filled in later
-        self._dof_to_joints = None          # OrderedDict that will map DOF indices to JointPrims
+        self._dof_to_joints = None          # dict that will map DOF indices to JointPrims
         self._last_action = None
         self._controllers = None
         self.dof_names_ordered = None
@@ -107,7 +107,7 @@ class ControllableObject(BaseObject):
         # Run super first
         super()._initialize()
         # Fill in the DOF to joint mapping
-        self._dof_to_joints = OrderedDict()
+        self._dof_to_joints = dict()
         idx = 0
         for joint in self._joints.values():
             for _ in range(joint.n_dof):
@@ -160,7 +160,7 @@ class ControllableObject(BaseObject):
         self.dof_names_ordered = list(self._joints.keys())
 
         # Initialize controllers to create
-        self._controllers = OrderedDict()
+        self._controllers = dict()
         # Loop over all controllers, in the order corresponding to @action dim
         for name in self.controller_order:
             assert_valid_key(key=name, valid_keys=self._controller_config, name="controller name")
@@ -326,7 +326,7 @@ class ControllableObject(BaseObject):
                 - list: control types for each joint
         """
         # First, loop over all controllers, and calculate the computed control
-        control = OrderedDict()
+        control = dict()
         idx = 0
 
         # Compose control_dict
@@ -457,7 +457,7 @@ class ControllableObject(BaseObject):
                 - root_quat: (4,) (x,y,z,w) global cartesian orientation of ths object's root link
         """
         pos, ori = self.get_position_orientation()
-        return OrderedDict(
+        return dict(
             joint_position=self.get_joint_positions(normalized=False),
             joint_velocity=self.get_joint_velocities(normalized=False),
             joint_effort=self.get_joint_efforts(normalized=False),
@@ -483,7 +483,7 @@ class ControllableObject(BaseObject):
         state = super()._dump_state()
 
         # Add in controller states
-        controller_states = OrderedDict()
+        controller_states = dict()
         for controller_name, controller in self._controllers.items():
             controller_states[controller_name] = controller.dump_state()
 
@@ -517,7 +517,7 @@ class ControllableObject(BaseObject):
         state_dict, idx = super()._deserialize(state=state)
 
         # Deserialize the controller states sequentially
-        controller_states = OrderedDict()
+        controller_states = dict()
         for c_name, c in self._controllers.items():
             state_size = c.state_size
             controller_states[c_name] = c.deserialize(state=state[idx: idx + state_size])
@@ -552,7 +552,7 @@ class ControllableObject(BaseObject):
         actions.
 
         Returns:
-            OrderedDict: Mapping from single action identifier (e.g.: a string, or a number) to array of continuous
+            dict: Mapping from single action identifier (e.g.: a string, or a number) to array of continuous
                 actions to deploy via this object's controllers.
         """
         raise NotImplementedError()
@@ -561,7 +561,7 @@ class ControllableObject(BaseObject):
     def controllers(self):
         """
         Returns:
-            OrderedDict: Controllers owned by this object, mapping controller name to controller object
+            dict: Controllers owned by this object, mapping controller name to controller object
         """
         return self._controllers
 

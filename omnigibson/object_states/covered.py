@@ -6,7 +6,6 @@ from omnigibson.systems.system_base import get_element_name_from_system, get_sys
 from omnigibson.systems.macro_particle_system import VisualParticleSystem, get_visual_particle_systems
 from omnigibson.systems.micro_particle_system import FluidSystem, get_fluid_systems
 from omnigibson.utils.python_utils import classproperty
-from collections import OrderedDict
 import numpy as np
 
 # Create settings for this module
@@ -62,11 +61,11 @@ class Covered(RelativeObjectState, BooleanState):
 
     def _initialize(self):
         # Create the visual particle groups
-        self._visual_particle_groups = OrderedDict((get_element_name_from_system(system), system.create_attachment_group(obj=self.obj))
+        self._visual_particle_groups = dict((get_element_name_from_system(system), system.create_attachment_group(obj=self.obj))
                                                    for system in get_visual_particle_systems().values())
 
         # Default initial particles is 0
-        self._n_initial_visual_particles = OrderedDict((get_element_name_from_system(system), 0)
+        self._n_initial_visual_particles = dict((get_element_name_from_system(system), 0)
                                                        for system in get_visual_particle_systems().values())
 
     def _get_value(self, system):
@@ -155,7 +154,7 @@ class Covered(RelativeObjectState, BooleanState):
         # For fluid systems, we don't need to dump state, because the fluid systems themselves handle all state dumping
         # related to fluids
         # For every visual particle system, add the initial number of particles
-        state = OrderedDict()
+        state = dict()
         for system in get_visual_particle_systems().values():
             name = get_element_name_from_system(system)
             state[f"{name}_initial_visual_particles"] = self._n_initial_visual_particles[name]
@@ -174,7 +173,7 @@ class Covered(RelativeObjectState, BooleanState):
         return np.array([val for val in state.values()], dtype=float)
 
     def _deserialize(self, state):
-        state_dict = OrderedDict()
+        state_dict = dict()
         for i, system in enumerate(get_visual_particle_systems().values()):
             name = get_element_name_from_system(system)
             state_dict[f"{name}_initial_visual_particles"] = int(state[i])

@@ -1,4 +1,4 @@
-from collections import Iterable, OrderedDict
+from collections import Iterable
 from pxr import Gf, Usd, UsdGeom, UsdShade, UsdPhysics
 from omni.isaac.core.utils.rotations import gf_quat_to_np_array
 from omni.isaac.core.utils.prims import (
@@ -426,16 +426,16 @@ class XFormPrim(BasePrim):
 
     def _dump_state(self):
         pos, ori = self.get_position_orientation()
-        return OrderedDict(pos=pos, ori=ori)
+        return dict(pos=pos, ori=ori)
 
     def _load_state(self, state):
         self.set_position_orientation(np.array(state["pos"]), np.array(state["ori"]))
 
     def _serialize(self, state):
         # We serialize by iterating over the keys and adding them to a list that's concatenated at the end
-        # This is a deterministic mapping because we assume the state is an OrderedDict
+        # This is a deterministic mapping because we assume the state is an dict
         return np.concatenate(list(state.values())).astype(float)
 
     def _deserialize(self, state):
         # We deserialize deterministically by knowing the order of values -- pos, ori
-        return OrderedDict(pos=state[0:3], ori=state[3:7]), 7
+        return dict(pos=state[0:3], ori=state[3:7]), 7

@@ -97,7 +97,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     }
 
     # Define objects to load: a light, table, and cloth
-    light_cfg = OrderedDict(
+    light_cfg = dict(
         type="LightObject",
         name="light",
         light_type="Sphere",
@@ -106,7 +106,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         position=[-2.0, -2.0, 2.0],
     )
 
-    table_cfg = OrderedDict(
+    table_cfg = dict(
         type="DatasetObject",
         name="table",
         category="breakfast_table",
