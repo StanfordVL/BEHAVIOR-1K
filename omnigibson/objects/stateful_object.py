@@ -15,6 +15,7 @@ from omnigibson.object_states.factory import (
     get_texture_change_states,
     get_fire_states,
     get_steam_states,
+    get_visual_states,
     get_texture_change_priority,
 )
 from omnigibson.object_states.object_state_base import REGISTERED_OBJECT_STATES
@@ -99,6 +100,7 @@ class StatefulObject(BaseObject):
         # Values that will be filled later
         self._states = None
         self._emitters = OrderedDict()
+        self._visual_states = None
         self._current_texture_state = None
 
         # Load abilities from taxonomy if needed & possible
@@ -206,11 +208,17 @@ class StatefulObject(BaseObject):
     def _post_load(self):
         super()._post_load()
 
-        if len(set(self.states) & set(get_steam_states())) > 0:
-            self._create_emitter_apis(EmitterType.STEAM)
+        # Check whether this object requires any visual updates
+        states_set = set(self.states)
+        self._visual_states = states_set & get_visual_states()
 
-        if len(set(self.states) & set(get_fire_states())) > 0:
-            self._create_emitter_apis(EmitterType.FIRE)
+        # If we require visual updates, possibly create additional APIs
+        if len(self._visual_states) > 0:
+            if len(states_set & get_steam_states()) > 0:
+                self._create_emitter_apis(EmitterType.STEAM)
+
+            if len(states_set & get_fire_states()) > 0:
+                self._create_emitter_apis(EmitterType.FIRE)
 
     def _create_emitter_apis(self, emitter_type):
         """
@@ -355,33 +363,35 @@ class StatefulObject(BaseObject):
         Update the prim's visuals (texture change, steam/fire effects, etc).
         Should be called after all the states are updated.
         """
-        texture_change_states = []
-        emitter_enabled = defaultdict(bool)
-        for state_type, state in self.states.items():
-            if state_type in get_texture_change_states():
-                if state_type == Saturated:
-                    for fluid_system in get_fluid_systems().values():
-                        if state.get_value(fluid_system):
-                            texture_change_states.append(state)
-                            # Only need to do this once, since soaked handles all fluid systems
-                            break
-                elif state.get_value():
-                    texture_change_states.append(state)
-            if state_type in get_steam_states():
-                emitter_enabled[EmitterType.STEAM] |= state.get_value()
-            if state_type in get_fire_states():
-                emitter_enabled[EmitterType.FIRE] |= state.get_value()
+        if len(self._visual_states) > 0:
+            texture_change_states = []
+            emitter_enabled = defaultdict(bool)
+            for state_type in self._visual_states:
+                state = self.states[state_type]
+                if state_type in get_texture_change_states():
+                    if state_type == Saturated:
+                        for fluid_system in get_fluid_systems().values():
+                            if state.get_value(fluid_system):
+                                texture_change_states.append(state)
+                                # Only need to do this once, since soaked handles all fluid systems
+                                break
+                    elif state.get_value():
+                        texture_change_states.append(state)
+                if state_type in get_steam_states():
+                    emitter_enabled[EmitterType.STEAM] |= state.get_value()
+                if state_type in get_fire_states():
+                    emitter_enabled[EmitterType.FIRE] |= state.get_value()
 
-            for emitter_type in emitter_enabled:
-                self.set_emitter_enabled(emitter_type, emitter_enabled[emitter_type])
+                for emitter_type in emitter_enabled:
+                    self.set_emitter_enabled(emitter_type, emitter_enabled[emitter_type])
 
-        texture_change_states.sort(key=lambda s: get_texture_change_priority()[s.__class__])
-        object_state = texture_change_states[-1] if len(texture_change_states) > 0 else None
+            texture_change_states.sort(key=lambda s: get_texture_change_priority()[s.__class__])
+            object_state = texture_change_states[-1] if len(texture_change_states) > 0 else None
 
-        # Only update our texture change if it's a different object state than the one we already have
-        if object_state != self._current_texture_state:
-            self._update_texture_change(object_state)
-            self._current_texture_state = object_state
+            # Only update our texture change if it's a different object state than the one we already have
+            if object_state != self._current_texture_state:
+                self._update_texture_change(object_state)
+                self._current_texture_state = object_state
 
     def _update_texture_change(self, object_state):
         """
