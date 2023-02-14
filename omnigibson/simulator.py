@@ -15,7 +15,7 @@ from omni.isaac.core.utils.prims import is_prim_ancestral, get_prim_type_name, i
 from omni.isaac.core.utils.stage import open_stage
 from omni.isaac.dynamic_control import _dynamic_control
 import omni.kit.loop._loop as omni_loop
-from pxr import Usd, Gf, UsdGeom, Sdf, UsdPhysics, PhysxSchema, PhysicsSchemaTools
+from pxr import Usd, Gf, UsdGeom, Sdf, UsdPhysics, PhysxSchema, PhysicsSchemaTools, UsdUtils
 from omni.isaac.core.loggers import DataLogger
 
 import omnigibson as og
@@ -109,6 +109,7 @@ class Simulator(SimulationContext, Serializable):
 
         # Set of categories that can be grasped by assisted grasping
         self.object_state_types = get_states_by_dependency_order()
+        self.object_state_types_requiring_update = [state for state in self.object_state_types if state.requires_update]
 
         # Set of all non-Omniverse transition rules to apply.
         self._transition_rules = DEFAULT_RULES
@@ -366,7 +367,7 @@ class Simulator(SimulationContext, Serializable):
 
             # Step the object states in global topological order (if the scene exists).
             if self.scene is not None:
-                for state_type in self.object_state_types:
+                for state_type in self.object_state_types_requiring_update:
                     for obj in self.scene.get_objects_with_state(state_type):
                         # Only update objects that have been initialized so far
                         if obj.initialized:
@@ -396,7 +397,7 @@ class Simulator(SimulationContext, Serializable):
         """
         # Create a dict from rule to filter to objects we care about.
         obj_dict = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
-        for obj in self.scene.objects + self.scene.robots:
+        for obj in self.scene.objects:
             for rule in self._transition_rules:
                 for fname, f in rule.individual_filters.items():
                     if f(obj):
@@ -504,6 +505,14 @@ class Simulator(SimulationContext, Serializable):
                 # Also update the scene registry
                 # TODO: A better place to put this perhaps?
                 self._scene.object_registry.update(keys="root_handle")
+
+    def pause(self):
+        if not self.is_paused():
+            super().pause()
+
+    def stop(self):
+        if not self.is_stopped():
+            super().stop()
 
     @property
     def n_physics_timesteps_per_render(self):
@@ -853,6 +862,9 @@ class Simulator(SimulationContext, Serializable):
             omni.usd.get_context().get_stage_event_stream().create_subscription_to_pop(self._stage_open_callback_fn)
         )
         self._contact_callback = self._physics_context._physx_sim_interface.subscribe_contact_report_events(self._on_contact)
+
+        # Set the lighting mode to be stage by default
+        self.set_lighting_mode(mode=LightingMode.STAGE)
 
         # Set the viewer camera, and then set its default pose
         self._set_viewer_camera()

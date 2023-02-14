@@ -161,6 +161,14 @@ class StatefulObject(BaseObject):
         """
         return self._states
 
+    @property
+    def abilities(self):
+        """
+        Returns:
+            dict: Dictionary mapping ability name to ability arguments for this object
+        """
+        return self._abilities
+
     def prepare_object_states(self, abilities=None, include_default_states=True):
         """
         Prepare the state dictionary for an object by generating the appropriate
