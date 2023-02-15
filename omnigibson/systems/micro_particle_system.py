@@ -227,7 +227,7 @@ class PhysxParticleInstancer(BasePrim):
             np.array: (N, 3) numpy array, where each of the N particles' positions are expressed in (x,y,z)
                 cartesian coordinates relative to this instancer's parent prim
         """
-        return np.array(self.get_attribute(attr="positions"))# + self.position
+        return np.array(self.get_attribute(attr="positions"))
 
     @particle_positions.setter
     def particle_positions(self, pos):
@@ -240,7 +240,6 @@ class PhysxParticleInstancer(BasePrim):
         """
         assert pos.shape[0] == self._n_particles, \
             f"Got mismatch in particle setting size: {pos.shape[0]}, vs. number of particles {self._n_particles}!"
-        # pos = (pos - self.position).astype(float)
         self.set_attribute(attr="positions", val=Vt.Vec3fArray.FromNumpy(pos.astype(float)))
 
     @property
@@ -845,6 +844,9 @@ class MicroParticleSystem(BaseParticleSystem):
         )
         instancer.initialize()
         cls.particle_instancers[name] = instancer
+        
+        # Update the max particle instancer ID
+        cls.update_max_instancer_idn()
 
         return instancer
 
@@ -1157,9 +1159,6 @@ class MicroParticleSystem(BaseParticleSystem):
         """
         Removes particle instancer with name @name from this system.
 
-        Note that if this is the default particle instancer (instancer 0), it will NOT delete this instancer,
-        but remove all of its owned particles
-
         Args:
             name (str): Particle instancer name to remove. If it does not exist, then an error will be raised
         """
@@ -1241,9 +1240,6 @@ class MicroParticleSystem(BaseParticleSystem):
             idn = cls.particle_instancer_name_to_idn(name=name)
             info = idn_to_info_mapping[idn]
             cls.generate_particle_instancer(idn=idn, particle_group=info["group"], n_particles=info["count"])
-
-        # Update the max particle instancer ID
-        cls.update_max_instancer_idn()
 
     @classmethod
     def _dump_state(cls):
