@@ -218,7 +218,7 @@ class PhysxParticleInstancer(BasePrim):
         Args:
             group (int): Particle group this instancer belongs to
         """
-        return self.set_attribute(attr="physxParticle:particleGroup", val=group)
+        self.set_attribute(attr="physxParticle:particleGroup", val=group)
 
     @property
     def particle_positions(self):
