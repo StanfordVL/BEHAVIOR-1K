@@ -43,7 +43,7 @@ class ContactFluids(RelativeObjectState, KinematicsMixin):
             return continue_traversal
 
         # Grab the relaxed AABB of this object or its link for coarse filtering of particles to ignore checking
-        lower, upper = self.obj.states[AABB].get_value() if link is None else self.obj.links[link].aabb
+        lower, upper = self.obj.states[AABB].get_value() if link is None else link.aabb
 
         # Add margin, which is a slightly relaxed radius value
         lower -= system.particle_contact_offset * 1.01
