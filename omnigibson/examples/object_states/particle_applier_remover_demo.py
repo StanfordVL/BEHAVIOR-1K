@@ -135,8 +135,8 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Set the viewer camera appropriately
     og.sim.viewer_camera.set_position_orientation(
-        position=np.array([-1.11136405, -1.12709412,  1.99587299]),
-        orientation=np.array([ 0.44662832, -0.17829795, -0.32506992,  0.81428652]),
+        position=np.array([-1.61340969, -1.79803028,  2.53167412]),
+        orientation=np.array([ 0.46291845, -0.12381886, -0.22679218,  0.84790371]),
     )
 
     # If we're using a projection volume, we manually add in the required metalink required in order to use the volume
@@ -192,7 +192,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         # Lower z needed to allow for adjacency bounding box to overlap properly
         z = 1.175
     else:
-        # Higher z needed for actual physical interaction to accomodate non-negligible particle radius
+        # Higher z needed for actual physical interaction to accommodate non-negligible particle radius
         z = 1.22
     modifier.keep_still()
     modifier.set_position_orientation(

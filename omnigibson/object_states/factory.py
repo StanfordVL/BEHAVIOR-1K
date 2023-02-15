@@ -9,6 +9,7 @@ _ALL_STATES = frozenset(
         AABB,
         Burnt,
         ContactBodies,
+        ContactFluids,
         Cooked,
         Covered,
         Heated,
