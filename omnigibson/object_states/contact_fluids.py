@@ -10,6 +10,9 @@ from omni.physx import get_physx_scene_query_interface
 
 
 class ContactFluids(RelativeObjectState, KinematicsMixin):
+    """
+    Object state that handles contact checking between rigid bodies and individual fluid particles.
+    """
 
     def __init__(self, obj):
         super().__init__(obj=obj)
