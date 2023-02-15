@@ -54,10 +54,6 @@ class FluidSink(AbsoluteObjectState, LinkBasedStateMixin):
                                            axis=-1) < self.max_sink_distance)[0]
             inst.remove_particles(idxs=idxs_to_remove)
 
-            # Possibly remove this instancer if there are no particles left and this is not the default instancer
-            if inst.n_particles == 0 and inst != self.fluid_system.default_particle_instancer:
-                self.fluid_system.remove_particle_instancer(name)
-
     def _set_value(self, new_value):
         raise ValueError("set_value not supported for FluidSink.")
 
