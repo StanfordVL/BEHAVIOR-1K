@@ -169,6 +169,11 @@ class Environment(gym.Env, GymObservable, Recreatable):
         og.sim.play()
 
         # Load the state from the loaded scene
+        # This is needed because when the sim is stopped, no joint state info is stored. So, any desired initial
+        # joint configuration needs to get loaded separately AFTER og.sim.play() gets
+        # called, since joint info is R/W only when the simulator is playing
+        # We do this by calling reset_scene(), which automatically loads the internally-cached initial state (including
+        # joints) into the simulator
         og.sim.reset_scene()
 
         # Load task. Should load additional task-relevant objects and configure the scene into its default initial state
