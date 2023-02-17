@@ -13,6 +13,7 @@ from omnigibson.utils.constants import SemanticClass
 from omnigibson.utils.python_utils import classproperty, subclass_factory
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object_symmetric_bimodal_distribution
 import omnigibson.utils.transform_utils as T
+from omnigibson.utils.usd_utils import FlatcacheAPI
 from omnigibson.prims.geom_prim import VisualGeomPrim
 import numpy as np
 
@@ -640,6 +641,10 @@ class VisualParticleSystem(MacroParticleSystem):
             scales = cls.sample_scales(group=group, n=n_particles)
         bbox_extents_local = [(cls.particle_object.aabb_extent * scale).tolist() for scale in scales]
 
+        # If we're using flatcache, we need to update the object's pose on the USD manually
+        if gm.ENABLE_FLATCACHE:
+            FlatcacheAPI.sync_raw_object_transforms_in_usd(prim=obj)
+
         # Generate particles
         z_up = np.zeros((3, 1))
         z_up[-1] = 1.0
@@ -653,15 +658,6 @@ class VisualParticleSystem(MacroParticleSystem):
                 base_to_center = bbox_extent_local[2] / 2.0
                 normal = (T.quat2mat(orientation) @ z_up).flatten()
                 position -= normal * base_to_center
-
-            if gm.ENABLE_FLATCACHE:
-                # If flatcache is enabled, we need to modify the position we're setting because we're directly writing
-                # to the USD, which is NOT being updated when flatcache is enabled!
-                # So, we need to set the particle w.r.t. the link's initial (i.e.: spawn) pose, NOT the current pose!
-                # We will calculate the transform from the link's current pose to its initial pose, and then apply this
-                # transform to the desired global pose
-                tf = T.pose_inv(T.pose2mat(link.get_position_orientation())) @ T.pose2mat(link.spawn_position_orientation)
-                position, orientation = T.mat2pose(tf @ T.pose2mat((position, orientation)))
 
             # Create particle
             particle = cls.add_particle(
