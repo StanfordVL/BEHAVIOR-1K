@@ -18,7 +18,7 @@ from omnigibson.utils.constants import ParticleModifyMethod, PrimType
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function, get_particle_positions_from_frame
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
 from omnigibson.utils.deprecated_utils import Core
-from omnigibson.utils.usd_utils import create_primitive_mesh
+from omnigibson.utils.usd_utils import create_primitive_mesh, FlatcacheAPI
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object
 from omni.physx import get_physx_scene_query_interface as psqi
@@ -389,18 +389,10 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin):
         return condition
 
     def _update(self):
-        # If we're using projection method and flatcache, we need to manually update the visualization animation pose
+        # If we're using projection method and flatcache, we need to manually update this object's transforms on the USD
+        # so the corresponding visualization and overlap meshes are updated properly
         if self.method == ParticleModifyMethod.PROJECTION and gm.ENABLE_FLATCACHE:
-            # We need to set the relative pose from the link frame to the visualization sphere frame
-            # First, get the transform in the world frame from the projection's spawn point (== link spawn point) to the
-            # current link pose
-            spawn_to_origin_tf = T.pose_inv(T.pose2mat(self.link.spawn_position_orientation))
-            origin_to_link_tf = T.pose2mat(self.link.get_position_orientation())
-            pos, quat = T.mat2pose(origin_to_link_tf @ spawn_to_origin_tf)
-            # Then, convert the transform position from the world frame into the link frame
-            pos = pos / self.link.scale
-            pos = T.quat2mat(self.link.get_local_pose()[1]).T @ pos
-            self.projection_source_sphere.set_local_pose(pos, quat)
+            FlatcacheAPI.sync_raw_object_transforms_in_usd(prim=self.obj)
 
         # Check if there's any overlap and if we're at the correct step
         if self._current_step == 0 and self._check_overlap():

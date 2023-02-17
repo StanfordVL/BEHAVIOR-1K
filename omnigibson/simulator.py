@@ -17,13 +17,14 @@ from omni.isaac.dynamic_control import _dynamic_control
 import omni.kit.loop._loop as omni_loop
 from pxr import Usd, Gf, UsdGeom, Sdf, UsdPhysics, PhysxSchema, PhysicsSchemaTools, UsdUtils
 from omni.isaac.core.loggers import DataLogger
+from omni.physx import get_physx_interface, get_physx_simulation_interface, get_physx_scene_query_interface
 
 import omnigibson as og
 from omnigibson.macros import gm, create_module_macros
 from omnigibson.utils.constants import LightingMode
 from omnigibson.utils.config_utils import NumpyEncoder
 from omnigibson.utils.python_utils import clear as clear_pu, create_object_from_init_info, Serializable
-from omnigibson.utils.usd_utils import clear as clear_uu, BoundingBoxAPI
+from omnigibson.utils.usd_utils import clear as clear_uu, BoundingBoxAPI, FlatcacheAPI
 from omnigibson.utils.ui_utils import CameraMover, disclaimer
 from omnigibson.scenes import Scene
 from omnigibson.objects.object_base import BaseObject
@@ -84,6 +85,9 @@ class Simulator(SimulationContext, Serializable):
             return
         Simulator._world_initialized = True
         self._dc_interface = _dynamic_control.acquire_dynamic_control_interface()
+        self._physx_interface = get_physx_interface()
+        self._physx_simulation_interface = get_physx_simulation_interface()
+        self._physx_scene_query_interface = get_physx_scene_query_interface()
         self._data_logger = DataLogger()
         self._contact_callback = self._physics_context._physx_sim_interface.subscribe_contact_report_events(self._on_contact)
 
@@ -514,6 +518,10 @@ class Simulator(SimulationContext, Serializable):
         if not self.is_stopped():
             super().stop()
 
+        # If we're using flatcache, we also need to reset its API
+        if gm.ENABLE_FLATCACHE:
+            FlatcacheAPI.reset()
+
     @property
     def n_physics_timesteps_per_render(self):
         """
@@ -666,9 +674,33 @@ class Simulator(SimulationContext, Serializable):
     def dc(self):
         """
         Returns:
-            _dynamic_control.DynamicControl: Dynamic control interface
+            _dynamic_control.DynamicControl: Dynamic control (dc) interface
         """
         return self._dc_interface
+
+    @property
+    def pi(self):
+        """
+        Returns:
+            PhysX: Physx Interface (pi) for controlling low-level physx engine
+        """
+        return self._physx_interface
+
+    @property
+    def psi(self):
+        """
+        Returns:
+            IPhysxSimulation: Physx Simulation Interface (psi) for controlling low-level physx simulation
+        """
+        return self._physx_simulation_interface
+
+    @property
+    def psqi(self):
+        """
+        Returns:
+            PhysXSceneQuery: Physx Scene Query Interface (psqi) for running low-level scene queries
+        """
+        return self._physx_scene_query_interface
 
     @property
     def scene(self):
