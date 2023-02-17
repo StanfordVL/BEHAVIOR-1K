@@ -80,25 +80,6 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
         """
         return self._cache
 
-    @classproperty
-    def requires_update(cls):
-        """
-        Returns:
-            bool: True if this state requires an update or not every sim step
-        """
-        # The __repr__ call tells us which actual function is being called
-        # Any subclass that actually implements _update() will cause this to return its own class_name._update
-        # Otherwise, __repr__ will return BaseObjectState._update
-        # So we use this as a heuristic to check whether or not a subclass has overridden the _update method
-        return "BaseObjectState" not in cls._update.__repr__()
-
-    def _update(self):
-        """
-        This function will be called once for every simulator step.
-        """
-        # Explicitly raise not implemented error to avoid silent bugs -- update should never be called otherwise
-        raise NotImplementedError()
-
     def _initialize(self):
         """
         This function will be called once; should be used for any object state-related objects have been loaded.
@@ -117,16 +98,6 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
 
         self._initialize()
         self._initialized = True
-
-    def update(self):
-        """
-        Updates the object state, possibly clearing internal cached information
-        """
-        assert self._initialized, "Cannot update uninitialized state."
-        # Clear all the changed values and update the last t value
-        self._changed = dict()
-        self._last_t_updated = og.sim.current_time_step_index
-        return self._update()
 
     def clear_cache(self):
         """

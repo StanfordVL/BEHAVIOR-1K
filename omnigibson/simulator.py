@@ -31,6 +31,7 @@ from omnigibson.objects.object_base import BaseObject
 from omnigibson.objects.stateful_object import StatefulObject
 from omnigibson.object_states.contact_subscribed_state_mixin import ContactSubscribedStateMixin
 from omnigibson.object_states.factory import get_states_by_dependency_order
+from omnigibson.object_states.update_state_mixin import UpdateStateMixin
 from omnigibson.sensors.vision_sensor import VisionSensor
 from omnigibson.transition_rules import DEFAULT_RULES
 
@@ -113,7 +114,8 @@ class Simulator(SimulationContext, Serializable):
 
         # Set of categories that can be grasped by assisted grasping
         self.object_state_types = get_states_by_dependency_order()
-        self.object_state_types_requiring_update = [state for state in self.object_state_types if state.requires_update]
+        self.object_state_types_requiring_update = \
+            [state for state in self.object_state_types if issubclass(state, UpdateStateMixin)]
 
         # Set of all non-Omniverse transition rules to apply.
         self._transition_rules = DEFAULT_RULES
