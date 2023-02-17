@@ -1,12 +1,16 @@
 """
 Helper classes and functions for streamlining user interactions
 """
+import contextlib
+
 import numpy as np
 import sys
 import omnigibson as og
 from omnigibson.macros import gm
 import omnigibson.utils.transform_utils as T
 import omni
+import omni.ui
+import omni.log
 import carb
 import random
 
@@ -97,6 +101,33 @@ class KeyboardEventHandler:
 
         # Always return True
         return True
+
+
+@contextlib.contextmanager
+def suppress_logging(channels):
+    """
+    A context scope for temporarily suppressing logging for certain omni channels.
+
+    Args:
+        channels (list of str): Logging channel(s) to suppress
+    """
+    # Record the state to restore to after the context exists
+    log = omni.log.get_log()
+
+    # For some reason, all enabled states always return False even if the logging is clearly enabled for the
+    # given channel, so we assume all channels are enabled
+    # We do, however, check what behavior was assigned to this channel, since we force an override during this context
+    channel_behavior = {channel: log.get_channel_enabled(channel)[2] for channel in channels}
+
+    # Suppress the channels
+    for channel in channels:
+        log.set_channel_enabled(channel, False, omni.log.SettingBehavior.OVERRIDE)
+
+    yield
+
+    # Unsuppress the channels
+    for channel in channels:
+        log.set_channel_enabled(channel, True, channel_behavior[channel])
 
 
 def disclaimer(msg):
