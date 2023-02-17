@@ -491,15 +491,12 @@ class Simulator(SimulationContext, Serializable):
             with self.slowed(dt=1e-3):
                 super().play()
 
-            # Update all object handles and spawn poses
+            # Update all object handles
             if self.scene is not None and self.scene.initialized:
                 for obj in self.scene.objects:
                     # Only need to update if object is already initialized as well
                     if obj.initialized:
                         obj.update_handles()
-                        # Only need to update spawn pose if we were stopped
-                        if was_stopped:
-                            obj.update_spawn_position_orientation()
 
             # Check to see if any objects should be initialized
             if len(self._objects_to_initialize) > 0:

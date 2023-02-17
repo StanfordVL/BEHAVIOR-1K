@@ -134,9 +134,6 @@ class RigidPrim(XFormPrim):
         self.update_handles()
         self._body_name = self.prim_path.split("/")[-1]
 
-        # Update the spawn pose of this prim now that it's been initialized properly
-        self.update_spawn_position_orientation()
-
     def update_meshes(self):
         """
         Helper function to refresh owned visual and collision meshes. Useful for synchronizing internal data if

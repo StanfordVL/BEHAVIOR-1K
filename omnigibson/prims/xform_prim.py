@@ -45,7 +45,6 @@ class XFormPrim(BasePrim):
         self._binding_api = None
         self._material = None
         self._collision_filter_api = None
-        self._spawn_position_orientation = None
 
         # Run super method
         super().__init__(
@@ -86,13 +85,6 @@ class XFormPrim(BasePrim):
         # Optionally set the scale and visibility
         if "scale" in self._load_config and self._load_config["scale"] is not None:
             self.scale = self._load_config["scale"]
-
-    def _initialize(self):
-        # Run super first
-        super()._initialize()
-
-        # Store the spawn pose of this prim
-        self.update_spawn_position_orientation()
 
     def _set_xform_properties(self):
         current_position, current_orientation = self.get_position_orientation()
@@ -304,24 +296,6 @@ class XFormPrim(BasePrim):
         transform = Gf.Transform()
         transform.SetMatrix(prim_tf)
         return np.array(transform.GetScale())
-
-    def update_spawn_position_orientation(self):
-        """
-        Updates this prim's spawn position and orientation based on its current pose
-        """
-        self._spawn_position_orientation = self.get_position_orientation()
-
-    @property
-    def spawn_position_orientation(self):
-        """
-        Gets prim's spawn pose (i.e.: the pose when this prim was initialized) with respect to the world's frame.
-
-        Returns:
-            2-tuple:
-                - 3-array: (x,y,z) position in the world frame
-                - 4-array: (x,y,z,w) quaternion orientation in the world frame
-        """
-        return self._spawn_position_orientation
 
     @property
     def scale(self):
