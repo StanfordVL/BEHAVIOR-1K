@@ -81,9 +81,6 @@ class EntityPrim(XFormPrim):
         # Update joint information
         self.update_joints()
 
-        # Update the spawn pose of this prim now that it's been initialized properly
-        self.update_spawn_position_orientation()
-
     def _load(self, simulator=None):
         # By default, this prim cannot be instantiated from scratch!
         raise NotImplementedError("By default, an entity prim cannot be created from scratch.")
@@ -874,14 +871,6 @@ class EntityPrim(XFormPrim):
                 return self._get_local_pose_when_simulating()
             else:
                 return super().get_local_pose()
-
-    def update_spawn_position_orientation(self):
-        # Call super first
-        super().update_spawn_position_orientation()
-
-        # Iterate over all owned links and update their spawn poses as well
-        for link in self.links.values():
-            link.update_spawn_position_orientation()
 
     # TODO: Is the omni joint damping (used for driving motors) same as dissipative joint damping (what we had in pb)?
     @property

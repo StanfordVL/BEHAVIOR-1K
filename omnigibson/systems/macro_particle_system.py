@@ -659,15 +659,6 @@ class VisualParticleSystem(MacroParticleSystem):
                 normal = (T.quat2mat(orientation) @ z_up).flatten()
                 position -= normal * base_to_center
 
-            if gm.ENABLE_FLATCACHE:
-                # If flatcache is enabled, we need to modify the position we're setting because we're directly writing
-                # to the USD, which is NOT being updated when flatcache is enabled!
-                # So, we need to set the particle w.r.t. the link's initial (i.e.: spawn) pose, NOT the current pose!
-                # We will calculate the transform from the link's current pose to its initial pose, and then apply this
-                # transform to the desired global pose
-                tf = T.pose_inv(T.pose2mat(link.get_position_orientation())) @ T.pose2mat(link.spawn_position_orientation)
-                position, orientation = T.mat2pose(tf @ T.pose2mat((position, orientation)))
-
             # Create particle
             particle = cls.add_particle(
                 prim_path=link_prim_path,
