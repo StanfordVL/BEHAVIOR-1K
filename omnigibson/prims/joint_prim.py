@@ -312,9 +312,8 @@ class JointPrim(BasePrim):
         Gets this joint's type (ignoring the "Physics" prefix)
 
         Returns:
-            str: Joint's type. Should be one of:
-                {"FixedJoint", "Joint", "PrismaticJoint", "RevoluteJoint", "SphericalJoint"}
-                    (equivalently, one of JointType)
+            JointType: Joint's type. Should be one corresponding to:
+                {JOINT_PRISMATIC, JOINT_REVOLUTE, JOINT_FIXED, JOINT_SPHERICAL}
         """
         return self._joint_type
 
