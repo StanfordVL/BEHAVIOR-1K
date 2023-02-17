@@ -562,7 +562,7 @@ class ParticleRemover(ParticleModifier):
             if system.n_particles > 0:
                 # Iterate over all particles and remove any that are within the relaxed AABB of the remover volume
                 particle_names = list(system.particles.keys())
-                particle_positions = np.array([system.get_particle_position_orientation(name=name) for name in system.particles.keys()])
+                particle_positions = np.array([system.get_particle_position_orientation(name=name)[0] for name in system.particles.keys()])
                 inbound_idxs = self._check_in_mesh(particle_positions).nonzero()[0]
                 max_particle_absorbed = self.visual_particle_modification_limit - self.modified_particle_count[system]
                 for idx in inbound_idxs[:max_particle_absorbed]:
