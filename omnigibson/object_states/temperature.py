@@ -4,6 +4,7 @@ from omnigibson.object_states.heat_source_or_sink import HeatSourceOrSink
 from omnigibson.object_states.inside import Inside
 from omnigibson.object_states.object_state_base import AbsoluteObjectState
 from omnigibson.object_states.aabb import AABB
+from omnigibson.object_states.update_state_mixin import UpdateStateMixin
 import omnigibson.utils.transform_utils as T
 import omnigibson as og
 
@@ -19,7 +20,7 @@ m.DEFAULT_TEMPERATURE = 23.0  # degrees Celsius
 m.TEMPERATURE_DECAY_SPEED = 0.02  # per second. We'll do the conversion to steps later.
 
 
-class Temperature(AbsoluteObjectState):
+class Temperature(AbsoluteObjectState, UpdateStateMixin):
     @staticmethod
     def get_dependencies():
         return AbsoluteObjectState.get_dependencies() + [AABB]

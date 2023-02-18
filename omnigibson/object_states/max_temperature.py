@@ -1,9 +1,10 @@
 from omnigibson.object_states.object_state_base import AbsoluteObjectState
 from omnigibson.object_states.temperature import Temperature
+from omnigibson.object_states.update_state_mixin import UpdateStateMixin
 import numpy as np
 
 
-class MaxTemperature(AbsoluteObjectState):
+class MaxTemperature(AbsoluteObjectState, UpdateStateMixin):
     """
     This state remembers the highest temperature reached by an object.
     """

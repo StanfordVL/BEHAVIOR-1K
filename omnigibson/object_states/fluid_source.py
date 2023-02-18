@@ -3,9 +3,10 @@ import numpy as np
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from omnigibson.object_states.object_state_base import AbsoluteObjectState
 from omnigibson.object_states.toggle import ToggledOn
+from omnigibson.object_states.update_state_mixin import UpdateStateMixin
 
 
-class FluidSource(AbsoluteObjectState, LinkBasedStateMixin):
+class FluidSource(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixin):
     def __init__(self, obj):
         super().__init__(obj)
 

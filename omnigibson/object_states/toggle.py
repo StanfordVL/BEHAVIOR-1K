@@ -4,6 +4,7 @@ from omnigibson.macros import create_module_macros
 from omnigibson.prims.geom_prim import VisualGeomPrim
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
+from omnigibson.object_states.update_state_mixin import UpdateStateMixin
 from omnigibson.utils.usd_utils import create_primitive_mesh
 from omni.isaac.core.utils.prims import get_prim_at_path
 
@@ -17,7 +18,7 @@ m.TOGGLE_BUTTON_SCALE = 0.05
 m.CAN_TOGGLE_STEPS = 5
 
 
-class ToggledOn(AbsoluteObjectState, BooleanState, LinkBasedStateMixin):
+class ToggledOn(AbsoluteObjectState, BooleanState, LinkBasedStateMixin, UpdateStateMixin):
     def __init__(self, obj):
         self.value = False
         self.robot_can_toggle_steps = 0

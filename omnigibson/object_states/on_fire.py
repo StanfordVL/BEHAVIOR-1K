@@ -3,6 +3,7 @@ from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from omnigibson.object_states.object_state_base import AbsoluteObjectState
 from omnigibson.object_states.temperature import Temperature
 from omnigibson.object_states.heat_source_or_sink import HeatSourceOrSink
+from omnigibson.object_states.update_state_mixin import UpdateStateMixin
 
 
 # Create settings for this module
@@ -15,7 +16,7 @@ m.DEFAULT_HEATING_RATE = 0.04
 m.DEFAULT_DISTANCE_THRESHOLD = 0.2
 
 
-class OnFire(HeatSourceOrSink):
+class OnFire(HeatSourceOrSink, UpdateStateMixin):
     """
     This state indicates the heat source is currently on fire.
 
@@ -61,7 +62,6 @@ class OnFire(HeatSourceOrSink):
         return HeatSourceOrSink.get_dependencies() + [Temperature]
 
     def _update(self):
-        super()._update()
         # If it's on fire, maintain the fire temperature
         if self.get_value():
             self.obj.states[Temperature].set_value(self.temperature)
