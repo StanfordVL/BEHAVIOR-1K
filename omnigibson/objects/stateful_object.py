@@ -499,7 +499,7 @@ class StatefulObject(BaseObject):
 
         return state_dic, idx
 
-    def clear_cached_states(self):
+    def clear_states_cache(self):
         """
         Clears the internal cache from all owned states
         """
@@ -510,26 +510,9 @@ class StatefulObject(BaseObject):
             obj_state.clear_cache()
         BoundingBoxAPI.clear()
 
-    def reset_states(self):
-        """
-        Resets all object states' internal values
-        """
-        # Check self._states just in case states have not been initialized yet.
-        if not self._states:
-            return
-        for _, obj_state in self._states.items():
-            obj_state.reset()
-
-    def reset(self):
-        # Call super first
-        super().reset()
-
-        # Reset all states
-        self.reset_states()
-
     def set_position_orientation(self, position=None, orientation=None):
         super().set_position_orientation(position=position, orientation=orientation)
-        self.clear_cached_states()
+        self.clear_states_cache()
 
     @classproperty
     def _do_not_register_classes(cls):

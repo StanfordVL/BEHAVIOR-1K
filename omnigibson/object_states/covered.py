@@ -27,24 +27,13 @@ class Covered(RelativeObjectState, BooleanState):
         super().__init__(obj)
 
         # Set internal values
-        self._visual_particle_groups = None
+        self._visual_particle_group = None
         self._n_initial_visual_particles = None
 
     @staticmethod
     def get_dependencies():
         # AABB needed for sampling visual particles on an object
         return RelativeObjectState.get_dependencies() + [AABB, ContactFluids]
-
-    def reset(self):
-        # Run super first
-        super().reset()
-
-        # Make sure all groups are cleared if initialized, and then re-initialize
-        if self._initialized:
-            self._clear_attachment_groups()
-
-            # Re-initialize system
-            self._initialize()
 
     def remove(self):
         if self._initialized:
@@ -54,15 +43,13 @@ class Covered(RelativeObjectState, BooleanState):
         """
         Utility function to destroy all corresponding attachment groups for this object
         """
-        for system_name, group in self._visual_particle_groups.items():
-            system = get_system_from_element_name(system_name)
-            if group in system.groups:
-                system.remove_attachment_group(group)
+        for system in get_visual_particle_systems().values():
+            if self._visual_particle_group in system.groups:
+                system.remove_attachment_group(self._visual_particle_group)
 
     def _initialize(self):
-        # Create the visual particle groups
-        self._visual_particle_groups = dict((get_element_name_from_system(system), system.create_attachment_group(obj=self.obj))
-                                                   for system in get_visual_particle_systems().values())
+        # Grab group name
+        self._visual_particle_group = VisualParticleSystem.get_group_name(obj=self.obj)
 
         # Default initial particles is 0
         self._n_initial_visual_particles = dict((get_element_name_from_system(system), 0)
@@ -76,10 +63,10 @@ class Covered(RelativeObjectState, BooleanState):
         if issubclass(system, VisualParticleSystem):
             # Create the group if it doesn't exist already
             name = get_element_name_from_system(system)
-            if self._visual_particle_groups[name] not in system.groups:
+            if self._visual_particle_group not in system.groups:
                 system.create_attachment_group(obj=self.obj)
             # We check whether the current number of particles assigned to the group is greater than the threshold
-            value = system.num_group_particles(group=self._visual_particle_groups[name]) \
+            value = system.num_group_particles(group=self._visual_particle_group) \
                    > m.VISUAL_PARTICLE_THRESHOLD * self._n_initial_visual_particles[name]
         elif issubclass(system, FluidSystem):
             # We only check if we have particle instancers currently
@@ -103,22 +90,21 @@ class Covered(RelativeObjectState, BooleanState):
         if issubclass(system, VisualParticleSystem):
             # Create the group if it doesn't exist already
             name = get_element_name_from_system(system)
-            if self._visual_particle_groups[name] not in system.groups:
+            if self._visual_particle_group not in system.groups:
                 system.create_attachment_group(obj=self.obj)
 
             # Check current state and only do something if we're changing state
             if self.get_value(system) != new_value:
-                group = self._visual_particle_groups[name]
                 if new_value:
                     # Generate particles
-                    success = system.generate_group_particles_on_object(group=group)
+                    success = system.generate_group_particles_on_object(group=self._visual_particle_group)
                     # If we succeeded with generating particles (new_value = True), store additional info
                     if success:
                         # Store how many particles there are now -- this is the "maximum" number possible
-                        self._n_initial_visual_particles[name] = system.num_group_particles(group=group)
+                        self._n_initial_visual_particles[name] = system.num_group_particles(group=self._visual_particle_group)
                 else:
                     # We remove all of this group's particles
-                    system.remove_all_group_particles(group=group)
+                    system.remove_all_group_particles(group=self._visual_particle_group)
 
         elif issubclass(system, FluidSystem):
             # Check current state and only do something if we're changing state

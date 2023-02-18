@@ -420,9 +420,8 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             system.reset()
 
         # Reset all object and robot states
-        for obj in self.objects:
-            if isinstance(obj, StatefulObject):
-                obj.reset_states()
+        for robot in self.robots:
+            robot.reset()
 
         # Reset the pose and joint configuration of all scene objects.
         if self._initial_state is not None:
@@ -600,6 +599,11 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
     def _load_state(self, state):
         # Default state for the scene is from the registry alone
         self._registry.load_state(state=state, serialized=False)
+
+        # We additionally clear caches for all object states
+        for obj in self.objects:
+            if isinstance(obj, StatefulObject):
+                obj.clear_states_cache()
 
     def _serialize(self, state):
         # Default state for the scene is from the registry alone

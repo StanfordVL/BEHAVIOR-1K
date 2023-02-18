@@ -63,14 +63,6 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
     def state_size(self):
         return 0
 
-    def reset(self):
-        """
-        Resets this object state. By default, it clears all internal caching data
-        """
-        self._cache = dict()
-        self._changed = dict()
-        self._last_t_updated = -1
-
     @property
     def cache(self):
         """
@@ -105,6 +97,8 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
         """
         # Clear all entries
         self._cache = dict()
+        self._changed = dict()
+        self._last_t_updated = -1
 
     def update_cache(self, get_value_args):
         """

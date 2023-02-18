@@ -238,9 +238,6 @@ class ControllableObject(BaseObject):
         # simulation in order to set joints
         assert self._simulator.is_playing(), "Simulator must be playing in order to reset controllable object's joints!"
 
-        # Run super first
-        super().reset()
-
         # Additionally set the joint states based on the reset values
         self.set_joint_positions(positions=self._reset_joint_pos, target=False)
         self.set_joint_velocities(velocities=np.zeros(self.n_dof), target=False)
