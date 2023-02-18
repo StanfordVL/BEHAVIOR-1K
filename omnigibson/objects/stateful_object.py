@@ -23,7 +23,7 @@ from omnigibson.object_states.heat_source_or_sink import HeatSourceOrSink
 from omnigibson.object_states.on_fire import OnFire
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.renderer_settings.renderer_settings import RendererSettings
-from omnigibson.systems.micro_particle_system import get_fluid_systems
+from omnigibson.systems.micro_particle_system import FluidSystem
 from omnigibson.utils.constants import PrimType, EmitterType
 from omnigibson.utils.usd_utils import BoundingBoxAPI
 from omnigibson.utils.python_utils import classproperty
@@ -370,7 +370,7 @@ class StatefulObject(BaseObject):
                 state = self.states[state_type]
                 if state_type in get_texture_change_states():
                     if state_type == Saturated:
-                        for fluid_system in get_fluid_systems().values():
+                        for fluid_system in FluidSystem.get_systems().values():
                             if state.get_value(fluid_system):
                                 texture_change_states.append(state)
                                 # Only need to do this once, since soaked handles all fluid systems

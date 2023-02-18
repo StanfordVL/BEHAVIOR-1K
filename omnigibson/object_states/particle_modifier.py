@@ -6,15 +6,15 @@ from omnigibson.macros import create_module_macros, macros, gm
 from omnigibson.prims.geom_prim import VisualGeomPrim
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.contact_bodies import ContactBodies
-from omnigibson.object_states.contact_fluids import ContactFluids
+from omnigibson.object_states.contact_particles import ContactParticles
 from omnigibson.object_states.covered import Covered
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from omnigibson.object_states.object_state_base import AbsoluteObjectState
 from omnigibson.object_states.toggle import ToggledOn
 from omnigibson.object_states.update_state_mixin import UpdateStateMixin
 from omnigibson.systems.system_base import get_element_name_from_system
-from omnigibson.systems.macro_particle_system import VisualParticleSystem, get_visual_particle_systems
-from omnigibson.systems.micro_particle_system import FluidSystem, get_fluid_systems
+from omnigibson.systems.macro_particle_system import VisualParticleSystem
+from omnigibson.systems.micro_particle_system import PhysicalParticleSystem
 from omnigibson.utils.constants import ParticleModifyMethod, PrimType
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function, get_particle_positions_from_frame
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
@@ -35,7 +35,7 @@ m.REMOVAL_LINK_NAME = "particleremover_link"
 
 # How many samples within the application area to generate per update step
 m.MAX_VISUAL_PARTICLES_APPLIED_PER_STEP = 2
-m.MAX_FLUID_PARTICLES_APPLIED_PER_STEP = 10
+m.MAX_PHYSICAL_PARTICLES_APPLIED_PER_STEP = 10
 
 # How many steps between generating particle samples
 m.N_STEPS_PER_APPLICATION = 5
@@ -43,11 +43,11 @@ m.N_STEPS_PER_REMOVAL = 1
 
 # Saturation thresholds -- maximum number of particles that can be applied by a ParticleApplier
 m.VISUAL_PARTICLES_APPLICATION_LIMIT = 1000000
-m.FLUID_PARTICLES_APPLICATION_LIMIT = 1000000
+m.PHYSICAL_PARTICLES_APPLICATION_LIMIT = 1000000
 
 # Saturation thresholds -- maximum number of particles that can be removed ("absorbed") by a ParticleRemover
 m.VISUAL_PARTICLES_REMOVAL_LIMIT = 40
-m.FLUID_PARTICLES_REMOVAL_LIMIT = 400
+m.PHYSICAL_PARTICLES_REMOVAL_LIMIT = 400
 
 # Fallback particle visualization radius for visualizing projected visual particles
 m.VISUAL_PARTICLE_PROJECTION_PARTICLE_RADIUS = 0.01
@@ -153,8 +153,8 @@ def create_projection_visualization(
 
 class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixin):
     """
-    Object state representing an object that has the ability to modify visual and / or fluid particles within the active
-    simulation.
+    Object state representing an object that has the ability to modify visual and / or physical particles within the
+    active simulation.
 
     Args:
         obj (StatefulObject): Object to which this state will be applied
@@ -381,9 +381,9 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
         if issubclass(system, VisualParticleSystem):
             def condition(obj):
                 return self.modified_particle_count[system] < self.visual_particle_modification_limit
-        elif issubclass(system, FluidSystem):
+        elif issubclass(system, PhysicalParticleSystem):
             def condition(obj):
-                return self.modified_particle_count[system] < self.fluid_particle_modification_limit
+                return self.modified_particle_count[system] < self.physical_particle_modification_limit
         else:
             self.unsupported_system_error(system=system)
 
@@ -426,7 +426,7 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
 
     @staticmethod
     def get_optional_dependencies():
-        return AbsoluteObjectState.get_optional_dependencies() + [Covered, ToggledOn, ContactBodies, ContactFluids]
+        return AbsoluteObjectState.get_optional_dependencies() + [Covered, ToggledOn, ContactBodies, ContactParticles]
 
     def check_at_limit(self, system, verify_not_over_limit=False):
         """
@@ -443,8 +443,8 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
         """
         if issubclass(system, VisualParticleSystem):
             limit = self.visual_particle_modification_limit
-        elif issubclass(system, FluidSystem):
-            limit = self.fluid_particle_modification_limit
+        elif issubclass(system, PhysicalParticleSystem):
+            limit = self.physical_particle_modification_limit
         else:
             self.unsupported_system_error(system=system)
 
@@ -468,8 +468,8 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
         if value:
             if issubclass(system, VisualParticleSystem):
                 n_particles = self.visual_particle_modification_limit
-            elif issubclass(system, FluidSystem):
-                n_particles = self.fluid_particle_modification_limit
+            elif issubclass(system, PhysicalParticleSystem):
+                n_particles = self.physical_particle_modification_limit
             else:
                 self.unsupported_system_error(system=system)
         self.modified_particle_count[system] = n_particles
@@ -491,7 +491,7 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
         Returns:
             list: All systems used in this state, ordered deterministically
         """
-        return list(get_visual_particle_systems().values()) + list(get_fluid_systems().values())
+        return list(VisualParticleSystem.get_systems().values()) + list(PhysicalParticleSystem.get_systems().values())
 
     @property
     def n_steps_per_modification(self):
@@ -510,10 +510,10 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
         raise NotImplementedError()
 
     @property
-    def fluid_particle_modification_limit(self):
+    def physical_particle_modification_limit(self):
         """
         Returns:
-            int: Maximum number of fluid particles from a specific system that can be modified by this object
+            int: Maximum number of physical particles from a specific system that can be modified by this object
         """
         raise NotImplementedError()
 
@@ -570,26 +570,26 @@ class ParticleRemover(ParticleModifier):
                     system.remove_particle(particle_names[idx])
                 self.modified_particle_count[system] += min(len(inbound_idxs), max_particle_absorbed)
 
-        elif issubclass(system, FluidSystem):
+        elif issubclass(system, PhysicalParticleSystem):
             instancer_to_particle_idxs = {}
             # If we're a cloth and using adjacency, we have to use check_in_mesh with the relaxed AABB since we
             # can't detect collisions via scene query interface. Alternatively, if we're using the projection method,
             # we also need to use check_in_mesh to check for overlap with the projection mesh
-            # We'll check for if the fluid particles are within this relaxed AABB
+            # We'll check for if the physical particles are within this relaxed AABB
             if self.obj.prim_type == PrimType.CLOTH or self.method == ParticleModifyMethod.PROJECTION:
                 for inst in system.particle_instancers.values():
                     inbound_idxs = self._check_in_mesh(inst.particle_positions).nonzero()[0]
                     instancer_to_particle_idxs[inst] = inbound_idxs
-            # Otherwise, we can simply use the ContactFluid state to infer contacts
+            # Otherwise, we can simply use the ContactParticle state to infer contacts
             else:
-                instancer_to_particle_idxs = self.obj.states[ContactFluids].get_value(system, self.link)
+                instancer_to_particle_idxs = self.obj.states[ContactParticles].get_value(system, self.link)
 
             # Iterate over all particles and hide any that are detected to be removed
             for inst, particle_idxs in instancer_to_particle_idxs.items():
                 # If at the limit, stop absorbing
                 if self.check_at_limit(system=system):
                     break
-                max_particle_absorbed = self.fluid_particle_modification_limit - self.modified_particle_count[
+                max_particle_absorbed = self.physical_particle_modification_limit - self.modified_particle_count[
                     system]
                 particles_to_absorb = min(len(particle_idxs), max_particle_absorbed)
                 particle_idxs_to_absorb = list(particle_idxs)[:particles_to_absorb]
@@ -617,8 +617,8 @@ class ParticleRemover(ParticleModifier):
         return m.VISUAL_PARTICLES_REMOVAL_LIMIT
 
     @property
-    def fluid_particle_modification_limit(self):
-        return m.FLUID_PARTICLES_REMOVAL_LIMIT
+    def physical_particle_modification_limit(self):
+        return m.PHYSICAL_PARTICLES_REMOVAL_LIMIT
 
 
 class ParticleApplier(ParticleModifier):
@@ -669,7 +669,7 @@ class ParticleApplier(ParticleModifier):
             ignore_objs=[self.obj],
             hit_proportion=0.0,             # We want all hits
             undo_cuboid_bottom_padding=issubclass(system, VisualParticleSystem),      # micro particles have zero cuboid dimensions so we need to maintain padding
-            cuboid_bottom_padding=system.particle_radius if issubclass(system, FluidSystem) else
+            cuboid_bottom_padding=system.particle_radius if issubclass(system, PhysicalParticleSystem) else
             macros.utils.sampling_utils.DEFAULT_CUBOID_BOTTOM_PADDING,
         ) if result[0] is not None]
 
@@ -718,9 +718,9 @@ class ParticleApplier(ParticleModifier):
                 # Update our particle count
                 self.modified_particle_count[system] += len(particle_info["link_prim_paths"])
 
-        elif issubclass(system, FluidSystem):
+        elif issubclass(system, PhysicalParticleSystem):
             # Compile the particle poses to generate and sample the particles
-            n_particles = min(len(hits), m.FLUID_PARTICLES_APPLICATION_LIMIT - self.modified_particle_count[system])
+            n_particles = min(len(hits), m.PHYSICAL_PARTICLES_APPLICATION_LIMIT - self.modified_particle_count[system])
             # Generate particles
             if n_particles > 0:
                 system.default_particle_instancer.add_particles(positions=np.array([hit[0] for hit in hits[:n_particles]]))
@@ -819,8 +819,8 @@ class ParticleApplier(ParticleModifier):
         # Check the system
         if issubclass(system, VisualParticleSystem):
             val = m.MAX_VISUAL_PARTICLES_APPLIED_PER_STEP
-        elif issubclass(system, FluidSystem):
-            val = m.MAX_FLUID_PARTICLES_APPLIED_PER_STEP
+        elif issubclass(system, PhysicalParticleSystem):
+            val = m.MAX_PHYSICAL_PARTICLES_APPLIED_PER_STEP
         else:
             # Invalid system queried
             self.unsupported_system_error(system=system)
@@ -839,5 +839,5 @@ class ParticleApplier(ParticleModifier):
         return m.VISUAL_PARTICLES_APPLICATION_LIMIT
 
     @property
-    def fluid_particle_modification_limit(self):
-        return m.FLUID_PARTICLES_APPLICATION_LIMIT
+    def physical_particle_modification_limit(self):
+        return m.PHYSICAL_PARTICLES_APPLICATION_LIMIT

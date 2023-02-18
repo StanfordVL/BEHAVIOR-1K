@@ -1,7 +1,6 @@
-from omnigibson.object_states.object_state_base import BaseObjectState
 
 
-class UpdateStateMixin(BaseObjectState):
+class UpdateStateMixin:
     """
     A state-mixin that allows for per-sim-step updates via the update() call
     """
