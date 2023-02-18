@@ -18,19 +18,6 @@ from omnigibson.prims.geom_prim import VisualGeomPrim
 import numpy as np
 
 
-def get_visual_particle_systems():
-    """
-    Returns:
-        dict: Mapping from fluid system name to fluid system
-    """
-    systems = dict()
-    for system in SYSTEMS_REGISTRY.objects:
-        if issubclass(system, VisualParticleSystem):
-            systems[system.name] = system
-
-    return systems
-
-
 class MacroParticleSystem(BaseParticleSystem):
     """
     Global system for modeling "macro" level particles, e.g.: dirt, dust, etc.

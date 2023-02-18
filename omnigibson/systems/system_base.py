@@ -117,6 +117,14 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
         """
         pass
 
+    @classmethod
+    def get_systems(cls):
+        """
+        Returns:
+            dict: Mapping from system name to system for all systems that are subclasses of this system
+        """
+        return {system.name: system for system in SYSTEMS_REGISTRY.objects if issubclass(system, cls)}
+
     def __init__(self):
         raise ValueError("System classes should not be created!")
 
