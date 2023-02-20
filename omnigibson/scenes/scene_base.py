@@ -1,6 +1,5 @@
 import json
 from abc import ABC
-from collections import OrderedDict
 from itertools import combinations
 from omni.isaac.core.objects.ground_plane import GroundPlane
 import numpy as np
@@ -15,7 +14,7 @@ from omnigibson.systems import SYSTEMS_REGISTRY
 from omnigibson.robots.robot_base import m as robot_macros
 
 # Global dicts that will contain mappings
-REGISTERED_SCENES = OrderedDict()
+REGISTERED_SCENES = dict()
 
 
 class Scene(Serializable, Registerable, Recreatable, ABC):
@@ -126,7 +125,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             list of str: Keys with which to index into the object registry. These should be valid public attributes of
                 prims that we can use as grouping IDs to reference prims, e.g., prim.in_rooms
         """
-        return ["prim_type", "states", "category", "fixed_base", "in_rooms", "states"]
+        return ["prim_type", "states", "category", "fixed_base", "in_rooms", "states", "abilities"]
 
     @property
     def loaded(self):
@@ -421,9 +420,8 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             system.reset()
 
         # Reset all object and robot states
-        for obj in self.objects:
-            if isinstance(obj, StatefulObject):
-                obj.reset_states()
+        for robot in self.robots:
+            robot.reset()
 
         # Reset the pose and joint configuration of all scene objects.
         if self._initial_state is not None:
@@ -572,7 +570,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         init_info = {obj.name: obj.get_init_info() for obj in self.object_registry.objects}
 
         # Compose as single dictionary and store internally
-        self._objects_info = OrderedDict(init_info=init_info)
+        self._objects_info = dict(init_info=init_info)
 
     def get_objects_info(self):
         """
@@ -601,6 +599,11 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
     def _load_state(self, state):
         # Default state for the scene is from the registry alone
         self._registry.load_state(state=state, serialized=False)
+
+        # We additionally clear caches for all object states
+        for obj in self.objects:
+            if isinstance(obj, StatefulObject):
+                obj.clear_states_cache()
 
     def _serialize(self, state):
         # Default state for the scene is from the registry alone

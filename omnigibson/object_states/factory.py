@@ -9,7 +9,7 @@ _ALL_STATES = frozenset(
         AABB,
         Burnt,
         ContactBodies,
-        ContactFluids,
+        ContactParticles,
         Cooked,
         Covered,
         Heated,
@@ -114,6 +114,8 @@ _TEXTURE_CHANGE_STATE_SET = frozenset(
     ]
 )
 
+_VISUAL_STATE_SET = frozenset(_FIRE_STATE_SET | _STEAM_STATE_SET | _TEXTURE_CHANGE_STATE_SET)
+
 _TEXTURE_CHANGE_PRIORITY = {
     Frozen: 4,
     Burnt: 3,
@@ -137,6 +139,10 @@ def get_texture_change_states():
 
 def get_texture_change_priority():
     return _TEXTURE_CHANGE_PRIORITY
+
+
+def get_visual_states():
+    return _VISUAL_STATE_SET
 
 
 def get_default_states():

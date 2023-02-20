@@ -1,5 +1,4 @@
 import logging
-from collections import OrderedDict
 import numpy as np
 
 import omnigibson as og
@@ -29,7 +28,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     }
 
     # Define objects to load into the environment
-    sink_cfg = OrderedDict(
+    sink_cfg = dict(
         type="DatasetObject",
         name="sink",
         category="sink",
@@ -42,7 +41,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     def check_water_saturation(obj):
         return obj.states[object_states.Saturated].get_value(WaterSystem)
 
-    brush_cfg = OrderedDict(
+    brush_cfg = dict(
         type="DatasetObject",
         name="brush",
         category="scrub_brush",
@@ -70,7 +69,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     )
 
     # Desk that's dusty
-    desk_cfg = OrderedDict(
+    desk_cfg = dict(
         type="DatasetObject",
         name="desk",
         category="breakfast_table",
@@ -80,7 +79,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     )
 
     # Bowl with stains
-    bowl_cfg = OrderedDict(
+    bowl_cfg = dict(
         type="DatasetObject",
         name="bowl",
         category="bowl",

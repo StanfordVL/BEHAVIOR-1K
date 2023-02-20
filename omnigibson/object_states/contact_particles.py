@@ -5,13 +5,13 @@ import omnigibson as og
 from omnigibson.object_states.object_state_base import RelativeObjectState
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.kinematics import KinematicsMixin
-from omnigibson.systems import FluidSystem
+from omnigibson.systems import PhysicalParticleSystem
 from omni.physx import get_physx_scene_query_interface
 
 
-class ContactFluids(RelativeObjectState, KinematicsMixin):
+class ContactParticles(RelativeObjectState, KinematicsMixin):
     """
-    Object state that handles contact checking between rigid bodies and individual fluid particles.
+    Object state that handles contact checking between rigid bodies and individual particles.
     """
 
     def __init__(self, obj):
@@ -19,7 +19,7 @@ class ContactFluids(RelativeObjectState, KinematicsMixin):
 
     def _get_value(self, system, link=None):
         # Make sure system is valid
-        assert issubclass(system, FluidSystem), "Can only get ContactFluids for a FluidSystem!"
+        assert issubclass(system, PhysicalParticleSystem), "Can only get ContactParticles for a PhysicalParticleSystem!"
 
         # Create contacts dictionary, mapping instancer to set of particle IDs in contact
         contacts = defaultdict(set)
@@ -61,7 +61,7 @@ class ContactFluids(RelativeObjectState, KinematicsMixin):
         return contacts
 
     def _set_value(self, system, new_value):
-        raise NotImplementedError("ContactFluids state currently does not support setting.")
+        raise NotImplementedError("ContactParticles state currently does not support setting.")
 
     def cache_info(self, get_value_args):
         # Run super first
@@ -69,7 +69,7 @@ class ContactFluids(RelativeObjectState, KinematicsMixin):
 
         # Store the system's number of particles for each instancer
         for arg in get_value_args:
-            if inspect.isclass(arg) and issubclass(arg, FluidSystem):
+            if inspect.isclass(arg) and issubclass(arg, PhysicalParticleSystem):
                 info[arg] = arg.n_particles
 
         return info
@@ -81,7 +81,7 @@ class ContactFluids(RelativeObjectState, KinematicsMixin):
         # If it's valid, do final check with system
         if is_valid:
             for arg, info in self._cache[get_value_args]["info"].items():
-                if inspect.isclass(arg) and issubclass(arg, FluidSystem):
+                if inspect.isclass(arg) and issubclass(arg, PhysicalParticleSystem):
                     # Make sure the number of particles in the system is the same; otherwise
                     # something has changed, so we need to update the cache internally
                     is_valid = arg.n_particles == info

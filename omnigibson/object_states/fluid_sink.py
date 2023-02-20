@@ -3,6 +3,7 @@ import numpy as np
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from omnigibson.object_states.object_state_base import AbsoluteObjectState
+from omnigibson.object_states.update_state_mixin import UpdateStateMixin
 
 
 # Create settings for this module
@@ -14,7 +15,7 @@ m.MIN_GROUP_FRACTION = 0.6
 m.MAX_SINK_DISTANCE = 0.05
 
 
-class FluidSink(AbsoluteObjectState, LinkBasedStateMixin):
+class FluidSink(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixin):
     def __init__(self, obj, max_distance=m.MAX_SINK_DISTANCE):
         super().__init__(obj)
 

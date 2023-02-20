@@ -1,6 +1,5 @@
 import numpy as np
 from omnigibson.utils.python_utils import Serializable
-from collections import OrderedDict
 
 
 class Filter(Serializable):
@@ -32,7 +31,7 @@ class Filter(Serializable):
 
     def _dump_state(self):
         # Default is no state (empty dict)
-        return OrderedDict()
+        return dict()
 
     def _load_state(self, state):
         # Default is no state (empty dict), so this is a no-op
@@ -44,7 +43,7 @@ class Filter(Serializable):
 
     def _deserialize(self, state):
         # Default is no state, so do nothing
-        return OrderedDict(), 0
+        return dict(), 0
 
 
 class MovingAverageFilter(Filter):

@@ -1,5 +1,4 @@
 import logging
-from collections import OrderedDict
 import os
 import numpy as np
 
@@ -128,7 +127,7 @@ class BehaviorTask(BaseTask):
 
     def _create_termination_conditions(self):
         # Initialize termination conditions dict and fill in with Timeout and PredicateGoal
-        terminations = OrderedDict()
+        terminations = dict()
 
         terminations["timeout"] = Timeout(max_steps=self._termination_config["max_steps"])
         terminations["predicate"] = PredicateGoal(goal_fcn=lambda: self.activity_goal_conditions)
@@ -137,7 +136,7 @@ class BehaviorTask(BaseTask):
 
     def _create_reward_functions(self):
         # Initialize reward functions dict and fill in with Potential reward
-        rewards = OrderedDict()
+        rewards = dict()
 
         rewards["potential"] = PotentialReward(
             potential_fcn=self.get_potential,
@@ -167,7 +166,7 @@ class BehaviorTask(BaseTask):
 
     def _load_non_low_dim_observation_space(self):
         # No non-low dim observations so we return an empty dict
-        return OrderedDict()
+        return dict()
 
     def update_activity(self, activity_name, activity_definition_id, predefined_problem=None):
         """
@@ -275,7 +274,7 @@ class BehaviorTask(BaseTask):
         Args:
             env (Environment): Current active environment instance
         """
-        self.room_type_to_object_instance = OrderedDict()
+        self.room_type_to_object_instance = dict()
         self.non_sampleable_object_instances = set()
         for cond in self.activity_conditions.parsed_initial_conditions:
             if cond[0] == "inroom":
@@ -955,7 +954,7 @@ class BehaviorTask(BaseTask):
         return True, None
 
     def _get_obs(self, env):
-        low_dim_obs = OrderedDict()
+        low_dim_obs = dict()
         low_dim_obs["robot_pos"] = np.array(env.robots[0].get_position())
         low_dim_obs["robot_ori_cos"] = np.cos(env.robots[0].get_rpy())
         low_dim_obs["robot_ori_sin"] = np.sin(env.robots[0].get_rpy())
@@ -973,7 +972,7 @@ class BehaviorTask(BaseTask):
                     low_dim_obs[f"obj_{i}_pos_in_gripper_{arm}"] = np.array([float(grasping_object)])
                 i += 1
 
-        return low_dim_obs, OrderedDict()
+        return low_dim_obs, dict()
 
     def _step_termination(self, env, action, info=None):
         # Run super first

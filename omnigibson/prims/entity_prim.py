@@ -1,5 +1,3 @@
-from collections import OrderedDict
-
 import numpy as np
 
 from omni.isaac.core.utils.rotations import gf_quat_to_np_array
@@ -122,7 +120,7 @@ class EntityPrim(XFormPrim):
 
         # We iterate over all children of this object's prim,
         # and grab any that are presumed to be rigid bodies (i.e.: other Xforms)
-        self._links = OrderedDict()
+        self._links = dict()
         joint_children = set()
         for prim in self._prim.GetChildren():
             link = None
@@ -173,7 +171,7 @@ class EntityPrim(XFormPrim):
                 joint.remove_names()
 
         # Initialize joints dictionary
-        self._joints = OrderedDict()
+        self._joints = dict()
         self.update_handles()
 
         # Handle case separately based on whether the handle is valid (i.e.: whether we are actually articulated or not)
@@ -183,7 +181,7 @@ class EntityPrim(XFormPrim):
 
             # Additionally grab DOF info if we have non-fixed joints
             if n_dof > 0:
-                self._dofs_infos = OrderedDict()
+                self._dofs_infos = dict()
                 # Grab DOF info
                 for index in range(n_dof):
                     dof_handle = self._dc.get_articulation_dof(self._handle, index)
@@ -332,7 +330,7 @@ class EntityPrim(XFormPrim):
     def joints(self):
         """
         Returns:
-            OrderedDict: Dictionary mapping joint names (str) to joint prims (JointPrim) owned by this articulation
+            dict: Dictionary mapping joint names (str) to joint prims (JointPrim) owned by this articulation
         """
         return self._joints
 
@@ -340,7 +338,7 @@ class EntityPrim(XFormPrim):
     def links(self):
         """
         Returns:
-            OrderedDict: Dictionary mapping link names (str) to link prims (RigidPrim) owned by this articulation
+            dict: Dictionary mapping link names (str) to link prims (RigidPrim) owned by this articulation
         """
         return self._links
 
@@ -1203,8 +1201,8 @@ class EntityPrim(XFormPrim):
 
     def _dump_state(self):
         # We don't call super, instead, this state is simply the root link state and all joint states
-        state = OrderedDict(root_link=self.root_link._dump_state())
-        joint_state = OrderedDict()
+        state = dict(root_link=self.root_link._dump_state())
+        joint_state = dict()
         for prim_name, prim in self._joints.items():
             joint_state[prim_name] = prim._dump_state()
         state["joints"] = joint_state
@@ -1234,8 +1232,8 @@ class EntityPrim(XFormPrim):
         # We deserialize by first de-flattening the root link state and then iterating over all joints and
         # sequentially grabbing from the flattened state array, incrementing along the way
         idx = self.root_link.state_size
-        state_dict = OrderedDict(root_link=self.root_link.deserialize(state=state[:idx]))
-        joint_state_dict = OrderedDict()
+        state_dict = dict(root_link=self.root_link.deserialize(state=state[:idx]))
+        joint_state_dict = dict()
         for prim_name, prim in self._joints.items():
             joint_state_dict[prim_name] = prim.deserialize(state=state[idx:idx+prim.state_size])
             idx += prim.state_size

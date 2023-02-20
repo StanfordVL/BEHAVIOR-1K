@@ -4,7 +4,7 @@ from omnigibson.object_states.adjacency import HorizontalAdjacency, VerticalAdja
 from omnigibson.object_states.attachment import Attached
 from omnigibson.object_states.burnt import Burnt
 from omnigibson.object_states.contact_bodies import ContactBodies
-from omnigibson.object_states.contact_fluids import ContactFluids
+from omnigibson.object_states.contact_particles import ContactParticles
 from omnigibson.object_states.cooked import Cooked
 from omnigibson.object_states.covered import Covered
 from omnigibson.object_states.frozen import Frozen

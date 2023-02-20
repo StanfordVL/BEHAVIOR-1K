@@ -1,5 +1,4 @@
 from abc import ABCMeta
-from collections import OrderedDict
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.python_utils import classproperty, assert_valid_key, Registerable
 from omnigibson.utils.gym_utils import GymObservable
@@ -7,7 +6,7 @@ from gym.spaces import Space
 
 
 # Registered sensors
-REGISTERED_SENSORS = OrderedDict()
+REGISTERED_SENSORS = dict()
 
 # All possible modalities across all sensors
 ALL_SENSOR_MODALITIES = set()
@@ -72,7 +71,7 @@ class BaseSensor(XFormPrim, GymObservable, Registerable, metaclass=ABCMeta):
         # self.noise.enabled is True.
         # Note that the returned dictionary will only be filled in if this sensor is enabled!
         if not self._enabled:
-            return OrderedDict()
+            return dict()
 
         obs = self._get_obs()
 
@@ -88,14 +87,14 @@ class BaseSensor(XFormPrim, GymObservable, Registerable, metaclass=ABCMeta):
         Get sensor reading. Should generally be extended by subclass.
 
         Returns:
-            OrderedDict: Keyword-mapped observations mapping modality names to numpy arrays of arbitrary dimension
+            dict: Keyword-mapped observations mapping modality names to numpy arrays of arbitrary dimension
         """
         # Default is returning an empty dict
-        return OrderedDict()
+        return dict()
 
     def _load_observation_space(self):
         # Fill in observation space based on mapping and active modalities
-        obs_space = OrderedDict()
+        obs_space = dict()
         for modality, space in self._obs_space_mapping.items():
             if modality in self._modalities:
                 if isinstance(space, Space):
@@ -147,7 +146,7 @@ class BaseSensor(XFormPrim, GymObservable, Registerable, metaclass=ABCMeta):
     def _obs_space_mapping(self):
         """
         Returns:
-            OrderedDict: Keyword-mapped observation space settings for each modality. For each modality in
+            dict: Keyword-mapped observation space settings for each modality. For each modality in
                 cls.all_modalities, its name should map directly to the corresponding gym space Space for that modality
                 or a 4-tuple entry (shape, low, high, dtype) for procedurally generating the appropriate Box Space
                 for that modality

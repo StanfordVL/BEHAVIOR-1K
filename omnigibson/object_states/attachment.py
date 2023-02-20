@@ -2,7 +2,6 @@ from pxr import Gf
 from omni.physx.bindings._physx import ContactEventType
 
 from enum import IntEnum
-from collections import OrderedDict
 import numpy as np
 
 import omnigibson as og
@@ -166,7 +165,7 @@ class Attached(RelativeObjectState, BooleanState, ContactSubscribedStateMixin):
         return 1
 
     def _dump_state(self):
-        return OrderedDict(attached_obj_uuid=-1 if self.attached_obj is None else self.attached_obj.uuid)
+        return dict(attached_obj_uuid=-1 if self.attached_obj is None else self.attached_obj.uuid)
 
     def _load_state(self, state):
         uuid = state["attached_obj_uuid"]
@@ -185,4 +184,4 @@ class Attached(RelativeObjectState, BooleanState, ContactSubscribedStateMixin):
         return np.array([state["attached_obj_uuid"]], dtype=float)
 
     def _deserialize(self, state):
-        return OrderedDict(attached_obj_uuid=int(state[0])), 1
+        return dict(attached_obj_uuid=int(state[0])), 1

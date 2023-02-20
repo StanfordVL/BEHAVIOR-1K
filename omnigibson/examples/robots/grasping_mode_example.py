@@ -2,7 +2,6 @@
 Example script demo'ing robot manipulation control with grasping.
 """
 import logging
-from collections import OrderedDict
 
 import numpy as np
 
@@ -10,7 +9,7 @@ import omnigibson as og
 from omnigibson.macros import gm
 from omnigibson.utils.ui_utils import choose_from_options, KeyboardRobotController
 
-GRASPING_MODES = OrderedDict(
+GRASPING_MODES = dict(
     sticky="Sticky Mitten - Objects are magnetized when they touch the fingers and a CLOSE command is given",
     physical="Physical Grasping - No additional grasping assistance applied",
 )
@@ -31,8 +30,8 @@ def main(random_selection=False, headless=False, short_exec=False):
     grasping_mode = choose_from_options(options=GRASPING_MODES, name="grasping mode", random_selection=random_selection)
 
     # Create environment configuration to use
-    scene_cfg = OrderedDict(type="Scene")
-    robot0_cfg = OrderedDict(
+    scene_cfg = dict(type="Scene")
+    robot0_cfg = dict(
         type="Fetch",
         obs_modalities=["rgb"],     # we're just doing a grasping demo so we don't need all observation modalities
         action_type="continuous",
@@ -41,7 +40,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     )
 
     # Define objects to load
-    table_cfg = OrderedDict(
+    table_cfg = dict(
         type="DatasetObject",
         name="table",
         category="breakfast_table",
@@ -53,7 +52,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         orientation=[0, 0, 0.707, 0.707],
     )
 
-    chair_cfg = OrderedDict(
+    chair_cfg = dict(
         type="DatasetObject",
         name="chair",
         category="straight_chair",
@@ -65,7 +64,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         orientation=[0, 0, -0.9990215, -0.0442276],
     )
 
-    box_cfg = OrderedDict(
+    box_cfg = dict(
         type="PrimitiveObject",
         name="box",
         primitive_type="Cube",
@@ -75,7 +74,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     )
 
     # Compile config
-    cfg = OrderedDict(scene=scene_cfg, robots=[robot0_cfg], objects=[table_cfg, chair_cfg, box_cfg])
+    cfg = dict(scene=scene_cfg, robots=[robot0_cfg], objects=[table_cfg, chair_cfg, box_cfg])
 
     # Create the environment
     env = og.Environment(configs=cfg, action_timestep=1/60., physics_timestep=1/60.)

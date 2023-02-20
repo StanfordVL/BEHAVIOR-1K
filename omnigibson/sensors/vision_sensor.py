@@ -1,4 +1,3 @@
-from collections import OrderedDict
 import numpy as np
 import time
 import gym
@@ -68,7 +67,7 @@ class VisionSensor(BaseSensor):
         viewport_name (None or str): If specified, will link this camera to the specified viewport, overriding its
             current camera. Otherwise, creates a new viewport
     """
-    _SENSOR_HELPERS = OrderedDict(
+    _SENSOR_HELPERS = dict(
         rgb=sensors_util.get_rgb,
         depth=sensors_util.get_depth,
         depth_linear=sensors_util.get_depth_linear,
@@ -83,7 +82,7 @@ class VisionSensor(BaseSensor):
     )
 
     # Define raw sensor types
-    _RAW_SENSOR_TYPES = OrderedDict(
+    _RAW_SENSOR_TYPES = dict(
         rgb=sensor_types.Rgb,
         depth=sensor_types.Depth,
         depth_linear=sensor_types.DepthLinear,
@@ -97,7 +96,7 @@ class VisionSensor(BaseSensor):
     )
 
     # Persistent dictionary of sensors, mapped from prim_path to sensor
-    SENSORS = OrderedDict()
+    SENSORS = dict()
 
     def __init__(
         self,
@@ -405,20 +404,20 @@ class VisionSensor(BaseSensor):
             gym.spaces.Box(low=0, high=MAX_VIEWER_SIZE, shape=(), dtype=int),  # y_max
         )))
 
-        camera_space = gym.spaces.Dict(OrderedDict(
+        camera_space = gym.spaces.Dict(dict(
             pose=gym.spaces.Box(low=-np.inf, high=np.inf, shape=(4, 4), dtype=float),
             fov=gym.spaces.Box(low=0, high=np.inf, shape=(), dtype=float),
             focal_length=gym.spaces.Box(low=0, high=np.inf, shape=(), dtype=float),
             horizontal_aperature=gym.spaces.Box(low=0, high=np.inf, shape=(), dtype=float),
             view_projection_matrix=gym.spaces.Box(low=-np.inf, high=np.inf, shape=(4, 4), dtype=float),
-            resolution=gym.spaces.Dict(OrderedDict(
+            resolution=gym.spaces.Dict(dict(
                 width=gym.spaces.Box(low=1, high=MAX_VIEWER_SIZE, shape=(), dtype=np.uint),
                 height=gym.spaces.Box(low=1, high=MAX_VIEWER_SIZE, shape=(), dtype=np.uint),
             )),
             clipping_range=gym.spaces.Box(low=0, high=np.inf, shape=(2,), dtype=float),
         ))
 
-        obs_space_mapping = OrderedDict(
+        obs_space_mapping = dict(
             rgb=((self.image_height, self.image_width, 4), 0, 255, np.uint8),
             depth=((self.image_height, self.image_width), 0.0, 1.0, np.float32),
             depth_linear=((self.image_height, self.image_width), 0.0, np.inf, np.float32),
@@ -448,7 +447,7 @@ class VisionSensor(BaseSensor):
         # Render to update
         render()
 
-        cls.SENSORS = OrderedDict()
+        cls.SENSORS = dict()
 
     @classproperty
     def all_modalities(cls):

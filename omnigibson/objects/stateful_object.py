@@ -1,6 +1,6 @@
 import logging
 import sys
-from collections import OrderedDict, defaultdict
+from collections import defaultdict
 
 import numpy as np
 from pxr.Sdf import ValueTypeNames as VT
@@ -15,6 +15,7 @@ from omnigibson.object_states.factory import (
     get_texture_change_states,
     get_fire_states,
     get_steam_states,
+    get_visual_states,
     get_texture_change_priority,
 )
 from omnigibson.object_states.object_state_base import REGISTERED_OBJECT_STATES
@@ -22,7 +23,7 @@ from omnigibson.object_states.heat_source_or_sink import HeatSourceOrSink
 from omnigibson.object_states.on_fire import OnFire
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.renderer_settings.renderer_settings import RendererSettings
-from omnigibson.systems.micro_particle_system import get_fluid_systems
+from omnigibson.systems.micro_particle_system import FluidSystem
 from omnigibson.utils.constants import PrimType, EmitterType
 from omnigibson.utils.usd_utils import BoundingBoxAPI
 from omnigibson.utils.python_utils import classproperty
@@ -98,7 +99,8 @@ class StatefulObject(BaseObject):
         """
         # Values that will be filled later
         self._states = None
-        self._emitters = OrderedDict()
+        self._emitters = dict()
+        self._visual_states = None
         self._current_texture_state = None
 
         # Load abilities from taxonomy if needed & possible
@@ -157,9 +159,17 @@ class StatefulObject(BaseObject):
         Get the current states of this object.
 
         Returns:
-            OrderedDict: Keyword-mapped states for this object
+            dict: Keyword-mapped states for this object
         """
         return self._states
+
+    @property
+    def abilities(self):
+        """
+        Returns:
+            dict: Dictionary mapping ability name to ability arguments for this object
+        """
+        return self._abilities
 
     def prepare_object_states(self, abilities=None, include_default_states=True):
         """
@@ -191,18 +201,24 @@ class StatefulObject(BaseObject):
                     state_types_and_params.append((dependency, {}))
 
         # Now generate the states in topological order.
-        self._states = OrderedDict()
+        self._states = dict()
         for state_type, params in reversed(state_types_and_params):
             self._states[state_type] = get_object_state_instance(state_type, self, params)
 
     def _post_load(self):
         super()._post_load()
 
-        if len(set(self.states) & set(get_steam_states())) > 0:
-            self._create_emitter_apis(EmitterType.STEAM)
+        # Check whether this object requires any visual updates
+        states_set = set(self.states)
+        self._visual_states = states_set & get_visual_states()
 
-        if len(set(self.states) & set(get_fire_states())) > 0:
-            self._create_emitter_apis(EmitterType.FIRE)
+        # If we require visual updates, possibly create additional APIs
+        if len(self._visual_states) > 0:
+            if len(states_set & get_steam_states()) > 0:
+                self._create_emitter_apis(EmitterType.STEAM)
+
+            if len(states_set & get_fire_states()) > 0:
+                self._create_emitter_apis(EmitterType.FIRE)
 
     def _create_emitter_apis(self, emitter_type):
         """
@@ -347,33 +363,35 @@ class StatefulObject(BaseObject):
         Update the prim's visuals (texture change, steam/fire effects, etc).
         Should be called after all the states are updated.
         """
-        texture_change_states = []
-        emitter_enabled = defaultdict(bool)
-        for state_type, state in self.states.items():
-            if state_type in get_texture_change_states():
-                if state_type == Saturated:
-                    for fluid_system in get_fluid_systems().values():
-                        if state.get_value(fluid_system):
-                            texture_change_states.append(state)
-                            # Only need to do this once, since soaked handles all fluid systems
-                            break
-                elif state.get_value():
-                    texture_change_states.append(state)
-            if state_type in get_steam_states():
-                emitter_enabled[EmitterType.STEAM] |= state.get_value()
-            if state_type in get_fire_states():
-                emitter_enabled[EmitterType.FIRE] |= state.get_value()
+        if len(self._visual_states) > 0:
+            texture_change_states = []
+            emitter_enabled = defaultdict(bool)
+            for state_type in self._visual_states:
+                state = self.states[state_type]
+                if state_type in get_texture_change_states():
+                    if state_type == Saturated:
+                        for fluid_system in FluidSystem.get_systems().values():
+                            if state.get_value(fluid_system):
+                                texture_change_states.append(state)
+                                # Only need to do this once, since soaked handles all fluid systems
+                                break
+                    elif state.get_value():
+                        texture_change_states.append(state)
+                if state_type in get_steam_states():
+                    emitter_enabled[EmitterType.STEAM] |= state.get_value()
+                if state_type in get_fire_states():
+                    emitter_enabled[EmitterType.FIRE] |= state.get_value()
 
-            for emitter_type in emitter_enabled:
-                self.set_emitter_enabled(emitter_type, emitter_enabled[emitter_type])
+                for emitter_type in emitter_enabled:
+                    self.set_emitter_enabled(emitter_type, emitter_enabled[emitter_type])
 
-        texture_change_states.sort(key=lambda s: get_texture_change_priority()[s.__class__])
-        object_state = texture_change_states[-1] if len(texture_change_states) > 0 else None
+            texture_change_states.sort(key=lambda s: get_texture_change_priority()[s.__class__])
+            object_state = texture_change_states[-1] if len(texture_change_states) > 0 else None
 
-        # Only update our texture change if it's a different object state than the one we already have
-        if object_state != self._current_texture_state:
-            self._update_texture_change(object_state)
-            self._current_texture_state = object_state
+            # Only update our texture change if it's a different object state than the one we already have
+            if object_state != self._current_texture_state:
+                self._update_texture_change(object_state)
+                self._current_texture_state = object_state
 
     def _update_texture_change(self, object_state):
         """
@@ -431,7 +449,7 @@ class StatefulObject(BaseObject):
         state = super()._dump_state()
 
         # Also add non-kinematic states
-        non_kin_states = OrderedDict()
+        non_kin_states = dict()
         for state_type, state_instance in self._states.items():
             if state_instance.stateful:
                 non_kin_states[get_state_name(state_type)] = state_instance.dump_state(serialized=False)
@@ -471,7 +489,7 @@ class StatefulObject(BaseObject):
         state_dic, idx = super()._deserialize(state=state)
 
         # Iterate over all states and deserialize their states if they're stateful
-        non_kin_state_dic = OrderedDict()
+        non_kin_state_dic = dict()
         for state_type, state_instance in self._states.items():
             state_name = get_state_name(state_type)
             if state_instance.stateful:
@@ -481,7 +499,7 @@ class StatefulObject(BaseObject):
 
         return state_dic, idx
 
-    def clear_cached_states(self):
+    def clear_states_cache(self):
         """
         Clears the internal cache from all owned states
         """
@@ -492,26 +510,9 @@ class StatefulObject(BaseObject):
             obj_state.clear_cache()
         BoundingBoxAPI.clear()
 
-    def reset_states(self):
-        """
-        Resets all object states' internal values
-        """
-        # Check self._states just in case states have not been initialized yet.
-        if not self._states:
-            return
-        for _, obj_state in self._states.items():
-            obj_state.reset()
-
-    def reset(self):
-        # Call super first
-        super().reset()
-
-        # Reset all states
-        self.reset_states()
-
     def set_position_orientation(self, position=None, orientation=None):
         super().set_position_orientation(position=position, orientation=orientation)
-        self.clear_cached_states()
+        self.clear_states_cache()
 
     @classproperty
     def _do_not_register_classes(cls):

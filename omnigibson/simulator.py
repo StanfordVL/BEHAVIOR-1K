@@ -15,21 +15,23 @@ from omni.isaac.core.utils.prims import is_prim_ancestral, get_prim_type_name, i
 from omni.isaac.core.utils.stage import open_stage
 from omni.isaac.dynamic_control import _dynamic_control
 import omni.kit.loop._loop as omni_loop
-from pxr import Usd, Gf, UsdGeom, Sdf, UsdPhysics, PhysxSchema, PhysicsSchemaTools
+from pxr import Usd, Gf, UsdGeom, Sdf, UsdPhysics, PhysxSchema, PhysicsSchemaTools, UsdUtils
 from omni.isaac.core.loggers import DataLogger
+from omni.physx import get_physx_interface, get_physx_simulation_interface, get_physx_scene_query_interface
 
 import omnigibson as og
 from omnigibson.macros import gm, create_module_macros
 from omnigibson.utils.constants import LightingMode
 from omnigibson.utils.config_utils import NumpyEncoder
 from omnigibson.utils.python_utils import clear as clear_pu, create_object_from_init_info, Serializable
-from omnigibson.utils.usd_utils import clear as clear_uu, BoundingBoxAPI
+from omnigibson.utils.usd_utils import clear as clear_uu, BoundingBoxAPI, FlatcacheAPI
 from omnigibson.utils.ui_utils import CameraMover, disclaimer
 from omnigibson.scenes import Scene
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.objects.stateful_object import StatefulObject
 from omnigibson.object_states.contact_subscribed_state_mixin import ContactSubscribedStateMixin
 from omnigibson.object_states.factory import get_states_by_dependency_order
+from omnigibson.object_states.update_state_mixin import UpdateStateMixin
 from omnigibson.sensors.vision_sensor import VisionSensor
 from omnigibson.transition_rules import DEFAULT_RULES
 
@@ -84,6 +86,9 @@ class Simulator(SimulationContext, Serializable):
             return
         Simulator._world_initialized = True
         self._dc_interface = _dynamic_control.acquire_dynamic_control_interface()
+        self._physx_interface = get_physx_interface()
+        self._physx_simulation_interface = get_physx_simulation_interface()
+        self._physx_scene_query_interface = get_physx_scene_query_interface()
         self._data_logger = DataLogger()
         self._contact_callback = self._physics_context._physx_sim_interface.subscribe_contact_report_events(self._on_contact)
 
@@ -109,6 +114,8 @@ class Simulator(SimulationContext, Serializable):
 
         # Set of categories that can be grasped by assisted grasping
         self.object_state_types = get_states_by_dependency_order()
+        self.object_state_types_requiring_update = \
+            [state for state in self.object_state_types if issubclass(state, UpdateStateMixin)]
 
         # Set of all non-Omniverse transition rules to apply.
         self._transition_rules = DEFAULT_RULES
@@ -366,7 +373,7 @@ class Simulator(SimulationContext, Serializable):
 
             # Step the object states in global topological order (if the scene exists).
             if self.scene is not None:
-                for state_type in self.object_state_types:
+                for state_type in self.object_state_types_requiring_update:
                     for obj in self.scene.get_objects_with_state(state_type):
                         # Only update objects that have been initialized so far
                         if obj.initialized:
@@ -396,7 +403,7 @@ class Simulator(SimulationContext, Serializable):
         """
         # Create a dict from rule to filter to objects we care about.
         obj_dict = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
-        for obj in self.scene.objects + self.scene.robots:
+        for obj in self.scene.objects:
             for rule in self._transition_rules:
                 for fname, f in rule.individual_filters.items():
                     if f(obj):
@@ -478,28 +485,41 @@ class Simulator(SimulationContext, Serializable):
             self.scene.reset()
 
     def play(self):
-        super().play()
+        if not self.is_playing():
+            # Track whether we're starting the simulator fresh -- i.e.: whether we were stopped previously
+            was_stopped = self.is_stopped()
 
-        # Update all object / robot handles
-        if self.scene is not None and self.scene.initialized:
-            for obj in self.scene.objects:
-                # Only need to update handles if object is already initialized as well
-                if obj.initialized:
-                    obj.update_handles()
+            # Minimize physics leakage by slowing down simulator significantly
+            with self.slowed(dt=1e-3):
+                super().play()
 
-            for robot in self.scene.robots:
-                # Only need to update handles if robot is already initialized as well
-                if robot.initialized:
-                    robot.update_handles()
+            # Update all object handles
+            if self.scene is not None and self.scene.initialized:
+                for obj in self.scene.objects:
+                    # Only need to update if object is already initialized as well
+                    if obj.initialized:
+                        obj.update_handles()
 
-        # Check to see if any objects should be initialized
-        if len(self._objects_to_initialize) > 0:
-            for obj in self._objects_to_initialize:
-                obj.initialize()
-            self._objects_to_initialize = []
-            # Also update the scene registry
-            # TODO: A better place to put this perhaps?
-            self._scene.object_registry.update(keys="root_handle")
+            # Check to see if any objects should be initialized
+            if len(self._objects_to_initialize) > 0:
+                for obj in self._objects_to_initialize:
+                    obj.initialize()
+                self._objects_to_initialize = []
+                # Also update the scene registry
+                # TODO: A better place to put this perhaps?
+                self._scene.object_registry.update(keys="root_handle")
+
+    def pause(self):
+        if not self.is_paused():
+            super().pause()
+
+    def stop(self):
+        if not self.is_stopped():
+            super().stop()
+
+        # If we're using flatcache, we also need to reset its API
+        if gm.ENABLE_FLATCACHE:
+            FlatcacheAPI.reset()
 
     @property
     def n_physics_timesteps_per_render(self):
@@ -653,9 +673,33 @@ class Simulator(SimulationContext, Serializable):
     def dc(self):
         """
         Returns:
-            _dynamic_control.DynamicControl: Dynamic control interface
+            _dynamic_control.DynamicControl: Dynamic control (dc) interface
         """
         return self._dc_interface
+
+    @property
+    def pi(self):
+        """
+        Returns:
+            PhysX: Physx Interface (pi) for controlling low-level physx engine
+        """
+        return self._physx_interface
+
+    @property
+    def psi(self):
+        """
+        Returns:
+            IPhysxSimulation: Physx Simulation Interface (psi) for controlling low-level physx simulation
+        """
+        return self._physx_simulation_interface
+
+    @property
+    def psqi(self):
+        """
+        Returns:
+            PhysXSceneQuery: Physx Scene Query Interface (psqi) for running low-level scene queries
+        """
+        return self._physx_scene_query_interface
 
     @property
     def scene(self):
@@ -849,6 +893,9 @@ class Simulator(SimulationContext, Serializable):
             omni.usd.get_context().get_stage_event_stream().create_subscription_to_pop(self._stage_open_callback_fn)
         )
         self._contact_callback = self._physics_context._physx_sim_interface.subscribe_contact_report_events(self._on_contact)
+
+        # Set the lighting mode to be stage by default
+        self.set_lighting_mode(mode=LightingMode.STAGE)
 
         # Set the viewer camera, and then set its default pose
         self._set_viewer_camera()

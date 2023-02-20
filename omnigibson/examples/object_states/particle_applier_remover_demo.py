@@ -13,9 +13,9 @@ from pxr import Gf
 
 # Set macros for this example
 macros.object_states.particle_modifier.VISUAL_PARTICLES_REMOVAL_LIMIT = 1000
-macros.object_states.particle_modifier.FLUID_PARTICLES_REMOVAL_LIMIT = 8000
+macros.object_states.particle_modifier.PHYSICAL_PARTICLES_REMOVAL_LIMIT = 8000
 macros.object_states.particle_modifier.MAX_VISUAL_PARTICLES_APPLIED_PER_STEP = 10
-macros.object_states.particle_modifier.MAX_FLUID_PARTICLES_APPLIED_PER_STEP = 40
+macros.object_states.particle_modifier.MAX_PHYSICAL_PARTICLES_APPLIED_PER_STEP = 40
 StainSystem._N_PARTICLES_PER_GROUP = 300
 
 # Make sure object states and GPU dynamics are enabled (GPU dynamics needed for fluids)
@@ -97,7 +97,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     }
 
     # Define objects to load: a light, table, and cloth
-    light_cfg = OrderedDict(
+    light_cfg = dict(
         type="LightObject",
         name="light",
         light_type="Sphere",
@@ -106,7 +106,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         position=[-2.0, -2.0, 2.0],
     )
 
-    table_cfg = OrderedDict(
+    table_cfg = dict(
         type="DatasetObject",
         name="table",
         category="breakfast_table",

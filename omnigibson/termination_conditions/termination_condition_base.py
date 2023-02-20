@@ -1,10 +1,9 @@
 from abc import ABCMeta, abstractmethod
-from collections import OrderedDict
 from omnigibson.utils.python_utils import classproperty, Registerable
 
-REGISTERED_TERMINATION_CONDITIONS = OrderedDict()
-REGISTERED_SUCCESS_CONDITIONS = OrderedDict()
-REGISTERED_FAILURE_CONDITIONS = OrderedDict()
+REGISTERED_TERMINATION_CONDITIONS = dict()
+REGISTERED_SUCCESS_CONDITIONS = dict()
+REGISTERED_FAILURE_CONDITIONS = dict()
 
 
 def register_success_condition(cls):

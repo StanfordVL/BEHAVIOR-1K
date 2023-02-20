@@ -1,5 +1,4 @@
 import numpy as np
-from collections import OrderedDict
 import logging
 
 import omnigibson as og
@@ -110,7 +109,7 @@ class PointNavigationTask(BaseTask):
 
     def _create_termination_conditions(self):
         # Initialize termination conditions dict and fill in with MaxCollision, Timeout, Falling, and PointGoal
-        terminations = OrderedDict()
+        terminations = dict()
         terminations["max_collision"] = MaxCollision(max_collisions=self._termination_config["max_collisions"])
         terminations["timeout"] = Timeout(max_steps=self._termination_config["max_steps"])
         terminations["falling"] = Falling(robot_idn=self._robot_idn, fall_height=self._termination_config["fall_height"])
@@ -124,7 +123,7 @@ class PointNavigationTask(BaseTask):
 
     def _create_reward_functions(self):
         # Initialize reward functions dict and fill in with Potential, Collision, and PointGoal rewards
-        rewards = OrderedDict()
+        rewards = dict()
 
         rewards["potential"] = PotentialReward(
             potential_fcn=self.get_potential,
@@ -377,18 +376,18 @@ class PointNavigationTask(BaseTask):
         ang_vel = T.quat2mat(quat).T @ env.robots[self._robot_idn].get_angular_velocity()
 
         # Compose observation dict
-        low_dim_obs = OrderedDict(
+        low_dim_obs = dict(
             xy_pos_to_goal=xy_pos_to_goal,
             robot_lin_vel=lin_vel,
             robot_ang_vel=ang_vel,
         )
 
         # We have no non-low-dim obs, so return empty dict for those
-        return low_dim_obs, OrderedDict()
+        return low_dim_obs, dict()
 
     def _load_non_low_dim_observation_space(self):
         # No non-low dim observations so we return an empty dict
-        return OrderedDict()
+        return dict()
 
     def get_goal_pos(self):
         """

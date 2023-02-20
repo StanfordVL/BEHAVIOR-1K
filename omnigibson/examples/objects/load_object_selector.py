@@ -1,6 +1,5 @@
 import logging
 import numpy as np
-from collections import OrderedDict
 import omnigibson as og
 from omnigibson.utils.asset_utils import (
     get_all_object_categories,
@@ -36,7 +35,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     avg_category_spec = get_og_avg_category_specs()
 
     # Create and load this object into the simulator
-    obj_cfg = OrderedDict(
+    obj_cfg = dict(
         type="DatasetObject",
         name="obj",
         category=obj_category,

@@ -1,10 +1,10 @@
 import numpy as np
-from collections import OrderedDict
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.heat_source_or_sink import HeatSourceOrSink
 from omnigibson.object_states.inside import Inside
 from omnigibson.object_states.object_state_base import AbsoluteObjectState
 from omnigibson.object_states.aabb import AABB
+from omnigibson.object_states.update_state_mixin import UpdateStateMixin
 import omnigibson.utils.transform_utils as T
 import omnigibson as og
 
@@ -20,7 +20,7 @@ m.DEFAULT_TEMPERATURE = 23.0  # degrees Celsius
 m.TEMPERATURE_DECAY_SPEED = 0.02  # per second. We'll do the conversion to steps later.
 
 
-class Temperature(AbsoluteObjectState):
+class Temperature(AbsoluteObjectState, UpdateStateMixin):
     @staticmethod
     def get_dependencies():
         return AbsoluteObjectState.get_dependencies() + [AABB]
@@ -99,7 +99,7 @@ class Temperature(AbsoluteObjectState):
 
     # For this state, we simply store its value.
     def _dump_state(self):
-        return OrderedDict(temperature=self.value)
+        return dict(temperature=self.value)
 
     def _load_state(self, state):
         self.value = state["temperature"]
@@ -108,4 +108,4 @@ class Temperature(AbsoluteObjectState):
         return np.array([state["temperature"]], dtype=float)
 
     def _deserialize(self, state):
-        return OrderedDict(temperature=state[0]), 1
+        return dict(temperature=state[0]), 1

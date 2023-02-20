@@ -1,5 +1,4 @@
 from abc import ABCMeta
-from collections import OrderedDict
 import logging
 
 from omnigibson.macros import create_module_macros
@@ -17,7 +16,7 @@ from omnigibson.utils.constants import PrimType, CLASS_NAME_TO_CLASS_ID
 from omni.isaac.core.utils.semantics import add_update_semantics
 
 # Global dicts that will contain mappings
-REGISTERED_OBJECTS = OrderedDict()
+REGISTERED_OBJECTS = dict()
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -196,7 +195,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
 
         # Iterate over all links and grab their relevant material info for highlighting (i.e.: emissivity info)
         self._highlighted = False
-        self._highlight_cached_values = OrderedDict()
+        self._highlight_cached_values = dict()
 
         for material in self.materials:
             self._highlight_cached_values[material] = {
@@ -204,12 +203,6 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
                 "emissive_color": material.emissive_color,
                 "emissive_intensity": material.emissive_intensity,
             }
-
-    def reset(self):
-        """
-        Runs any necessary resetting functionality for this object. Default is pass-through
-        """
-        pass
 
     @property
     def articulation_root_path(self):

@@ -1,5 +1,4 @@
 import logging
-from collections import OrderedDict
 import numpy as np
 
 import omnigibson as og
@@ -22,7 +21,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     obj_configs = []
 
     # Light
-    obj_configs.append(OrderedDict(
+    obj_configs.append(dict(
         type="LightObject",
         light_type="Sphere",
         name="light",
@@ -32,7 +31,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     ))
 
     # Stove
-    obj_configs.append(OrderedDict(
+    obj_configs.append(dict(
         type="DatasetObject",
         name="stove",
         category="stove",
@@ -42,7 +41,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # 2 Apples
     for i in range(2):
-        obj_configs.append(OrderedDict(
+        obj_configs.append(dict(
             type="DatasetObject",
             name=f"apple{i}",
             category="apple",

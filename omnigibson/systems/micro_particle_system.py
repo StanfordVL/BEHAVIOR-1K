@@ -18,7 +18,6 @@ import omni
 from omni.isaac.core.utils.prims import get_prim_at_path, is_prim_path_valid
 from omni.physx.scripts import particleUtils
 from omni.physx import get_physx_scene_query_interface
-from collections import OrderedDict
 import numpy as np
 from pxr import Gf, Vt, UsdShade, UsdGeom, PhysxSchema
 from collections import defaultdict
@@ -65,19 +64,6 @@ def set_carb_settings_for_fluid_isosurface():
     isregistry.set_int("rtx-defaults/pathtracing/maxSpecularAndTransmissionBounces", 16)
     isregistry.set_int("rtx-defaults/post/dlss/execMode", 1)
     isregistry.set_int("rtx-defaults/translucency/maxRefractionBounces", 12)
-
-
-def get_fluid_systems():
-    """
-    Returns:
-        OrderedDict: Mapping from fluid system name to fluid system
-    """
-    systems = OrderedDict()
-    for system in SYSTEMS_REGISTRY.objects:
-        if issubclass(system, FluidSystem):
-            systems[system.name] = system
-
-    return systems
 
 
 class PhysxParticleInstancer(BasePrim):
@@ -172,15 +158,16 @@ class PhysxParticleInstancer(BasePrim):
             idxs (list or np.array of int): IDs corresponding to the indices of specific particles to remove from this
                 instancer
         """
-        # Update the number of particles
-        self._n_particles -= len(idxs)
-        # Remove all requested indices and write to all the internal data arrays
-        self.particle_positions = np.delete(self.particle_positions, idxs, axis=0)
-        self.particle_velocities = np.delete(self.particle_velocities, idxs, axis=0)
-        self.particle_orientations = np.delete(self.particle_orientations, idxs, axis=0)
-        self.particle_scales = np.delete(self.particle_scales, idxs, axis=0)
-        self.particle_prototype_ids = np.delete(self.particle_prototype_ids, idxs, axis=0)
-        self.particle_visibilities = np.delete(self.particle_visibilities, idxs, axis=0)
+        if len(idxs) > 0:
+            # Update the number of particles
+            self._n_particles -= len(idxs)
+            # Remove all requested indices and write to all the internal data arrays
+            self.particle_positions = np.delete(self.particle_positions, idxs, axis=0)
+            self.particle_velocities = np.delete(self.particle_velocities, idxs, axis=0)
+            self.particle_orientations = np.delete(self.particle_orientations, idxs, axis=0)
+            self.particle_scales = np.delete(self.particle_scales, idxs, axis=0)
+            self.particle_prototype_ids = np.delete(self.particle_prototype_ids, idxs, axis=0)
+            self.particle_visibilities = np.delete(self.particle_visibilities, idxs, axis=0)
 
     def remove_all_particles(self):
         """
@@ -367,7 +354,7 @@ class PhysxParticleInstancer(BasePrim):
         self.set_attribute(attr="ids", val=visibilities)
 
     def _dump_state(self):
-        return OrderedDict(
+        return dict(
             idn=self._idn,
             particle_group=self.particle_group,
             n_particles=self._n_particles,
@@ -414,7 +401,7 @@ class PhysxParticleInstancer(BasePrim):
 
         # De-compress from 1D array
         n_particles = int(state[2])
-        state_dict = OrderedDict(
+        state_dict = dict(
             idn=int(state[0]),
             particle_group=int(state[1]),
             n_particles=n_particles,
@@ -435,41 +422,11 @@ class PhysxParticleInstancer(BasePrim):
 
 class MicroParticleSystem(BaseParticleSystem):
     """
-    Global system for modeling "micro" level particles, e.g.: water, seeds, rice, etc. This system leverages
+    Global system for modeling "micro" level particles, e.g.: water, seeds, cloth. This system leverages
     Omniverse's native physx particle systems
     """
     # Particle system prim in the scene, should be generated at runtime
     prim = None
-
-    # Particle prototypes -- will be list of mesh prims to use as particle prototypes for this system
-    particle_prototypes = None
-
-    # Particle instancers -- maps name to particle instancer prims (OrderedDict)
-    particle_instancers = None
-
-    # Material -- either a MaterialPrim or None if no material is used for this particle system
-    _material = None
-
-    # Color associated with this system (NOTE: external queries should call cls.color)
-    _color = None
-
-    # Scaling factor to sample from when generating a new particle
-    min_scale = None                # (x,y,z) scaling
-    max_scale = None                # (x,y,z) scaling
-
-    # Max particle instancer identification number -- this monotonically increases until reset() is called
-    max_instancer_idn = None
-
-    # State cache -- OrderedDict, anything that should be updated exactly once between simulation step calls
-    state_cache = None
-
-    @classproperty
-    def n_particles(cls):
-        """
-        Returns:
-            int: Number of active particles in this system
-        """
-        return sum([instancer.n_particles for instancer in cls.particle_instancers.values()])
 
     @classproperty
     def prim_path(cls):
@@ -479,174 +436,13 @@ class MicroParticleSystem(BaseParticleSystem):
         """
         return f"/World/{cls.name}"
 
-    @classproperty
-    def mat_path(cls):
-        """
-        Returns:
-            str: Path to this system's material in the scene stage
-        """
-        return f"{cls.prim_path}/{cls.name}_material"
-
-    @classproperty
-    def mat_name(cls):
-        """
-        Returns:
-            str: Name of this system's material
-        """
-        return f"{cls.name}:material"
-
-    @classproperty
-    def material(cls):
-        """
-        Returns:
-            None or MaterialPrim: The bound material to this prim, if there is one
-        """
-        return cls._material
-
     @classmethod
     def initialize(cls, simulator):
         # Run super first
         super().initialize(simulator=simulator)
 
-        # Initialize class variables that are mutable so they don't get overridden by children classes
-        cls.particle_instancers = OrderedDict()
-
-        # Set the default scales
-        cls.min_scale = np.ones(3)
-        cls.max_scale = np.ones(3)
-
-        # Initialize max instancer idn
-        cls.max_instancer_idn = -1
-
-        # Initialize state cache
-        cls.state_cache = OrderedDict()
-
-        # Create the particle system if it doesn't already exist, otherwise sync with the pre-existing system
-        prototype_path = get_prototype_path_from_particle_system_path(particle_system_path=cls.prim_path)
-
-        if cls.particle_system_exists:
-            cls.prim = get_prim_at_path(cls.prim_path)
-            # If Material already exists on stage, just create a MaterialPrim wrapper around it (run its post_load())
-            if is_prim_path_valid(cls.mat_path):
-                cls._material = cls._create_particle_material_template()
-                cls._material.shader_force_populate()
-            prototype_dir_prim = get_prim_at_path(prototype_path)
-            cls.particle_prototypes = [prototype_prim for prototype_prim in prototype_dir_prim.GetChildren()]
-
-            # Also need to synchronize any instancers we have
-            for prim in cls.prim.GetChildren():
-                name = prim.GetName()
-                if prim.GetPrimTypeInfo().GetTypeName() == "PointInstancer":
-                    cls.particle_instancers[name] = PhysxParticleInstancer(
-                        prim_path=prim.GetPrimPath().pathString,
-                        name=name,
-                        idn=cls.particle_instancer_name_to_idn(name=name),
-                    )
-        else:
-            cls.prim = cls._create_particle_system()
-            # Create the particle material (only if we're using high-quality rendering since this takes time)
-            cls._material = cls._create_particle_material_template() if gm.ENABLE_HQ_RENDERING else None
-            if cls._material is not None:
-                # Load the material
-                cls._material.load()
-                # Bind the material to the particle system
-                cls._material.bind(cls.prim_path)
-                # Also apply physics to this material
-                particleUtils.add_pbd_particle_material(cls.simulator.stage, cls.mat_path)
-                # Force populate inputs and outputs of the shader
-                cls._material.shader_force_populate()
-                # Potentially modify the material
-                cls._customize_particle_material()
-            # Create the particle prototypes, move them to the appropriate directory, and make them all invisible
-            prototypes = cls._create_particle_prototypes()
-            cls.particle_prototypes = []
-            cls.simulator.stage.DefinePrim(prototype_path, "Scope")
-            cls.simulator.stage.DefinePrim(f"{prototype_path}/{cls.name}", "Scope")
-            for i, prototype_prim in enumerate(prototypes):
-                # TODO: Omni no longer likes prototypes being created in nested locations. Where to place now?
-                path_from = prototype_prim.GetPrimPath().pathString
-                path_to = f"{prototype_path}/{cls.name}/ParticlePrototype{i}"
-                omni.kit.commands.execute("MovePrim", path_from=path_from, path_to=path_to)
-                # path_to = prototype_prim.GetPrimPath().pathString
-                prototype_prim_new = get_prim_at_path(path_to)
-                UsdGeom.Imageable(prototype_prim_new).MakeInvisible()
-                cls.particle_prototypes.append(prototype_prim_new)
-
-        # Set custom rendering settings if we're using a fluid isosurface
-        if cls.is_fluid and cls.use_isosurface and gm.ENABLE_HQ_RENDERING:
-            set_carb_settings_for_fluid_isosurface()
-
-            # We also modify the grid smoothing radius to avoid "blobby" appearances
-            cls.prim.GetAttribute("physxParticleIsosurface:gridSmoothingRadius").Set(0.0001)
-
-        # Set the color for this system
-        if cls._material is not None:
-            base_color_weight = cls._material.diffuse_reflection_weight
-            transmission_weight = cls._material.enable_specular_transmission * cls._material.specular_transmission_weight
-            total_weight = base_color_weight + transmission_weight
-            if total_weight == 0.0:
-                # If the fluid doesn't have any color, we add a "blue" tint by default
-                color = np.array([0.0, 0.0, 1.0])
-            else:
-                base_color_weight /= total_weight
-                transmission_weight /= total_weight
-                # Weighted sum of base color and transmission color
-                color = base_color_weight * cls._material.diffuse_reflection_color + \
-                        transmission_weight * (0.5 * cls._material.specular_transmission_color + \
-                                               0.5 * cls._material.specular_transmission_scattering_color)
-            cls._color = color
-
-    @classmethod
-    def reset(cls):
-        # Reset all internal variables
-        cls.remove_all_particle_instancers()
-        cls.state_cache = OrderedDict()
-
-    @classmethod
-    def update_max_instancer_idn(cls):
-        """
-        Updates the max instancer identification number based on the current internal state
-        """
-        cls.max_instancer_idn = -1 if len(cls.particle_instancers) == 0 else \
-            int(np.max([cls.particle_instancer_name_to_idn(name) for name in cls.particle_instancers.keys()]))
-
-    @classproperty
-    def state_size(cls):
-        # We have the number of particle instancers (1), the instancer groups, particle groups, and,
-        # number of particles in each instancer (3n),
-        # and the corresponding states in each instancer (X)
-        return 1 + 3 * len(cls.particle_instancers) + sum(inst.state_size for inst in cls.particle_instancers.values())
-
-    @classproperty
-    def default_particle_instancer(cls):
-        """
-        Returns:
-            PhysxParticleInstancer: Default particle instancer for this particle system
-        """
-        # TODO: Clean up this logic, ideally FluidSystem stuff should exist here, but it breaks because ClothSystem doesn't use any of this logic!
-        raise NotImplementedError()
-
-    @classproperty
-    def particle_system_exists(cls):
-        """
-        Returns:
-            bool: Whether this particle system already exists on the current stage. Useful for internal logic
-                synchronization during, e.g., initialization, where a USD snapshot may have been loaded with a particle
-                system already on the stage
-        """
-        return is_prim_path_valid(cls.prim_path)
-
-    @classproperty
-    def color(cls):
-        return cls._color
-
-    @classproperty
-    def is_fluid(cls):
-        """
-        Returns:
-            bool: Whether this system is modeling fluid or not
-        """
-        raise NotImplementedError()
+        # Create or grab reference to particle system, depending on whether the system exists or not
+        cls.prim = cls._create_particle_system()
 
     @classproperty
     def visual_only(cls):
@@ -705,7 +501,234 @@ class MicroParticleSystem(BaseParticleSystem):
         """
         # Magic number from omni tutorials
         # See https://docs.omniverse.nvidia.com/prod_extensions/prod_extensions/ext_physics.html#offset-autocomputation
-        return 0.99 * 0.6 * cls.particle_contact_offset if cls.is_fluid else 0.99 * cls.particle_contact_offset
+        return 0.99 * cls.particle_contact_offset
+
+    @classmethod
+    def _create_particle_system(cls):
+        """
+        Creates the single, global particle system. This should only be ever called once, and during initialize()
+
+        Returns:
+            Usd.Prim: Particle system prim created
+        """
+        return create_physx_particle_system(
+            prim_path=cls.prim_path,
+            physics_scene_path=cls.simulator.get_physics_context().get_current_physics_scene_prim().GetPrimPath().pathString,
+            particle_contact_offset=cls.particle_contact_offset,
+            visual_only=cls.visual_only,
+            smoothing=cls.use_smoothing and gm.ENABLE_HQ_RENDERING,
+            anisotropy=cls.use_anisotropy and gm.ENABLE_HQ_RENDERING,
+            isosurface=cls.use_isosurface and gm.ENABLE_HQ_RENDERING,
+        ).GetPrim()
+
+
+class PhysicalParticleSystem(MicroParticleSystem):
+    """
+    Global system for modeling physical "micro" level particles, e.g.: water, seeds, rice, etc. This system leverages
+    Omniverse's native physx particle systems
+    """
+    # Particle prototypes -- will be list of mesh prims to use as particle prototypes for this system
+    particle_prototypes = None
+
+    # Particle instancers -- maps name to particle instancer prims (dict)
+    particle_instancers = None
+
+    # Material -- either a MaterialPrim or None if no material is used for this particle system
+    _material = None
+
+    # Color associated with this system (NOTE: external queries should call cls.color)
+    _color = None
+
+    # Scaling factor to sample from when generating a new particle
+    min_scale = None  # (x,y,z) scaling
+    max_scale = None  # (x,y,z) scaling
+
+    # Max particle instancer identification number -- this monotonically increases until reset() is called
+    max_instancer_idn = None
+
+    @classproperty
+    def n_particles(cls):
+        """
+        Returns:
+            int: Number of active particles in this system
+        """
+        return sum([instancer.n_particles for instancer in cls.particle_instancers.values()])
+
+    @classproperty
+    def prim_path(cls):
+        """
+        Returns:
+            str: Path to this system's prim in the scene stage
+        """
+        return f"/World/{cls.name}"
+
+    @classproperty
+    def mat_path(cls):
+        """
+        Returns:
+            str: Path to this system's material in the scene stage
+        """
+        return f"{cls.prim_path}/{cls.name}_material"
+
+    @classproperty
+    def mat_name(cls):
+        """
+        Returns:
+            str: Name of this system's material
+        """
+        return f"{cls.name}:material"
+
+    @classproperty
+    def material(cls):
+        """
+        Returns:
+            None or MaterialPrim: The bound material to this prim, if there is one
+        """
+        return cls._material
+
+    @classmethod
+    def initialize(cls, simulator):
+        # Check if the particle system exists, before we create it!
+
+        # Run super first
+        super().initialize(simulator=simulator)
+
+        # Initialize class variables that are mutable so they don't get overridden by children classes
+        cls.particle_instancers = dict()
+
+        # Set the default scales
+        cls.min_scale = np.ones(3)
+        cls.max_scale = np.ones(3)
+
+        # Initialize max instancer idn
+        cls.max_instancer_idn = -1
+
+        # Create the particle system if it doesn't already exist, otherwise sync with the pre-existing system
+        prototype_path = get_prototype_path_from_particle_system_path(particle_system_path=cls.prim_path)
+
+        # Create the particle material (only if we're using high-quality rendering since this takes time)
+        cls._material = cls._create_particle_material_template() if gm.ENABLE_HQ_RENDERING else None
+        if cls._material is not None:
+            # Load the material
+            cls._material.load()
+            # Bind the material to the particle system
+            cls._material.bind(cls.prim_path)
+            # Also apply physics to this material
+            particleUtils.add_pbd_particle_material(cls.simulator.stage, cls.mat_path)
+            # Force populate inputs and outputs of the shader
+            cls._material.shader_force_populate()
+            # Potentially modify the material
+            cls._customize_particle_material()
+        # Create the particle prototypes, move them to the appropriate directory, and make them all invisible
+        prototypes = cls._create_particle_prototypes()
+        cls.particle_prototypes = []
+        cls.simulator.stage.DefinePrim(prototype_path, "Scope")
+        cls.simulator.stage.DefinePrim(f"{prototype_path}/{cls.name}", "Scope")
+        for i, prototype_prim in enumerate(prototypes):
+            # TODO: Omni no longer likes prototypes being created in nested locations. Where to place now?
+            path_from = prototype_prim.GetPrimPath().pathString
+            path_to = f"{prototype_path}/{cls.name}/ParticlePrototype{i}"
+            omni.kit.commands.execute("MovePrim", path_from=path_from, path_to=path_to)
+            # path_to = prototype_prim.GetPrimPath().pathString
+            prototype_prim_new = get_prim_at_path(path_to)
+            UsdGeom.Imageable(prototype_prim_new).MakeInvisible()
+            cls.particle_prototypes.append(prototype_prim_new)
+
+        # Set custom rendering settings if we're using a fluid isosurface
+        if cls.is_fluid and cls.use_isosurface and gm.ENABLE_HQ_RENDERING:
+            set_carb_settings_for_fluid_isosurface()
+
+            # We also modify the grid smoothing radius to avoid "blobby" appearances
+            cls.prim.GetAttribute("physxParticleIsosurface:gridSmoothingRadius").Set(0.0001)
+
+        # Set the color for this system
+        if cls._material is not None:
+            base_color_weight = cls._material.diffuse_reflection_weight
+            transmission_weight = cls._material.enable_specular_transmission * cls._material.specular_transmission_weight
+            total_weight = base_color_weight + transmission_weight
+            if total_weight == 0.0:
+                # If the fluid doesn't have any color, we add a "blue" tint by default
+                color = np.array([0.0, 0.0, 1.0])
+            else:
+                base_color_weight /= total_weight
+                transmission_weight /= total_weight
+                # Weighted sum of base color and transmission color
+                color = base_color_weight * cls._material.diffuse_reflection_color + \
+                        transmission_weight * (0.5 * cls._material.specular_transmission_color + \
+                                               0.5 * cls._material.specular_transmission_scattering_color)
+            cls._color = color
+
+    @classmethod
+    def reset(cls):
+        # Call super first
+        super().reset()
+
+        # Reset all internal variables
+        cls.remove_all_particle_instancers()
+
+    @classmethod
+    def update_max_instancer_idn(cls):
+        """
+        Updates the max instancer identification number based on the current internal state
+        """
+        cls.max_instancer_idn = -1 if len(cls.particle_instancers) == 0 else \
+            int(np.max([cls.particle_instancer_name_to_idn(name) for name in cls.particle_instancers.keys()]))
+
+    @classproperty
+    def state_size(cls):
+        # We have the number of particle instancers (1), the instancer groups, particle groups, and,
+        # number of particles in each instancer (3n),
+        # and the corresponding states in each instancer (X)
+        return 1 + 3 * len(cls.particle_instancers) + sum(inst.state_size for inst in cls.particle_instancers.values())
+
+    @classproperty
+    def default_particle_instancer(cls):
+        """
+        Returns:
+            PhysxParticleInstancer: Default particle instancer for this particle system
+        """
+        # Default instancer is the 0th ID instancer
+        name = cls.particle_instancer_idn_to_name(idn=0)
+        # NOTE: Cannot use dict.get() call for some reason; it messes up IDE introspection
+        return cls.particle_instancers[name] if name in cls.particle_instancers else cls.generate_particle_instancer(n_particles=0)
+
+    @classproperty
+    def color(cls):
+        return cls._color
+
+    @classproperty
+    def particle_radius(cls):
+        """
+        Returns:
+            float: Radius for the particles to be generated, since all fluids are composed of spheres
+        """
+        # Magic number from omni tutorials
+        # See https://docs.omniverse.nvidia.com/prod_extensions/prod_extensions/ext_physics.html#offset-autocomputation
+        return 0.99 * 0.6 * cls.particle_contact_offset if cls.is_fluid else super().particle_radius
+
+    @classproperty
+    def visual_only(cls):
+        return False
+
+    @classproperty
+    def use_smoothing(cls):
+        return False
+
+    @classproperty
+    def use_anisotropy(cls):
+        return False
+
+    @classproperty
+    def use_isosurface(cls):
+        return False
+
+    @classproperty
+    def is_fluid(cls):
+        """
+        Returns:
+            bool: Whether this system is modeling fluid or not
+        """
+        raise NotImplementedError()
 
     @classproperty
     def particle_density(cls):
@@ -748,22 +771,73 @@ class MicroParticleSystem(BaseParticleSystem):
         pass
 
     @classmethod
-    def _create_particle_system(cls):
+    def generate_particles(
+            cls,
+            positions,
+            instancer_idn=None,
+            particle_group=0,
+            velocities=None,
+            orientations=None,
+            scales=None,
+            self_collision=True,
+            prototype_indices=None,
+    ):
         """
-        Creates the single, global particle system. This should only be ever called once, and during initialize()
+        Generates new particles, either as part of a pre-existing instancer corresponding to @instancer_idn or as part
+            of a newly generated instancer.
+
+        NOTE:
+
+        Args:
+            positions (np.array): (n_particles, 3) shaped array specifying per-particle (x,y,z) positions.
+                If not specified, will be set to the origin by default
+            instancer_idn (None or int): Unique identification number of the particle instancer to assign the generated
+                particles to. This is used to deterministically reproduce individual particle instancer states
+                dynamically, even if we delete / add additional ones at runtime during simulation. If there is no
+                active instancer that matches the requested idn, a new one will be created.
+                If None, this system will add particles to the default particle instancer
+            particle_group (int): ID for this particle set. Particles from different groups will automatically collide
+                with each other. Particles in the same group will have collision behavior dictated by @self_collision
+            velocities (None or np.array): (n_particles, 3) shaped array specifying per-particle (x,y,z) velocities.
+                If not specified, all will be set to 0
+            orientations (None or np.array): (n_particles, 4) shaped array specifying per-particle (x,y,z,w) quaternion
+                orientations. If not specified, all will be set to canonical orientation (0, 0, 0, 1)
+            scales (None or np.array): (n_particles, 3) shaped array specifying per-particle (x,y,z) scales.
+                If not specified, will be uniformly randomly sampled from (cls.min_scale, cls.max_scale)
+            self_collision (bool): Whether to enable particle-particle collision within the set
+                (as defined by @particle_group) or not
+            prototype_indices (None or list of int): If specified, should specify which prototype should be used for
+                each particle. If None, will use all 0s (i.e.: the first prototype created)
 
         Returns:
-            Usd.Prim: Particle system prim created
+            PhysxParticleInstancer: Particle instancer that includes the generated particles
         """
-        return create_physx_particle_system(
-            prim_path=cls.prim_path,
-            physics_scene_path=cls.simulator.get_physics_context().get_current_physics_scene_prim().GetPrimPath().pathString,
-            particle_contact_offset=cls.particle_contact_offset,
-            visual_only=cls.visual_only,
-            smoothing=cls.use_smoothing and gm.ENABLE_HQ_RENDERING,
-            anisotropy=cls.use_anisotropy and gm.ENABLE_HQ_RENDERING,
-            isosurface=cls.use_isosurface and gm.ENABLE_HQ_RENDERING,
-        ).GetPrim()
+        # Create a new particle instancer if a new idn is requested, otherwise use the pre-existing one
+        inst = cls.default_particle_instancer if instancer_idn is None else \
+            cls.particle_instancers.get(cls.particle_instancer_idn_to_name(idn=instancer_idn), None)
+
+        if inst is None:
+            inst = cls.generate_particle_instancer(
+                idn=instancer_idn,
+                particle_group=particle_group,
+                n_particles=len(positions),
+                positions=positions,
+                velocities=velocities,
+                orientations=orientations,
+                scales=scales,
+                prototype_indices=prototype_indices,
+                self_collision=self_collision,
+            )
+        else:
+            inst.add_particles(
+                positions=positions,
+                velocities=velocities,
+                orientations=orientations,
+                scales=scales,
+                prototype_indices=prototype_indices,
+            )
+
+        return inst
 
     @classmethod
     def generate_particle_instancer(
@@ -844,7 +918,7 @@ class MicroParticleSystem(BaseParticleSystem):
         )
         instancer.initialize()
         cls.particle_instancers[name] = instancer
-        
+
         # Update the max particle instancer ID
         cls.update_max_instancer_idn()
 
@@ -920,14 +994,16 @@ class MicroParticleSystem(BaseParticleSystem):
         # We sample the range of each extent minus
         sampling_distance = 2 * cls.particle_radius if sampling_distance is None else sampling_distance
         n_particles_per_axis = ((extent - 2 * cls.particle_radius) / sampling_distance).astype(int) + 1
-        arrs = [np.linspace(lo + cls.particle_radius, hi - cls.particle_radius, n) for lo, hi, n in zip(low, high, n_particles_per_axis)]
+        arrs = [np.linspace(lo + cls.particle_radius, hi - cls.particle_radius, n) for lo, hi, n in
+                zip(low, high, n_particles_per_axis)]
         # Generate 3D-rectangular grid of points
         particle_positions = np.stack([arr.flatten() for arr in np.meshgrid(*arrs)]).T
         # Check which points are inside the volume and only keep those
         particle_positions = particle_positions[np.where(check_in_volume(particle_positions))[0]]
         # Also potentially sub-sample if we're past our limit
         if len(particle_positions) > max_samples:
-            particle_positions = particle_positions[np.random.choice(len(particle_positions), size=(max_samples,), replace=False)]
+            particle_positions = particle_positions[
+                np.random.choice(len(particle_positions), size=(max_samples,), replace=False)]
 
         # Get information about our sampled points
         n_particles = len(particle_positions)
@@ -938,26 +1014,13 @@ class MicroParticleSystem(BaseParticleSystem):
         else:
             prototype_indices = None
 
-        # Create a new particle instancer if a new idn is requested, otherwise use the pre-existing one
-        inst = cls.default_particle_instancer if instancer_idn is None else \
-            cls.particle_instancers.get(cls.particle_instancer_idn_to_name(idn=instancer_idn), None)
-
-        if inst is None:
-            inst = cls.generate_particle_instancer(
-                idn=instancer_idn,
-                particle_group=particle_group,
-                n_particles=n_particles,
-                positions=particle_positions,
-                self_collision=self_collision,
-                prototype_indices=prototype_indices,
-            )
-        else:
-            inst.add_particles(
-                positions=particle_positions,
-                prototype_indices=prototype_indices,
-            )
-
-        return inst
+        return cls.generate_particles(
+            instancer_idn=instancer_idn,
+            particle_group=particle_group,
+            positions=particle_positions,
+            self_collision=self_collision,
+            prototype_indices=prototype_indices,
+        )
 
     @classmethod
     def generate_particles_from_mesh(
@@ -1021,8 +1084,8 @@ class MicroParticleSystem(BaseParticleSystem):
         # forward even if we don't explicitly call sim.step())
         with cls.simulator.paused():
             cls.simulator.step_physics()
-        time.sleep(0.1)                         # Empirically validated for ~2500 samples (0.02 time doesn't work)
-        cls.simulator.render()                  # Rendering is needed after an initial, nontrivial amount of time for the particles to actually be sampled
+        time.sleep(0.1)  # Empirically validated for ~2500 samples (0.02 time doesn't work)
+        cls.simulator.render()  # Rendering is needed after an initial, nontrivial amount of time for the particles to actually be sampled
 
         # Grab the actual positions, we will write this to a new instancer that's not tied to the sampler
         # The points / instancer tied to the sampled mesh seems to operate a bit weirdly, which is why we do it this way
@@ -1046,26 +1109,13 @@ class MicroParticleSystem(BaseParticleSystem):
         else:
             prototype_indices = None
 
-        # Create a new particle instancer if a new idn is requested, otherwise use the pre-existing one
-        inst = cls.default_particle_instancer if instancer_idn is None else \
-            cls.particle_instancers.get(cls.particle_instancer_idn_to_name(idn=instancer_idn), None)
-
-        if inst is None:
-            inst = cls.generate_particle_instancer(
-                idn=instancer_idn,
-                particle_group=particle_group,
-                n_particles=n_particles,
-                positions=pos,
-                self_collision=self_collision,
-                prototype_indices=prototype_indices,
-            )
-        else:
-            inst.add_particles(
-                positions=pos,
-                prototype_indices=prototype_indices,
-            )
-
-        return inst
+        return cls.generate_particles(
+            instancer_idn=instancer_idn,
+            particle_group=particle_group,
+            positions=pos,
+            self_collision=self_collision,
+            prototype_indices=prototype_indices,
+        )
 
     @classmethod
     def generate_particles_on_object(
@@ -1122,7 +1172,8 @@ class MicroParticleSystem(BaseParticleSystem):
         particle_positions = np.array([result[0] for result in results if result[0] is not None])
         # Also potentially sub-sample if we're past our limit
         if len(particle_positions) > max_samples:
-            particle_positions = particle_positions[np.random.choice(len(particle_positions), size=(max_samples,), replace=False)]
+            particle_positions = particle_positions[
+                np.random.choice(len(particle_positions), size=(max_samples,), replace=False)]
 
         # Get information about our sampled points
         n_particles = len(particle_positions)
@@ -1133,26 +1184,13 @@ class MicroParticleSystem(BaseParticleSystem):
         else:
             prototype_indices = None
 
-        # Create a new particle instancer if a new idn is requested, otherwise use the pre-existing one
-        inst = cls.default_particle_instancer if instancer_idn is None else \
-            cls.particle_instancers.get(cls.particle_instancer_idn_to_name(idn=instancer_idn), None)
-
-        if inst is None:
-            inst = cls.generate_particle_instancer(
-                idn=instancer_idn,
-                particle_group=particle_group,
-                n_particles=n_particles,
-                positions=particle_positions,
-                self_collision=self_collision,
-                prototype_indices=prototype_indices,
-            )
-        else:
-            inst.add_particles(
-                positions=particle_positions,
-                prototype_indices=prototype_indices,
-            )
-
-        return inst
+        return cls.generate_particles(
+            instancer_idn=instancer_idn,
+            particle_group=particle_group,
+            positions=particle_positions,
+            self_collision=self_collision,
+            prototype_indices=prototype_indices,
+        )
 
     @classmethod
     def remove_particle_instancer(cls, name):
@@ -1167,7 +1205,8 @@ class MicroParticleSystem(BaseParticleSystem):
         # Remove instancer from our tracking and delete its prim
         instancer = cls.particle_instancers.pop(name)
         instancer.remove(simulator=cls.simulator)
-        cls.simulator.stage.RemovePrim(f"{get_prototype_path_from_particle_system_path(particle_system_path=cls.prim_path)}/{name}")
+        cls.simulator.stage.RemovePrim(
+            f"{get_prototype_path_from_particle_system_path(particle_system_path=cls.prim_path)}/{name}")
 
         # Update the max particle instancer idn
         cls.update_max_instancer_idn()
@@ -1243,31 +1282,17 @@ class MicroParticleSystem(BaseParticleSystem):
 
     @classmethod
     def _dump_state(cls):
-        return OrderedDict(
+        return dict(
             n_particle_instancers=len(cls.particle_instancers),
             instancer_idns=[inst.idn for inst in cls.particle_instancers.values()],
             instancer_particle_groups=[inst.particle_group for inst in cls.particle_instancers.values()],
             instancer_particle_counts=[inst.n_particles for inst in cls.particle_instancers.values()],
-            particle_states=OrderedDict(((name, inst.dump_state(serialized=False))
-                                         for name, inst in cls.particle_instancers.items())),
+            particle_states=dict(((name, inst.dump_state(serialized=False))
+                                  for name, inst in cls.particle_instancers.items())),
         )
 
     @classmethod
     def _load_state(cls, state):
-        # TODO: Verify this is no longer an issue once omni's fluid writing is ready
-        if og.sim.is_playing():
-            # Post disclaimer, we cannot write to omni particle states when sim is playing currently
-            disclaimer(f"We are attempting to load the [{cls.name}], a particle system, state, which requires writing "
-                       f"to individual particle positions.\n"
-                       f"Currently, Omniverse does not respect writing to these "
-                       f"states, but this should be resolved by the next public release.\n"
-                       f"As a result, the fluid state may not be set correctly.\n"
-                       f"Two explicit cases where a failure case will occur:\n"
-                       f"    - Isosurfaces: Because an extra physics step is required to render the fluid correctly"
-                       f"           when generating isosurfaces, we lose the ability to set positions afterwards\n"
-                       f"    - Existing instance with different positions: Because this instance will not be deleted "
-                       f"           and recreated in the simulator, we lose the ability to set positions.")
-
         # Synchronize the particle instancers
         cls._sync_particle_instancers(
             idns=state["instancer_idns"],
@@ -1295,7 +1320,7 @@ class MicroParticleSystem(BaseParticleSystem):
     def _deserialize(cls, state):
         # Synchronize the particle instancers
         n_instancers = int(state[0])
-        instancer_info = OrderedDict()
+        instancer_info = dict()
         idx = 1
         for info_name in ("instancer_idns", "instancer_particle_groups", "instancer_particle_counts"):
             instancer_info[info_name] = state[idx: idx + n_instancers].astype(int).tolist()
@@ -1308,14 +1333,14 @@ class MicroParticleSystem(BaseParticleSystem):
         )
 
         # Procedurally deserialize the particle states
-        particle_states = OrderedDict()
+        particle_states = dict()
         for idn in instancer_info["instancer_idns"]:
             name = cls.particle_instancer_idn_to_name(idn=idn)
             state_size = cls.particle_instancers[name].state_size
             particle_states[name] = cls.particle_instancers[name].deserialize(state[idx: idx + state_size])
             idx += state_size
 
-        return OrderedDict(
+        return dict(
             n_particle_instancers=n_instancers,
             **instancer_info,
             particle_states=particle_states,
@@ -1345,18 +1370,11 @@ class MicroParticleSystem(BaseParticleSystem):
         cls._sync_particle_instancers(idns=[], particle_groups=[], particle_counts=[])
 
 
-class FluidSystem(MicroParticleSystem):
+class FluidSystem(PhysicalParticleSystem):
     """
     Particle system class simulating fluids, leveraging isosurface feature in omniverse to render nice PBR fluid
     texture. Individual particles are composed of spheres.
     """
-
-    @classproperty
-    def default_particle_instancer(cls):
-        # Default instancer is the 0th ID instancer
-        name = cls.particle_instancer_idn_to_name(idn=0)
-        # NOTE: Cannot use dict.get() call for some reason; it messes up IDE introspection
-        return cls.particle_instancers[name] if name in cls.particle_instancers else cls.generate_particle_instancer(n_particles=0)
 
     @classproperty
     def is_fluid(cls):
@@ -1511,11 +1529,6 @@ class ClothSystem(MicroParticleSystem):
     Particle system class to simulate cloth.
     """
 
-    @classmethod
-    def remove_all_particle_instancers(cls):
-        # Override this method to not do anything since Cloth systems don't generate particle instancers
-        pass
-
     @classproperty
     def _register_system(cls):
         # We should register this system since it's an "actual" system (not an intermediate class)
@@ -1525,10 +1538,6 @@ class ClothSystem(MicroParticleSystem):
     def particle_contact_offset(cls):
         # TODO (eric): figure out whether one offset can fit all
         return 0.005
-
-    @classproperty
-    def is_fluid(cls):
-        return False
 
     @classproperty
     def visual_only(cls):
@@ -1546,7 +1555,27 @@ class ClothSystem(MicroParticleSystem):
     def use_isosurface(cls):
         return False
 
-    @classmethod
-    def _create_particle_prototypes(cls):
-        return []
+    @classproperty
+    def state_size(cls):
+        # Default is no state
+        return 0
 
+    @classmethod
+    def _dump_state(cls):
+        # Empty by default
+        return dict()
+
+    @classmethod
+    def _load_state(cls, state):
+        # Nothing by default
+        pass
+
+    @classmethod
+    def _serialize(cls, state):
+        # Nothing by default
+        return np.array([], dtype=float)
+
+    @classmethod
+    def _deserialize(cls, state):
+        # Nothing by default
+        return dict(), 0

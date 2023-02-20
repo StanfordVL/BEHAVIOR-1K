@@ -1,4 +1,3 @@
-from collections import OrderedDict
 from omni.isaac.core.utils.prims import get_prim_at_path, get_prim_parent
 from omni.isaac.core.utils.transformations import tf_matrix_from_pose
 from omni.isaac.core.utils.rotations import gf_quat_to_np_array
@@ -127,16 +126,13 @@ class RigidPrim(XFormPrim):
             for mesh in mesh_group.values():
                 mesh.initialize()
 
-        # Add enabled attribute for the rigid body
-        self._rigid_api.CreateRigidBodyEnabledAttr(True)
-
         # We grab contact info for the first time before setting our internal handle, because this changes the dc handle
         if self.contact_reporting_enabled:
             self._cs.get_rigid_body_raw_data(self._prim_path)
 
         # Grab handle to this rigid body and get name
         self.update_handles()
-        self._body_name = self._dc.get_rigid_body_name(self._handle)
+        self._body_name = self.prim_path.split("/")[-1]
 
     def update_meshes(self):
         """
@@ -153,7 +149,7 @@ class RigidPrim(XFormPrim):
             for visual_mesh in self._visual_meshes.values():
                 visual_mesh.remove_names()
 
-        self._collision_meshes, self._visual_meshes = OrderedDict(), OrderedDict()
+        self._collision_meshes, self._visual_meshes = dict(), dict()
         prims_to_check = []
         coms, vols = [], []
         for prim in self._prim.GetChildren():
@@ -368,7 +364,7 @@ class RigidPrim(XFormPrim):
     def collision_meshes(self):
         """
         Returns:
-            OrderedDict: Dictionary mapping collision mesh names (str) to mesh prims (CollisionMeshPrim) owned by
+            dict: Dictionary mapping collision mesh names (str) to mesh prims (CollisionMeshPrim) owned by
                 this rigid body
         """
         return self._collision_meshes
@@ -377,7 +373,7 @@ class RigidPrim(XFormPrim):
     def visual_meshes(self):
         """
         Returns:
-            OrderedDict: Dictionary mapping visual mesh names (str) to mesh prims (VisualMeshPrim) owned by
+            dict: Dictionary mapping visual mesh names (str) to mesh prims (VisualMeshPrim) owned by
                 this rigid body
         """
         return self._visual_meshes
