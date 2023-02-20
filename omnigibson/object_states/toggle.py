@@ -1,10 +1,10 @@
 import numpy as np
-from collections import OrderedDict
 
 from omnigibson.macros import create_module_macros
 from omnigibson.prims.geom_prim import VisualGeomPrim
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
+from omnigibson.object_states.update_state_mixin import UpdateStateMixin
 from omnigibson.utils.usd_utils import create_primitive_mesh
 from omni.isaac.core.utils.prims import get_prim_at_path
 
@@ -18,7 +18,7 @@ m.TOGGLE_BUTTON_SCALE = 0.05
 m.CAN_TOGGLE_STEPS = 5
 
 
-class ToggledOn(AbsoluteObjectState, BooleanState, LinkBasedStateMixin):
+class ToggledOn(AbsoluteObjectState, BooleanState, LinkBasedStateMixin, UpdateStateMixin):
     def __init__(self, obj):
         self.value = False
         self.robot_can_toggle_steps = 0
@@ -91,7 +91,7 @@ class ToggledOn(AbsoluteObjectState, BooleanState, LinkBasedStateMixin):
 
     # For this state, we simply store its value and the robot_can_toggle steps.
     def _dump_state(self):
-        return OrderedDict(value=self.value, hand_in_marker_steps=self.robot_can_toggle_steps)
+        return dict(value=self.value, hand_in_marker_steps=self.robot_can_toggle_steps)
 
     def _load_state(self, state):
         # Nothing special to do here when initialized vs. uninitialized
@@ -102,4 +102,4 @@ class ToggledOn(AbsoluteObjectState, BooleanState, LinkBasedStateMixin):
         return np.array([state["value"], state["hand_in_marker_steps"]], dtype=float)
 
     def _deserialize(self, state):
-        return OrderedDict(value=bool(state[0]), hand_in_marker_steps=int(state[1])), 2
+        return dict(value=bool(state[0]), hand_in_marker_steps=int(state[1])), 2

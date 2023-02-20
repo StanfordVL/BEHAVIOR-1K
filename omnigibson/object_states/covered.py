@@ -1,11 +1,11 @@
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states import AABB
 from omnigibson.object_states.object_state_base import RelativeObjectState, BooleanState
-from omnigibson.systems.system_base import get_element_name_from_system
-from omnigibson.systems.macro_particle_system import VisualParticleSystem, get_visual_particle_systems
-from omnigibson.systems.micro_particle_system import FluidSystem, get_fluid_systems
+from omnigibson.object_states.contact_particles import ContactParticles
+from omnigibson.systems.system_base import get_element_name_from_system, get_system_from_element_name
+from omnigibson.systems.macro_particle_system import VisualParticleSystem
+from omnigibson.systems.micro_particle_system import PhysicalParticleSystem
 from omnigibson.utils.python_utils import classproperty
-from collections import OrderedDict
 import numpy as np
 
 # Create settings for this module
@@ -14,11 +14,11 @@ m = create_module_macros(module_path=__file__)
 # Value in [0, 1] determining the minimum proportion of particles needed in order for Covered --> True
 m.VISUAL_PARTICLE_THRESHOLD = 0.75
 
-# Number of fluid particles needed in order for Covered --> True
-m.FLUID_THRESHOLD = 50
+# Number of physical particles needed in order for Covered --> True
+m.PHYSICAL_PARTICLE_THRESHOLD = 50
 
-# Maximum number of fluid particles to sample when setting an object to be covered = True
-m.MAX_FLUID_PARTICLES = 5000
+# Maximum number of physical particles to sample when setting an object to be covered = True
+m.MAX_PHYSICAL_PARTICLES = 5000
 
 
 class Covered(RelativeObjectState, BooleanState):
@@ -27,47 +27,63 @@ class Covered(RelativeObjectState, BooleanState):
         super().__init__(obj)
 
         # Set internal values
-        self._visual_particle_groups = None
+        self._visual_particle_group = None
         self._n_initial_visual_particles = None
 
     @staticmethod
     def get_dependencies():
         # AABB needed for sampling visual particles on an object
-        return RelativeObjectState.get_dependencies() + [AABB]
+        return RelativeObjectState.get_dependencies() + [AABB, ContactParticles]
+
+    def remove(self):
+        if self._initialized:
+            self._clear_attachment_groups()
+
+    def _clear_attachment_groups(self):
+        """
+        Utility function to destroy all corresponding attachment groups for this object
+        """
+        for system in VisualParticleSystem.get_systems().values():
+            if self._visual_particle_group in system.groups:
+                system.remove_attachment_group(self._visual_particle_group)
 
     def _initialize(self):
-        # Create the visual particle groups
-        self._visual_particle_groups = OrderedDict((get_element_name_from_system(system), system.create_attachment_group(obj=self.obj))
-                                                   for system in get_visual_particle_systems().values())
+        # Grab group name
+        self._visual_particle_group = VisualParticleSystem.get_group_name(obj=self.obj)
+
+        # Create attachment groups if they don't already exist
+        for system in VisualParticleSystem.get_systems().values():
+            if self._visual_particle_group not in system.groups:
+                system.create_attachment_group(obj=self.obj)
 
         # Default initial particles is 0
-        self._n_initial_visual_particles = OrderedDict((get_element_name_from_system(system), 0)
-                                                       for system in get_visual_particle_systems().values())
+        self._n_initial_visual_particles = dict((get_element_name_from_system(system), 0)
+                                                       for system in VisualParticleSystem.get_systems().values())
 
     def _get_value(self, system):
         # Value is false by default
         value = False
         # First, we check what type of system
-        # Currently, we support VisualParticleSystems and FluidSystems
+        # Currently, we support VisualParticleSystems and PhysicalParticleSystems
         if issubclass(system, VisualParticleSystem):
-            # We check whether the current number of particles assigned to the group is greater than the threshold
+            # Create the group if it doesn't exist already
             name = get_element_name_from_system(system)
-            value = system.num_group_particles(group=self._visual_particle_groups[name]) \
+            if self._visual_particle_group not in system.groups:
+                system.create_attachment_group(obj=self.obj)
+            # We check whether the current number of particles assigned to the group is greater than the threshold
+            value = system.num_group_particles(group=self._visual_particle_group) \
                    > m.VISUAL_PARTICLE_THRESHOLD * self._n_initial_visual_particles[name]
-        elif issubclass(system, FluidSystem):
+        elif issubclass(system, PhysicalParticleSystem):
             # We only check if we have particle instancers currently
             if len(system.particle_instancers) > 0:
                 # We've already cached particle contacts, so we merely search through them to see if any particles are
                 # touching the object and are visible (the non-visible ones are considered already "removed")
-                n_near_particles = 0
-                for instancer, particle_idxs in system.state_cache["obj_particle_contacts"][self.obj].items():
-                    particle_idxs = np.array(list(particle_idxs))
-                    n_near_particles += np.sum(instancer.particle_visibilities[particle_idxs])
+                n_near_particles = np.sum([len(idxs) for idxs in self.obj.states[ContactParticles].get_value(system).values()])
                 # Heuristic: If the number of near particles is above the threshold, we consdier this covered
-                value = n_near_particles >= m.FLUID_THRESHOLD
+                value = n_near_particles >= m.PHYSICAL_PARTICLE_THRESHOLD
         else:
             raise ValueError(f"Invalid system {system} received for getting Covered state!"
-                             f"Currently, only VisualParticleSystems and FluidSystems are supported.")
+                             f"Currently, only VisualParticleSystems and PhysicalParticleSystems are supported.")
 
         return value
 
@@ -75,47 +91,47 @@ class Covered(RelativeObjectState, BooleanState):
         # Default success value is True
         success = True
         # First, we check what type of system
-        # Currently, we support VisualParticleSystems and FluidSystems
+        # Currently, we support VisualParticleSystems and PhysicalParticleSystems
         if issubclass(system, VisualParticleSystem):
+            # Create the group if it doesn't exist already
+            name = get_element_name_from_system(system)
+            if self._visual_particle_group not in system.groups:
+                system.create_attachment_group(obj=self.obj)
+
             # Check current state and only do something if we're changing state
             if self.get_value(system) != new_value:
-                name = get_element_name_from_system(system)
-                group = self._visual_particle_groups[name]
                 if new_value:
                     # Generate particles
-                    success = system.generate_group_particles_on_object(group=group)
+                    success = system.generate_group_particles_on_object(group=self._visual_particle_group)
                     # If we succeeded with generating particles (new_value = True), store additional info
                     if success:
                         # Store how many particles there are now -- this is the "maximum" number possible
-                        self._n_initial_visual_particles[name] = system.num_group_particles(group=group)
+                        self._n_initial_visual_particles[name] = system.num_group_particles(group=self._visual_particle_group)
                 else:
                     # We remove all of this group's particles
-                    system.remove_all_group_particles(group=group)
+                    system.remove_all_group_particles(group=self._visual_particle_group)
 
-        elif issubclass(system, FluidSystem):
+        elif issubclass(system, PhysicalParticleSystem):
             # Check current state and only do something if we're changing state
             if self.get_value(system) != new_value:
                 if new_value:
                     # Sample particles on top of the object
-                    system.generate_particle_instancer_on_object(obj=self.obj, max_samples=m.MAX_FLUID_PARTICLES)
+                    system.generate_particles_on_object(obj=self.obj, max_samples=m.MAX_PHYSICAL_PARTICLES)
                 else:
-                    # We hide all particles within range to be garbage collected by fluid system
-                    for inst, particle_idxs in system.state_cache["obj_particle_contacts"][self.obj].items():
-                        indices = np.array(list(particle_idxs))
-                        current_visibilities = inst.particle_visibilities
-                        current_visibilities[indices] = 0
-                        inst.particle_visibilities = current_visibilities
+                    # We delete all particles touching this object
+                    for inst, particle_idxs in self.obj.states[ContactParticles].get_value(system).items():
+                        inst.remove_particles(idxs=list(particle_idxs))
 
         else:
             raise ValueError(f"Invalid system {system} received for setting Covered state!"
-                             f"Currently, only VisualParticleSystems and FluidSystems are supported.")
+                             f"Currently, only VisualParticleSystems and PhysicalParticleSystems are supported.")
 
         return success
 
     @property
     def state_size(self):
         # We have a single value for every visual particle system
-        return len(get_visual_particle_systems())
+        return len(VisualParticleSystem.get_systems())
 
     @classproperty
     def supported_systems(self):
@@ -123,24 +139,24 @@ class Covered(RelativeObjectState, BooleanState):
         Returns:
             list: All systems used in this state, ordered deterministically
         """
-        return list(get_visual_particle_systems().values()) + list(get_fluid_systems().values())
+        return list(VisualParticleSystem.get_systems().values()) + list(PhysicalParticleSystem.get_systems().values())
 
     def _dump_state(self):
-        # For fluid systems, we don't need to dump state, because the fluid systems themselves handle all state dumping
-        # related to fluids
+        # For physical particle systems, we don't need to dump state, because the systems themselves handle all state
+        # dumping related to physical particles
         # For every visual particle system, add the initial number of particles
-        state = OrderedDict()
-        for system in get_visual_particle_systems().values():
+        state = dict()
+        for system in VisualParticleSystem.get_systems().values():
             name = get_element_name_from_system(system)
             state[f"{name}_initial_visual_particles"] = self._n_initial_visual_particles[name]
 
         return state
 
     def _load_state(self, state):
-        # For fluid systems, we don't need to load state, because the fluid systems themselves handle all state loading
-        # related to fluids
+        # For physical particle systems, we don't need to load state, because the systems themselves handle all
+        # state loading related to physical particles
         # For every visual particle system, set the initial number of particles
-        for system in get_visual_particle_systems().values():
+        for system in VisualParticleSystem.get_systems().values():
             name = get_element_name_from_system(system)
             self._n_initial_visual_particles[name] = state[f"{name}_initial_visual_particles"]
 
@@ -148,8 +164,8 @@ class Covered(RelativeObjectState, BooleanState):
         return np.array([val for val in state.values()], dtype=float)
 
     def _deserialize(self, state):
-        state_dict = OrderedDict()
-        for i, system in enumerate(get_visual_particle_systems().values()):
+        state_dict = dict()
+        for i, system in enumerate(VisualParticleSystem.get_systems().values()):
             name = get_element_name_from_system(system)
             state_dict[f"{name}_initial_visual_particles"] = int(state[i])
 

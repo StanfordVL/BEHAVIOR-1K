@@ -9,6 +9,7 @@ _ALL_STATES = frozenset(
         AABB,
         Burnt,
         ContactBodies,
+        ContactParticles,
         Cooked,
         Covered,
         Heated,
@@ -25,8 +26,10 @@ _ALL_STATES = frozenset(
         MaxTemperature,
         NextTo,
         ObjectsInFOVOfRobot,
+        OnFire,
         OnTop,
         Open,
+        Overlaid,
         ParticleApplier,
         ParticleRemover,
         Pose,
@@ -42,6 +45,7 @@ _ALL_STATES = frozenset(
         WaterSink,
         Filled,
         Folded,
+        Unfolded,
     ]
     + ROOM_STATES
 )
@@ -58,6 +62,7 @@ _ABILITY_TO_STATE_MAPPING = {
     "heatable": [Heated],
     "heatSource": [HeatSourceOrSink],
     "openable": [Open],
+    "flammable": [OnFire],
     "robot": ROOM_STATES + [ObjectsInFOVOfRobot],
     "saturable": [Saturated],
     "sliceable": [Sliced],
@@ -67,6 +72,7 @@ _ABILITY_TO_STATE_MAPPING = {
     "waterSink": [WaterSink],
     "fillable": [Filled],
     "foldable": [Folded],
+    "unfoldable": [Unfolded],
 }
 
 _DEFAULT_STATE_SET = frozenset(
@@ -78,6 +84,7 @@ _DEFAULT_STATE_SET = frozenset(
         Inside,
         NextTo,
         OnTop,
+        Overlaid,
         Touching,
         Under,
         Covered,
@@ -87,6 +94,7 @@ _DEFAULT_STATE_SET = frozenset(
 _FIRE_STATE_SET = frozenset(
     [
         HeatSourceOrSink,
+        OnFire,
     ]
 )
 
@@ -105,6 +113,8 @@ _TEXTURE_CHANGE_STATE_SET = frozenset(
         ToggledOn,
     ]
 )
+
+_VISUAL_STATE_SET = frozenset(_FIRE_STATE_SET | _STEAM_STATE_SET | _TEXTURE_CHANGE_STATE_SET)
 
 _TEXTURE_CHANGE_PRIORITY = {
     Frozen: 4,
@@ -129,6 +139,10 @@ def get_texture_change_states():
 
 def get_texture_change_priority():
     return _TEXTURE_CHANGE_PRIORITY
+
+
+def get_visual_states():
+    return _VISUAL_STATE_SET
 
 
 def get_default_states():

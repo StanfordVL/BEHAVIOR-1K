@@ -12,6 +12,7 @@ from omni.isaac.core.utils.prims import (
 )
 from omni.isaac.core.utils.prims import delete_prim
 from omnigibson.utils.python_utils import Serializable, UniquelyNamed, Recreatable
+from omnigibson.utils.sim_utils import check_deletable_prim
 
 
 class BasePrim(Serializable, UniquelyNamed, Recreatable, ABC):
@@ -125,8 +126,10 @@ class BasePrim(Serializable, UniquelyNamed, Recreatable, ABC):
         if not self._loaded:
             raise ValueError("Cannot remove a prim that was never loaded.")
 
-        # Remove prim
-        delete_prim(self.prim_path)
+        # Remove prim if it can be deleted
+        if check_deletable_prim(self.prim_path):
+            delete_prim(self.prim_path)
+
         if simulator:
             # Also clear the name so we can reuse this later
             self.remove_names(include_all_owned=True, skip_ids={id(simulator)})

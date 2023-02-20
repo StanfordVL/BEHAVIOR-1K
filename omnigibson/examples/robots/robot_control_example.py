@@ -4,7 +4,6 @@ Example script demo'ing robot control.
 Options for random actions, as well as selection of robot action space
 """
 import logging
-from collections import OrderedDict
 
 import numpy as np
 
@@ -14,12 +13,12 @@ from omnigibson.robots import REGISTERED_ROBOTS
 from omnigibson.utils.ui_utils import choose_from_options, KeyboardRobotController
 
 
-CONTROL_MODES = OrderedDict(
+CONTROL_MODES = dict(
     random="Use autonomous random actions (default)",
     teleop="Use keyboard control",
 )
 
-SCENES = OrderedDict(
+SCENES = dict(
     Rs_int="Realistic interactive home environment (default)",
     empty="Empty environment with no objects",
 )
@@ -37,10 +36,10 @@ def choose_controllers(robot, random_selection=False):
     :param robot: BaseRobot, robot class from which to infer relevant valid controller options
     :param random_selection: bool, if the selection is random (for automatic demo execution). Default False
 
-    :return OrderedDict: Mapping from individual robot component (e.g.: base, arm, etc.) to selected controller names
+    :return dict: Mapping from individual robot component (e.g.: base, arm, etc.) to selected controller names
     """
     # Create new dict to store responses from user
-    controller_choices = OrderedDict()
+    controller_choices = dict()
 
     # Grab the default controller config so we have the registry of all possible controller options
     default_config = robot._default_controller_config
@@ -75,7 +74,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     )
 
     # Create the config for generating the environment we want
-    scene_cfg = OrderedDict()
+    scene_cfg = dict()
     if scene_model == "empty":
         scene_cfg["type"] = "Scene"
     else:
@@ -83,14 +82,14 @@ def main(random_selection=False, headless=False, short_exec=False):
         scene_cfg["scene_model"] = scene_model
 
     # Add the robot we want to load
-    robot0_cfg = OrderedDict()
+    robot0_cfg = dict()
     robot0_cfg["type"] = robot_name
     robot0_cfg["obs_modalities"] = ["rgb", "depth", "seg_instance", "normal", "scan", "occupancy_grid"]
     robot0_cfg["action_type"] = "continuous"
     robot0_cfg["action_normalize"] = True
 
     # Compile config
-    cfg = OrderedDict(scene=scene_cfg, robots=[robot0_cfg])
+    cfg = dict(scene=scene_cfg, robots=[robot0_cfg])
 
     # Create the environment
     env = og.Environment(configs=cfg, action_timestep=1/60., physics_timestep=1/60.)

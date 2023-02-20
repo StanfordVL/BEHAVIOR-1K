@@ -29,7 +29,7 @@ class BaseFilter(metaclass=ABCMeta):
         Initializes the cached state for this filter if it doesn't already exist
         """
         if cls.state is None:
-            cls.state = OrderedDict()
+            cls.state = dict()
 
         return super(BaseFilter, cls).__new__(cls)
 
@@ -261,13 +261,8 @@ class SlicingRule(BaseTransitionRule):
             return False
 
         contact_list = slicer_obj.states[ContactBodies].get_value()
-        sliced_link_paths = {link.prim_path for link in sliced_obj.links.values()}
-        hit_obj = False
-        for c in contact_list:
-            if not set(c).isdisjoint(sliced_link_paths):
-                hit_obj = True
-                break
-        if not hit_obj:
+        sliced_links = set(sliced_obj.links.values())
+        if contact_list.isdisjoint(sliced_links):
             return False
 
         # Slicer may contact the same body in multiple points, so cut once since removing the object from the simulator
@@ -333,7 +328,7 @@ def _contained_objects(scene, container_obj):
     Returns:
         list of BaseObject: All objects ``inside'' the container object, as defined by its AABB.
     """
-    bbox = BoundingBoxAPI.compute_aabb(container_obj.prim_path)
+    bbox = BoundingBoxAPI.compute_aabb(container_obj)
     contained_objs = []
     for obj in scene.objects:
         if obj == container_obj:
@@ -495,13 +490,13 @@ class ContainerGarbageRule(BaseTransitionRule):
 
 
 class BlenderRule(BaseTransitionRule):
-    def __init__(self, output_fluid, fluid_requirements=None, obj_requirements=None):
+    def __init__(self, output_system, particle_requirements=None, obj_requirements=None):
         """
         Transition rule to apply when objects are blended together
 
         Args:
-            output_fluid (FluidSystem): Fluid to generate once all the input ingredients are blended
-            fluid_requirements (None or dict): If specified, should map fluid system to the minimum number of fluid
+            output_system (PhysicalParticleSystem): Fluid to generate once all the input ingredients are blended
+            particle_requirements (None or dict): If specified, should map fluid system to the minimum number of fluid
                 particles required in order to successfully blend
             obj_requirements (None or dict): If specified, should map object category names to minimum number of that
                 type of object rqeuired in order to successfully blend
@@ -511,12 +506,12 @@ class BlenderRule(BaseTransitionRule):
         group_filters = {category: CategoryFilter(category) for category in obj_requirements.keys()}
 
         # Store internal variables
-        self.output_fluid = output_fluid
-        self.fluid_requirements = fluid_requirements
+        self.output_system = output_system
+        self.particle_requirements = particle_requirements
         self.obj_requirements = obj_requirements
 
         # Store a cached dictionary to check blender volumes so we don't have to do this later
-        self._check_in_volume = OrderedDict()
+        self._check_in_volume = dict()
 
         # Call super method
         super().__init__(individual_filters=individual_filters, group_filters=group_filters)
@@ -542,7 +537,7 @@ class BlenderRule(BaseTransitionRule):
             group_objects[obj_category] = inside_objs
 
         # Check whether we have sufficient fluids as well
-        for system, n_min_particles in self.fluid_requirements.items():
+        for system, n_min_particles in self.particle_requirements.items():
             if len(system.particle_instancers) > 0:
                 particle_positions = np.concatenate([inst.particle_positions for inst in system.particle_instancers.values()], axis=0)
                 n_particles_in_volume = np.sum(self._check_in_volume[blender.name](particle_positions))
@@ -564,7 +559,7 @@ class BlenderRule(BaseTransitionRule):
                 t_results.remove.append(obj)
 
         # Hide all fluid particles that are inside the blender
-        for system in self.fluid_requirements.keys():
+        for system in self.particle_requirements.keys():
             # No need to check for whether particle instancers exist because they must due to @self.condition passing!
             for inst in system.particle_instancers.values():
                 indices = self._check_in_volume[blender.name](inst.particle_positions).nonzero()[0]
@@ -573,7 +568,7 @@ class BlenderRule(BaseTransitionRule):
                 inst.particle_visibilities = current_visibilities
 
         # Spawn in blended fluid!
-        blender.states[Filled].set_value(self.output_fluid, True)
+        blender.states[Filled].set_value(self.output_system, True)
 
         return t_results
 
@@ -595,8 +590,8 @@ DEFAULT_RULES = (
     SlicingRule(),
     # Strawberry smoothie
     BlenderRule(
-        output_fluid=StrawberrySmoothieSystem,
-        fluid_requirements={MilkSystem: 10},
+        output_system=StrawberrySmoothieSystem,
+        particle_requirements={MilkSystem: 10},
         obj_requirements={"strawberry": 5, "ice_cube": 5},
     ),
 )

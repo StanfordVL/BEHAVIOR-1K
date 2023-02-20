@@ -1,4 +1,3 @@
-from collections import OrderedDict
 from omni.isaac.core.utils.prims import get_prim_at_path, get_prim_parent
 from omni.isaac.core.utils.transformations import tf_matrix_from_pose
 from omni.isaac.core.utils.rotations import gf_quat_to_np_array
@@ -14,7 +13,7 @@ from omnigibson.utils.sim_utils import CsRawData
 from omnigibson.utils.usd_utils import mesh_prim_to_trimesh_mesh
 
 # Import omni sensor based on type
-from omni.isaac.isaac_sensor import _isaac_sensor as _s
+from omni.isaac.sensor import _sensor as _s
 
 
 # Create settings for this module
@@ -91,7 +90,7 @@ class RigidPrim(XFormPrim):
 
         # Only create contact report api if we're not visual only
         if (not self._visual_only) and gm.ENABLE_GLOBAL_CONTACT_REPORTING:
-            self._physx_rigid_api = PhysxSchema.PhysxContactReportAPI(self._prim) if \
+            self._physx_contact_report_api_api = PhysxSchema.PhysxContactReportAPI(self._prim) if \
                 self._prim.HasAPI(PhysxSchema.PhysxContactReportAPI) else \
                 PhysxSchema.PhysxContactReportAPI.Apply(self._prim)
 
@@ -127,16 +126,13 @@ class RigidPrim(XFormPrim):
             for mesh in mesh_group.values():
                 mesh.initialize()
 
-        # Add enabled attribute for the rigid body
-        self._rigid_api.CreateRigidBodyEnabledAttr(True)
-
         # We grab contact info for the first time before setting our internal handle, because this changes the dc handle
         if self.contact_reporting_enabled:
             self._cs.get_rigid_body_raw_data(self._prim_path)
 
         # Grab handle to this rigid body and get name
         self.update_handles()
-        self._body_name = self._dc.get_rigid_body_name(self._handle)
+        self._body_name = self.prim_path.split("/")[-1]
 
     def update_meshes(self):
         """
@@ -153,7 +149,7 @@ class RigidPrim(XFormPrim):
             for visual_mesh in self._visual_meshes.values():
                 visual_mesh.remove_names()
 
-        self._collision_meshes, self._visual_meshes = OrderedDict(), OrderedDict()
+        self._collision_meshes, self._visual_meshes = dict(), dict()
         prims_to_check = []
         coms, vols = [], []
         for prim in self._prim.GetChildren():
@@ -208,7 +204,7 @@ class RigidPrim(XFormPrim):
         """
         Updates all internal handles for this prim, in case they change since initialization
         """
-        self._handle = self._dc.get_rigid_body(self._prim_path)
+        self._handle = None if self.kinematic_only else self._dc.get_rigid_body(self._prim_path)
 
     def contact_list(self):
         """
@@ -368,7 +364,7 @@ class RigidPrim(XFormPrim):
     def collision_meshes(self):
         """
         Returns:
-            OrderedDict: Dictionary mapping collision mesh names (str) to mesh prims (CollisionMeshPrim) owned by
+            dict: Dictionary mapping collision mesh names (str) to mesh prims (CollisionMeshPrim) owned by
                 this rigid body
         """
         return self._collision_meshes
@@ -377,7 +373,7 @@ class RigidPrim(XFormPrim):
     def visual_meshes(self):
         """
         Returns:
-            OrderedDict: Dictionary mapping visual mesh names (str) to mesh prims (VisualMeshPrim) owned by
+            dict: Dictionary mapping visual mesh names (str) to mesh prims (VisualMeshPrim) owned by
                 this rigid body
         """
         return self._visual_meshes
@@ -501,6 +497,65 @@ class RigidPrim(XFormPrim):
         self._mass_api.GetDensityAttr().Set(density)
 
     @property
+    def kinematic_only(self):
+        """
+        Returns:
+            bool: Whether this object is a kinematic-only object (otherwise, it is a rigid body). A kinematic-only
+                object is not subject to simulator dynamics, and remains fixed unless the user explicitly sets the
+                body's pose / velocities. See https://docs.omniverse.nvidia.com/app_create/prod_extensions/ext_physics/rigid-bodies.html?highlight=rigid%20body%20enabled#kinematic-rigid-bodies
+                for more information
+        """
+        return self.get_attribute("physics:kinematicEnabled")
+
+    @kinematic_only.setter
+    def kinematic_only(self, val):
+        """
+        Args:
+            val (bool): Whether this object is a kinematic-only object (otherwise, it is a rigid body). A kinematic-only
+                object is not subject to simulator dynamics, and remains fixed unless the user explicitly sets the
+                body's pose / velocities. See https://docs.omniverse.nvidia.com/app_create/prod_extensions/ext_physics/rigid-bodies.html?highlight=rigid%20body%20enabled#kinematic-rigid-bodies
+                for more information
+        """
+        self.set_attribute("physics:kinematicEnabled", val)
+        self.set_attribute("physics:rigidBodyEnabled", not val)
+
+    @property
+    def sleep_threshold(self):
+        """
+        Returns:
+            float: threshold for sleeping this rigid body
+        """
+        return self.get_attribute("physxRigidBody:sleepThreshold")
+
+    @sleep_threshold.setter
+    def sleep_threshold(self, threshold):
+        """
+        Sets threshold for sleeping this rigid body
+
+        Args:
+            threshold (float): Sleeping threshold
+        """
+        self.set_attribute("physxRigidBody:sleepThreshold", threshold)
+
+    @property
+    def stabilization_threshold(self):
+        """
+        Returns:
+            float: threshold for stabilizing this rigid body
+        """
+        return self.get_attribute("physxRigidBody:stabilizationThreshold")
+
+    @stabilization_threshold.setter
+    def stabilization_threshold(self, threshold):
+        """
+        Sets threshold for stabilizing this rigid body
+
+        Args:
+            threshold (float): stabilizing threshold
+        """
+        self.set_attribute("physxRigidBody:stabilizationThreshold", threshold)
+
+    @property
     def ccd_enabled(self):
         """
         Returns:
@@ -542,7 +597,7 @@ class RigidPrim(XFormPrim):
         Returns:
             bool: Whether dc interface can be used or not
         """
-        return self._handle is not None and self._dc.is_simulating()
+        return self._handle is not None and self._dc.is_simulating() and not self.kinematic_only
 
     def enable_gravity(self):
         """
@@ -562,13 +617,15 @@ class RigidPrim(XFormPrim):
         """
         Enable physics for this rigid body
         """
-        self._dc.wake_up_rigid_body(self._handle)
+        if self.dc_is_accessible:
+            self._dc.wake_up_rigid_body(self._handle)
 
     def sleep(self):
         """
         Disable physics for this rigid body
         """
-        self._dc.sleep_rigid_body(self._handle)
+        if self.dc_is_accessible:
+            self._dc.sleep_rigid_body(self._handle)
 
     def _dump_state(self):
         # Grab pose from super class
@@ -582,9 +639,10 @@ class RigidPrim(XFormPrim):
         # Call super first
         super()._load_state(state=state)
 
-        # Set velocities
-        self.set_linear_velocity(np.array(state["lin_vel"]))
-        self.set_angular_velocity(np.array(state["ang_vel"]))
+        # Set velocities if not kinematic
+        if not self.kinematic_only:
+            self.set_linear_velocity(np.array(state["lin_vel"]))
+            self.set_angular_velocity(np.array(state["ang_vel"]))
 
     def _deserialize(self, state):
         # Call supermethod first

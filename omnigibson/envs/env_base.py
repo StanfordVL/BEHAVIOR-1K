@@ -1,6 +1,5 @@
 import gym
 import logging
-from collections import OrderedDict
 
 import omnigibson as og
 from omnigibson.objects import REGISTERED_OBJECTS
@@ -169,7 +168,15 @@ class Environment(gym.Env, GymObservable, Recreatable):
         assert og.sim.is_stopped(), "sim should be stopped when load_task starts"
         og.sim.play()
 
-        # Load task. Should load additinal task-relevant objects and configure the scene into its default initial state
+        # Load the state from the loaded scene
+        # This is needed because when the sim is stopped, no joint state info is stored. So, any desired initial
+        # joint configuration needs to get loaded separately AFTER og.sim.play() gets
+        # called, since joint info is R/W only when the simulator is playing
+        # We do this by calling reset_scene(), which automatically loads the internally-cached initial state (including
+        # joints) into the simulator
+        og.sim.reset_scene()
+
+        # Load task. Should load additional task-relevant objects and configure the scene into its default initial state
         self._task.load(env=self)
 
         # Update the initial scene state
@@ -239,7 +246,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
     def _load_observation_space(self):
         # Grab robot(s) and task obs spaces
-        obs_space = OrderedDict()
+        obs_space = dict()
 
         for robot in self.robots:
             # Load the observation space for the robot
@@ -292,9 +299,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
         Get the current environment observation.
 
         Returns:
-            OrderedDict: Keyword-mapped observations, which are possibly nested
+            dict: Keyword-mapped observations, which are possibly nested
         """
-        obs = OrderedDict()
+        obs = dict()
 
         # Grab all observations from each robot
         for robot in self.robots:
@@ -329,14 +336,14 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
         Returns:
             4-tuple:
-                - OrderedDict: state, i.e. next observation
+                - dict: state, i.e. next observation
                 - float: reward, i.e. reward at this current timestep
                 - bool: done, i.e. whether this episode is terminated
-                - OrderedDict: info, i.e. dictionary with any useful information
+                - dict: info, i.e. dictionary with any useful information
         """
         # If the action is not a dictionary, convert into a dictionary
         if not isinstance(action, dict) and not isinstance(action, gym.spaces.Dict):
-            action_dict = OrderedDict()
+            action_dict = dict()
             idx = 0
             for robot in self.robots:
                 action_dim = robot.action_dim

@@ -1,15 +1,37 @@
 """
 Helper classes and functions for streamlining user interactions
 """
+import contextlib
+
 import numpy as np
 import sys
-from collections import OrderedDict
 import omnigibson as og
 from omnigibson.macros import gm
 import omnigibson.utils.transform_utils as T
 import omni
+import omni.ui
+import omni.log
 import carb
 import random
+
+
+def dock_window(space, name, location, ratio=0.5):
+    """
+    Method for docking a specific GUI window in a specified location within the workspace
+
+    Args:
+        space (WindowHandle): Handle to the docking space to dock the window specified by @name
+        name (str): Name of a window to dock
+        location (omni.ui.DockPosition): docking position for placing the window specified by @name
+        ratio (float): Ratio when splitting the docking space between the pre-existing and newly added window
+
+    Returns:
+        WindowHandle: Handle to the docking space that the window specified by @name was placed in
+    """
+    window = omni.ui.Workspace.get_window(name)
+    if window and space:
+        window.dock_in(space, location, ratio=ratio)
+    return window
 
 
 class KeyboardEventHandler:
@@ -17,7 +39,7 @@ class KeyboardEventHandler:
     Simple singleton class for handing keyboard events
     """
     # Global keyboard callbacks
-    KEYBOARD_CALLBACKS = OrderedDict()
+    KEYBOARD_CALLBACKS = dict()
 
     # ID assigned to meta callback method for this class
     _CALLBACK_ID = None
@@ -44,7 +66,7 @@ class KeyboardEventHandler:
         input_interface = carb.input.acquire_input_interface()
         keyboard = appwindow.get_keyboard()
         input_interface.unsubscribe_to_keyboard_events(keyboard, cls._CALLBACK_ID)
-        cls.KEYBOARD_CALLBACKS = OrderedDict()
+        cls.KEYBOARD_CALLBACKS = dict()
         cls._CALLBACK_ID = None
 
     @classmethod
@@ -79,6 +101,33 @@ class KeyboardEventHandler:
 
         # Always return True
         return True
+
+
+@contextlib.contextmanager
+def suppress_logging(channels):
+    """
+    A context scope for temporarily suppressing logging for certain omni channels.
+
+    Args:
+        channels (list of str): Logging channel(s) to suppress
+    """
+    # Record the state to restore to after the context exists
+    log = omni.log.get_log()
+
+    # For some reason, all enabled states always return False even if the logging is clearly enabled for the
+    # given channel, so we assume all channels are enabled
+    # We do, however, check what behavior was assigned to this channel, since we force an override during this context
+    channel_behavior = {channel: log.get_channel_enabled(channel)[2] for channel in channels}
+
+    # Suppress the channels
+    for channel in channels:
+        log.set_channel_enabled(channel, False, omni.log.SettingBehavior.OVERRIDE)
+
+    yield
+
+    # Unsuppress the channels
+    for channel in channels:
+        log.set_channel_enabled(channel, True, channel_behavior[channel])
 
 
 def disclaimer(msg):
@@ -267,7 +316,7 @@ class KeyboardRobotController:
         # Store relevant info from robot
         self.robot = robot
         self.action_dim = robot.action_dim
-        self.controller_info = OrderedDict()
+        self.controller_info = dict()
         idx = 0
         for name, controller in robot._controllers.items():
             self.controller_info[name] = {

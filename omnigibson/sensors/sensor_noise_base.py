@@ -1,11 +1,10 @@
 from abc import ABCMeta, abstractmethod
-from collections import OrderedDict
 
 from omnigibson.utils.python_utils import classproperty, Registerable
 
 
 # Registered sensor noises
-REGISTERED_SENSOR_NOISES = OrderedDict()
+REGISTERED_SENSOR_NOISES = dict()
 
 
 class BaseSensorNoise(Registerable, metaclass=ABCMeta):

@@ -1,5 +1,4 @@
 import logging
-from collections import OrderedDict
 import numpy as np
 
 import omnigibson as og
@@ -23,7 +22,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     obj_configs = []
 
     # Light
-    obj_configs.append(OrderedDict(
+    obj_configs.append(dict(
         type="LightObject",
         light_type="Sphere",
         name="light",
@@ -33,7 +32,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     ))
 
     # Stove
-    obj_configs.append(OrderedDict(
+    obj_configs.append(dict(
         type="DatasetObject",
         name="stove",
         category="stove",
@@ -42,7 +41,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     ))
 
     # Microwave
-    obj_configs.append(OrderedDict(
+    obj_configs.append(dict(
         type="DatasetObject",
         name="microwave",
         category="microwave",
@@ -52,7 +51,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     ))
 
     # Oven
-    obj_configs.append(OrderedDict(
+    obj_configs.append(dict(
         type="DatasetObject",
         name="oven",
         category="oven",
@@ -61,7 +60,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     ))
 
     # Tray
-    obj_configs.append(OrderedDict(
+    obj_configs.append(dict(
         type="DatasetObject",
         name="tray",
         category="tray",
@@ -71,7 +70,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     ))
 
     # Fridge
-    obj_configs.append(OrderedDict(
+    obj_configs.append(dict(
         type="DatasetObject",
         name="fridge",
         category="fridge",
@@ -87,7 +86,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # 5 Apples
     for i in range(5):
-        obj_configs.append(OrderedDict(
+        obj_configs.append(dict(
             type="DatasetObject",
             name=f"apple{i}",
             category="apple",
@@ -133,7 +132,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     for apple in apples:
         apple.states[object_states.Temperature].set_value(-50)
     apples[0].states[object_states.Inside].set_value(oven, True, use_ray_casting_method=True)
-    apples[1].set_position(stove.links["heat_source_link"].get_position() + np.array([0, 0, 0.1]))
+    apples[1].set_position(stove.states[object_states.HeatSourceOrSink].get_link_position() + np.array([0, 0, 0.1]))
     apples[2].states[object_states.OnTop].set_value(tray, True, use_ray_casting_method=True)
     apples[3].states[object_states.Inside].set_value(fridge, True, use_ray_casting_method=True)
     apples[4].states[object_states.Inside].set_value(microwave, True, use_ray_casting_method=True)

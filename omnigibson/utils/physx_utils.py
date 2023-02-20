@@ -220,11 +220,11 @@ def create_physx_particleset_pointinstancer(
 
     # Set particle states
     instancer.GetProtoIndicesAttr().Set(prototype_indices)
-    instancer.GetPositionsAttr().Set(array_to_vtarray(arr=positions, element_type=Gf.Vec3f))
-    instancer.GetOrientationsAttr().Set(array_to_vtarray(arr=orientations, element_type=Gf.Quath))
-    instancer.GetVelocitiesAttr().Set(array_to_vtarray(arr=velocities, element_type=Gf.Vec3f))
-    instancer.GetAngularVelocitiesAttr().Set(array_to_vtarray(arr=angular_velocities, element_type=Gf.Vec3f))
-    instancer.GetScalesAttr().Set(array_to_vtarray(arr=scales, element_type=Gf.Vec3f))
+    instancer.GetPositionsAttr().Set(Vt.Vec3fArray.FromNumpy(positions))
+    instancer.GetOrientationsAttr().Set(Vt.QuathArray.FromNumpy(orientations))
+    instancer.GetVelocitiesAttr().Set(Vt.Vec3fArray.FromNumpy(velocities))
+    instancer.GetAngularVelocitiesAttr().Set(Vt.Vec3fArray.FromNumpy(angular_velocities))
+    instancer.GetScalesAttr().Set(Vt.Vec3fArray.FromNumpy(scales))
 
     instancer_prim = instancer.GetPrim()
 
@@ -240,9 +240,6 @@ def create_physx_particleset_pointinstancer(
 
     # Set whether the instancer is enabled or not
     instancer_prim.GetAttribute("physxParticle:particleEnabled").Set(enabled)
-
-    # Add ability to translate instancer as well
-    physicsUtils.set_or_add_translate_op(instancer, Gf.Vec3f(0, 0, 0))
 
     if is_isosurface:
         # We have to update the physics for a single step here, and then pause the simulator and take an additional sim

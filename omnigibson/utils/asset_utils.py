@@ -414,7 +414,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--download_assets", action="store_true", help="download assets file")
     parser.add_argument("--download_demo_data", action="store_true", help="download demo data Rs")
-    parser.add_argument("--download_og_dataset", action="store_true", help="download iG Dataset")
+    parser.add_argument("--download_og_dataset", action="store_true", help="download OmniGibson Dataset")
     parser.add_argument("--change_data_path", action="store_true", help="change the path to store assets and datasets")
 
     args = parser.parse_args()
@@ -427,3 +427,5 @@ if __name__ == "__main__":
         download_og_dataset()
     elif args.change_data_path:
         change_data_path()
+
+    og.shutdown()

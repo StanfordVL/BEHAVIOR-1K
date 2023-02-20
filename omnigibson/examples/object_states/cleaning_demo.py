@@ -7,8 +7,9 @@ from omnigibson.macros import gm
 from omnigibson.systems import DustSystem, StainSystem, WaterSystem
 from omnigibson.utils.constants import ParticleModifyMethod
 
-# Make sure object states are enabled
+# Make sure object states are enabled and GPU dynamics are used
 gm.ENABLE_OBJECT_STATES = True
+gm.USE_GPU_DYNAMICS = True
 
 
 def main(random_selection=False, headless=False, short_exec=False):
@@ -86,6 +87,8 @@ def main(random_selection=False, headless=False, short_exec=False):
         position=np.array([-0.825556,  2.42499 ,  1.04104 ]),
         orientation=np.array([0.56919735, 0.09896035, 0.13981109, 0.80416049]),
     )
+
+    og.sim.enable_viewer_camera_teleoperation()
 
     max_steps = -1 if not short_exec else 1000
     step = 0

@@ -30,7 +30,7 @@ class LinkBasedStateMixin:
     def get_link_position(self):
         # The necessary link is not found
         if self.link is None:
-            return
+            return None
 
-        pos, orn = self.link.get_position_orientation()
+        pos, _ = self.link.get_position_orientation()
         return np.array(pos)

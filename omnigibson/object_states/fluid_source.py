@@ -3,15 +3,14 @@ import numpy as np
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from omnigibson.object_states.object_state_base import AbsoluteObjectState
 from omnigibson.object_states.toggle import ToggledOn
-from collections import OrderedDict
+from omnigibson.object_states.update_state_mixin import UpdateStateMixin
 
 
-class FluidSource(AbsoluteObjectState, LinkBasedStateMixin):
+class FluidSource(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixin):
     def __init__(self, obj):
         super().__init__(obj)
 
         # Initialize variables that will be filled in at runtime
-        self.fluid_groups = None
         self._step_counter = None
 
     @property
@@ -51,7 +50,6 @@ class FluidSource(AbsoluteObjectState, LinkBasedStateMixin):
             return
 
         # Further initialize internal variables
-        self.fluid_groups = OrderedDict()
         self._step_counter = 0
 
     def _update(self):
@@ -59,10 +57,6 @@ class FluidSource(AbsoluteObjectState, LinkBasedStateMixin):
         if fluid_source_position is None or not self._simulator.is_playing():
             # Terminate early, this is a "dead" fluid source or we're not stepping physics
             return
-
-        # Synchronize our tracked fluid groups with the fluid system -- some might have been deleted from a fluid sink
-        self.fluid_groups = OrderedDict([(name, inst) for name, inst in self.fluid_groups.items()
-                                         if name in self.fluid_system.particle_instancers])
 
         # Possibly increment our fluid generation counter if we're either (a) not using any toggle state (i.e.:
         # fluid source is always on), or (b) toggledon is True
@@ -75,12 +69,8 @@ class FluidSource(AbsoluteObjectState, LinkBasedStateMixin):
             # Modify the z direction procedurally, to simulated a "falling" stream of fluid
             particle_dist = self.fluid_system.particle_contact_offset * 2
             positions[:, -1] -= np.arange(0, particle_dist * self.n_particles_per_group, particle_dist)
-            # Generate a new group, and store it internally
-            particle_instancer = self.fluid_system.generate_particle_instancer(
-                n_particles=self.n_particles_per_group,
-                positions=positions,
-            )
-            self.fluid_groups[particle_instancer.name] = particle_instancer
+            # Add new particles to the system's default instancer
+            self.fluid_system.default_particle_instancer.add_particles(positions=positions)
 
             # Reset the counter
             self._step_counter = 0

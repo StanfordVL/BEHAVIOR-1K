@@ -1,4 +1,4 @@
-from collections import Iterable, OrderedDict
+from collections import Iterable
 from pxr import Gf, Usd, Sdf, UsdGeom, UsdShade, UsdPhysics, PhysxSchema
 from omni.isaac.dynamic_control import _dynamic_control
 from omni.isaac.core.utils.rotations import gf_quat_to_np_array
@@ -312,9 +312,8 @@ class JointPrim(BasePrim):
         Gets this joint's type (ignoring the "Physics" prefix)
 
         Returns:
-            str: Joint's type. Should be one of:
-                {"FixedJoint", "Joint", "PrismaticJoint", "RevoluteJoint", "SphericalJoint"}
-                    (equivalently, one of JointType)
+            JointType: Joint's type. Should be one corresponding to:
+                {JOINT_PRISMATIC, JOINT_REVOLUTE, JOINT_FIXED, JOINT_SPHERICAL}
         """
         return self._joint_type
 
@@ -367,9 +366,9 @@ class JointPrim(BasePrim):
         self._dc.set_dof_properties(self._dof_handles[0], self._dof_properties[0])
 
     @property
-    def max_force(self):
+    def max_effort(self):
         """
-        Gets this joint's maximum force
+        Gets this joint's maximum effort
 
         Returns:
             float: maximum force for this joint
@@ -380,10 +379,10 @@ class JointPrim(BasePrim):
         raw_force = self._dof_properties[0].max_effort
         return m.DEFAULT_MAX_EFFORT if raw_force is None or np.abs(raw_force) > m.INF_EFFORT_THRESHOLD else raw_force
 
-    @max_force.setter
-    def max_force(self, force):
+    @max_effort.setter
+    def max_effort(self, force):
         """
-        Sets this joint's maximum force
+        Sets this joint's maximum effort
 
         Args:
             force (float): Force to set
@@ -696,7 +695,7 @@ class JointPrim(BasePrim):
         Returns:
             n-array: n-DOF normalized effort in range [-1, 1]
         """
-        return effort / self.max_force
+        return effort / self.max_effort
 
     def _denormalize_effort(self, effort):
         """
@@ -708,7 +707,7 @@ class JointPrim(BasePrim):
         Returns:
             n-array: n-DOF de-normalized effort
         """
-        return effort * self.max_force
+        return effort * self.max_effort
 
     def set_pos(self, pos, normalized=False, target=False):
         """
@@ -808,7 +807,7 @@ class JointPrim(BasePrim):
     def _dump_state(self):
         pos, vel, effort = self.get_state() if self.articulated else (np.array([]), np.array([]), np.array([]))
         target_pos, target_vel = self.get_target() if self.articulated else (np.array([]), np.array([]))
-        return OrderedDict(
+        return dict(
             pos=pos,
             vel=vel,
             effort=effort,
@@ -828,12 +827,12 @@ class JointPrim(BasePrim):
 
     def _serialize(self, state):
         # We serialize by iterating over the keys and adding them to a list that's concatenated at the end
-        # This is a deterministic mapping because we assume the state is an OrderedDict
+        # This is a deterministic mapping because we assume the state is an dict
         return np.concatenate(list(state.values())).astype(float)
 
     def _deserialize(self, state):
         # We deserialize deterministically by knowing the order of values -- pos, vel, effort
-        return OrderedDict(
+        return dict(
             pos=state[0:self.n_dof],
             vel=state[self.n_dof:2*self.n_dof],
             effort=state[2*self.n_dof:3*self.n_dof],

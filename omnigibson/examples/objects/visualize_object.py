@@ -1,6 +1,5 @@
 import argparse
 import logging
-from collections import OrderedDict
 import numpy as np
 
 import omnigibson as og
@@ -33,7 +32,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         usd_path = args.usd_path
 
     # Define objects to load
-    light0_cfg = OrderedDict(
+    light0_cfg = dict(
         type="LightObject",
         light_type="Sphere",
         name="sphere_light0",
@@ -42,7 +41,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         position=[-2.0, -2.0, 2.0],
     )
 
-    light1_cfg = OrderedDict(
+    light1_cfg = dict(
         type="LightObject",
         light_type="Sphere",
         name="sphere_light1",
@@ -75,7 +74,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         }
 
     # Import the desired object
-    obj_cfg = OrderedDict(
+    obj_cfg = dict(
         **kwargs,
         name="obj",
         usd_path=usd_path,

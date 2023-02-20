@@ -2,7 +2,6 @@ from pxr import Gf
 from omni.physx.bindings._physx import ContactEventType
 
 from enum import IntEnum
-from collections import OrderedDict
 import numpy as np
 
 import omnigibson as og
@@ -57,9 +56,9 @@ class Attached(RelativeObjectState, BooleanState, ContactSubscribedStateMixin):
     # Attempts to attach two objects when a CONTACT_FOUND event happens
     def on_contact(self, other, contact_header, contact_data):
         if contact_header.type == ContactEventType.CONTACT_FOUND:
-            self.set_value(other, True)
+            self.set_value(other, True, check_contact=False)
 
-    def _set_value(self, other, new_value):
+    def _set_value(self, other, new_value, check_contact=True):
         # Attempt to attach
         if new_value:
             if self.attached_obj == other:
@@ -67,7 +66,7 @@ class Attached(RelativeObjectState, BooleanState, ContactSubscribedStateMixin):
                 return True
             elif self.attached_obj is None:
                 # If the attachment type and category match, and they are in contact, they should attach
-                if self._can_attach(other) and check_collision(self.obj, other):
+                if self._can_attach(other) and (not check_contact or check_collision(self.obj, other)):
                     self._attach(other)
 
                     # Non-sticky attachment is bidirectional
@@ -166,7 +165,7 @@ class Attached(RelativeObjectState, BooleanState, ContactSubscribedStateMixin):
         return 1
 
     def _dump_state(self):
-        return OrderedDict(attached_obj_uuid=-1 if self.attached_obj is None else self.attached_obj.uuid)
+        return dict(attached_obj_uuid=-1 if self.attached_obj is None else self.attached_obj.uuid)
 
     def _load_state(self, state):
         uuid = state["attached_obj_uuid"]
@@ -185,4 +184,4 @@ class Attached(RelativeObjectState, BooleanState, ContactSubscribedStateMixin):
         return np.array([state["attached_obj_uuid"]], dtype=float)
 
     def _deserialize(self, state):
-        return OrderedDict(attached_obj_uuid=int(state[0])), 1
+        return dict(attached_obj_uuid=int(state[0])), 1

@@ -5,8 +5,10 @@ from omnigibson.macros import gm, macros
 from omnigibson.systems import WaterSystem
 from omnigibson.utils.constants import ParticleModifyMethod
 
-# Make sure object states are enabled
+# Make sure object states are enabled, we're using GPU dynamics, and HQ rendering is enabled
 gm.ENABLE_OBJECT_STATES = True
+gm.USE_GPU_DYNAMICS = True
+gm.ENABLE_HQ_RENDERING = True
 
 
 def main():

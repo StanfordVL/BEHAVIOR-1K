@@ -4,6 +4,7 @@ from omnigibson.object_states.adjacency import HorizontalAdjacency, VerticalAdja
 from omnigibson.object_states.attachment import Attached
 from omnigibson.object_states.burnt import Burnt
 from omnigibson.object_states.contact_bodies import ContactBodies
+from omnigibson.object_states.contact_particles import ContactParticles
 from omnigibson.object_states.cooked import Cooked
 from omnigibson.object_states.covered import Covered
 from omnigibson.object_states.frozen import Frozen
@@ -12,8 +13,10 @@ from omnigibson.object_states.heated import Heated
 from omnigibson.object_states.inside import Inside
 from omnigibson.object_states.max_temperature import MaxTemperature
 from omnigibson.object_states.next_to import NextTo
+from omnigibson.object_states.on_fire import OnFire
 from omnigibson.object_states.on_top import OnTop
 from omnigibson.object_states.open import Open
+from omnigibson.object_states.overlaid import Overlaid
 from omnigibson.object_states.particle_modifier import ParticleRemover, ParticleApplier
 from omnigibson.object_states.pose import Pose
 from omnigibson.object_states.robot_related_states import (
@@ -61,3 +64,4 @@ from omnigibson.object_states.water_source import WaterSource
 from omnigibson.object_states.water_sink import WaterSink
 from omnigibson.object_states.filled import Filled
 from omnigibson.object_states.folded import Folded
+from omnigibson.object_states.unfolded import Unfolded

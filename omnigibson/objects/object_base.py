@@ -1,5 +1,4 @@
 from abc import ABCMeta
-from collections import OrderedDict
 import logging
 
 from omnigibson.macros import create_module_macros
@@ -17,7 +16,7 @@ from omnigibson.utils.constants import PrimType, CLASS_NAME_TO_CLASS_ID
 from omni.isaac.core.utils.semantics import add_update_semantics
 
 # Global dicts that will contain mappings
-REGISTERED_OBJECTS = OrderedDict()
+REGISTERED_OBJECTS = dict()
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -138,16 +137,21 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
 
         # Add fixed joint if we're fixing the base
         if self.fixed_base:
-            # Create fixed joint, and set Body0 to be this object's root prim
-            create_joint(
-                prim_path=f"{self._prim_path}/rootJoint",
-                joint_type="FixedJoint",
-                body1=f"{self._prim_path}/{self._root_link_name}",
-            )
-            # Also set the articulation root to be the object head if it doesn't already exist
-            if not self._prim.HasAPI(UsdPhysics.ArticulationRootAPI):
-                UsdPhysics.ArticulationRootAPI.Apply(self.prim)
-                PhysxSchema.PhysxArticulationAPI.Apply(self.prim)
+            # For optimization purposes, if we only have a single rigid body, we assume this
+            # is not an articulated object so we merely set this to be a static collider, i.e.: kinematic-only
+            if self.n_joints == 0:
+                self.kinematic_only = True
+            else:
+                # Create fixed joint, and set Body0 to be this object's root prim
+                create_joint(
+                    prim_path=f"{self._prim_path}/rootJoint",
+                    joint_type="FixedJoint",
+                    body1=f"{self._prim_path}/{self._root_link_name}",
+                )
+                # Also set the articulation root to be the object head if it doesn't already exist
+                if not self._prim.HasAPI(UsdPhysics.ArticulationRootAPI):
+                    UsdPhysics.ArticulationRootAPI.Apply(self.prim)
+                    PhysxSchema.PhysxArticulationAPI.Apply(self.prim)
         else:
             if self._prim.HasAPI(UsdPhysics.ArticulationRootAPI):
                 # If we only have a link, remove the articulation root API
@@ -191,7 +195,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
 
         # Iterate over all links and grab their relevant material info for highlighting (i.e.: emissivity info)
         self._highlighted = False
-        self._highlight_cached_values = OrderedDict()
+        self._highlight_cached_values = dict()
 
         for material in self.materials:
             self._highlight_cached_values[material] = {
@@ -199,12 +203,6 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
                 "emissive_color": material.emissive_color,
                 "emissive_intensity": material.emissive_intensity,
             }
-
-    def reset(self):
-        """
-        Runs any necessary resetting functionality for this object. Default is pass-through
-        """
-        pass
 
     @property
     def articulation_root_path(self):

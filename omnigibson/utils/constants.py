@@ -2,7 +2,7 @@
 Constant Definitions
 """
 import os
-from enum import IntEnum
+from enum import Enum, IntEnum
 
 import omnigibson
 from omnigibson.utils.asset_utils import get_og_avg_category_specs
@@ -16,6 +16,15 @@ class ViewerMode(IntEnum):
     NAVIGATION = 0
     MANIPULATION = 1
     PLANNING = 2
+
+
+class LightingMode(str, Enum):
+    # See https://stackoverflow.com/a/58608362 for info on string enums
+    STAGE = "stage"
+    CAMERA = "camera"
+    RIG_DEFAULT = "Default"
+    RIG_GREY = "Grey Studio"
+    RIG_COLORED = "Colored Lights"
 
 
 class SimulatorMode(IntEnum):

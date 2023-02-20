@@ -1,5 +1,3 @@
-from collections import OrderedDict
-
 import numpy as np
 
 from omni.isaac.core.utils.rotations import gf_quat_to_np_array
@@ -122,7 +120,7 @@ class EntityPrim(XFormPrim):
 
         # We iterate over all children of this object's prim,
         # and grab any that are presumed to be rigid bodies (i.e.: other Xforms)
-        self._links = OrderedDict()
+        self._links = dict()
         joint_children = set()
         for prim in self._prim.GetChildren():
             link = None
@@ -173,17 +171,17 @@ class EntityPrim(XFormPrim):
                 joint.remove_names()
 
         # Initialize joints dictionary
-        self._joints = OrderedDict()
+        self._joints = dict()
         self.update_handles()
 
         # Handle case separately based on whether the handle is valid (i.e.: whether we are actually articulated or not)
-        if self._handle != _dynamic_control.INVALID_HANDLE:
+        if (not self.kinematic_only) and self._handle != _dynamic_control.INVALID_HANDLE:
             root_prim = get_prim_at_path(self._dc.get_rigid_body_path(self._root_handle))
             n_dof = self._dc.get_articulation_dof_count(self._handle)
 
             # Additionally grab DOF info if we have non-fixed joints
             if n_dof > 0:
-                self._dofs_infos = OrderedDict()
+                self._dofs_infos = dict()
                 # Grab DOF info
                 for index in range(n_dof):
                     dof_handle = self._dc.get_articulation_dof(self._handle, index)
@@ -237,7 +235,7 @@ class EntityPrim(XFormPrim):
              bool: Whether this prim is articulated or not
         """
         # An invalid handle implies that there is no articulation available for this object
-        return self._handle != _dynamic_control.INVALID_HANDLE and self.n_joints > 0
+        return self._handle != _dynamic_control.INVALID_HANDLE
 
     @property
     def articulation_root_path(self):
@@ -247,13 +245,6 @@ class EntityPrim(XFormPrim):
                 this corresponds to self.prim_path
         """
         return self._prim_path
-
-    def assert_articulated(self):
-        """
-        Sanity check to make sure this joint is articulated. Used as a gatekeeping function to prevent non-intended
-        behavior (e.g.: trying to grab this joint's state if it's not articulated)
-        """
-        assert self.articulated, "Tried to call method not intended for non-articulated entity prim!"
 
     @property
     def root_link_name(self):
@@ -315,7 +306,17 @@ class EntityPrim(XFormPrim):
         Returns:
             int: Number of joints owned by this articulation
         """
-        return len(list(self._joints.keys()))
+        if self.initialized:
+            num = len(list(self._joints.keys()))
+        else:
+            # Manually iterate over all links and check for any joints that are not fixed joints!
+            num = 0
+            for link in self._links.values():
+                for child_prim in link.prim.GetChildren():
+                    prim_type = child_prim.GetPrimTypeInfo().GetTypeName().lower()
+                    if "joint" in prim_type and "fixed" not in prim_type:
+                        num += 1
+        return num
 
     @property
     def n_links(self):
@@ -329,7 +330,7 @@ class EntityPrim(XFormPrim):
     def joints(self):
         """
         Returns:
-            OrderedDict: Dictionary mapping joint names (str) to joint prims (JointPrim) owned by this articulation
+            dict: Dictionary mapping joint names (str) to joint prims (JointPrim) owned by this articulation
         """
         return self._joints
 
@@ -337,7 +338,7 @@ class EntityPrim(XFormPrim):
     def links(self):
         """
         Returns:
-            OrderedDict: Dictionary mapping link names (str) to link prims (RigidPrim) owned by this articulation
+            dict: Dictionary mapping link names (str) to link prims (RigidPrim) owned by this articulation
         """
         return self._links
 
@@ -403,35 +404,6 @@ class EntityPrim(XFormPrim):
             contacts += link.contact_list()
         return contacts
 
-    def in_contact_links(self):
-        """
-        Get set of unique rigid body prim paths that this object prim is in contact with
-
-        Returns:
-            set: Unique rigid body prim paths that this body is in contact with
-        """
-        contact_list = self.contact_list()
-        link_paths = {link.prim_path for link in self._links.values()}
-        body0_contacts = {c.body0 for c in contact_list if c.body0 not in link_paths}
-        body1_contacts = {c.body1 for c in contact_list if c.body1 not in link_paths}
-        return body0_contacts.union(body1_contacts)
-
-    def in_contact(self, prims=None):
-        """
-        Returns whether this entity is in contact with any prim(s) @prims. If no @prims is specified,
-        then this will check for any contact.
-
-        NOTE: If checking for self-collisions, set prims=self
-
-        Args:
-            prims (None or EntityPrim or RigidPrim or tuple of EntityPrim or RigidPrim): Prim(s) to check for collision.
-            If None, will check against all objects currently in the scene.
-
-        Returns:
-            bool: Whether this object is in contact with the specified prim(s)
-        """
-        return check_collision(prims=self, prims_check=prims, step_physics=False)
-
     def enable_gravity(self) -> None:
         """
         Enables gravity for this entity
@@ -464,7 +436,7 @@ class EntityPrim(XFormPrim):
         """
         # Run sanity checks -- make sure our handle is initialized and that we are articulated
         assert self._handle is not None, "handles are not initialized yet!"
-        self.assert_articulated()
+        assert self.n_joints > 0, "Tried to call method not intended for entity prim with no joints!"
 
         # Possibly de-normalize the inputs
         if normalized:
@@ -508,7 +480,7 @@ class EntityPrim(XFormPrim):
         """
         # Run sanity checks -- make sure our handle is initialized and that we are articulated
         assert self._handle is not None, "handles are not initialized yet!"
-        self.assert_articulated()
+        assert self.n_joints > 0, "Tried to call method not intended for entity prim with no joints!"
 
         # Possibly de-normalize the inputs
         if normalized:
@@ -548,7 +520,7 @@ class EntityPrim(XFormPrim):
         """
         # Run sanity checks -- make sure our handle is initialized and that we are articulated
         assert self._handle is not None, "handles are not initialized yet!"
-        self.assert_articulated()
+        assert self.n_joints > 0, "Tried to call method not intended for entity prim with no joints!"
 
         # Possibly de-normalize the inputs
         if normalized:
@@ -677,8 +649,11 @@ class EntityPrim(XFormPrim):
         Updates all internal handles for this prim, in case they change since initialization
         """
         self._handle = self._dc.get_articulation(self.articulation_root_path)
-        self._root_handle = self._dc.get_articulation_root_body(self._handle) if \
-            self._handle != _dynamic_control.INVALID_HANDLE else self._dc.get_rigid_body(f"{self._prim_path}/{self.root_link_name}")
+
+        # We only have a root handle if we're not a cloth prim
+        if self._prim_type != PrimType.CLOTH:
+            self._root_handle = self._dc.get_articulation_root_body(self._handle) if \
+                self._handle != _dynamic_control.INVALID_HANDLE else self.root_link.handle
 
         # Update all links and joints as well
         for link in self._links.values():
@@ -703,7 +678,7 @@ class EntityPrim(XFormPrim):
         """
         # Run sanity checks -- make sure our handle is initialized and that we are articulated
         assert self._handle is not None, "handles are not initialized yet!"
-        self.assert_articulated()
+        assert self.n_joints > 0, "Tried to call method not intended for entity prim with no joints!"
 
         joint_positions = self._dc.get_articulation_dof_states(self._handle, _dynamic_control.STATE_POS)["pos"]
 
@@ -722,7 +697,7 @@ class EntityPrim(XFormPrim):
         """
         # Run sanity checks -- make sure our handle is initialized and that we are articulated
         assert self._handle is not None, "handles are not initialized yet!"
-        self.assert_articulated()
+        assert self.n_joints > 0, "Tried to call method not intended for entity prim with no joints!"
 
         joint_velocities = self._dc.get_articulation_dof_states(self._handle, _dynamic_control.STATE_VEL)["vel"]
 
@@ -741,7 +716,7 @@ class EntityPrim(XFormPrim):
         """
         # Run sanity checks -- make sure our handle is initialized and that we are articulated
         assert self._handle is not None, "handles are not initialized yet!"
-        self.assert_articulated()
+        assert self.n_joints > 0, "Tried to call method not intended for entity prim with no joints!"
 
         joint_efforts = self._dc.get_articulation_dof_states(self._handle, _dynamic_control.STATE_EFFORT)["effort"]
 
@@ -946,7 +921,7 @@ class EntityPrim(XFormPrim):
         Returns:
             n-array: maximum efforts for this robot's joints
         """
-        return np.array([joint.max_force for joint in self._joints.values()])
+        return np.array([joint.max_effort for joint in self._joints.values()])
 
     @property
     def joint_position_limits(self):
@@ -1061,7 +1036,8 @@ class EntityPrim(XFormPrim):
         Returns:
             float: threshold for stabilizing this articulation
         """
-        return get_prim_property(self.articulation_root_path, "physxArticulation:stabilizationThreshold")
+        return get_prim_property(self.articulation_root_path, "physxArticulation:stabilizationThreshold") if \
+            self.articulated else self.root_link.stabilization_threshold
 
     @stabilization_threshold.setter
     def stabilization_threshold(self, threshold):
@@ -1071,8 +1047,11 @@ class EntityPrim(XFormPrim):
         Args:
             threshold (float): Stabilization threshold
         """
-        set_prim_property(self.articulation_root_path, "physxArticulation:stabilizationThreshold", threshold)
-        return
+        if self.articulated:
+            set_prim_property(self.articulation_root_path, "physxArticulation:stabilizationThreshold", threshold)
+        else:
+            for link in self._links.values():
+                link.stabilization_threshold = threshold
 
     @property
     def self_collisions(self):
@@ -1094,12 +1073,35 @@ class EntityPrim(XFormPrim):
         return
 
     @property
+    def kinematic_only(self):
+        """
+        Returns:
+            bool: Whether this object is a kinematic-only object (otherwise, it is a rigid body). A kinematic-only
+                object is not subject to simulator dynamics, and remains fixed unless the user explicitly sets the
+                body's pose / velocities. See https://docs.omniverse.nvidia.com/app_create/prod_extensions/ext_physics/rigid-bodies.html?highlight=rigid%20body%20enabled#kinematic-rigid-bodies
+                for more information
+        """
+        return self.root_link.kinematic_only
+
+    @kinematic_only.setter
+    def kinematic_only(self, val):
+        """
+        Args:
+            val (bool): Whether this object is a kinematic-only object (otherwise, it is a rigid body). A kinematic-only
+                object is not subject to simulator dynamics, and remains fixed unless the user explicitly sets the
+                body's pose / velocities. See https://docs.omniverse.nvidia.com/app_create/prod_extensions/ext_physics/rigid-bodies.html?highlight=rigid%20body%20enabled#kinematic-rigid-bodies
+                for more information
+        """
+        self.root_link.kinematic_only = val
+
+    @property
     def sleep_threshold(self):
         """
         Returns:
             float: threshold for sleeping this articulation
         """
-        return get_prim_property(self.articulation_root_path, "physxArticulation:sleepThreshold")
+        return get_prim_property(self.articulation_root_path, "physxArticulation:sleepThreshold") if \
+            self.articulated else self.root_link.sleep_threshold
 
     @sleep_threshold.setter
     def sleep_threshold(self, threshold):
@@ -1109,8 +1111,11 @@ class EntityPrim(XFormPrim):
         Args:
             threshold (float): Sleeping threshold
         """
-        set_prim_property(self.articulation_root_path, "physxArticulation:sleepThreshold", threshold)
-        return
+        if self.articulated:
+            set_prim_property(self.articulation_root_path, "physxArticulation:sleepThreshold", threshold)
+        else:
+            for link in self._links.values():
+                link.sleep_threshold = threshold
 
     def wake(self):
         """
@@ -1196,8 +1201,8 @@ class EntityPrim(XFormPrim):
 
     def _dump_state(self):
         # We don't call super, instead, this state is simply the root link state and all joint states
-        state = OrderedDict(root_link=self.root_link._dump_state())
-        joint_state = OrderedDict()
+        state = dict(root_link=self.root_link._dump_state())
+        joint_state = dict()
         for prim_name, prim in self._joints.items():
             joint_state[prim_name] = prim._dump_state()
         state["joints"] = joint_state
@@ -1227,8 +1232,8 @@ class EntityPrim(XFormPrim):
         # We deserialize by first de-flattening the root link state and then iterating over all joints and
         # sequentially grabbing from the flattened state array, incrementing along the way
         idx = self.root_link.state_size
-        state_dict = OrderedDict(root_link=self.root_link.deserialize(state=state[:idx]))
-        joint_state_dict = OrderedDict()
+        state_dict = dict(root_link=self.root_link.deserialize(state=state[:idx]))
+        joint_state_dict = dict()
         for prim_name, prim in self._joints.items():
             joint_state_dict[prim_name] = prim.deserialize(state=state[idx:idx+prim.state_size])
             idx += prim.state_size

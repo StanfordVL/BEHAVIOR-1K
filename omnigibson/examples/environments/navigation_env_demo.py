@@ -4,12 +4,7 @@ import os
 import yaml
 
 import omnigibson as og
-from omnigibson.macros import gm
 from omnigibson.utils.ui_utils import choose_from_options
-
-# Use flatcache for performance speedups unless we're using GPU dynamics
-if not gm.USE_GPU_DYNAMICS:
-    gm.ENABLE_FLATCACHE = True
 
 
 def main(random_selection=False, headless=False, short_exec=False):
@@ -23,7 +18,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
 
     # Load the config
-    config_filename = os.path.join(og.example_config_path, f"turtlebot_nav.yaml")
+    config_filename = os.path.join(og.example_config_path, f"turtlebot_interactive_nav.yaml")
     config = yaml.load(open(config_filename, "r"), Loader=yaml.FullLoader)
 
     # check if we want to quick load or full load the scene

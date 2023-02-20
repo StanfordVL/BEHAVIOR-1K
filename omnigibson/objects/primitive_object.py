@@ -165,8 +165,14 @@ class PrimitiveObject(StatefulObject):
         visual_geom_prim.color = self._load_config["color"]
         visual_geom_prim.opacity = self._load_config["opacity"]
 
-        # Update collision approximation
-        self.root_link.collision_meshes["collision"].set_collision_approximation("convexHull")
+        # Set the collision approximation appropriately
+        if self._primitive_type == "Sphere":
+            col_approximation = "boundingSphere"
+        elif self._primitive_type == "Cube":
+            col_approximation = "boundingCube"
+        else:
+            col_approximation = "convexHull"
+        self.root_link.collision_meshes["collision"].set_collision_approximation(col_approximation)
 
         # Possibly set scalings (only if the scale value is not set)
         if self._load_config["scale"] is not None:
@@ -203,13 +209,17 @@ class PrimitiveObject(StatefulObject):
             radius (float): radius to set
         """
         assert_valid_key(key=self._primitive_type, valid_keys=VALID_RADIUS_OBJECTS, name="primitive object with radius")
+        # Update the extents variable
         original_extent = self._extents
+        self._extents = np.ones(3) * radius * 2.0 if self._primitive_type == "Sphere" else \
+            np.array([radius * 2.0, radius * 2.0, self._extents[2]])
         attr_pairs = []
         for geom in self._vis_geom, self._col_geom:
             if geom is not None:
                 for attr in (geom.GetPointsAttr(), geom.GetNormalsAttr()):
                     vals = np.array(attr.Get()).astype(np.float64)
                     attr_pairs.append([attr, vals])
+                geom.GetExtentAttr().Set(Vt.Vec3fArray([Gf.Vec3f(*(-self._extents / 2.0)), Gf.Vec3f(*(self._extents / 2.0))]))
 
         # Calculate how much to scale extents by and then modify the points / normals accordingly
         scaling_factor = 2.0 * radius / original_extent[0]
@@ -222,10 +232,6 @@ class PrimitiveObject(StatefulObject):
                 vals[:, :2] = vals[:, :2] * scaling_factor
             # Set the value
             attr.Set(Vt.Vec3fArray([Gf.Vec3f(*v) for v in vals]))
-
-        # Update the extents variable
-        self._extents = np.ones(3) * radius * 2.0 if self._primitive_type == "Sphere" else \
-            np.array([radius * 2.0, radius * 2.0, self._extents[2]])
 
     @property
     def height(self):
@@ -251,7 +257,9 @@ class PrimitiveObject(StatefulObject):
             height (float): height to set
         """
         assert_valid_key(key=self._primitive_type, valid_keys=VALID_HEIGHT_OBJECTS, name="primitive object with height")
+        # Update the extents variable
         original_extent = self._extents
+        self._extents[2] = height
 
         # Calculate the correct scaling factor and scale the points and normals appropriately
         scaling_factor = height / original_extent[2]
@@ -262,9 +270,7 @@ class PrimitiveObject(StatefulObject):
                     # Scale the z axis by the scaling factor
                     vals[:, 2] = vals[:, 2] * scaling_factor
                     attr.Set(Vt.Vec3fArray([Gf.Vec3f(*v) for v in vals]))
-
-        # Update the extents variable
-        self._extents[2] = height
+                geom.GetExtentAttr().Set(Vt.Vec3fArray([Gf.Vec3f(*(-self._extents / 2.0)), Gf.Vec3f(*(self._extents / 2.0))]))
 
     @property
     def size(self):
@@ -291,7 +297,9 @@ class PrimitiveObject(StatefulObject):
         """
         assert_valid_key(key=self._primitive_type, valid_keys=VALID_SIZE_OBJECTS, name="primitive object with size")
 
+        # Update the extents variable
         original_extent = self._extents
+        self._extents = np.ones(3) * size
 
         # Calculate the correct scaling factor and scale the points and normals appropriately
         scaling_factor = size / original_extent[0]
@@ -301,9 +309,7 @@ class PrimitiveObject(StatefulObject):
                     # Scale all three axes by the scaling factor
                     vals = np.array(attr.Get()).astype(np.float64) * scaling_factor
                     attr.Set(Vt.Vec3fArray([Gf.Vec3f(*v) for v in vals]))
-
-        # Update the extents variable
-        self._extents = np.ones(3) * size
+                geom.GetExtentAttr().Set(Vt.Vec3fArray([Gf.Vec3f(*(-self._extents / 2.0)), Gf.Vec3f(*(self._extents / 2.0))]))
 
     def _create_prim_with_same_kwargs(self, prim_path, name, load_config):
         # Add additional kwargs (fit_avg_dim_volume and bounding_box are already captured in load_config)

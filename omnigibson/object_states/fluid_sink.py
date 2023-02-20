@@ -3,6 +3,7 @@ import numpy as np
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from omnigibson.object_states.object_state_base import AbsoluteObjectState
+from omnigibson.object_states.update_state_mixin import UpdateStateMixin
 
 
 # Create settings for this module
@@ -14,7 +15,7 @@ m.MIN_GROUP_FRACTION = 0.6
 m.MAX_SINK_DISTANCE = 0.05
 
 
-class FluidSink(AbsoluteObjectState, LinkBasedStateMixin):
+class FluidSink(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixin):
     def __init__(self, obj, max_distance=m.MAX_SINK_DISTANCE):
         super().__init__(obj)
 
@@ -45,20 +46,14 @@ class FluidSink(AbsoluteObjectState, LinkBasedStateMixin):
             return
 
         # We iterate over all active fluid groups in this sink's corresponding fluid system,
-        # and check to see if the group matches both the (a) distance and (b) fraction criteria in
-        # order to "sink" (delete) it
-        names_to_remove = []
+        # and check to see if each owned particle matches distance criteria in order to "sink" (delete) it
         for name, inst in self.fluid_system.particle_instancers.items():
             # Grab particle positions, shape (N, 3)
             particle_pos = inst.particle_positions
-            # Get distances and check fraction simultaneously
-            frac_in_sink = (np.linalg.norm(particle_pos - fluid_sink_position.reshape(1, 3), axis=-1) < self.max_sink_distance).mean()
-            if frac_in_sink >= m.MIN_GROUP_FRACTION:
-                names_to_remove.append(name)
-
-        # Delete all recorded groups
-        for name in names_to_remove:
-            self.fluid_system.remove_particle_instancer(name)
+            # Get distances
+            idxs_to_remove = np.where(np.linalg.norm(particle_pos - fluid_sink_position.reshape(1, 3),
+                                           axis=-1) < self.max_sink_distance)[0]
+            inst.remove_particles(idxs=idxs_to_remove)
 
     def _set_value(self, new_value):
         raise ValueError("set_value not supported for FluidSink.")

@@ -50,7 +50,7 @@ def main():
 
     # Heat source is off.
     print("Heat source is OFF.")
-    heat_source_state, heat_source_position = stove.states[object_states.HeatSourceOrSink].get_value()
+    heat_source_state = stove.states[object_states.HeatSourceOrSink].get_value()
     assert not heat_source_state
 
     # Toggle on stove, notify user
@@ -63,7 +63,7 @@ def main():
     env.step(np.array([]))
 
     # Heat source is on
-    heat_source_state, heat_source_position = stove.states[object_states.HeatSourceOrSink].get_value()
+    heat_source_state = stove.states[object_states.HeatSourceOrSink].get_value()
     assert heat_source_state
     for _ in range(500):
         env.step(np.array([]))

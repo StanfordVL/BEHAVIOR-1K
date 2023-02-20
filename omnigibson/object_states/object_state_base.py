@@ -1,11 +1,10 @@
 from abc import ABC, abstractmethod
-from collections import OrderedDict
 import omnigibson as og
 from omnigibson.utils.python_utils import classproperty, Serializable, Registerable, Recreatable
 
 
 # Global dicts that will contain mappings
-REGISTERED_OBJECT_STATES = OrderedDict()
+REGISTERED_OBJECT_STATES = dict()
 
 
 class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
@@ -47,6 +46,7 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
         self._cache = None
         self._changed = None
         self._simulator = None
+        self._last_t_updated = -1               # Last timestep when this state was updated
 
     @property
     def stateful(self):
@@ -63,27 +63,14 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
     def state_size(self):
         return 0
 
-    def reset(self):
-        """
-        Resets this object state. By default, it clears all internal caching data
-        """
-        self._cache = OrderedDict()
-        self._changed = OrderedDict()
-
     @property
     def cache(self):
         """
         Returns:
-            OrdereDict: Dictionary mapping specific argument combinations from @self.get_value() to cached values and
+            dict: Dictionary mapping specific argument combinations from @self.get_value() to cached values and
                 information stored for that specific combination
         """
         return self._cache
-
-    def _update(self):
-        """
-        This function will be called once for every simulator step.
-        """
-        pass
 
     def _initialize(self):
         """
@@ -104,21 +91,14 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
         self._initialize()
         self._initialized = True
 
-    def update(self):
-        """
-        Updates the object state, possibly clearing internal cached information
-        """
-        assert self._initialized, "Cannot update uninitialized state."
-        # Clear all the changed values
-        self._changed = OrderedDict()
-        return self._update()
-
     def clear_cache(self):
         """
         Clears the internal cache
         """
         # Clear all entries
-        self._cache = OrderedDict()
+        self._cache = dict()
+        self._changed = dict()
+        self._last_t_updated = -1
 
     def update_cache(self, get_value_args):
         """
@@ -131,7 +111,7 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
         t = og.sim.current_time_step_index
         # Compute value and update cache
         val = self._get_value(*get_value_args)
-        self._cache[get_value_args] = OrderedDict(value=val, info=self.cache_info(get_value_args=get_value_args), t=t)
+        self._cache[get_value_args] = dict(value=val, info=self.cache_info(get_value_args=get_value_args), t=t)
 
     def cache_info(self, get_value_args):
         """
@@ -143,10 +123,10 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
                 @self.get_value whose caching information should be computed
 
         Returns:
-            OrderedDict: Any caching information to include at the current timestep when this state's value is computed
+            dict: Any caching information to include at the current timestep when this state's value is computed
         """
         # Default is an empty dictionary
-        return OrderedDict()
+        return dict()
 
     def cache_is_valid(self, get_value_args):
         """
@@ -194,7 +174,7 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
             get_value_args (tuple): Specific argument combinations (usually tuple of objects) passed into
                 @self.get_value
             value (any): Cached value computed at timestep @t for this object state
-            info (OrderedDict): Information calculated at timestep @t when computing this state's value
+            info (dict): Information calculated at timestep @t when computing this state's value
             t (int): Initial timestep to compare against. This should be an index of the steps taken,
                 i.e. a value queried from og.sim.current_time_step_index at some point in time. It is assumed @value
                 and @info were computed at this timestep
@@ -203,10 +183,15 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
             bool: Whether this object state has changed between @t and the current timestep index for the specific
                 @get_value_args
         """
+        # Check current sim step index; if it doesn't match the internal value, we need to clear the changed history
+        current_t = og.sim.current_time_step_index
+        if self._last_t_updated != current_t:
+            self._changed = dict()
+            self._last_t_updated = current_t
         # Compile t, args, and kwargs deterministically
         history_key = (t, *get_value_args)
         # If t == the current timestep, then we obviously haven't changed so our value is False
-        if t == og.sim.current_time_step_index:
+        if t == current_t:
             val = False
         # Otherwise, check if it already exists in our has changed dictionary; we return that value if so
         elif history_key in self._changed:
@@ -229,7 +214,7 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
             get_value_args (tuple): Specific argument combinations (usually tuple of objects) passed into
                 @self.get_value
             value (any): Cached value computed at timestep @t for this object state
-            info (OrderedDict): Information calculated at timestep @t when computing this state's value
+            info (dict): Information calculated at timestep @t when computing this state's value
 
         Returns:
             bool: Whether the value has changed between @value and @info and the coresponding value and info computed

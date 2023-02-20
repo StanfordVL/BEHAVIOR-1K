@@ -1,5 +1,4 @@
 import numpy as np
-from collections import OrderedDict
 import omnigibson as og
 from omnigibson import object_states
 from omnigibson.macros import gm
@@ -12,7 +11,7 @@ def main():
     # Define object configurations for objects to load -- we want to load a light and three bowls
     obj_configs = []
 
-    obj_configs.append(OrderedDict(
+    obj_configs.append(dict(
         type="LightObject",
         light_type="Sphere",
         name="light",
@@ -22,7 +21,7 @@ def main():
     ))
 
     for i, (scale, x) in enumerate(zip([0.5, 1.0, 2.0], [-0.6, 0, 0.8])):
-        obj_configs.append(OrderedDict(
+        obj_configs.append(dict(
             type="DatasetObject",
             name=f"bowl{i}",
             category="bowl",
