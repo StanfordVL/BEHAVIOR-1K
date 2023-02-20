@@ -1,4 +1,4 @@
-FROM nvcr.io/nvidia/isaac-sim:2022.1.1
+FROM nvcr.io/nvidia/isaac-sim:2022.2.0
 
 # Set up all the prerequisites.
 RUN apt-get update && apt-get install -y \
