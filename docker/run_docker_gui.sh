@@ -33,7 +33,15 @@ if [ ! -e "$EGL_VENDOR_PATH" ]; then
     echo "(default path: /usr/share/vulkan/icd.d/nvidia_icd.json)";
     echo "To continue update the file path at the top of the run_docker.sh file and retry";
     exit;
-fi 
+fi
+
+# Move directories from their legacy paths.
+if [ -e "${DATA_PATH}/og_dataset"]; then
+    mv "${DATA_PATH}/og_dataset" "${DATA_PATH}/datasets/og_dataset"
+fi
+if [ -e "${DATA_PATH}/assets"]; then
+    mv "${DATA_PATH}/assets" "${DATA_PATH}/datasets/assets"
+fi
 
 echo -e "${BYellow}IMPORTANT: Saving OmniGibson assets at ${DATA_PATH}."
 echo -e "You can change this path by providing your desired path as an argument"
