@@ -15,7 +15,7 @@ builtins.ISAAC_LAUNCHED_FROM_JUPYTER = (
 import nest_asyncio
 nest_asyncio.apply()
 
-__version__ = "0.0.4"
+__version__ = "0.0.5"
 
 logging.getLogger().setLevel(logging.INFO)
 

@@ -13,7 +13,7 @@ long_description = "".join(lines)
 
 setup(
     name="omnigibson",
-    version="0.0.4",
+    version="0.0.5",
     author="Stanford University",
     long_description_content_type="text/markdown",
     long_description=long_description,
