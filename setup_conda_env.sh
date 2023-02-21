@@ -15,8 +15,8 @@ if grep -qxF '# OmniGibson additional dependencies' ${CFG_PATH}; then
 else
   echo '' >> ${CFG_PATH}
   echo '# OmniGibson additional dependencies' >> ${CFG_PATH}
-  echo '"omni.flow.usd" = {}' >> ${CFG_PATH}
-  echo '"omni.particles.system.bundle" = {}' >> ${CFG_PATH}
+  echo '"omni.flowusd" = {}' >> ${CFG_PATH}
+  echo '"omni.particle.system.bundle" = {}' >> ${CFG_PATH}
 fi
 
 # Next, we prune some packages from Isaac Sim that are outdated relative to what we need in OmniGibson
