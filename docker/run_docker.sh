@@ -19,7 +19,7 @@ if [ ! -e "$ICD_PATH" ]; then
     echo "Consider updating your driver to 525 if you cannot find the file.";
     echo "To continue update the file path at the top of the run_docker.sh file and retry";
     exit;
-else 
+fi 
 if [ ! -e "$LAYERS_PATH" ]; then
     echo "Missing ${LAYERS_PATH} file."
     echo "(default path: /usr/share/vulkan/icd.d/nvidia_layers.json)";
@@ -27,13 +27,13 @@ if [ ! -e "$LAYERS_PATH" ]; then
     echo "Consider updating your driver to 525 if you cannot find the file.";
     echo "To continue update the file path at the top of the run_docker.sh file and retry";
     exit;
-else 
+fi 
 if [ ! -e "$EGL_VENDOR_PATH" ]; then
     echo "Missing ${EGL_VENDOR_PATH} file."
     echo "(default path: /usr/share/vulkan/icd.d/nvidia_icd.json)";
     echo "To continue update the file path at the top of the run_docker.sh file and retry";
     exit;
-else 
+fi 
 
 echo -e "${BYellow}IMPORTANT: Saving OmniGibson assets at ${DATA_PATH}."
 echo -e "You can change this path by providing your desired path as an argument"
