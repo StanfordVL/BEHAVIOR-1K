@@ -7,7 +7,6 @@ RUN apt-get update && apt-get install -y \
   wget \
   && rm -rf /var/lib/apt/lists/*
 
-RUN echo "bash /isaac-sim/vulkan_check.sh" >> /root/.bashrc
 RUN rm -rf /isaac-sim/exts/omni.isaac.ml_archive/pip_prebundle/gym
 RUN rm -rf /isaac-sim/kit/extscore/omni.kit.pip_archive/pip_prebundle/numpy
 
