@@ -7,6 +7,34 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 DEFAULT_DATA_DIR="$SCRIPT_DIR/omnigibson_data"
 DATA_PATH=${1:-$DEFAULT_DATA_DIR}
 
+ICD_PATH="/usr/share/vulkan/icd.d/nvidia_icd.json"
+LAYERS_PATH="/usr/share/vulkan/icd.d/nvidia_layers.json"
+EGL_VENDOR_PATH="/usr/share/glvnd/egl_vendor.d/10_nvidia.json"
+
+# Assert the presence of relevant Vulkan files
+if [ ! -e "$ICD_PATH" ]; then
+    echo "Missing ${ICD_PATH} file."
+    echo "(default path: /usr/share/vulkan/icd.d/nvidia_icd.json)";
+    echo "In some distributions this file will be at /etc/vulkan/icd.d/";
+    echo "Consider updating your driver to 525 if you cannot find the file.";
+    echo "To continue update the file path at the top of the run_docker.sh file and retry";
+    exit;
+else 
+if [ ! -e "$LAYERS_PATH" ]; then
+    echo "Missing ${LAYERS_PATH} file."
+    echo "(default path: /usr/share/vulkan/icd.d/nvidia_layers.json)";
+    echo "In some distributions this file will be at /etc/vulkan/implicit_layer.d/";
+    echo "Consider updating your driver to 525 if you cannot find the file.";
+    echo "To continue update the file path at the top of the run_docker.sh file and retry";
+    exit;
+else 
+if [ ! -e "$EGL_VENDOR_PATH" ]; then
+    echo "Missing ${EGL_VENDOR_PATH} file."
+    echo "(default path: /usr/share/vulkan/icd.d/nvidia_icd.json)";
+    echo "To continue update the file path at the top of the run_docker.sh file and retry";
+    exit;
+else 
+
 echo -e "${BYellow}IMPORTANT: Saving OmniGibson assets at ${DATA_PATH}."
 echo -e "You can change this path by providing your desired path as an argument"
 echo -e "to the run_docker script you are using. Also note that Docker containers"
@@ -33,5 +61,16 @@ docker run \
     --privileged \
     -e DISPLAY \
     -e OMNIGIBSON_HEADLESS=1 \
-    -v $DATA_PATH:/data \
+    -v $DATA_PATH/datasets:/data \
+    -v ${ICD_PATH}:/etc/vulkan/icd.d/nvidia_icd.json \
+    -v ${LAYERS_PATH}:/etc/vulkan/implicit_layer.d/nvidia_layers.json \
+    -v ${EGL_VENDOR_PATH}:/usr/share/glvnd/egl_vendor.d/10_nvidia.json \
+    -v $DATA_PATH/isaac-sim/cache/ov:/root/.cache/ov:rw \
+    -v $DATA_PATH/isaac-sim/cache/pip:/root/.cache/pip:rw \
+    -v $DATA_PATH/isaac-sim/cache/glcache:/root/.cache/nvidia/GLCache:rw \
+    -v $DATA_PATH/isaac-sim/cache/computecache:/root/.nv/ComputeCache:rw \
+    -v $DATA_PATH/isaac-sim/logs:/root/.nvidia-omniverse/logs:rw \
+    -v $DATA_PATH/isaac-sim/config:/root/.nvidia-omniverse/config:rw \
+    -v $DATA_PATH/isaac-sim/data:/root/.local/share/ov/data:rw \
+    -v $DATA_PATH/isaac-sim/documents:/root/Documents:rw \
     --network=host --rm -it stanfordvl/omnigibson bash -c "source ~/.bashrc && jupyter lab --allow-root"
