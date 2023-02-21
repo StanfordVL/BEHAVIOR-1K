@@ -68,7 +68,7 @@ cfg["objects"] = [ # (1)!
         "name": "brilliant_light",
         "light_type": "Sphere", # (16)!
         "intensity": 50000, # (17)!
-        "radius": 0.1 # (18)!
+        "radius": 0.1, # (18)!
         "position": [3.0, 3.0, 4.0],
     },
 ]
