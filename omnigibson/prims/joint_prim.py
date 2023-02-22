@@ -85,6 +85,7 @@ class JointPrim(BasePrim):
         self._joint_type = None
         self._control_type = None
         self._dof_properties = None
+        self._joint_state_api = None
 
         # The following values will only be valid if this joint is part of an articulation
         self._dc = None
@@ -119,6 +120,17 @@ class JointPrim(BasePrim):
         # run super first
         super()._post_load()
 
+        # Add joint state API if this is a revolute or prismatic joint
+        self._joint_type = JointType.get_type(self._prim.GetTypeName().split("Physics")[-1])
+        if self.is_single_dof:
+            state_type = "angular" if self._joint_type == JointType.JOINT_REVOLUTE else "linear"
+            # We MUST already have the joint state API defined beforehand in the USD
+            # This is because dc complains if we try to add physx APIs AFTER a simulation step occurs, which
+            # happens because joint prims are usually created externally during an EntityPrim's initialization phase
+            assert self._prim.HasAPI(PhysxSchema.JointStateAPI), \
+                "Revolute or Prismatic joints must already have JointStateAPI added!"
+            self._joint_state_api = PhysxSchema.JointStateAPI(self._prim, state_type)
+
         # Possibly set the bodies
         if "body0" in self._load_config and self._load_config["body0"] is not None:
             self.body0 = self._load_config["body0"]
@@ -128,9 +140,6 @@ class JointPrim(BasePrim):
     def _initialize(self):
         # Always run super first
         super()._initialize()
-
-        # Get joint info
-        self._joint_type = JointType.get_type(self._prim.GetTypeName().split("Physics")[-1])
 
         # Initialize dynamic control references if this joint is articulated
         if self.articulated:
@@ -552,7 +561,7 @@ class JointPrim(BasePrim):
         Returns:
             bool: Whether this joint is revolute or  not
         """
-        return self._joint_type == "RevoluteJoint"
+        return self._joint_type == JointType.JOINT_REVOLUTE
 
     @property
     def is_single_dof(self):
@@ -560,7 +569,7 @@ class JointPrim(BasePrim):
         Returns:
             bool: Whether this joint has a single DOF or not
         """
-        return self._joint_type in {"RevoluteJoint", "PrismaticJoint"}
+        return self._joint_type in {JointType.JOINT_REVOLUTE, JointType.JOINT_PRISMATIC}
 
     def assert_articulated(self):
         """

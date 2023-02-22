@@ -911,6 +911,14 @@ class Simulator(SimulationContext, Serializable):
         self._app.shutdown()
 
     @property
+    def stage_id(self):
+        """
+        Returns:
+            int: ID of the current active stage
+        """
+        return UsdUtils.StageCache.Get().GetId(self.stage).ToLongInt()
+
+    @property
     def device(self):
         """
         Returns:
