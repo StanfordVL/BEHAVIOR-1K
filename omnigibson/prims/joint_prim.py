@@ -120,10 +120,8 @@ class JointPrim(BasePrim):
         # run super first
         super()._post_load()
 
-        # Add joint state API if it doesn't already exist, otherwise reference it
-        self._joint_type = JointType.get_type(self._prim.GetTypeName().split("Physics")[-1])
-
         # Add joint state API if this is a revolute or prismatic joint
+        self._joint_type = JointType.get_type(self._prim.GetTypeName().split("Physics")[-1])
         if self.is_single_dof:
             state_type = "angular" if self._joint_type == JointType.JOINT_REVOLUTE else "linear"
             # We MUST already have the joint state API defined beforehand in the USD
