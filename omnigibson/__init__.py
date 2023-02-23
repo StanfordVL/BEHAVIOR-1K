@@ -122,6 +122,8 @@ def start():
     global app, sim, Environment, REGISTERED_SCENES, REGISTERED_OBJECTS, REGISTERED_ROBOTS, REGISTERED_CONTROLLERS, \
         REGISTERED_TASKS, ALL_SENSOR_MODALITIES
 
+    logging.info(f"{'-' * 10} Starting OmniGibson {'-' * 10}")
+
     # First create the app, then create the sim
     app = create_app()
     sim = create_sim()
@@ -146,5 +148,6 @@ if not (os.getenv("OMNIGIBSON_NO_OMNIVERSE", 'False').lower() in {'true', '1', '
 
 def shutdown():
     global app
+    logging.info(f"{'-' * 10} Shutting Down OmniGibson {'-' * 10}")
     app.close()
     exit(0)
