@@ -415,6 +415,9 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         """
         Resets this scene
         """
+        # Make sure the simulator is playing
+        assert og.sim.is_playing(), "Simulator must be playing in order to reset the scene!"
+
         # Reset all systems
         for system in self.systems:
             system.reset()
