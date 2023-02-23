@@ -490,9 +490,8 @@ class Simulator(SimulationContext, Serializable):
             # Track whether we're starting the simulator fresh -- i.e.: whether we were stopped previously
             was_stopped = self.is_stopped()
 
-            # Minimize physics leakage by slowing down simulator significantly
-            with self.slowed(dt=1e-3):
-                super().play()
+            # Run super first
+            super().play()
 
             # Update all object handles
             if self.scene is not None and self.scene.initialized:
@@ -509,6 +508,12 @@ class Simulator(SimulationContext, Serializable):
                 # Also update the scene registry
                 # TODO: A better place to put this perhaps?
                 self._scene.object_registry.update(keys="root_handle")
+
+            # If we were stopped, take an additional sim step to make sure simulator is functioning properly
+            # We need to do this because for some reason omniverse exhibits strange behavior if we do certain operations
+            # immediately after playing; e.g.: syncing USD poses when flatcache is enabled
+            if was_stopped:
+                self.step()
 
     def pause(self):
         if not self.is_paused():
@@ -717,6 +722,14 @@ class Simulator(SimulationContext, Serializable):
             VisionSensor: Active camera sensor corresponding to the active viewport window instance shown in the omni UI
         """
         return self._viewer_camera
+
+    @property
+    def camera_mover(self):
+        """
+        Returns:
+            None or CameraMover: If enabled, the teleoperation interface for controlling the active viewer camera
+        """
+        return self._camera_mover
 
     @property
     def world_prim(self):
