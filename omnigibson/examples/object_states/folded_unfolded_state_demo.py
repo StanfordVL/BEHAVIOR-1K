@@ -2,6 +2,7 @@ from omnigibson.utils.constants import PrimType
 from omnigibson.object_states import Folded, Unfolded
 from omnigibson.macros import gm
 import logging
+import numpy as np
 
 import omnigibson as og
 
@@ -62,13 +63,9 @@ def main(random_selection=False, headless=False, short_exec=False):
     carpet = env.scene.object_registry("name", "carpet")
     dishtowel = env.scene.object_registry("name", "dishtowel")
     shirt = env.scene.object_registry("name", "shirt")
+    objs = [carpet, dishtowel, shirt]
 
-    max_steps = 100 if short_exec else -1
-    steps = 0
-
-    while steps != max_steps:
-        og.sim.step()
-
+    def print_state():
         folded = carpet.states[Folded].get_value()
         unfolded = carpet.states[Unfolded].get_value()
         info = "carpet: [folded] %d [unfolded] %d" % (folded, unfolded)
@@ -82,7 +79,68 @@ def main(random_selection=False, headless=False, short_exec=False):
         info += " || tshirt: [folded] %d [unfolded] %d" % (folded, unfolded)
 
         print(info)
-        steps += 1
+
+    for _ in range(100):
+        og.sim.step()
+
+    if not short_exec:
+        # Fold all three cloths along the x-axis
+        for i in range(3):
+            obj = objs[i]
+            pos = obj.root_link.particle_positions
+            x_min, x_max = np.min(pos, axis=0)[0], np.max(pos, axis=0)[0]
+            x_extent = x_max - x_min
+            # Get indices for the bottom 10 percent vertices in the x-axis
+            indices = np.argsort(pos, axis=0)[:, 0][:(pos.shape[0] // 10)]
+            start = np.copy(pos[indices])
+
+            # lift up a bit
+            mid = np.copy(start)
+            mid[:, 2] += x_extent * 0.2
+
+            # move towards x_max
+            end = np.copy(mid)
+            end[:, 0] += x_extent * 0.9
+
+            increments = 25
+            for ctrl_pts in np.concatenate([np.linspace(start, mid, increments), np.linspace(mid, end, increments)]):
+                pos = obj.root_link.particle_positions
+                pos[indices] = ctrl_pts
+                obj.root_link.particle_positions = pos
+                og.sim.step()
+                print_state()
+
+        # Fold the t-shirt twice again along the y-axis
+        for direction in [-1, 1]:
+            obj = shirt
+            pos = obj.root_link.particle_positions
+            y_min, y_max = np.min(pos, axis=0)[1], np.max(pos, axis=0)[1]
+            y_extent = y_max - y_min
+            if direction == 1:
+                indices = np.argsort(pos, axis=0)[:, 1][:(pos.shape[0] // 20)]
+            else:
+                indices = np.argsort(pos, axis=0)[:, 1][-(pos.shape[0] // 20):]
+            start = np.copy(pos[indices])
+
+            # lift up a bit
+            mid = np.copy(start)
+            mid[:, 2] += y_extent * 0.2
+
+            # move towards y_max
+            end = np.copy(mid)
+            end[:, 1] += direction * y_extent * 0.4
+
+            increments = 25
+            for ctrl_pts in np.concatenate([np.linspace(start, mid, increments), np.linspace(mid, end, increments)]):
+                pos = obj.root_link.particle_positions
+                pos[indices] = ctrl_pts
+                obj.root_link.particle_positions = pos
+                og.sim.step()
+                print_state()
+
+        while True:
+            og.sim.step()
+            print_state()
 
     # Shut down env at the end
     env.close()

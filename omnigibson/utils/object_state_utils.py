@@ -10,6 +10,8 @@ from omnigibson.macros import create_module_macros, Dict
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.contact_bodies import ContactBodies
 from omnigibson.utils import sampling_utils
+from omnigibson.utils.constants import PrimType
+from omnigibson.utils.ui_utils import debug_breakpoint
 import omnigibson.utils.transform_utils as T
 
 
@@ -17,21 +19,24 @@ import omnigibson.utils.transform_utils as T
 m = create_module_macros(module_path=__file__)
 
 m.ON_TOP_RAY_CASTING_SAMPLING_PARAMS = Dict({
-    # "hit_to_plane_threshold": 0.1,  # TODO: Tune this parameter.
-    "max_angle_with_z_axis": 0.17,
     "bimodal_stdev_fraction": 1e-6,
     "bimodal_mean_fraction": 1.0,
-    "max_sampling_attempts": 50,
     "aabb_offset": 0.01,
+    "max_sampling_attempts": 50,
 })
 
 m.INSIDE_RAY_CASTING_SAMPLING_PARAMS = Dict({
-    # "hit_to_plane_threshold": 0.1,  # TODO: Tune this parameter.
-    "max_angle_with_z_axis": 0.17,
     "bimodal_stdev_fraction": 0.4,
     "bimodal_mean_fraction": 0.5,
+    "aabb_offset": 0.0,
     "max_sampling_attempts": 100,
-    "aabb_offset": -0.01,
+})
+
+m.UNDER_RAY_CASTING_SAMPLING_PARAMS = Dict({
+    "bimodal_stdev_fraction": 1e-6,
+    "bimodal_mean_fraction": 0.5,
+    "aabb_offset": 0.01,
+    "max_sampling_attempts": 50,
 })
 
 
@@ -39,7 +44,7 @@ def sample_kinematics(
     predicate,
     objA,
     objB,
-    use_ray_casting_method=False,
+    use_ray_casting_method=True,
     max_trials=10,
     z_offset=0.05,
     skip_falling=False,
@@ -61,7 +66,6 @@ def sample_kinematics(
     Returns:
         bool: True if successfully sampled, else False
     """
-
     assert z_offset > 0.5 * 9.81 * (og.sim.get_physics_dt() ** 2) + 0.02,\
         f"z_offset {z_offset} is too small for the current physics_dt {og.sim.get_physics_dt()}"
 
@@ -96,7 +100,7 @@ def sample_kinematics(
         # Orientation needs to be set for stable_z_on_aabb to work correctly
         # Position needs to be set to be very far away because the object's
         # original position might be blocking rays (use_ray_casting_method=True)
-        old_pos = np.array([200, 200, 200])
+        old_pos = np.array([100, 100, 10])
         objA.set_position_orientation(old_pos, orientation)
         objA.keep_still()
         # We also need to step physics to make sure the pose propagates downstream (e.g.: to Bounding Box computations)
@@ -110,13 +114,15 @@ def sample_kinematics(
                 params = m.ON_TOP_RAY_CASTING_SAMPLING_PARAMS
             elif predicate == "inside":
                 params = m.INSIDE_RAY_CASTING_SAMPLING_PARAMS
+            elif predicate == "under":
+                params = m.UNDER_RAY_CASTING_SAMPLING_PARAMS
             else:
-                raise ValueError(f"predicate must be either onTop or inside in order to use ray casting-based "
+                raise ValueError(f"predicate must be onTop, under or inside in order to use ray casting-based "
                                  f"kinematic sampling, but instead got: {predicate}")
 
             # Run import here to avoid circular imports
             from omnigibson.objects.dataset_object import DatasetObject
-            if isinstance(objA, DatasetObject):
+            if isinstance(objA, DatasetObject) and objA.prim_type == PrimType.RIGID:
                 # Retrieve base CoM frame-aligned bounding box parallel to the XY plane
                 parallel_bbox_center, parallel_bbox_orn, parallel_bbox_extents, _ = objA.get_base_aligned_bbox(
                     xy_aligned=True
@@ -127,15 +133,35 @@ def sample_kinematics(
                 parallel_bbox_orn = np.array([0.0, 0.0, 0.0, 1.0])
                 parallel_bbox_extents = aabb_upper - aabb_lower
 
-            sampling_results = sampling_utils.sample_cuboid_on_object_symmetric_bimodal_distribution(
-                objB,
-                num_samples=1,
-                cuboid_dimensions=parallel_bbox_extents,
-                axis_probabilities=[0, 0, 1],
-                refuse_downwards=True,
-                undo_cuboid_bottom_padding=True,
-                **params,
-            )
+            if predicate == "under":
+                start_points, end_points = sampling_utils.sample_raytest_start_end_symmetric_bimodal_distribution(
+                    obj=objB,
+                    num_samples=1,
+                    axis_probabilities=[0, 0, 1],
+                    **params,
+                )
+                sampling_results = sampling_utils.sample_cuboid_on_object(
+                    obj=None,
+                    start_points=start_points,
+                    end_points=end_points,
+                    ignore_objs=[objB],
+                    cuboid_dimensions=parallel_bbox_extents,
+                    refuse_downwards=True,
+                    undo_cuboid_bottom_padding=True,
+                    max_angle_with_z_axis=0.17,
+                    hit_proportion=0.0,  # rays will NOT hit the object itself, but the surface below it.
+                )
+            else:
+                sampling_results = sampling_utils.sample_cuboid_on_object_symmetric_bimodal_distribution(
+                    objB,
+                    num_samples=1,
+                    axis_probabilities=[0, 0, 1],
+                    cuboid_dimensions=parallel_bbox_extents,
+                    refuse_downwards=True,
+                    undo_cuboid_bottom_padding=True,
+                    max_angle_with_z_axis=0.17,
+                    **params,
+                )
 
             sampled_vector = sampling_results[0][0]
             sampled_quaternion = sampling_results[0][2]
@@ -200,8 +226,7 @@ def sample_kinematics(
             success = len(objA.states[ContactBodies].get_value()) == 0
 
         if og.debug_sampling:
-            print("sample_kinematics", success)
-            embed()
+            debug_breakpoint(f"sample_kinematics: {success}")
 
         if success:
             break
@@ -227,7 +252,7 @@ def sample_kinematics(
 # Folded / Unfolded related utils
 m.DEBUG_CLOTH_PROJ_VIS = False
 # Angle threshold for checking smoothness of the cloth; surface normals need to be close enough to the z-axis
-m.NORMAL_Z_ANGLE_DIFF = np.deg2rad(30.0)
+m.NORMAL_Z_ANGLE_DIFF = np.deg2rad(45.0)
 # Subsample cloth particle points to fit a convex hull for efficiency purpose
 m.N_POINTS_CONVEX_HULL = 1000
 

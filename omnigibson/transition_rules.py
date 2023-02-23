@@ -5,6 +5,7 @@ from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.object_states import *
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.usd_utils import BoundingBoxAPI
+from omnigibson import og_dataset_path
 
 
 # Tuple of attributes of objects created in transitions.

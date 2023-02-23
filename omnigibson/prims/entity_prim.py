@@ -766,17 +766,14 @@ class EntityPrim(XFormPrim):
             orientation = current_orientation
 
         if self._prim_type == PrimType.CLOTH:
-            # Can only set position
             if self._dc is not None and self._dc.is_simulating():
-                # Assume there is only one base link (the cloth)
                 self.root_link.set_position_orientation(position, orientation)
             else:
                 super().set_position_orientation(position, orientation)
         else:
             if self._root_handle is not None and self._root_handle != _dynamic_control.INVALID_HANDLE and \
                     self._dc is not None and self._dc.is_simulating():
-                pose = _dynamic_control.Transform(position, orientation)
-                self._dc.set_rigid_body_pose(self._root_handle, pose)
+                self.root_link.set_position_orientation(position, orientation)
             else:
                 super().set_position_orientation(position=position, orientation=orientation)
 
@@ -789,8 +786,7 @@ class EntityPrim(XFormPrim):
         else:
             if self._root_handle is not None and self._root_handle != _dynamic_control.INVALID_HANDLE and \
                     self._dc is not None and self._dc.is_simulating():
-                pose = self._dc.get_rigid_body_pose(self._root_handle)
-                return np.asarray(pose.p), np.asarray(pose.r)
+                return self.root_link.get_position_orientation()
             else:
                 return super().get_position_orientation()
 

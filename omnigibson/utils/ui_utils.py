@@ -13,7 +13,8 @@ import omni.ui
 import omni.log
 import carb
 import random
-
+import logging
+from IPython import embed
 
 def dock_window(space, name, location, ratio=0.5):
     """
@@ -143,6 +144,11 @@ def disclaimer(msg):
               "should be resolved by the next Isaac Sim release.")
         print(f"Exact Limitation: {msg}")
         print("************************")
+
+
+def debug_breakpoint(msg):
+    logging.error(msg)
+    embed()
 
 
 def choose_from_options(options, name, random_selection=False):

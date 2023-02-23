@@ -1,8 +1,9 @@
 import random
+import logging
 
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.object_state_base import BooleanState, AbsoluteObjectState
-
+from omnigibson.utils.constants import JointType
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -11,8 +12,8 @@ m = create_module_macros(module_path=__file__)
 # Should be a number in the range [0, 1] which will be transformed
 # to a position in the joint's min-max range.
 m.JOINT_THRESHOLD_BY_TYPE = {
-    "RevoluteJoint": 0.05,#p.JOINT_REVOLUTE: 0.05,
-    "PrismaticJoint": 0.05,#p.JOINT_PRISMATIC: 0.05,
+    JointType.JOINT_REVOLUTE: 0.05,
+    JointType.JOINT_PRISMATIC: 0.05,
 }
 m.OPEN_SAMPLING_ATTEMPTS = 5
 
@@ -76,37 +77,34 @@ def _get_relevant_joints(obj):
             - list of int: Joint directions for each corresponding relevant joint
     """
     global m
+
+    default_both_sides = False
+    default_relevant_joints = list(obj.joints.values())
+    # 1 means the open direction corresponds to positive joint angle change and -1 means the opposite
+    default_joint_directions = [1] * len(default_relevant_joints)
+
     if not hasattr(obj, "metadata"):
-        return None, None, None
+        logging.warning("No openable joint metadata found for object %s" % obj.name)
+        return default_both_sides, default_relevant_joints, default_joint_directions
+
+    # Get joint IDs and names from metadata annotation. If not, return default values.
+    if m.METADATA_FIELD not in obj.metadata:
+        logging.warning("No openable joint metadata found for object %s" % obj.name)
+        return default_both_sides, default_relevant_joints, default_joint_directions
 
     both_sides = obj.metadata[m.BOTH_SIDES_METADATA_FIELD] if m.BOTH_SIDES_METADATA_FIELD in obj.metadata else False
-
-    # Get joint IDs and names from metadata annotation. If object doesn't have the openable metadata,
-    # we stop here and return Open=False.
-    if m.METADATA_FIELD not in obj.metadata:
-        print("No openable joint metadata found for object %s" % obj.name)
-        return None, None, None
-
     joint_metadata = obj.metadata[m.METADATA_FIELD].items()
 
     # The joint metadata is in the format of [(joint_id, joint_name), ...] for legacy annotations and
     # [(joint_id, joint_name, joint_direction), ...] for direction-annotated objects.
     joint_names = [m[1] for m in joint_metadata]
     joint_directions = [m[2] if len(m) > 2 else 1 for m in joint_metadata]
-    if not joint_names:
-        print("No openable joint was listed in metadata for object %s" % obj.name)
-        return None, None, None
 
-    # Get joint infos and compute openness thresholds.
-    relevant_joints = [joint for key, joint in obj.joints.items() if key in joint_names]
+    relevant_joints = []
+    for key in joint_names:
+        assert key in obj.joints, f"Unexpected joint name from Open metadata for object {obj.name}: {key}"
+        relevant_joints.append(obj.joints[key])
 
-    # Assert that all of the joints' names match our expectations.
-    assert len(joint_names) == len(
-        relevant_joints
-    ), "Unexpected joints found during Open state joint checking. Expected %r, found %r." % (
-        joint_names,
-        relevant_joints,
-    )
     assert all(joint.joint_type in m.JOINT_THRESHOLD_BY_TYPE.keys() for joint in relevant_joints)
 
     return both_sides, relevant_joints, joint_directions

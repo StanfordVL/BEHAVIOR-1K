@@ -29,22 +29,25 @@ m.DEFAULT_NEW_RAY_PER_HORIZONTAL_DISTANCE = 0.1
 m.DEFAULT_HIT_PROPORTION = 0.6
 
 
-def fit_plane(points):
+def fit_plane(points, refusal_log):
     """
     Fits a plane to the given 3D points.
     Copied from https://stackoverflow.com/a/18968498
 
     Args:
         points ((k, 3)-array): np.array of shape (k, 3)
+        refusal_log (dict): Debugging dictionary to add error messages to
 
     Returns:
         2-tuple:
             - 3-array: (x,y,z) points' centroid
             - 3-array: (x,y,z) normal of the fitted plane
     """
-    assert points.shape[1] <= points.shape[0], "Cannot fit plane with only {} points in {} dimensions.".format(
-        points.shape[0], points.shape[1]
-    )
+    if points.shape[0] < points.shape[1]:
+        if og.debug_sampling:
+            refusal_log.append(f"insufficient points to fit a 3D plane: needs 3, has {points.shape[0]}.")
+        return None, None
+
     ctr = points.mean(axis=0)
     x = points - ctr
     normal = np.linalg.svd(np.dot(x.T, x))[0][:, -1]
@@ -737,9 +740,11 @@ def sample_cuboid_on_object(
                 assert (this_cuboid_dimensions[:-1] > 0).all(), \
                     f"Cuboid x and y dimensions must not be zero if z dimension is nonzero! Got: {this_cuboid_dimensions}"
                 # Obtain the parallel rays using the direction sampling method.
-                sources, destinations, grid = np.array(get_parallel_rays(
+                sources, destinations, grid = get_parallel_rays(
                     start_pos, end_pos, this_cuboid_dimensions[:2] / 2.0, new_ray_per_horizontal_distance,
-                ))
+                )
+                sources = np.array(sources)
+                destinations = np.array(destinations)
             else:
                 sources = np.array([start_pos])
                 destinations = np.array([end_pos])
@@ -789,7 +794,9 @@ def sample_cuboid_on_object(
                     continue
 
                 # Fit a plane to the points.
-                plane_centroid, plane_normal = fit_plane(hit_positions)
+                plane_centroid, plane_normal = fit_plane(hit_positions, refusal_reasons["fit_plane"])
+                if plane_centroid is None:
+                    continue
 
                 # The fit_plane normal can be facing either direction on the normal axis, but we want it to face away from
                 # the object for purposes of normal checking and padding. To do this:
