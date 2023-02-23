@@ -278,6 +278,7 @@ class Simulator(SimulationContext, Serializable):
         """
         self._camera_mover = CameraMover(cam=self._viewer_camera)
         self._camera_mover.print_info()
+        return self._camera_mover
 
     def import_scene(self, scene):
         """
