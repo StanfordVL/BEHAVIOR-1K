@@ -26,7 +26,6 @@ class DummyTask(BaseTask):
     def _reset_agent(self, env):
         # Place agent(s) at origin by default
         for robot in env.robots:
-            robot.reset()
             land_object(robot, np.zeros(3), np.array([0, 0, 0, 1]), env.initial_pos_z_offset)
 
     def _get_obs(self, env):
