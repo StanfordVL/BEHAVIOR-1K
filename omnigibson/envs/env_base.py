@@ -292,7 +292,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         """
         Clean up the environment and shut down the simulation.
         """
-        og.sim.close()
+        og.shutdown()
 
     def get_obs(self):
         """
