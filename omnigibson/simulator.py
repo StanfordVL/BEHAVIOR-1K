@@ -29,6 +29,7 @@ from omnigibson.utils.ui_utils import CameraMover, disclaimer
 from omnigibson.scenes import Scene
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.objects.stateful_object import StatefulObject
+from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.object_states.contact_subscribed_state_mixin import ContactSubscribedStateMixin
 from omnigibson.object_states.factory import get_states_by_dependency_order
 from omnigibson.object_states.update_state_mixin import UpdateStateMixin
@@ -475,8 +476,9 @@ class Simulator(SimulationContext, Serializable):
         for added_obj_attr in added_obj_attrs:
             new_obj = added_obj_attr.obj
             self.import_object(added_obj_attr.obj)
-            pos, orn = added_obj_attr.pos, added_obj_attr.orn
-            new_obj.set_position_orientation(position=pos, orientation=orn)
+            new_obj.set_position_orientation(position=added_obj_attr.pos, orientation=added_obj_attr.orn)
+            if isinstance(new_obj, DatasetObject):
+                new_obj.set_bbox_center_position_orientation(position=added_obj_attr.bb_pos, orientation=added_obj_attr.bb_orn)
 
     def reset_scene(self):
         """
