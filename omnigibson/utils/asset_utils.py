@@ -176,7 +176,7 @@ def get_object_models_of_category(category_name, filter_method=None):
                 models.append(model_name)
         else:
             raise Exception("Unknown filter method: {}".format(filter_method))
-    return models
+    return sorted(models)
 
 
 def get_all_object_categories():
@@ -189,8 +189,8 @@ def get_all_object_categories():
     og_dataset_path = og.og_dataset_path
     og_categories_path = os.path.join(og_dataset_path, "objects")
 
-    categories = sorted([f for f in os.listdir(og_categories_path) if not folder_is_hidden(f)])
-    return categories
+    categories =[f for f in os.listdir(og_categories_path) if not folder_is_hidden(f)]
+    return sorted(categories)
 
 
 def get_all_object_models():
@@ -212,7 +212,7 @@ def get_all_object_models():
             item for item in category_models if os.path.isdir(os.path.join(og_categories_path, category, item))
         ]
         models.extend([os.path.join(og_categories_path, category, item) for item in category_models])
-    return models
+    return sorted(models)
 
 
 def get_og_assets_version():

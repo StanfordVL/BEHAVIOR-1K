@@ -111,7 +111,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     env.step(np.array([]))
 
     # Move the object so that its center is at [0, 0, 1]
-    center_offset = obj.aabb_center - obj.get_position() + np.array([0, 0, 1.0])
+    center_offset = obj.get_position() - obj.aabb_center + np.array([0, 0, 1.0])
     obj.set_position(center_offset)
 
     # Allow the user to easily move the camera around
@@ -132,6 +132,9 @@ def main(random_selection=False, headless=False, short_exec=False):
             obj.keep_still()
         obj.set_position_orientation(position=pos, orientation=quat)
         env.step(np.array([]))
+
+    # Shut down at the end
+    og.shutdown()
 
 
 if __name__ == "__main__":
