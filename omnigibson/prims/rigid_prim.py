@@ -1,3 +1,4 @@
+import trimesh.triangles
 from omni.isaac.core.utils.prims import get_prim_at_path, get_prim_parent
 from omni.isaac.core.utils.transformations import tf_matrix_from_pose
 from omni.isaac.core.utils.rotations import gf_quat_to_np_array
@@ -422,7 +423,14 @@ class RigidPrim(XFormPrim):
             if mesh_type == "Mesh":
                 # We construct a trimesh object from this mesh in order to infer its volume
                 trimesh_mesh = mesh_prim_to_trimesh_mesh(mesh)
-                mesh_volume = trimesh_mesh.volume if trimesh_mesh.is_volume else trimesh_mesh.convex_hull.volume
+                if trimesh_mesh.is_volume:
+                    mesh_volume = trimesh_mesh.volume
+                elif trimesh.triangles.all_coplanar(trimesh_mesh.triangles):
+                    # The mesh is a plane, so we can't make a convex hull -- return 0 volume
+                    mesh_volume = 0.0
+                else:
+                    # Fallback to convex hull approximation
+                    mesh_volume = trimesh_mesh.convex_hull.volume
             elif mesh_type == "Sphere":
                 mesh_volume = 4 / 3 * np.pi * (mesh.GetAttribute("radius").Get() ** 3)
             elif mesh_type == "Cube":
