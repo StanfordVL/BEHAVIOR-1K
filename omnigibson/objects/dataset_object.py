@@ -268,12 +268,8 @@ class DatasetObject(USDObject):
             if self._prim_type == PrimType.RIGID:
                 density = mass / self.volume
                 for link in self._links.values():
-                    if bool(link.prim.GetAttribute("ig:is_metalink").Get()):
-                        # This is a metalink; we set a negligible value
-                        link.mass = 1e-6
-                        link.density = 0.0
-                    else:
-                        # Otherwise overwrite the original, inaccurate mass value
+                    # If we're not a metalink, overwrite the original, inaccurate mass value
+                    if not bool(link.prim.GetAttribute("ig:is_metalink").Get()):
                         link.mass = 0.0
                         link.density = density
 
@@ -283,12 +279,14 @@ class DatasetObject(USDObject):
                 self._links["base_link"].mass = mass
 
         # Lastly, after post loading (which includes loading / registering the links internally)
-        # check for any metalinks. If there are any, we disable gravity and collisions for them
+        # check for any metalinks. If there are any, we disable gravity and collisions for them, and also reduce
+        # their density and mass
         for link in self._links.values():
-            is_metalink = link.prim.GetAttribute("ig:is_metalink").Get() or False
-            if is_metalink:
-                # Make sure this link is only visual (i.e.: no collisions or gravity enabled)
+            if bool(link.prim.GetAttribute("ig:is_metalink").Get()):
+                # Make sure this link is only visual (i.e.: no collisions or gravity enabled), and also set small mass
                 link.visual_only = True
+                link.mass = 1e-6
+                link.density = 0.0
 
     def _update_texture_change(self, object_state):
         """
