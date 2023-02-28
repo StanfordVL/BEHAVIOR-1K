@@ -1,5 +1,3 @@
-import logging
-
 import numpy as np
 
 import omnigibson as og
@@ -11,7 +9,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     Robot demo
     Loads all robots in an empty scene, generate random actions
     """
-    logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
+    og.log.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
     # Create empty scene with no robots in it initially
     cfg = {
         "scene": {
@@ -40,8 +38,8 @@ def main(random_selection=False, headless=False, short_exec=False):
         robot.keep_still()
 
         # Log information
-        logging.info(f"Loaded {robot_name}")
-        logging.info(f"Moving {robot_name}")
+        og.log.info(f"Loaded {robot_name}")
+        og.log.info(f"Moving {robot_name}")
 
         if not headless:
             # Set viewer in front facing robot

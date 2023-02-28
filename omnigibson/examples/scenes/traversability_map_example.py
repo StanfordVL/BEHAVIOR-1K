@@ -1,4 +1,3 @@
-import logging
 import os
 
 import cv2
@@ -6,6 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
 
+import omnigibson as og
 from omnigibson.utils.asset_utils import get_og_scene_path, get_available_og_scenes
 from omnigibson.utils.ui_utils import choose_from_options
 
@@ -16,7 +16,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     Loads the floor plan and obstacles for the requested scene, and overlays them in a visual figure such that the
     highlighted area reflects the traversable (free-space) area
     """
-    logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
+    og.log.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
 
     scenes = get_available_og_scenes()
     scene_model = choose_from_options(options=scenes, name="scene model", random_selection=random_selection)

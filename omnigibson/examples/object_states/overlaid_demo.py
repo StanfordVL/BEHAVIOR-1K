@@ -1,7 +1,6 @@
 from omnigibson.utils.constants import PrimType
 from omnigibson.object_states import Overlaid
 from omnigibson.macros import gm
-import logging
 
 import omnigibson as og
 
@@ -17,7 +16,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     Loads a carpet on top of a table. Initially Overlaid will be True because the carpet largely covers the table.
     If you drag the carpet off the table or even just fold it into half, Overlaid will become False.
     """
-    logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
+    og.log.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
 
     # Create the scene config to load -- empty scene + custom cloth object + custom rigid object
     cfg = {

@@ -1,4 +1,3 @@
-import logging
 from abc import ABC, abstractmethod
 from pxr import Gf, Usd, UsdGeom, UsdShade
 from omni.isaac.core.utils.prims import (
@@ -13,6 +12,10 @@ from omni.isaac.core.utils.prims import (
 from omni.isaac.core.utils.prims import delete_prim
 from omnigibson.utils.python_utils import Serializable, UniquelyNamed, Recreatable
 from omnigibson.utils.sim_utils import check_deletable_prim
+from omnigibson.utils.ui_utils import create_module_logger
+
+# Create module logger
+log = create_module_logger(module_name=__name__)
 
 
 class BasePrim(Serializable, UniquelyNamed, Recreatable, ABC):
@@ -53,7 +56,7 @@ class BasePrim(Serializable, UniquelyNamed, Recreatable, ABC):
 
         # Run some post-loading steps if this prim has already been loaded
         if is_prim_path_valid(prim_path=self._prim_path):
-            logging.debug(f"prim {name} already exists, skipping load")
+            log.debug(f"prim {name} already exists, skipping load")
             self._prim = get_prim_at_path(prim_path=self._prim_path)
             self._loaded = True
             # Run post load.

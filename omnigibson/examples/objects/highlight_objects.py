@@ -1,7 +1,6 @@
 """
 Generate example top-down segmentation map via renderer
 """
-import logging
 import numpy as np
 import omnigibson as og
 
@@ -12,7 +11,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     It also demonstrates how to apply an action on all instances of objects of a given category
     ONLY WORKS WITH OPTIMIZED RENDERING (not on Mac)
     """
-    logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
+    og.log.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
 
     # Create the scene config to load -- empty scene
     cfg = {
@@ -36,7 +35,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         env.step(np.array([]))
         if i % 50 == 0:
             highlighted = not highlighted
-            logging.info(f"Toggling window highlight to: {highlighted}")
+            og.log.info(f"Toggling window highlight to: {highlighted}")
             for window in windows:
                 # Note that this property is R/W!
                 window.highlighted = highlighted

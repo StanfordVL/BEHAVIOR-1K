@@ -1,4 +1,3 @@
-import logging
 import numpy as np
 
 import omnigibson as og
@@ -18,7 +17,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     Loads an empty scene with a sink, a dusty table and a dirty and stained bowl, and a cleaning tool
     If everything is cleaned, or after N steps, the scene resets to the initial state
     """
-    logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
+    og.log.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
 
     # Create the scene config to load -- empty scene
     cfg = {
@@ -133,14 +132,14 @@ def main(random_selection=False, headless=False, short_exec=False):
             ):
                 steps += 1
                 env.step(np.array([]))
-                logging.info(f"Step {steps}")
+                og.log.info(f"Step {steps}")
 
             if not desk.states[object_states.Covered].get_value(DustSystem):
-                logging.info("Reset because Table cleaned")
+                og.log.info("Reset because Table cleaned")
             elif not bowl.states[object_states.Covered].get_value(StainSystem):
-                logging.info("Reset because Bowl cleaned")
+                og.log.info("Reset because Bowl cleaned")
             else:
-                logging.info("Reset because max steps")
+                og.log.info("Reset because max steps")
 
             # Reset to the initial state
             og.sim.load_state(initial_state)

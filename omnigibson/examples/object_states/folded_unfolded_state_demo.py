@@ -1,7 +1,6 @@
 from omnigibson.utils.constants import PrimType
 from omnigibson.object_states import Folded, Unfolded
 from omnigibson.macros import gm
-import logging
 
 import omnigibson as og
 
@@ -14,7 +13,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     """
     Demo of cloth objects that can potentially be folded.
     """
-    logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
+    og.log.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
 
     # Create the scene config to load -- empty scene + custom cloth object
     cfg = {

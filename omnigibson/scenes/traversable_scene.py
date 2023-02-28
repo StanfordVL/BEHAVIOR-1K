@@ -1,7 +1,9 @@
-import logging
-
 from omnigibson.scenes.scene_base import Scene
 from omnigibson.maps.traversable_map import TraversableMap
+from omnigibson.utils.ui_utils import create_module_logger
+
+# Create module logger
+log = create_module_logger(module_name=__name__)
 
 
 class TraversableScene(Scene):
@@ -40,7 +42,7 @@ class TraversableScene(Scene):
             floor_plane_color (3-array): if @floor_plane_visible is True, this determines the (R,G,B) color assigned
                 to the generated floor plane
         """
-        logging.info("TraversableScene model: {}".format(scene_model))
+        log.info("TraversableScene model: {}".format(scene_model))
         self.scene_model = scene_model
 
         # Create traversable map

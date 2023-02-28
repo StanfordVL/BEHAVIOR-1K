@@ -5,13 +5,10 @@ This only serves as a starting point that users can further build upon.
 """
 
 import argparse
-import logging
 import os, time, cv2
 
 import omnigibson as og
 from omnigibson import example_config_path
-
-log = logging.getLogger(__name__)
 
 try:
     import gym
@@ -25,7 +22,7 @@ try:
     from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback, EvalCallback
 
 except ModuleNotFoundError:
-    log.error("stable-baselines3 is not installed. You would need to do: pip install stable-baselines3")
+    og.log.error("stable-baselines3 is not installed. You would need to do: pip install stable-baselines3")
     exit(1)
 
 
@@ -150,7 +147,7 @@ def main():
         print("Starting evaluation...")
         mean_reward, std_reward = evaluate_policy(model, env, n_eval_episodes=50)
         print("Finished evaluation!")
-        log.info(f"Mean reward: {mean_reward} +/- {std_reward:.2f}")
+        og.log.info(f"Mean reward: {mean_reward} +/- {std_reward:.2f}")
 
     else:
         model = PPO(
@@ -164,7 +161,7 @@ def main():
             device='cuda',
         )
         checkpoint_callback = CheckpointCallback(save_freq=1000, save_path=tensorboard_log_dir, name_prefix=prefix)
-        log.debug(model.policy)
+        og.log.debug(model.policy)
         print(model)
 
         print("Starting training...")

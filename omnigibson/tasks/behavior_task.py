@@ -1,4 +1,3 @@
-import logging
 import os
 import numpy as np
 
@@ -37,6 +36,10 @@ from omnigibson.utils.constants import (
 )
 from omnigibson.utils.python_utils import classproperty, assert_valid_key
 from omnigibson.systems.system_base import get_system_from_element_name
+from omnigibson.utils.ui_utils import create_module_logger
+
+# Create module logger
+log = create_module_logger(module_name=__name__)
 
 
 class BehaviorTask(BaseTask):
@@ -510,22 +513,22 @@ class BehaviorTask(BaseTask):
         """
         error_msg = self.parse_non_sampleable_object_room_assignment(env)
         if error_msg:
-            logging.warning(error_msg)
+            log.warning(error_msg)
             return False, error_msg
 
         error_msg = self.build_sampling_order(env)
         if error_msg:
-            logging.warning(error_msg)
+            log.warning(error_msg)
             return False, error_msg
 
         error_msg = self.build_non_sampleable_object_scope(env)
         if error_msg:
-            logging.warning(error_msg)
+            log.warning(error_msg)
             return False, error_msg
 
         error_msg = self.import_sampleable_objects(env)
         if error_msg:
-            logging.warning(error_msg)
+            log.warning(error_msg)
             return False, error_msg
 
         self.object_scope["agent.n.01_1"] = self.get_agent(env)
@@ -563,9 +566,9 @@ class BehaviorTask(BaseTask):
                 matched_sim_obj = get_system_from_element_name(
                     SYSTEM_SYNSETS_TO_SYSTEM_NAMES[self.object_instance_to_category[obj_inst]])
             else:
-                logging.info(f"checking objects...")
+                log.info(f"checking objects...")
                 for sim_obj in og.sim.scene.objects:
-                    logging.info(f"checking bddl obj scope for obj: {sim_obj.name}")
+                    log.info(f"checking bddl obj scope for obj: {sim_obj.name}")
                     if hasattr(sim_obj, "bddl_object_scope") and sim_obj.bddl_object_scope == obj_inst:
                         matched_sim_obj = sim_obj
                         break
@@ -585,7 +588,7 @@ class BehaviorTask(BaseTask):
                 - bool: Whether this evaluated condition is positive or negative
         """
         if not isinstance(condition.children[0], Negation) and not isinstance(condition.children[0], AtomicFormula):
-            logging.warning(("Skipping over sampling of predicate that is not a negation or an atomic formula"))
+            log.warning(("Skipping over sampling of predicate that is not a negation or an atomic formula"))
             return None, None
 
         if isinstance(condition.children[0], Negation):
@@ -687,7 +690,7 @@ class BehaviorTask(BaseTask):
                                         str(success),
                                     ]
                                 )
-                                logging.warning(log_msg)
+                                log.warning(log_msg)
 
                                 # If any condition fails for this candidate object, skip
                                 if not success:
@@ -769,23 +772,23 @@ class BehaviorTask(BaseTask):
                     obj_inst_to_obj_per_room_inst[obj_inst] = filtered_object_scope[room_type][obj_inst][room_inst]
                 top_nodes = []
                 log_msg = "MBM for room instance [{}]".format(room_inst)
-                logging.warning((log_msg))
+                log.warning((log_msg))
                 for obj_inst in obj_inst_to_obj_per_room_inst:
                     for obj in obj_inst_to_obj_per_room_inst[obj_inst]:
                         # Create an edge between obj instance and each of the simulator obj that supports sampling
                         graph.add_edge(obj_inst, obj)
                         log_msg = "Adding edge: {} <-> {}".format(obj_inst, obj.name)
-                        logging.warning((log_msg))
+                        log.warning((log_msg))
                         top_nodes.append(obj_inst)
                 # Need to provide top_nodes that contain all nodes in one bipartite node set
                 # The matches will have two items for each match (e.g. A -> B, B -> A)
                 matches = nx.bipartite.maximum_matching(graph, top_nodes=top_nodes)
                 if len(matches) == 2 * len(obj_inst_to_obj_per_room_inst):
-                    logging.warning(("Object scope finalized:"))
+                    log.warning(("Object scope finalized:"))
                     for obj_inst, obj in matches.items():
                         if obj_inst in obj_inst_to_obj_per_room_inst:
                             self.object_scope[obj_inst] = obj
-                            logging.warning((obj_inst, obj.name))
+                            log.warning((obj_inst, obj.name))
                     success = True
                     break
             if not success:
@@ -833,7 +836,7 @@ class BehaviorTask(BaseTask):
             None or str: If successful, returns None. Otherwise, returns an error message
         """
         np.random.shuffle(self.ground_goal_state_options)
-        logging.warning(("number of ground_goal_state_options", len(self.ground_goal_state_options)))
+        log.warning(("number of ground_goal_state_options", len(self.ground_goal_state_options)))
         num_goal_condition_set_to_test = 10
 
         goal_condition_success = False
@@ -932,23 +935,23 @@ class BehaviorTask(BaseTask):
 
         error_msg = self.group_initial_conditions()
         if error_msg:
-            logging.warning(error_msg)
+            log.warning(error_msg)
             return False, error_msg
 
         error_msg = self.sample_initial_conditions()
         if error_msg:
-            logging.warning(error_msg)
+            log.warning(error_msg)
             return False, error_msg
 
         if validate_goal:
             error_msg = self.sample_goal_conditions()
             if error_msg:
-                logging.warning(error_msg)
+                log.warning(error_msg)
                 return False, error_msg
 
         error_msg = self.sample_initial_conditions_final()
         if error_msg:
-            logging.warning(error_msg)
+            log.warning(error_msg)
             return False, error_msg
 
         return True, None

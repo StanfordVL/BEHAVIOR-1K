@@ -1,4 +1,3 @@
-import logging
 import numpy as np
 
 import omnigibson as og
@@ -8,6 +7,10 @@ from omnigibson.tasks.point_navigation_task import PointNavigationTask
 from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.sim_utils import land_object, test_valid_pose
 import omnigibson.utils.transform_utils as T
+from omnigibson.utils.ui_utils import create_module_logger
+
+# Create module logger
+log = create_module_logger(module_name=__name__)
 
 
 class PointNavigationObstacleTask(PointNavigationTask):
@@ -129,7 +132,7 @@ class PointNavigationObstacleTask(PointNavigationTask):
                     break
 
             if not success:
-                logging.warning("WARNING: Failed to reset interactive obj without collision")
+                log.warning("WARNING: Failed to reset interactive obj without collision")
 
             land_object(obj, pos, ori, env.initial_pos_z_offset)
 

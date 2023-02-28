@@ -1,4 +1,3 @@
-import logging
 import os
 import matplotlib.pyplot as plt
 import omni
@@ -16,6 +15,10 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.utils.usd_utils import FlatcacheAPI
 from omnigibson.prims.geom_prim import VisualGeomPrim
 import numpy as np
+from omnigibson.utils.ui_utils import create_module_logger
+
+# Create module logger
+log = create_module_logger(module_name=__name__)
 
 
 class MacroParticleSystem(BaseParticleSystem):
@@ -800,7 +803,7 @@ class VisualParticleSystem(MacroParticleSystem):
         for name in common_groups:
             info = name_to_info_mapping[name]
             if cls.num_group_particles(group=name) != info["n_particles"]:
-                logging.debug(f"Got mismatch in particle group {name} when syncing, "
+                log.debug(f"Got mismatch in particle group {name} when syncing, "
                                 f"deleting and recreating group now.")
                 # Add this group to both the delete and creation pile
                 groups_to_delete.add(name)
@@ -976,7 +979,7 @@ class VisualParticleSystem(MacroParticleSystem):
                 particle_attached_link_names=[group_obj_id2link[int(idn)] for idn in state[idx + 2 + n_particles : idx + 2 + n_particles * 2]],
             )
             idx += 2 + n_particles * 2
-        logging.debug(f"Syncing {cls.name} particles with {n_groups} groups..")
+        log.debug(f"Syncing {cls.name} particles with {n_groups} groups..")
         cls._sync_particle_groups(
             group_objects=group_objs,
             particle_idns=[group_info["particle_idns"] for group_info in groups_dict.values()],

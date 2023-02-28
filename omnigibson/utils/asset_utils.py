@@ -1,6 +1,5 @@
 import argparse
 import json
-import logging
 import os
 import subprocess
 import tempfile
@@ -10,10 +9,14 @@ from collections import defaultdict
 import yaml
 
 import omnigibson as og
+from omnigibson.utils.ui_utils import create_module_logger
 
 if os.name == "nt":
     import win32api
     import win32con
+
+# Create module logger
+log = create_module_logger(module_name=__name__)
 
 
 def folder_is_hidden(p):
@@ -42,7 +45,7 @@ def get_og_avg_category_specs():
         with open(avg_obj_dim_file) as f:
             return json.load(f)
     else:
-        logging.warning(
+        log.warning(
             "Requested average specs of the object categories in the OmniGibson Dataset of objects, but the "
             "file cannot be found. Did you download the dataset? Returning an empty dictionary"
         )
@@ -108,7 +111,7 @@ def get_og_scene_path(scene_name):
     """
     og_dataset_path = og.og_dataset_path
     og_scenes_path = os.path.join(og_dataset_path, "scenes")
-    logging.info("Scene name: {}".format(scene_name))
+    log.info("Scene name: {}".format(scene_name))
     assert scene_name in os.listdir(og_scenes_path), "Scene {} does not exist".format(scene_name)
     return os.path.join(og_scenes_path, scene_name)
 
@@ -288,7 +291,7 @@ def download_assets():
         tmp_file = os.path.join(tempfile.gettempdir(), "og_assets.tar.gz")
         os.makedirs(og.assets_path, exist_ok=True)
         path = "https://storage.googleapis.com/gibson_scenes/og_assets.tar.gz"
-        logging.info(f"Downloading and decompressing demo OmniGibson assets from {path}")
+        log.info(f"Downloading and decompressing demo OmniGibson assets from {path}")
         assert subprocess.call(["wget", "-c", "--no-check-certificate", "--retry-connrefused", "--tries=5", "--timeout=5", path, "-O", tmp_file]) == 0, "Assets download failed."
         assert subprocess.call(["tar", "-zxf", tmp_file, "--strip-components=1", "--directory", og.assets_path]) == 0, "Assets extraction failed."
         # These datasets come as folders; in these folder there are scenes, so --strip-components are needed.
@@ -348,7 +351,7 @@ def download_og_dataset():
         tmp_file = os.path.join(tempfile.gettempdir(), "og_dataset.tar.gz")
         os.makedirs(og.og_dataset_path, exist_ok=True)
         path = "https://storage.googleapis.com/gibson_scenes/og_dataset.tar.gz"
-        logging.info(f"Downloading and decompressing demo OmniGibson dataset from {path}")
+        log.info(f"Downloading and decompressing demo OmniGibson dataset from {path}")
         assert subprocess.call(["wget", "-c", "--no-check-certificate", "--retry-connrefused", "--tries=5", "--timeout=5", path, "-O", tmp_file]) == 0, "Dataset download failed."
         assert subprocess.call(["tar", "-zxf", tmp_file, "--strip-components=1", "--directory", og.og_dataset_path]) == 0, "Dataset extraction failed."
         # These datasets come as folders; in these folder there are scenes, so --strip-components are needed.

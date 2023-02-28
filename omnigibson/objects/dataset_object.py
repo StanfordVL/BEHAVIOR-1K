@@ -1,5 +1,4 @@
 import itertools
-import logging
 import math
 import os
 import tempfile
@@ -19,6 +18,10 @@ from omnigibson.utils.usd_utils import BoundingBoxAPI
 from omnigibson.utils.asset_utils import decrypt_file
 from omnigibson.utils.constants import PrimType
 from omnigibson.macros import gm, create_module_macros
+from omnigibson.utils.ui_utils import create_module_logger
+
+# Create module logger
+log = create_module_logger(module_name=__name__)
 
 
 # Create settings for this module
@@ -531,7 +534,7 @@ class DatasetObject(USDObject):
                 # If a visual bounding box does not exist in the dictionary, try switching to collision.
                 # We expect that every link has its collision bb annotated (or set to None if none exists).
                 if bbox_type == "visual" and "visual" not in self.native_link_bboxes[link_name]:
-                    logging.debug(
+                    log.debug(
                         "Falling back to collision bbox for object %s link %s since no visual bbox exists.",
                         self.name,
                         link_name,

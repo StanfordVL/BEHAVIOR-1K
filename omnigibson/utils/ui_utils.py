@@ -112,7 +112,7 @@ class KeyboardEventHandler:
 
 
 @contextlib.contextmanager
-def suppress_logging(channels):
+def suppress_omni_log(channels):
     """
     A context scope for temporarily suppressing logging for certain omni channels.
 
@@ -136,6 +136,41 @@ def suppress_logging(channels):
     # Unsuppress the channels
     for channel in channels:
         log.set_channel_enabled(channel, True, channel_behavior[channel])
+
+
+@contextlib.contextmanager
+def suppress_loggers(logger_names):
+    """
+    A context scope for temporarily suppressing logging for certain omni channels.
+
+    Args:
+        logger_names (list of str): Logger name(s) whose corresponding loggers should be suppressed
+    """
+    # Store prior states so we can restore them after this context exits
+    logger_levels = {logging.getLogger(name).getEffectiveLevel() for name in logger_names}
+
+    # Suppress the loggers (only output fatal messages)
+    for name in logger_names:
+        logging.getLogger(name).setLevel(logging.FATAL)
+
+    yield
+
+    # Unsuppress the loggers
+    for name in logger_names:
+        logging.getLogger(name).setLevel(logger_levels[name])
+
+
+def create_module_logger(module_name):
+    """
+    Creates and returns a logger for logging statements from the module represented by @module_name
+
+    Args:
+    module_name (str): Module to create the logger for. Should be the module's `__name__` variable
+
+    Returns:
+        Logger: Created logger for the module
+    """
+    return logging.getLogger(module_name)
 
 
 def disclaimer(msg):
@@ -271,7 +306,7 @@ class CameraMover:
             fpath (None or str): If specified, the absolute fpath to the image save location. Default is located in
                 self.save_dir
         """
-        logging.info("Recording image...")
+        og.log.info("Recording image...")
 
         # Use default fpath if not specified
         if fpath is None:
@@ -281,7 +316,7 @@ class CameraMover:
         # Make sure save path directory exists, and then save the image to that location
         Path(Path(fpath).parent).mkdir(parents=True, exist_ok=True)
         Image.fromarray(self.get_image()).save(fpath)
-        logging.info(f"Saved current viewer camera image to {fpath}.")
+        og.log.info(f"Saved current viewer camera image to {fpath}.")
 
     def record_trajectory(self, poses, fps, steps_per_frame=1, fpath=None):
         """
@@ -297,7 +332,7 @@ class CameraMover:
             fpath (None or str): If specified, the absolute fpath to the video save location. Default is located in
                 self.save_dir
         """
-        logging.info("Recording trajectory...")
+        og.log.info("Recording trajectory...")
 
         # Use default fpath if not specified
         if fpath is None:
@@ -317,7 +352,7 @@ class CameraMover:
 
         # Close writer
         video_writer.close()
-        logging.info(f"Saved camera trajectory video to {fpath}.")
+        og.log.info(f"Saved camera trajectory video to {fpath}.")
 
     def record_trajectory_from_waypoints(self, waypoints, per_step_distance, fps, steps_per_frame=1, fpath=None):
         """

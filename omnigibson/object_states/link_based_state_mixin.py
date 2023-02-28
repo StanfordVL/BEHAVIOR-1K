@@ -1,5 +1,8 @@
 import numpy as np
-import logging
+from omnigibson.utils.ui_utils import create_module_logger
+
+# Create module logger
+log = create_module_logger(module_name=__name__)
 
 
 class LinkBasedStateMixin:
@@ -21,7 +24,7 @@ class LinkBasedStateMixin:
             self.link = self.obj.links[self.get_state_link_name()]
         except KeyError:
             # Metalink not found, so we failed to initialize, so we assume this is a "dead" linkbasedstatemixin
-            logging.warning(f"Warning: failed to initialize LinkBasedStateMixin {self.__class__.__name__} for object {self.obj.name}, no metalink"
+            log.warning(f"Warning: failed to initialize LinkBasedStateMixin {self.__class__.__name__} for object {self.obj.name}, no metalink"
                             f"with name {self.get_state_link_name()} found!")
             return False
 

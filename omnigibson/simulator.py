@@ -1,6 +1,5 @@
 from collections import defaultdict
 import itertools
-import logging
 import contextlib
 import os
 from pathlib import Path
@@ -25,7 +24,7 @@ from omnigibson.utils.constants import LightingMode
 from omnigibson.utils.config_utils import NumpyEncoder
 from omnigibson.utils.python_utils import clear as clear_pu, create_object_from_init_info, Serializable
 from omnigibson.utils.usd_utils import clear as clear_uu, BoundingBoxAPI, FlatcacheAPI
-from omnigibson.utils.ui_utils import CameraMover, disclaimer
+from omnigibson.utils.ui_utils import CameraMover, disclaimer, create_module_logger
 from omnigibson.scenes import Scene
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.objects.stateful_object import StatefulObject
@@ -36,6 +35,8 @@ from omnigibson.object_states.update_state_mixin import UpdateStateMixin
 from omnigibson.sensors.vision_sensor import VisionSensor
 from omnigibson.transition_rules import DEFAULT_RULES
 
+# Create module logger
+log = create_module_logger(module_name=__name__)
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -307,6 +308,7 @@ class Simulator(SimulationContext, Serializable):
         # Need to one more step for particle systems to work
         self.step()
         self.stop()
+        log.info("Imported scene.")
 
     def initialize_object_on_next_sim_step(self, obj):
         """
@@ -779,7 +781,7 @@ class Simulator(SimulationContext, Serializable):
                 to recreate a scene.
         """
         if not json_path.endswith(".json"):
-            logging.error(f"You have to define the full json_path to load from. Got: {json_path}")
+            log.error(f"You have to define the full json_path to load from. Got: {json_path}")
             return
 
         # Clear the current stage
@@ -805,7 +807,7 @@ class Simulator(SimulationContext, Serializable):
         self.play()
         self.load_state(state, serialized=False)
 
-        logging.info("The saved simulation environment loaded.")
+        log.info("The saved simulation environment loaded.")
 
         return
 
@@ -823,13 +825,13 @@ class Simulator(SimulationContext, Serializable):
         # Make sure there are no objects in the initialization queue, if not, terminate early and notify user
         # Also run other sanity checks before saving
         if len(self._objects_to_initialize) > 0:
-            logging.error("There are still objects to initialize! Please take one additional sim step and then save.")
+            log.error("There are still objects to initialize! Please take one additional sim step and then save.")
             return
         if not self.scene:
-            logging.warning("Scene has not been loaded. Nothing to save.")
+            log.warning("Scene has not been loaded. Nothing to save.")
             return
         if not json_path.endswith(".json"):
-            logging.error(f"You have to define the full json_path to save the scene to. Got: {json_path}")
+            log.error(f"You have to define the full json_path to save the scene to. Got: {json_path}")
             return
 
         # Update scene info
@@ -847,7 +849,7 @@ class Simulator(SimulationContext, Serializable):
         with open(json_path, "w+") as f:
             json.dump(scene_info, f, cls=NumpyEncoder, indent=4)
 
-        logging.info("The current simulation environment saved.")
+        log.info("The current simulation environment saved.")
 
         return
 
@@ -869,7 +871,7 @@ class Simulator(SimulationContext, Serializable):
         """
         # Stop the physics if we're playing
         if not self.is_stopped():
-            logging.warning("Stopping simulation in order to load stage.")
+            log.warning("Stopping simulation in order to load stage.")
             self.stop()
 
         # Store physics dt and rendering dt to reuse later

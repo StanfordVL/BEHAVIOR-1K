@@ -1,7 +1,6 @@
 from abc import abstractmethod
 from copy import deepcopy
 import numpy as np
-import logging
 import gym
 from collections import Iterable
 from omnigibson.objects.object_base import BaseObject
@@ -9,6 +8,10 @@ from omnigibson.controllers import create_controller
 from omnigibson.controllers.controller_base import ControlType
 from omnigibson.utils.python_utils import assert_valid_key, merge_nested_dicts
 from omnigibson.utils.constants import PrimType
+from omnigibson.utils.ui_utils import create_module_logger
+
+# Create module logger
+log = create_module_logger(module_name=__name__)
 
 
 class ControllableObject(BaseObject):
@@ -136,7 +139,7 @@ class ControllableObject(BaseObject):
         # Set the control frequency if one was not provided.
         expected_control_freq = 1.0 / simulator.get_rendering_dt()
         if self._control_freq is None:
-            logging.info(
+            log.info(
                 "Control frequency is None - being set to default of 1 / render_timestep: %.4f", expected_control_freq
             )
             self._control_freq = expected_control_freq

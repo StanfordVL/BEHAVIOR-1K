@@ -1,4 +1,3 @@
-import logging
 import numpy as np
 from omnigibson.objects.stateful_object import StatefulObject
 from omnigibson.utils.python_utils import assert_valid_key
@@ -8,6 +7,10 @@ from omnigibson.utils.constants import PrimType, PRIMITIVE_MESH_TYPES
 from omnigibson.utils.usd_utils import create_primitive_mesh
 from omnigibson.utils.render_utils import create_pbr_material
 from omnigibson.utils.physx_utils import bind_material
+from omnigibson.utils.ui_utils import create_module_logger
+
+# Create module logger
+log = create_module_logger(module_name=__name__)
 
 
 # Define valid objects that can be created
@@ -115,8 +118,6 @@ class PrimitiveObject(StatefulObject):
         )
 
     def _load(self, simulator=None):
-        logging.info(f"Loading the following primitive: {self._primitive_type}")
-
         # Define an Xform at the specified path
         stage = simulator.stage
         prim = stage.DefinePrim(self._prim_path, "Xform")
@@ -176,7 +177,7 @@ class PrimitiveObject(StatefulObject):
 
         # Possibly set scalings (only if the scale value is not set)
         if self._load_config["scale"] is not None:
-            logging.warning("Custom scale specified for primitive object, so ignoring radius, height, and size arguments!")
+            log.warning("Custom scale specified for primitive object, so ignoring radius, height, and size arguments!")
         else:
             if self._load_config["radius"] is not None:
                 self.radius = self._load_config["radius"]

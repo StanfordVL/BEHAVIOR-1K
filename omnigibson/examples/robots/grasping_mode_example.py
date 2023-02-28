@@ -1,8 +1,6 @@
 """
 Example script demo'ing robot manipulation control with grasping.
 """
-import logging
-
 import numpy as np
 
 import omnigibson as og
@@ -24,7 +22,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     Robot grasping mode demo with selection
     Queries the user to select a type of grasping mode and GUI
     """
-    logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
+    og.log.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
 
     # Choose type of grasping
     grasping_mode = choose_from_options(options=GRASPING_MODES, name="grasping mode", random_selection=random_selection)

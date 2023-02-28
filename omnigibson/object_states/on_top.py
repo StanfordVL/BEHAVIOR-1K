@@ -1,6 +1,6 @@
 from IPython import embed
 
-import omnigibson
+import omnigibson as og
 from omnigibson.object_states.kinematics import KinematicsMixin
 from omnigibson.object_states.adjacency import VerticalAdjacency
 from omnigibson.object_states.object_state_base import BooleanState, RelativeObjectState
@@ -26,7 +26,7 @@ class OnTop(KinematicsMixin, RelativeObjectState, BooleanState):
             if sampling_success:
                 if self.get_value(other) != new_value:
                     sampling_success = False
-                if omnigibson.debug_sampling:
+                if og.debug_sampling:
                     print("OnTop checking", sampling_success)
                     embed()
             if sampling_success:

@@ -1,5 +1,4 @@
 from abc import ABCMeta
-import logging
 
 from omnigibson.macros import create_module_macros
 from omnigibson.utils.constants import (
@@ -12,11 +11,15 @@ from omnigibson.utils.usd_utils import create_joint, CollisionAPI
 from omnigibson.prims.entity_prim import EntityPrim
 from omnigibson.utils.python_utils import Registerable, classproperty
 from omnigibson.utils.constants import PrimType, CLASS_NAME_TO_CLASS_ID
+from omnigibson.utils.ui_utils import create_module_logger
 
 from omni.isaac.core.utils.semantics import add_update_semantics
 
 # Global dicts that will contain mappings
 REGISTERED_OBJECTS = dict()
+
+# Create module logger
+log = create_module_logger(module_name=__name__)
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -80,8 +83,6 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         assert len(str(self.uuid)) <= 8, f"UUID for this object must be at max 8-digits, got: {self.uuid}"
         self.category = category
         self.fixed_base = fixed_base
-
-        logging.info(f"Category: {self.category}")
 
         # This sets the collision group of the object. In omnigibson, objects are only permitted to be part of a single
         # collision group, e.g. collisions are only enabled within a single group

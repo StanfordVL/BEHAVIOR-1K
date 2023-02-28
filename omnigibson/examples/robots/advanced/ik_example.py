@@ -22,7 +22,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     without explicitly utilizing all of OmniGibson's class abstractions, and also showcases how to manipulate
     the simulator at a lower-level than the main Environment entry point.
     """
-    logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
+    log.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
 
     # Assuming that if random_selection=True, headless=True, short_exec=True, we are calling it from tests and we
     # do not want to parse args (it would fail because the calling function is pytest "testfile.py")
@@ -89,7 +89,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Define a helper function for executing specific end-effector commands using the ik solver
     def execute_ik(pos, quat=None, max_iter=100):
-        logging.info("Querying joint configuration to current marker position")
+        log.info("Querying joint configuration to current marker position")
         # Grab the joint positions in order to reach the desired pose target
         joint_pos = ik_solver.solve(
             target_pos=pos,
@@ -97,10 +97,10 @@ def main(random_selection=False, headless=False, short_exec=False):
             max_iterations=max_iter,
         )
         if joint_pos is not None:
-            logging.info("Solution found. Setting new arm configuration.")
+            log.info("Solution found. Setting new arm configuration.")
             robot.set_joint_positions(joint_pos, indices=control_idx, target=True)
         else:
-            logging.info("EE position not reachable.")
+            log.info("EE position not reachable.")
         og.sim.step()
 
     if programmatic_pos or headless:
@@ -139,7 +139,7 @@ def main(random_selection=False, headless=False, short_exec=False):
                     execute_ik(pos=command)
                 elif event.input == carb.input.KeyboardInput.ESCAPE:
                     # Quit
-                    logging.info("Quit.")
+                    log.info("Quit.")
                     exit_now = True
                 else:
                     # We see if we received a valid delta command, and if so, we update our command and visualized

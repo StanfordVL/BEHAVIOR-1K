@@ -1,4 +1,3 @@
-import logging
 import sys
 from collections import defaultdict
 
@@ -28,6 +27,10 @@ from omnigibson.utils.constants import PrimType, EmitterType
 from omnigibson.utils.usd_utils import BoundingBoxAPI
 from omnigibson.utils.python_utils import classproperty
 from omnigibson.object_states import Saturated
+from omnigibson.utils.ui_utils import create_module_logger
+
+# Create module logger
+log = create_module_logger(module_name=__name__)
 
 
 # Optionally import bddl for object taxonomy.
@@ -469,7 +472,7 @@ class StatefulObject(BaseObject):
                 if state_name in state["non_kin"]:
                     state_instance.load_state(state=state["non_kin"][state_name], serialized=False)
                 else:
-                    logging.warning("Missing object state [{}] in the state dump".format(state_name))
+                    log.warning("Missing object state [{}] in the state dump".format(state_name))
 
     def _serialize(self, state):
         # Call super method first

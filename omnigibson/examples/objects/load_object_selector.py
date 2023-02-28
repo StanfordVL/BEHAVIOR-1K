@@ -1,4 +1,3 @@
-import logging
 import numpy as np
 import omnigibson as og
 from omnigibson.utils.asset_utils import (
@@ -17,7 +16,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     The example also shows how to use the Environment API or directly the Simulator API, loading objects and robots
     and executing actions
     """
-    logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
+    og.log.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
     scene_options = ["Scene", "InteractiveTraversableScene"]
     scene_type = choose_from_options(options=scene_options, name="scene type", random_selection=random_selection)
 

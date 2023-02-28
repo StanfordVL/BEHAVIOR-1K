@@ -1,4 +1,3 @@
-import logging
 import numpy as np
 import omnigibson as og
 from omnigibson.object_states import Covered
@@ -32,7 +31,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     with particles to be removed. The ParticleApplier / ParticleRemover state is applied to an imported cloth object
     and allowed to interact with the table, applying / removing particles from the table.
     """
-    logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
+    og.log.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
 
     # Choose what configuration to load
     modifier_type = choose_from_options(
