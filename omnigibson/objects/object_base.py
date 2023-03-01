@@ -126,7 +126,19 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         self._simulator = simulator
 
         # Run super method ONLY if we're not loaded yet
-        return super().load(simulator=simulator) if not self.loaded else self._prim
+        if self.loaded:
+            prim = self._prim
+        else:
+            prim = super().load(simulator=simulator)
+            log.info(f"Loaded {self.name} at {self.prim_path}")
+        return prim
+
+    def remove(self, simulator=None):
+        # Run super first
+        super().remove(simulator=simulator)
+
+        # Notify user that the object was removed
+        log.info(f"Removed {self.name} from {self.prim_path}")
 
     def _post_load(self):
         # Run super first
@@ -142,6 +154,10 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             # is not an articulated object so we merely set this to be a static collider, i.e.: kinematic-only
             if self.n_joints == 0:
                 self.kinematic_only = True
+                # Also remove any articulation root API that this prim has
+                if self._prim.HasAPI(UsdPhysics.ArticulationRootAPI):
+                    self._prim.RemoveAPI(UsdPhysics.ArticulationRootAPI)
+                    self._prim.RemoveAPI(PhysxSchema.PhysxArticulationAPI)
             else:
                 # Create fixed joint, and set Body0 to be this object's root prim
                 create_joint(
