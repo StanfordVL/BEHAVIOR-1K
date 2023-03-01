@@ -125,8 +125,8 @@ class PrimitiveObject(StatefulObject):
         if self._prim_type == PrimType.RIGID:
             # Define a nested mesh corresponding to the root link for this prim
             base_link = stage.DefinePrim(f"{self._prim_path}/base_link", "Xform")
-            self._vis_geom = create_primitive_mesh(prim_path=f"{self._prim_path}/base_link/visual", primitive_type=self._primitive_type)
-            self._col_geom = create_primitive_mesh(prim_path=f"{self._prim_path}/base_link/collision", primitive_type=self._primitive_type)
+            self._vis_geom = create_primitive_mesh(prim_path=f"{self._prim_path}/base_link/visuals", primitive_type=self._primitive_type)
+            self._col_geom = create_primitive_mesh(prim_path=f"{self._prim_path}/base_link/collisions", primitive_type=self._primitive_type)
 
             # Add collision API to collision geom
             UsdPhysics.CollisionAPI.Apply(self._col_geom.GetPrim())
@@ -173,7 +173,7 @@ class PrimitiveObject(StatefulObject):
             col_approximation = "boundingCube"
         else:
             col_approximation = "convexHull"
-        self.root_link.collision_meshes["collision"].set_collision_approximation(col_approximation)
+        self.root_link.collision_meshes["collisions"].set_collision_approximation(col_approximation)
 
         # Possibly set scalings (only if the scale value is not set)
         if self._load_config["scale"] is not None:
