@@ -117,25 +117,33 @@ def suppress_omni_log(channels):
     A context scope for temporarily suppressing logging for certain omni channels.
 
     Args:
-        channels (list of str): Logging channel(s) to suppress
+        channels (None or list of str): Logging channel(s) to suppress. If None, will globally disable logger
     """
     # Record the state to restore to after the context exists
     log = omni.log.get_log()
 
-    # For some reason, all enabled states always return False even if the logging is clearly enabled for the
-    # given channel, so we assume all channels are enabled
-    # We do, however, check what behavior was assigned to this channel, since we force an override during this context
-    channel_behavior = {channel: log.get_channel_enabled(channel)[2] for channel in channels}
+    if channels is None:
+        # Globally disable log
+        log.enabled = False
+    else:
+        # For some reason, all enabled states always return False even if the logging is clearly enabled for the
+        # given channel, so we assume all channels are enabled
+        # We do, however, check what behavior was assigned to this channel, since we force an override during this context
+        channel_behavior = {channel: log.get_channel_enabled(channel)[2] for channel in channels}
 
-    # Suppress the channels
-    for channel in channels:
-        log.set_channel_enabled(channel, False, omni.log.SettingBehavior.OVERRIDE)
+        # Suppress the channels
+        for channel in channels:
+            log.set_channel_enabled(channel, False, omni.log.SettingBehavior.OVERRIDE)
 
     yield
 
-    # Unsuppress the channels
-    for channel in channels:
-        log.set_channel_enabled(channel, True, channel_behavior[channel])
+    if channels is None:
+        # Globallly re-enable log
+        log.enabled = True
+    else:
+        # Unsuppress the channels
+        for channel in channels:
+            log.set_channel_enabled(channel, True, channel_behavior[channel])
 
 
 @contextlib.contextmanager
@@ -147,7 +155,7 @@ def suppress_loggers(logger_names):
         logger_names (list of str): Logger name(s) whose corresponding loggers should be suppressed
     """
     # Store prior states so we can restore them after this context exits
-    logger_levels = {logging.getLogger(name).getEffectiveLevel() for name in logger_names}
+    logger_levels = {name: logging.getLogger(name).getEffectiveLevel() for name in logger_names}
 
     # Suppress the loggers (only output fatal messages)
     for name in logger_names:
