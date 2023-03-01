@@ -7,7 +7,7 @@ from omnigibson.sensors.sensor_base import BaseSensor
 from omnigibson.utils.constants import MAX_CLASS_COUNT, MAX_INSTANCE_COUNT, MAX_VIEWER_SIZE, VALID_OMNI_CHARS
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
 from omnigibson.utils.sim_utils import set_carb_setting
-from omnigibson.utils.ui_utils import dock_window
+from omnigibson.utils.ui_utils import dock_window, suppress_omni_log
 from omnigibson.utils.usd_utils import get_camera_params
 from omnigibson.utils.transform_utils import euler2quat, quat2euler
 
@@ -196,28 +196,26 @@ class VisionSensor(BaseSensor):
         # Initialize sensors
         self.initialize_sensors(names=self._modalities)
 
-    def initialize_sensors(self, names, timeout=10.0):
+    def initialize_sensors(self, names):
         """Initializes a raw sensor in the simulation.
 
         Args:
             names (str or list of str): Name of the raw sensor(s) to initialize.
                 If they are not part of self._RAW_SENSOR_TYPES' keys, we will simply pass over them
-            timeout (int): Maximum time in seconds to attempt to initialize sensors.
         """
         # Standardize the input and grab the intersection with all possible raw sensors
         names = set([names]) if isinstance(names, str) else set(names)
         names = names.intersection(set(self._RAW_SENSOR_TYPES.keys()))
 
-        # Record the start time so we know how long this takes
-        start = time.time()
-        is_initialized = False
-        sensors = []
-
         # Initialize sensors
+        sensors = []
         for name in names:
             sensors.append(sensors_util.create_or_retrieve_sensor(self._viewport.viewport_api, self._RAW_SENSOR_TYPES[name]))
-        render()
-        render() # Extra frame required to prevent access violation error
+
+        # Suppress syntheticdata warning here because we know the first render is invalid
+        with suppress_omni_log(channels=["omni.syntheticdata.plugin"]):
+            render()
+        render()    # Extra frame required to prevent access violation error
 
     def _get_obs(self):
         # Make sure we're initialized
