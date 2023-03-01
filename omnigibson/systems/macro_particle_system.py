@@ -54,6 +54,9 @@ class MacroParticleSystem(BaseParticleSystem):
         cls.max_scale = np.ones(3)
         cls.max_particle_idn = -1
 
+        # Create the system prim -- this is merely a scope prim
+        cls.simulator.stage.DefinePrim(f"/World/{cls.name}", "Scope")
+
         # Load the particle template
         particle_template = cls._create_particle_template()
         simulator.import_object(obj=particle_template, register=False, auto_initialize=True)
