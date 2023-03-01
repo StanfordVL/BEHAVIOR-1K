@@ -360,7 +360,7 @@ def land_object(obj, pos, quat=None, z_offset=None):
         land_success = check_collision(prims=obj)
         if land_success:
             # Once we're successful, we can break immediately
-            print(f"Landed object {obj.name} successfully!")
+            log.info(f"Landed object {obj.name} successfully!")
             break
 
     # Print out warning in case we failed to land the object successfully
