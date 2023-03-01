@@ -95,16 +95,19 @@ class RigidPrim(XFormPrim):
                 self._prim.HasAPI(PhysxSchema.PhysxContactReportAPI) else \
                 PhysxSchema.PhysxContactReportAPI.Apply(self._prim)
 
-        # Possibly set the mass / density
-        if "mass" in self._load_config and self._load_config["mass"] is not None:
-            self.mass = self._load_config["mass"]
-        if "density" in self._load_config and self._load_config["density"] is not None:
-            self.density = self._load_config["density"]
-
         # Store references to owned visual / collision meshes
         # We iterate over all children of this object's prim,
         # and grab any that are presumed to be meshes
         self.update_meshes()
+
+        # Possibly set the mass / density
+        if len(self._collision_meshes) == 0:
+            # We have no collision meshes, so set a negligible mass
+            self.mass = 1e-6
+        elif "mass" in self._load_config and self._load_config["mass"] is not None:
+            self.mass = self._load_config["mass"]
+        if "density" in self._load_config and self._load_config["density"] is not None:
+            self.density = self._load_config["density"]
 
         # Set the visual-only attribute
         # This automatically handles setting collisions / gravity appropriately
