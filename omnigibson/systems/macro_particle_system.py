@@ -98,6 +98,10 @@ class MacroParticleSystem(BaseParticleSystem):
         return f"{cls.name}Particle"
 
     @classproperty
+    def requires_gpu_dynamics(cls):
+        return False
+
+    @classproperty
     def state_size(cls):
         # We have max_particle_idn (1), n_particles (1), each particle pose (7*n), scale (3*n), and
         # possibly template pose (7), and template scale (3)

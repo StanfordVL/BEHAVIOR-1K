@@ -8,10 +8,14 @@ from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.python_utils import classproperty, Serializable, Registerable, Recreatable, \
     create_object_from_init_info
 from omnigibson.utils.registry_utils import SerializableRegistry
+from omnigibson.utils.ui_utils import suppress_loggers, create_module_logger
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.objects.stateful_object import StatefulObject
 from omnigibson.systems import SYSTEMS_REGISTRY
 from omnigibson.robots.robot_base import m as robot_macros
+
+# Create module logger
+log = create_module_logger(module_name=__name__)
 
 # Global dicts that will contain mappings
 REGISTERED_SCENES = dict()
@@ -116,7 +120,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             list of str: Keys with which to index into the object registry. These should be valid public attributes of
                 prims that we can use as unique IDs to reference prims, e.g., prim.prim_path, prim.name, prim.handle, etc.
         """
-        return ["name", "prim_path", "root_handle", "uuid"]
+        return ["name", "prim_path", "uuid"]
 
     @property
     def object_registry_group_keys(self):
@@ -233,15 +237,12 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             simulator.stop()
 
     def initialize_systems(self, simulator):
-        # Initialize registries
         for system in self.systems:
-            print(f"Initializing system: {system.name}")
             system.initialize(simulator=simulator)
 
     def clear_systems(self):
         # Clears systems so they can be re-initialized
         for system in self.systems:
-            print(f"Clearing system: {system.name}")
             system.clear()
 
     def clear(self):
@@ -266,9 +267,8 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         assert not self._initialized, "Scene can only be initialized once! (It is already initialized)"
         self._initialize()
 
-        # Grab relevant objects info and re-initialize object registry by handle since now handles are populated
+        # Grab relevant objects info
         self.update_objects_info()
-        self.object_registry.update(keys="root_handle")
         self.wake_scene_objects()
 
         self._initialized = True
@@ -298,8 +298,10 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             class_types=SerializableRegistry,
         )
 
-        # Add registry for systems -- this is already created externally, so we just pull it directly
-        registry.add(obj=SYSTEMS_REGISTRY)
+        # Avoid circular imports
+        from omnigibson.systems.system_base import refresh_systems_registry
+        # Add registry for systems -- this is already created externally, so we just update it and pull it directly
+        registry.add(obj=refresh_systems_registry())
 
         # Add registry for objects
         registry.add(obj=SerializableRegistry(

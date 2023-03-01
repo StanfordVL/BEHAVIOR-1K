@@ -447,6 +447,10 @@ class MicroParticleSystem(BaseParticleSystem):
         cls.prim = cls._create_particle_system()
 
     @classproperty
+    def requires_gpu_dynamics(cls):
+        return True
+
+    @classproperty
     def visual_only(cls):
         """
         Returns:

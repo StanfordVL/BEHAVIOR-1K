@@ -176,6 +176,14 @@ class Registry(UniquelyNamed):
                     # We remove a value from the resulting set
                     mapping[attr].remove(obj)
 
+    def clear(self):
+        """
+        Removes all owned objects from this registry
+        """
+        # Re-create the owned dicts programmatically
+        for k in self.unique_keys.union(self.group_keys):
+            self.__setattr__(f"_objects_by_{k}", dict())
+
     def update(self, keys=None):
         """
         Updates this registry, refreshing all internal mappings in case an object's value was updated
