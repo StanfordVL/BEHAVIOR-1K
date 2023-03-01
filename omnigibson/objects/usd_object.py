@@ -1,10 +1,6 @@
 from omnigibson.objects.stateful_object import StatefulObject
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.usd_utils import add_asset_to_stage
-from omnigibson.utils.ui_utils import create_module_logger
-
-# Create module logger
-log = create_module_logger(module_name=__name__)
 
 
 class USDObject(StatefulObject):
@@ -33,7 +29,6 @@ class USDObject(StatefulObject):
         **kwargs,
     ):
         """
-
         Args:
             prim_path (str): global path in the stage to this object
             usd_path (str): global path to the USD file to load
@@ -86,7 +81,6 @@ class USDObject(StatefulObject):
         """
         Load the object into pybullet and set it to the correct pose
         """
-        log.info(f"Loading the following USD: {self._usd_path}")
         return add_asset_to_stage(asset_path=self._usd_path, prim_path=self._prim_path)
 
     def _create_prim_with_same_kwargs(self, prim_path, name, load_config):
@@ -109,7 +103,8 @@ class USDObject(StatefulObject):
     @property
     def usd_path(self):
         """
-        :return str: absolute path to this model's USD file. By default, this is the loaded usd path
-        passed in as an argument
+        Returns:
+            str: absolute path to this model's USD file. By default, this is the loaded usd path
+                passed in as an argument
         """
         return self._usd_path
