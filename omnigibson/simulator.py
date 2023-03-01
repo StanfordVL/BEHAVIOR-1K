@@ -24,7 +24,7 @@ from omnigibson.utils.constants import LightingMode
 from omnigibson.utils.config_utils import NumpyEncoder
 from omnigibson.utils.python_utils import clear as clear_pu, create_object_from_init_info, Serializable
 from omnigibson.utils.usd_utils import clear as clear_uu, BoundingBoxAPI, FlatcacheAPI
-from omnigibson.utils.ui_utils import CameraMover, disclaimer, create_module_logger
+from omnigibson.utils.ui_utils import CameraMover, disclaimer, create_module_logger, suppress_omni_log
 from omnigibson.scenes import Scene
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.objects.stateful_object import StatefulObject
@@ -362,9 +362,6 @@ class Simulator(SimulationContext, Serializable):
             for obj in self._objects_to_initialize:
                 obj.initialize()
             self._objects_to_initialize = []
-            # Also update the scene registry
-            # TODO: A better place to put this perhaps?
-            self._scene.object_registry.update(keys="root_handle")
 
         # Propagate states if the feature is enabled
         if gm.ENABLE_OBJECT_STATES:
@@ -495,7 +492,9 @@ class Simulator(SimulationContext, Serializable):
             was_stopped = self.is_stopped()
 
             # Run super first
-            super().play()
+            # We suppress warnings from omni.usd because it complains about values set in the native USD
+            with suppress_omni_log(channels=["omni.usd"]):
+                super().play()
 
             # Update all object handles
             if self.scene is not None and self.scene.initialized:
@@ -509,9 +508,6 @@ class Simulator(SimulationContext, Serializable):
                 for obj in self._objects_to_initialize:
                     obj.initialize()
                 self._objects_to_initialize = []
-                # Also update the scene registry
-                # TODO: A better place to put this perhaps?
-                self._scene.object_registry.update(keys="root_handle")
 
             # If we were stopped, take an additional sim step to make sure simulator is functioning properly
             # We need to do this because for some reason omniverse exhibits strange behavior if we do certain operations
@@ -887,7 +883,9 @@ class Simulator(SimulationContext, Serializable):
         # Clear simulation state
         self._clear_state()
 
-        open_stage(usd_path=usd_path)
+        # Open new stage -- suppressing warning that we're opening a new stage
+        with suppress_omni_log(None):
+            open_stage(usd_path=usd_path)
 
         # Re-initialize necessary internal vars
         self._app = omni.kit.app.get_app_interface()
