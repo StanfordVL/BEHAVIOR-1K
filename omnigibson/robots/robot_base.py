@@ -189,6 +189,9 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         for sensor in self._sensors.values():
             sensor.initialize()
 
+        # Load the observation space for this robot
+        self.load_observation_space()
+
         # Validate this robot configuration
         self._validate_configuration()
 
