@@ -8,6 +8,7 @@ import builtins
 from omnigibson.macros import gm
 
 # Create logger
+logging.basicConfig(format='%(levelname)s:%(name)s:%(message)s')
 log = logging.getLogger(__name__)
 
 builtins.ISAAC_LAUNCHED_FROM_JUPYTER = (
@@ -20,7 +21,7 @@ nest_asyncio.apply()
 
 __version__ = "0.0.5"
 
-log.setLevel(log.info)
+log.setLevel(logging.INFO)
 
 with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), "global_config.yaml")) as f:
     global_config = yaml.load(f, Loader=yaml.FullLoader)
