@@ -70,8 +70,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     for bbox_modality in bbox_modalities:
         # Print out each of the modalities
-        print(f"Observation modality {bbox_modality}:")
-        print(obs[bbox_modality])
+        og.log.info(f"Observation modality {bbox_modality}:\n{obs[bbox_modality]}")
 
         # Also write the 2d loose bounding box to disk
         if "3d" not in bbox_modality:

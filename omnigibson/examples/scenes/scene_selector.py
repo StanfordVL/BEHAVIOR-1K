@@ -26,7 +26,6 @@ def main(random_selection=False, headless=False, short_exec=False):
     # Choose the scene model to load
     scenes = get_available_og_scenes() if scene_type == "InteractiveTraversableScene" else get_available_g_scenes()
     scene_model = choose_from_options(options=scenes, name="scene model", random_selection=random_selection)
-    print(f"scene model: {scene_model}")
 
     cfg = {
         "scene": {
