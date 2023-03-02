@@ -504,17 +504,18 @@ class Simulator(SimulationContext, Serializable):
                     if obj.initialized:
                         obj.update_handles()
 
-            # Check to see if any objects should be initialized
-            if len(self._objects_to_initialize) > 0:
-                for obj in self._objects_to_initialize:
-                    obj.initialize()
-                self._objects_to_initialize = []
-
             # If we were stopped, take an additional sim step to make sure simulator is functioning properly
             # We need to do this because for some reason omniverse exhibits strange behavior if we do certain operations
             # immediately after playing; e.g.: syncing USD poses when flatcache is enabled
             if was_stopped:
-                self.step()
+                self.step_physics()
+
+            # Additionally run non physics things if we have a valid scene
+            if self._scene is not None:
+                self._omni_update_step()
+                self._non_physics_step()
+                if gm.ENABLE_TRANSITION_RULES:
+                    self._transition_rule_step()
 
     def pause(self):
         if not self.is_paused():
