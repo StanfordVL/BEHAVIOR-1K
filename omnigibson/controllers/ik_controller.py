@@ -5,6 +5,10 @@ from omnigibson.controllers import ControlType, ManipulationController
 from omnigibson.utils.processing_utils import MovingAverageFilter
 from omnigibson.utils.control_utils import IKSolver
 from omnigibson.utils.python_utils import assert_valid_key
+from omnigibson.utils.ui_utils import create_module_logger
+
+# Create module logger
+log = create_module_logger(module_name=__name__)
 
 # Different modes
 IK_MODE_COMMAND_DIMS = {
@@ -272,7 +276,7 @@ class InverseKinematicsController(ManipulationController):
         if target_joint_pos is None:
             # Print warning that we couldn't find a valid solution, and return the current joint configuration
             # instead so that we execute a no-op control
-            print(f"Could not find valid IK configuration! Returning no-op control instead.")
+            log.warning(f"Could not find valid IK configuration! Returning no-op control instead.")
             target_joint_pos = current_joint_pos
 
         # Optionally pass through smoothing filter for better stability
