@@ -45,6 +45,7 @@ class MultiFingerGripperController(GripperController):
         """
         Args:
             control_freq (int): controller loop frequency
+            motor_type (str): type of motor being controlled, one of {position, velocity, effort}
             control_limits (Dict[str, Tuple[Array[float], Array[float]]]): The min/max limits to the outputted
                 control signal. Should specify per-dof type limits, i.e.:
 
