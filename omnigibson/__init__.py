@@ -8,7 +8,7 @@ import builtins
 from omnigibson.macros import gm
 
 # Create logger
-logging.basicConfig(format='%(levelname)s:%(name)s:%(message)s')
+logging.basicConfig(format='[%(levelname)s] [%(name)s] %(message)s')
 log = logging.getLogger(__name__)
 
 builtins.ISAAC_LAUNCHED_FROM_JUPYTER = (
