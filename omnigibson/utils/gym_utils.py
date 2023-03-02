@@ -71,6 +71,6 @@ class GymObservable(metaclass=ABCMeta):
         """
         # Load the observation space and convert it into a gym-compatible dictionary
         self.observation_space = gym.spaces.Dict(self._load_observation_space())
-        log.info(f"Loaded obs space dictionary for: {self.__class__.__name__}")
+        log.debug(f"Loaded obs space dictionary for: {self.__class__.__name__}")
 
         return self.observation_space
