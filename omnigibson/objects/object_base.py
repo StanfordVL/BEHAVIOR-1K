@@ -215,8 +215,13 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         )
 
         # Force populate inputs and outputs of the shaders of all materials
-        for material in self.materials:
-            material.shader_force_populate()
+        # We suppress errors from omni.hydra if we're using encrypted assets, because we're loading from tmp location,
+        # not the original location
+        with suppress_omni_log(channels=["omni.hydra"] if gm.USE_ENCRYPTED_ASSETS else []):
+            # Single render step needed before populating materials
+            og.sim.render()
+            for material in self.materials:
+                material.shader_force_populate(render=False)
 
         # Iterate over all links and grab their relevant material info for highlighting (i.e.: emissivity info)
         self._highlighted = False
