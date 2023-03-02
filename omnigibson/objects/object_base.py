@@ -1,6 +1,8 @@
 from abc import ABCMeta
+import numpy as np
 
-from omnigibson.macros import create_module_macros
+import omnigibson as og
+from omnigibson.macros import create_module_macros, gm
 from omnigibson.utils.constants import (
     DEFAULT_COLLISION_GROUP,
     SPECIAL_COLLISION_GROUPS,
@@ -11,7 +13,7 @@ from omnigibson.utils.usd_utils import create_joint, CollisionAPI
 from omnigibson.prims.entity_prim import EntityPrim
 from omnigibson.utils.python_utils import Registerable, classproperty
 from omnigibson.utils.constants import PrimType, CLASS_NAME_TO_CLASS_ID
-from omnigibson.utils.ui_utils import create_module_logger
+from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
 
 from omni.isaac.core.utils.semantics import add_update_semantics
 
@@ -148,16 +150,21 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         if "visible" in self._load_config and self._load_config["visible"] is not None:
             self.visible = self._load_config["visible"]
 
+        # First, remove any articulation root API that already exists at the object-level prim
+        if self._prim.HasAPI(UsdPhysics.ArticulationRootAPI):
+            self._prim.RemoveAPI(UsdPhysics.ArticulationRootAPI)
+            self._prim.RemoveAPI(PhysxSchema.PhysxArticulationAPI)
+
+        articulation_root_prim = None
         # Add fixed joint if we're fixing the base
         if self.fixed_base:
-            # For optimization purposes, if we only have a single rigid body, we assume this
-            # is not an articulated object so we merely set this to be a static collider, i.e.: kinematic-only
-            if self.n_joints == 0:
+            # For optimization purposes, if we only have a single rigid body that has either
+            # (no custom scaling OR no fixed joints), we assume this is not an articulated object so we
+            # merely set this to be a static collider, i.e.: kinematic-only
+            # The custom scaling / fixed joints requirement is needed because omniverse complains about scaling that
+            # occurs with respect to fixed joints, as omni will "snap" bodies together otherwise
+            if self.n_joints == 0 and (np.all(np.isclose(self.scale, 1.0, atol=1e-3)) or self.n_fixed_joints == 0):
                 self.kinematic_only = True
-                # Also remove any articulation root API that this prim has
-                if self._prim.HasAPI(UsdPhysics.ArticulationRootAPI):
-                    self._prim.RemoveAPI(UsdPhysics.ArticulationRootAPI)
-                    self._prim.RemoveAPI(PhysxSchema.PhysxArticulationAPI)
             else:
                 # Create fixed joint, and set Body0 to be this object's root prim
                 create_joint(
@@ -165,27 +172,28 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
                     joint_type="FixedJoint",
                     body1=f"{self._prim_path}/{self._root_link_name}",
                 )
-                # Also set the articulation root to be the object head if it doesn't already exist
-                if not self._prim.HasAPI(UsdPhysics.ArticulationRootAPI):
-                    UsdPhysics.ArticulationRootAPI.Apply(self.prim)
-                    PhysxSchema.PhysxArticulationAPI.Apply(self.prim)
+                # Also set the articulation root to be the object-level prim
+                articulation_root_prim = self._prim
         else:
-            if self._prim.HasAPI(UsdPhysics.ArticulationRootAPI):
-                # If we only have a link, remove the articulation root API
-                if self.n_links == 1:
-                    self._prim.RemoveAPI(UsdPhysics.ArticulationRootAPI)
-                    self._prim.RemoveAPI(PhysxSchema.PhysxArticulationAPI)
-                else:
-                    # We need to fix (change) the articulation root
-                    # We have to do something very hacky because omniverse is buggy
-                    # Articulation roots mess up the joint order if it's on a non-fixed base robot, e.g. a
-                    # mobile manipulator. So if we have to move it to the actual root link of the robot instead.
-                    # See https://forums.developer.nvidia.com/t/inconsistent-values-from-isaacsims-dc-get-joint-parent-child-body/201452/2
-                    # for more info
-                    self._prim.RemoveAPI(UsdPhysics.ArticulationRootAPI)
-                    self._prim.RemoveAPI(PhysxSchema.PhysxArticulationAPI)
-                    UsdPhysics.ArticulationRootAPI.Apply(self.root_prim)
-                    PhysxSchema.PhysxArticulationAPI.Apply(self.root_prim)
+            # 3 cases:
+            has_articulated_joints, has_fixed_joints = self.n_joints > 0, self.n_fixed_joints > 0
+            if not has_articulated_joints:
+                # 1. no articulated joints, yes fixed joints --> Articulation Root should exist at object-level prim
+                # 2. no articulated joints, no fixed joints --> Articulation Root should not exist
+                articulation_root_prim = self._prim if has_fixed_joints else None
+            else:
+                # 3. yes articulated joints, no / yes fixed joints --> Articulation Root should exist at root_link prim
+                # This is a bit hacky because omniverse is buggy
+                # Articulation roots mess up the joint order if it's on a non-fixed base robot, e.g. a
+                # mobile manipulator. So if we have to move it to the actual root link of the robot instead.
+                # See https://forums.developer.nvidia.com/t/inconsistent-values-from-isaacsims-dc-get-joint-parent-child-body/201452/2
+                # for more info
+                articulation_root_prim = self.root_prim
+
+        # Potentially add articulation root APIs
+        if articulation_root_prim is not None:
+            UsdPhysics.ArticulationRootAPI.Apply(articulation_root_prim)
+            PhysxSchema.PhysxArticulationAPI.Apply(articulation_root_prim)
 
         # Set self collisions if we have articulation API to set
         if self._prim.HasAPI(UsdPhysics.ArticulationRootAPI) or self.root_prim.HasAPI(UsdPhysics.ArticulationRootAPI):

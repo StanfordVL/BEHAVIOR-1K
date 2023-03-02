@@ -319,6 +319,22 @@ class EntityPrim(XFormPrim):
         return num
 
     @property
+    def n_fixed_joints(self):
+        """
+        Returns:
+        int: Number of fixed joints owned by this articulation
+        """
+        # Manually iterate over all links and check for any joints that are not fixed joints!
+        num = 0
+        for link in self._links.values():
+            for child_prim in link.prim.GetChildren():
+                prim_type = child_prim.GetPrimTypeInfo().GetTypeName().lower()
+                if "joint" in prim_type and "fixed" in prim_type:
+                    num += 1
+
+        return num
+
+    @property
     def n_links(self):
         """
         Returns:
