@@ -476,8 +476,12 @@ class Simulator(SimulationContext, Serializable):
         for added_obj_attr in added_obj_attrs:
             new_obj = added_obj_attr.obj
             self.import_object(added_obj_attr.obj)
-            new_obj.set_position_orientation(position=added_obj_attr.pos, orientation=added_obj_attr.orn)
-            if isinstance(new_obj, DatasetObject):
+            # By default, added_obj_attr is populated with all Nones -- so these will all be pass-through operations
+            # unless pos / orn (or, conversely, bb_pos / bb_orn) is specified
+            if added_obj_attr.pos is not None or added_obj_attr.orn is not None:
+                new_obj.set_position_orientation(position=added_obj_attr.pos, orientation=added_obj_attr.orn)
+            elif isinstance(new_obj, DatasetObject) and \
+                    (added_obj_attr.bb_pos is not None or added_obj_attr.bb_orn is not None):
                 new_obj.set_bbox_center_position_orientation(position=added_obj_attr.bb_pos, orientation=added_obj_attr.bb_orn)
 
     def reset_scene(self):
@@ -494,6 +498,8 @@ class Simulator(SimulationContext, Serializable):
 
             # Run super first
             # We suppress warnings from omni.usd because it complains about values set in the native USD
+            # These warnings occur because the native USD file has some type mismatch in the `scale` property,
+            # where the property expects a double but for whatever reason the USD interprets its values as floats
             with suppress_omni_log(channels=["omni.usd"]):
                 super().play()
 

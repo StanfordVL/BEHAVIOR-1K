@@ -288,8 +288,11 @@ class SlicingRule(BaseTransitionRule):
             # Determine the relative scale to apply to the object part from the original object
             # Note that proper (rotated) scaling can only be applied when the relative orientation of
             # the object part is a multiple of 90 degrees wrt the parent object, so we assert that here
-            # Check by making sure the real component of rotation is close to 0, 0.707, or 1
-            assert np.any(np.isclose(np.ones(3) * part_bb_orn[-1], np.array([1.0, 0.7071, 0.0]), atol=1e-3)), \
+            # Check by making sure the quaternion is some permutation of +/- (1, 0, 0, 0),
+            # +/- (0.707, 0.707, 0, 0), or +/- (0.5, 0.5, 0.5, 0.5)
+            # Because orientations are all normalized (same L2-norm), every orientation should have a unique L1-norm
+            # So we check the L1-norm of the absolute value of the orientation as a proxy for verifying these values
+            assert np.any(np.isclose(np.abs(part_bb_orn).sum(), np.array([1.0, 1.414, 2.0]), atol=1e-3)), \
                 "Sliceable objects should only have relative object part orientations that are factors of 90 degrees!"
 
             # Scale the offset accordingly.
@@ -308,8 +311,7 @@ class SlicingRule(BaseTransitionRule):
                 name=part_obj_name,
                 category=part["category"],
                 model=part["model"],
-                bounding_box=part["bb_size"] * scale,
-                abilities={},
+                bounding_box=part["bb_size"] * scale,   # equiv. to scale=(part["bb_size"] / self.native_bbox) * (scale)
             )
 
             # Add the new object to the results.
