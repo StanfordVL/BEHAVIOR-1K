@@ -564,6 +564,18 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         """
         self._initial_state = self.dump_state(serialized=False)
 
+    def update_object_initial_state(self, obj):
+        """
+        Updates the initial state for the object specified by @obj (which the scene will get reset
+            to upon calling reset())
+
+        Args:
+            obj (BaseObject): Object whose initial state should be updated
+        """
+        # Only update if we already have a pre-existing initial state
+        if self._initial_state is not None:
+            self._initial_state["object_registry"][obj.name] = obj.dump_state(serialized=False)
+
     def update_objects_info(self):
         """
         Updates the scene-relevant information and saves it to the active USD. Useful for reloading a scene directly

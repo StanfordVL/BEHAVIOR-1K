@@ -361,6 +361,7 @@ class Simulator(SimulationContext, Serializable):
         if len(self._objects_to_initialize) > 0 and self.is_playing():
             for obj in self._objects_to_initialize:
                 obj.initialize()
+                self._scene.update_object_initial_state(obj)
             self._objects_to_initialize = []
 
         # Propagate states if the feature is enabled
