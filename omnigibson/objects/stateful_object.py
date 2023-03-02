@@ -474,6 +474,9 @@ class StatefulObject(BaseObject):
                 else:
                     log.warning("Missing object state [{}] in the state dump".format(state_name))
 
+        # Clear cache after loading state
+        self.clear_states_cache()
+
     def _serialize(self, state):
         # Call super method first
         state_flat = super()._serialize(state=state)

@@ -45,22 +45,6 @@ class GeomPrim(XFormPrim):
         # By default, GeomPrim shows up in the rendering.
         self.purpose = "default"
 
-    def _dump_state(self):
-        # No state to dump
-        return dict()
-
-    def _load_state(self, state):
-        # No state to load
-        pass
-
-    def _serialize(self, state):
-        # No state to serialize
-        return np.array([])
-
-    def _deserialize(self, state):
-        # No state to deserialize
-        return dict()
-
     def duplicate(self, simulator, prim_path):
         # Cannot directly duplicate a mesh prim
         raise NotImplementedError("Cannot directly duplicate a geom prim!")
@@ -277,12 +261,7 @@ class CollisionGeomPrim(GeomPrim):
 
         # Make sure to add the appropriate API if we're setting certain values
         if approximation_type == "convexHull" and not self._prim.HasAPI(PhysxSchema.PhysxConvexHullCollisionAPI):
-            pch_api = PhysxSchema.PhysxConvexHullCollisionAPI.Apply(self._prim)
-            # Also make sure the maximum vertex count is 60 (max number compatible with GPU)
-            # https://docs.omniverse.nvidia.com/app_create/prod_extensions/ext_physics/rigid-bodies.html#collision-settings
-            if pch_api.GetHullVertexLimitAttr().Get() is None:
-                pch_api.CreateHullVertexLimitAttr()
-            pch_api.GetHullVertexLimitAttr().Set(60)
+            PhysxSchema.PhysxConvexHullCollisionAPI.Apply(self._prim)
         elif approximation_type == "convexDecomposition" and not self._prim.HasAPI(PhysxSchema.PhysxConvexDecompositionCollisionAPI):
             PhysxSchema.PhysxConvexDecompositionCollisionAPI.Apply(self._prim)
         elif approximation_type == "meshSimplification" and not self._prim.HasAPI(PhysxSchema.PhysxTriangleMeshSimplificationCollisionAPI):
@@ -291,6 +270,15 @@ class CollisionGeomPrim(GeomPrim):
             PhysxSchema.PhysxSDFMeshCollisionAPI.Apply(self._prim)
         elif approximation_type == "none" and not self._prim.HasAPI(PhysxSchema.PhysxTriangleMeshCollisionAPI):
             PhysxSchema.PhysxTriangleMeshCollisionAPI.Apply(self._prim)
+
+        if approximation_type == "convexHull":
+            pch_api = PhysxSchema.PhysxConvexHullCollisionAPI(self._prim)
+            # Also make sure the maximum vertex count is 60 (max number compatible with GPU)
+            # https://docs.omniverse.nvidia.com/app_create/prod_extensions/ext_physics/rigid-bodies.html#collision-settings
+            if pch_api.GetHullVertexLimitAttr().Get() is None:
+                pch_api.CreateHullVertexLimitAttr()
+            pch_api.GetHullVertexLimitAttr().Set(60)
+
         self._mesh_collision_api.GetApproximationAttr().Set(approximation_type)
 
     def get_collision_approximation(self):

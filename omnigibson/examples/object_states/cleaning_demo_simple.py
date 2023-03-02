@@ -109,8 +109,8 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     assert sink.states[object_states.ToggledOn].set_value(True)
     assert desk.states[object_states.Covered].set_value(DustSystem, True)
-    assert bowl.states[object_states.OnTop].set_value(desk, True, use_ray_casting_method=True)
-    assert brush.states[object_states.OnTop].set_value(desk, True, use_ray_casting_method=True)
+    assert bowl.states[object_states.OnTop].set_value(desk, True)
+    assert brush.states[object_states.OnTop].set_value(desk, True)
     assert bowl.states[object_states.Covered].set_value(StainSystem, True)
 
     # Take a step, and save the state

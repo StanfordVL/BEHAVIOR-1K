@@ -33,13 +33,13 @@ class MaxTemperature(AbsoluteObjectState, UpdateStateMixin):
         return 1
 
     def _dump_state(self):
-        return dict(temperature=self.value)
+        return dict(max_temperature=self.value)
 
     def _load_state(self, state):
-        self.value = state["temperature"]
+        self.value = state["max_temperature"]
 
     def _serialize(self, state):
-        return np.array([state["temperature"]], dtype=float)
+        return np.array([state["max_temperature"]], dtype=float)
 
     def _deserialize(self, state):
-        return dict(temperature=state[0]), 1
+        return dict(max_temperature=state[0]), 1

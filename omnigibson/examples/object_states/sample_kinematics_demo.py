@@ -75,7 +75,7 @@ def sample_microwave_plates_apples(env):
 
     # Set microwave on top of the cabinet, open it, and step 100 times
     og.log.info("Placing microwave OnTop of the cabinet")
-    assert microwave.states[object_states.OnTop].set_value(cabinet, True, use_ray_casting_method=True)
+    assert microwave.states[object_states.OnTop].set_value(cabinet, True)
     assert microwave.states[object_states.Open].set_value(True)
     og.log.info("Microwave loaded and placed")
     for _ in range(50):
@@ -98,10 +98,10 @@ def sample_microwave_plates_apples(env):
         # Put the 1st plate in the microwave
         if i == 0:
             og.log.info("Loading plate Inside the microwave")
-            assert plate.states[object_states.Inside].set_value(microwave, True, use_ray_casting_method=True)
+            assert plate.states[object_states.Inside].set_value(microwave, True)
         else:
             og.log.info("Loading plate OnTop the microwave")
-            assert plate.states[object_states.OnTop].set_value(microwave, True, use_ray_casting_method=True)
+            assert plate.states[object_states.OnTop].set_value(microwave, True)
 
         og.log.info("Plate %d loaded and placed." % i)
         for _ in range(50):
@@ -117,7 +117,7 @@ def sample_microwave_plates_apples(env):
             )
             og.sim.import_object(apple)
             env.step(np.array([]))  # One step is needed for the object to be fully initialized
-            assert apple.states[object_states.OnTop].set_value(plate, True, use_ray_casting_method=True)
+            assert apple.states[object_states.OnTop].set_value(plate, True)
             og.log.info("Apple %d loaded and placed." % j)
             for _ in range(50):
                 env.step(np.array([]))
@@ -150,7 +150,7 @@ def sample_boxes_on_shelf(env):
         )
         og.sim.import_object(box)
         env.step(np.array([]))  # One step is needed for the object to be fully initialized
-        box.states[object_states.Inside].set_value(shelf, True, use_ray_casting_method=True)
+        box.states[object_states.Inside].set_value(shelf, True)
         og.log.info(f"Box {i} placed.")
 
         for _ in range(50):

@@ -245,7 +245,6 @@ class RigidPrim(XFormPrim):
             self._dc.set_rigid_body_linear_velocity(self._handle, velocity)
         else:
             self._rigid_api.GetVelocityAttr().Set(Gf.Vec3f(velocity.tolist()))
-        return
 
     def get_linear_velocity(self):
         """
@@ -269,7 +268,6 @@ class RigidPrim(XFormPrim):
             self._dc.set_rigid_body_angular_velocity(self._handle, velocity)
         else:
             self._rigid_api.GetAngularVelocityAttr().Set(Gf.Vec3f(velocity.tolist()))
-        return
 
     def get_angular_velocity(self):
         """
@@ -654,6 +652,16 @@ class RigidPrim(XFormPrim):
         if not self.kinematic_only:
             self.set_linear_velocity(np.array(state["lin_vel"]))
             self.set_angular_velocity(np.array(state["ang_vel"]))
+
+    def _serialize(self, state):
+        # Run super first
+        state_flat = super()._serialize(state=state)
+
+        return np.concatenate([
+            state_flat,
+            state["lin_vel"],
+            state["ang_vel"],
+        ]).astype(float)
 
     def _deserialize(self, state):
         # Call supermethod first

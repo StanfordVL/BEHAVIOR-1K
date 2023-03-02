@@ -17,15 +17,9 @@ _ALL_STATES = frozenset(
         Frozen,
         HeatSourceOrSink,
         HorizontalAdjacency,
-        InFOVOfRobot,
-        InHandOfRobot,
-        InReachOfRobot,
-        InSameRoomAsRobot,
         Inside,
-        InsideRoomTypes,
         MaxTemperature,
         NextTo,
-        ObjectsInFOVOfRobot,
         OnFire,
         OnTop,
         Open,
@@ -47,7 +41,6 @@ _ALL_STATES = frozenset(
         Folded,
         Unfolded,
     ]
-    + ROOM_STATES
 )
 
 _ABILITY_TO_STATE_MAPPING = {
@@ -63,7 +56,6 @@ _ABILITY_TO_STATE_MAPPING = {
     "heatSource": [HeatSourceOrSink],
     "openable": [Open],
     "flammable": [OnFire],
-    "robot": ROOM_STATES + [ObjectsInFOVOfRobot],
     "saturable": [Saturated],
     "sliceable": [Sliced],
     "slicer": [Slicer],
@@ -77,10 +69,6 @@ _ABILITY_TO_STATE_MAPPING = {
 
 _DEFAULT_STATE_SET = frozenset(
     [
-        InFOVOfRobot,
-        InHandOfRobot,
-        InReachOfRobot,
-        InSameRoomAsRobot,
         Inside,
         NextTo,
         OnTop,

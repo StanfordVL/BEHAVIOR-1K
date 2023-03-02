@@ -40,7 +40,6 @@ exclude = [
 testpaths = [
     "tests",
 ]
-addopts = '--cov=omnigibson --cov-report=xml'
 
 [tool.coverage.run]
 omit = ["omnigibson/external/*"]

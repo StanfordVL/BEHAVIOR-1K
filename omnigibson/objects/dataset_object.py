@@ -12,6 +12,7 @@ from omni.isaac.core.utils.rotations import gf_quat_to_np_array
 
 import omnigibson as og
 from omnigibson.objects.usd_object import USDObject
+from omnigibson.prims.rigid_prim import RigidPrim
 from omnigibson.utils.constants import AVERAGE_CATEGORY_SPECS, DEFAULT_JOINT_FRICTION, SPECIAL_JOINT_FRICTIONS, JointType
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.usd_utils import BoundingBoxAPI
@@ -509,6 +510,7 @@ class DatasetObject(USDObject):
                 - 3-array: (x,y,z) bbox extent in world frame
                 - 3-array: (x,y,z) bbox center in desired frame
         """
+        assert self.prim_type == PrimType.RIGID, "get_base_aligned_bbox is only supported for rigid objects."
         bbox_type = "visual" if visual else "collision"
 
         # Get the base position transform.

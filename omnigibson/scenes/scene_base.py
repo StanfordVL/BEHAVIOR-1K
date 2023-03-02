@@ -617,11 +617,6 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # Default state for the scene is from the registry alone
         self._registry.load_state(state=state, serialized=False)
 
-        # We additionally clear caches for all object states
-        for obj in self.objects:
-            if isinstance(obj, StatefulObject):
-                obj.clear_states_cache()
-
     def _serialize(self, state):
         # Default state for the scene is from the registry alone
         return self._registry.serialize(state=state)

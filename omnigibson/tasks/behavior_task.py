@@ -880,11 +880,6 @@ class BehaviorTask(BaseTask):
                 )
                 return error_msg
 
-        # Use ray casting for ontop and inside sampling for sampleable objects
-        for condition, positive in self.sampleable_object_conditions:
-            if condition.STATE_NAME in ["inside", "ontop"]:
-                condition.kwargs["use_ray_casting_method"] = True
-
         if len(self.object_sampling_orders) > 0:
             # Pop non-sampleable objects
             self.object_sampling_orders.pop(0)
