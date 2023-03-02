@@ -114,6 +114,11 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         # Initialize internal attributes that will be loaded later
         self._sensors = None                     # e.g.: scan sensor, vision sensor
 
+        # If specified, make sure scale is uniform -- this is because non-uniform scale can result in non-matching
+        # collision representations for parts of the robot that were optimized (e.g.: bounding sphere for wheels)
+        assert scale is None or isinstance(scale, int) or isinstance(scale, float) or np.all(scale == scale[0]), \
+            f"Robot scale must be uniform! Got: {scale}"
+
         # Run super init
         super().__init__(
             prim_path=prim_path,
@@ -188,6 +193,9 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         # Initialize all sensors
         for sensor in self._sensors.values():
             sensor.initialize()
+
+        # Load the observation space for this robot
+        self.load_observation_space()
 
         # Validate this robot configuration
         self._validate_configuration()

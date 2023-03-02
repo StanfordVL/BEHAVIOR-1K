@@ -1,4 +1,3 @@
-import logging
 import os
 import pickle
 import sys
@@ -10,6 +9,10 @@ from PIL import Image
 
 from omnigibson.maps.map_base import BaseMap
 import omnigibson.utils.transform_utils as T
+from omnigibson.utils.ui_utils import create_module_logger
+
+# Create module logger
+log = create_module_logger(module_name=__name__)
 
 
 class TraversableMap(BaseMap):
@@ -67,7 +70,7 @@ class TraversableMap(BaseMap):
             int: Size of the loaded map
         """
         if not os.path.exists(maps_path):
-            logging.warning("trav map does not exist: {}".format(maps_path))
+            log.warning("trav map does not exist: {}".format(maps_path))
             return
 
         self.floor_heights = floor_heights
@@ -128,11 +131,11 @@ class TraversableMap(BaseMap):
             maps_path, "floor_trav_{}_py{}{}.p".format(floor, sys.version_info.major, sys.version_info.minor)
         )
         if os.path.isfile(graph_file):
-            logging.info("Loading traversable graph")
+            log.info("Loading traversable graph")
             with open(graph_file, "rb") as pfile:
                 g = pickle.load(pfile)
         else:
-            logging.info("Building traversable graph")
+            log.info("Building traversable graph")
             g = nx.Graph()
             for i in range(map_size):
                 for j in range(map_size):

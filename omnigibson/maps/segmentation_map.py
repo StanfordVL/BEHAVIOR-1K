@@ -1,4 +1,3 @@
-import logging
 import os
 
 import numpy as np
@@ -7,6 +6,10 @@ from PIL import Image
 
 import omnigibson as og
 from omnigibson.maps.map_base import BaseMap
+from omnigibson.utils.ui_utils import create_module_logger
+
+# Create module logger
+log = create_module_logger(module_name=__name__)
 
 
 class SegmentationMap(BaseMap):
@@ -112,7 +115,7 @@ class SegmentationMap(BaseMap):
                 - 3-array: (x,y,z) randomly sampled point in a room of type @room_type
         """
         if room_type not in self.room_sem_name_to_sem_id:
-            logging.warning("room_type [{}] does not exist.".format(room_type))
+            log.warning("room_type [{}] does not exist.".format(room_type))
             return None, None
 
         sem_id = self.room_sem_name_to_sem_id[room_type]
@@ -138,7 +141,7 @@ class SegmentationMap(BaseMap):
                 - 3-array: (x,y,z) randomly sampled point in room @room_instance
         """
         if room_instance not in self.room_ins_name_to_ins_id:
-            logging.warning("room_instance [{}] does not exist.".format(room_instance))
+            log.warning("room_instance [{}] does not exist.".format(room_instance))
             return None, None
 
         ins_id = self.room_ins_name_to_ins_id[room_instance]

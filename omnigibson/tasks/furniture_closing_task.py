@@ -1,5 +1,3 @@
-import logging
-
 import numpy as np
 
 import omnigibson as og
@@ -12,6 +10,10 @@ from omnigibson.termination_conditions.timeout import Timeout
 from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.sim_utils import land_object, test_valid_pose
 import omnigibson.utils.transform_utils as T
+from omnigibson.utils.ui_utils import create_module_logger
+
+# Create module logger
+log = create_module_logger(module_name=__name__)
 
 
 FURNITURE_CATEGORIES = {
@@ -145,7 +147,7 @@ class FurnitureClosingTask(BaseTask):
 
         # Notify user if we failed to reset a collision-free sampled pose
         if not success:
-            logging.warning("WARNING: Failed to reset robot without collision")
+            log.warning("WARNING: Failed to reset robot without collision")
 
         # Land the robot
         land_object(env.robots[self._robot_idn], initial_pos, initial_quat, env.initial_pos_z_offset)

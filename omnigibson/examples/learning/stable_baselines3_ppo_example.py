@@ -5,13 +5,10 @@ This only serves as a starting point that users can further build upon.
 """
 
 import argparse
-import logging
 import os, time, cv2
 
 import omnigibson as og
 from omnigibson import example_config_path
-
-log = logging.getLogger(__name__)
 
 try:
     import gym
@@ -25,7 +22,7 @@ try:
     from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback, EvalCallback
 
 except ModuleNotFoundError:
-    log.error("stable-baselines3 is not installed. You would need to do: pip install stable-baselines3")
+    og.log.error("stable-baselines3 is not installed. You would need to do: pip install stable-baselines3")
     exit(1)
 
 
@@ -44,7 +41,7 @@ class CustomCombinedExtractor(BaseFeaturesExtractor):
         feature_size = 128
         for key, subspace in observation_space.spaces.items():
             if key in ["rgb", "ins_seg"]:
-                print(subspace.shape)
+                og.log.info(f"obs {key} shape: {subspace.shape}")
                 n_input_channels = subspace.shape[2]  # channel last
                 cnn = nn.Sequential(
                     nn.Conv2d(n_input_channels, 4, kernel_size=8, stride=4, padding=0),
@@ -147,10 +144,10 @@ def main():
     if args.eval:
         assert args.checkpoint is not None, "If evaluating a PPO policy, @checkpoint argument must be specified!"
         model = PPO.load(args.checkpoint)
-        print("Starting evaluation...")
+        og.log.info("Starting evaluation...")
         mean_reward, std_reward = evaluate_policy(model, env, n_eval_episodes=50)
-        print("Finished evaluation!")
-        log.info(f"Mean reward: {mean_reward} +/- {std_reward:.2f}")
+        og.log.info("Finished evaluation!")
+        og.log.info(f"Mean reward: {mean_reward} +/- {std_reward:.2f}")
 
     else:
         model = PPO(
@@ -164,14 +161,14 @@ def main():
             device='cuda',
         )
         checkpoint_callback = CheckpointCallback(save_freq=1000, save_path=tensorboard_log_dir, name_prefix=prefix)
-        log.debug(model.policy)
-        print(model)
+        og.log.debug(model.policy)
+        og.log.info(f"model: {model}")
 
-        print("Starting training...")
+        og.log.info("Starting training...")
         model.learn(total_timesteps=10000000, callback=checkpoint_callback,
                     eval_env=env, eval_freq=1000,
                     n_eval_episodes=20)
-        print("Finished training!")
+        og.log.info("Finished training!")
 
 
 if __name__ == "__main__":

@@ -1,4 +1,3 @@
-import logging
 import matplotlib.pyplot as plt
 
 import numpy as np
@@ -17,7 +16,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     https://docs.omniverse.nvidia.com/prod_extensions/prod_extensions/ext_replicator/visualization.html#the-visualizer
     """
-    logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
+    og.log.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
 
     # Specify objects to load
     banana_cfg = dict(
@@ -71,8 +70,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     for bbox_modality in bbox_modalities:
         # Print out each of the modalities
-        print(f"Observation modality {bbox_modality}:")
-        print(obs[bbox_modality])
+        og.log.info(f"Observation modality {bbox_modality}:\n{obs[bbox_modality]}")
 
         # Also write the 2d loose bounding box to disk
         if "3d" not in bbox_modality:

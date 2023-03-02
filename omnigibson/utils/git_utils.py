@@ -3,7 +3,7 @@ from pathlib import Path
 import bddl
 import git
 
-import omnigibson
+import omnigibson as og
 
 
 def git_info(directory):
@@ -23,6 +23,6 @@ def git_info(directory):
 
 def project_git_info():
     return {
-        "OmniGibson": git_info(Path(omnigibson.root_path).parent),
+        "OmniGibson": git_info(Path(og.root_path).parent),
         "bddl": git_info(Path(bddl.__file__).parent.parent),
     }

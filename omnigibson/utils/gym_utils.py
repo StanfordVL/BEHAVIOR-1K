@@ -1,7 +1,11 @@
 import gym
 from abc import ABCMeta, abstractmethod
-
 import numpy as np
+
+from omnigibson.utils.ui_utils import create_module_logger
+
+# Create module logger
+log = create_module_logger(module_name=__name__)
 
 
 class GymObservable(metaclass=ABCMeta):
@@ -67,6 +71,6 @@ class GymObservable(metaclass=ABCMeta):
         """
         # Load the observation space and convert it into a gym-compatible dictionary
         self.observation_space = gym.spaces.Dict(self._load_observation_space())
-        print(f"Loaded obs space dictionary for: {self.__class__.__name__}")
+        log.debug(f"Loaded obs space dictionary for: {self.__class__.__name__}")
 
         return self.observation_space

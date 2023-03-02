@@ -1,13 +1,15 @@
 """
 A set of utility functions for registering and tracking objects
 """
-import logging
 from inspect import isclass
 import numpy as np
 from collections import Iterable
 from omnigibson.macros import create_module_macros
 from omnigibson.utils.python_utils import Serializable, SerializableNonInstance, UniquelyNamed
+from omnigibson.utils.ui_utils import create_module_logger
 
+# Create module logger
+log = create_module_logger(module_name=__name__)
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -135,10 +137,10 @@ class Registry(UniquelyNamed):
                 if k in self.unique_keys:
                     # Handle unique case
                     if attr in mapping:
-                        logging.warning(f"Instance identifier '{k}' should be unique for adding to this registry mapping! Existing {k}: {attr}")
+                        log.warning(f"Instance identifier '{k}' should be unique for adding to this registry mapping! Existing {k}: {attr}")
                         # Special case for "name" attribute, which should ALWAYS be unique
                         if k == "name":
-                            logging.error(f"For name attribute, objects MUST be unique. Exiting.")
+                            log.error(f"For name attribute, objects MUST be unique. Exiting.")
                             exit(-1)
                     mapping[attr] = obj
                 else:
@@ -173,6 +175,14 @@ class Registry(UniquelyNamed):
                     # Not unique case
                     # We remove a value from the resulting set
                     mapping[attr].remove(obj)
+
+    def clear(self):
+        """
+        Removes all owned objects from this registry
+        """
+        # Re-create the owned dicts programmatically
+        for k in self.unique_keys.union(self.group_keys):
+            self.__setattr__(f"_objects_by_{k}", dict())
 
     def update(self, keys=None):
         """
@@ -328,7 +338,7 @@ class SerializableRegistry(Registry, Serializable):
         # Iterate over all objects and load their states
         for obj in self.objects:
             if obj.name not in state:
-                logging.warning(f"Object '{obj.name}' is not in the state dict to load from. Skip loading its state.")
+                log.warning(f"Object '{obj.name}' is not in the state dict to load from. Skip loading its state.")
                 continue
             obj.load_state(state[obj.name], serialized=False)
 

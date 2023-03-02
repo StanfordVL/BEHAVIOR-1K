@@ -1,10 +1,13 @@
 from pxr import UsdLux
-import logging
 from omni.isaac.core.utils.stage import get_current_stage
 from omnigibson.objects.stateful_object import StatefulObject
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.constants import PrimType
+from omnigibson.utils.ui_utils import create_module_logger
+
+# Create module logger
+log = create_module_logger(module_name=__name__)
 
 
 class LightObject(StatefulObject):
@@ -101,8 +104,6 @@ class LightObject(StatefulObject):
         )
 
     def _load(self, simulator=None):
-        logging.info(f"Loading the following light: {self.light_type}")
-
         # Define a light prim at the current stage, or the simulator's stage if specified
         stage = get_current_stage()
 

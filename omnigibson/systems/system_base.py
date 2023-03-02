@@ -1,6 +1,14 @@
+from omnigibson.macros import gm
 from omnigibson.utils.python_utils import classproperty, assert_valid_key, \
     SerializableNonInstance, UniquelyNamedNonInstance
 from omnigibson.utils.registry_utils import SerializableRegistry
+from omnigibson.utils.ui_utils import create_module_logger
+
+# Create module logger
+log = create_module_logger(module_name=__name__)
+
+# Global dicts that will contain mappings
+REGISTERED_SYSTEMS = dict()
 
 
 def get_system_from_element_name(name):
@@ -13,7 +21,7 @@ def get_system_from_element_name(name):
     Returns:
         BaseSystem: Corresponding system singleton
     """
-    systems = SYSTEMS_REGISTRY.get_dict("__name__")
+    systems = SYSTEMS_REGISTRY.get_dict("name")
     system_name = f"{name}System"
     assert_valid_key(key=system_name, valid_keys=systems, name="system name")
     return systems[system_name]
@@ -29,9 +37,31 @@ def get_element_name_from_system(system):
     Returns:
         BaseSystem: Corresponding system singleton
     """
-    systems = {v: k for k, v in SYSTEMS_REGISTRY.get_dict("__name__").items()}
+    systems = {v: k for k, v in SYSTEMS_REGISTRY.get_dict("name").items()}
     assert_valid_key(key=system, valid_keys=systems, name="system")
     return systems[system].split("System")[0]
+
+
+def refresh_systems_registry():
+    """
+    Updates the global systems registry based on whether GPU dynamics are enabled
+
+    Returns:
+        SerializableRegistry: Updated global systems registry, also mapped to the SYSTEMS_REGISTRY variable
+    """
+    global SYSTEMS_REGISTRY
+    SYSTEMS_REGISTRY.clear()
+    # Note that we possibly filter out systems that require GPU dynamics if we're not using GPU dynamics!
+    # In that case, we also notify the user to warn them that those systems will not be accessible
+    if not gm.USE_GPU_DYNAMICS:
+        log.warning("Omniverse-based particle systems (e.g. fluid, cloth) require gm.USE_GPU_DYNAMICS flag "
+                    "to be enabled. These systems will not be initialized.")
+
+    for system in REGISTERED_SYSTEMS.values():
+        if gm.USE_GPU_DYNAMICS or not system.requires_gpu_dynamics:
+            SYSTEMS_REGISTRY.add(obj=system)
+
+    return SYSTEMS_REGISTRY
 
 
 class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
@@ -44,11 +74,10 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
         # Run super init
         super().__init_subclass__(**kwargs)
 
-        global SYSTEMS_REGISTRY
+        global REGISTERED_SYSTEMS
         # Register this system if requested
         if cls._register_system:
-            print(f"registering system: {cls.name}")
-            SYSTEMS_REGISTRY.add(obj=cls)
+            REGISTERED_SYSTEMS[cls.__name__] = cls
 
     # Simulator reference
     simulator = None
@@ -77,6 +106,14 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
         """
         # We are initialized if we have an internal simulator reference
         return cls.simulator is not None
+
+    @classproperty
+    def requires_gpu_dynamics(cls):
+        """
+        Returns:
+            bool: Whether this system requires GPU dynamics to function or not
+        """
+        raise NotImplementedError()
 
     @classmethod
     def initialize(cls, simulator):
@@ -129,11 +166,9 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
         raise ValueError("System classes should not be created!")
 
 
-# Because we don't instantiate individual systems, we store the classes themselves in a global registry
+# Serializable registry of systems -- note this may be a subset of all registered systems!
 SYSTEMS_REGISTRY = SerializableRegistry(
     name="system_registry",
     class_types=BaseSystem,
-    # Ideally "name" would work, but for some reason __getattribute__()
-    # is not equivalent to .attr during the __init_subclass__ call, which is when we add these systems
-    default_key="__name__",
+    default_key="name",
 )

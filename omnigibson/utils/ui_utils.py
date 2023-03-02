@@ -3,18 +3,27 @@ Helper classes and functions for streamlining user interactions
 """
 import contextlib
 
+import logging
 import numpy as np
 import sys
+import datetime
+from pathlib import Path
+from PIL import Image
 import omnigibson as og
 from omnigibson.macros import gm
 import omnigibson.utils.transform_utils as T
+from scipy.spatial.transform import Rotation as R
+from scipy.interpolate import CubicSpline
+from scipy.integrate import quad
 import omni
 import omni.ui
 import omni.log
 import carb
 import random
+import imageio
 import logging
 from IPython import embed
+
 
 def dock_window(space, name, location, ratio=0.5):
     """
@@ -105,30 +114,73 @@ class KeyboardEventHandler:
 
 
 @contextlib.contextmanager
-def suppress_logging(channels):
+def suppress_omni_log(channels):
     """
     A context scope for temporarily suppressing logging for certain omni channels.
 
     Args:
-        channels (list of str): Logging channel(s) to suppress
+        channels (None or list of str): Logging channel(s) to suppress. If None, will globally disable logger
     """
     # Record the state to restore to after the context exists
     log = omni.log.get_log()
 
-    # For some reason, all enabled states always return False even if the logging is clearly enabled for the
-    # given channel, so we assume all channels are enabled
-    # We do, however, check what behavior was assigned to this channel, since we force an override during this context
-    channel_behavior = {channel: log.get_channel_enabled(channel)[2] for channel in channels}
+    if channels is None:
+        # Globally disable log
+        log.enabled = False
+    else:
+        # For some reason, all enabled states always return False even if the logging is clearly enabled for the
+        # given channel, so we assume all channels are enabled
+        # We do, however, check what behavior was assigned to this channel, since we force an override during this context
+        channel_behavior = {channel: log.get_channel_enabled(channel)[2] for channel in channels}
 
-    # Suppress the channels
-    for channel in channels:
-        log.set_channel_enabled(channel, False, omni.log.SettingBehavior.OVERRIDE)
+        # Suppress the channels
+        for channel in channels:
+            log.set_channel_enabled(channel, False, omni.log.SettingBehavior.OVERRIDE)
 
     yield
 
-    # Unsuppress the channels
-    for channel in channels:
-        log.set_channel_enabled(channel, True, channel_behavior[channel])
+    if channels is None:
+        # Globallly re-enable log
+        log.enabled = True
+    else:
+        # Unsuppress the channels
+        for channel in channels:
+            log.set_channel_enabled(channel, True, channel_behavior[channel])
+
+
+@contextlib.contextmanager
+def suppress_loggers(logger_names):
+    """
+    A context scope for temporarily suppressing logging for certain omni channels.
+
+    Args:
+        logger_names (list of str): Logger name(s) whose corresponding loggers should be suppressed
+    """
+    # Store prior states so we can restore them after this context exits
+    logger_levels = {name: logging.getLogger(name).getEffectiveLevel() for name in logger_names}
+
+    # Suppress the loggers (only output fatal messages)
+    for name in logger_names:
+        logging.getLogger(name).setLevel(logging.FATAL)
+
+    yield
+
+    # Unsuppress the loggers
+    for name in logger_names:
+        logging.getLogger(name).setLevel(logger_levels[name])
+
+
+def create_module_logger(module_name):
+    """
+    Creates and returns a logger for logging statements from the module represented by @module_name
+
+    Args:
+    module_name (str): Module to create the logger for. Should be the module's `__name__` variable
+
+    Returns:
+        Logger: Created logger for the module
+    """
+    return logging.getLogger(module_name)
 
 
 def disclaimer(msg):
@@ -195,16 +247,28 @@ class CameraMover:
     Args:
         cam (VisionSensor): The camera vision sensor to manipulate via the keyboard
         delta (float): Change (m) per keypress when moving the camera
+        save_dir (str): Absolute path to where recorded images should be stored. Default is <OMNIGIBSON_PATH>/imgs
     """
-    def __init__(self, cam, delta=0.25):
+    def __init__(self, cam, delta=0.25, save_dir=f"{og.root_path}/../images"):
         self.cam = cam
         self.delta = delta
         self.light_val = 5e5
+        self.save_dir = save_dir
 
         self._appwindow = omni.appwindow.get_default_app_window()
         self._input = carb.input.acquire_input_interface()
         self._keyboard = self._appwindow.get_keyboard()
         self._sub_keyboard = self._input.subscribe_to_keyboard_events(self._keyboard, self._sub_keyboard_event)
+
+    def set_save_dir(self, save_dir):
+        """
+        Sets the absolute path corresponding to the image directory where recorded images from this CameraMover
+        should be saved
+
+        Args:
+            save_dir (str): Absolute path to where recorded images should be stored
+        """
+        self.save_dir = save_dir
 
     def change_light(self, delta):
         self.light_val += delta
@@ -232,12 +296,133 @@ class CameraMover:
         print(f"\t T / G : Move camera up / down")
         print(f"\t 9 / 0 : Increase / decrease the lights")
         print(f"\t P : Print current camera pose")
+        print(f"\t O: Save the current camera view as an image")
 
     def print_cam_pose(self):
         """
         Prints out the camera pose as (position, quaternion) in the world frame
         """
         print(f"cam pose: {self.cam.get_position_orientation()}")
+
+    def get_image(self):
+        """
+        Helper function for quickly grabbing the currently viewed RGB image
+
+        Returns:
+            np.array: (H, W, 3) sized RGB image array
+        """
+        return self.cam.get_obs()["rgb"][:, :, :-1]
+
+    def record_image(self, fpath=None):
+        """
+        Saves the currently viewed image and writes it to disk
+
+        Args:
+            fpath (None or str): If specified, the absolute fpath to the image save location. Default is located in
+                self.save_dir
+        """
+        og.log.info("Recording image...")
+
+        # Use default fpath if not specified
+        if fpath is None:
+            timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            fpath = f"{self.save_dir}/og_{timestamp}.png"
+
+        # Make sure save path directory exists, and then save the image to that location
+        Path(Path(fpath).parent).mkdir(parents=True, exist_ok=True)
+        Image.fromarray(self.get_image()).save(fpath)
+        og.log.info(f"Saved current viewer camera image to {fpath}.")
+
+    def record_trajectory(self, poses, fps, steps_per_frame=1, fpath=None):
+        """
+        Moves the viewer camera through the poses specified by @poses and records the resulting trajectory to an mp4
+        video file on disk.
+
+        Args:
+            poses (list of 2-tuple): List of global (position, quaternion) values to set the viewer camera to defining
+                this trajectory
+            fps (int): Frames per second when recording this video
+            steps_per_frame (int): How many sim steps should occur between each frame being recorded. Minimum and
+                default is 1.
+            fpath (None or str): If specified, the absolute fpath to the video save location. Default is located in
+                self.save_dir
+        """
+        og.log.info("Recording trajectory...")
+
+        # Use default fpath if not specified
+        if fpath is None:
+            timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            fpath = f"{self.save_dir}/og_{timestamp}.mp4"
+
+        # Make sure save path directory exists, and then create the video writer
+        Path(Path(fpath).parent).mkdir(parents=True, exist_ok=True)
+        video_writer = imageio.get_writer(fpath, fps=fps)
+
+        # Iterate through all desired poses, and record the trajectory
+        for i, (pos, quat) in enumerate(poses):
+            self.cam.set_position_orientation(position=pos, orientation=quat)
+            og.sim.step()
+            if i % steps_per_frame == 0:
+                video_writer.append_data(self.get_image())
+
+        # Close writer
+        video_writer.close()
+        og.log.info(f"Saved camera trajectory video to {fpath}.")
+
+    def record_trajectory_from_waypoints(self, waypoints, per_step_distance, fps, steps_per_frame=1, fpath=None):
+        """
+        Moves the viewer camera through the waypoints specified by @waypoints and records the resulting trajectory to
+        an mp4 video file on disk.
+
+        Args:
+            waypoints (np.array): (n, 3) global position waypoint values to set the viewer camera to defining this trajectory
+            per_step_distance (float): How much distance (in m) should be approximately covered per trajectory step.
+                This will determine the path length between individual waypoints
+            fps (int): Frames per second when recording this video
+            steps_per_frame (int): How many sim steps should occur between each frame being recorded. Minimum and
+                default is 1.
+            fpath (None or str): If specified, the absolute fpath to the video save location. Default is located in
+                self.save_dir
+        """
+        # Create splines and their derivatives
+        n_waypoints = len(waypoints)
+        splines = [CubicSpline(range(n_waypoints), waypoints[:, i], bc_type='clamped') for i in range(3)]
+        dsplines = [spline.derivative() for spline in splines]
+
+        # Function help get arc derivative
+        def arc_derivative(u):
+            return np.sqrt(np.sum([dspline(u) ** 2 for dspline in dsplines]))
+
+        # Function to help get interpolated positions
+        def get_interpolated_positions(step):
+            assert step < n_waypoints - 1
+            dist = quad(func=arc_derivative, a=step, b=step + 1)[0]
+            path_length = int(dist / per_step_distance)
+            interpolated_points = np.zeros((path_length, 3))
+            for i in range(path_length):
+                curr_step = step + (1.0 / path_length * i)
+                interpolated_points[i, :] = np.array([spline(curr_step) for spline in splines])
+            return interpolated_points
+
+        # Iterate over all waypoints and infer the resulting trajectory, recording the resulting poses
+        poses = []
+        for i in range(n_waypoints - 1):
+            positions = get_interpolated_positions(step=i)
+            for j in range(len(positions) - 1):
+                # Get direction vector from the current to the following point
+                direction = positions[j + 1] - positions[j]
+                direction = direction / np.linalg.norm(direction)
+                # Infer tilt and pan angles from this direction
+                xy_direction = direction[:2] / np.linalg.norm(direction[:2])
+                z = direction[2]
+                pan_angle = np.arctan2(-xy_direction[0], xy_direction[1])
+                tilt_angle = np.arcsin(z)
+                # Infer global quat orientation from these angles
+                quat = T.euler2quat([np.pi / 2 - tilt_angle, 0.0, pan_angle])
+                poses.append([positions[i], quat])
+
+        # Record the generated trajectory
+        self.record_trajectory(poses=poses, fps=fps, steps_per_frame=steps_per_frame, fpath=fpath)
 
     def set_delta(self, delta):
         """
@@ -264,9 +449,10 @@ class CameraMover:
             dict: Mapping from relevant keypresses to corresponding function call to use
         """
         return {
+            carb.input.KeyboardInput.O: lambda: self.record_image(fpath=None),
             carb.input.KeyboardInput.P: lambda: self.print_cam_pose(),
-            carb.input.KeyboardInput.KEY_9: lambda: self.change_light(delta=2e4),
-            carb.input.KeyboardInput.KEY_0: lambda: self.change_light(delta=-2e4),
+            carb.input.KeyboardInput.KEY_9: lambda: self.change_light(delta=-2e4),
+            carb.input.KeyboardInput.KEY_0: lambda: self.change_light(delta=2e4),
         }
 
     @property

@@ -12,8 +12,10 @@ from omnigibson.object_states.object_state_base import BooleanState, RelativeObj
 from omnigibson.object_states.contact_bodies import ContactBodies
 from omnigibson.utils.usd_utils import create_joint
 from omnigibson.utils.sim_utils import check_collision
+from omnigibson.utils.ui_utils import create_module_logger
 
-import logging
+# Create module logger
+log = create_module_logger(module_name=__name__)
 
 
 # Create settings for this module
@@ -75,11 +77,11 @@ class Attached(RelativeObjectState, BooleanState, ContactSubscribedStateMixin):
 
                     return True
                 else:
-                    logging.warning(f"Trying to attach object {self.obj.name} to object {other.name}, "
+                    log.warning(f"Trying to attach object {self.obj.name} to object {other.name}, "
                                     f"but they have attachment type/category mismatch or they are not in contact.")
                     return False
             else:
-                logging.warning(f"Trying to attach object {self.obj.name} to object {other.name}, "
+                log.warning(f"Trying to attach object {self.obj.name} to object {other.name}, "
                                 f"but it is already attached to object {self.attached_obj.name}. Try detaching first.")
                 return False
 

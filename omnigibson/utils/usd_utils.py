@@ -24,7 +24,7 @@ import omnigibson as og
 from omnigibson.macros import gm
 from omnigibson.utils.constants import JointType, PRIMITIVE_MESH_TYPES
 from omnigibson.utils.python_utils import assert_valid_key
-from omnigibson.utils.ui_utils import suppress_logging
+from omnigibson.utils.ui_utils import suppress_omni_log
 import omnigibson.utils.transform_utils as T
 
 GF_TO_VT_MAPPING = {
@@ -420,7 +420,7 @@ class FlatcacheAPI:
 
         # We're somewhat abusing low-level dynamic control - physx - usd integration, but we (supposedly) know
         # what we're doing so we suppress logging so we don't see any error messages :D
-        with suppress_logging(["omni.physx.plugin"]):
+        with suppress_omni_log(["omni.physx.plugin"]):
             # Import here to avoid circular imports
             from omnigibson.prims.xform_prim import XFormPrim
 
@@ -464,7 +464,7 @@ class FlatcacheAPI:
 
         # We're somewhat abusing low-level dynamic control - physx - usd integration, but we (supposedly) know
         # what we're doing so we suppress logging so we don't see any error messages :D
-        with suppress_logging(["omni.physx.plugin"]):
+        with suppress_omni_log(["omni.physx.plugin"]):
             # Import here to avoid circular imports
             from omnigibson.prims.xform_prim import XFormPrim
 
@@ -531,13 +531,11 @@ def create_mesh_prim_with_default_xform(primitive_type, prim_path, stage=None, u
     # TODO (eric): change it to 0.5 once the mesh generator API accepts floating-number HALF_SCALE
     #  (currently it only accepts integer-number and floors 0.5 into 0).
     carb.settings.get_settings().set(evaluator.SETTING_OBJECT_HALF_SCALE, 1)
-
-    stage = get_current_stage() if stage is None else stage
-    prim_path_from = Sdf.Path(omni.usd.get_stage_next_free_path(stage, primitive_type, True))
     if u_patches is not None and v_patches is not None:
         omni.kit.commands.execute(
             "CreateMeshPrimWithDefaultXform",
             prim_type=primitive_type,
+            prim_path=prim_path,
             u_patches=u_patches,
             v_patches=v_patches,
         )
@@ -545,8 +543,8 @@ def create_mesh_prim_with_default_xform(primitive_type, prim_path, stage=None, u
         omni.kit.commands.execute(
             "CreateMeshPrimWithDefaultXform",
             prim_type=primitive_type,
+            prim_path=prim_path,
         )
-    omni.kit.commands.execute("MovePrim", path_from=prim_path_from, path_to=prim_path)
 
     carb.settings.get_settings().set(evaluator.SETTING_U_SCALE, u_backup)
     carb.settings.get_settings().set(evaluator.SETTING_V_SCALE, v_backup)
@@ -630,7 +628,7 @@ def add_asset_to_stage(asset_path, prim_path):
     asset_type = asset_path[-3:]
 
     # Make sure the path exists
-    assert os.path.exists(asset_path), f"{asset_type.upper()} file {asset_path} does not exist!"
+    assert os.path.exists(asset_path), f"Cannot load {asset_type.upper()} file {asset_path} because it does not exist!"
 
     # Add reference to stage and grab prim
     add_reference_to_stage(usd_path=asset_path, prim_path=prim_path)

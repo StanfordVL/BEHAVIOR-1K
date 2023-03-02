@@ -1,5 +1,4 @@
 import gym
-import logging
 
 import omnigibson as og
 from omnigibson.objects import REGISTERED_OBJECTS
@@ -8,8 +7,13 @@ from omnigibson.tasks import REGISTERED_TASKS
 from omnigibson.scenes import REGISTERED_SCENES
 from omnigibson.utils.gym_utils import GymObservable
 from omnigibson.utils.config_utils import parse_config
+from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.python_utils import assert_valid_key, merge_nested_dicts, create_class_from_registry_and_config,\
     Recreatable
+
+
+# Create module logger
+log = create_module_logger(module_name=__name__)
 
 
 class Environment(gym.Env, GymObservable, Recreatable):
@@ -292,7 +296,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         """
         Clean up the environment and shut down the simulation.
         """
-        og.sim.close()
+        og.shutdown()
 
     def get_obs(self):
         """
@@ -409,11 +413,11 @@ class Environment(gym.Env, GymObservable, Recreatable):
             # Print out all observations for all robots and task
             for robot in self.robots:
                 for key, value in self.observation_space[robot.name].items():
-                    logging.error(("obs_space", key, value.dtype, value.shape))
-                    logging.error(("obs", key, obs[robot.name][key].dtype, obs[robot.name][key].shape))
+                    log.error(("obs_space", key, value.dtype, value.shape))
+                    log.error(("obs", key, obs[robot.name][key].dtype, obs[robot.name][key].shape))
             for key, value in self.observation_space["task"].items():
-                logging.error(("obs_space", key, value.dtype, value.shape))
-                logging.error(("obs", key, obs["task"][key].dtype, obs["task"][key].shape))
+                log.error(("obs_space", key, value.dtype, value.shape))
+                log.error(("obs", key, obs["task"][key].dtype, obs["task"][key].shape))
             raise ValueError("Observation space does not match returned observations!")
 
         return obs

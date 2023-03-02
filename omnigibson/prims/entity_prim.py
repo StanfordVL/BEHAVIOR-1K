@@ -11,11 +11,11 @@ import omni
 from omni.isaac.core.utils.prims import get_prim_property, set_prim_property, \
     get_prim_parent, get_prim_at_path
 
+import omnigibson as og
 from omnigibson.prims.cloth_prim import ClothPrim
 from omnigibson.prims.joint_prim import JointPrim
 from omnigibson.prims.rigid_prim import RigidPrim
 from omnigibson.prims.xform_prim import XFormPrim
-from omnigibson.utils.sim_utils import check_collision
 from omnigibson.utils.constants import PrimType, GEOM_TYPES
 from omnigibson.macros import gm
 
@@ -175,7 +175,7 @@ class EntityPrim(XFormPrim):
         self.update_handles()
 
         # Handle case separately based on whether the handle is valid (i.e.: whether we are actually articulated or not)
-        if (not self.kinematic_only) and self._handle != _dynamic_control.INVALID_HANDLE:
+        if (not self.kinematic_only) and self._handle is not None:
             root_prim = get_prim_at_path(self._dc.get_rigid_body_path(self._root_handle))
             n_dof = self._dc.get_articulation_dof_count(self._handle)
 
@@ -235,7 +235,7 @@ class EntityPrim(XFormPrim):
              bool: Whether this prim is articulated or not
         """
         # An invalid handle implies that there is no articulation available for this object
-        return self._handle != _dynamic_control.INVALID_HANDLE
+        return self._handle is not None
 
     @property
     def articulation_root_path(self):
@@ -275,8 +275,8 @@ class EntityPrim(XFormPrim):
     def handle(self):
         """
         Returns:
-            int: ID (articulation) handle assigned to this prim from dynamic_control interface. Note that
-                if this prim is not an articulation, it is assigned _dynamic_control.INVALID_HANDLE
+            None or int: ID (articulation) handle assigned to this prim from dynamic_control interface. Note that
+                if this prim is not an articulation, it is None
         """
         return self._handle
 
@@ -316,6 +316,22 @@ class EntityPrim(XFormPrim):
                     prim_type = child_prim.GetPrimTypeInfo().GetTypeName().lower()
                     if "joint" in prim_type and "fixed" not in prim_type:
                         num += 1
+        return num
+
+    @property
+    def n_fixed_joints(self):
+        """
+        Returns:
+        int: Number of fixed joints owned by this articulation
+        """
+        # Manually iterate over all links and check for any joints that are not fixed joints!
+        num = 0
+        for link in self._links.values():
+            for child_prim in link.prim.GetChildren():
+                prim_type = child_prim.GetPrimTypeInfo().GetTypeName().lower()
+                if "joint" in prim_type and "fixed" in prim_type:
+                    num += 1
+
         return num
 
     @property
@@ -648,12 +664,20 @@ class EntityPrim(XFormPrim):
         """
         Updates all internal handles for this prim, in case they change since initialization
         """
-        self._handle = self._dc.get_articulation(self.articulation_root_path)
+        assert og.sim.is_playing(), "Simulator must be playing if updating handles!"
+
+        # Grab the handle -- we know it might not return a valid value, so we suppress omni's warning here
+        self._handle = self._dc.get_articulation(self.articulation_root_path) if \
+            get_prim_at_path(self.articulation_root_path).HasAPI(UsdPhysics.ArticulationRootAPI) else None
+
+        # Sanity check -- make sure handle is not invalid handle -- it should only ever be None or a valid integer
+        assert self._handle != _dynamic_control.INVALID_HANDLE, \
+            f"Got invalid articulation handle for entity at {self.articulation_root_path}"
 
         # We only have a root handle if we're not a cloth prim
         if self._prim_type != PrimType.CLOTH:
             self._root_handle = self._dc.get_articulation_root_body(self._handle) if \
-                self._handle != _dynamic_control.INVALID_HANDLE else self.root_link.handle
+                self._handle is not None else self.root_link.handle
 
         # Update all links and joints as well
         for link in self._links.values():

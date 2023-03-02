@@ -1,5 +1,3 @@
-import logging
-
 import numpy as np
 import omnigibson as og
 from omnigibson.renderer_settings.renderer_settings import RendererSettings
@@ -9,7 +7,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     """
     Shows how to use RendererSettings class
     """
-    logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
+    og.log.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
 
     # Specify objects to load
     banana_cfg = dict(

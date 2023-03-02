@@ -4,6 +4,10 @@ import logging
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.object_state_base import BooleanState, AbsoluteObjectState
 from omnigibson.utils.constants import JointType
+from omnigibson.utils.ui_utils import create_module_logger
+
+# Create module logger
+log = create_module_logger(module_name=__name__)
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -89,7 +93,7 @@ def _get_relevant_joints(obj):
 
     # Get joint IDs and names from metadata annotation. If not, return default values.
     if m.METADATA_FIELD not in obj.metadata:
-        logging.warning("No openable joint metadata found for object %s" % obj.name)
+        log.warning(f"No openable joint metadata found for object {obj.name}")
         return default_both_sides, default_relevant_joints, default_joint_directions
 
     both_sides = obj.metadata[m.BOTH_SIDES_METADATA_FIELD] if m.BOTH_SIDES_METADATA_FIELD in obj.metadata else False
@@ -111,8 +115,15 @@ def _get_relevant_joints(obj):
 
 
 class Open(AbsoluteObjectState, BooleanState):
+    def __init__(self, obj):
+        # Check the metadata info to get relevant joints information
+        self.relevant_joints_info = _get_relevant_joints(obj)
+
+        # Run super method
+        super().__init__(obj=obj)
+
     def _get_value(self):
-        both_sides, relevant_joints, joint_directions = _get_relevant_joints(self.obj)
+        both_sides, relevant_joints, joint_directions = self.relevant_joints_info
         if not relevant_joints:
             return False
 
@@ -150,7 +161,7 @@ class Open(AbsoluteObjectState, BooleanState):
         @param fully: whether the object should be fully opened/closed (e.g. all relevant joints to 0/1).
         @return: bool indicating setter success. Failure may happen due to unannotated objects.
         """
-        both_sides, relevant_joints, joint_directions = _get_relevant_joints(self.obj)
+        both_sides, relevant_joints, joint_directions = self.relevant_joints_info
         if not relevant_joints:
             return False
 

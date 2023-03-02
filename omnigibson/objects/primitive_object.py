@@ -1,4 +1,3 @@
-import logging
 import numpy as np
 from omnigibson.objects.stateful_object import StatefulObject
 from omnigibson.utils.python_utils import assert_valid_key
@@ -8,6 +7,10 @@ from omnigibson.utils.constants import PrimType, PRIMITIVE_MESH_TYPES
 from omnigibson.utils.usd_utils import create_primitive_mesh
 from omnigibson.utils.render_utils import create_pbr_material
 from omnigibson.utils.physx_utils import bind_material
+from omnigibson.utils.ui_utils import create_module_logger
+
+# Create module logger
+log = create_module_logger(module_name=__name__)
 
 
 # Define valid objects that can be created
@@ -115,8 +118,6 @@ class PrimitiveObject(StatefulObject):
         )
 
     def _load(self, simulator=None):
-        logging.info(f"Loading the following primitive: {self._primitive_type}")
-
         # Define an Xform at the specified path
         stage = simulator.stage
         prim = stage.DefinePrim(self._prim_path, "Xform")
@@ -124,8 +125,8 @@ class PrimitiveObject(StatefulObject):
         if self._prim_type == PrimType.RIGID:
             # Define a nested mesh corresponding to the root link for this prim
             base_link = stage.DefinePrim(f"{self._prim_path}/base_link", "Xform")
-            self._vis_geom = create_primitive_mesh(prim_path=f"{self._prim_path}/base_link/visual", primitive_type=self._primitive_type)
-            self._col_geom = create_primitive_mesh(prim_path=f"{self._prim_path}/base_link/collision", primitive_type=self._primitive_type)
+            self._vis_geom = create_primitive_mesh(prim_path=f"{self._prim_path}/base_link/visuals", primitive_type=self._primitive_type)
+            self._col_geom = create_primitive_mesh(prim_path=f"{self._prim_path}/base_link/collisions", primitive_type=self._primitive_type)
 
             # Add collision API to collision geom
             UsdPhysics.CollisionAPI.Apply(self._col_geom.GetPrim())
@@ -172,11 +173,11 @@ class PrimitiveObject(StatefulObject):
             col_approximation = "boundingCube"
         else:
             col_approximation = "convexHull"
-        self.root_link.collision_meshes["collision"].set_collision_approximation(col_approximation)
+        self.root_link.collision_meshes["collisions"].set_collision_approximation(col_approximation)
 
         # Possibly set scalings (only if the scale value is not set)
         if self._load_config["scale"] is not None:
-            logging.warning("Custom scale specified for primitive object, so ignoring radius, height, and size arguments!")
+            log.warning("Custom scale specified for primitive object, so ignoring radius, height, and size arguments!")
         else:
             if self._load_config["radius"] is not None:
                 self.radius = self._load_config["radius"]

@@ -7,6 +7,10 @@ import builtins
 # TODO: Need to fix somehow -- omnigibson gets imported first BEFORE we can actually modify the macros
 from omnigibson.macros import gm
 
+# Create logger
+logging.basicConfig(format='[%(levelname)s] [%(name)s] %(message)s')
+log = logging.getLogger(__name__)
+
 builtins.ISAAC_LAUNCHED_FROM_JUPYTER = (
     os.getenv("ISAAC_JUPYTER_KERNEL") is not None
 )  # We set this in the kernel.json file
@@ -17,7 +21,7 @@ nest_asyncio.apply()
 
 __version__ = "0.0.5"
 
-logging.getLogger().setLevel(logging.INFO)
+log.setLevel(logging.INFO)
 
 with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), "global_config.yaml")) as f:
     global_config = yaml.load(f, Loader=yaml.FullLoader)
@@ -58,17 +62,17 @@ if not os.path.isabs(og_dataset_path):
 if not os.path.isabs(key_path):
     key_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), key_path)
 
-logging.info("Importing OmniGibson (omnigibson module)")
-logging.info("Assets path: {}".format(assets_path))
-logging.info("Gibson Dataset path: {}".format(g_dataset_path))
-logging.info("OmniGibson Dataset path: {}".format(og_dataset_path))
-logging.info("OmniGibson Key path: {}".format(key_path))
+log.info("Importing OmniGibson (omnigibson module)")
+log.info("Assets path: {}".format(assets_path))
+log.info("Gibson Dataset path: {}".format(g_dataset_path))
+log.info("OmniGibson Dataset path: {}".format(og_dataset_path))
+log.info("OmniGibson Key path: {}".format(key_path))
 
 example_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "examples")
 example_config_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "configs")
 
-logging.info("Example path: {}".format(example_path))
-logging.info("Example config path: {}".format(example_config_path))
+log.info("Example path: {}".format(example_path))
+log.info("Example config path: {}".format(example_config_path))
 
 # whether to enable debugging mode for object sampling
 debug_sampling = False
@@ -87,7 +91,7 @@ ALL_SENSOR_MODALITIES = None
 
 # Helper functions for starting omnigibson
 def print_save_usd_warning(_):
-    logging.warning("Exporting individual USDs has been disabled in OG due to copyrights.")
+    log.warning("Exporting individual USDs has been disabled in OG due to copyrights.")
 
 
 def create_app():
@@ -122,6 +126,8 @@ def start():
     global app, sim, Environment, REGISTERED_SCENES, REGISTERED_OBJECTS, REGISTERED_ROBOTS, REGISTERED_CONTROLLERS, \
         REGISTERED_TASKS, ALL_SENSOR_MODALITIES
 
+    log.info(f"{'-' * 10} Starting OmniGibson {'-' * 10}")
+
     # First create the app, then create the sim
     app = create_app()
     sim = create_sim()
@@ -146,5 +152,6 @@ if not (os.getenv("OMNIGIBSON_NO_OMNIVERSE", 'False').lower() in {'true', '1', '
 
 def shutdown():
     global app
+    log.info(f"{'-' * 10} Shutting Down OmniGibson {'-' * 10}")
     app.close()
     exit(0)

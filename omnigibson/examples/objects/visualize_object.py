@@ -1,5 +1,4 @@
 import argparse
-import logging
 import numpy as np
 
 import omnigibson as og
@@ -16,7 +15,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     Visualizes object as specified by its USD path, @usd_path. If None if specified, will instead
     result in an object selection from OmniGibson's object dataset
     """
-    logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
+    og.log.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
 
     # Assuming that if random_selection=True, headless=True, short_exec=True, we are calling it from tests and we
     # do not want to parse args (it would fail because the calling function is pytest "testfile.py")
@@ -111,7 +110,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     env.step(np.array([]))
 
     # Move the object so that its center is at [0, 0, 1]
-    center_offset = obj.aabb_center - obj.get_position() + np.array([0, 0, 1.0])
+    center_offset = obj.get_position() - obj.aabb_center + np.array([0, 0, 1.0])
     obj.set_position(center_offset)
 
     # Allow the user to easily move the camera around
@@ -132,6 +131,9 @@ def main(random_selection=False, headless=False, short_exec=False):
             obj.keep_still()
         obj.set_position_orientation(position=pos, orientation=quat)
         env.step(np.array([]))
+
+    # Shut down at the end
+    og.shutdown()
 
 
 if __name__ == "__main__":

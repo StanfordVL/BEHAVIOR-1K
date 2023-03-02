@@ -1,4 +1,3 @@
-import logging
 import numpy as np
 
 import omnigibson as og
@@ -18,7 +17,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     Loads an interactive scene and sets all object surface to be dirty
     Loads also a cleaning tool that can be soaked in water and used to clean objects if moved manually
     """
-    logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
+    og.log.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
 
     # Create the scene config to load -- Rs_int with only a few object categories loaded, as
     # well as a custom block object that will be used as a cleaning tool
@@ -70,16 +69,16 @@ def main(random_selection=False, headless=False, short_exec=False):
     water_source_objects = env.scene.get_objects_with_state(object_states.WaterSource)
 
     for obj in dusty_objects:
-        logging.info(f"Setting object {obj.name} to be Dusty")
+        og.log.info(f"Setting object {obj.name} to be Dusty")
         obj.states[object_states.Covered].set_value(DustSystem, True)
 
     for obj in stained_objects:
-        logging.info(f"Setting object {obj.name} to be Stained")
+        og.log.info(f"Setting object {obj.name} to be Stained")
         obj.states[object_states.Covered].set_value(StainSystem, True)
 
     for obj in water_source_objects:
         if object_states.ToggledOn in obj.states:
-            logging.info(f"Setting water source object {obj} to be ToggledOn")
+            og.log.info(f"Setting water source object {obj} to be ToggledOn")
             obj.states[object_states.ToggledOn].set_value(True)
 
     # Set the camera to be in a good position

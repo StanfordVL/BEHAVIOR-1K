@@ -1,3 +1,4 @@
+import trimesh.triangles
 from omni.isaac.core.utils.prims import get_prim_at_path, get_prim_parent
 from omni.isaac.core.utils.transformations import tf_matrix_from_pose
 from omni.isaac.core.utils.rotations import gf_quat_to_np_array
@@ -94,16 +95,19 @@ class RigidPrim(XFormPrim):
                 self._prim.HasAPI(PhysxSchema.PhysxContactReportAPI) else \
                 PhysxSchema.PhysxContactReportAPI.Apply(self._prim)
 
-        # Possibly set the mass / density
-        if "mass" in self._load_config and self._load_config["mass"] is not None:
-            self.mass = self._load_config["mass"]
-        if "density" in self._load_config and self._load_config["density"] is not None:
-            self.density = self._load_config["density"]
-
         # Store references to owned visual / collision meshes
         # We iterate over all children of this object's prim,
         # and grab any that are presumed to be meshes
         self.update_meshes()
+
+        # Possibly set the mass / density
+        if len(self._collision_meshes) == 0:
+            # We have no collision meshes, so set a negligible mass
+            self.mass = 1e-6
+        elif "mass" in self._load_config and self._load_config["mass"] is not None:
+            self.mass = self._load_config["mass"]
+        if "density" in self._load_config and self._load_config["density"] is not None:
+            self.density = self._load_config["density"]
 
         # Set the visual-only attribute
         # This automatically handles setting collisions / gravity appropriately
@@ -420,7 +424,14 @@ class RigidPrim(XFormPrim):
             if mesh_type == "Mesh":
                 # We construct a trimesh object from this mesh in order to infer its volume
                 trimesh_mesh = mesh_prim_to_trimesh_mesh(mesh)
-                mesh_volume = trimesh_mesh.volume if trimesh_mesh.is_volume else trimesh_mesh.convex_hull.volume
+                if trimesh_mesh.is_volume:
+                    mesh_volume = trimesh_mesh.volume
+                elif trimesh.triangles.all_coplanar(trimesh_mesh.triangles):
+                    # The mesh is a plane, so we can't make a convex hull -- return 0 volume
+                    mesh_volume = 0.0
+                else:
+                    # Fallback to convex hull approximation
+                    mesh_volume = trimesh_mesh.convex_hull.volume
             elif mesh_type == "Sphere":
                 mesh_volume = 4 / 3 * np.pi * (mesh.GetAttribute("radius").Get() ** 3)
             elif mesh_type == "Cube":

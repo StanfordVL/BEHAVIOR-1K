@@ -1,5 +1,6 @@
 from abc import ABCMeta, abstractmethod
 from collections import namedtuple
+import omnigibson as og
 from omnigibson.systems import *
 from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.object_states import *
@@ -9,7 +10,7 @@ from omnigibson import og_dataset_path
 
 
 # Tuple of attributes of objects created in transitions.
-_attrs_fields = ["category", "model", "name", "scale", "obj", "pos", "orn"]
+_attrs_fields = ["category", "model", "name", "scale", "obj", "pos", "orn", "bb_pos", "bb_orn"]
 ObjectAttrs = namedtuple(
     "ObjectAttrs", _attrs_fields, defaults=(None,) * len(_attrs_fields))
 
@@ -278,37 +279,44 @@ class SlicingRule(BaseTransitionRule):
         t_results = TransitionResults()
 
         # Load object parts.
-        for _, part_idx in enumerate(sliced_obj.metadata["object_parts"]):
-            # List of dicts gets replaced by {'0':dict, '1':dict, ...}.
-            part = sliced_obj.metadata["object_parts"][part_idx]
-            part_category = part["category"]
-            part_model = part["model"]
+        for part_idx, part in sliced_obj.metadata["object_parts"].items():
+            # List of dicts gets replaced by {'0':dict, '1':dict, ...}
+
+            # Get bounding box info
+            part_bb_pos = np.array(part["bb_pos"])
+            part_bb_orn = np.array(part["bb_orn"])
+
+            # Determine the relative scale to apply to the object part from the original object
+            # Note that proper (rotated) scaling can only be applied when the relative orientation of
+            # the object part is a multiple of 90 degrees wrt the parent object, so we assert that here
+            # Check by making sure the quaternion is some permutation of +/- (1, 0, 0, 0),
+            # +/- (0.707, 0.707, 0, 0), or +/- (0.5, 0.5, 0.5, 0.5)
+            # Because orientations are all normalized (same L2-norm), every orientation should have a unique L1-norm
+            # So we check the L1-norm of the absolute value of the orientation as a proxy for verifying these values
+            assert np.any(np.isclose(np.abs(part_bb_orn).sum(), np.array([1.0, 1.414, 2.0]), atol=1e-3)), \
+                "Sliceable objects should only have relative object part orientations that are factors of 90 degrees!"
+
             # Scale the offset accordingly.
-            part_pos = part["pos"] * sliced_obj.scale
-            part_orn = part["orn"]
-            part_obj_name = f"{sliced_obj.name}_part_{part_idx}"
-            model_root_path = f"{og_dataset_path}/objects/{part_category}/{part_model}"
-            usd_path = f"{model_root_path}/usd/{part_model}.usd"
+            scale = np.abs(T.quat2mat(part_bb_orn) @ sliced_obj.scale)
 
-            # Calculate global part pose.
-            part_pos = np.array(part_pos) + pos
-            part_orn = T.quat_multiply(np.array(part_orn), orn)
+            # Calculate global part bounding box pose.
+            part_bb_pos = pos + T.quat2mat(orn) @ (part_bb_pos * scale)
+            part_bb_orn = T.quat_multiply(orn, part_bb_orn)
 
-            # Circular import.
+            # Avoid circular imports
             from omnigibson.objects.dataset_object import DatasetObject
 
+            part_obj_name = f"{sliced_obj.name}_part_{part_idx}"
             part_obj = DatasetObject(
                 prim_path=f"/World/{part_obj_name}",
-                usd_path=usd_path,
-                category=part_category,
                 name=part_obj_name,
-                scale=sliced_obj.scale,
-                abilities={}
+                category=part["category"],
+                model=part["model"],
+                bounding_box=part["bb_size"] * scale,   # equiv. to scale=(part["bb_size"] / self.native_bbox) * (scale)
             )
 
             # Add the new object to the results.
-            new_obj_attrs = ObjectAttrs(
-                obj=part_obj, pos=np.array(part_pos), orn=np.array(part_orn))
+            new_obj_attrs = ObjectAttrs(obj=part_obj, bb_pos=part_bb_pos, bb_orn=part_bb_orn)
             t_results.add.append(new_obj_attrs)
 
         # Delete original object from stage.
@@ -387,7 +395,7 @@ class ContainerRule(BaseTransitionRule):
         self._counter += 1
         scale = self.obj_attrs.scale
 
-        model_root_path = f"{og_dataset_path}/objects/{category}/{model}"
+        model_root_path = f"{og.og_dataset_path}/objects/{category}/{model}"
         usd_path = f"{model_root_path}/usd/{model}.usd"
 
         final_obj = DatasetObject(
@@ -465,7 +473,7 @@ class ContainerGarbageRule(BaseTransitionRule):
         self._counter += 1
         scale = self.obj_attrs.scale
 
-        model_root_path = f"{og_dataset_path}/objects/{category}/{model}"
+        model_root_path = f"{og.og_dataset_path}/objects/{category}/{model}"
         usd_path = f"{model_root_path}/usd/{model}.usd"
 
         garbage_obj = DatasetObject(

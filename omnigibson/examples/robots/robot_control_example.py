@@ -3,8 +3,6 @@ Example script demo'ing robot control.
 
 Options for random actions, as well as selection of robot action space
 """
-import logging
-
 import numpy as np
 
 import omnigibson as og
@@ -63,7 +61,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     Robot control demo with selection
     Queries the user to select a robot, the controllers, a scene and a type of input (random actions or teleop)
     """
-    logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
+    og.log.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
 
     # Choose scene to load
     scene_model = choose_from_options(options=SCENES, name="scene", random_selection=random_selection)

@@ -1,5 +1,4 @@
 import os
-import logging
 import numpy as np
 
 import omnigibson as og
@@ -13,7 +12,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     Prompts the user to select whether they are saving or loading an environment, and interactively
     shows how an environment can be saved or restored.
     """
-    logging.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
+    og.log.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
 
     cfg = {
         "scene": {

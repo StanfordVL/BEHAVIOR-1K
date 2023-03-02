@@ -1,5 +1,4 @@
 import numpy as np
-import logging
 
 import omnigibson as og
 from omnigibson.objects.primitive_object import PrimitiveObject
@@ -15,6 +14,10 @@ from omnigibson.termination_conditions.timeout import Timeout
 from omnigibson.utils.python_utils import classproperty, assert_valid_key
 from omnigibson.utils.sim_utils import land_object, test_valid_pose
 import omnigibson.utils.transform_utils as T
+from omnigibson.utils.ui_utils import create_module_logger
+
+# Create module logger
+log = create_module_logger(module_name=__name__)
 
 
 # Valid point navigation reward types
@@ -236,13 +239,13 @@ class PointNavigationTask(BaseTask):
                     break
             # Notify if we weren't able to get a valid start / end point sampled in the requested range
             if not in_range_dist:
-                logging.warning("Failed to sample initial and target positions within requested path range")
+                log.warning("Failed to sample initial and target positions within requested path range")
         else:
             goal_pos = self._goal_pos
 
         # Add additional logging info
-        logging.info("Sampled initial pose: {}, {}".format(initial_pos, initial_quat))
-        logging.info("Sampled goal position: {}".format(goal_pos))
+        log.info("Sampled initial pose: {}, {}".format(initial_pos, initial_quat))
+        log.info("Sampled goal position: {}".format(goal_pos))
         return initial_pos, initial_quat, goal_pos
 
     def _get_geodesic_potential(self, env):
@@ -316,7 +319,7 @@ class PointNavigationTask(BaseTask):
 
         # Notify user if we failed to reset a collision-free sampled pose
         if not success:
-            logging.warning("WARNING: Failed to reset robot without collision")
+            log.warning("WARNING: Failed to reset robot without collision")
 
         # Land the robot
         land_object(env.robots[self._robot_idn], initial_pos, initial_quat, env.initial_pos_z_offset)
