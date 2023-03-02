@@ -444,8 +444,8 @@ class CameraMover:
         return {
             carb.input.KeyboardInput.O: lambda: self.record_image(fpath=None),
             carb.input.KeyboardInput.P: lambda: self.print_cam_pose(),
-            carb.input.KeyboardInput.KEY_9: lambda: self.change_light(delta=2e4),
-            carb.input.KeyboardInput.KEY_0: lambda: self.change_light(delta=-2e4),
+            carb.input.KeyboardInput.KEY_9: lambda: self.change_light(delta=-2e4),
+            carb.input.KeyboardInput.KEY_0: lambda: self.change_light(delta=2e4),
         }
 
     @property
