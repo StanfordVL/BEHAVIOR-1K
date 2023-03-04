@@ -15,6 +15,7 @@ from omnigibson.utils.python_utils import Registerable, classproperty
 from omnigibson.utils.constants import PrimType, CLASS_NAME_TO_CLASS_ID
 from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
 
+from omni.isaac.core.utils.prims import get_prim_at_path
 from omni.isaac.core.utils.semantics import add_update_semantics
 
 # Global dicts that will contain mappings
@@ -155,7 +156,6 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             self._prim.RemoveAPI(UsdPhysics.ArticulationRootAPI)
             self._prim.RemoveAPI(PhysxSchema.PhysxArticulationAPI)
 
-        articulation_root_prim = None
         # Add fixed joint if we're fixing the base
         if self.fixed_base:
             # For optimization purposes, if we only have a single rigid body that has either
@@ -172,31 +172,12 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
                     joint_type="FixedJoint",
                     body1=f"{self._prim_path}/{self._root_link_name}",
                 )
-                # Also set the articulation root to be the object-level prim
-                articulation_root_prim = self._prim
-        else:
-            # 3 cases:
-            has_articulated_joints, has_fixed_joints = self.n_joints > 0, self.n_fixed_joints > 0
-            if not has_articulated_joints:
-                # 1. no articulated joints, yes fixed joints --> Articulation Root should exist at object-level prim
-                # 2. no articulated joints, no fixed joints --> Articulation Root should not exist
-                articulation_root_prim = self._prim if has_fixed_joints else None
-            else:
-                # 3. yes articulated joints, no / yes fixed joints --> Articulation Root should exist at root_link prim
-                # This is a bit hacky because omniverse is buggy
-                # Articulation roots mess up the joint order if it's on a non-fixed base robot, e.g. a
-                # mobile manipulator. So if we have to move it to the actual root link of the robot instead.
-                # See https://forums.developer.nvidia.com/t/inconsistent-values-from-isaacsims-dc-get-joint-parent-child-body/201452/2
-                # for more info
-                articulation_root_prim = self.root_prim
 
-        # Potentially add articulation root APIs
-        if articulation_root_prim is not None:
-            UsdPhysics.ArticulationRootAPI.Apply(articulation_root_prim)
-            PhysxSchema.PhysxArticulationAPI.Apply(articulation_root_prim)
-
-        # Set self collisions if we have articulation API to set
-        if self._prim.HasAPI(UsdPhysics.ArticulationRootAPI) or self.root_prim.HasAPI(UsdPhysics.ArticulationRootAPI):
+        # Potentially add articulation root APIs and also set self collisions
+        root_prim = None if self.articulation_root_path is None else get_prim_at_path(self.articulation_root_path)
+        if root_prim is not None:
+            UsdPhysics.ArticulationRootAPI.Apply(root_prim)
+            PhysxSchema.PhysxArticulationAPI.Apply(root_prim)
             self.self_collisions = self._load_config["self_collisions"]
 
         # TODO: Do we need to explicitly add all links? or is adding articulation root itself sufficient?
@@ -236,14 +217,22 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
 
     @property
     def articulation_root_path(self):
-        # We override this because omniverse is buggy ):
-        # For non-fixed base objects (e.g.: mobile manipulators), using the default articulation root breaks the
-        # kinematic chain for some reason. So, the current workaround is to set the articulation root to be the
-        # actual base link of the robot instead.
-        # See https://forums.developer.nvidia.com/t/inconsistent-values-from-isaacsims-dc-get-joint-parent-child-body/201452/2
-        # for more info
-        return f"{self._prim_path}/{self.root_link_name}" if \
-            (not self.fixed_base) and (self.n_joints > 0) else super().articulation_root_path
+        has_articulated_joints, has_fixed_joints = self.n_joints > 0, self.n_fixed_joints > 0
+        if self.kinematic_only or ((not has_articulated_joints) and (not has_fixed_joints)):
+            # Kinematic only, or non-jointed single body objects
+            return None
+        elif has_articulated_joints and not self.fixed_base:
+            # Non-fixed objects that have articulated joints
+            # This is a bit hacky because omniverse is buggy
+            # Articulation roots mess up the joint order if it's on a non-fixed base robot, e.g. a
+            # mobile manipulator. So if we have to move it to the actual root link of the robot instead.
+            # See https://forums.developer.nvidia.com/t/inconsistent-values-from-isaacsims-dc-get-joint-parent-child-body/201452/2
+            # for more info
+            return f"{self._prim_path}/{self.root_link_name}"
+        else:
+            # Fixed objects that are not kinematic only, or non-fixed objects that have no articulated joints but do
+            # have fixed joints
+            return self._prim_path
 
     @property
     def mass(self):
