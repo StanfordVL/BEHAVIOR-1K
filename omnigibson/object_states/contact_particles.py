@@ -2,11 +2,17 @@ from collections import defaultdict
 import inspect
 
 import omnigibson as og
+from omnigibson.macros import create_module_macros
 from omnigibson.object_states.object_state_base import RelativeObjectState
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.kinematics import KinematicsMixin
 from omnigibson.systems import PhysicalParticleSystem
 from omni.physx import get_physx_scene_query_interface
+
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
+
+m.POSITIONAL_VALIDATION_EPSILON = 1e-10
 
 
 class ContactParticles(RelativeObjectState, KinematicsMixin):
@@ -45,9 +51,9 @@ class ContactParticles(RelativeObjectState, KinematicsMixin):
         # Grab the relaxed AABB of this object or its link for coarse filtering of particles to ignore checking
         lower, upper = self.obj.states[AABB].get_value() if link is None else link.aabb
 
-        # Add margin, which is a slightly relaxed radius value
-        lower -= system.particle_contact_offset * 1.01
-        upper += system.particle_contact_offset * 1.01
+        # Add margin for filtering inbound
+        lower = lower - (system.particle_contact_offset + 0.001)
+        upper = upper + (system.particle_contact_offset + 0.001)
 
         # Iterate over all instancers and aggregate contacts
         for inst in system.particle_instancers.values():
@@ -63,27 +69,44 @@ class ContactParticles(RelativeObjectState, KinematicsMixin):
     def _set_value(self, system, new_value):
         raise NotImplementedError("ContactParticles state currently does not support setting.")
 
-    def cache_info(self, get_value_args):
-        # Run super first
-        info = super().cache_info(get_value_args=get_value_args)
-
-        # Store the system's number of particles for each instancer
-        for arg in get_value_args:
-            if inspect.isclass(arg) and issubclass(arg, PhysicalParticleSystem):
-                info[arg] = arg.n_particles
-
-        return info
-
-    def _cache_is_valid(self, get_value_args):
-        # Run super first
-        is_valid = super()._cache_is_valid(get_value_args=get_value_args)
-
-        # If it's valid, do final check with system
-        if is_valid:
-            for arg, info in self._cache[get_value_args]["info"].items():
-                if inspect.isclass(arg) and issubclass(arg, PhysicalParticleSystem):
-                    # Make sure the number of particles in the system is the same; otherwise
-                    # something has changed, so we need to update the cache internally
-                    is_valid = arg.n_particles == info
-
-        return is_valid
+    # TODO: investigate whether this caching actually makes things faster because we hypothesize that it will be very
+    # rare for all the particles to be still.
+    # def cache_info(self, get_value_args):
+    #     # Run super first
+    #     info = super().cache_info(get_value_args=get_value_args)
+    #
+    #     # Store the system's particle positions for each instancer
+    #     for arg in get_value_args:
+    #         if inspect.isclass(arg) and issubclass(arg, PhysicalParticleSystem):
+    #             info[arg] = {instancer: instancer.particle_positions for instancer in arg.particle_instancers.values()}
+    #
+    #     return info
+    #
+    # def _cache_is_valid(self, get_value_args):
+    #     # Run super first
+    #     is_valid = super()._cache_is_valid(get_value_args=get_value_args)
+    #
+    #     if not is_valid:
+    #         return False
+    #
+    #     for arg, info in self._cache[get_value_args]["info"].items():
+    #         if inspect.isclass(arg) and issubclass(arg, PhysicalParticleSystem):
+    #             # TODO: adopt the has_changed mechanism in object_state_base
+    #             # Check if the particle positions have changed
+    #
+    #             # If the instancers don't match, return False
+    #             if list(arg.particle_instancers.values()) != list(info.keys()):
+    #                 return False
+    #
+    #             # If there are no instancers, skip
+    #             if len(info.keys()) == 0:
+    #                 continue
+    #
+    #             arg_pos= np.vstack([instancer.particle_positions for instancer in arg.particle_instancers.values()])
+    #             info_pos = np.vstack([particle_positions for particle_positions in info.values()])
+    #
+    #             # If any of the particles moved, return False
+    #             if np.any(np.linalg.norm(arg_pos - info_pos, axis=1) >= m.POSITIONAL_VALIDATION_EPSILON):
+    #                 return False
+    #
+    #     return True

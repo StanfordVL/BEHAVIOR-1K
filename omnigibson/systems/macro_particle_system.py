@@ -4,10 +4,9 @@ import omni
 from omni.isaac.core.utils.prims import get_prim_at_path
 
 import omnigibson as og
-import omnigibson.objects
 from omnigibson.macros import gm
 from omnigibson.systems.system_base import SYSTEMS_REGISTRY
-from omnigibson.systems.particle_system_base import BaseParticleSystem
+from omnigibson.systems.system_base import BaseSystem
 from omnigibson.utils.constants import SemanticClass
 from omnigibson.utils.python_utils import classproperty, subclass_factory
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object_symmetric_bimodal_distribution
@@ -21,7 +20,7 @@ from omnigibson.utils.ui_utils import create_module_logger
 log = create_module_logger(module_name=__name__)
 
 
-class MacroParticleSystem(BaseParticleSystem):
+class MacroParticleSystem(BaseSystem):
     """
     Global system for modeling "macro" level particles, e.g.: dirt, dust, etc.
     """
@@ -60,6 +59,10 @@ class MacroParticleSystem(BaseParticleSystem):
         # Load the particle template
         particle_template = cls._create_particle_template()
         simulator.import_object(obj=particle_template, register=False, auto_initialize=True)
+
+        # Make sure there is no ambiguity about which mesh to use as the particle from this template
+        assert len(particle_template.links) == 1, "MacroParticleSystem particle template has more than one link"
+        assert len(particle_template.root_link.visual_meshes) == 1, "MacroParticleSystem particle template has more than one visual mesh"
 
         # Class particle objet is assumed to be the first and only visual mesh belonging to the root link
         cls.set_particle_template_object(obj=list(particle_template.root_link.visual_meshes.values())[0])
@@ -836,7 +839,7 @@ class VisualParticleSystem(MacroParticleSystem):
                 cls._particles_info[particle.name] = dict(obj=obj, link=obj.links[link_name])
 
     @classmethod
-    def create(cls, particle_name, n_particles_per_group, create_particle_template, min_scale=None, max_scale=None, **kwargs):
+    def create(cls, name, n_particles_per_group, create_particle_template, min_scale=None, max_scale=None, **kwargs):
         """
         Utility function to programmatically generate monolithic visual particle system classes.
 
@@ -846,7 +849,7 @@ class VisualParticleSystem(MacroParticleSystem):
             Use: super(cls).__get__(cls).<METHOD_NAME>(<KWARGS>)
 
         Args:
-            particle_name (str): Name of the visual particles
+            name (str): Name of the visual particles
             n_particles_per_group (int): Number of particles to generate per group of these particles
             min_scale (None or 3-array): If specified, sets the minumum bound for the visual particles' relative scale.
                 Else, defaults to 1
@@ -889,8 +892,7 @@ class VisualParticleSystem(MacroParticleSystem):
 
         @classmethod
         def cm_create_particle_template(cls):
-            name = f"{particle_name}_template"
-            return create_particle_template(prim_path=f"/World/{cls.name}/{name}", name=name)
+            return create_particle_template(prim_path=f"{cls.prim_path}/template", name=f"{cls.name}_template")
 
         # Add to any other params specified
         kwargs["_register_system"] = cp_register_system
@@ -899,7 +901,7 @@ class VisualParticleSystem(MacroParticleSystem):
         kwargs["_create_particle_template"] = cm_create_particle_template
 
         # Create and return the class
-        return subclass_factory(name=f"{particle_name}System", base_classes=cls, **kwargs)
+        return subclass_factory(name=f"{name}System", base_classes=cls, **kwargs)
 
     @classmethod
     def _dump_state(cls):
@@ -1031,9 +1033,9 @@ def stain_update_particle_scaling(cls, group):
 
 
 DustSystem = VisualParticleSystem.create(
-    particle_name="Dust",
+    name="Dust",
     n_particles_per_group=20,
-    create_particle_template=lambda prim_path, name: omnigibson.objects.PrimitiveObject(
+    create_particle_template=lambda prim_path, name: og.objects.PrimitiveObject(
         prim_path=prim_path,
         primitive_type="Cube",
         name=name,
@@ -1049,9 +1051,9 @@ DustSystem = VisualParticleSystem.create(
 
 
 StainSystem = VisualParticleSystem.create(
-    particle_name="Stain",
+    name="Stain",
     n_particles_per_group=20,
-    create_particle_template=lambda prim_path, name: omnigibson.objects.USDObject(
+    create_particle_template=lambda prim_path, name: og.objects.USDObject(
         prim_path=prim_path,
         usd_path=os.path.join(og.assets_path, "models", "stain", "stain.usd"),
         name=name,
@@ -1075,9 +1077,9 @@ StainSystem = VisualParticleSystem.create(
 
 
 # GrassSystem = VisualParticleSystem.create(
-#     particle_name="Grass",
+#     name="Grass",
 #     n_particles_per_group=20,
-#     create_particle_template=lambda prim_path, name: omnigibson.objects.DatasetObject(
+#     create_particle_template=lambda prim_path, name: og.objects.DatasetObject(
 #         prim_path=prim_path,
 #         name=name,
 #         category="grass_patch",

@@ -6,13 +6,14 @@ import omnigibson.utils.transform_utils as T
 
 # Make sure object states, contact reporting, and transition rules are enabled
 gm.ENABLE_OBJECT_STATES = True
+gm.USE_GPU_DYNAMICS = True
 gm.ENABLE_GLOBAL_CONTACT_REPORTING = True
 gm.ENABLE_TRANSITION_RULES = True
 
 
 def main(random_selection=False, headless=False, short_exec=False):
     """
-    Demo of slicing an apple into two apple slices
+    Demo of dicing an apple into apple dices
     """
     og.log.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
 
@@ -33,6 +34,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         model="00_0",
         scale=1.5,
         position=[0.085, 0,  0.90],
+        abilities={"diceable": {}}
     )
 
     knife_cfg = dict(
@@ -92,13 +94,13 @@ def main(random_selection=False, headless=False, short_exec=False):
         orientation=T.euler2quat([-np.pi / 2, 0, 0]),
     )
 
-    input("The knife will fall on the apple and slice it. Press [ENTER] to continue.")
+    input("The knife will fall on the apple and dice it. Press [ENTER] to continue.")
 
-    # Step simulation for a bit so that apple is sliced
+    # Step simulation for a bit so that apple is diced
     for i in range(1000):
         env.step(np.array([]))
 
-    input("Apple has been sliced! Press [ENTER] to terminate the demo.")
+    input("Apple has been diced! Press [ENTER] to terminate the demo.")
 
     # Always close environment at the end
     env.close()

@@ -30,9 +30,13 @@ class KinematicsMixin(BaseObjectState):
         return info
 
     def _cache_is_valid(self, get_value_args):
+        # Import here to avoid circular imports
+        from omnigibson.objects.stateful_object import StatefulObject
+
         # Cache is valid if and only if all of our cached objects have not changed
         t = self._cache[get_value_args]["t"]
         for obj, pose in self._cache[get_value_args]["info"].items():
-            if obj.states[Pose].has_changed(get_value_args=(), value=pose, info={}, t=t):
-                return False
+            if isinstance(obj, StatefulObject):
+                if obj.states[Pose].has_changed(get_value_args=(), value=pose, info={}, t=t):
+                    return False
         return True

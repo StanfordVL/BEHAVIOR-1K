@@ -24,7 +24,7 @@ class Filled(RelativeObjectState, BooleanState, LinkBasedStateMixin):
         assert issubclass(system, PhysicalParticleSystem), "Can only get Filled state with a valid PhysicalParticleSystem!"
         # Check what volume is filled
         if len(system.particle_instancers) > 0:
-            particle_positions = np.concatenate([inst.particle_positions[inst.particle_visibilities.nonzero()[0]] for inst in system.particle_instancers.values()], axis=0)
+            particle_positions = np.concatenate([inst.particle_positions for inst in system.particle_instancers.values()], axis=0)
             particles_in_volume = self.check_in_volume(particle_positions)
             particle_volume = 4 / 3 * np.pi * (system.particle_radius ** 3)
             prop_filled = particle_volume * particles_in_volume.sum() / self.calculate_volume()
