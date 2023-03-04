@@ -235,16 +235,16 @@ class EntityPrim(XFormPrim):
              bool: Whether this prim is articulated or not
         """
         # An invalid handle implies that there is no articulation available for this object
-        return self._handle is not None
+        return self._handle is not None or self.articulation_root_path is not None
 
     @property
     def articulation_root_path(self):
         """
         Returns:
-            str: Absolute USD path to the expected prim that represents the articulation root, if it exists. By default,
+            None or str: Absolute USD path to the expected prim that represents the articulation root, if it exists. By default,
                 this corresponds to self.prim_path
         """
-        return self._prim_path
+        return self._prim_path if self.n_joints > 0 else None
 
     @property
     def root_link_name(self):
@@ -667,8 +667,8 @@ class EntityPrim(XFormPrim):
         assert og.sim.is_playing(), "Simulator must be playing if updating handles!"
 
         # Grab the handle -- we know it might not return a valid value, so we suppress omni's warning here
-        self._handle = self._dc.get_articulation(self.articulation_root_path) if \
-            get_prim_at_path(self.articulation_root_path).HasAPI(UsdPhysics.ArticulationRootAPI) else None
+        self._handle = None if self.articulation_root_path is None else \
+            self._dc.get_articulation(self.articulation_root_path)
 
         # Sanity check -- make sure handle is not invalid handle -- it should only ever be None or a valid integer
         assert self._handle != _dynamic_control.INVALID_HANDLE, \
@@ -1018,7 +1018,8 @@ class EntityPrim(XFormPrim):
         Returns:
             int: How many position iterations to take per physics step by the physx solver
         """
-        return get_prim_property(self.articulation_root_path, "physxArticulation:solverPositionIterationCount")
+        return get_prim_property(self.articulation_root_path, "physxArticulation:solverPositionIterationCount") if \
+            self.articulated else self.root_link.solver_position_iteration_count
 
     @solver_position_iteration_count.setter
     def solver_position_iteration_count(self, count):
@@ -1028,8 +1029,11 @@ class EntityPrim(XFormPrim):
         Args:
             count (int): How many position iterations to take per physics step by the physx solver
         """
-        set_prim_property(self.articulation_root_path, "physxArticulation:solverPositionIterationCount", count)
-        return
+        if self.articulated:
+            set_prim_property(self.articulation_root_path, "physxArticulation:solverPositionIterationCount", count)
+        else:
+            for link in self._links.values():
+                link.solver_position_iteration_count = count
 
     @property
     def solver_velocity_iteration_count(self):
@@ -1037,7 +1041,8 @@ class EntityPrim(XFormPrim):
         Returns:
             int: How many velocity iterations to take per physics step by the physx solver
         """
-        return get_prim_property(self.articulation_root_path, "physxArticulation:solverVelocityIterationCount")
+        return get_prim_property(self.articulation_root_path, "physxArticulation:solverVelocityIterationCount") if \
+            self.articulated else self.root_link.solver_velocity_iteration_count
 
     @solver_velocity_iteration_count.setter
     def solver_velocity_iteration_count(self, count):
@@ -1047,8 +1052,11 @@ class EntityPrim(XFormPrim):
         Args:
             count (int): How many velocity iterations to take per physics step by the physx solver
         """
-        set_prim_property(self.articulation_root_path, "physxArticulation:solverVelocityIterationCount", count)
-        return
+        if self.articulated:
+            set_prim_property(self.articulation_root_path, "physxArticulation:solverVelocityIterationCount", count)
+        else:
+            for link in self._links.values():
+                link.solver_velocity_iteration_count = count
 
     @property
     def stabilization_threshold(self):
@@ -1074,11 +1082,35 @@ class EntityPrim(XFormPrim):
                 link.stabilization_threshold = threshold
 
     @property
+    def sleep_threshold(self):
+        """
+        Returns:
+            float: threshold for sleeping this articulation
+        """
+        return get_prim_property(self.articulation_root_path, "physxArticulation:sleepThreshold") if \
+            self.articulated else self.root_link.sleep_threshold
+
+    @sleep_threshold.setter
+    def sleep_threshold(self, threshold):
+        """
+        Sets threshold for sleeping this articulation
+
+        Args:
+            threshold (float): Sleeping threshold
+        """
+        if self.articulated:
+            set_prim_property(self.articulation_root_path, "physxArticulation:sleepThreshold", threshold)
+        else:
+            for link in self._links.values():
+                link.sleep_threshold = threshold
+
+    @property
     def self_collisions(self):
         """
         Returns:
             bool: Whether self-collisions are enabled for this prim or not
         """
+        assert self.articulated, "Cannot get self-collision for non-articulated EntityPrim!"
         return get_prim_property(self.articulation_root_path, "physxArticulation:enabledSelfCollisions")
 
     @self_collisions.setter
@@ -1089,8 +1121,8 @@ class EntityPrim(XFormPrim):
         Args:
             flag (bool): Whether self collisions are enabled for this prim or not
         """
+        assert self.articulated, "Cannot set self-collision for non-articulated EntityPrim!"
         set_prim_property(self.articulation_root_path, "physxArticulation:enabledSelfCollisions", flag)
-        return
 
     @property
     def kinematic_only(self):
@@ -1113,29 +1145,6 @@ class EntityPrim(XFormPrim):
                 for more information
         """
         self.root_link.kinematic_only = val
-
-    @property
-    def sleep_threshold(self):
-        """
-        Returns:
-            float: threshold for sleeping this articulation
-        """
-        return get_prim_property(self.articulation_root_path, "physxArticulation:sleepThreshold") if \
-            self.articulated else self.root_link.sleep_threshold
-
-    @sleep_threshold.setter
-    def sleep_threshold(self, threshold):
-        """
-        Sets threshold for sleeping this articulation
-
-        Args:
-            threshold (float): Sleeping threshold
-        """
-        if self.articulated:
-            set_prim_property(self.articulation_root_path, "physxArticulation:sleepThreshold", threshold)
-        else:
-            for link in self._links.values():
-                link.sleep_threshold = threshold
 
     def wake(self):
         """

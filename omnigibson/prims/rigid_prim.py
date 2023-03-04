@@ -529,22 +529,40 @@ class RigidPrim(XFormPrim):
         self.set_attribute("physics:rigidBodyEnabled", not val)
 
     @property
-    def sleep_threshold(self):
+    def solver_position_iteration_count(self):
         """
         Returns:
-            float: threshold for sleeping this rigid body
+            int: How many position iterations to take per physics step by the physx solver
         """
-        return self.get_attribute("physxRigidBody:sleepThreshold")
+        return self.get_attribute("physxRigidBody:solverPositionIterationCount")
 
-    @sleep_threshold.setter
-    def sleep_threshold(self, threshold):
+    @solver_position_iteration_count.setter
+    def solver_position_iteration_count(self, count):
         """
-        Sets threshold for sleeping this rigid body
+        Sets how many position iterations to take per physics step by the physx solver
 
         Args:
-            threshold (float): Sleeping threshold
+            count (int): How many position iterations to take per physics step by the physx solver
         """
-        self.set_attribute("physxRigidBody:sleepThreshold", threshold)
+        self.set_attribute("physxRigidBody:solverPositionIterationCount", count)
+
+    @property
+    def solver_velocity_iteration_count(self):
+        """
+        Returns:
+            int: How many velocity iterations to take per physics step by the physx solver
+        """
+        return self.get_attribute("physxRigidBody:solverVelocityIterationCount")
+
+    @solver_velocity_iteration_count.setter
+    def solver_velocity_iteration_count(self, count):
+        """
+        Sets how many velocity iterations to take per physics step by the physx solver
+
+        Args:
+            count (int): How many velocity iterations to take per physics step by the physx solver
+        """
+        self.set_attribute("physxRigidBody:solverVelocityIterationCount", count)
 
     @property
     def stabilization_threshold(self):
@@ -563,6 +581,24 @@ class RigidPrim(XFormPrim):
             threshold (float): stabilizing threshold
         """
         self.set_attribute("physxRigidBody:stabilizationThreshold", threshold)
+
+    @property
+    def sleep_threshold(self):
+        """
+        Returns:
+            float: threshold for sleeping this rigid body
+        """
+        return self.get_attribute("physxRigidBody:sleepThreshold")
+
+    @sleep_threshold.setter
+    def sleep_threshold(self, threshold):
+        """
+        Sets threshold for sleeping this rigid body
+
+        Args:
+            threshold (float): Sleeping threshold
+        """
+        self.set_attribute("physxRigidBody:sleepThreshold", threshold)
 
     @property
     def ccd_enabled(self):
