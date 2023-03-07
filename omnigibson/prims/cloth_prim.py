@@ -91,7 +91,7 @@ class ClothPrim(GeomPrim):
             stage=og.sim.stage,
             path=self.prim_path,
             dynamic_mesh_path=None,
-            particle_system_path=cloth_system.prim_path,
+            particle_system_path=cloth_system.system_prim_path,
             spring_stretch_stiffness=m.CLOTH_STRETCH_STIFFNESS,
             spring_bend_stiffness=m.CLOTH_BEND_STIFFNESS,
             spring_shear_stiffness=m.CLOTH_SHEAR_STIFFNESS,
