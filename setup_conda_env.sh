@@ -1,9 +1,25 @@
 #!/usr/bin/env bash
 
-# Make sure that the ISAAC_SIM_PATH variable is set
-if [ x"${ISAAC_SIM_PATH}" == "x" ]; then
-  echo "Please set ISAAC_SIM_PATH!"
+# Helper function to check whether the script is soruced
+is_sourced() {
+  if [ -n "$ZSH_VERSION" ]; then 
+    case $ZSH_EVAL_CONTEXT in *:file:*) return 0;; esac
+  else
+    case ${0##*/} in dash|-dash|bash|-bash|ksh|-ksh|sh|-sh) return 0;; esac
+  fi
+  return 1
+}
+is_sourced && sourced=1 || sourced=0
+
+if [[ $sourced == 0 ]]; then
+  echo "Please source the script to make sure conda env is created successfully!"
   exit
+fi
+
+# Make sure that the ISAAC_SIM_PATH variable is set
+if [[ x"${ISAAC_SIM_PATH}" == "x" ]]; then
+  echo "Please set ISAAC_SIM_PATH!"
+  return
 fi
 
 # We search to see if we've already modified this config; if not, we add a couple additional dependencies
@@ -18,9 +34,6 @@ else
   echo '"omni.flowusd" = {}' >> ${CFG_PATH}
   echo '"omni.particle.system.bundle" = {}' >> ${CFG_PATH}
 fi
-
-# Next, we prune some packages from Isaac Sim that are outdated relative to what we need in OmniGibson
-rm -r "${ISAAC_SIM_PATH}/exts/omni.isaac.ml_archive/pip_prebundle/gym*"
 
 # Create a conda environment with python 3.7
 conda create -y -n omnigibson python=3.7
@@ -55,3 +68,5 @@ pip install -e .
 # Cycle conda environment so that all dependencies are propagated
 conda deactivate
 conda activate omnigibson
+
+echo "OmniGibson successfully installed!"
