@@ -123,6 +123,7 @@ class Simulator(SimulationContext, Serializable):
 
         # Set of all non-Omniverse transition rules to apply.
         self._transition_rules = DEFAULT_RULES
+        self._transition_object_init_states = dict()    # Maps object to object state to args to pass to state setter
 
         # Toggle simulator state once so that downstream omni features can be used without bugs
         # e.g.: particle sampling, which for some reason requires sim.play() to be called at least once
@@ -405,6 +406,12 @@ class Simulator(SimulationContext, Serializable):
         """
         Applies all internal non-Omniverse transition rules.
         """
+        # Apply any transiiton object init states from before, and then clear the dictionary
+        for obj, states_info in self._transition_object_init_states.items():
+            for state, args in states_info.items():
+                obj.states[state].set_value(*args)
+        self._transition_object_init_states = dict()
+
         # Create a dict from rule to filter to objects we care about.
         obj_dict = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
         for obj in self.scene.objects:
@@ -477,7 +484,7 @@ class Simulator(SimulationContext, Serializable):
 
         for added_obj_attr in added_obj_attrs:
             new_obj = added_obj_attr.obj
-            self.import_object(added_obj_attr.obj)
+            self.import_object(new_obj)
             # By default, added_obj_attr is populated with all Nones -- so these will all be pass-through operations
             # unless pos / orn (or, conversely, bb_pos / bb_orn) is specified
             if added_obj_attr.pos is not None or added_obj_attr.orn is not None:
@@ -485,6 +492,9 @@ class Simulator(SimulationContext, Serializable):
             elif isinstance(new_obj, DatasetObject) and \
                     (added_obj_attr.bb_pos is not None or added_obj_attr.bb_orn is not None):
                 new_obj.set_bbox_center_position_orientation(position=added_obj_attr.bb_pos, orientation=added_obj_attr.bb_orn)
+            # Additionally record any requested states if specified to be updated during the next transition step
+            if added_obj_attr.states is not None:
+                self._transition_object_init_states[new_obj] = added_obj_attr.states
 
     def reset_scene(self):
         """
