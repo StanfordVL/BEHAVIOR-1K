@@ -4,6 +4,7 @@ from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from omnigibson.object_states.object_state_base import RelativeObjectState, BooleanState
 from omnigibson.systems.micro_particle_system import PhysicalParticleSystem
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
+from omnigibson.utils.python_utils import classproperty
 from omnigibson.systems import get_system_from_element_name, get_element_name_from_system
 
 # Create settings for this module
@@ -12,12 +13,18 @@ m = create_module_macros(module_path=__file__)
 # Proportion of object's volume that must be filled for object to be considered filled
 m.VOLUME_FILL_PROPORTION = 0.3
 
+m.FILLED_LINK_PREFIX = "container"
+
 
 class Filled(RelativeObjectState, BooleanState, LinkBasedStateMixin):
     def __init__(self, obj):
         super().__init__(obj)
         self.check_in_volume = None        # Function to check whether particles are in volume for this container
         self.calculate_volume = None       # Function to calculate the real-world volume for this container
+
+    @classproperty
+    def metalink_prefix(cls):
+        return m.FILLED_LINK_PREFIX
 
     def _get_value(self, system):
         # Sanity check to make sure system is valid
@@ -43,10 +50,6 @@ class Filled(RelativeObjectState, BooleanState, LinkBasedStateMixin):
         assert issubclass(system, PhysicalParticleSystem), \
             "Can only set Filled state with a valid PhysicalParticleSystem!"
 
-        # If we found no link, directly return
-        if self.link is None:
-            return False
-
         # First, check our current state
         current_state = self.get_value(system)
 
@@ -70,18 +73,9 @@ class Filled(RelativeObjectState, BooleanState, LinkBasedStateMixin):
         super()._initialize()
         self.initialize_link_mixin()
 
-        # If we found no link, directly return
-        if self.link is None:
-            return
-
         # Generate volume checker function for this object
         self.check_in_volume, self.calculate_volume = \
             generate_points_in_volume_checker_function(obj=self.obj, volume_link=self.link, mesh_name_prefixes="container")
-
-    @staticmethod
-    def get_state_link_name():
-        # Should be implemented by subclass
-        return "container_link"
 
     @staticmethod
     def get_optional_dependencies():

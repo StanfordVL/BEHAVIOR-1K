@@ -6,6 +6,7 @@ from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
 from omnigibson.object_states.update_state_mixin import UpdateStateMixin
 from omnigibson.utils.usd_utils import create_primitive_mesh
+from omnigibson.utils.python_utils import classproperty
 from omni.isaac.core.utils.prims import get_prim_at_path
 
 
@@ -13,7 +14,7 @@ from omni.isaac.core.utils.prims import get_prim_at_path
 m = create_module_macros(module_path=__file__)
 
 m.TOGGLE_DISTANCE_THRESHOLD = 0.1
-m.TOGGLE_LINK_NAME = "togglebutton_link"
+m.TOGGLE_LINK_PREFIX = "togglebutton"
 m.TOGGLE_BUTTON_SCALE = 0.05
 m.CAN_TOGGLE_STEPS = 5
 
@@ -25,16 +26,16 @@ class ToggledOn(AbsoluteObjectState, BooleanState, LinkBasedStateMixin, UpdateSt
         self.visual_marker = None
         super(ToggledOn, self).__init__(obj)
 
+    @classproperty
+    def metalink_prefix(cls):
+        return m.TOGGLE_LINK_PREFIX
+
     def _get_value(self):
         return self.value
 
     def _set_value(self, new_value):
         self.value = new_value
         return True
-
-    @staticmethod
-    def get_state_link_name():
-        return m.TOGGLE_LINK_NAME
 
     def _initialize(self):
         super(ToggledOn, self)._initialize()
@@ -50,20 +51,17 @@ class ToggledOn(AbsoluteObjectState, BooleanState, LinkBasedStateMixin, UpdateSt
 
             # Create the visual geom instance referencing the generated mesh prim
             self.visual_marker = VisualGeomPrim(prim_path=mesh_prim_path, name=f"{self.obj.name}_visual_marker")
+            self.visual_marker.scale = 1 / self.obj.scale
             self.visual_marker.initialize()
 
             # Make sure the marker isn't translated at all
             self.visual_marker.set_local_pose(translation=np.zeros(3), orientation=np.array([0, 0, 0, 1.0]))
 
     def _update(self):
-        button_position_on_object = self.get_link_position()
-        if button_position_on_object is None:
-            return
-
         robot_can_toggle = False
         # detect marker and hand interaction
         for robot in self._simulator.scene.robots:
-            robot_can_toggle = robot.can_toggle(button_position_on_object, m.TOGGLE_DISTANCE_THRESHOLD)
+            robot_can_toggle = robot.can_toggle(self.link.get_position(), m.TOGGLE_DISTANCE_THRESHOLD)
             if robot_can_toggle:
                 break
 

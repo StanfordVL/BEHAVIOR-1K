@@ -1,6 +1,4 @@
 from omnigibson.macros import create_module_macros
-from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
-from omnigibson.object_states.object_state_base import AbsoluteObjectState
 from omnigibson.object_states.temperature import Temperature
 from omnigibson.object_states.heat_source_or_sink import HeatSourceOrSink
 from omnigibson.object_states.update_state_mixin import UpdateStateMixin

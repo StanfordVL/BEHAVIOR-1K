@@ -116,11 +116,17 @@ def _get_relevant_joints(obj):
 
 class Open(AbsoluteObjectState, BooleanState):
     def __init__(self, obj):
-        # Check the metadata info to get relevant joints information
-        self.relevant_joints_info = _get_relevant_joints(obj)
+        self._relevant_joints_info = None
 
         # Run super method
         super().__init__(obj=obj)
+
+    def _initialize(self):
+        # Run super first
+        super()._initialize()
+
+        # Check the metadata info to get relevant joints information
+        self.relevant_joints_info = _get_relevant_joints(self.obj)
 
     def _get_value(self):
         both_sides, relevant_joints, joint_directions = self.relevant_joints_info

@@ -30,8 +30,8 @@ from pxr import PhysicsSchemaTools, UsdGeom, Gf, Sdf
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
-m.APPLICATION_LINK_NAME = "particleapplication_link"
-m.REMOVAL_LINK_NAME = "particleremover_link"
+m.APPLICATION_LINK_PREFIX = "particleapplication"
+m.REMOVAL_LINK_PREFIX = "particleremover"
 
 # How many samples within the application area to generate per update step
 m.MAX_VISUAL_PARTICLES_APPLIED_PER_STEP = 2
@@ -211,10 +211,6 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
         # Run super method
         super().__init__(obj)
 
-    @staticmethod
-    def get_state_link_name():
-        raise NotImplementedError()
-
     def _initialize(self):
         # Run link initialization
         self.initialize_link_mixin()
@@ -236,8 +232,8 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
 
         # Possibly create a projection volume if we're using the projection method
         if self.method == ParticleModifyMethod.PROJECTION:
-            # Make sure link is defined
-            assert self.link is not None, f"Cannot use particle projection method without a metalink specified!"
+            # Construct naming prefix to apply to generated prims
+            name_prefix = f"{self.obj.name}_{self.__class__.__name__}"
             # Make sure projection mesh params are specified
             # Import here to avoid circular imports
             from omnigibson.objects.dataset_object import DatasetObject
@@ -260,7 +256,7 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
                 mesh.GetAttribute("radius").Set(radius / 2.0)
 
             # Create the visual geom instance referencing the generated mesh prim, and then hide it
-            self.projection_mesh = VisualGeomPrim(prim_path=mesh_prim_path, name=f"{self.obj.name}_projection_mesh")
+            self.projection_mesh = VisualGeomPrim(prim_path=mesh_prim_path, name=f"{name_prefix}_projection_mesh")
             self.projection_mesh.initialize()
             self.projection_mesh.visible = False
 
@@ -280,7 +276,7 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
             particle_material = system.particle_object.material if issubclass(system, VisualParticleSystem) else system.material
 
             # Create the projection visualization if it doesn't already exist, otherwise we reference it directly
-            projection_name = f"{self.obj.name}_projection_visualization"
+            projection_name = f"{name_prefix}_projection_visualization"
             projection_path = f"/OmniGraph/{projection_name}"
             projection_visualization_path = f"{self.link.prim_path}/projection_visualization"
             if is_prim_path_valid(projection_path):
@@ -298,7 +294,7 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
                 )
 
             # Create the visual geom instance referencing the generated source mesh prim, and then hide it
-            self.projection_source_sphere = VisualGeomPrim(prim_path=projection_visualization_path, name=f"{self.obj.name}_projection_source_sphere")
+            self.projection_source_sphere = VisualGeomPrim(prim_path=projection_visualization_path, name=f"{name_prefix}_projection_source_sphere")
             self.projection_source_sphere.initialize()
             self.projection_source_sphere.visible = False
 
@@ -323,7 +319,7 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
             # Define the function for checking whether points are within the adjacency mesh
             def check_in_adjacency_mesh(particle_positions):
                 # Define the AABB bounds
-                lower, upper = self.obj.states[AABB].get_value() if self.link is None else self.link.aabb
+                lower, upper = self.link.aabb
                 # Add the margin
                 lower -= m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN
                 upper += m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN
@@ -334,7 +330,7 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
             def check_overlap():
                 nonlocal valid_hit
                 valid_hit = False
-                aabb = self.obj.states[AABB].get_value() if self.link is None else self.link.aabb
+                aabb = self.link.aabb
                 psqi().overlap_box(
                     halfExtent=(aabb[1] - aabb[0]) / 2.0 + m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN,
                     pos=(aabb[1] + aabb[0]) / 2.0,
@@ -604,9 +600,14 @@ class ParticleRemover(ParticleModifier):
             # Invalid system queried
             self.unsupported_system_error(system=system)
 
-    @staticmethod
-    def get_state_link_name():
-        return m.REMOVAL_LINK_NAME
+    @classproperty
+    def metalink_prefix(cls):
+        return m.REMOVAL_LINK_PREFIX
+
+    @property
+    def _default_link(self):
+        # Only supported for adjacency, NOT projection
+        return self.obj.root_link if self.method == ParticleModifyMethod.ADJACENCY else super()._default_link
 
     @property
     def n_steps_per_modification(self):
@@ -792,13 +793,13 @@ class ParticleApplier(ParticleModifier):
         """
         # Randomly sample end points from within the object's AABB
         n_samples = self._get_max_particles_limit_per_step(system=system)
-        lower, upper = self.obj.states[AABB].get_value() if self.link is None else self.link.aabb
+        lower, upper = self.link.aabb
         lower = lower.reshape(1, 3) - m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN
         upper = upper.reshape(1, 3) + m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN
         lower_upper = np.concatenate([lower, upper], axis=0)
 
         # Sample in all directions, shooting from the center of the link / object frame
-        pos = self.obj.get_position() if self.link is None else self.link.get_position()
+        pos = self.link.get_position()
         start_points = np.ones((n_samples, 3)) * pos.reshape(1, 3)
         end_points = np.random.uniform(low=lower, high=upper, size=(n_samples, 3))
         sides, axes = np.random.randint(2, size=(n_samples,)), np.random.randint(3, size=(n_samples,))
@@ -826,9 +827,14 @@ class ParticleApplier(ParticleModifier):
             self.unsupported_system_error(system=system)
         return val
 
-    @staticmethod
-    def get_state_link_name():
-        return m.APPLICATION_LINK_NAME
+    @classproperty
+    def metalink_prefix(cls):
+        return m.APPLICATION_LINK_PREFIX
+
+    @property
+    def _default_link(self):
+        # Only supported for adjacency, NOT projection
+        return self.obj.root_link if self.method == ParticleModifyMethod.ADJACENCY else super()._default_link
 
     @property
     def n_steps_per_modification(self):

@@ -5,15 +5,15 @@ from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from omnigibson.object_states.object_state_base import AbsoluteObjectState
 from omnigibson.object_states.open import Open
 from omnigibson.object_states.toggle import ToggledOn
+from omnigibson.utils.python_utils import classproperty
+import omnigibson.utils.transform_utils as T
 
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
-m.HEATING_ELEMENT_LINK_NAME = "heatsource_link"
-
+m.HEATSOURCE_LINK_PREFIX = "heatsource"
 m.HEATING_ELEMENT_MARKER_SCALE = [1.0] * 3
-# m.HEATING_ELEMENT_MARKER_FILENAME = os.path.join(omnigibson.assets_path, "models/fire/fire.obj")
 
 # TODO: Delete default values for this and make them required.
 m.DEFAULT_TEMPERATURE = 200
@@ -81,6 +81,16 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin):
         # we record that for use in the heat transfer process.
         self.requires_inside = requires_inside
 
+    @classproperty
+    def metalink_prefix(cls):
+        return m.HEATSOURCE_LINK_PREFIX
+
+    @property
+    def _default_link(self):
+        # Only supported if we require inside
+        # return self.obj.root_link if self.requires_inside else super()._default_link
+        return super()._default_link if self.requires_inside else self.obj.root_link
+
     @staticmethod
     def get_dependencies():
         return AbsoluteObjectState.get_dependencies() + [AABB, Inside]
@@ -89,20 +99,12 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin):
     def get_optional_dependencies():
         return AbsoluteObjectState.get_optional_dependencies() + [ToggledOn, Open]
 
-    @staticmethod
-    def get_state_link_name():
-        return m.HEATING_ELEMENT_LINK_NAME
-
     def _initialize(self):
         # Run super first
         super()._initialize()
         self.initialize_link_mixin()
 
     def _get_value(self):
-        # if the object is not in self.requires_inside mode, the link position is required.
-        if not self.requires_inside and self.get_link_position() is None:
-            return False
-
         # Check the toggle state.
         if self.requires_toggled_on and not self.obj.states[ToggledOn].get_value():
             return False
