@@ -327,6 +327,9 @@ def main(random_selection=False, headless=False, short_exec=False):
         # Run the demo
         demo_names_to_demos[demo_name]()
 
+    # Shutdown omnigibson
+    og.shutdown()
+
 
 if __name__ == "__main__":
     main()

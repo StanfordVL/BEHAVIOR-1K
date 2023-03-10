@@ -68,6 +68,7 @@ def main(random_selection=False, headless=False, short_exec=False):
             "type": "Cone",
             # Size of the cone
             "extents": np.array([0.375, 0.375, 0.75]),
+            "visualize": True,
         },
     }
 
@@ -88,7 +89,7 @@ def main(random_selection=False, headless=False, short_exec=False):
                 # For a specific particle system, this specifies what conditions are required in order for the
                 # particle applier / remover to apply / remover particles associated with that system
                 # The list should contain functions with signature condition() --> bool,
-                # where True means the condition is satisified
+                # where True means the condition is satisfied
                 particle_system: [],
             },
             "projection_mesh_params": projection_mesh_params[method_type],
