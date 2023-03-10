@@ -265,8 +265,10 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
 
             # Make sure the mesh is translated so that its tip lies at the metalink origin, and rotated so the vector
             # from tip to tail faces the positive x axis
+            x_offset = self._projection_mesh_params["extents"][2] / 4 if \
+                self._projection_mesh_params["type"] == "Cylinder" else self._projection_mesh_params["extents"][2] / 2
             self.projection_mesh.set_local_pose(
-                translation=np.array([self._projection_mesh_params["extents"][2] / (2 * self.link.scale[2]), 0, 0]),
+                translation=np.array([x_offset / self.link.scale[2], 0, 0]),
                 orientation=T.euler2quat([0, -np.pi / 2, 0]),
             )
 
@@ -374,6 +376,7 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
             function: Limit checker function, with signature condition(obj) --> bool, where @obj is the specific object
                 that this ParticleModifier state belongs to
         """
+        # TODO: Update to only check for systems within conditions
         if issubclass(system, VisualParticleSystem):
             def condition(obj):
                 return self.modified_particle_count[system] < self.visual_particle_modification_limit
@@ -755,15 +758,17 @@ class ParticleApplier(ParticleModifier):
             sampled_r_theta[:, 0] * np.cos(sampled_r_theta[:, 1]),
             sampled_r_theta[:, 0] * np.sin(sampled_r_theta[:, 1]),
         ], axis=1)
-        if self._projection_mesh_params["type"] == "Cone":
+        projection_type = self._projection_mesh_params["type"]
+        if projection_type == "Cone":
             # All start points are the cone tip, which is the local link origin
             start_points = np.zeros((n_samples, 3))
-        elif self._projection_mesh_params["type"] == "Cylinder":
+        elif projection_type == "Cylinder":
             # All start points are the parallel point for their corresponding end point
             # i.e.: (x, y, 0)
             start_points = end_points + np.array([-h, 0, 0]).reshape(1, 3)
         else:
-            raise ValueError(f"Unsupported projection mesh type: {self._projection_mesh_params['type']}!")
+            # Other types not supported
+            raise ValueError(f"Unsupported projection mesh type: {projection_type}!")
 
         # Convert sampled normalized radius and angle into 3D points
         # We convert r, theta --> 3D point in local link frame --> 3D point in global world frame
