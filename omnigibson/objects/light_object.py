@@ -120,6 +120,9 @@ class LightObject(StatefulObject):
         # run super first
         super()._post_load()
 
+        # Make root link mass very small so omni doesn't complain about no mass
+        self.root_link.mass = 1e-6
+
         # Grab reference to light link
         self._light_link = XFormPrim(prim_path=f"{self._prim_path}/base_link/light", name=f"{self.name}:light_link")
 
