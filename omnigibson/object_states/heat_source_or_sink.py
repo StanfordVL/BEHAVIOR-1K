@@ -118,4 +118,38 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin):
     def _set_value(self, new_value):
         raise NotImplementedError("Setting heat source capability is not supported.")
 
+    def compute_temperature_delta(self, obj):
+        """
+        Computes the temperature delta that may be applied to object @obj. NOTE: This value is agnostic to simulation
+        stepping speed, and should be scaled accordingly
+
+        Args:
+            obj (StatefulObject): Object whose temperature delta should be computed
+        """
+        # Avoid circular imports
+        from omnigibson.object_states.temperature import Temperature
+
+        # No change if we're not on
+        if not self.get_value():
+            return 0.0
+
+        # Otherwise, check for other edge cases
+        # If we require the object to be inside, make sure the object is inside, otherwise, we return 0
+        # Otherwise, make sure the object is within close proximity of this heat source
+        if self.requires_inside:
+            if obj.states[Inside].get_value(self.obj):
+                pass
+            else:
+                return 0.0
+        else:
+            aabb_lower, aabb_upper = obj.states[AABB].get_value()
+            obj_pos = (aabb_lower + aabb_upper) / 2.0
+            # Position is either the AABB center of the default link or the metalink position itself
+            heat_source_pos = self.link.aabb_center if self.link == self._default_link else self.link.get_position()
+            if T.l2_distance(heat_source_pos, obj_pos) > self.distance_threshold:
+                return 0.0
+
+        # Compute the delta to return
+        return (self.temperature - obj.states[Temperature].get_value()) * self.heating_rate
+
     # Nothing needs to be done to save/load HeatSource

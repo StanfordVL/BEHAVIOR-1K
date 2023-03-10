@@ -60,30 +60,11 @@ class Temperature(AbsoluteObjectState, UpdateStateMixin):
 
             heat_source = obj2.states.get(OnFire, obj2.states.get(HeatSourceOrSink, None))
             assert heat_source is not None, "Unknown HeatSourceOrSink subclass"
-            heat_source_state = heat_source.get_value()
-            if heat_source_state:
-                heat_source_position = heat_source.get_link_position()
-                # If the object is on fire and there is no heat source position annotation, we use the AABB center
-                if OnFire in obj2.states and heat_source_position is None:
-                    aabb_lower, aabb_upper = obj2.states[AABB].get_value()
-                    heat_source_position = (aabb_lower + aabb_upper) / 2.0
-                # The heat source is on and there is a heat source position, we check distance.
-                # If not, we check whether we are inside it or not.
-                if heat_source_position is not None:
-                    aabb_lower, aabb_upper = self.obj.states[AABB].get_value()
-                    position = (aabb_lower + aabb_upper) / 2.0
-                    # Compute distance to heat source from our position.
-                    dist = T.l2_distance(heat_source_position, position)
-                    if dist > heat_source.distance_threshold:
-                        continue
-                else:
-                    if not self.obj.states[Inside].get_value(obj2):
-                        continue
 
-                new_temperature += (
-                    (heat_source.temperature - self.value) * heat_source.heating_rate * self._simulator.get_rendering_dt()
-                )
-                affected_by_heat_source = True
+            # Compute delta to apply
+            delta = heat_source.compute_temperature_delta(obj=self.obj)
+            affected_by_heat_source = delta != 0
+            new_temperature += delta * self._simulator.get_rendering_dt()
 
         # Apply temperature decay if not affected by any heat source.
         if not affected_by_heat_source:
@@ -92,6 +73,9 @@ class Temperature(AbsoluteObjectState, UpdateStateMixin):
             )
 
         self.value = new_temperature
+
+        # Also update cache to force syncing of temperature so get_value() is consistent with self.value
+        self.update_cache(get_value_args=())
 
     @property
     def state_size(self):
