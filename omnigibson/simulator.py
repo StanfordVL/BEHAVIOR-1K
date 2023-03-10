@@ -118,6 +118,8 @@ class Simulator(SimulationContext, Serializable):
         self.object_state_types = get_states_by_dependency_order()
         self.object_state_types_requiring_update = \
             [state for state in self.object_state_types if issubclass(state, UpdateStateMixin)]
+        self.object_state_types_on_contact = \
+            [state for state in self.object_state_types if issubclass(state, ContactSubscribedStateMixin)]
 
         # Set of all non-Omniverse transition rules to apply.
         self._transition_rules = DEFAULT_RULES
@@ -590,22 +592,31 @@ class Simulator(SimulationContext, Serializable):
         For each of the pair of objects in each contact, we invoke the on_contact function for each of its states
         that subclass ContactSubscribedStateMixin. These states update based on contact events.
         """
-        for contact_header in contact_headers:
-            actor0 = str(PhysicsSchemaTools.intToSdfPath(contact_header.actor0))
-            actor1 = str(PhysicsSchemaTools.intToSdfPath(contact_header.actor1))
-            # actor0/1 are prim paths for links that are in contact. Find the corresponding objects.
-            actor0_obj = self._scene.object_registry("prim_path", "/".join(actor0.split("/")[:-1]))
-            actor1_obj = self._scene.object_registry("prim_path", "/".join(actor1.split("/")[:-1]))
-            if actor0_obj is None or actor1_obj is None or not actor0_obj.initialized or not actor1_obj.initialized:
-                continue
-
-            for obj0, obj1 in [(actor0_obj, actor1_obj), (actor1_obj, actor0_obj)]:
-                if not isinstance(obj0, StatefulObject):
+        if gm.ENABLE_OBJECT_STATES:
+            combos = set()
+            headers = defaultdict(list)
+            for contact_header in contact_headers:
+                actor0 = str(PhysicsSchemaTools.intToSdfPath(contact_header.actor0))
+                actor1 = str(PhysicsSchemaTools.intToSdfPath(contact_header.actor1))
+                # actor0/1 are prim paths for links that are in contact. Find the corresponding objects.
+                actor0_obj = self._scene.object_registry("prim_path", "/".join(actor0.split("/")[:-1]))
+                actor1_obj = self._scene.object_registry("prim_path", "/".join(actor1.split("/")[:-1]))
+                if actor0_obj is None or actor1_obj is None or not actor0_obj.initialized or not actor1_obj.initialized:
                     continue
-                for state_type in obj0.states:
-                    if not issubclass(state_type, ContactSubscribedStateMixin):
+                elif (actor1_obj, actor0_obj) in combos:
+                    headers[(actor1_obj, actor0_obj)].append(contact_header)
+                else:
+                    combos.add((actor0_obj, actor1_obj))
+                    headers[(actor0_obj, actor1_obj)].append(contact_header)
+
+            # from IPython import embed; embed()
+            for (actor0_obj, actor1_obj) in combos:
+                for obj0, obj1 in [(actor0_obj, actor1_obj), (actor1_obj, actor0_obj)]:
+                    if not isinstance(obj0, StatefulObject):
                         continue
-                    obj0.states[state_type].on_contact(obj1, contact_header, contact_data)
+                    for state_type in self.object_state_types_on_contact:
+                        if state_type in obj0.states:
+                            obj0.states[state_type].on_contact(obj1, headers[(actor0_obj, actor1_obj)], contact_data)
 
     def is_paused(self):
         """
