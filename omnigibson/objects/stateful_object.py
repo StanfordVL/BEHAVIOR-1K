@@ -144,6 +144,18 @@ class StatefulObject(BaseObject):
         for state in self._states.values():
             state.initialize(self._simulator)
 
+        # Check whether this object requires any visual updates
+        states_set = set(self.states)
+        self._visual_states = states_set & get_visual_states()
+
+        # If we require visual updates, possibly create additional APIs
+        if len(self._visual_states) > 0:
+            if len(states_set & get_steam_states()) > 0:
+                self._create_emitter_apis(EmitterType.STEAM)
+
+            if len(states_set & get_fire_states()) > 0:
+                self._create_emitter_apis(EmitterType.FIRE)
+
     def add_state(self, state):
         """
         Adds state @state with name @name to self.states.
@@ -207,21 +219,6 @@ class StatefulObject(BaseObject):
         self._states = dict()
         for state_type, params in reversed(state_types_and_params):
             self._states[state_type] = get_object_state_instance(state_type, self, params)
-
-    def _post_load(self):
-        super()._post_load()
-
-        # Check whether this object requires any visual updates
-        states_set = set(self.states)
-        self._visual_states = states_set & get_visual_states()
-
-        # If we require visual updates, possibly create additional APIs
-        if len(self._visual_states) > 0:
-            if len(states_set & get_steam_states()) > 0:
-                self._create_emitter_apis(EmitterType.STEAM)
-
-            if len(states_set & get_fire_states()) > 0:
-                self._create_emitter_apis(EmitterType.FIRE)
 
     def _create_emitter_apis(self, emitter_type):
         """
