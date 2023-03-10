@@ -622,7 +622,7 @@ class PhysicalParticleSystem(MicroParticleSystem):
             # Also apply physics to this material
             particleUtils.add_pbd_particle_material(cls.simulator.stage, cls.mat_path)
             # Force populate inputs and outputs of the shader
-            cls._material.shader_force_populate()
+            cls._material.shader_force_populate(render=True)
             # Potentially modify the material
             cls._customize_particle_material()
         # Create the particle prototypes, move them to the appropriate directory, and make them all invisible

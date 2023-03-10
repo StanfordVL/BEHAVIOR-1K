@@ -515,6 +515,10 @@ class Simulator(SimulationContext, Serializable):
             with suppress_omni_log(channels=["omni.usd"]):
                 super().play()
 
+            # Take a render step -- this is needed so that certain (unknown, maybe omni internal state?) is populated
+            # correctly
+            self.render()
+
             # Update all object handles
             if self.scene is not None and self.scene.initialized:
                 for obj in self.scene.objects:

@@ -195,12 +195,14 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             type_label="class",
         )
 
+    def _initialize(self):
+        # Run super first
+        super()._initialize()
+
         # Force populate inputs and outputs of the shaders of all materials
         # We suppress errors from omni.hydra if we're using encrypted assets, because we're loading from tmp location,
         # not the original location
         with suppress_omni_log(channels=["omni.hydra"] if gm.USE_ENCRYPTED_ASSETS else []):
-            # Single render step needed before populating materials
-            og.sim.render()
             for material in self.materials:
                 material.shader_force_populate(render=False)
 

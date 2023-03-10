@@ -62,7 +62,9 @@ class MacroParticleSystem(BaseParticleSystem):
         simulator.import_object(obj=particle_template, register=False, auto_initialize=True)
 
         # Class particle objet is assumed to be the first and only visual mesh belonging to the root link
-        cls.set_particle_template_object(obj=list(particle_template.root_link.visual_meshes.values())[0])
+        template = list(particle_template.root_link.visual_meshes.values())[0]
+        template.material.shader_force_populate(render=True)
+        cls.set_particle_template_object(obj=template)
 
     @classmethod
     def _create_particle_template(cls):

@@ -156,16 +156,6 @@ class PrimitiveObject(StatefulObject):
         # Run super first
         super()._post_load()
 
-        if self._prim_type == PrimType.RIGID:
-            visual_geom_prim = list(self.links["base_link"].visual_meshes.values())[0]
-        elif self._prim_type == PrimType.CLOTH:
-            visual_geom_prim = self.links["base_link"]
-        else:
-            raise ValueError("Prim type must either be PrimType.RIGID or PrimType.CLOTH for loading a primitive object")
-
-        visual_geom_prim.color = self._load_config["color"]
-        visual_geom_prim.opacity = self._load_config["opacity"]
-
         # Set the collision approximation appropriately
         if self._primitive_type == "Sphere":
             col_approximation = "boundingSphere"
@@ -185,6 +175,21 @@ class PrimitiveObject(StatefulObject):
                 self.height = self._load_config["height"]
             if self._load_config["size"] is not None:
                 self.size = self._load_config["size"]
+
+    def _initialize(self):
+        # Run super first
+        super()._initialize()
+
+        # Set color and opacity
+        if self._prim_type == PrimType.RIGID:
+            visual_geom_prim = list(self.links["base_link"].visual_meshes.values())[0]
+        elif self._prim_type == PrimType.CLOTH:
+            visual_geom_prim = self.links["base_link"]
+        else:
+            raise ValueError("Prim type must either be PrimType.RIGID or PrimType.CLOTH for loading a primitive object")
+
+        visual_geom_prim.color = self._load_config["color"]
+        visual_geom_prim.opacity = self._load_config["opacity"]
 
     @property
     def radius(self):
