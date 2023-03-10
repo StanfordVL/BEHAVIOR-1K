@@ -235,16 +235,17 @@ class StatefulObject(BaseObject):
         emitter_config = {}
         bbox_extent_local = self.native_bbox if hasattr(self, "native_bbox") else self.aabb_extent / self.scale
         if emitter_type == EmitterType.FIRE:
+            fire_at_metalink = True
             if OnFire in self.states:
-                fire_at_metalink = self.states[OnFire].get_state_link_name() in self._links
-                # Use the heat source link if there exists any (e.g. candle wick), or use the root link (e.g. charcoal).
-                link_name = self.states[OnFire].get_state_link_name() if fire_at_metalink else self.root_link_name
+                # Note whether the heat source link is explicitly set
+                link = self.states[OnFire].link
+                fire_at_metalink = link != self.root_link
             elif HeatSourceOrSink in self.states:
-                # Missing the heat source link annotation, return.
-                if self.states[HeatSourceOrSink].get_state_link_name() not in self._links:
+                # Only apply fire to non-root-link (i.e.: explicitly specified) heat source links
+                # Otherwise, immediately return
+                link = self.states[HeatSourceOrSink].link
+                if link == self.root_link:
                     return
-                fire_at_metalink = True
-                link_name = self.states[HeatSourceOrSink].get_state_link_name()
             else:
                 raise ValueError("Unknown fire state")
 
@@ -260,7 +261,7 @@ class StatefulObject(BaseObject):
             emitter_config["constantMask"] = 5.0
             emitter_config["attenuation"] = 0.5
         elif emitter_type == EmitterType.STEAM:
-            link_name = self.root_link_name
+            link = self.root_link
             emitter_config["name"] = "flowEmitterBox"
             emitter_config["type"] = "FlowEmitterBox"
             emitter_config["position"] = (0.0, 0.0, bbox_extent_local[2] * m.STEAM_EMITTER_HEIGHT_RATIO)
@@ -276,10 +277,10 @@ class StatefulObject(BaseObject):
 
         # Define prim paths.
         # The flow system is created under the root link so that it automatically updates its pose as the object moves
-        flowEmitter_prim_path = f"{self._prim_path}/{link_name}/{emitter_config['name']}"
-        flowSimulate_prim_path = f"{self._prim_path}/{link_name}/flowSimulate"
-        flowOffscreen_prim_path = f"{self._prim_path}/{link_name}/flowOffscreen"
-        flowRender_prim_path = f"{self._prim_path}/{link_name}/flowRender"
+        flowEmitter_prim_path = f"{link.prim_path}/{emitter_config['name']}"
+        flowSimulate_prim_path = f"{link.prim_path}/flowSimulate"
+        flowOffscreen_prim_path = f"{link.prim_path}/flowOffscreen"
+        flowRender_prim_path = f"{link.prim_path}/flowRender"
 
         # Define prims.
         stage = self._simulator.stage
