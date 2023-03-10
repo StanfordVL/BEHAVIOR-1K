@@ -6,9 +6,8 @@ import omnigibson as og
 from omnigibson.macros import gm
 from omnigibson.utils.ui_utils import choose_from_options
 
-# Make sure object states are enabled and global contact reporting is enabled
+# Make sure object states are enabled
 gm.ENABLE_OBJECT_STATES = True
-gm.ENABLE_GLOBAL_CONTACT_REPORTING = True
 
 
 def main(random_selection=False, headless=False, short_exec=False):

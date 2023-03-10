@@ -5,9 +5,8 @@ from omnigibson.utils.constants import PrimType
 import omnigibson.utils.transform_utils as T
 import numpy as np
 
-# Make sure object states and GPU dynamics are enabled (GPU dynamics needed for cloth)
+# Make sure GPU dynamics are enabled (GPU dynamics needed for cloth)
 gm.ENABLE_OBJECT_STATES = True
-gm.ENABLE_GLOBAL_CONTACT_REPORTING = True
 gm.USE_GPU_DYNAMICS = True
 
 TEMP_RELATED_ABILITIES = {"cookable": {}, "freezable": {}, "burnable": {}, "heatable": {}}

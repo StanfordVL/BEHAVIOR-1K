@@ -4,9 +4,8 @@ import omnigibson as og
 from omnigibson.macros import gm
 import omnigibson.utils.transform_utils as T
 
-# Make sure object states, contact reporting, and transition rules are enabled
+# Make sure object states and transition rules are enabled
 gm.ENABLE_OBJECT_STATES = True
-gm.ENABLE_GLOBAL_CONTACT_REPORTING = True
 gm.ENABLE_TRANSITION_RULES = True
 
 

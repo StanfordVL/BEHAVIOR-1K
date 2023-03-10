@@ -7,9 +7,8 @@ from omnigibson.utils.ui_utils import choose_from_options
 from omnigibson.object_states.attachment import AttachmentType
 from omnigibson.object_states import Attached
 
-# Make sure object states are enabled and global contact reporting is enabled
+# Make sure object states are enabled
 gm.ENABLE_OBJECT_STATES = True
-gm.ENABLE_GLOBAL_CONTACT_REPORTING = True
 
 
 def setup_scene_for_abilities(abilities1, abilities2):

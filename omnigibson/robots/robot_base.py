@@ -148,15 +148,6 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         # Run super post load first
         super()._post_load()
 
-        # Possibly force enabling of contact sensing for this robot if we set the global flag
-        # TODO: Remove this once we have a more optimized solution
-        # Only create contact report api if we're not visual only
-        if (not self._visual_only) and gm.ENABLE_ROBOT_CONTACT_REPORTING:
-            for link in self._links.values():
-                PhysxSchema.PhysxContactReportAPI(link.prim) if \
-                    link.prim.HasAPI(PhysxSchema.PhysxContactReportAPI) else \
-                    PhysxSchema.PhysxContactReportAPI.Apply(link.prim)
-
         # Search for any sensors this robot might have attached to any of its links
         self._sensors = dict()
         obs_modalities = set()

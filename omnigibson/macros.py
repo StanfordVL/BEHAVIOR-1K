@@ -22,14 +22,6 @@ gm.DEBUG = True
 # Whether to print out disclaimers (i.e.: known failure cases resulting from Omniverse's current bugs / limitations)
 gm.SHOW_DISCLAIMERS = True
 
-# Whether to enable (a) [global / robot] contact checking or not
-# Note: You can enable the robot contact checking, even if global checking is disabled
-# If global checking is enabled but robot checking disabled, global checking will take
-# precedence (i.e.: robot will still have contact checking)
-# TODO: Remove this once we have an optimized solution
-gm.ENABLE_GLOBAL_CONTACT_REPORTING = False
-gm.ENABLE_ROBOT_CONTACT_REPORTING = True
-
 # Whether to use omni's GPU dynamics
 # This is necessary for certain features; e.g. particles (fluids / cloth)
 gm.USE_GPU_DYNAMICS = False

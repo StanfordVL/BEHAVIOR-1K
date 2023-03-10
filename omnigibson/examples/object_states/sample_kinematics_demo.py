@@ -8,9 +8,8 @@ from omnigibson.macros import gm
 from omnigibson.objects import DatasetObject
 
 
-# Make sure object states and global contact reporting are enabled
+# Make sure object states are enabled
 gm.ENABLE_OBJECT_STATES = True
-gm.ENABLE_GLOBAL_CONTACT_REPORTING = True
 
 
 def main(random_selection=False, headless=False, short_exec=False):
