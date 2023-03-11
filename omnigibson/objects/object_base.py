@@ -1,4 +1,3 @@
-import tempfile
 from abc import ABCMeta
 import numpy as np
 
@@ -101,12 +100,6 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         self._simulator = None
         self._highlight_cached_values = None
         self._highlighted = None
-
-        # Create and expose a per-object temporary directory for any use cases. It will get
-        # destroyed once the TemporaryDirectory object is deallocated. All accesses should happen
-        # using the temporary_directory field.
-        self._temporary_directory_handle = tempfile.TemporaryDirectory()
-        self.temporary_directory = self._temporary_directory_handle.name
 
         # Create load config from inputs
         load_config = dict() if load_config is None else load_config

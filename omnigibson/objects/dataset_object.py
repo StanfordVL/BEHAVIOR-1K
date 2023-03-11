@@ -220,7 +220,7 @@ class DatasetObject(USDObject):
             # Create a temporary file to store the decrytped asset, load it, and then delete it.
             original_usd_path = self._usd_path
             encrypted_filename = original_usd_path.replace(".usd", ".encrypted.usd")
-            decrypted_filename = os.path.join(self.temporary_directory, os.path.basename(original_usd_path))
+            _, decrypted_filename = tempfile.mkstemp(os.path.basename(original_usd_path), dir=og.tempdir)
             decrypt_file(encrypted_filename, decrypted_filename)
             self._usd_path = decrypted_filename
             prim = super()._load(simulator=simulator)
