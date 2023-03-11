@@ -282,13 +282,14 @@ def download_assets():
     if os.path.exists(og.assets_path):
         print("Assets already downloaded.")
     else:
-        tmp_file = os.path.join(tempfile.gettempdir(), "og_assets.tar.gz")
-        os.makedirs(og.assets_path, exist_ok=True)
-        path = "https://storage.googleapis.com/gibson_scenes/og_assets.tar.gz"
-        log.info(f"Downloading and decompressing demo OmniGibson assets from {path}")
-        assert subprocess.call(["wget", "-c", "--no-check-certificate", "--retry-connrefused", "--tries=5", "--timeout=5", path, "-O", tmp_file]) == 0, "Assets download failed."
-        assert subprocess.call(["tar", "-zxf", tmp_file, "--strip-components=1", "--directory", og.assets_path]) == 0, "Assets extraction failed."
-        # These datasets come as folders; in these folder there are scenes, so --strip-components are needed.
+        with tempfile.TemporaryDirectory() as td:
+            tmp_file = os.path.join(td, "og_assets.tar.gz")
+            os.makedirs(og.assets_path, exist_ok=True)
+            path = "https://storage.googleapis.com/gibson_scenes/og_assets.tar.gz"
+            log.info(f"Downloading and decompressing demo OmniGibson assets from {path}")
+            assert subprocess.call(["wget", "-c", "--no-check-certificate", "--retry-connrefused", "--tries=5", "--timeout=5", path, "-O", tmp_file]) == 0, "Assets download failed."
+            assert subprocess.call(["tar", "-zxf", tmp_file, "--strip-components=1", "--directory", og.assets_path]) == 0, "Assets extraction failed."
+            # These datasets come as folders; in these folder there are scenes, so --strip-components are needed.
 
 
 def download_demo_data():
