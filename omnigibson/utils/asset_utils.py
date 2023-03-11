@@ -374,7 +374,7 @@ def change_data_path():
             yaml.dump(global_config, f)
 
 
-def decrypt_file(encrypted_filename, decrypted_filename=None, decrypted_file=None):
+def decrypt_file(encrypted_filename, decrypted_filename):
     with open(og.key_path, "rb") as filekey:
         key = filekey.read()
     fernet = Fernet(key)
@@ -384,11 +384,8 @@ def decrypt_file(encrypted_filename, decrypted_filename=None, decrypted_file=Non
 
     decrypted = fernet.decrypt(encrypted)
 
-    if decrypted_file is not None:
+    with open(decrypted_filename, "wb") as decrypted_file:
         decrypted_file.write(decrypted)
-    else:
-        with open(decrypted_filename, "wb") as decrypted_file:
-            decrypted_file.write(decrypted)
 
 
 def encrypt_file(original_filename, encrypted_filename=None, encrypted_file=None):
