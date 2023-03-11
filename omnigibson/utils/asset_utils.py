@@ -11,26 +11,20 @@ import yaml
 import omnigibson as og
 from omnigibson.utils.ui_utils import create_module_logger
 
-if os.name == "nt":
-    import win32api
-    import win32con
-
 # Create module logger
 log = create_module_logger(module_name=__name__)
 
 
 def folder_is_hidden(p):
     """
-    Removes hidden folders from a list. Works on Linux, Mac and Windows
+    Check if a folder is hidden. This corresponds to checking if its filename starts with a dot.
+    Note that while this does not actually correspond to checking for hidden files on Windows, the
+    files we want to ignore will still start with a dot and thus this works.
 
     Returns:
         bool: true if a folder is hidden in the OS
     """
-    if os.name == "nt":
-        attribute = win32api.GetFileAttributes(p)
-        return attribute & (win32con.FILE_ATTRIBUTE_HIDDEN | win32con.FILE_ATTRIBUTE_SYSTEM)
-    else:
-        return p.startswith(".")  # linux-osx
+    return p.startswith(".")
 
 
 def get_og_avg_category_specs():
