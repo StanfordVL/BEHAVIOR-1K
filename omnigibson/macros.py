@@ -5,9 +5,9 @@ NOTE: This is generally decentralized -- the monolithic @settings variable is cr
 but submodules within OmniGibson may import this dictionary and add to it dynamically
 """
 import os
+import pathlib
 
 from addict import Dict
-
 
 # Initialize settings
 macros = Dict()
@@ -83,11 +83,14 @@ def create_module_macros(module_path):
         Dict: addict dictionary which can be populated with values
     """
     # Sanity check module path, make sure omnigibson/ is in the path
-    assert "omnigibson/" in module_path, \
-        f"module_path is expected to be a filepath including the omnigibson root directory, got: {module_path}!"
+    module_path = pathlib.Path(module_path)
+    omnigibson_path = pathlib.Path(__file__).parent
 
     # Trim the .py, and anything before and including omnigibson/, and split into its appropriate parts
-    subsections = module_path[:-3].split("omnigibson/")[-1].split("/")
+    try:
+        subsections = module_path.with_suffix("").relative_to(omnigibson_path).parts
+    except ValueError:
+        raise ValueError("module_path is expected to be a filepath including the omnigibson root directory, got: {module_path}!")
 
     # Create and return the generated sub-dictionary
     def _recursively_get_or_create_dict(dic, keys):

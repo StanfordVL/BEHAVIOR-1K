@@ -98,6 +98,8 @@ def create_app():
     global app
     from omni.isaac.kit import SimulationApp
     app = SimulationApp({"headless": gm.HEADLESS})
+    from omni.isaac.core.utils.extensions import enable_extension
+    enable_extension("omni.kit.window.viewport")
     import omni
 
     # Possibly hide windows if in debug mode
