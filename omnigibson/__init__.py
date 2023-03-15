@@ -1,5 +1,6 @@
 import logging
 import os
+import socket
 
 import yaml
 import builtins
@@ -97,7 +98,34 @@ def print_save_usd_warning(_):
 def create_app():
     global app
     from omni.isaac.kit import SimulationApp
-    app = SimulationApp({"headless": gm.HEADLESS})
+    remote_rendering = bool(os.getenv("REMOTE_ENABLED"))
+    app = SimulationApp({"headless": gm.HEADLESS or remote_rendering})
+
+    # Default Livestream settings
+    if remote_rendering:
+        app.set_setting("/app/window/drawMouse", True)
+        app.set_setting("/app/livestream/proto", "ws")
+        app.set_setting("/app/livestream/websocket/framerate_limit", 120)
+        app.set_setting("/ngx/enabled", False)
+
+        from omni.isaac.core.utils.extensions import enable_extension
+
+        # Note: Only one livestream extension can be enabled at a time
+        # Enable Native Livestream extension
+        # Default App: Streaming Client from the Omniverse Launcher
+        # enable_extension("omni.kit.livestream.native")
+
+        # Enable WebSocket Livestream extension
+        # Default URL: http://localhost:8211/streaming/client/
+        # enable_extension("omni.services.streamclient.websocket")
+
+        # Enable WebRTC Livestream extension
+        # Default URL: http://localhost:8211/streaming/webrtc-client/
+        enable_extension("omni.services.streamclient.webrtc")
+        hostname = socket.gethostname()
+        print("Now streaming on:")
+        print(f"\thttp://{hostname}:8211/streaming/webrtc-client?server={hostname}\n")
+
     import omni
 
     # Possibly hide windows if in debug mode
