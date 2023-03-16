@@ -209,6 +209,15 @@ class Simulator(SimulationContext, Serializable):
         self._physics_context.set_gpu_total_aggregate_pairs_capacity(gm.GPU_AGGR_PAIRS_CAPACITY)
         self._physics_context.set_gpu_max_particle_contacts(gm.GPU_MAX_PARTICLE_CONTACTS)
 
+    def _set_renderer_settings(self):
+        # TODO: For now we are setting these to some reasonable high-performance values but these can be made configurable.
+        carb.settings.get_settings().set_bool("/rtx/reflections/enabled", False)  # Can be True with a 10fps penalty
+        carb.settings.get_settings().set_bool("/rtx/indirectDiffuse/enabled", True)  # Can be False with a 5fps gain
+        carb.settings.get_settings().set_bool("/rtx/directLighting/sampledLighting/enabled", True)
+        carb.settings.get_settings().set_int("/rtx/raytracing/showLights", 1)
+        carb.settings.get_settings().set_float("/rtx/sceneDb/ambientLightIntensity", 0.1)
+        carb.settings.get_settings().set_int("/rtx/domeLight/upperLowerStrategy", 3)  # "Limited image-based"
+
     @property
     def viewer_visibility(self):
         """
@@ -899,6 +908,7 @@ class Simulator(SimulationContext, Serializable):
             stage_units_in_meters=self._initial_stage_units_in_meters,
         )
         self._set_physics_engine_settings()
+        self._set_renderer_settings()
         self._setup_default_callback_fns()
         self._stage_open_callback = (
             omni.usd.get_context().get_stage_event_stream().create_subscription_to_pop(self._stage_open_callback_fn)
