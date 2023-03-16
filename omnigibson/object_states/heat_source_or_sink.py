@@ -88,8 +88,7 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin):
     @property
     def _default_link(self):
         # Only supported if we require inside
-        # return self.obj.root_link if self.requires_inside else super()._default_link
-        return super()._default_link if self.requires_inside else self.obj.root_link
+        return self.obj.root_link if self.requires_inside else super()._default_link
 
     @staticmethod
     def get_dependencies():
