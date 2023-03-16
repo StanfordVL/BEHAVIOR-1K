@@ -620,9 +620,9 @@ class Simulator(SimulationContext, Serializable):
                 headers[tuple(sorted((actor0_obj, actor1_obj), key=lambda x:x.uuid))].append(contact_header)
 
             for (actor0_obj, actor1_obj) in combos:
+                if not isinstance(actor0_obj, StatefulObject) or not isinstance(actor1_obj, StatefulObject):
+                    continue
                 for obj0, obj1 in [(actor0_obj, actor1_obj), (actor1_obj, actor0_obj)]:
-                    if not isinstance(obj0, StatefulObject):
-                        continue
                     for state_type in self.object_state_types_on_contact:
                         if state_type in obj0.states:
                             obj0.states[state_type].on_contact(obj1, headers[(actor0_obj, actor1_obj)], contact_data)
