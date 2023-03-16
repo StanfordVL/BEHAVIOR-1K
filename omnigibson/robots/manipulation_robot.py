@@ -2,7 +2,7 @@ from abc import abstractmethod
 from collections import namedtuple
 import numpy as np
 
-from omnigibson import app
+import omnigibson as og
 from omnigibson.macros import gm, create_module_macros
 from omnigibson.utils.asset_utils import get_assisted_grasping_categories
 import omnigibson.utils.transform_utils as T
@@ -1046,7 +1046,7 @@ class ManipulationRobot(BaseRobot):
 
         # We have to toggle the joint from off to on after a physics step because of an omni quirk
         # Otherwise the joint transform is very weird
-        app.update()
+        og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
         joint_prim.GetAttribute("physics:jointEnabled").Set(True)
 
         # Save a reference to this joint prim
@@ -1239,7 +1239,7 @@ class ManipulationRobot(BaseRobot):
 
         # We have to toggle the joint from off to on after a physics step because of an omni quirk
         # Otherwise the joint transform is very weird
-        app.update()
+        og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
         joint_prim.GetAttribute("physics:jointEnabled").Set(True)
 
         # Save a reference to this joint prim
