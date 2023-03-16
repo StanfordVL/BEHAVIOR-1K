@@ -18,6 +18,7 @@ from omnigibson.utils.python_utils import classproperty, assert_valid_key
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
 from omnigibson.utils.constants import JointType, PrimType
 from omnigibson.utils.usd_utils import create_joint
+from omnigibson.utils.ui_utils import suppress_omni_log
 
 from pxr import Gf
 
@@ -1046,7 +1047,8 @@ class ManipulationRobot(BaseRobot):
 
         # We have to toggle the joint from off to on after a physics step because of an omni quirk
         # Otherwise the joint transform is very weird
-        og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
+        with suppress_omni_log(channels=["omni.physx.plugin"]):
+            og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
         joint_prim.GetAttribute("physics:jointEnabled").Set(True)
 
         # Save a reference to this joint prim
@@ -1239,7 +1241,8 @@ class ManipulationRobot(BaseRobot):
 
         # We have to toggle the joint from off to on after a physics step because of an omni quirk
         # Otherwise the joint transform is very weird
-        og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
+        with suppress_omni_log(channels=["omni.physx.plugin"]):
+            og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
         joint_prim.GetAttribute("physics:jointEnabled").Set(True)
 
         # Save a reference to this joint prim
