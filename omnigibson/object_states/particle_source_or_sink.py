@@ -76,7 +76,7 @@ class ParticleSource(ParticleApplier):
         # Note that object state steps are discretized by og.sim.render_step
         # Note: t derived from quadratic formula: height = 0.5 g t^2 + v0 t
         t = (-self._initial_speed + np.sqrt(self._initial_speed ** 2 + 2 * og.sim.gravity * self._projection_mesh_params["extents"][2])) / og.sim.gravity
-        self._n_steps_per_modification = int(1 + t / og.sim.get_rendering_dt())
+        self._n_steps_per_modification = np.ceil(1 + t / og.sim.get_rendering_dt()).astype(int)
 
         # Override check overlap such that it always returns True (since we are ignoring overlaps and directly
         # spawning particles
@@ -137,6 +137,7 @@ class ParticleSink(ParticleRemover):
             obj=obj,
             method=ParticleModifyMethod.PROJECTION,
             conditions=conditions,
+            # TODO: Discuss how this will sync with new asset metalinks
             projection_mesh_params={
                 "type": "Cylinder",
                 "extents": [sink_radius * 2, sink_radius * 2, sink_height],
