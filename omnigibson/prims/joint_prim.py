@@ -86,6 +86,7 @@ class JointPrim(BasePrim):
         self._control_type = None
         self._dof_properties = None
         self._joint_state_api = None
+        self._driven = None
 
         # The following values will only be valid if this joint is part of an articulation
         self._dc = None
@@ -119,6 +120,9 @@ class JointPrim(BasePrim):
     def _post_load(self):
         # run super first
         super()._post_load()
+
+        # Check whether this joint is driven or not
+        self._driven = self._prim.HasAPI(UsdPhysics.DriveAPI)
 
         # Add joint state API if this is a revolute or prismatic joint
         self._joint_type = JointType.get_type(self._prim.GetTypeName().split("Physics")[-1])
@@ -325,6 +329,14 @@ class JointPrim(BasePrim):
                 {JOINT_PRISMATIC, JOINT_REVOLUTE, JOINT_FIXED, JOINT_SPHERICAL}
         """
         return self._joint_type
+
+    @property
+    def driven(self):
+        """
+        Returns:
+            bool: Whether this joint can be driven by a motor or not
+        """
+        return self._driven
 
     @property
     def control_type(self):
@@ -793,8 +805,9 @@ class JointPrim(BasePrim):
                 de-normalized first before being executed). Default is False
         """
         # Sanity checks -- make sure that we're articulated (no control type check like position and velocity
-        # because we can't set effort targets)
+        # because we can't set effort targets) and that we're driven
         self.assert_articulated()
+        assert self._driven, "Cannot set efforts for joint that is not driven!"
 
         # Standardize input
         effort = np.array([effort]) if self._n_dof == 1 and not isinstance(effort, Iterable) else np.array(effort)
@@ -828,7 +841,8 @@ class JointPrim(BasePrim):
         if self.articulated:
             self.set_pos(state["pos"], target=False)
             self.set_vel(state["vel"], target=False)
-            self.set_effort(state["effort"])
+            if self._driven:
+                self.set_effort(state["effort"])
             if self._control_type == ControlType.POSITION:
                 self.set_pos(state["target_pos"], target=True)
             elif self._control_type == ControlType.VELOCITY:

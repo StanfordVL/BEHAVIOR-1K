@@ -173,6 +173,10 @@ class ControllableObject(BaseObject):
                 cfg["command_input_limits"] = "default"  # default is normalized (-1, 1)
             # Create the controller
             self._controllers[name] = create_controller(**cfg)
+            controller = create_controller(**cfg)
+            # Verify the controller's DOFs can all be driven
+            for idx in controller.dof_idx:
+                assert self._joints[self.dof_names_ordered[idx]].driven, "Controllers should only control driveable joints!"
 
         self._update_controller_mode()
 
@@ -343,7 +347,7 @@ class ControllableObject(BaseObject):
         # Compose controls
         u_vec = np.zeros(self.n_dof)
         # By default, the control type is effort and the control value is 0 (np.zeros) - 0 effort means no control.
-        u_type_vec = np.array([ControlType.EFFORT] * self.n_dof)
+        u_type_vec = np.array([ControlType.NONE] * self.n_dof)
         for group, ctrl in control.items():
             idx = self._controllers[group].dof_idx
             u_vec[idx] = ctrl["value"]
@@ -434,6 +438,9 @@ class ControllableObject(BaseObject):
                 joint.set_vel(ctrl, normalized=norm, target=True)
             elif ctrl_type == ControlType.POSITION:
                 joint.set_pos(ctrl, normalized=norm, target=True)
+            elif ctrl_type == ControlType.NONE:
+                # Do nothing
+                pass
             else:
                 raise ValueError("Invalid control type specified: {}".format(ctrl_type))
 
