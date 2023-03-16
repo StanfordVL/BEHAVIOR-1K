@@ -383,7 +383,6 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
             function: Limit checker function, with signature condition(obj) --> bool, where @obj is the specific object
                 that this ParticleModifier state belongs to
         """
-        # TODO: Update to only check for systems within conditions
         if issubclass(system, VisualParticleSystem):
             def condition(obj):
                 return self.modified_particle_count[system] < self.visual_particle_modification_limit
