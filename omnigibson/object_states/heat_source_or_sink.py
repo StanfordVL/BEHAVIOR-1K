@@ -133,9 +133,9 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin):
     def _set_value(self, new_value):
         raise NotImplementedError("Setting heat source capability is not supported.")
 
-    def influences_obj(self, obj):
+    def affects_obj(self, obj):
         """
-        Computes whether this heat source or sink object is influencing objedct @obj
+        Computes whether this heat source or sink object is affecting object @obj
         Computes the temperature delta that may be applied to object @obj. NOTE: This value is agnostic to simulation
         stepping speed, and should be scaled accordingly
 
@@ -143,7 +143,7 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin):
             obj (StatefulObject): Object whose temperature delta should be computed
 
         Returns:
-            bool: Whether this heat source or sink is currently influencing @obj's temperature
+            bool: Whether this heat source or sink is currently affecting @obj's temperature
         """
         # No change if we're not on
         if not self.get_value():

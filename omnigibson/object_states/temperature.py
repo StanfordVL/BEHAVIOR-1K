@@ -62,8 +62,8 @@ class Temperature(AbsoluteObjectState, UpdateStateMixin):
             heat_source = obj2.states.get(OnFire, obj2.states.get(HeatSourceOrSink, None))
             assert heat_source is not None, "Unknown HeatSourceOrSink subclass"
 
-            # Compute delta to apply if the heat source is active
-            if heat_source.influences_obj(obj=self.obj):
+            # Compute delta to apply if the heat source is actively affecting this object
+            if heat_source.affects_obj(obj=self.obj):
                 new_temperature += (heat_source.temperature - self.value) * heat_source.heating_rate * og.sim.get_rendering_dt()
 
         # Apply temperature decay if not affected by any heat source.
