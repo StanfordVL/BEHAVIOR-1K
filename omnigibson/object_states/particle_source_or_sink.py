@@ -75,7 +75,7 @@ class ParticleSource(ParticleApplier):
         # This is equivalent to the time it takes for a generated particle to travel @source_height distance
         # Note that object state steps are discretized by og.sim.render_step
         # Note: t derived from quadratic formula: height = 0.5 g t^2 + v0 t
-        t = (-self._initial_speed + np.sqrt(self._initial_speed ** 2 + 2 * 9.81 * self._projection_mesh_params["extents"][2])) / (2 * 9.81)
+        t = (-self._initial_speed + np.sqrt(self._initial_speed ** 2 + 2 * og.sim.gravity * self._projection_mesh_params["extents"][2])) / og.sim.gravity
         self._n_steps_per_modification = int(1 + t / og.sim.get_rendering_dt())
 
         # Override check overlap such that it always returns True (since we are ignoring overlaps and directly
