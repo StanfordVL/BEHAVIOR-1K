@@ -617,13 +617,8 @@ class Simulator(SimulationContext, Serializable):
                 actor1_obj = self._scene.object_registry("prim_path", "/".join(actor1.split("/")[:-1]))
                 if actor0_obj is None or actor1_obj is None or not actor0_obj.initialized or not actor1_obj.initialized:
                     continue
-                elif (actor1_obj, actor0_obj) in combos:
-                    headers[(actor1_obj, actor0_obj)].append(contact_header)
-                else:
-                    combos.add((actor0_obj, actor1_obj))
-                    headers[(actor0_obj, actor1_obj)].append(contact_header)
+                headers[tuple(sorted((actor0_obj, actor1_obj), key=lambda x:x.uuid))].append(contact_header)
 
-            # from IPython import embed; embed()
             for (actor0_obj, actor1_obj) in combos:
                 for obj0, obj1 in [(actor0_obj, actor1_obj), (actor1_obj, actor0_obj)]:
                     if not isinstance(obj0, StatefulObject):
