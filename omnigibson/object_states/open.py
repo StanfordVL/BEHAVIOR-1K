@@ -1,5 +1,4 @@
 import random
-import logging
 
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.object_state_base import BooleanState, AbsoluteObjectState
@@ -88,7 +87,7 @@ def _get_relevant_joints(obj):
     default_joint_directions = [1] * len(default_relevant_joints)
 
     if not hasattr(obj, "metadata"):
-        logging.warning("No openable joint metadata found for object %s" % obj.name)
+        log.warning("No openable joint metadata found for object %s" % obj.name)
         return default_both_sides, default_relevant_joints, default_joint_directions
 
     # Get joint IDs and names from metadata annotation. If not, return default values.
@@ -116,7 +115,7 @@ def _get_relevant_joints(obj):
 
 class Open(AbsoluteObjectState, BooleanState):
     def __init__(self, obj):
-        self._relevant_joints_info = None
+        self.relevant_joints_info = None
 
         # Run super method
         super().__init__(obj=obj)

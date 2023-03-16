@@ -266,7 +266,7 @@ class SlicingRule(BaseTransitionRule):
             return False
 
         # Slicer may contact the same body in multiple points, so cut once since removing the object from the simulator
-        return Sliced in sliced_obj.states and not sliced_obj.states[Sliced].get_value()
+        return not sliced_obj.states[Sliced].get_value()
 
     def transition(self, individual_objects, group_objects):
         slicer_obj, sliced_obj = individual_objects["slicer"], individual_objects["sliceable"]
@@ -324,6 +324,46 @@ class SlicingRule(BaseTransitionRule):
 
         # Delete original object from stage.
         t_results.remove.append(sliced_obj)
+
+        return t_results
+
+class DicingRule(BaseTransitionRule):
+    """
+    Transition rule to apply to diceable / slicer object pairs.
+    """
+
+    def __init__(self):
+        # Define an individual filter dictionary so we can track all valid combos of slicer - sliceable
+        individual_filters = {ability: AbilityFilter(ability) for ability in ("diceable", "slicer")}
+
+        # Run super
+        super().__init__(individual_filters=individual_filters)
+
+    def condition(self, individual_objects, group_objects):
+        slicer_obj, diced_obj = individual_objects["slicer"], individual_objects["diceable"]
+        slicer_position = slicer_obj.states[Slicer].get_link_position()
+        if slicer_position is None:
+            return False
+
+        contact_list = slicer_obj.states[ContactBodies].get_value()
+        sliced_links = set(diced_obj.links.values())
+        if contact_list.isdisjoint(sliced_links):
+            return False
+
+        # Return if the diceable object still exists
+        return True
+
+    def transition(self, individual_objects, group_objects):
+        t_results = TransitionResults()
+
+        slicer_obj, diced_obj = individual_objects["slicer"], individual_objects["diceable"]
+
+        from omnigibson.systems.system_base import get_system_from_element_name
+        system = get_system_from_element_name("DicedApple")
+        system.generate_particles_from_link(diced_obj, diced_obj.root_link, use_visual_meshes=False)
+
+        # Delete original object from stage.
+        t_results.remove.append(diced_obj)
 
         return t_results
 
@@ -575,9 +615,7 @@ class BlenderRule(BaseTransitionRule):
             # No need to check for whether particle instancers exist because they must due to @self.condition passing!
             for inst in system.particle_instancers.values():
                 indices = self._check_in_volume[blender.name](inst.particle_positions).nonzero()[0]
-                current_visibilities = inst.particle_visibilities
-                current_visibilities[indices] = 0
-                inst.particle_visibilities = current_visibilities
+                inst.remove_particles(idxs=indices)
 
         # Spawn in blended fluid!
         blender.states[Filled].set_value(self.output_system, True)
@@ -600,6 +638,7 @@ class BlenderRule(BaseTransitionRule):
 # dynamically
 DEFAULT_RULES = (
     SlicingRule(),
+    DicingRule(),
     # Strawberry smoothie
     BlenderRule(
         output_system=StrawberrySmoothieSystem,

@@ -209,6 +209,22 @@ class DatasetObject(USDObject):
         # Run super method first
         super()._initialize()
 
+        # Apply any forced light intensity updates.
+        if gm.FORCE_LIGHT_INTENSITY is not None:
+            def recursive_light_update(child_prim):
+                if "Light" in child_prim.GetPrimTypeInfo().GetTypeName():
+                    child_prim.GetAttribute("intensity").Set(gm.FORCE_LIGHT_INTENSITY)
+
+                for child_child_prim in child_prim.GetChildren():
+                    recursive_light_update(child_child_prim)
+
+            recursive_light_update(self._prim)
+
+        # Apply any forced roughness updates
+        for material in self.materials:
+            material.reflection_roughness_texture_influence = 0.0
+            material.reflection_roughness_constant = gm.FORCE_ROUGHNESS
+
         # Set the joint frictions based on category
         friction = SPECIAL_JOINT_FRICTIONS.get(self.category, DEFAULT_JOINT_FRICTION)
         for joint in self._joints.values():

@@ -4,10 +4,15 @@ from pxr import Usd, UsdGeom, Sdf, Gf, Vt, PhysxSchema
 import omni
 from omni.isaac.core.utils.prims import get_prim_at_path
 from omni.isaac.core.utils.stage import get_current_stage
+from omnigibson.macros import gm, create_module_macros
 from omni.physx.scripts import physicsUtils, particleUtils
-import omnigibson as og
 from omnigibson.utils.usd_utils import array_to_vtarray
+import omnigibson as og
 
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
+
+m.PROTOTYPE_GRAVEYARD_POS = (100.0, 100.0, 100.0)
 
 def create_physx_particle_system(
     prim_path,
@@ -93,23 +98,11 @@ def bind_material(prim_path, material_path):
     )
 
 
-def get_prototype_path_from_particle_system_path(particle_system_path):
-    """
-    Grabs the particle prototype directory prim path from the particle system path. This is different from before
-    because Omni no longer allows for meshes to be nested within each other.
-
-    Args:
-        particle_system_path (str): Prim path to the particle system of interest
-
-    Returns:
-        str: Corresponding directory to the particle system's prototypes
-    """
-    return f"{particle_system_path}Prototypes"
-
-
 def create_physx_particleset_pointinstancer(
     name,
     particle_system_path,
+    physx_particle_system_path,
+    prototype_prim_paths,
     particle_group,
     positions,
     self_collision=True,
@@ -120,7 +113,6 @@ def create_physx_particleset_pointinstancer(
     velocities=None,
     angular_velocities=None,
     scales=None,
-    prototype_prim_paths=None,
     prototype_indices=None,
     enabled=True,
 ) -> Usd.Prim:
@@ -130,7 +122,9 @@ def create_physx_particleset_pointinstancer(
 
     Args:
         name (str): Name for this point instancer
-        particle_system_path (str): Stage path to particle system that simulates the set
+        particle_system_path (str): Stage path to particle system (Scope)
+        physx_particle_system_path (str): Stage path to physx particle system (PhysxParticleSystem)
+        prototype_prim_paths (list of str): Stage path(s) to the prototypes to reference for this particle set.
         particle_group (int): ID for this particle set. Particles from different groups will automatically collide
             with each other. Particles in the same group will have collision behavior dictated by @self_collision
         positions (list of 3-tuple or np.array): Particle (x,y,z) positions either as a list or a (N, 3) numpy array
@@ -150,8 +144,6 @@ def create_physx_particleset_pointinstancer(
             list or a (N, 3) numpy array. If not specified, all will be set to 0
         scales (None or list of 3-array or np.array): Particle (x,y,z) scales either as a list or a (N, 3)
             numpy array. If not specified, all will be set to 1.0
-        prototype_prim_paths (None or str or list of str): Stage path(s) to the prototypes to reference for this
-            particle set. If None, will generate a default sphere called "particlePrototype" as the prototype.
         prototype_indices (None or list of int): If specified, should specify which prototype should be used for
             each particle. If None, will use all 0s (i.e.: the first prototype created)
         enabled (bool): Whether to enable this particle instancer. If not enabled, then no physics will be used
@@ -161,48 +153,43 @@ def create_physx_particleset_pointinstancer(
     """
     stage = get_current_stage()
     n_particles = len(positions)
-    particle_system = get_prim_at_path(particle_system_path)
+    particle_system = get_prim_at_path(physx_particle_system_path)
 
-    # Make sure no prototype doesn't already exist at this point
+    # Create point instancer scope
     prim_path = f"{particle_system_path}/{name}"
-    assert not stage.GetPrimAtPath(prim_path), f"Cannot create PointInstancer prim, prim already exists at {prim_path}!"
+    assert not stage.GetPrimAtPath(prim_path), f"Cannot create an instancer scope, scope already exists at {prim_path}!"
+    stage.DefinePrim(prim_path, "Scope")
 
     # Create point instancer
-    assert not stage.GetPrimAtPath(prim_path)
-    instancer = UsdGeom.PointInstancer.Define(stage, prim_path)
+    instancer_prim_path = f"{prim_path}/instancer"
+    assert not stage.GetPrimAtPath(instancer_prim_path), f"Cannot create a PointInstancer prim, prim already exists at {instancer_prim_path}!"
+    instancer = UsdGeom.PointInstancer.Define(stage, instancer_prim_path)
 
-    # Create particle instance prototypes if none are specified
-    prototype_root_path = f"{get_prototype_path_from_particle_system_path(particle_system_path=particle_system_path)}/{name}"
-    stage.DefinePrim(prototype_root_path, "Scope")
-    if prototype_prim_paths is None:
-        prototype_path = f"{prototype_root_path}/particlePrototype"
-        UsdGeom.Sphere.Define(stage, prototype_path)
-        prototype_prim_paths = [prototype_path]
-    else:
-        # We copy the prototypes at the prims
-        # We need to make copies currently because omni behavior is weird (frozen particles)
-        # if multiple instancers share the same prototype prim for some reason
-        new_prototype_prim_paths = []
-        for i, p_path in enumerate(prototype_prim_paths):
-            new_path = f"{prototype_root_path}/particlePrototype{i}"
-            omni.kit.commands.execute("CopyPrim", path_from=p_path, path_to=new_path)
-            new_prototype_prim_paths.append(new_path)
-        prototype_prim_paths = new_prototype_prim_paths
-
-    # Add prototype mesh prim paths to the prototypes relationship attribute for this point set
-    # We also hide the prototype if we're using an isosurface
-    mesh_list = instancer.GetPrototypesRel()
     is_isosurface = particle_system.HasAPI(PhysxSchema.PhysxParticleIsosurfaceAPI) and \
                     particle_system.GetAttribute("physxParticleIsosurface:isosurfaceEnabled").Get()
 
-    for prototype_prim_path in prototype_prim_paths:
-        # Make sure this prim is visible first if we're not using isosurface
+    # Add prototype mesh prim paths to the prototypes relationship attribute for this point set
+    # We need to make copies of prototypes for each instancer currently because particles won't render properly
+    # if multiple instancers share the same prototypes for some reason
+    mesh_list = instancer.GetPrototypesRel()
+    prototype_prims = []
+    for i, original_path in enumerate(prototype_prim_paths):
+        prototype_prim_path = f"{prim_path}/prototype{i}"
+        omni.kit.commands.execute("CopyPrim", path_from=original_path, path_to=prototype_prim_path)
+        prototype_prim = get_prim_at_path(prototype_prim_path)
+        # Make sure this prim is invisible if we're using isosurface, and vice versa.
+        imageable = UsdGeom.Imageable(prototype_prim)
         if is_isosurface:
-            UsdGeom.Imageable(get_prim_at_path(prototype_prim_path)).MakeInvisible()
+            imageable.MakeInvisible()
         else:
-            UsdGeom.Imageable(get_prim_at_path(prototype_prim_path)).MakeVisible()
-        # Add target
+            imageable.MakeVisible()
+
+        # Move the prototype to the graveyard position so that it won't be visible to the agent
+        # We can't directly hide the prototype because it will also hide all the generated particles (if not isosurface)
+        prototype_prim.GetAttribute("xformOp:translate").Set(m.PROTOTYPE_GRAVEYARD_POS)
+
         mesh_list.AddTarget(Sdf.Path(prototype_prim_path))
+        prototype_prims.append(prototype_prim)
 
     # Set particle instance default data
     prototype_indices = [0] * n_particles if prototype_indices is None else prototype_indices
@@ -226,11 +213,21 @@ def create_physx_particleset_pointinstancer(
     instancer.GetAngularVelocitiesAttr().Set(Vt.Vec3fArray.FromNumpy(angular_velocities))
     instancer.GetScalesAttr().Set(Vt.Vec3fArray.FromNumpy(scales))
 
+    # Take a render step to "lock" the visuals of the prototypes at the graveyard position
+    # This needs to happen AFTER setting particle states
+    og.sim.render()
+
+    # Then we move the prototypes back to zero offset because otherwise all the generated particles will be offset by
+    # the graveyard position. At this point, the prototypes themselves no longer appear at the zero offset (locked at
+    # the graveyard position), which is desirable because we don't want the agent to see the prototypes themselves.
+    for prototype_prim in prototype_prims:
+        prototype_prim.GetAttribute("xformOp:translate").Set((0.0, 0.0, 0.0))
+
     instancer_prim = instancer.GetPrim()
 
     particleUtils.configure_particle_set(
         instancer_prim,
-        particle_system_path,
+        physx_particle_system_path,
         self_collision,
         fluid,
         particle_group,
@@ -242,11 +239,6 @@ def create_physx_particleset_pointinstancer(
     instancer_prim.GetAttribute("physxParticle:particleEnabled").Set(enabled)
 
     if is_isosurface:
-        # We have to update the physics for a single step here, and then pause the simulator and take an additional sim
-        # step in order for the isosurface to be rendered correctly! (empirically validated, idk why)
-        # TODO: Follow-up / cleanup with omni team to see if this is expected BEHAVIOR
-        og.sim.step_physics()
-        with og.sim.paused():
-            og.app.update()
+        og.log.warning(f"Creating an instancer that uses isosurface {instancer_prim_path}. The rendering of these particles will have a delay of one timestep.")
 
     return instancer_prim

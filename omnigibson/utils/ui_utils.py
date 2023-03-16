@@ -21,7 +21,6 @@ import omni.log
 import carb
 import random
 import imageio
-import logging
 from IPython import embed
 
 
@@ -199,7 +198,7 @@ def disclaimer(msg):
 
 
 def debug_breakpoint(msg):
-    logging.error(msg)
+    og.log.error(msg)
     embed()
 
 

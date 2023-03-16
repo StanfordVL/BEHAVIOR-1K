@@ -256,7 +256,7 @@ def generate_points_in_volume_checker_function(obj, volume_link, use_visual_mesh
     # Iterate through all visual meshes and keep track of any that are prefixed with container
     container_meshes = []
     meshes = volume_link.visual_meshes if use_visual_meshes else volume_link.collision_meshes
-    for container_mesh_name, container_mesh in volume_link.visual_meshes.items():
+    for container_mesh_name, container_mesh in meshes.items():
         if mesh_name_prefixes is None or mesh_name_prefixes in container_mesh_name:
             container_meshes.append(container_mesh.prim)
 
@@ -268,6 +268,7 @@ def generate_points_in_volume_checker_function(obj, volume_link, use_visual_mesh
         if mesh_type == "Mesh":
             # For efficiency, we pre-compute the mesh using trimesh and find its corresponding faces and normals
             trimesh_mesh = mesh_prim_to_trimesh_mesh(sub_container_mesh)
+            assert trimesh_mesh.is_convex, f"Trying to generate a volume checker function for a non-convex mesh {sub_container_mesh.GetPath().pathString}"
             face_centroids = trimesh_mesh.vertices[trimesh_mesh.faces].mean(axis=1)
             face_normals = trimesh_mesh.face_normals
 

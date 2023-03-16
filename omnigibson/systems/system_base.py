@@ -88,6 +88,14 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
         return cls.__name__
 
     @classproperty
+    def prim_path(cls):
+        """
+        Returns:
+            str: Path to this system's prim in the scene stage
+        """
+        return f"/World/{cls.name}"
+
+    @classproperty
     def _register_system(cls):
         """
         Returns:
@@ -122,6 +130,7 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
         """
         assert not cls.initialized, f"Already initialized system {cls.name}!"
         cls.simulator = simulator
+        cls.simulator.stage.DefinePrim(cls.prim_path, "Scope")
 
     @classmethod
     def clear(cls):
@@ -132,20 +141,6 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
         if cls.initialized:
             cls.reset()
             cls.simulator = None
-
-    @classmethod
-    def cache(cls):
-        """
-        Cache any necessary system level state info used by the object state system.
-        """
-        pass
-
-    @classmethod
-    def update(cls):
-        """
-        Conduct any necessary internal updates after a simulation step
-        """
-        pass
 
     @classmethod
     def reset(cls):
@@ -164,7 +159,6 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
 
     def __init__(self):
         raise ValueError("System classes should not be created!")
-
 
 # Serializable registry of systems -- note this may be a subset of all registered systems!
 SYSTEMS_REGISTRY = SerializableRegistry(

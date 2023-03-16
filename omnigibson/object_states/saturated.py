@@ -10,10 +10,6 @@ m = create_module_macros(module_path=__file__)
 
 
 class Saturated(RelativeObjectState, BooleanState):
-    def __init__(self, obj):
-        # Run super init
-        super().__init__(obj)
-
     def _get_value(self, system):
         return self.obj.states[ParticleRemover].check_at_limit(system=system)
 
