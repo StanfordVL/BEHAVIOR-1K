@@ -78,10 +78,6 @@ class ParticleSource(ParticleApplier):
         t = (-self._initial_speed + np.sqrt(self._initial_speed ** 2 + 2 * og.sim.gravity * self._projection_mesh_params["extents"][2])) / og.sim.gravity
         self._n_steps_per_modification = np.ceil(1 + t / og.sim.get_rendering_dt()).astype(int)
 
-        # Override check overlap such that it always returns True (since we are ignoring overlaps and directly
-        # spawning particles
-        self._check_overlap = lambda: True
-
     def _get_max_particles_limit_per_step(self, system):
         # Check the system
         if issubclass(system, PhysicalParticleSystem):

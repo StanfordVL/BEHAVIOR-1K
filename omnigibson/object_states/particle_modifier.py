@@ -616,7 +616,7 @@ class ParticleRemover(ParticleModifier):
     @property
     def _default_link(self):
         # Only supported for adjacency, NOT projection
-        return self.obj.root_link if self.method == ParticleModifyMethod.ADJACENCY else super()._default_link
+        return self.obj.root_link if self.method == ParticleModifyMethod.ADJACENCY else None
 
     @property
     def n_steps_per_modification(self):
@@ -671,6 +671,9 @@ class ParticleApplier(ParticleModifier):
         self._sample_particle_locations = None
         self._sample_with_raycast = sample_with_raycast
         self._initial_speed = initial_speed
+
+        # Pre-cached values for where particles should be spawned, and in what direction, when this state is
+        # initialized so we can quickly spawn them at runtime
         self._in_mesh_local_particle_positions = None
         self._in_mesh_local_particle_directions = None
 
@@ -704,45 +707,59 @@ class ParticleApplier(ParticleModifier):
             # Override the check overlap function -- this now always returns True because we don't require contact with
             # anything in order to generate particles
             self._check_overlap = lambda: True
-            # We now pre-compute local particle positions that are within the projection mesh used to infer spawn pos
-            # We sample the range of each extent minus the particle radius
-            sampling_distance = 2 * system.particle_radius
-            extent = np.array(self._projection_mesh_params["extents"])
-            h = extent[2]
-            low = np.array([-extent[0] / 2, -extent[1] / 2, 0])
-            high = np.array([extent[0] / 2, extent[1] / 2, h])
-            n_particles_per_axis = ((extent - 2 * system.particle_radius) / sampling_distance).astype(int) + 1
-            arrs = [np.linspace(lo + system.particle_radius, hi - system.particle_radius, n) for lo, hi, n in
-                    zip(low, high, n_particles_per_axis)]
-            # Generate 3D-rectangular grid of points, and only keep the ones inside the mesh
-            points = np.stack([arr.flatten() for arr in np.meshgrid(*arrs)]).T
-            # Flip the x and z values so that the positions are in the LINK frame, not the MESH frame
-            points = points[:, [2, 1, 0]]
-            pos, quat = self.link.get_position_orientation()
-            points_in_world_frame = get_particle_positions_from_frame(
-                pos=pos,
-                quat=quat,
-                scale=np.ones(3),
-                particle_positions=points,
-            )
-            points = points[np.where(self._check_in_mesh(points_in_world_frame))[0]]
-            n_max_particles = self._get_max_particles_limit_per_step(system=system)
-            # Potentially sub-sample points based on max particle limit per step
-            self._in_mesh_local_particle_positions = points if n_max_particles > len(points) else \
-                points[np.random.choice(len(points), n_max_particles, replace=False)]
-            # Also programmatically compute the directions of each particle position -- this is the normalized
-            # vector pointing from source to the particle
-            projection_type = self._projection_mesh_params["type"]
-            if projection_type == "Cone":
-                # Particles point from source to point location
-                directions = [point - np.array([h, 0, 0]) for point in self._in_mesh_local_particle_positions]
-            elif projection_type == "Cylinder":
-                # All particle points in the same parallel direction
-                directions = np.zeros_like(self._in_mesh_local_particle_positions)
-                directions[:, 0] = -h
-            else:
-                raise ValueError("If not sampling with raycast, ParticleApplier only supports `Cone` or `Cylinder` projection types!")
-            self._in_mesh_local_particle_directions = directions / np.linalg.norm(directions, axis=-1).reshape(-1, 1)
+            # Compute particle spawning information once
+            self._compute_particle_spawn_information(system=system)
+
+    def _compute_particle_spawn_information(self, system):
+        """
+        Helper function to compute where particles should be spawned. This is to save computation time at runtime
+        if @self._sample_with_raycast is False, meaning that we were deterministically sample particles.
+
+        Args:
+            system (ParticleSystem): Particle system whose particles will be spawned from this ParticleApplier
+        """
+        # We now pre-compute local particle positions that are within the projection mesh used to infer spawn pos
+        # We sample the range of each extent minus the particle radius
+        sampling_distance = 2 * system.particle_radius
+        extent = np.array(self._projection_mesh_params["extents"])
+        h = extent[2]
+        low = np.array([-extent[0] / 2, -extent[1] / 2, 0])
+        high = np.array([extent[0] / 2, extent[1] / 2, h])
+        n_particles_per_axis = ((extent - 2 * system.particle_radius) / sampling_distance).astype(int) + 1
+        arrs = [np.linspace(lo + system.particle_radius, hi - system.particle_radius, n) for lo, hi, n in
+                zip(low, high, n_particles_per_axis)]
+        # Generate 3D-rectangular grid of points, and only keep the ones inside the mesh
+        points = np.stack([arr.flatten() for arr in np.meshgrid(*arrs)]).T
+        # Flip the x and z values so that the positions are in the LINK frame, not the MESH frame
+        # This is super ugly, but necessary because omni requires the native visualization XForm to have its
+        # local x-axis pointing in the direction where particles will be spawned!
+        points = points[:, [2, 1, 0]]
+        pos, quat = self.link.get_position_orientation()
+        points_in_world_frame = get_particle_positions_from_frame(
+            pos=pos,
+            quat=quat,
+            scale=np.ones(3),
+            particle_positions=points,
+        )
+        points = points[np.where(self._check_in_mesh(points_in_world_frame))[0]]
+        n_max_particles = self._get_max_particles_limit_per_step(system=system)
+        # Potentially sub-sample points based on max particle limit per step
+        self._in_mesh_local_particle_positions = points if n_max_particles > len(points) else \
+            points[np.random.choice(len(points), n_max_particles, replace=False)]
+        # Also programmatically compute the directions of each particle position -- this is the normalized
+        # vector pointing from source to the particle
+        projection_type = self._projection_mesh_params["type"]
+        if projection_type == "Cone":
+            # Particles point from source to point location
+            directions = [point - np.array([h, 0, 0]) for point in self._in_mesh_local_particle_positions]
+        elif projection_type == "Cylinder":
+            # All particle points in the same parallel direction
+            directions = np.zeros_like(self._in_mesh_local_particle_positions)
+            directions[:, 0] = -h
+        else:
+            raise ValueError(
+                "If not sampling with raycast, ParticleApplier only supports `Cone` or `Cylinder` projection types!")
+        self._in_mesh_local_particle_directions = directions / np.linalg.norm(directions, axis=-1).reshape(-1, 1)
 
     def _modify_particles(self, system):
         # If at the limit, don't modify anything
@@ -980,7 +997,7 @@ class ParticleApplier(ParticleModifier):
     @property
     def _default_link(self):
         # Only supported for adjacency, NOT projection
-        return self.obj.root_link if self.method == ParticleModifyMethod.ADJACENCY else super()._default_link
+        return self.obj.root_link if self.method == ParticleModifyMethod.ADJACENCY else None
 
     @property
     def n_steps_per_modification(self):
