@@ -375,6 +375,7 @@ class EntityPrim(XFormPrim):
                     mat_path = xform.material.prim_path
                     if mat_path not in material_paths:
                         materials.add(xform.material)
+                        material_paths.add(mat_path)
         return materials
 
     @property
