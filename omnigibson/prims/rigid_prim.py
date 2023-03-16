@@ -101,8 +101,8 @@ class RigidPrim(XFormPrim):
         self.update_meshes()
 
         # Possibly set the mass / density
-        if len(self._collision_meshes) == 0 and len(self._visual_meshes) > 0:
-            # We have no collision meshes but some visual meshes, set a negligible mass
+        if len(self._collision_meshes) == 0:
+            # We have no collision meshes, this is a meta (virtual) link, so set a negligible mass
             self.mass = 1e-6
         elif "mass" in self._load_config and self._load_config["mass"] is not None:
             self.mass = self._load_config["mass"]
