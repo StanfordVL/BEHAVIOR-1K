@@ -37,8 +37,8 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
 
     def __init__(
             self,
-            prim_path,
-            name=None,
+            name,
+            prim_path=None,
             category="object",
             class_id=None,
             uuid=None,
@@ -53,9 +53,9 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
     ):
         """
         Args:
-            prim_path (str): global path in the stage to this object
-            name (None or str): Name for the object. Names need to be unique per scene. If None, a name will be
-                generated at the time the object is added to the scene, using the object's category.
+            name (str): Name for the object. Names need to be unique per scene
+            prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
+                created at /World/<name>
             category (str): Category for the object. Defaults to "object".
             class_id (None or int): What class ID the object should be assigned in semantic segmentation rendering mode.
                 If None, the ID will be inferred from this object's category.
@@ -76,10 +76,8 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
                 Note that this base object does NOT pass kwargs down into the Prim-type super() classes, and we assume
                 that kwargs are only shared between all SUBclasses (children), not SUPERclasses (parents).
         """
-        # Generate a name if necessary. Note that the generation order & set of these names is not deterministic.
-        if name is None:
-            address = "%08X" % id(self)
-            name = "{}_{}".format(category, address)
+        # Generate default prim path if none is specified
+        prim_path = f"/World/{name}" if prim_path is None else prim_path
 
         # Store values
         self.uuid = int(str(id(self))[-8:]) if uuid is None else uuid

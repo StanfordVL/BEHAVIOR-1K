@@ -57,8 +57,8 @@ class StatefulObject(BaseObject):
 
     def __init__(
             self,
-            prim_path,
-            name=None,
+            name,
+            prim_path=None,
             category="object",
             class_id=None,
             uuid=None,
@@ -75,9 +75,9 @@ class StatefulObject(BaseObject):
     ):
         """
         Args:
-            prim_path (str): global path in the stage to this object
-            name (None or str): Name for the object. Names need to be unique per scene. If None, a name will be
-                generated at the time the object is added to the scene, using the object's category.
+            name (str): Name for the object. Names need to be unique per scene
+            prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
+                created at /World/<name>
             category (str): Category for the object. Defaults to "object".
             class_id (None or int): What class ID the object should be assigned in semantic segmentation rendering mode.
                 If None, the ID will be inferred from this object's category.

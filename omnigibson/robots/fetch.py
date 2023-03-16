@@ -32,8 +32,8 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
     def __init__(
         self,
         # Shared kwargs in hierarchy
-        prim_path,
-        name=None,
+        name,
+        prim_path=None,
         class_id=None,
         uuid=None,
         scale=None,
@@ -68,9 +68,9 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
     ):
         """
         Args:
-            prim_path (str): global path in the stage to this object
-            name (None or str): Name for the object. Names need to be unique per scene. If None, a name will be
-                generated at the time the object is added to the scene, using the object's category.
+            name (str): Name for the object. Names need to be unique per scene
+            prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
+                created at /World/<name>
             class_id (None or int): What class ID the object should be assigned in semantic segmentation rendering mode.
                 If None, the ID will be inferred from this object's category.
             uuid (None or int): Unique unsigned-integer identifier to assign to this object (max 8-numbers).

@@ -26,9 +26,9 @@ class PrimitiveObject(StatefulObject):
 
     def __init__(
         self,
-        prim_path,
+        name,
         primitive_type,
-        name=None,
+        prim_path=None,
         category="object",
         class_id=None,
         uuid=None,
@@ -49,11 +49,11 @@ class PrimitiveObject(StatefulObject):
     ):
         """
         Args:
-            prim_path (str): global path in the stage to this object
+            name (str): Name for the object. Names need to be unique per scene
             primitive_type (str): type of primitive object to create. Should be one of:
                 {"Cone", "Cube", "Cylinder", "Disk", "Plane", "Sphere", "Torus"}
-            name (None or str): Name for the object. Names need to be unique per scene. If None, a name will be
-                generated at the time the object is added to the scene, using the object's category.
+            prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
+                created at /World/<name>
             category (str): Category for the object. Defaults to "object".
             class_id (None or int): What class ID the object should be assigned in semantic segmentation rendering mode.
                 If None, the ID will be inferred from this object's category.
