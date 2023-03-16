@@ -153,9 +153,7 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin):
         # If we require the object to be inside, make sure the object is inside, otherwise, we return 0
         # Otherwise, make sure the object is within close proximity of this heat source
         if self.requires_inside:
-            if obj.states[Inside].get_value(self.obj):
-                pass
-            else:
+            if not obj.states[Inside].get_value(self.obj):
                 return False
         else:
             aabb_lower, aabb_upper = obj.states[AABB].get_value()
