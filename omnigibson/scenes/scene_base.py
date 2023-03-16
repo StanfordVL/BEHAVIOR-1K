@@ -4,18 +4,25 @@ from itertools import combinations
 from omni.isaac.core.objects.ground_plane import GroundPlane
 import numpy as np
 import omnigibson as og
+from omnigibson.macros import create_module_macros
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.python_utils import classproperty, Serializable, Registerable, Recreatable, \
     create_object_from_init_info
 from omnigibson.utils.registry_utils import SerializableRegistry
-from omnigibson.utils.ui_utils import suppress_loggers, create_module_logger
+from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.objects.object_base import BaseObject
-from omnigibson.objects.stateful_object import StatefulObject
-from omnigibson.systems import SYSTEMS_REGISTRY
+from omnigibson.objects.light_object import LightObject
 from omnigibson.robots.robot_base import m as robot_macros
+from pxr import Sdf, Gf
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
+
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
+
+# Default texture to use for skybox
+m.DEFAULT_SKYBOX_TEXTURE = f"{og.assets_path}/models/background/sky.jpg"
 
 # Global dicts that will contain mappings
 REGISTERED_SCENES = dict()
@@ -31,6 +38,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             scene_file=None,
             use_floor_plane=True,
             floor_plane_visible=True,
+            use_skybox=True,
             floor_plane_color=(1.0, 1.0, 1.0),
     ):
         """
@@ -54,6 +62,8 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         self._floor_plane_visible = floor_plane_visible
         self._floor_plane_color = floor_plane_color
         self._floor_plane = None
+        self._use_skybox = use_skybox
+        self._skybox = None
 
         # Call super init
         super().__init__()
@@ -150,6 +160,19 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # We just add a ground plane if requested
         if self._use_floor_plane:
             self.add_ground_plane(color=self._floor_plane_color, visible=self._floor_plane_visible)
+
+        # Also add skybox if requested
+        if self._use_skybox:
+            self._skybox = LightObject(
+                prim_path="/World/skybox",
+                name="skybox",
+                light_type="Dome",
+                intensity=1500,
+            )
+            og.sim.import_object(self._skybox)
+            light_prim = self._skybox.light_link.prim
+            light_prim.GetAttribute("color").Set(Gf.Vec3f(1.07, 0.85, 0.61))
+            light_prim.GetAttribute("texture:file").Set(Sdf.AssetPath(m.DEFAULT_SKYBOX_TEXTURE))
 
     def _load_objects_from_scene_file(self, simulator):
         """
