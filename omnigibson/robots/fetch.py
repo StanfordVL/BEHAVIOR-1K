@@ -38,7 +38,6 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         uuid=None,
         scale=None,
         visible=True,
-        fixed_base=False,
         visual_only=False,
         self_collisions=False,
         load_config=None,
@@ -80,7 +79,6 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
                 for this object. A single number corresponds to uniform scaling along the x,y,z axes, whereas a
                 3-array specifies per-axis scaling.
             visible (bool): whether to render this object or not in the stage
-            fixed_base (bool): whether to fix the base of this object or not
             visual_only (bool): Whether this object should be visual only (and not collide with any other objects)
             self_collisions (bool): Whether to enable self collisions for this object
             load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
@@ -138,7 +136,7 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
             uuid=uuid,
             scale=scale,
             visible=visible,
-            fixed_base=fixed_base,
+            fixed_base=False,
             visual_only=visual_only,
             self_collisions=self_collisions,
             load_config=load_config,
