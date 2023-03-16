@@ -56,4 +56,3 @@ class LinkBasedStateMixin:
         if self.link is None:
             raise ValueError(f"Error: failed to initialize LinkBasedStateMixin {self.__class__.__name__} for object "
                              f"{self.obj.name}; no metalink with prefix {self.metalink_prefix} found!")
-        return True

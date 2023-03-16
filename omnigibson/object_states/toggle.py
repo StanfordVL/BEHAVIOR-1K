@@ -39,23 +39,23 @@ class ToggledOn(AbsoluteObjectState, BooleanState, LinkBasedStateMixin, UpdateSt
 
     def _initialize(self):
         super(ToggledOn, self)._initialize()
-        if self.initialize_link_mixin():
-            mesh_prim_path = f"{self.link.prim_path}/visual_marker"
-            # Create a primitive mesh if it doesn't already exist
-            if not get_prim_at_path(mesh_prim_path):
-                mesh = create_primitive_mesh(
-                    prim_path=mesh_prim_path,
-                    primitive_type="Sphere",
-                    extents=m.TOGGLE_BUTTON_SCALE,
-                )
+        self.initialize_link_mixin()
+        mesh_prim_path = f"{self.link.prim_path}/visual_marker"
+        # Create a primitive mesh if it doesn't already exist
+        if not get_prim_at_path(mesh_prim_path):
+            mesh = create_primitive_mesh(
+                prim_path=mesh_prim_path,
+                primitive_type="Sphere",
+                extents=m.TOGGLE_BUTTON_SCALE,
+            )
 
-            # Create the visual geom instance referencing the generated mesh prim
-            self.visual_marker = VisualGeomPrim(prim_path=mesh_prim_path, name=f"{self.obj.name}_visual_marker")
-            self.visual_marker.scale = 1 / self.obj.scale
-            self.visual_marker.initialize()
+        # Create the visual geom instance referencing the generated mesh prim
+        self.visual_marker = VisualGeomPrim(prim_path=mesh_prim_path, name=f"{self.obj.name}_visual_marker")
+        self.visual_marker.scale = 1 / self.obj.scale
+        self.visual_marker.initialize()
 
-            # Make sure the marker isn't translated at all
-            self.visual_marker.set_local_pose(translation=np.zeros(3), orientation=np.array([0, 0, 0, 1.0]))
+        # Make sure the marker isn't translated at all
+        self.visual_marker.set_local_pose(translation=np.zeros(3), orientation=np.array([0, 0, 0, 1.0]))
 
     def _update(self):
         robot_can_toggle = False
