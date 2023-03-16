@@ -36,7 +36,8 @@ class LinkBasedStateMixin:
                 no valid metalink is found
         """
         # No default link by default
-        # TODO: Make this None to enforce that downstream object states have properly annotated objects
+        # TODO: Make NotImplementedError() and force downstream Object states to implement, once
+        # assets are fully updated
         return self.obj.root_link
 
     def initialize_link_mixin(self):
