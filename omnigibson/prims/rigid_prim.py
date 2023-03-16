@@ -476,6 +476,11 @@ class RigidPrim(XFormPrim):
             mass (float): mass of the rigid body in kg.
         """
         self._mass_api.GetMassAttr().Set(mass)
+        # Write to dc as well if it's accessible
+        if self.dc_is_accessible:
+            rb_props = self.rigid_body_properties
+            rb_props.mass = mass
+            self._dc.set_rigid_body_properties(self._handle, rb_props)
 
     @property
     def density(self):
