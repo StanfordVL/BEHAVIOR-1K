@@ -246,8 +246,8 @@ class ControllableObject(BaseObject):
         assert self._simulator.is_playing(), "Simulator must be playing in order to reset controllable object's joints!"
 
         # Additionally set the joint states based on the reset values
-        self.set_joint_positions(positions=self._reset_joint_pos, target=False)
-        self.set_joint_velocities(velocities=np.zeros(self.n_dof), target=False)
+        self.set_joint_positions(positions=self._reset_joint_pos, drive=False)
+        self.set_joint_velocities(velocities=np.zeros(self.n_dof), drive=False)
 
         # Update the control modes of each joint based on the outputted control from the controllers
         # Omni resets them after every reset
@@ -346,7 +346,7 @@ class ControllableObject(BaseObject):
 
         # Compose controls
         u_vec = np.zeros(self.n_dof)
-        # By default, the control type is effort and the control value is 0 (np.zeros) - 0 effort means no control.
+        # By default, the control type is None and the control value is 0 (np.zeros) - i.e. no control applied
         u_type_vec = np.array([ControlType.NONE] * self.n_dof)
         for group, ctrl in control.items():
             idx = self._controllers[group].dof_idx
@@ -435,9 +435,9 @@ class ControllableObject(BaseObject):
             if ctrl_type == ControlType.EFFORT:
                 joint.set_effort(ctrl, normalized=norm)
             elif ctrl_type == ControlType.VELOCITY:
-                joint.set_vel(ctrl, normalized=norm, target=True)
+                joint.set_vel(ctrl, normalized=norm, drive=True)
             elif ctrl_type == ControlType.POSITION:
-                joint.set_pos(ctrl, normalized=norm, target=True)
+                joint.set_pos(ctrl, normalized=norm, drive=True)
             elif ctrl_type == ControlType.NONE:
                 # Do nothing
                 pass

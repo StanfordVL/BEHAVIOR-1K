@@ -730,7 +730,7 @@ class JointPrim(BasePrim):
         """
         return effort * self.max_effort
 
-    def set_pos(self, pos, normalized=False, target=False):
+    def set_pos(self, pos, normalized=False, drive=False):
         """
         Set the position of this joint in metric space
 
@@ -739,12 +739,14 @@ class JointPrim(BasePrim):
                 float if the joint only has a single DOF, otherwise it should be an n-array of floats.
             normalized (bool): Whether the input is normalized to [-1, 1] (in this case, the values will be
                 de-normalized first before being executed). Default is False
-            target (bool): Whether the position being set is a target value or manual value to immediately set. Default
-                is False, corresponding to an instantaneous setting of the position
+            drive (bool): Whether the joint should be driven naturally via its motor to the position being set or
+                whether it should be instantaneously set. Default is False, corresponding to an
+                instantaneous setting of the position
         """
         # Sanity checks -- make sure we're the correct control type if we're setting a target and that we're articulated
         self.assert_articulated()
-        if target:
+        if drive:
+            assert self._driven, "Can only use set_pos with drive=True if this joint is driven!"
             assert self._control_type == ControlType.POSITION, \
                 "Trying to set joint position target, but control type is not position!"
 
@@ -757,12 +759,12 @@ class JointPrim(BasePrim):
 
         # Set the DOF(s) in this joint
         for dof_handle, p in zip(self._dof_handles, pos):
-            if not target:
+            if not drive:
                 self._dc.set_dof_position(dof_handle, p)
-            # We set the position in either case
+            # We set the position target in either case
             self._dc.set_dof_position_target(dof_handle, p)
 
-    def set_vel(self, vel, normalized=False, target=False):
+    def set_vel(self, vel, normalized=False, drive=False):
         """
         Set the velocity of this joint in metric space
 
@@ -771,12 +773,14 @@ class JointPrim(BasePrim):
                 float if the joint only has a single DOF, otherwise it should be an n-array of floats.
             normalized (bool): Whether the input is normalized to [-1, 1] (in this case, the values will be
                 de-normalized first before being executed). Default is False
-            target (bool): Whether the velocity being set is a target value or manual value to immediately set. Default
-                is False, corresponding to an instantaneous setting of the velocity
+            drive (bool): Whether the joint should be driven naturally via its motor to the velocity being set or
+                whether it should be instantaneously set. Default is False, corresponding to an
+                instantaneous setting of the velocity
         """
         # Sanity checks -- make sure we're the correct control type if we're setting a target and that we're articulated
         self.assert_articulated()
-        if target:
+        if drive:
+            assert self._driven, "Can only use set_vel with drive=True if this joint is driven!"
             assert self._control_type == ControlType.VELOCITY, \
                 f"Trying to set joint velocity target for joint {self.name}, but control type is not velocity!"
 
@@ -789,7 +793,7 @@ class JointPrim(BasePrim):
 
         # Set the DOF(s) in this joint
         for dof_handle, v in zip(self._dof_handles, vel):
-            if not target:
+            if not drive:
                 self._dc.set_dof_velocity(dof_handle, v)
             # We set the target in either case
             self._dc.set_dof_velocity_target(dof_handle, v)
@@ -839,14 +843,14 @@ class JointPrim(BasePrim):
 
     def _load_state(self, state):
         if self.articulated:
-            self.set_pos(state["pos"], target=False)
-            self.set_vel(state["vel"], target=False)
+            self.set_pos(state["pos"], drive=False)
+            self.set_vel(state["vel"], drive=False)
             if self._driven:
                 self.set_effort(state["effort"])
             if self._control_type == ControlType.POSITION:
-                self.set_pos(state["target_pos"], target=True)
+                self.set_pos(state["target_pos"], drive=True)
             elif self._control_type == ControlType.VELOCITY:
-                self.set_vel(state["target_vel"], target=True)
+                self.set_vel(state["target_vel"], drive=True)
 
     def _serialize(self, state):
         return np.concatenate([

@@ -97,7 +97,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         )
         if joint_pos is not None:
             og.log.info("Solution found. Setting new arm configuration.")
-            robot.set_joint_positions(joint_pos, indices=control_idx, target=True)
+            robot.set_joint_positions(joint_pos, indices=control_idx, drive=True)
         else:
             og.log.info("EE position not reachable.")
         og.sim.step()

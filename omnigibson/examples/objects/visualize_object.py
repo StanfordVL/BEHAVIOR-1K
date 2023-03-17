@@ -127,7 +127,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         if obj.n_dof > 0:
             frac = (i % steps_per_joint) / steps_per_joint
             j_frac = -1.0 + 2.0 * frac if (i // steps_per_joint) % 2 == 0 else 1.0 - 2.0 * frac
-            obj.set_joint_positions(positions=j_frac * np.ones(obj.n_dof), normalized=True, target=False)
+            obj.set_joint_positions(positions=j_frac * np.ones(obj.n_dof), normalized=True, drive=False)
             obj.keep_still()
         obj.set_position_orientation(position=pos, orientation=quat)
         env.step(np.array([]))
