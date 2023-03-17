@@ -15,9 +15,9 @@ from omnigibson.utils.ui_utils import create_module_logger
 log = create_module_logger(module_name=__name__)
 
 
-def folder_is_hidden(p):
+def is_dot_file(p):
     """
-    Check if a folder is hidden. This corresponds to checking if its filename starts with a dot.
+    Check if a filename starts with a dot.
     Note that while this does not actually correspond to checking for hidden files on Windows, the
     files we want to ignore will still start with a dot and thus this works.
 
@@ -88,7 +88,7 @@ def get_available_og_scenes():
     og_dataset_path = og.og_dataset_path
     og_scenes_path = os.path.join(og_dataset_path, "scenes")
     available_og_scenes = sorted(
-        [f for f in os.listdir(og_scenes_path) if (not folder_is_hidden(f) and f != "background")]
+        [f for f in os.listdir(og_scenes_path) if (not is_dot_file(f) and f != "background")]
     )
     return available_og_scenes
 
@@ -186,7 +186,7 @@ def get_all_object_categories():
     og_dataset_path = og.og_dataset_path
     og_categories_path = os.path.join(og_dataset_path, "objects")
 
-    categories =[f for f in os.listdir(og_categories_path) if not folder_is_hidden(f)]
+    categories =[f for f in os.listdir(og_categories_path) if not is_dot_file(f)]
     return sorted(categories)
 
 
@@ -230,7 +230,7 @@ def get_available_g_scenes():
         list: available Gibson scenes
     """
     data_path = og.g_dataset_path
-    available_g_scenes = sorted([f for f in os.listdir(data_path) if not folder_is_hidden(f)])
+    available_g_scenes = sorted([f for f in os.listdir(data_path) if not is_dot_file(f)])
     return available_g_scenes
 
 

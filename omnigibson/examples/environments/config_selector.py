@@ -3,7 +3,7 @@ import os
 import yaml
 
 import omnigibson as og
-from omnigibson.utils.asset_utils import folder_is_hidden
+from omnigibson.utils.asset_utils import is_dot_file
 from omnigibson.utils.ui_utils import choose_from_options
 
 
@@ -21,7 +21,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         [
             f
             for f in os.listdir(og_config_path)
-            if (not folder_is_hidden(f) and os.path.isfile(os.path.join(og_config_path, f)))
+            if (not is_dot_file(f) and os.path.isfile(os.path.join(og_config_path, f)))
         ]
     )
     config_id = choose_from_options(options=available_configs, name="config file", random_selection=random_selection)
