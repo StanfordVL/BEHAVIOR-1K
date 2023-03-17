@@ -22,8 +22,8 @@ class ControllableObject(BaseObject):
     """
     def __init__(
         self,
-        prim_path,
-        name=None,
+        name,
+        prim_path=None,
         category="object",
         class_id=None,
         uuid=None,
@@ -43,9 +43,9 @@ class ControllableObject(BaseObject):
     ):
         """
         Args:
-            prim_path (str): global path in the stage to this object
-            name (None or str): Name for the object. Names need to be unique per scene. If None, a name will be
-                generated at the time the object is added to the scene, using the object's category.
+            name (str): Name for the object. Names need to be unique per scene
+            prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
+                created at /World/<name>
             category (str): Category for the object. Defaults to "object".
             class_id (None or int): What class ID the object should be assigned in semantic segmentation rendering mode.
                 If None, the ID will be inferred from this object's category.
@@ -173,6 +173,10 @@ class ControllableObject(BaseObject):
                 cfg["command_input_limits"] = "default"  # default is normalized (-1, 1)
             # Create the controller
             self._controllers[name] = create_controller(**cfg)
+            controller = create_controller(**cfg)
+            # Verify the controller's DOFs can all be driven
+            for idx in controller.dof_idx:
+                assert self._joints[self.dof_names_ordered[idx]].driven, "Controllers should only control driveable joints!"
 
         self._update_controller_mode()
 
@@ -242,8 +246,8 @@ class ControllableObject(BaseObject):
         assert self._simulator.is_playing(), "Simulator must be playing in order to reset controllable object's joints!"
 
         # Additionally set the joint states based on the reset values
-        self.set_joint_positions(positions=self._reset_joint_pos, target=False)
-        self.set_joint_velocities(velocities=np.zeros(self.n_dof), target=False)
+        self.set_joint_positions(positions=self._reset_joint_pos, drive=False)
+        self.set_joint_velocities(velocities=np.zeros(self.n_dof), drive=False)
 
         # Update the control modes of each joint based on the outputted control from the controllers
         # Omni resets them after every reset
@@ -342,8 +346,8 @@ class ControllableObject(BaseObject):
 
         # Compose controls
         u_vec = np.zeros(self.n_dof)
-        # By default, the control type is effort and the control value is 0 (np.zeros) - 0 effort means no control.
-        u_type_vec = np.array([ControlType.EFFORT] * self.n_dof)
+        # By default, the control type is None and the control value is 0 (np.zeros) - i.e. no control applied
+        u_type_vec = np.array([ControlType.NONE] * self.n_dof)
         for group, ctrl in control.items():
             idx = self._controllers[group].dof_idx
             u_vec[idx] = ctrl["value"]
@@ -431,9 +435,12 @@ class ControllableObject(BaseObject):
             if ctrl_type == ControlType.EFFORT:
                 joint.set_effort(ctrl, normalized=norm)
             elif ctrl_type == ControlType.VELOCITY:
-                joint.set_vel(ctrl, normalized=norm, target=True)
+                joint.set_vel(ctrl, normalized=norm, drive=True)
             elif ctrl_type == ControlType.POSITION:
-                joint.set_pos(ctrl, normalized=norm, target=True)
+                joint.set_pos(ctrl, normalized=norm, drive=True)
+            elif ctrl_type == ControlType.NONE:
+                # Do nothing
+                pass
             else:
                 raise ValueError("Invalid control type specified: {}".format(ctrl_type))
 

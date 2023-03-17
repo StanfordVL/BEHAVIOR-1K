@@ -35,10 +35,12 @@ class IsGraspingState(IntEnum):
 
 # Define macros
 class ControlType:
+    NONE = -1
     POSITION = 0
     VELOCITY = 1
     EFFORT = 2
     _MAPPING = {
+        "none": NONE,
         "position": POSITION,
         "velocity": VELOCITY,
         "effort": EFFORT,

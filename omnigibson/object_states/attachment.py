@@ -12,7 +12,7 @@ from omnigibson.object_states.object_state_base import BooleanState, RelativeObj
 from omnigibson.object_states.contact_bodies import ContactBodies
 from omnigibson.utils.usd_utils import create_joint
 from omnigibson.utils.sim_utils import check_collision
-from omnigibson.utils.ui_utils import create_module_logger
+from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -56,9 +56,11 @@ class Attached(RelativeObjectState, BooleanState, ContactSubscribedStateMixin):
         self.attached_obj = None
 
     # Attempts to attach two objects when a CONTACT_FOUND event happens
-    def on_contact(self, other, contact_header, contact_data):
-        if contact_header.type == ContactEventType.CONTACT_FOUND:
-            self.set_value(other, True, check_contact=False)
+    def on_contact(self, other, contact_headers, contact_data):
+        for contact_header in contact_headers:
+            if contact_header.type == ContactEventType.CONTACT_FOUND:
+                self.set_value(other, True, check_contact=False)
+                break
 
     def _set_value(self, other, new_value, check_contact=True):
         # Attempt to attach
@@ -77,11 +79,11 @@ class Attached(RelativeObjectState, BooleanState, ContactSubscribedStateMixin):
 
                     return True
                 else:
-                    log.warning(f"Trying to attach object {self.obj.name} to object {other.name}, "
+                    log.debug(f"Trying to attach object {self.obj.name} to object {other.name}, "
                                     f"but they have attachment type/category mismatch or they are not in contact.")
                     return False
             else:
-                log.warning(f"Trying to attach object {self.obj.name} to object {other.name}, "
+                log.debug(f"Trying to attach object {self.obj.name} to object {other.name}, "
                                 f"but it is already attached to object {self.attached_obj.name}. Try detaching first.")
                 return False
 
@@ -125,10 +127,8 @@ class Attached(RelativeObjectState, BooleanState, ContactSubscribedStateMixin):
         Creates a fixed joint between self.obj and other (where other is the parent and self.obj is the child)
         """
         self.attached_obj = other
-
-        attached_joint_path = f"{other.prim_path}/attachment_joint"
         attached_joint = create_joint(
-            prim_path=attached_joint_path,
+            prim_path=f"{other.prim_path}/attachment_joint",
             joint_type="FixedJoint",
             body0=f"{other.prim_path}/base_link",
             body1=f"{self.obj.prim_path}/base_link",
@@ -149,6 +149,11 @@ class Attached(RelativeObjectState, BooleanState, ContactSubscribedStateMixin):
         attached_joint.GetAttribute("physics:localRot0").Set(Gf.Quatf(*rel_quat))
         attached_joint.GetAttribute("physics:localPos1").Set(Gf.Vec3f(0.0, 0.0, 0.0))
         attached_joint.GetAttribute("physics:localRot1").Set(Gf.Quatf(1.0, 0.0, 0.0, 0.0))
+
+        # We update the simulation now without actually stepping physics so we can bypass the snapping warning from
+        # PhysicsUSD
+        with suppress_omni_log(channels=["omni.physx.plugin"]):
+            og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
 
     def _detach(self):
         """

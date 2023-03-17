@@ -212,8 +212,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 # Add a name for the robot if necessary
                 if "name" not in robot_config:
                     robot_config["name"] = f"robot{i}"
-                # Set prim path
-                robot_config["prim_path"] = f"/World/{robot_config['name']}"
                 # Make sure robot exists, grab its corresponding kwargs, and create / import the robot
                 robot = create_class_from_registry_and_config(
                     cls_name=robot_config["type"],
@@ -232,9 +230,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
             # Add a name for the object if necessary
             if "name" not in obj_config:
                 obj_config["name"] = f"obj{i}"
-            # Set prim path if not specified
-            if "prim_path" not in obj_config:
-                obj_config["prim_path"] = f"/World/{obj_config['name']}"
             # Pop the desired position and orientation
             position, orientation = obj_config.pop("position", None), obj_config.pop("orientation", None)
             # Make sure robot exists, grab its corresponding kwargs, and create / import the robot

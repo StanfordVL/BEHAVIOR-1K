@@ -375,6 +375,7 @@ class EntityPrim(XFormPrim):
                     mat_path = xform.material.prim_path
                     if mat_path not in material_paths:
                         materials.add(xform.material)
+                        material_paths.add(mat_path)
         return materials
 
     @property
@@ -434,7 +435,7 @@ class EntityPrim(XFormPrim):
         for link in self._links.values():
             link.disable_gravity()
 
-    def set_joint_positions(self, positions, indices=None, normalized=False, target=False):
+    def set_joint_positions(self, positions, indices=None, normalized=False, drive=False):
         """
         Set the joint positions (both actual value and target values) in simulation. Note: only works if the simulator
         is actively running!
@@ -447,8 +448,9 @@ class EntityPrim(XFormPrim):
                 Default is None, which assumes that all joints are being set.
             normalized (bool): Whether the inputted joint positions should be interpreted as normalized values. Default
                 is False
-            target (bool): Whether the positions being set are target values or manual values to immediately set.
-                Default is False, corresponding to an instantaneous setting of the positions
+            drive (bool): Whether the positions being set are values that should be driven naturally by this entity's
+                motors or manual values to immediately set. Default is False, corresponding to an instantaneous
+                setting of the positions
         """
         # Run sanity checks -- make sure our handle is initialized and that we are articulated
         assert self._handle is not None, "handles are not initialized yet!"
@@ -472,13 +474,13 @@ class EntityPrim(XFormPrim):
 
         # Set the DOF states
         dof_states["pos"] = new_positions
-        if not target:
+        if not drive:
             self._dc.set_articulation_dof_states(self._handle, dof_states, _dynamic_control.STATE_POS)
 
         # Also set the target
         self._dc.set_articulation_dof_position_targets(self._handle, new_positions.astype(np.float32))
 
-    def set_joint_velocities(self, velocities, indices=None, normalized=False, target=False):
+    def set_joint_velocities(self, velocities, indices=None, normalized=False, drive=False):
         """
         Set the joint velocities (both actual value and target values) in simulation. Note: only works if the simulator
         is actively running!
@@ -491,8 +493,9 @@ class EntityPrim(XFormPrim):
                 Default is None, which assumes that all joints are being set.
             normalized (bool): Whether the inputted joint velocities should be interpreted as normalized values. Default
                 is False
-            target (bool): Whether the velocities being set are target values or manual values to immediately set.
-                Default is False, corresponding to an instantaneous setting of the velocities
+            drive (bool): Whether the velocities being set are values that should be driven naturally by this entity's
+                motors or manual values to immediately set. Default is False, corresponding to an instantaneous
+                setting of the velocities
         """
         # Run sanity checks -- make sure our handle is initialized and that we are articulated
         assert self._handle is not None, "handles are not initialized yet!"
@@ -514,7 +517,7 @@ class EntityPrim(XFormPrim):
 
         # Set the DOF states
         dof_states["vel"] = new_velocities
-        if not target:
+        if not drive:
             self._dc.set_articulation_dof_states(self._handle, dof_states, _dynamic_control.STATE_VEL)
 
         # Also set the target

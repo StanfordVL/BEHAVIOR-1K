@@ -48,13 +48,12 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
     def __init__(
         self,
         # Shared kwargs in hierarchy
-        prim_path,
-        name=None,
+        name,
+        prim_path=None,
         class_id=None,
         uuid=None,
         scale=None,
         visible=True,
-        fixed_base=False,
         visual_only=False,
         self_collisions=False,
         load_config=None,
@@ -85,9 +84,9 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
     ):
         """
         Args:
-            prim_path (str): global path in the stage to this object
-            name (None or str): Name for the object. Names need to be unique per scene. If None, a name will be
-                generated at the time the object is added to the scene, using the object's category.
+            name (str): Name for the object. Names need to be unique per scene
+            prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
+                created at /World/<name>
             category (str): Category for the object. Defaults to "object".
             class_id (None or int): What class ID the object should be assigned in semantic segmentation rendering mode.
                 If None, the ID will be inferred from this object's category.
@@ -97,7 +96,6 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
                 for this object. A single number corresponds to uniform scaling along the x,y,z axes, whereas a
                 3-array specifies per-axis scaling.
             visible (bool): whether to render this object or not in the stage
-            fixed_base (bool): whether to fix the base of this object or not
             visual_only (bool): Whether this object should be visual only (and not collide with any other objects)
             self_collisions (bool): Whether to enable self collisions for this object
             prim_type (PrimType): Which type of prim the object is, Valid options are: {PrimType.RIGID, PrimType.CLOTH}
@@ -159,7 +157,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             uuid=uuid,
             scale=scale,
             visible=visible,
-            fixed_base=fixed_base,
+            fixed_base=True,
             visual_only=visual_only,
             self_collisions=self_collisions,
             load_config=load_config,
@@ -282,7 +280,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             self.eef_links[arm].visual_only = True
             self.eef_links[arm].visible = False
 
-        self._world_base_fixed_joint_prim = get_prim_at_path(os.path.join(self.root_link.prim_path, "world_base_joint"))
+        self._world_base_fixed_joint_prim = get_prim_at_path(f"{self._prim_path}/rootJoint")
         position, orientation = self.get_position_orientation()
         # Set the world-to-base fixed joint to be at the robot's current pose
         self._world_base_fixed_joint_prim.GetAttribute("physics:localPos0").Set(tuple(position))
@@ -572,12 +570,12 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
             relative_pos, relative_orn = T.pose_transform(inv_joint_pos, inv_joint_orn, position, orientation)
             relative_rpy = T.quat2euler(relative_orn)
-            self.joints["base_footprint_x_joint"].set_pos(relative_pos[0], target=False)
-            self.joints["base_footprint_y_joint"].set_pos(relative_pos[1], target=False)
-            self.joints["base_footprint_z_joint"].set_pos(relative_pos[2], target=False)
-            self.joints["base_footprint_rx_joint"].set_pos(relative_rpy[0], target=False)
-            self.joints["base_footprint_ry_joint"].set_pos(relative_rpy[1], target=False)
-            self.joints["base_footprint_rz_joint"].set_pos(relative_rpy[2], target=False)
+            self.joints["base_footprint_x_joint"].set_pos(relative_pos[0], drive=False)
+            self.joints["base_footprint_y_joint"].set_pos(relative_pos[1], drive=False)
+            self.joints["base_footprint_z_joint"].set_pos(relative_pos[2], drive=False)
+            self.joints["base_footprint_rx_joint"].set_pos(relative_rpy[0], drive=False)
+            self.joints["base_footprint_ry_joint"].set_pos(relative_rpy[1], drive=False)
+            self.joints["base_footprint_rz_joint"].set_pos(relative_rpy[2], drive=False)
 
         # Else, set the pose of the robot frame, and then move the joint frame of the world_base_joint to match it
         else:
@@ -594,9 +592,9 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         # such velocity), which is different from the default behavior of set_linear_velocity for all other objects.
         orn = self.root_link.get_orientation()
         velocity_in_root_link = T.quat2mat(orn).T @ velocity
-        self.joints["base_footprint_x_joint"].set_vel(velocity_in_root_link[0], target=False)
-        self.joints["base_footprint_y_joint"].set_vel(velocity_in_root_link[1], target=False)
-        self.joints["base_footprint_z_joint"].set_vel(velocity_in_root_link[2], target=False)
+        self.joints["base_footprint_x_joint"].set_vel(velocity_in_root_link[0], drive=False)
+        self.joints["base_footprint_y_joint"].set_vel(velocity_in_root_link[1], drive=False)
+        self.joints["base_footprint_z_joint"].set_vel(velocity_in_root_link[2], drive=False)
 
     def get_linear_velocity(self) -> np.ndarray:
         # Note that the link we are interested in is self.base_footprint_link, not self.root_link
@@ -606,9 +604,9 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         # See comments of self.set_linear_velocity
         orn = self.root_link.get_orientation()
         velocity_in_root_link = T.quat2mat(orn).T @ velocity
-        self.joints["base_footprint_rx_joint"].set_vel(velocity_in_root_link[0], target=False)
-        self.joints["base_footprint_ry_joint"].set_vel(velocity_in_root_link[1], target=False)
-        self.joints["base_footprint_rz_joint"].set_vel(velocity_in_root_link[2], target=False)
+        self.joints["base_footprint_rx_joint"].set_vel(velocity_in_root_link[0], drive=False)
+        self.joints["base_footprint_ry_joint"].set_vel(velocity_in_root_link[1], drive=False)
+        self.joints["base_footprint_rz_joint"].set_vel(velocity_in_root_link[2], drive=False)
 
     def get_angular_velocity(self) -> np.ndarray:
         # Note that the link we are interested in is self.base_footprint_link, not self.root_link

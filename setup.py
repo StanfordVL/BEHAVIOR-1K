@@ -36,6 +36,7 @@ setup(
         "bddl>=3.0.0b1",
         "opencv-python",
         "nest_asyncio",
+        "imageio",
     ],
     tests_require=[],
     python_requires=">=3",

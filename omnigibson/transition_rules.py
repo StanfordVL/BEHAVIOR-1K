@@ -10,7 +10,8 @@ from omnigibson import og_dataset_path
 
 
 # Tuple of attributes of objects created in transitions.
-_attrs_fields = ["category", "model", "name", "scale", "obj", "pos", "orn", "bb_pos", "bb_orn"]
+# `states` field is dict mapping object state class to arguments to pass to setter for that class
+_attrs_fields = ["category", "model", "name", "scale", "obj", "pos", "orn", "bb_pos", "bb_orn", "states"]
 ObjectAttrs = namedtuple(
     "ObjectAttrs", _attrs_fields, defaults=(None,) * len(_attrs_fields))
 
@@ -258,9 +259,6 @@ class SlicingRule(BaseTransitionRule):
 
     def condition(self, individual_objects, group_objects):
         slicer_obj, sliced_obj = individual_objects["slicer"], individual_objects["sliceable"]
-        slicer_position = slicer_obj.states[Slicer].get_link_position()
-        if slicer_position is None:
-            return False
 
         contact_list = slicer_obj.states[ContactBodies].get_value()
         sliced_links = set(sliced_obj.links.values())
@@ -316,7 +314,12 @@ class SlicingRule(BaseTransitionRule):
             )
 
             # Add the new object to the results.
-            new_obj_attrs = ObjectAttrs(obj=part_obj, bb_pos=part_bb_pos, bb_orn=part_bb_orn)
+            new_obj_attrs = ObjectAttrs(
+                obj=part_obj,
+                bb_pos=part_bb_pos,
+                bb_orn=part_bb_orn,
+                states={Sliced: (True,)},
+            )
             t_results.add.append(new_obj_attrs)
 
         # Delete original object from stage.

@@ -35,8 +35,8 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
     def __init__(
         self,
         # Shared kwargs in hierarchy
-        prim_path,
-        name=None,
+        name,
+        prim_path=None,
         class_id=None,
         uuid=None,
         scale=None,
@@ -64,9 +64,9 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
     ):
         """
         Args:
-            prim_path (str): global path in the stage to this object
-            name (None or str): Name for the object. Names need to be unique per scene. If None, a name will be
-                generated at the time the object is added to the scene, using the object's category.
+            name (str): Name for the object. Names need to be unique per scene
+            prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
+                created at /World/<name>
             class_id (None or int): What class ID the object should be assigned in semantic segmentation rendering mode.
                 If None, the ID will be inferred from this object's category.
             uuid (None or int): Unique unsigned-integer identifier to assign to this object (max 8-numbers).
@@ -147,15 +147,6 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
     def _post_load(self):
         # Run super post load first
         super()._post_load()
-
-        # Possibly force enabling of contact sensing for this robot if we set the global flag
-        # TODO: Remove this once we have a more optimized solution
-        # Only create contact report api if we're not visual only
-        if (not self._visual_only) and gm.ENABLE_ROBOT_CONTACT_REPORTING:
-            for link in self._links.values():
-                PhysxSchema.PhysxContactReportAPI(link.prim) if \
-                    link.prim.HasAPI(PhysxSchema.PhysxContactReportAPI) else \
-                    PhysxSchema.PhysxContactReportAPI.Apply(link.prim)
 
         # Search for any sensors this robot might have attached to any of its links
         self._sensors = dict()

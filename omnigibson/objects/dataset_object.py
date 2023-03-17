@@ -41,9 +41,9 @@ class DatasetObject(USDObject):
 
     def __init__(
         self,
-        prim_path,
+        name,
         usd_path=None,
-        name=None,
+        prim_path=None,
         category="object",
         model=None,
         class_id=None,
@@ -65,11 +65,11 @@ class DatasetObject(USDObject):
     ):
         """
         Args:
-            prim_path (str): global path in the stage to this object
+            name (str): Name for the object. Names need to be unique per scene
             usd_path (None or str): If specified, global path to the USD file to load. Note that this will override
                 @category + @model!
-            name (None or str): Name for the object. Names need to be unique per scene. If None, a name will be
-                generated at the time the object is added to the scene, using the object's category.
+            prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
+                created at /World/<name>
             category (str): Category for the object. Defaults to "object".
             model (None or str): if @usd_path is not specified, then this must be specified in conjunction with
                 @category to infer the usd filepath to load for this object, which evaluates to the following:
