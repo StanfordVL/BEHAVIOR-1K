@@ -1,12 +1,10 @@
 from omnigibson.object_states.fluid_source import FluidSource
-from omnigibson.systems.micro_particle_system import WaterSystem
-
+from omnigibson.systems import get_system
 
 class WaterSource(FluidSource):
-
     @property
     def fluid_system(self):
-        return WaterSystem
+        return get_system("water")
 
     @property
     def n_particles_per_group(self):

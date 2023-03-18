@@ -90,7 +90,7 @@ class RigidPrim(XFormPrim):
             UsdPhysics.MassAPI.Apply(self._prim)
 
         # Only create contact report api if we're not visual only
-        if (not self._visual_only) and gm.ENABLE_GLOBAL_CONTACT_REPORTING:
+        if not self._visual_only:
             self._physx_contact_report_api_api = PhysxSchema.PhysxContactReportAPI(self._prim) if \
                 self._prim.HasAPI(PhysxSchema.PhysxContactReportAPI) else \
                 PhysxSchema.PhysxContactReportAPI.Apply(self._prim)
@@ -102,7 +102,7 @@ class RigidPrim(XFormPrim):
 
         # Possibly set the mass / density
         if len(self._collision_meshes) == 0:
-            # We have no collision meshes, so set a negligible mass
+            # We have no collision meshes, this is a meta (virtual) link, so set a negligible mass
             self.mass = 1e-6
         elif "mass" in self._load_config and self._load_config["mass"] is not None:
             self.mass = self._load_config["mass"]

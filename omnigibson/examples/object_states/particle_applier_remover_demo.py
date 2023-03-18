@@ -3,7 +3,7 @@ import omnigibson as og
 from omnigibson.object_states import Covered
 from omnigibson.objects import DatasetObject
 from omnigibson.macros import gm, macros
-from omnigibson.systems import *
+from omnigibson.systems import get_system
 from omnigibson.utils.usd_utils import create_joint
 from omnigibson.utils.ui_utils import choose_from_options
 from omnigibson.utils.constants import ParticleModifyMethod
@@ -15,7 +15,7 @@ macros.object_states.particle_modifier.VISUAL_PARTICLES_REMOVAL_LIMIT = 1000
 macros.object_states.particle_modifier.PHYSICAL_PARTICLES_REMOVAL_LIMIT = 8000
 macros.object_states.particle_modifier.MAX_VISUAL_PARTICLES_APPLIED_PER_STEP = 10
 macros.object_states.particle_modifier.MAX_PHYSICAL_PARTICLES_APPLIED_PER_STEP = 40
-StainSystem._N_PARTICLES_PER_GROUP = 300
+macros.object_states.covered.MAX_VISUAL_PARTICLES = 300
 
 # Make sure object states and GPU dynamics are enabled (GPU dynamics needed for fluids)
 gm.ENABLE_OBJECT_STATES = True
@@ -48,13 +48,12 @@ def main(random_selection=False, headless=False, short_exec=False):
         "particleRemover": "particleremover_link",
     }
 
-    particle_mapping = {system.name: system for system in [StainSystem, WaterSystem]}
+    particle_types = ["stain", "water"]
     particle_type = choose_from_options(
-        options={name: f"{name} particles will be applied or removed from the simulator" for name in particle_mapping},
+        options={name: f"{name} particles will be applied or removed from the simulator" for name in particle_types},
         name="particle type",
         random_selection=random_selection,
     )
-    particle_system = particle_mapping[particle_type]
 
     modification_method = {
         "Adjacency": ParticleModifyMethod.ADJACENCY,
@@ -68,6 +67,7 @@ def main(random_selection=False, headless=False, short_exec=False):
             "type": "Cone",
             # Size of the cone
             "extents": np.array([0.375, 0.375, 0.75]),
+            "visualize": True,
         },
     }
 
@@ -89,7 +89,7 @@ def main(random_selection=False, headless=False, short_exec=False):
                 # particle applier / remover to apply / remover particles associated with that system
                 # The list should contain functions with signature condition() --> bool,
                 # where True means the condition is satisified
-                particle_system: [],
+                particle_type: [],
             },
             "projection_mesh_params": projection_mesh_params[method_type],
         }
@@ -145,11 +145,11 @@ def main(random_selection=False, headless=False, short_exec=False):
         category="dishtowel",
         model="Tag_Dishtowel_Basket_Weave_Red",
         scale=np.ones(3) * 2.0,
-        visual_only=method_type == "Projection" or particle_system == StainSystem,  # Fluid + adjacency requires the object to have collision geoms active
+        visual_only=method_type == "Projection" or particle_type == "stain",  # Fluid + adjacency requires the object to have collision geoms active
         abilities=abilities,
     )
     modifier_root_link_path = f"{modifier.prim_path}/base_link"
-    modifier._prim = modifier._load(og.sim)
+    modifier._prim = modifier._load()
     if method_type == "Projection":
         metalink_path = f"{modifier.prim_path}/{modification_metalink[modifier_type]}"
         og.sim.stage.DefinePrim(metalink_path, "Xform")
@@ -174,7 +174,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # If we're removing particles, set the table's covered state to be True
     if modifier_type == "particleRemover":
-        table.states[Covered].set_value(particle_system, True)
+        table.states[Covered].set_value(get_system(particle_type), True)
 
         # Take a few steps to let particles settle
         for _ in range(25):
@@ -187,7 +187,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     if method_type == "Projection":
         # Higher z to showcase projection volume at work
         z = 1.85
-    elif particle_system == StainSystem:
+    elif particle_type == "stain":
         # Lower z needed to allow for adjacency bounding box to overlap properly
         z = 1.175
     else:

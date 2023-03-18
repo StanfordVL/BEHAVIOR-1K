@@ -168,30 +168,18 @@ class Environment(gym.Env, GymObservable, Recreatable):
             cfg=self.task_config,
             cls_type_descriptor="task",
         )
-
-        assert og.sim.is_stopped(), "sim should be stopped when load_task starts"
-        og.sim.play()
-
-        # Load the state from the loaded scene
-        # This is needed because when the sim is stopped, no joint state info is stored. So, any desired initial
-        # joint configuration needs to get loaded separately AFTER og.sim.play() gets
-        # called, since joint info is R/W only when the simulator is playing
-        # We do this by calling reset_scene(), which automatically loads the internally-cached initial state (including
-        # joints) into the simulator
-        og.sim.reset_scene()
+        assert og.sim.is_stopped(), "Simulator must be stopped before loading tasks!"
 
         # Load task. Should load additional task-relevant objects and configure the scene into its default initial state
         self._task.load(env=self)
 
-        # Update the initial scene state
-        self.scene.update_initial_state()
-
-        og.sim.stop()
+        assert og.sim.is_stopped(), "Simulator must be stopped after loading tasks!"
 
     def _load_scene(self):
         """
         Load the scene and robot specified in the config file.
         """
+        assert og.sim.is_stopped(), "Simulator must be stopped before loading scene!"
         # Create the scene from our scene config
         scene = create_class_from_registry_and_config(
             cls_name=self.scene_config["type"],
@@ -200,6 +188,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
             cls_type_descriptor="scene",
         )
         og.sim.import_scene(scene)
+        assert og.sim.is_stopped(), "Simulator must be stopped after loading scene!"
 
     def _load_robots(self):
         """
@@ -207,13 +196,15 @@ class Environment(gym.Env, GymObservable, Recreatable):
         """
         # Only actually load robots if no robot has been imported from the scene loading directly yet
         if len(self.scene.robots) == 0:
+            assert og.sim.is_stopped(), "Simulator must be stopped before loading robots!"
+
             # Iterate over all robots to generate in the robot config
             for i, robot_config in enumerate(self.robots_config):
                 # Add a name for the robot if necessary
                 if "name" not in robot_config:
                     robot_config["name"] = f"robot{i}"
-                # Set prim path
-                robot_config["prim_path"] = f"/World/{robot_config['name']}"
+
+                position, orientation = robot_config.pop("position", None), robot_config.pop("orientation", None)
                 # Make sure robot exists, grab its corresponding kwargs, and create / import the robot
                 robot = create_class_from_registry_and_config(
                     cls_name=robot_config["type"],
@@ -223,18 +214,25 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 )
                 # Import the robot into the simulator
                 og.sim.import_object(robot)
+                robot.set_position_orientation(position=position, orientation=orientation)
+
+            # Auto-initialize all robots
+            og.sim.play()
+            self.scene.reset()
+            self.scene.update_initial_state()
+            og.sim.stop()
+
+        assert og.sim.is_stopped(), "Simulator must be stopped after loading robots!"
 
     def _load_objects(self):
         """
         Load any additional custom objects into the scene
         """
+        assert og.sim.is_stopped(), "Simulator must be stopped before loading objects!"
         for i, obj_config in enumerate(self.objects_config):
             # Add a name for the object if necessary
             if "name" not in obj_config:
                 obj_config["name"] = f"obj{i}"
-            # Set prim path if not specified
-            if "prim_path" not in obj_config:
-                obj_config["prim_path"] = f"/World/{obj_config['name']}"
             # Pop the desired position and orientation
             position, orientation = obj_config.pop("position", None), obj_config.pop("orientation", None)
             # Make sure robot exists, grab its corresponding kwargs, and create / import the robot
@@ -247,6 +245,14 @@ class Environment(gym.Env, GymObservable, Recreatable):
             # Import the robot into the simulator and set the pose
             og.sim.import_object(obj)
             obj.set_position_orientation(position=position, orientation=orientation)
+
+        # Auto-initialize all objects
+        og.sim.play()
+        self.scene.reset()
+        self.scene.update_initial_state()
+        og.sim.stop()
+
+        assert og.sim.is_stopped(), "Simulator must be stopped after loading objects!"
 
     def _load_observation_space(self):
         # Grab robot(s) and task obs spaces
@@ -534,7 +540,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 # Traversibility map kwargs
                 "waypoint_resolution": 0.2,
                 "num_waypoints": 10,
-                "build_graph": False,
+                "build_graph": True,
                 "trav_map_resolution": 0.1,
                 "trav_map_erosion": 2,
                 "trav_map_with_objects": True,

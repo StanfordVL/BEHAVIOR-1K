@@ -5,6 +5,7 @@ import numpy as np
 from pxr.Sdf import ValueTypeNames as VT
 from pxr import Sdf, Gf
 
+import omnigibson as og
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.factory import (
     get_default_states,
@@ -57,8 +58,8 @@ class StatefulObject(BaseObject):
 
     def __init__(
             self,
-            prim_path,
-            name=None,
+            name,
+            prim_path=None,
             category="object",
             class_id=None,
             uuid=None,
@@ -75,9 +76,9 @@ class StatefulObject(BaseObject):
     ):
         """
         Args:
-            prim_path (str): global path in the stage to this object
-            name (None or str): Name for the object. Names need to be unique per scene. If None, a name will be
-                generated at the time the object is added to the scene, using the object's category.
+            name (str): Name for the object. Names need to be unique per scene
+            prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
+                created at /World/<name>
             category (str): Category for the object. Defaults to "object".
             class_id (None or int): What class ID the object should be assigned in semantic segmentation rendering mode.
                 If None, the ID will be inferred from this object's category.
@@ -142,7 +143,19 @@ class StatefulObject(BaseObject):
 
         # Initialize all states
         for state in self._states.values():
-            state.initialize(self._simulator)
+            state.initialize()
+
+        # Check whether this object requires any visual updates
+        states_set = set(self.states)
+        self._visual_states = states_set & get_visual_states()
+
+        # If we require visual updates, possibly create additional APIs
+        if len(self._visual_states) > 0:
+            if len(states_set & get_steam_states()) > 0:
+                self._create_emitter_apis(EmitterType.STEAM)
+
+            if len(states_set & get_fire_states()) > 0:
+                self._create_emitter_apis(EmitterType.FIRE)
 
     def add_state(self, state):
         """
@@ -208,21 +221,6 @@ class StatefulObject(BaseObject):
         for state_type, params in reversed(state_types_and_params):
             self._states[state_type] = get_object_state_instance(state_type, self, params)
 
-    def _post_load(self):
-        super()._post_load()
-
-        # Check whether this object requires any visual updates
-        states_set = set(self.states)
-        self._visual_states = states_set & get_visual_states()
-
-        # If we require visual updates, possibly create additional APIs
-        if len(self._visual_states) > 0:
-            if len(states_set & get_steam_states()) > 0:
-                self._create_emitter_apis(EmitterType.STEAM)
-
-            if len(states_set & get_fire_states()) > 0:
-                self._create_emitter_apis(EmitterType.FIRE)
-
     def _create_emitter_apis(self, emitter_type):
         """
         Create necessary prims and apis for steam effects.
@@ -238,16 +236,17 @@ class StatefulObject(BaseObject):
         emitter_config = {}
         bbox_extent_local = self.native_bbox if hasattr(self, "native_bbox") else self.aabb_extent / self.scale
         if emitter_type == EmitterType.FIRE:
+            fire_at_metalink = True
             if OnFire in self.states:
-                fire_at_metalink = self.states[OnFire].get_state_link_name() in self._links
-                # Use the heat source link if there exists any (e.g. candle wick), or use the root link (e.g. charcoal).
-                link_name = self.states[OnFire].get_state_link_name() if fire_at_metalink else self.root_link_name
+                # Note whether the heat source link is explicitly set
+                link = self.states[OnFire].link
+                fire_at_metalink = link != self.root_link
             elif HeatSourceOrSink in self.states:
-                # Missing the heat source link annotation, return.
-                if self.states[HeatSourceOrSink].get_state_link_name() not in self._links:
+                # Only apply fire to non-root-link (i.e.: explicitly specified) heat source links
+                # Otherwise, immediately return
+                link = self.states[HeatSourceOrSink].link
+                if link == self.root_link:
                     return
-                fire_at_metalink = True
-                link_name = self.states[HeatSourceOrSink].get_state_link_name()
             else:
                 raise ValueError("Unknown fire state")
 
@@ -263,7 +262,7 @@ class StatefulObject(BaseObject):
             emitter_config["constantMask"] = 5.0
             emitter_config["attenuation"] = 0.5
         elif emitter_type == EmitterType.STEAM:
-            link_name = self.root_link_name
+            link = self.root_link
             emitter_config["name"] = "flowEmitterBox"
             emitter_config["type"] = "FlowEmitterBox"
             emitter_config["position"] = (0.0, 0.0, bbox_extent_local[2] * m.STEAM_EMITTER_HEIGHT_RATIO)
@@ -279,13 +278,13 @@ class StatefulObject(BaseObject):
 
         # Define prim paths.
         # The flow system is created under the root link so that it automatically updates its pose as the object moves
-        flowEmitter_prim_path = f"{self._prim_path}/{link_name}/{emitter_config['name']}"
-        flowSimulate_prim_path = f"{self._prim_path}/{link_name}/flowSimulate"
-        flowOffscreen_prim_path = f"{self._prim_path}/{link_name}/flowOffscreen"
-        flowRender_prim_path = f"{self._prim_path}/{link_name}/flowRender"
+        flowEmitter_prim_path = f"{link.prim_path}/{emitter_config['name']}"
+        flowSimulate_prim_path = f"{link.prim_path}/flowSimulate"
+        flowOffscreen_prim_path = f"{link.prim_path}/flowOffscreen"
+        flowRender_prim_path = f"{link.prim_path}/flowRender"
 
         # Define prims.
-        stage = self._simulator.stage
+        stage = og.sim.stage
         emitter = stage.DefinePrim(flowEmitter_prim_path, emitter_config["type"])
         simulate = stage.DefinePrim(flowSimulate_prim_path, "FlowSimulate")
         offscreen = stage.DefinePrim(flowOffscreen_prim_path, "FlowOffscreen")
@@ -373,8 +372,8 @@ class StatefulObject(BaseObject):
                 state = self.states[state_type]
                 if state_type in get_texture_change_states():
                     if state_type == Saturated:
-                        for fluid_system in FluidSystem.get_systems().values():
-                            if state.get_value(fluid_system):
+                        for particle_system in ParticleRemover.supported_active_systems().values():
+                            if state.get_value(particle_system):
                                 texture_change_states.append(state)
                                 # Only need to do this once, since soaked handles all fluid systems
                                 break
@@ -432,20 +431,16 @@ class StatefulObject(BaseObject):
         if not np.allclose(material.diffuse_tint, diffuse_tint):
             material.diffuse_tint = diffuse_tint
 
-    def remove(self, simulator=None):
+    def remove(self):
         """
         Removes this prim from omniverse stage
-
-        Args:
-            simulator (None or SimulationContext): If specified, should be simulator into which this prim will be
-                removed. Otherwise, it will be removed from the default stage
         """
         # Iterate over all states and run their remove call
         for state_instance in self._states.values():
             state_instance.remove()
 
         # Run super
-        super().remove(simulator=simulator)
+        super().remove()
 
     def _dump_state(self):
         # Grab state from super class

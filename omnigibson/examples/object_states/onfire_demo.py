@@ -78,10 +78,10 @@ def main(random_selection=False, headless=False, short_exec=False):
     stove.states[object_states.ToggledOn].set_value(True)
 
     # The first apple will be affected by the stove
-    apples[0].set_position(stove.states[object_states.HeatSourceOrSink].get_link_position() + np.array([-0.15, 0, 0.1]))
+    apples[0].set_position(stove.states[object_states.HeatSourceOrSink].link.get_position() + np.array([-0.15, 0, 0.1]))
 
     # The second apple will NOT be affected by the stove, but will be affected by the first apple once it's on fire.
-    apples[1].set_position(stove.states[object_states.HeatSourceOrSink].get_link_position() + np.array([-0.3, 0, 0.1]))
+    apples[1].set_position(stove.states[object_states.HeatSourceOrSink].link.get_position() + np.array([-0.3, 0, 0.1]))
 
     steps = 0
     max_steps = -1 if not short_exec else 1000

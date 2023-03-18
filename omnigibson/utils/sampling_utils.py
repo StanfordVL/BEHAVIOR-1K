@@ -8,8 +8,6 @@ import trimesh
 from scipy.spatial.transform import Rotation as R
 from scipy.stats import truncnorm
 
-from omni.physx import get_physx_scene_query_interface
-
 import omnigibson as og
 from omnigibson.macros import create_module_macros
 import omnigibson.utils.transform_utils as T
@@ -332,7 +330,7 @@ def raytest(
 
     # For efficiency's sake, we handle special case of no ignore_bodies, ignore_collisions, and closest_hit
     if only_closest and ignore_bodies is None and ignore_collisions is None:
-        return get_physx_scene_query_interface().raycast_closest(
+        return og.sim.psqi.raycast_closest(
             origin=start_point,
             dir=direction,
             distance=distance,
@@ -358,7 +356,7 @@ def raytest(
             return True
 
         # Grab all collisions
-        get_physx_scene_query_interface().raycast_all(
+        og.sim.psqi.raycast_all(
             origin=start_point,
             dir=direction,
             distance=distance,

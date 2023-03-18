@@ -7,7 +7,6 @@ from omnigibson.object_states.object_state_base import RelativeObjectState
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.kinematics import KinematicsMixin
 from omnigibson.systems import PhysicalParticleSystem
-from omni.physx import get_physx_scene_query_interface
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -61,7 +60,7 @@ class ContactParticles(RelativeObjectState, KinematicsMixin):
             # Only check positions that are within the relaxed AABB of this object
             inbound_idxs = ((lower < positions) & (positions < upper)).all(axis=-1).nonzero()[0]
             for idx in inbound_idxs:
-                get_physx_scene_query_interface().overlap_sphere(system.particle_contact_offset, positions[idx], report_hit, False)
+                og.sim.psqi.overlap_sphere(system.particle_contact_offset, positions[idx], report_hit, False)
 
         # Return contacts
         return contacts

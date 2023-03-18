@@ -48,7 +48,7 @@ class MaterialPrim(BasePrim):
             load_config=load_config,
         )
 
-    def _load(self, simulator=None):
+    def _load(self):
         # We create a new material at the specified path
         mtl_created = []
         omni.kit.commands.execute(

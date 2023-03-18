@@ -1,10 +1,10 @@
 import numpy as np
-from omnigibson.macros import gm, create_module_macros
+from omnigibson.macros import create_module_macros
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from omnigibson.object_states.object_state_base import RelativeObjectState, BooleanState
 from omnigibson.systems.micro_particle_system import PhysicalParticleSystem
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
-from omnigibson.systems import get_system_from_element_name, get_element_name_from_system
+from omnigibson.utils.python_utils import classproperty
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -12,12 +12,18 @@ m = create_module_macros(module_path=__file__)
 # Proportion of object's volume that must be filled for object to be considered filled
 m.VOLUME_FILL_PROPORTION = 0.3
 
+m.FILLED_LINK_PREFIX = "container"
+
 
 class Filled(RelativeObjectState, BooleanState, LinkBasedStateMixin):
     def __init__(self, obj):
         super().__init__(obj)
         self.check_in_volume = None        # Function to check whether particles are in volume for this container
         self.calculate_volume = None       # Function to calculate the real-world volume for this container
+
+    @classproperty
+    def metalink_prefix(cls):
+        return m.FILLED_LINK_PREFIX
 
     def _get_value(self, system):
         # Sanity check to make sure system is valid
@@ -43,10 +49,6 @@ class Filled(RelativeObjectState, BooleanState, LinkBasedStateMixin):
         assert issubclass(system, PhysicalParticleSystem), \
             "Can only set Filled state with a valid PhysicalParticleSystem!"
 
-        # If we found no link, directly return
-        if self.link is None:
-            return False
-
         # First, check our current state
         current_state = self.get_value(system)
 
@@ -70,51 +72,10 @@ class Filled(RelativeObjectState, BooleanState, LinkBasedStateMixin):
         super()._initialize()
         self.initialize_link_mixin()
 
-        # If we found no link, directly return
-        if self.link is None:
-            return
-
         # Generate volume checker function for this object
         self.check_in_volume, self.calculate_volume = \
             generate_points_in_volume_checker_function(obj=self.obj, volume_link=self.link, mesh_name_prefixes="container")
 
     @staticmethod
-    def get_state_link_name():
-        # Should be implemented by subclass
-        return "container_link"
-
-    @staticmethod
     def get_optional_dependencies():
         return []
-
-    @property
-    def state_size(self):
-        return len(PhysicalParticleSystem.get_systems())
-
-    def _dump_state(self):
-        # Store whether we're filled for each volume or not
-        state = dict()
-        for system in PhysicalParticleSystem.get_systems().values():
-            system_name = get_element_name_from_system(system)
-            state[system_name] = self.get_value(system)
-
-        return state
-
-    def _load_state(self, state):
-        # Check to see if the value is different from what we currently have
-        # This should always be the same, because our get_value() reads from the particle system, which should
-        # hav already updated / synchronized its state
-        for system_name, val in state.items():
-            assert val == self.get_value(get_system_from_element_name(system_name)), \
-            f"Expected state {self.__class__.__name__} to have synchronized values, but got current value: {self.get_value(get_system_from_element_name(system_name))} with desired value: {val}"
-
-    def _serialize(cls, state):
-        return np.array(list(state.values()), dtype=float)
-
-    def _deserialize(self, state):
-        state_dict = dict()
-        for i, system in enumerate(PhysicalParticleSystem.get_systems().values()):
-            system_name = get_element_name_from_system(system)
-            state_dict[system_name] = bool(state[i])
-
-        return state_dict, len(state_dict)

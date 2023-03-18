@@ -1,12 +1,12 @@
 from omnigibson.object_states.fluid_sink import FluidSink
-from omnigibson.systems.micro_particle_system import WaterSystem
+from omnigibson.systems import get_system
 
 
 class WaterSink(FluidSink):
 
     @property
     def fluid_system(self):
-        return WaterSystem
+        return get_system("water")
 
     @staticmethod
     def get_state_link_name():

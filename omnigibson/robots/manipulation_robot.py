@@ -2,7 +2,7 @@ from abc import abstractmethod
 from collections import namedtuple
 import numpy as np
 
-from omnigibson import app
+import omnigibson as og
 from omnigibson.macros import gm, create_module_macros
 from omnigibson.utils.asset_utils import get_assisted_grasping_categories
 import omnigibson.utils.transform_utils as T
@@ -18,6 +18,7 @@ from omnigibson.utils.python_utils import classproperty, assert_valid_key
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
 from omnigibson.utils.constants import JointType, PrimType
 from omnigibson.utils.usd_utils import create_joint
+from omnigibson.utils.ui_utils import suppress_omni_log
 
 from pxr import Gf
 
@@ -83,8 +84,8 @@ class ManipulationRobot(BaseRobot):
     def __init__(
         self,
         # Shared kwargs in hierarchy
-        prim_path,
-        name=None,
+        name,
+        prim_path=None,
         class_id=None,
         uuid=None,
         scale=None,
@@ -115,9 +116,9 @@ class ManipulationRobot(BaseRobot):
     ):
         """
         Args:
-            prim_path (str): global path in the stage to this object
-            name (None or str): Name for the object. Names need to be unique per scene. If None, a name will be
-                generated at the time the object is added to the scene, using the object's category.
+            name (str): Name for the object. Names need to be unique per scene
+            prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
+                created at /World/<name>
             class_id (None or int): What class ID the object should be assigned in semantic segmentation rendering mode.
                 If None, the ID will be inferred from this object's category.
             uuid (None or int): Unique unsigned-integer identifier to assign to this object (max 8-numbers).
@@ -374,7 +375,7 @@ class ManipulationRobot(BaseRobot):
         arm = self.default_arm if arm == "default" else arm
 
         # Remove joint and filtered collision restraints
-        self._simulator.stage.RemovePrim(self._ag_obj_constraint_params[arm]["ag_joint_prim_path"])
+        og.sim.stage.RemovePrim(self._ag_obj_constraint_params[arm]["ag_joint_prim_path"])
         self._ag_data[arm] = None
         self._ag_obj_constraints[arm] = None
         self._ag_obj_constraint_params[arm] = {}
@@ -771,7 +772,7 @@ class ManipulationRobot(BaseRobot):
         # TODO: Better heuristic, hacky, we assume the parent object prim path is the prim_path minus the last "/" item
         ag_obj_prim_path = "/".join(prim_path.split("/")[:-1])
         ag_obj_link_name = prim_path.split("/")[-1]
-        ag_obj = self._simulator.scene.object_registry("prim_path", ag_obj_prim_path)
+        ag_obj = og.sim.scene.object_registry("prim_path", ag_obj_prim_path)
         ag_obj_link = ag_obj.links[ag_obj_link_name]
 
         # Return None if object cannot be assisted grasped or not touching at least two fingers
@@ -791,7 +792,7 @@ class ManipulationRobot(BaseRobot):
         """
         arm = self.default_arm if arm == "default" else arm
         self._ag_release_counter[arm] += 1
-        time_since_release = self._ag_release_counter[arm] * self._simulator.get_rendering_dt()
+        time_since_release = self._ag_release_counter[arm] * og.sim.get_rendering_dt()
         if time_since_release >= m.RELEASE_WINDOW:
             # TODO: Verify not needed!
             # Remove filtered collision restraints
@@ -1035,7 +1036,7 @@ class ManipulationRobot(BaseRobot):
             body0=self.eef_links[arm].prim_path,
             body1=ag_link.prim_path,
             enabled=False,
-            stage=self._simulator.stage,
+            stage=og.sim.stage,
         )
 
         # Set the local pose of this joint
@@ -1046,7 +1047,8 @@ class ManipulationRobot(BaseRobot):
 
         # We have to toggle the joint from off to on after a physics step because of an omni quirk
         # Otherwise the joint transform is very weird
-        app.update()
+        with suppress_omni_log(channels=["omni.physx.plugin"]):
+            og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
         joint_prim.GetAttribute("physics:jointEnabled").Set(True)
 
         # Save a reference to this joint prim
@@ -1173,7 +1175,7 @@ class ManipulationRobot(BaseRobot):
         if not gripper_finger_close:
             return None
 
-        cloth_objs = self._simulator.scene.object_registry("prim_type", PrimType.CLOTH)
+        cloth_objs = og.sim.scene.object_registry("prim_type", PrimType.CLOTH)
         if cloth_objs is None:
             return None
 
@@ -1222,7 +1224,6 @@ class ManipulationRobot(BaseRobot):
             T.relative_pose_transform(attachment_point_pos, [0, 0, 0, 1], eef_link_pos, eef_link_orn)
 
         # Create the joint
-        # self._simulator.pause()
         joint_prim_path = f"{ag_link.prim_path}/ag_constraint"
         joint_type = "FixedJoint"
         joint_prim = create_joint(
@@ -1231,7 +1232,7 @@ class ManipulationRobot(BaseRobot):
             body0=ag_link.prim_path,
             body1=None,
             enabled=False,
-            stage=self._simulator.stage,
+            stage=og.sim.stage,
         )
 
         # Set the local pose of this joint
@@ -1239,7 +1240,8 @@ class ManipulationRobot(BaseRobot):
 
         # We have to toggle the joint from off to on after a physics step because of an omni quirk
         # Otherwise the joint transform is very weird
-        app.update()
+        with suppress_omni_log(channels=["omni.physx.plugin"]):
+            og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
         joint_prim.GetAttribute("physics:jointEnabled").Set(True)
 
         # Save a reference to this joint prim

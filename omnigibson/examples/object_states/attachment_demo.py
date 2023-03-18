@@ -7,9 +7,8 @@ from omnigibson.utils.ui_utils import choose_from_options
 from omnigibson.object_states.attachment import AttachmentType
 from omnigibson.object_states import Attached
 
-# Make sure object states are enabled and global contact reporting is enabled
+# Make sure object states are enabled
 gm.ENABLE_OBJECT_STATES = True
-gm.ENABLE_GLOBAL_CONTACT_REPORTING = True
 
 
 def setup_scene_for_abilities(abilities1, abilities2):
@@ -327,6 +326,9 @@ def main(random_selection=False, headless=False, short_exec=False):
         demo_name = choose_from_options(options=list(demo_names_to_demos.keys()), name="attachment demo")
         # Run the demo
         demo_names_to_demos[demo_name]()
+
+    # Shutdown omnigibson
+    og.shutdown()
 
 
 if __name__ == "__main__":

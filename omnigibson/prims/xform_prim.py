@@ -8,6 +8,7 @@ from omni.isaac.core.utils.prims import (
 )
 import numpy as np
 import carb
+import omnigibson as og
 from omni.isaac.core.utils.stage import get_current_stage
 from omnigibson.prims.prim_base import BasePrim
 from omnigibson.prims.material_prim import MaterialPrim
@@ -53,12 +54,8 @@ class XFormPrim(BasePrim):
             load_config=load_config,
         )
 
-    def _load(self, simulator=None):
-        # Define an Xform prim at the current stage, or the simulator's stage if specified
-        stage = get_current_stage()
-        prim = stage.DefinePrim(self._prim_path, "Xform")
-
-        return prim
+    def _load(self):
+        return og.sim.stage.DefinePrim(self._prim_path, "Xform")
 
     def _post_load(self):
         # run super first

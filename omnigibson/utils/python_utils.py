@@ -2,6 +2,7 @@
 A set of utility functions for general python usage
 """
 import inspect
+import re
 from abc import ABCMeta
 from copy import deepcopy
 from collections import Iterable
@@ -273,6 +274,43 @@ def create_class_from_registry_and_config(cls_name, cls_registry, cfg, cls_type_
     # Create the class
     return cls(**cls_kwargs)
 
+
+def get_uuid(name, n_digits=8):
+    """
+    Helper function to create a unique @n_digits uuid given a unique @name
+
+    Args:
+        name (str): Name of the object or class
+        n_digits (int): Number of digits of the uuid, default is 8
+
+    Returns:
+        int: uuid
+    """
+    return abs(hash(name)) % (10 ** n_digits)
+
+def camel_case_to_snake_case(camel_case_text):
+    """
+    Helper function to convert a camel case text to snake case, e.g. "StrawberrySmoothie" -> "strawberry_smoothie"
+
+    Args:
+        camel_case_text (str): Text in camel case
+
+    Returns:
+        str: snake case text
+    """
+    return re.sub(r'(?<!^)(?=[A-Z])', '_', camel_case_text).lower()
+
+def snake_case_to_camel_case(snake_case_text):
+    """
+    Helper function to convert a snake case text to camel case, e.g. "strawberry_smoothie" -> "StrawberrySmoothie"
+
+    Args:
+        snake_case_text (str): Text in snake case
+
+    Returns:
+        str: camel case text
+    """
+    return ''.join(item.title() for item in snake_case_text.split('_'))
 
 class UniquelyNamed:
     """
@@ -678,7 +716,6 @@ class SerializableNonInstance:
         """
         # Sanity check the idx with the expected state size
         state_dict, idx = cls._deserialize(state=state)
-        assert cls.state_size is not None, "State size must be specified by subclass!"
         assert idx == cls.state_size, f"Invalid state deserialization occurred! Expected {cls.state_size} total " \
                                       f"values to be deserialized, only {idx} were."
 

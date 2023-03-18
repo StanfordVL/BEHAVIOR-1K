@@ -1,5 +1,6 @@
 import numpy as np
 
+import omnigibson as og
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from omnigibson.object_states.object_state_base import AbsoluteObjectState
 from omnigibson.object_states.toggle import ToggledOn
@@ -54,7 +55,7 @@ class FluidSource(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixin):
 
     def _update(self):
         fluid_source_position = self.get_link_position()
-        if fluid_source_position is None or not self._simulator.is_playing():
+        if fluid_source_position is None or not og.sim.is_playing():
             # Terminate early, this is a "dead" fluid source or we're not stepping physics
             return
 

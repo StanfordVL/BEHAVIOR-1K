@@ -17,13 +17,13 @@ class OnTop(KinematicsMixin, RelativeObjectState, BooleanState):
         if not new_value:
             raise NotImplementedError("OnTop does not support set_value(False)")
 
-        state = self._simulator.dump_state(serialized=False)
+        state = og.sim.dump_state(serialized=False)
 
         for _ in range(10):
             if sample_kinematics("onTop", self.obj, other) and self.get_value(other):
                 return True
             else:
-                self._simulator.load_state(state, serialized=False)
+                og.sim.load_state(state, serialized=False)
 
         return False
 

@@ -35,7 +35,7 @@ from omnigibson.utils.constants import (
     SYSTEM_SYNSETS_TO_SYSTEM_NAMES,
 )
 from omnigibson.utils.python_utils import classproperty, assert_valid_key
-from omnigibson.systems.system_base import get_system_from_element_name
+from omnigibson.systems import get_system
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
@@ -156,9 +156,6 @@ class BehaviorTask(BaseTask):
         success, self.feedback = self.initialize_activity(env=env)
         if not success:
             print(f"Failed to initialize Behavior Activity. Feedback:\n{self.feedback}")
-
-        # Also reset the agent
-        self._reset_agent(env=env)
 
         # Highlight any task relevant objects if requested
         if self.highlight_task_relevant_objs:
@@ -398,8 +395,7 @@ class BehaviorTask(BaseTask):
         Args:
             env (Environment): Current active environment instance
         """
-        assert og.sim.is_playing()
-        og.sim.stop()
+        assert og.sim.is_stopped(), "Simulator should be stopped when importing sampleable objects"
 
         # Move the robot object frame to a far away location, similar to other newly imported objects below
         env.robots[0].set_position_orientation([300, 300, 300], [0, 0, 0, 1])
@@ -416,7 +412,7 @@ class BehaviorTask(BaseTask):
             if obj_cat in SYSTEM_SYNSETS_TO_SYSTEM_NAMES:
                 assert len(self.activity_conditions.parsed_objects[obj_cat]) == 1, "Systems are singletons"
                 obj_inst = self.activity_conditions.parsed_objects[obj_cat][0]
-                self.object_scope[obj_inst] = get_system_from_element_name(SYSTEM_SYNSETS_TO_SYSTEM_NAMES[obj_cat])
+                self.object_scope[obj_inst] = get_system(SYSTEM_SYNSETS_TO_SYSTEM_NAMES[obj_cat])
                 continue
 
             is_sliceable = self.object_taxonomy.has_ability(obj_cat, "sliceable")
@@ -492,13 +488,6 @@ class BehaviorTask(BaseTask):
                 self.sampled_objects.add(simulator_obj)
                 self.object_scope[obj_inst] = simulator_obj
 
-        # Play the sim again to initialize all the newly imported objects.
-        og.sim.play()
-        # Also reset the agent
-        env.robots[0].reset()
-        # Take one extra step so that the bounding box of the agent is up-to-date.
-        og.sim.step()
-
     def check_scene(self, env):
         """
         Runs sanity checks for the current scene for the given BEHAVIOR task
@@ -563,8 +552,7 @@ class BehaviorTask(BaseTask):
                 matched_sim_obj = self.get_agent(env)
             # If the object scope points to a system
             elif self.object_instance_to_category[obj_inst] in SYSTEM_SYNSETS_TO_SYSTEM_NAMES:
-                matched_sim_obj = get_system_from_element_name(
-                    SYSTEM_SYNSETS_TO_SYSTEM_NAMES[self.object_instance_to_category[obj_inst]])
+                matched_sim_obj = get_system(SYSTEM_SYNSETS_TO_SYSTEM_NAMES[self.object_instance_to_category[obj_inst]])
             else:
                 log.info(f"checking objects...")
                 for sim_obj in og.sim.scene.objects:
@@ -927,6 +915,9 @@ class BehaviorTask(BaseTask):
                 - bool: Whether sampling was successful or not
                 - None or str: None if successful, otherwise the associated error message
         """
+        # Auto-initialize all sampleable objects
+        og.sim.play()
+        env.scene.reset()
 
         error_msg = self.group_initial_conditions()
         if error_msg:
@@ -948,6 +939,9 @@ class BehaviorTask(BaseTask):
         if error_msg:
             log.warning(error_msg)
             return False, error_msg
+
+        env.scene.update_initial_state()
+        og.sim.stop()
 
         return True, None
 

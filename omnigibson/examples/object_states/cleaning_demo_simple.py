@@ -3,7 +3,7 @@ import numpy as np
 import omnigibson as og
 from omnigibson import object_states
 from omnigibson.macros import gm
-from omnigibson.systems import DustSystem, StainSystem, WaterSystem
+from omnigibson.systems import get_system
 from omnigibson.utils.constants import ParticleModifyMethod
 
 # Make sure object states are enabled and GPU dynamics are used
@@ -38,7 +38,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     )
 
     def check_water_saturation(obj):
-        return obj.states[object_states.Saturated].get_value(WaterSystem)
+        return obj.states[object_states.Saturated].get_value(get_system("water"))
 
     brush_cfg = dict(
         type="DatasetObject",
@@ -59,9 +59,9 @@ def main(random_selection=False, headless=False, short_exec=False):
                     # where True means the condition is satisfied
                     # In this case, we only allow our cleaning tool to remove stains and dust particles if
                     # the object is saturated with water, i.e.: it's "soaked" with water particles
-                    StainSystem: [check_water_saturation],
-                    DustSystem: [check_water_saturation],
-                    WaterSystem: [],
+                    "stain": [check_water_saturation],
+                    "dust": [],
+                    "water": [],
                 },
             },
         },
@@ -108,10 +108,10 @@ def main(random_selection=False, headless=False, short_exec=False):
     bowl = env.scene.object_registry("name", "bowl")
 
     assert sink.states[object_states.ToggledOn].set_value(True)
-    assert desk.states[object_states.Covered].set_value(DustSystem, True)
+    assert desk.states[object_states.Covered].set_value(get_system("dust"), True)
     assert bowl.states[object_states.OnTop].set_value(desk, True)
     assert brush.states[object_states.OnTop].set_value(desk, True)
-    assert bowl.states[object_states.Covered].set_value(StainSystem, True)
+    assert bowl.states[object_states.Covered].set_value(get_system("stain"), True)
 
     # Take a step, and save the state
     env.step(np.array([]))
@@ -126,17 +126,17 @@ def main(random_selection=False, headless=False, short_exec=False):
             # Keep stepping until table or bowl are clean, or we reach 1000 steps
             steps = 0
             while (
-                desk.states[object_states.Covered].get_value(DustSystem)
-                and bowl.states[object_states.Covered].get_value(StainSystem)
+                desk.states[object_states.Covered].get_value(get_system("dust"))
+                and bowl.states[object_states.Covered].get_value(get_system("stain"))
                 and steps != max_steps
             ):
                 steps += 1
                 env.step(np.array([]))
                 og.log.info(f"Step {steps}")
 
-            if not desk.states[object_states.Covered].get_value(DustSystem):
+            if not desk.states[object_states.Covered].get_value(get_system("dust")):
                 og.log.info("Reset because Table cleaned")
-            elif not bowl.states[object_states.Covered].get_value(StainSystem):
+            elif not bowl.states[object_states.Covered].get_value(get_system("stain")):
                 og.log.info("Reset because Bowl cleaned")
             else:
                 og.log.info("Reset because max steps")

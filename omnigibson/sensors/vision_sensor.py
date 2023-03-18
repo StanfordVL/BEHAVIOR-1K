@@ -130,11 +130,10 @@ class VisionSensor(BaseSensor):
             load_config=load_config,
         )
 
-    def _load(self, simulator=None):
+    def _load(self):
         # Define a new camera prim at the current stage
-        stage = get_current_stage()
-        prim = UsdGeom.Camera.Define(stage, self._prim_path).GetPrim()
-        return prim
+        # Note that we can't use og.sim.stage here because the vision sensors get loaded first
+        return UsdGeom.Camera.Define(get_current_stage(), self._prim_path).GetPrim()
 
     def _post_load(self):
         # run super first
@@ -253,7 +252,7 @@ class VisionSensor(BaseSensor):
         xform_orient_op = self.get_attribute("xformOp:rotateXYZ")
         return np.array(xform_translate_op), euler2quat(np.array(xform_orient_op))
 
-    def remove(self, simulator=None):
+    def remove(self):
         # Remove from global sensors dictionary
         self.SENSORS.pop(self._prim_path)
 
@@ -261,7 +260,7 @@ class VisionSensor(BaseSensor):
         self._viewport.destroy()
 
         # Run super
-        super().remove(simulator=simulator)
+        super().remove()
 
     @property
     def viewer_visibility(self):

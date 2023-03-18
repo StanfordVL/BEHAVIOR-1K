@@ -3,6 +3,7 @@ from omnigibson.objects.stateful_object import StatefulObject
 from omnigibson.utils.python_utils import assert_valid_key
 
 from pxr import Gf, Vt, UsdPhysics, PhysxSchema
+import omnigibson as og
 from omnigibson.utils.constants import PrimType, PRIMITIVE_MESH_TYPES
 from omnigibson.utils.usd_utils import create_primitive_mesh
 from omnigibson.utils.render_utils import create_pbr_material
@@ -26,9 +27,9 @@ class PrimitiveObject(StatefulObject):
 
     def __init__(
         self,
-        prim_path,
+        name,
         primitive_type,
-        name=None,
+        prim_path=None,
         category="object",
         class_id=None,
         uuid=None,
@@ -49,11 +50,11 @@ class PrimitiveObject(StatefulObject):
     ):
         """
         Args:
-            prim_path (str): global path in the stage to this object
+            name (str): Name for the object. Names need to be unique per scene
             primitive_type (str): type of primitive object to create. Should be one of:
                 {"Cone", "Cube", "Cylinder", "Disk", "Plane", "Sphere", "Torus"}
-            name (None or str): Name for the object. Names need to be unique per scene. If None, a name will be
-                generated at the time the object is added to the scene, using the object's category.
+            prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
+                created at /World/<name>
             category (str): Category for the object. Defaults to "object".
             class_id (None or int): What class ID the object should be assigned in semantic segmentation rendering mode.
                 If None, the ID will be inferred from this object's category.
@@ -117,14 +118,13 @@ class PrimitiveObject(StatefulObject):
             **kwargs,
         )
 
-    def _load(self, simulator=None):
+    def _load(self):
         # Define an Xform at the specified path
-        stage = simulator.stage
-        prim = stage.DefinePrim(self._prim_path, "Xform")
+        prim = og.sim.stage.DefinePrim(self._prim_path, "Xform")
 
         if self._prim_type == PrimType.RIGID:
             # Define a nested mesh corresponding to the root link for this prim
-            base_link = stage.DefinePrim(f"{self._prim_path}/base_link", "Xform")
+            base_link = og.sim.stage.DefinePrim(f"{self._prim_path}/base_link", "Xform")
             self._vis_geom = create_primitive_mesh(prim_path=f"{self._prim_path}/base_link/visuals", primitive_type=self._primitive_type)
             self._col_geom = create_primitive_mesh(prim_path=f"{self._prim_path}/base_link/collisions", primitive_type=self._primitive_type)
 
@@ -145,7 +145,7 @@ class PrimitiveObject(StatefulObject):
             self._col_geom = None
 
         # Create a material for this object for the base link
-        stage.DefinePrim(f"{self._prim_path}/Looks", "Scope")
+        og.sim.stage.DefinePrim(f"{self._prim_path}/Looks", "Scope")
         mat_path = f"{self._prim_path}/Looks/default"
         mat = create_pbr_material(prim_path=mat_path)
         bind_material(prim_path=self._vis_geom.GetPrim().GetPrimPath().pathString, material_path=mat_path)
@@ -155,16 +155,6 @@ class PrimitiveObject(StatefulObject):
     def _post_load(self):
         # Run super first
         super()._post_load()
-
-        if self._prim_type == PrimType.RIGID:
-            visual_geom_prim = list(self.links["base_link"].visual_meshes.values())[0]
-        elif self._prim_type == PrimType.CLOTH:
-            visual_geom_prim = self.links["base_link"]
-        else:
-            raise ValueError("Prim type must either be PrimType.RIGID or PrimType.CLOTH for loading a primitive object")
-
-        visual_geom_prim.color = self._load_config["color"]
-        visual_geom_prim.opacity = self._load_config["opacity"]
 
         # Set the collision approximation appropriately
         if self._primitive_type == "Sphere":
@@ -185,6 +175,21 @@ class PrimitiveObject(StatefulObject):
                 self.height = self._load_config["height"]
             if self._load_config["size"] is not None:
                 self.size = self._load_config["size"]
+
+    def _initialize(self):
+        # Run super first
+        super()._initialize()
+
+        # Set color and opacity
+        if self._prim_type == PrimType.RIGID:
+            visual_geom_prim = list(self.links["base_link"].visual_meshes.values())[0]
+        elif self._prim_type == PrimType.CLOTH:
+            visual_geom_prim = self.links["base_link"]
+        else:
+            raise ValueError("Prim type must either be PrimType.RIGID or PrimType.CLOTH for loading a primitive object")
+
+        visual_geom_prim.color = self._load_config["color"]
+        visual_geom_prim.opacity = self._load_config["opacity"]
 
     @property
     def radius(self):
