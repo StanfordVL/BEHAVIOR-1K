@@ -12,6 +12,7 @@ from omni.isaac.core.utils.prims import (
     get_prim_object_type,
 )
 import numpy as np
+import omnigibson as og
 from omni.isaac.core.utils.stage import get_current_stage
 from omnigibson.macros import create_module_macros
 from omnigibson.prims.prim_base import BasePrim
@@ -102,17 +103,16 @@ class JointPrim(BasePrim):
             load_config=load_config,
         )
 
-    def _load(self, simulator=None):
+    def _load(self):
         # Make sure this joint isn't articulated
         assert not self.articulated, "Joint cannot be created, since this is an articulated joint! We are assuming" \
                                      "the joint already exists in the stage."
 
         # Define a joint prim at the current stage
-        stage = get_current_stage()
         prim = create_joint(
             prim_path=self._prim_path,
             joint_type=self._load_config.get("joint_type", JointType.JOINT),
-            stage=stage,
+            stage=og.sim.stage,
         )
 
         return prim
@@ -871,6 +871,6 @@ class JointPrim(BasePrim):
             target_vel=state[4*self.n_dof:5*self.n_dof],
         ), 5*self.n_dof
 
-    def duplicate(self, simulator, prim_path):
+    def duplicate(self, prim_path):
         # Cannot directly duplicate a joint prim
         raise NotImplementedError("Cannot directly duplicate a joint prim!")

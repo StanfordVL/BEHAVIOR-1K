@@ -10,14 +10,15 @@ from pxr import UsdPhysics, Gf, Vt, PhysxSchema
 from pxr.Sdf import ValueTypeNames as VT
 
 from omni.physx.scripts import particleUtils
-from omni.physx import get_physx_scene_query_interface
 
 from omnigibson.macros import create_module_macros, gm
 from omnigibson.prims.geom_prim import GeomPrim
+from omnigibson.systems import get_system
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.sim_utils import CsRawData
 from omnigibson.utils.usd_utils import array_to_vtarray, mesh_prim_to_trimesh_mesh
 from omnigibson.utils.constants import GEOM_TYPES
+from omnigibson.utils.python_utils import classproperty
 import omnigibson as og
 
 import numpy as np
@@ -83,15 +84,11 @@ class ClothPrim(GeomPrim):
         if "mass" in self._load_config and self._load_config["mass"] is not None:
             self.mass = self._load_config["mass"]
 
-        # Avoid circular import
-        from omnigibson.systems.system_base import get_system_from_element_name
-        cloth_system = get_system_from_element_name("Cloth")
-
         particleUtils.add_physx_particle_cloth(
             stage=og.sim.stage,
             path=self.prim_path,
             dynamic_mesh_path=None,
-            particle_system_path=cloth_system.system_prim_path,
+            particle_system_path=ClothPrim.cloth_system.system_prim_path,
             spring_stretch_stiffness=m.CLOTH_STRETCH_STIFFNESS,
             spring_bend_stiffness=m.CLOTH_BEND_STIFFNESS,
             spring_shear_stiffness=m.CLOTH_SHEAR_STIFFNESS,
@@ -109,6 +106,10 @@ class ClothPrim(GeomPrim):
 
         # Store the default position of the points in the local frame
         self._default_positions = np.array(self.get_attribute(attr="points"))
+
+    @classproperty
+    def cloth_system(cls):
+        return get_system("cloth")
 
     @property
     def n_particles(self):
@@ -194,11 +195,6 @@ class ClothPrim(GeomPrim):
             list of CsRawData: raw contact info for this cloth body
         """
         contacts = []
-
-        # Avoid circular import
-        from omnigibson.systems.system_base import get_system_from_element_name
-        cloth_system = get_system_from_element_name("Cloth")
-
         def report_hit(hit):
             contacts.append(CsRawData(
                 time=0.0,  # dummy value
@@ -212,7 +208,7 @@ class ClothPrim(GeomPrim):
             return True
 
         for pos in self.particle_positions:
-            get_physx_scene_query_interface().overlap_sphere(cloth_system.particle_contact_offset, pos, report_hit, False)
+            og.sim.psqi.overlap_sphere(ClothPrim.cloth_system.particle_contact_offset, pos, report_hit, False)
 
         return contacts
 

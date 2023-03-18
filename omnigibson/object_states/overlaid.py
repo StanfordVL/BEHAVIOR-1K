@@ -39,7 +39,7 @@ class Overlaid(KinematicsMixin, RelativeObjectState, BooleanState):
         if not (self.obj.prim_type == PrimType.CLOTH and other.prim_type == PrimType.RIGID):
             raise ValueError("Overlaid state requires obj1 is cloth and obj2 is rigid.")
 
-        state = self._simulator.dump_state(serialized=False)
+        state = og.sim.dump_state(serialized=False)
 
         # Get the top center of the object below
         aabb_low, aabb_hi = other.states[AABB].get_value()
@@ -63,11 +63,12 @@ class Overlaid(KinematicsMixin, RelativeObjectState, BooleanState):
                 og.sim.step_physics()
                 if len(self.obj.states[ContactBodies].get_value()) > 0:
                     break
+            self.obj.keep_still()
 
             if self.get_value(other) == new_value:
                 return True
             else:
-                self._simulator.load_state(state, serialized=False)
+                og.sim.load_state(state, serialized=False)
 
         return False
 

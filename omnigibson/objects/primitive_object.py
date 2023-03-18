@@ -3,6 +3,7 @@ from omnigibson.objects.stateful_object import StatefulObject
 from omnigibson.utils.python_utils import assert_valid_key
 
 from pxr import Gf, Vt, UsdPhysics, PhysxSchema
+import omnigibson as og
 from omnigibson.utils.constants import PrimType, PRIMITIVE_MESH_TYPES
 from omnigibson.utils.usd_utils import create_primitive_mesh
 from omnigibson.utils.render_utils import create_pbr_material
@@ -117,14 +118,13 @@ class PrimitiveObject(StatefulObject):
             **kwargs,
         )
 
-    def _load(self, simulator=None):
+    def _load(self):
         # Define an Xform at the specified path
-        stage = simulator.stage
-        prim = stage.DefinePrim(self._prim_path, "Xform")
+        prim = og.sim.stage.DefinePrim(self._prim_path, "Xform")
 
         if self._prim_type == PrimType.RIGID:
             # Define a nested mesh corresponding to the root link for this prim
-            base_link = stage.DefinePrim(f"{self._prim_path}/base_link", "Xform")
+            base_link = og.sim.stage.DefinePrim(f"{self._prim_path}/base_link", "Xform")
             self._vis_geom = create_primitive_mesh(prim_path=f"{self._prim_path}/base_link/visuals", primitive_type=self._primitive_type)
             self._col_geom = create_primitive_mesh(prim_path=f"{self._prim_path}/base_link/collisions", primitive_type=self._primitive_type)
 
@@ -145,7 +145,7 @@ class PrimitiveObject(StatefulObject):
             self._col_geom = None
 
         # Create a material for this object for the base link
-        stage.DefinePrim(f"{self._prim_path}/Looks", "Scope")
+        og.sim.stage.DefinePrim(f"{self._prim_path}/Looks", "Scope")
         mat_path = f"{self._prim_path}/Looks/default"
         mat = create_pbr_material(prim_path=mat_path)
         bind_material(prim_path=self._vis_geom.GetPrim().GetPrimPath().pathString, material_path=mat_path)

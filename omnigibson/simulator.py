@@ -172,7 +172,7 @@ class Simulator(SimulationContext, Serializable):
             viewport_name=viewport_name,
         )
         if not self._viewer_camera.loaded:
-            self._viewer_camera.load(simulator=self)
+            self._viewer_camera.load()
 
         # We update its clipping range and focal length so we get a good FOV and so that it doesn't clip
         # nearby objects (default min is 1 m)
@@ -308,7 +308,7 @@ class Simulator(SimulationContext, Serializable):
         self.clear()
 
         self._scene = scene
-        self._scene.load(self)
+        self._scene.load()
 
         # Make sure simulator is not running, then start it so that we can initialize the scene
         assert self.is_stopped(), "Simulator must be stopped after importing a scene!"
@@ -347,7 +347,7 @@ class Simulator(SimulationContext, Serializable):
         assert self.scene is not None, "import_object needs to be called after import_scene"
 
         # Load the object in omniverse by adding it to the scene
-        self.scene.add_object(obj, self, register=register, _is_call_from_simulator=True)
+        self.scene.add_object(obj, register=register, _is_call_from_simulator=True)
 
         # Lastly, additionally add this object automatically to be initialized as soon as another simulator step occurs
         # if requested
@@ -361,7 +361,7 @@ class Simulator(SimulationContext, Serializable):
         Args:
             obj (BaseObject): a non-robot object to load
         """
-        self._scene.remove_object(obj, simulator=self)
+        self._scene.remove_object(obj)
         self.app.update()
 
     def _non_physics_step(self):
@@ -373,7 +373,6 @@ class Simulator(SimulationContext, Serializable):
         if len(self._objects_to_initialize) > 0 and self.is_playing():
             for obj in self._objects_to_initialize:
                 obj.initialize()
-                self._scene.update_object_initial_state(obj)
             self._objects_to_initialize = []
 
         # Propagate states if the feature is enabled
@@ -492,13 +491,6 @@ class Simulator(SimulationContext, Serializable):
             if added_obj_attr.states is not None:
                 self._transition_object_init_states[new_obj] = added_obj_attr.states
 
-    def reset_scene(self):
-        """
-        Resets ths scene (if it exists) and its corresponding objects
-        """
-        if self.scene is not None and self.scene.initialized:
-            self.scene.reset()
-
     def play(self):
         if not self.is_playing():
             # Track whether we're starting the simulator fresh -- i.e.: whether we were stopped previously
@@ -522,10 +514,18 @@ class Simulator(SimulationContext, Serializable):
                     if obj.initialized:
                         obj.update_handles()
 
-            # If we were stopped, take an additional sim step to make sure simulator is functioning properly
-            # We need to do this because for some reason omniverse exhibits strange behavior if we do certain operations
-            # immediately after playing; e.g.: syncing USD poses when flatcache is enabled
+
             if was_stopped:
+                # We need to update controller mode because kp and kd were set to the original (incorrect) values when
+                # sim was stopped. We need to reset them to default_kp and default_kd defined in ControllableObject.
+                # We also need to take an additional sim step to make sure simulator is functioning properly.
+                # We need to do this because for some reason omniverse exhibits strange behavior if we do certain
+                # operations immediately after playing; e.g.: syncing USD poses when flatcache is enabled
+                if self.scene is not None and self.scene.initialized:
+                    for robot in self.scene.robots:
+                        if robot.initialized:
+                            robot.update_controller_mode()
+
                 self.step_physics()
 
             # Additionally run non physics things if we have a valid scene
@@ -639,10 +639,10 @@ class Simulator(SimulationContext, Serializable):
         # Infer what state we're currently in, then stop, yield, and then restore the original state
         sim_is_playing, sim_is_paused = self.is_playing(), self.is_paused()
         if sim_is_playing or sim_is_paused:
-            og.sim.stop()
+            self.stop()
         yield
-        if sim_is_playing: og.sim.play()
-        elif sim_is_paused: og.sim.pause()
+        if sim_is_playing: self.play()
+        elif sim_is_paused: self.pause()
 
     @contextlib.contextmanager
     def playing(self):
@@ -653,10 +653,10 @@ class Simulator(SimulationContext, Serializable):
         # Infer what state we're currently in, then stop, yield, and then restore the original state
         sim_is_stopped, sim_is_paused = self.is_stopped(), self.is_paused()
         if sim_is_stopped or sim_is_paused:
-            og.sim.play()
+            self.play()
         yield
-        if sim_is_stopped: og.sim.stop()
-        elif sim_is_paused: og.sim.pause()
+        if sim_is_stopped: self.stop()
+        elif sim_is_paused: self.pause()
 
     @contextlib.contextmanager
     def paused(self):
@@ -667,10 +667,10 @@ class Simulator(SimulationContext, Serializable):
         # Infer what state we're currently in, then stop, yield, and then restore the original state
         sim_is_stopped, sim_is_playing = self.is_stopped(), self.is_playing()
         if sim_is_stopped or sim_is_playing:
-            og.sim.pause()
+            self.pause()
         yield
-        if sim_is_stopped: og.sim.stop()
-        elif sim_is_playing: og.sim.play()
+        if sim_is_stopped: self.stop()
+        elif sim_is_playing: self.play()
 
     @contextlib.contextmanager
     def slowed(self, dt):

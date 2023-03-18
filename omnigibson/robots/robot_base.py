@@ -376,13 +376,13 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         # One final plot show so all the figures get rendered
         plt.show()
 
-    def remove(self, simulator=None):
+    def remove(self):
         # Remove all sensors
         for sensor in self._sensors.values():
-            sensor.remove(simulator=simulator)
+            sensor.remove()
 
         # Run super
-        super().remove(simulator=simulator)
+        super().remove()
 
     @property
     def sensors(self):

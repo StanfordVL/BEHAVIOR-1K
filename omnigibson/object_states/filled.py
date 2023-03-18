@@ -1,11 +1,10 @@
 import numpy as np
-from omnigibson.macros import gm, create_module_macros
+from omnigibson.macros import create_module_macros
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from omnigibson.object_states.object_state_base import RelativeObjectState, BooleanState
 from omnigibson.systems.micro_particle_system import PhysicalParticleSystem
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
 from omnigibson.utils.python_utils import classproperty
-from omnigibson.systems import get_system_from_element_name, get_element_name_from_system
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -80,35 +79,3 @@ class Filled(RelativeObjectState, BooleanState, LinkBasedStateMixin):
     @staticmethod
     def get_optional_dependencies():
         return []
-
-    @property
-    def state_size(self):
-        return len(PhysicalParticleSystem.get_systems())
-
-    def _dump_state(self):
-        # Store whether we're filled for each volume or not
-        state = dict()
-        for system in PhysicalParticleSystem.get_systems().values():
-            system_name = get_element_name_from_system(system)
-            state[system_name] = self.get_value(system)
-
-        return state
-
-    def _load_state(self, state):
-        # Check to see if the value is different from what we currently have
-        # This should always be the same, because our get_value() reads from the particle system, which should
-        # hav already updated / synchronized its state
-        for system_name, val in state.items():
-            assert val == self.get_value(get_system_from_element_name(system_name)), \
-            f"Expected state {self.__class__.__name__} to have synchronized values, but got current value: {self.get_value(get_system_from_element_name(system_name))} with desired value: {val}"
-
-    def _serialize(cls, state):
-        return np.array(list(state.values()), dtype=float)
-
-    def _deserialize(self, state):
-        state_dict = dict()
-        for i, system in enumerate(PhysicalParticleSystem.get_systems().values()):
-            system_name = get_element_name_from_system(system)
-            state_dict[system_name] = bool(state[i])
-
-        return state_dict, len(state_dict)

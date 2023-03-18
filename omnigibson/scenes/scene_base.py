@@ -11,6 +11,7 @@ from omnigibson.utils.python_utils import classproperty, Serializable, Registera
 from omnigibson.utils.registry_utils import SerializableRegistry
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.objects.object_base import BaseObject
+from omnigibson.systems import SYSTEM_REGISTRY
 from omnigibson.objects.light_object import LightObject
 from omnigibson.robots.robot_base import m as robot_macros
 from pxr import Sdf, Gf
@@ -88,8 +89,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
     def system_registry(self):
         """
         Returns:
-            SerializableRegistry: System registry containing all physical systems in the scene (e.g.: WaterSystem,
-                DustSystem, etc.)
+            SerializableRegistry: System registry containing all systems in the scene (e.g.: water, dust, etc.)
         """
         return self._registry(key="name", value="system_registry")
 
@@ -149,13 +149,10 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
     def initialized(self):
         return self._initialized
 
-    def _load(self, simulator):
+    def _load(self):
         """
         Load the scene into simulator
         The elements to load may include: floor, building, objects, etc.
-
-        Args:
-            simulator (Simulator): the simulator to load the scene into
         """
         # We just add a ground plane if requested
         if self._use_floor_plane:
@@ -174,7 +171,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             light_prim.GetAttribute("color").Set(Gf.Vec3f(1.07, 0.85, 0.61))
             light_prim.GetAttribute("texture:file").Set(Sdf.AssetPath(m.DEFAULT_SKYBOX_TEXTURE))
 
-    def _load_objects_from_scene_file(self, simulator):
+    def _load_objects_from_scene_file(self):
         """
         Loads scene objects based on metadata information found in the current USD stage's scene info
         (information stored in the world prim's CustomData)
@@ -194,7 +191,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             # Create object class instance
             obj = create_object_from_init_info(obj_info)
             # Import into the simulator
-            simulator.import_object(obj)
+            og.sim.import_object(obj)
             # Set the init pose accordingly
             obj.set_position_orientation(
                 position=init_state[obj_name]["root_link"]["pos"],
@@ -223,16 +220,13 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         """
         return True
 
-    def load(self, simulator):
+    def load(self):
         """
         Load the scene into simulator
         The elements to load may include: floor, building, objects, etc.
-
-        Args:
-            simulator (Simulator): the simulator to load the scene into
         """
         # Make sure simulator is stopped
-        assert simulator.is_stopped(), "Simulator should be stopped when loading this scene!"
+        assert og.sim.is_stopped(), "Simulator should be stopped when loading this scene!"
 
         # Do not override this function. Override _load instead.
         if self._loaded:
@@ -242,26 +236,19 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         self._registry = self._create_registry()
 
         # Store world prim and load the scene into the simulator
-        self._world_prim = simulator.world_prim
-        self._load(simulator)
-
-        # Initialize systems
-        self.initialize_systems(simulator)
+        self._world_prim = og.sim.world_prim
+        self._load()
 
         # If we have any scene file specified, use it to load the objects within it and also update the initial state
         if self.scene_file is not None:
-            self._load_objects_from_scene_file(simulator)
+            self._load_objects_from_scene_file()
 
         # We're now loaded
         self._loaded = True
 
         # Always stop the sim if we started it internally
-        if not simulator.is_stopped():
-            simulator.stop()
-
-    def initialize_systems(self, simulator):
-        for system in self.systems:
-            system.initialize(simulator=simulator)
+        if not og.sim.is_stopped():
+            og.sim.stop()
 
     def clear_systems(self):
         # Clears systems so they can be re-initialized
@@ -321,10 +308,8 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             class_types=SerializableRegistry,
         )
 
-        # Avoid circular imports
-        from omnigibson.systems.system_base import refresh_systems_registry
         # Add registry for systems -- this is already created externally, so we just update it and pull it directly
-        registry.add(obj=refresh_systems_registry())
+        registry.add(obj=SYSTEM_REGISTRY)
 
         # Add registry for objects
         registry.add(obj=SerializableRegistry(
@@ -388,7 +373,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         """
         pass
 
-    def add_object(self, obj, simulator, register=True, _is_call_from_simulator=False):
+    def add_object(self, obj, register=True, _is_call_from_simulator=False):
         """
         Add an object to the scene, loading it if the scene is already loaded.
 
@@ -397,7 +382,6 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
         Args:
             obj (BaseObject): the object to load
-            simulator (Simulator): the simulator to add the object to
             register (bool): whether to track this object internally in the scene registry
             _is_call_from_simulator (bool): whether the caller is the simulator. This should
             **not** be set by any callers that are not the Simulator class
@@ -411,7 +395,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
         # If the scene is already loaded, we need to load this object separately. Otherwise, don't do anything now,
         # let scene._load() load the object when called later on.
-        prim = obj.load(simulator)
+        prim = obj.load()
 
         # Add this object to our registry based on its type, if we want to register it
         if register:
@@ -422,19 +406,18 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
 
         return prim
 
-    def remove_object(self, obj, simulator):
+    def remove_object(self, obj):
         """
         Method to remove an object from the simulator
 
         Args:
             obj (BaseObject): Object to remove
-            simulator (Simulator): current simulation context
         """
         # Remove from the appropriate registry
         self.object_registry.remove(obj)
 
         # Remove from omni stage
-        obj.remove(simulator=simulator)
+        obj.remove()
 
     def reset(self):
         """
@@ -443,18 +426,10 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # Make sure the simulator is playing
         assert og.sim.is_playing(), "Simulator must be playing in order to reset the scene!"
 
-        # Reset all systems
-        for system in self.systems:
-            system.reset()
-
-        # Reset all object and robot states
-        for robot in self.robots:
-            robot.reset()
-
-        # Reset the pose and joint configuration of all scene objects.
-        if self._initial_state is not None:
-            self.load_state(self._initial_state)
-            og.app.update()
+        # Reset the states of all objects (including robots), including (non-)kinematic states and internal variables.
+        assert self._initial_state is not None
+        self.load_state(self._initial_state)
+        og.sim.step()
 
     @property
     def n_floors(self):
@@ -586,18 +561,6 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         Updates the initial state for this scene (which the scene will get reset to upon calling reset())
         """
         self._initial_state = self.dump_state(serialized=False)
-
-    def update_object_initial_state(self, obj):
-        """
-        Updates the initial state for the object specified by @obj (which the scene will get reset
-            to upon calling reset())
-
-        Args:
-            obj (BaseObject): Object whose initial state should be updated
-        """
-        # Only update if we already have a pre-existing initial state
-        if self._initial_state is not None:
-            self._initial_state["object_registry"][obj.name] = obj.dump_state(serialized=False)
 
     def update_objects_info(self):
         """

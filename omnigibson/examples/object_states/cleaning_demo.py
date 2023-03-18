@@ -3,7 +3,7 @@ import numpy as np
 import omnigibson as og
 from omnigibson import object_states
 from omnigibson.macros import gm
-from omnigibson.systems import DustSystem, StainSystem, WaterSystem
+from omnigibson.systems import get_system
 from omnigibson.utils.constants import ParticleModifyMethod
 
 # Make sure object states are enabled and GPU dynamics are used
@@ -22,7 +22,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     # Create the scene config to load -- Rs_int with only a few object categories loaded, as
     # well as a custom block object that will be used as a cleaning tool
     def check_water_saturation(obj):
-        return obj.states[object_states.Saturated].get_value(WaterSystem)
+        return obj.states[object_states.Saturated].get_value(get_system("water"))
 
     cfg = {
         "scene": {
@@ -49,9 +49,9 @@ def main(random_selection=False, headless=False, short_exec=False):
                             # where True means the condition is satisfied
                             # In this case, we only allow our cleaning tool to remove stains and dust particles if
                             # the object is saturated with water, i.e.: it's "soaked" with water particles
-                            StainSystem: [check_water_saturation],
-                            DustSystem: [check_water_saturation],
-                            WaterSystem: [],
+                            "stain": [check_water_saturation],
+                            "dust": [],
+                            "water": [],
                         },
                     },
                 },
@@ -70,11 +70,11 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     for obj in dusty_objects:
         og.log.info(f"Setting object {obj.name} to be Dusty")
-        obj.states[object_states.Covered].set_value(DustSystem, True)
+        obj.states[object_states.Covered].set_value(get_system("dust"), True)
 
     for obj in stained_objects:
         og.log.info(f"Setting object {obj.name} to be Stained")
-        obj.states[object_states.Covered].set_value(StainSystem, True)
+        obj.states[object_states.Covered].set_value(get_system("stain"), True)
 
     for obj in water_source_objects:
         if object_states.ToggledOn in obj.states:

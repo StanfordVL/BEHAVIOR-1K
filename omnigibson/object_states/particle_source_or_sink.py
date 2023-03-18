@@ -80,20 +80,12 @@ class ParticleSource(ParticleApplier):
 
     def _get_max_particles_limit_per_step(self, system):
         # Check the system
-        if issubclass(system, PhysicalParticleSystem):
-            val = m.MAX_SOURCE_PARTICLES_PER_STEP
-        else:
-            # Invalid system queried
-            self.unsupported_system_error(system=system)
-        return val
+        assert issubclass(system, PhysicalParticleSystem), "ParticleSource only supports PhysicalParticleSystem"
+        return m.MAX_SOURCE_PARTICLES_PER_STEP
 
     @classproperty
     def metalink_prefix(cls):
         return m.SOURCE_LINK_PREFIX
-
-    @classproperty
-    def supported_systems(self):
-        return list(PhysicalParticleSystem.get_systems().values())
 
     @property
     def n_steps_per_modification(self):
@@ -151,20 +143,12 @@ class ParticleSink(ParticleRemover):
 
     def _get_max_particles_limit_per_step(self, system):
         # Check the system
-        if issubclass(system, PhysicalParticleSystem):
-            val = m.MAX_PHYSICAL_PARTICLES_SOURCED_PER_STEP
-        else:
-            # Invalid system queried
-            self.unsupported_system_error(system=system)
-        return val
+        assert issubclass(system, PhysicalParticleSystem), "ParticleSink only supports PhysicalParticleSystem"
+        return m.MAX_PHYSICAL_PARTICLES_SOURCED_PER_STEP
 
     @classproperty
     def metalink_prefix(cls):
         return m.SINK_LINK_PREFIX
-
-    @classproperty
-    def supported_systems(self):
-        return list(PhysicalParticleSystem.get_systems().values())
 
     @property
     def n_steps_per_modification(self):

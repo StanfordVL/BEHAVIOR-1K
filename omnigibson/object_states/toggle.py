@@ -1,5 +1,6 @@
 import numpy as np
 
+import omnigibson as og
 from omnigibson.macros import create_module_macros
 from omnigibson.prims.geom_prim import VisualGeomPrim
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
@@ -60,7 +61,7 @@ class ToggledOn(AbsoluteObjectState, BooleanState, LinkBasedStateMixin, UpdateSt
     def _update(self):
         robot_can_toggle = False
         # detect marker and hand interaction
-        for robot in self._simulator.scene.robots:
+        for robot in og.sim.scene.robots:
             robot_can_toggle = robot.can_toggle(self.link.get_position(), m.TOGGLE_DISTANCE_THRESHOLD)
             if robot_can_toggle:
                 break

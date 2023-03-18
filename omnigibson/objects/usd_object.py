@@ -77,7 +77,7 @@ class USDObject(StatefulObject):
             **kwargs,
         )
 
-    def _load(self, simulator=None):
+    def _load(self):
         """
         Load the object into pybullet and set it to the correct pose
         """

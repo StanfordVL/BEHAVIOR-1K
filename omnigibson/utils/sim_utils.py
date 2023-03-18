@@ -306,13 +306,7 @@ def test_valid_pose(obj, pos, quat=None, z_offset=None):
 
     # Set the pose of the object
     place_base_pose(obj, pos, quat, z_offset)
-
-    # If we're placing a robot, make sure it's reset and not moving
-    # Run import here to avoid circular imports
-    from omnigibson.robots.robot_base import BaseRobot
-    if isinstance(obj, BaseRobot):
-        obj.reset()
-        obj.keep_still()
+    obj.keep_still()
 
     # Check whether we're in collision after taking a single physics step
     in_collision = check_collision(prims=obj, step_physics=True)
@@ -341,14 +335,7 @@ def land_object(obj, pos, quat=None, z_offset=None):
     # Set the object's pose
     quat = T.euler2quat([0, 0, np.random.uniform(0, np.pi * 2)]) if quat is None else quat
     place_base_pose(obj, pos, quat, z_offset)
-
-    # If we're placing a robot, make sure it's reset and not moving
-    # Run import here to avoid circular imports
-    from omnigibson.robots.robot_base import BaseRobot
-    is_robot = isinstance(obj, BaseRobot)
-    if is_robot:
-        obj.reset()
-        obj.keep_still()
+    obj.keep_still()
 
     # Check to make sure we landed successfully
     # land for maximum 1 second, should fall down ~5 meters
@@ -367,7 +354,4 @@ def land_object(obj, pos, quat=None, z_offset=None):
     if not land_success:
         log.warning(f"Object {obj.name} failed to land.")
 
-    # Make sure object isn't moving at the end if we're a robot
-    if is_robot:
-        obj.reset()
-        obj.keep_still()
+    obj.keep_still()

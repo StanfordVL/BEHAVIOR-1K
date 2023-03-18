@@ -81,7 +81,7 @@ class EntityPrim(XFormPrim):
         # Update joint information
         self.update_joints()
 
-    def _load(self, simulator=None):
+    def _load(self):
         # By default, this prim cannot be instantiated from scratch!
         raise NotImplementedError("By default, an entity prim cannot be created from scratch.")
 

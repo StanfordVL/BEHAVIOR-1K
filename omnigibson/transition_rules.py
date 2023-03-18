@@ -1,7 +1,7 @@
 from abc import ABCMeta, abstractmethod
 from collections import namedtuple
 import omnigibson as og
-from omnigibson.systems import *
+from omnigibson.systems import get_system, is_system_active
 from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.object_states import *
 import omnigibson.utils.transform_utils as T
@@ -358,8 +358,8 @@ class DicingRule(BaseTransitionRule):
 
         slicer_obj, diced_obj = individual_objects["slicer"], individual_objects["diceable"]
 
-        from omnigibson.systems.system_base import get_system_from_element_name
-        system = get_system_from_element_name("DicedApple")
+        system_name = f"diced_{diced_obj.category}"
+        system = get_system(system_name)
         system.generate_particles_from_link(diced_obj, diced_obj.root_link, use_visual_meshes=False)
 
         # Delete original object from stage.
@@ -547,9 +547,9 @@ class BlenderRule(BaseTransitionRule):
         Transition rule to apply when objects are blended together
 
         Args:
-            output_system (PhysicalParticleSystem): Fluid to generate once all the input ingredients are blended
-            particle_requirements (None or dict): If specified, should map fluid system to the minimum number of fluid
-                particles required in order to successfully blend
+            output_system (str): Name of the physical particle to generate once all the input ingredients are blended
+            particle_requirements (None or dict): If specified, should map physical particle system name to the minimum
+                number of physical particles required in order to successfully blend
             obj_requirements (None or dict): If specified, should map object category names to minimum number of that
                 type of object rqeuired in order to successfully blend
         """
@@ -588,15 +588,18 @@ class BlenderRule(BaseTransitionRule):
             # We mutate the group_objects in place so that we only keep the ones inside the blender
             group_objects[obj_category] = inside_objs
 
-        # Check whether we have sufficient fluids as well
-        for system, n_min_particles in self.particle_requirements.items():
-            if len(system.particle_instancers) > 0:
-                particle_positions = np.concatenate([inst.particle_positions for inst in system.particle_instancers.values()], axis=0)
-                n_particles_in_volume = np.sum(self._check_in_volume[blender.name](particle_positions))
-                if n_particles_in_volume < n_min_particles:
-                    return False
-            else:
-                # Fluid doesn't even exist yet, so we know the condition is not met
+        # Check whether we have sufficient physical particles as well
+        for system_name, n_min_particles in self.particle_requirements.items():
+            if not is_system_active(system_name):
+                return False
+
+            system = get_system(system_name)
+            if system.n_particles == 0:
+                return False
+
+            particle_positions = np.concatenate([inst.particle_positions for inst in system.particle_instancers.values()], axis=0)
+            n_particles_in_volume = np.sum(self._check_in_volume[blender.name](particle_positions))
+            if n_particles_in_volume < n_min_particles:
                 return False
 
         # Our condition is whether we have sufficient ingredients or not
@@ -610,15 +613,16 @@ class BlenderRule(BaseTransitionRule):
             for j, obj in enumerate(objs):
                 t_results.remove.append(obj)
 
-        # Hide all fluid particles that are inside the blender
-        for system in self.particle_requirements.keys():
+        # Remove all physical particles that are inside the blender
+        for system_name in self.particle_requirements.keys():
+            system = get_system(system_name)
             # No need to check for whether particle instancers exist because they must due to @self.condition passing!
             for inst in system.particle_instancers.values():
                 indices = self._check_in_volume[blender.name](inst.particle_positions).nonzero()[0]
                 inst.remove_particles(idxs=indices)
 
-        # Spawn in blended fluid!
-        blender.states[Filled].set_value(self.output_system, True)
+        # Spawn in blended physical particles!
+        blender.states[Filled].set_value(get_system(self.output_system), True)
 
         return t_results
 
@@ -641,8 +645,8 @@ DEFAULT_RULES = (
     DicingRule(),
     # Strawberry smoothie
     BlenderRule(
-        output_system=StrawberrySmoothieSystem,
-        particle_requirements={MilkSystem: 10},
+        output_system="strawberry_smoothie",
+        particle_requirements={"milk": 10},
         obj_requirements={"strawberry": 5, "ice_cube": 5},
     ),
 )

@@ -223,6 +223,7 @@ def sample_kinematics(
             objA.keep_still()
 
             og.sim.step_physics()
+            objA.keep_still()
             success = len(objA.states[ContactBodies].get_value()) == 0
 
         if og.debug_sampling:
@@ -242,6 +243,8 @@ def sample_kinematics(
             og.sim.step_physics()
             if len(objA.states[ContactBodies].get_value()) > 0:
                 break
+
+        objA.keep_still()
 
         # Render at the end
         og.sim.render()

@@ -3,6 +3,7 @@ from copy import deepcopy
 import numpy as np
 import gym
 from collections import Iterable
+import omnigibson as og
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.controllers import create_controller
 from omnigibson.controllers.controller_base import ControlType
@@ -132,12 +133,12 @@ class ControllableObject(BaseObject):
         self.reset()
         self.keep_still()
 
-    def load(self, simulator=None):
+    def load(self):
         # Run super first
-        prim = super().load(simulator=simulator)
+        prim = super().load()
 
         # Set the control frequency if one was not provided.
-        expected_control_freq = 1.0 / simulator.get_rendering_dt()
+        expected_control_freq = 1.0 / og.sim.get_rendering_dt()
         if self._control_freq is None:
             log.info(
                 "Control frequency is None - being set to default of 1 / render_timestep: %.4f", expected_control_freq
@@ -178,9 +179,9 @@ class ControllableObject(BaseObject):
             for idx in controller.dof_idx:
                 assert self._joints[self.dof_names_ordered[idx]].driven, "Controllers should only control driveable joints!"
 
-        self._update_controller_mode()
+        self.update_controller_mode()
 
-    def _update_controller_mode(self):
+    def update_controller_mode(self):
         """
         Helper function to force the joints to use the internal specified control mode and gains
         """
@@ -243,15 +244,11 @@ class ControllableObject(BaseObject):
     def reset(self):
         # Make sure simulation is playing, otherwise, we cannot reset because DC requires active running
         # simulation in order to set joints
-        assert self._simulator.is_playing(), "Simulator must be playing in order to reset controllable object's joints!"
+        assert og.sim.is_playing(), "Simulator must be playing in order to reset controllable object's joints!"
 
         # Additionally set the joint states based on the reset values
         self.set_joint_positions(positions=self._reset_joint_pos, drive=False)
         self.set_joint_velocities(velocities=np.zeros(self.n_dof), drive=False)
-
-        # Update the control modes of each joint based on the outputted control from the controllers
-        # Omni resets them after every reset
-        self._update_controller_mode()
 
         # Reset all controllers
         for controller in self._controllers.values():

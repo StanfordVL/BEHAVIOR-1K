@@ -1,12 +1,9 @@
 import numpy as np
-import omnigibson as og
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.heat_source_or_sink import HeatSourceOrSink
-from omnigibson.object_states.inside import Inside
 from omnigibson.object_states.object_state_base import AbsoluteObjectState
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.update_state_mixin import UpdateStateMixin
-import omnigibson.utils.transform_utils as T
 import omnigibson as og
 
 
@@ -70,7 +67,7 @@ class Temperature(AbsoluteObjectState, UpdateStateMixin):
         # Apply temperature decay if not affected by any heat source.
         if not affected_by_heat_source:
             new_temperature += (
-                (m.DEFAULT_TEMPERATURE - self.value) * m.TEMPERATURE_DECAY_SPEED * self._simulator.get_rendering_dt()
+                (m.DEFAULT_TEMPERATURE - self.value) * m.TEMPERATURE_DECAY_SPEED * og.sim.get_rendering_dt()
             )
 
         self.value = new_temperature

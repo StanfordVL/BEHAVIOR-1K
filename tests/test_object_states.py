@@ -313,7 +313,6 @@ def test_adjacency():
         bottom_cabinet.states[HorizontalAdjacency].set_value(None)
         bottom_cabinet.states[VerticalAdjacency].set_value(None)
 
-
 @og_test
 def test_temperature():
     microwave = og.sim.scene.object_registry("name", "microwave")
@@ -323,7 +322,7 @@ def test_temperature():
     bagel = og.sim.scene.object_registry("name", "bagel")
     dishtowel = og.sim.scene.object_registry("name", "cookable_dishtowel")
 
-    microwave.set_position_orientation([0., 0., 0.17], [0, 0, 0, 1])
+    microwave.set_position_orientation([0., 0., 0.15], [0, 0, 0, 1])
     stove.set_position_orientation([1, 0., 0.45], [0, 0, 0, 1])
     fridge.set_position_orientation([2, 0., 0.98], [0, 0, 0, 1])
     plywood.set_position_orientation([3, 0, 0.05], [0, 0, 0, 1])
@@ -390,8 +389,8 @@ def test_temperature():
     assert dishtowel.states[Temperature].get_value() == m.object_states.temperature.DEFAULT_TEMPERATURE
 
     # Set the objects to be on top of the stove
-    bagel.set_position_orientation([1.3, -0.1, 0.88], [0, 0, 0, 1])
-    dishtowel.set_position_orientation([1.12, -0.1, 0.88], [0, 0, 0, 1])
+    bagel.set_position_orientation([0.71, 0.11, 0.88], [0, 0, 0, 1])
+    dishtowel.set_position_orientation([0.82, 0.11, 0.88], [0, 0, 0, 1])
 
     for _ in range(5):
         og.sim.step()
@@ -660,12 +659,18 @@ def test_toggled_on():
     robot = og.sim.scene.object_registry("name", "robot0")
 
     stove.set_position_orientation([1.5, 0.3, 0.45], T.euler2quat([0, 0, -np.pi / 2.0]))
-    robot.set_position_orientation([0.01, -0.02, 0], [0, 0, 0, 1])
+    robot.set_position_orientation([0.01, 0.38, 0], [0, 0, 0, 1])
 
     assert not stove.states[ToggledOn].get_value()
 
-    robot.joints["shoulder_lift_joint"].set_pos(np.pi / 36)
+    robot.joints["torso_lift_joint"].set_pos(0.0)
     robot.joints["shoulder_pan_joint"].set_pos(np.pi / 2)
+    robot.joints["shoulder_lift_joint"].set_pos(np.pi / 36)
+    robot.joints["upperarm_roll_joint"].set_pos(0.0)
+    robot.joints["elbow_flex_joint"].set_pos(0.0)
+    robot.joints["forearm_roll_joint"].set_pos(0.0)
+    robot.joints["wrist_flex_joint"].set_pos(0.0)
+    robot.joints["wrist_roll_joint"].set_pos(0.0)
 
     steps = m.object_states.toggle.CAN_TOGGLE_STEPS
     for _ in range(steps):

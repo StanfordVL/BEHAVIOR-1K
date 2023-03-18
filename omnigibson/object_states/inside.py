@@ -1,6 +1,6 @@
 from IPython import embed
 
-import omnigibson
+import omnigibson as og
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.adjacency import HorizontalAdjacency, VerticalAdjacency, flatten_planes
 from omnigibson.object_states.kinematics import KinematicsMixin
@@ -18,13 +18,13 @@ class Inside(KinematicsMixin, RelativeObjectState, BooleanState):
         if not new_value:
             raise NotImplementedError("Inside does not support set_value(False)")
 
-        state = self._simulator.dump_state(serialized=False)
+        state = og.sim.dump_state(serialized=False)
 
         for _ in range(10):
             if sample_kinematics("inside", self.obj, other) and self.get_value(other):
                 return True
             else:
-                self._simulator.load_state(state, serialized=False)
+                og.sim.load_state(state, serialized=False)
 
         return False
 

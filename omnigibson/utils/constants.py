@@ -172,9 +172,9 @@ if os.path.isfile(non_sampleable_category_txt):
 MACRO_PARTICLE_SYNSETS = {"stain.n.01", "dust.n.01"}
 WATER_SYNSETS = {"water.n.06"}
 SYSTEM_SYNSETS_TO_SYSTEM_NAMES = {
-    "water.n.06": "Water",
-    "stain.n.01": "Stain",
-    "dust.n.01": "Dust",
+    "water.n.06": "water",
+    "stain.n.01": "stain",
+    "dust.n.01": "dust",
 }
 
 MAX_TASK_RELEVANT_OBJS = 50

@@ -160,7 +160,7 @@ class Attached(RelativeObjectState, BooleanState, ContactSubscribedStateMixin):
         Removes the attachment joint
         """
         attached_joint_path = f"{self.attached_obj.prim_path}/attachment_joint"
-        self._simulator.stage.RemovePrim(attached_joint_path)
+        og.sim.stage.RemovePrim(attached_joint_path)
         self.attached_obj = None
 
     @property
@@ -176,7 +176,11 @@ class Attached(RelativeObjectState, BooleanState, ContactSubscribedStateMixin):
 
     def _load_state(self, state):
         uuid = state["attached_obj_uuid"]
-        attached_obj = None if uuid == -1 else og.sim.scene.object_registry("uuid", uuid)
+        if uuid == -1:
+            attached_obj = None
+        else:
+            attached_obj = og.sim.scene.object_registry("uuid", uuid)
+            assert attached_obj is not None, "attached_obj_uuid does not match any object in the scene."
 
         if self.attached_obj != attached_obj:
             # If it's currently attached to something, detach.

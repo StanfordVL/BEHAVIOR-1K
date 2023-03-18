@@ -112,7 +112,7 @@ class ScanSensor(BaseSensor):
             load_config=load_config,
         )
 
-    def _load(self, simulator=None):
+    def _load(self):
         # Define a LIDAR prim at the current stage
         result, lidar = execute("RangeSensorCreateLidar", path=self._prim_path)
 

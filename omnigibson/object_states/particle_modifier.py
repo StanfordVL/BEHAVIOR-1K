@@ -12,9 +12,9 @@ from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from omnigibson.object_states.object_state_base import AbsoluteObjectState
 from omnigibson.object_states.toggle import ToggledOn
 from omnigibson.object_states.update_state_mixin import UpdateStateMixin
-from omnigibson.systems.system_base import get_element_name_from_system
 from omnigibson.systems.macro_particle_system import VisualParticleSystem
 from omnigibson.systems.micro_particle_system import PhysicalParticleSystem
+from omnigibson.systems import get_system, is_visual_particle_system, is_physical_particle_system, is_system_active
 from omnigibson.utils.constants import ParticleModifyMethod, PrimType
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function, get_particle_positions_from_frame
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
@@ -22,7 +22,6 @@ from omnigibson.utils.deprecated_utils import Core
 from omnigibson.utils.usd_utils import create_primitive_mesh, FlatcacheAPI
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object
-from omni.physx import get_physx_scene_query_interface as psqi
 from omni.isaac.core.utils.prims import get_prim_at_path, delete_prim, move_prim, is_prim_path_valid
 from pxr import PhysicsSchemaTools, UsdGeom, Gf, Sdf
 
@@ -161,12 +160,11 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
 
     Args:
         obj (StatefulObject): Object to which this state will be applied
-        method (ParticleModifyMethod): Method to modify particles. Current options supported are:
-            ADJACENCY (i.e.: "touching" particles)
-            PROJECTION (i.e.: "spraying" particles)
-        conditions (dict): Dictionary mapping ParticleSystem to None or corresponding condition / list of conditions
-            (where None represents no conditions) necessary in order for this particle modifier to be able to
-            modify particles belonging to @ParticleSystem. Each condition should be a function, whose signature
+        method (ParticleModifyMethod): Method to modify particles. Current options supported are ADJACENCY (i.e.:
+            "touching" particles) or PROJECTION (i.e.: "spraying" particles)
+        conditions (dict): Dictionary mapping the names of ParticleSystem (str) to None or the corresponding condition /
+            list of conditions (where None represents no conditions) necessary in order for this particle modifier to be
+            able to modify particles belonging to @ParticleSystem. Each condition should be a function, whose signature
             is as follows:
 
                 def condition(obj) --> bool
@@ -200,19 +198,19 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
         self._current_step = None
         self._projection_mesh_params = projection_mesh_params
 
-        # Map of system to number of modified particles for this object corresponding to the specific system
-        self.modified_particle_count = dict([(system, 0) for system in self.supported_systems])
+        # Map of system to number of modified particles (only include systems specified in the conditions)
+        self.modified_particle_count = dict([(system_name, 0) for system_name in self.conditions])
 
         # Standardize the conditions (make sure every system has at least one condition, which to make sure
         # the particle modifier isn't already limited with the specific number of particles)
-        for system, conds in conditions.items():
+        for system_name, conds in conditions.items():
             # Make sure the system is supported
-            assert_valid_key(key=system, valid_keys=self.supported_systems, name="particle system")
+            assert is_visual_particle_system(system_name) or is_physical_particle_system(system_name), f"Unsupported system for ParticleModifier {system_name}"
             # Make sure conds isn't empty and is a list
             conds = [] if conds is None else list(conds)
             # Add the condition to avoid limits
-            conds.append(self._generate_limit_condition(system=system))
-            conditions[system] = conds
+            conds.append(self._generate_limit_condition(system_name))
+            conditions[system_name] = conds
 
         # Run super method
         super().__init__(obj)
@@ -278,35 +276,6 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
                 orientation=T.euler2quat([0, -np.pi / 2, 0]),
             )
 
-            # Generate the projection visualization
-            system = list(self.conditions.keys())[0]    # Only one system should be included for a ParticleApplier!
-            particle_radius = m.VISUAL_PARTICLE_PROJECTION_PARTICLE_RADIUS if issubclass(system, VisualParticleSystem) else system.particle_radius
-            particle_material = system.particle_object.material if issubclass(system, VisualParticleSystem) else system.material
-
-            # Create the projection visualization if it doesn't already exist, otherwise we reference it directly
-            projection_name = f"{name_prefix}_projection_visualization"
-            projection_path = f"/OmniGraph/{projection_name}"
-            projection_visualization_path = f"{self.link.prim_path}/projection_visualization"
-            if is_prim_path_valid(projection_path):
-                self.projection_system = get_prim_at_path(projection_path)
-                self.projection_emitter = get_prim_at_path(f"{projection_path}/emitter")
-            else:
-                self.projection_system, self.projection_emitter = create_projection_visualization(
-                    prim_path=projection_visualization_path,
-                    shape=self._projection_mesh_params["type"],
-                    projection_name=projection_name,
-                    projection_radius=radius,
-                    projection_height=height,
-                    particle_radius=particle_radius,
-                    material=particle_material,
-                    visualize=self._projection_mesh_params["visualize"],
-                )
-
-            # Create the visual geom instance referencing the generated source mesh prim, and then hide it
-            self.projection_source_sphere = VisualGeomPrim(prim_path=projection_visualization_path, name=f"{name_prefix}_projection_source_sphere")
-            self.projection_source_sphere.initialize()
-            self.projection_source_sphere.visible = False
-
             # Generate the function for checking whether points are within the projection mesh
             self._check_in_mesh, _ = generate_points_in_volume_checker_function(
                 obj=self.obj,
@@ -321,7 +290,7 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
             def check_overlap():
                 nonlocal valid_hit
                 valid_hit = False
-                psqi().overlap_shape(*projection_mesh_ids, reportFn=overlap_callback)
+                og.sim.psqi.overlap_shape(*projection_mesh_ids, reportFn=overlap_callback)
                 return valid_hit
 
         elif self.method == ParticleModifyMethod.ADJACENCY:
@@ -340,7 +309,7 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
                 nonlocal valid_hit
                 valid_hit = False
                 aabb = self.link.aabb
-                psqi().overlap_box(
+                og.sim.psqi.overlap_box(
                     halfExtent=(aabb[1] - aabb[0]) / 2.0 + m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN,
                     pos=(aabb[1] + aabb[0]) / 2.0,
                     rot=np.array([0, 0, 0, 1.0]),
@@ -372,25 +341,24 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
         """
         raise NotImplementedError()
 
-    def _generate_limit_condition(self, system):
+    def _generate_limit_condition(self, system_name):
         """
-        Generates a limit function condition for specific system @system
+        Generates a limit function condition for specific system of name @system_name
 
         Args:
-             system (ParticleSystem): Particle system for which to generate a limit checker function
+             system_name (str): Name of the particle system for which to generate a limit checker function
 
         Returns:
             function: Limit checker function, with signature condition(obj) --> bool, where @obj is the specific object
                 that this ParticleModifier state belongs to
         """
-        if issubclass(system, VisualParticleSystem):
+        assert system_name in self.conditions, f"System {system_name} is not defined in the conditions."
+        if is_visual_particle_system(system_name):
             def condition(obj):
-                return self.modified_particle_count[system] < self.visual_particle_modification_limit
-        elif issubclass(system, PhysicalParticleSystem):
+                return self.modified_particle_count[system_name] < self.visual_particle_modification_limit
+        elif is_physical_particle_system(system_name):
             def condition(obj):
-                return self.modified_particle_count[system] < self.physical_particle_modification_limit
-        else:
-            self.unsupported_system_error(system=system)
+                return self.modified_particle_count[system_name] < self.physical_particle_modification_limit
 
         return condition
 
@@ -403,13 +371,16 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
         # Check if there's any overlap and if we're at the correct step
         if self._current_step == 0 and self._check_overlap():
             # Iterate over all owned systems for this particle modifier
-            for system, conditions in self.conditions.items():
-                # Check if all conditions are met
-                if np.all([condition(self.obj) for condition in conditions]):
-                    # Sanity check for oversaturation
-                    self.check_at_limit(system=system, verify_not_over_limit=True)
-                    # Potentially modify particles within the volume
-                    self._modify_particles(system=system)
+            for system_name, conditions in self.conditions.items():
+                # Check if the system is active (for ParticleApplier, the system is always active)
+                if is_system_active(system_name):
+                    # Check if all conditions are met
+                    if np.all([condition(self.obj) for condition in conditions]):
+                        system = get_system(system_name)
+                        # Sanity check for oversaturation
+                        self.check_at_limit(system=system, verify_not_over_limit=True)
+                        # Potentially modify particles within the volume
+                        self._modify_particles(system=system)
 
         # Update the current step
         self._current_step = (self._current_step + 1) % self.n_steps_per_modification
@@ -446,20 +417,19 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
         Returns:
             bool: True if the object has reached its limit with objects from @system, otherwise False
         """
+        assert system.name in self.conditions, f"System {system.name} is not defined in the conditions."
         if issubclass(system, VisualParticleSystem):
             limit = self.visual_particle_modification_limit
         elif issubclass(system, PhysicalParticleSystem):
             limit = self.physical_particle_modification_limit
-        else:
-            self.unsupported_system_error(system=system)
 
         # If requested, run sanity check to make sure we're not over the limit with this system's particles
         if verify_not_over_limit:
-            assert self.modified_particle_count[system] <= limit, \
+            assert self.modified_particle_count[system.name] <= limit, \
                 f"{self.__class__.__name__} should not be over the limit! " \
-                f"Max: {limit}, got: {self.modified_particle_count[system]}"
+                f"Max: {limit}, got: {self.modified_particle_count[system.name]}"
 
-        return self.modified_particle_count[system] == limit
+        return self.modified_particle_count[system.name] == limit
 
     def set_at_limit(self, system, value):
         """
@@ -469,34 +439,22 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
             system (ParticleSystem): System to set corresponding absorbed particle count limit level for
             value (bool): Whether to set the particle limit level to be at its limit or not
         """
+        assert system.name in self.conditions, f"System {system.name} is not defined in the conditions."
         n_particles = 0
         if value:
             if issubclass(system, VisualParticleSystem):
                 n_particles = self.visual_particle_modification_limit
             elif issubclass(system, PhysicalParticleSystem):
                 n_particles = self.physical_particle_modification_limit
-            else:
-                self.unsupported_system_error(system=system)
-        self.modified_particle_count[system] = n_particles
-
-    @classmethod
-    def unsupported_system_error(cls, system):
-        """
-        Raises a ValueError given unsupported system @system
-
-        Args:
-            system (ParticleSystem): Any unsupported system (any system that does not exist in @self.supported_systems)
-        """
-        raise ValueError(f"Invalid system for {cls.__name__}! Supported systems: "
-                         f"{[sys.name for sys in cls.supported_systems]}, got: {system.name}")
+        self.modified_particle_count[system.name] = n_particles
 
     @classproperty
-    def supported_systems(self):
+    def supported_active_systems(cls):
         """
         Returns:
-            list: All systems used in this state, ordered deterministically
+            list: All systems used in this state that are active, dynamic across time
         """
-        return list(VisualParticleSystem.get_systems().values()) + list(PhysicalParticleSystem.get_systems().values())
+        return list(VisualParticleSystem.get_active_systems().values()) + list(PhysicalParticleSystem.get_active_systems().values())
 
     @property
     def n_steps_per_modification(self):
@@ -528,27 +486,28 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
         return len(self.modified_particle_count) + 1
 
     def _dump_state(self):
-        state = dict()
-        for system, val in self.modified_particle_count.items():
-            state[get_element_name_from_system(system)] = val
-        # Add current step
-        state["current_step"] = self._current_step
-        return state
+        systems_dict = dict()
+        for system_name, val in self.modified_particle_count.items():
+            systems_dict[system_name] = val
+        return dict(current_step=self._current_step, systems=systems_dict)
 
     def _load_state(self, state):
-        for system in self.supported_systems:
-            self.modified_particle_count[system] = state[get_element_name_from_system(system)]
-        # Set current step
+        for system_name in self.modified_particle_count:
+            self.modified_particle_count[system_name] = state["systems"][system_name]
         self._current_step = state["current_step"]
 
     def _serialize(self, state):
-        return np.array(list(state.values()), dtype=float)
+        return np.concatenate([
+            [state["current_step"]],
+            list(state["systems"].values())
+        ]).astype(float)
 
     def _deserialize(self, state):
-        state_dict = dict()
-        for i, system in enumerate(self.modified_particle_count.keys()):
-            state_dict[get_element_name_from_system(system)] = int(state[i])
-        state_dict["current_step"] = int(state[len(self.modified_particle_count)])
+        current_step = int(state[0])
+        systems_dict = dict()
+        for i, system_name in enumerate(self.modified_particle_count):
+            systems_dict[system_name] = int(state[1 + i])  # system particle count starts from idx 1
+        state_dict = dict(current_step=current_step, systems=systems_dict)
 
         return state_dict, len(self.modified_particle_count) + 1
 
@@ -559,28 +518,30 @@ class ParticleRemover(ParticleModifier):
     """
 
     def _modify_particles(self, system):
-        # If at the limit, don't modify anything
+        # If at the limit, return
         if self.check_at_limit(system=system):
             return
+
+        # If the system has no particles, return
+        if system.n_particles == 0:
+            return
+
         # Check the system
         if issubclass(system, VisualParticleSystem):
-            # Only modify particles if there are any that exist
-            if system.n_particles > 0:
-                # Iterate over all particles and remove any that are within the relaxed AABB of the remover volume
-                particle_names = list(system.particles.keys())
-                particle_positions = np.array([system.get_particle_position_orientation(name=name)[0] for name in system.particles.keys()])
-                inbound_idxs = self._check_in_mesh(particle_positions).nonzero()[0]
-                max_particle_absorbed = self.visual_particle_modification_limit - self.modified_particle_count[system]
-                for idx in inbound_idxs[:max_particle_absorbed]:
-                    system.remove_particle(particle_names[idx])
-                self.modified_particle_count[system] += min(len(inbound_idxs), max_particle_absorbed)
+            # Iterate over all particles and remove any that are within the relaxed AABB of the remover volume
+            particle_names = list(system.particles.keys())
+            particle_positions = np.array([system.get_particle_position_orientation(name=name)[0] for name in system.particles.keys()])
+            inbound_idxs = self._check_in_mesh(particle_positions).nonzero()[0]
+            max_particle_absorbed = self.visual_particle_modification_limit - self.modified_particle_count[system.name]
+            for idx in inbound_idxs[:max_particle_absorbed]:
+                system.remove_particle(particle_names[idx])
+            self.modified_particle_count[system.name] += min(len(inbound_idxs), max_particle_absorbed)
 
         elif issubclass(system, PhysicalParticleSystem):
             instancer_to_particle_idxs = {}
-            # If we're a cloth and using adjacency, we have to use check_in_mesh with the relaxed AABB since we
-            # can't detect collisions via scene query interface. Alternatively, if we're using the projection method,
-            # we also need to use check_in_mesh to check for overlap with the projection mesh
-            # We'll check for if the physical particles are within this relaxed AABB
+            # If the object is a cloth, we have to use check_in_mesh with the relaxed AABB since we can't detect
+            # collisions via scene query interface. Alternatively, if we're using the projection method,
+            # we also need to use check_in_mesh to check for overlap with the projection mesh.
             if self.obj.prim_type == PrimType.CLOTH or self.method == ParticleModifyMethod.PROJECTION:
                 for inst in system.particle_instancers.values():
                     inbound_idxs = self._check_in_mesh(inst.particle_positions).nonzero()[0]
@@ -594,8 +555,8 @@ class ParticleRemover(ParticleModifier):
                 # If at the limit, stop absorbing
                 if self.check_at_limit(system=system):
                     break
-                max_particle_absorbed = self.physical_particle_modification_limit - self.modified_particle_count[
-                    system]
+                max_particle_absorbed = self.physical_particle_modification_limit - \
+                                        self.modified_particle_count[system.name]
                 particles_to_absorb = min(len(particle_idxs), max_particle_absorbed)
                 particle_idxs_to_absorb = list(particle_idxs)[:particles_to_absorb]
 
@@ -603,11 +564,7 @@ class ParticleRemover(ParticleModifier):
                 inst.remove_particles(idxs=particle_idxs_to_absorb)
 
                 # Keep track of the particles that have been absorbed
-                self.modified_particle_count[system] += particles_to_absorb
-
-        else:
-            # Invalid system queried
-            self.unsupported_system_error(system=system)
+                self.modified_particle_count[system.name] += particles_to_absorb
 
     @classproperty
     def metalink_prefix(cls):
@@ -684,11 +641,46 @@ class ParticleApplier(ParticleModifier):
         # First, sanity check to make sure only one system is being applied, since unlike a ParticleRemover, which
         # can potentially remove multiple types of particles, a ParticleApplier should only apply one type of particle
         assert len(self.conditions) == 1, f"A ParticleApplier can only have a single ParticleSystem associated " \
-                                          f"with it! Got: {[system.name for system in self.conditions.keys()]}"
-        system = list(self.conditions.keys())[0]
-
+                                          f"with it! Got: {[system_name for system_name in self.conditions.keys()]}"
         # Run super
         super()._initialize()
+
+        system_name = list(self.conditions.keys())[0]
+
+        # get_system will initialize the system if it's not initialized already.
+        system = get_system(system_name)
+
+        if self.method == ParticleModifyMethod.PROJECTION:
+            radius, height = self._projection_mesh_params["extents"][0] / 2.0, self._projection_mesh_params["extents"][2]
+
+            # Generate the projection visualization
+            particle_radius = m.VISUAL_PARTICLE_PROJECTION_PARTICLE_RADIUS if issubclass(system, VisualParticleSystem) else system.particle_radius
+            particle_material = system.particle_object.material if issubclass(system, VisualParticleSystem) else system.material
+
+            name_prefix = f"{self.obj.name}_{self.__class__.__name__}"
+            # Create the projection visualization if it doesn't already exist, otherwise we reference it directly
+            projection_name = f"{name_prefix}_projection_visualization"
+            projection_path = f"/OmniGraph/{projection_name}"
+            projection_visualization_path = f"{self.link.prim_path}/projection_visualization"
+            if is_prim_path_valid(projection_path):
+                self.projection_system = get_prim_at_path(projection_path)
+                self.projection_emitter = get_prim_at_path(f"{projection_path}/emitter")
+            else:
+                self.projection_system, self.projection_emitter = create_projection_visualization(
+                    prim_path=projection_visualization_path,
+                    shape=self._projection_mesh_params["type"],
+                    projection_name=projection_name,
+                    projection_radius=radius,
+                    projection_height=height,
+                    particle_radius=particle_radius,
+                    material=particle_material,
+                    visualize=self._projection_mesh_params["visualize"],
+                )
+
+            # Create the visual geom instance referencing the generated source mesh prim, and then hide it
+            self.projection_source_sphere = VisualGeomPrim(prim_path=projection_visualization_path, name=f"{name_prefix}_projection_source_sphere")
+            self.projection_source_sphere.initialize()
+            self.projection_source_sphere.visible = False
 
         # Store which method to use for sampling particle locations
         if self._sample_with_raycast:
@@ -771,27 +763,39 @@ class ParticleApplier(ParticleModifier):
             start_points, end_points = self._sample_particle_locations(system=system)
             n_samples = len(start_points)
 
+            if issubclass(system, VisualParticleSystem):
+                group = system.get_group_name(obj=self.obj)
+                # Create an attachment group if necessary
+                if group not in system.groups:
+                    system.create_attachment_group(obj=self.obj)
+                avg_scale = np.cbrt(np.product(self.obj.scale))
+                scales = system.sample_scales(group=group, n=len(start_points))
+                cuboid_dimensions = scales * system.particle_object.aabb_extent.reshape(1, 3) * avg_scale
+            else:
+                scales = None
+                cuboid_dimensions = np.zeros(3)
+
             # Sample the rays to see where particle can be generated
-            hits = [result for result in sample_cuboid_on_object(
+            results = sample_cuboid_on_object(
                 obj=None,
                 start_points=start_points.reshape(n_samples, 1, 3),
                 end_points=end_points.reshape(n_samples, 1, 3),
-                cuboid_dimensions=system.sample_scales(
-                    group=system.get_group_name(obj=self.obj), n=len(start_points)) * system.particle_object.aabb_extent.reshape(1, 3)
-                if issubclass(system, VisualParticleSystem) else np.zeros(3),
+                cuboid_dimensions=cuboid_dimensions,
                 ignore_objs=[self.obj],
                 hit_proportion=0.0,             # We want all hits
                 undo_cuboid_bottom_padding=issubclass(system, VisualParticleSystem),      # micro particles have zero cuboid dimensions so we need to maintain padding
                 cuboid_bottom_padding=system.particle_radius if issubclass(system, PhysicalParticleSystem) else
                 macros.utils.sampling_utils.DEFAULT_CUBOID_BOTTOM_PADDING,
-            ) if result[0] is not None]
+            )
 
-            self._apply_particles_at_raycast_hits(system=system, hits=hits)
+            hits = [result for result in results if result[0] is not None]
+            scales = [scale for scale, result in zip(scales, results) if result[0] is not None] if scales is not None else scales
 
+            self._apply_particles_at_raycast_hits(system=system, hits=hits, scales=scales)
         else:
             self._apply_particle_in_projection_volume(system=system)
 
-    def _apply_particles_at_raycast_hits(self, system, hits):
+    def _apply_particles_at_raycast_hits(self, system, hits, scales=None):
         """
         Helper function to apply particles from system @system given raycast hits @hits,
         which are the filtered results from omnigibson.utils.sampling_utils.raytest_batch that include only
@@ -800,17 +804,21 @@ class ParticleApplier(ParticleModifier):
         Args:
             system (ParticleSystem): System to apply particles from
             hits (list of dict): Valid hit results from a batched raycast representing locations for sampling particles
+            scales (list of numpy arrays or None): None or scales of the particles that should be sampled, same length as hits
         """
+        assert system.name in self.conditions, f"System {system.name} is not defined in the conditions."
         # Check the system
         if issubclass(system, VisualParticleSystem):
+            assert scales is not None, "applying visual particles at raycast hits requires scales."
+            assert len(hits) == len(scales), "length of hits and scales are different when spawning visual particles."
             # Sample potential application points
             z_up = np.zeros(3)
             z_up[-1] = 1.0
-            n_particles = min(len(hits), m.VISUAL_PARTICLES_APPLICATION_LIMIT - self.modified_particle_count[system])
+            n_particles = min(len(hits), m.VISUAL_PARTICLES_APPLICATION_LIMIT - self.modified_particle_count[system.name])
             # Generate particle info -- maps group name to particle info for that group,
             # i.e.: positions, orientations, and link_prim_paths
             particles_info = defaultdict(lambda: defaultdict(lambda: []))
-            for hit in hits[:n_particles]:
+            for hit, scale in zip(hits[:n_particles], scales[:n_particles]):
                 # Infer which object was hit
                 hit_obj = og.sim.scene.object_registry("prim_path", "/".join(hit[3].split("/")[:-1]), None)
                 if hit_obj is not None:
@@ -821,6 +829,7 @@ class ParticleApplier(ParticleModifier):
                     # Add to info
                     particles_info[group]["positions"].append(hit[0])
                     particles_info[group]["orientations"].append(hit[2])
+                    particles_info[group]["scales"].append(scale)
                     particles_info[group]["link_prim_paths"].append(hit[3])
             # Generate all the particles for each group
             for group, particle_info in particles_info.items():
@@ -829,14 +838,15 @@ class ParticleApplier(ParticleModifier):
                     group=group,
                     positions=np.array(particle_info["positions"]),
                     orientations=np.array(particle_info["orientations"]),
+                    scales=np.array(particles_info[group]["scales"]),
                     link_prim_paths=particle_info["link_prim_paths"],
                 )
                 # Update our particle count
-                self.modified_particle_count[system] += len(particle_info["link_prim_paths"])
+                self.modified_particle_count[system.name] += len(particle_info["link_prim_paths"])
 
         elif issubclass(system, PhysicalParticleSystem):
             # Compile the particle poses to generate and sample the particles
-            n_particles = min(len(hits), m.PHYSICAL_PARTICLES_APPLICATION_LIMIT - self.modified_particle_count[system])
+            n_particles = min(len(hits), m.PHYSICAL_PARTICLES_APPLICATION_LIMIT - self.modified_particle_count[system.name])
             # Generate particles
             if n_particles > 0:
                 velocities = None if self._initial_speed == 0 else -self._initial_speed * np.array([hit[1] for hit in hits[:n_particles]])
@@ -846,10 +856,6 @@ class ParticleApplier(ParticleModifier):
                 )
                 # Update our particle count
                 self.modified_particle_count[system] += n_particles
-
-        else:
-            # Invalid system queried
-            self.unsupported_system_error(system=system)
 
     def _apply_particle_in_projection_volume(self, system):
         """
@@ -887,11 +893,7 @@ class ParticleApplier(ParticleModifier):
                     velocities=velocities,
                 )
                 # Update our particle count
-                self.modified_particle_count[system] += n_particles
-
-        else:
-            # Invalid system queried
-            self.unsupported_system_error(system=system)
+                self.modified_particle_count[system.name] += n_particles
 
     def _sample_particle_locations_from_projection_volume(self, system):
         """
@@ -980,14 +982,12 @@ class ParticleApplier(ParticleModifier):
         Returns:
             int: Maximum particles to apply per step for the given system @system
         """
+        assert system.name in self.conditions, f"System {system.name} is not defined in the conditions."
         # Check the system
         if issubclass(system, VisualParticleSystem):
             val = m.MAX_VISUAL_PARTICLES_APPLIED_PER_STEP
         elif issubclass(system, PhysicalParticleSystem):
             val = m.MAX_PHYSICAL_PARTICLES_APPLIED_PER_STEP
-        else:
-            # Invalid system queried
-            self.unsupported_system_error(system=system)
         return val
 
     @classproperty

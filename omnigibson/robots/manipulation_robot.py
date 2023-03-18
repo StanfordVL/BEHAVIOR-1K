@@ -375,7 +375,7 @@ class ManipulationRobot(BaseRobot):
         arm = self.default_arm if arm == "default" else arm
 
         # Remove joint and filtered collision restraints
-        self._simulator.stage.RemovePrim(self._ag_obj_constraint_params[arm]["ag_joint_prim_path"])
+        og.sim.stage.RemovePrim(self._ag_obj_constraint_params[arm]["ag_joint_prim_path"])
         self._ag_data[arm] = None
         self._ag_obj_constraints[arm] = None
         self._ag_obj_constraint_params[arm] = {}
@@ -772,7 +772,7 @@ class ManipulationRobot(BaseRobot):
         # TODO: Better heuristic, hacky, we assume the parent object prim path is the prim_path minus the last "/" item
         ag_obj_prim_path = "/".join(prim_path.split("/")[:-1])
         ag_obj_link_name = prim_path.split("/")[-1]
-        ag_obj = self._simulator.scene.object_registry("prim_path", ag_obj_prim_path)
+        ag_obj = og.sim.scene.object_registry("prim_path", ag_obj_prim_path)
         ag_obj_link = ag_obj.links[ag_obj_link_name]
 
         # Return None if object cannot be assisted grasped or not touching at least two fingers
@@ -792,7 +792,7 @@ class ManipulationRobot(BaseRobot):
         """
         arm = self.default_arm if arm == "default" else arm
         self._ag_release_counter[arm] += 1
-        time_since_release = self._ag_release_counter[arm] * self._simulator.get_rendering_dt()
+        time_since_release = self._ag_release_counter[arm] * og.sim.get_rendering_dt()
         if time_since_release >= m.RELEASE_WINDOW:
             # TODO: Verify not needed!
             # Remove filtered collision restraints
@@ -1036,7 +1036,7 @@ class ManipulationRobot(BaseRobot):
             body0=self.eef_links[arm].prim_path,
             body1=ag_link.prim_path,
             enabled=False,
-            stage=self._simulator.stage,
+            stage=og.sim.stage,
         )
 
         # Set the local pose of this joint
@@ -1175,7 +1175,7 @@ class ManipulationRobot(BaseRobot):
         if not gripper_finger_close:
             return None
 
-        cloth_objs = self._simulator.scene.object_registry("prim_type", PrimType.CLOTH)
+        cloth_objs = og.sim.scene.object_registry("prim_type", PrimType.CLOTH)
         if cloth_objs is None:
             return None
 
@@ -1224,7 +1224,6 @@ class ManipulationRobot(BaseRobot):
             T.relative_pose_transform(attachment_point_pos, [0, 0, 0, 1], eef_link_pos, eef_link_orn)
 
         # Create the joint
-        # self._simulator.pause()
         joint_prim_path = f"{ag_link.prim_path}/ag_constraint"
         joint_type = "FixedJoint"
         joint_prim = create_joint(
@@ -1233,7 +1232,7 @@ class ManipulationRobot(BaseRobot):
             body0=ag_link.prim_path,
             body1=None,
             enabled=False,
-            stage=self._simulator.stage,
+            stage=og.sim.stage,
         )
 
         # Set the local pose of this joint

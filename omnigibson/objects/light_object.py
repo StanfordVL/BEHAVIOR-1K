@@ -1,4 +1,5 @@
 from pxr import UsdLux
+import omnigibson as og
 from omni.isaac.core.utils.stage import get_current_stage
 from omnigibson.objects.stateful_object import StatefulObject
 from omnigibson.prims.xform_prim import XFormPrim
@@ -103,16 +104,13 @@ class LightObject(StatefulObject):
             **kwargs,
         )
 
-    def _load(self, simulator=None):
-        # Define a light prim at the current stage, or the simulator's stage if specified
-        stage = get_current_stage()
-
+    def _load(self):
         # Define XForm and base link for this light
-        prim = stage.DefinePrim(self._prim_path, "Xform")
-        base_link = stage.DefinePrim(f"{self._prim_path}/base_link", "Xform")
+        prim = og.sim.stage.DefinePrim(self._prim_path, "Xform")
+        base_link = og.sim.stage.DefinePrim(f"{self._prim_path}/base_link", "Xform")
 
         # Define the actual light link
-        light_prim = UsdLux.__dict__[f"{self.light_type}Light"].Define(stage, f"{self._prim_path}/base_link/light").GetPrim()
+        light_prim = UsdLux.__dict__[f"{self.light_type}Light"].Define(og.sim.stage, f"{self._prim_path}/base_link/light").GetPrim()
 
         return prim
 

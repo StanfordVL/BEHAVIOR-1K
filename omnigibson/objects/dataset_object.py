@@ -231,7 +231,7 @@ class DatasetObject(USDObject):
             if joint.joint_type != JointType.JOINT_FIXED:
                 joint.friction = friction
 
-    def _load(self, simulator=None):
+    def _load(self):
         if gm.USE_ENCRYPTED_ASSETS:
             # Create a temporary file to store the decrytped asset, load it, and then delete it.
             with tempfile.NamedTemporaryFile(suffix=".usd") as fp:
@@ -239,11 +239,11 @@ class DatasetObject(USDObject):
                 encrypted_filename = original_usd_path.replace(".usd", ".encrypted.usd")
                 decrypt_file(encrypted_filename, decrypted_file=fp)
                 self._usd_path = fp.name
-                prim = super()._load(simulator=simulator)
+                prim = super()._load()
                 self._usd_path = original_usd_path
                 return prim
         else:
-            return super()._load(simulator=simulator)
+            return super()._load()
 
     def _post_load(self):
         # We run this post loading first before any others because we're modifying the load config that will be used

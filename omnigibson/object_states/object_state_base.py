@@ -45,7 +45,6 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
         self._initialized = False
         self._cache = None
         self._changed = None
-        self._simulator = None
         self._last_t_updated = -1               # Last timestep when this state was updated
 
     @property
@@ -78,14 +77,11 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
         """
         pass
 
-    def initialize(self, simulator):
+    def initialize(self):
         """
         Initialize this object state
         """
         assert not self._initialized, "State is already initialized."
-
-        # Store simulator reference and create cache
-        self._simulator = simulator
 
         self._initialize()
         self._initialized = True

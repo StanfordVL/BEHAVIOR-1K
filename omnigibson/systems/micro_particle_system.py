@@ -3,10 +3,9 @@ from omnigibson.macros import gm, create_module_macros
 from omnigibson.prims.prim_base import BasePrim
 from omnigibson.prims.geom_prim import VisualGeomPrim
 from omnigibson.prims.material_prim import MaterialPrim
-from omnigibson.systems.system_base import SYSTEMS_REGISTRY
-from omnigibson.systems.system_base import BaseSystem
+from omnigibson.systems.system_base import BaseSystem, REGISTERED_SYSTEMS
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
-from omnigibson.utils.python_utils import classproperty, assert_valid_key, subclass_factory
+from omnigibson.utils.python_utils import classproperty, assert_valid_key, subclass_factory, snake_case_to_camel_case
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object_full_grid_topdown
 from omnigibson.utils.usd_utils import array_to_vtarray
 from omnigibson.utils.physx_utils import create_physx_particle_system, create_physx_particleset_pointinstancer
@@ -15,7 +14,6 @@ from omnigibson.utils.ui_utils import disclaimer, create_module_logger
 import omni
 from omni.isaac.core.utils.prims import get_prim_at_path, is_prim_path_valid
 from omni.physx.scripts import particleUtils
-from omni.physx import get_physx_scene_query_interface
 import numpy as np
 from pxr import Gf, Vt, UsdShade, UsdGeom, PhysxSchema
 from collections import defaultdict
@@ -32,6 +30,12 @@ import carb
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
+
+
+def is_physical_particle_system(system_name):
+    assert system_name in REGISTERED_SYSTEMS, f"System {system_name} not in REGISTERED_SYSTEMS."
+    system = REGISTERED_SYSTEMS[system_name]
+    return issubclass(system, PhysicalParticleSystem)
 
 
 def set_carb_settings_for_fluid_isosurface():
@@ -84,7 +88,7 @@ class PhysxParticleInstancer(BasePrim):
         # Run super method directly
         super().__init__(prim_path=prim_path, name=name)
 
-    def _load(self, simulator=None):
+    def _load(self):
         # We raise an error, this should NOT be created from scratch
         raise NotImplementedError("PhysxPointInstancer should NOT be loaded via this class! Should be created before.")
 
@@ -312,7 +316,7 @@ class PhysxParticleInstancer(BasePrim):
     def state_size(self):
         # idn (1), particle_group (1), n_particles (1), and the corresponding states for each particle
         # N * (pos (3) + vel (3) + orn (4) + scale (3) + prototype_id (1))
-        return 3 + len(self._n_particles) * 14
+        return 3 + self._n_particles * 14
 
     def _dump_state(self):
         return dict(
@@ -390,18 +394,16 @@ class MicroParticleSystem(BaseSystem):
     system_prim = None
 
     @classmethod
-    def initialize(cls, simulator):
+    def initialize(cls):
         # Run super first
-        super().initialize(simulator=simulator)
+        super().initialize()
+        if not gm.USE_GPU_DYNAMICS:
+            raise ValueError(f"Failed to initialize {cls.name} system. Please set gm.USE_GPU_DYNAMICS to be True.")
         cls.system_prim = cls._create_particle_system()
 
     @classproperty
     def system_prim_path(cls):
         return f"{cls.prim_path}/system"
-
-    @classproperty
-    def requires_gpu_dynamics(cls):
-        return True
 
     @classproperty
     def visual_only(cls):
@@ -540,9 +542,9 @@ class PhysicalParticleSystem(MicroParticleSystem):
         return f"{cls.name}:material"
 
     @classmethod
-    def initialize(cls, simulator):
+    def initialize(cls):
         # Run super first
-        super().initialize(simulator=simulator)
+        super().initialize()
 
         # Initialize class variables that are mutable so they don't get overridden by children classes
         cls.particle_instancers = dict()
@@ -914,6 +916,7 @@ class PhysicalParticleSystem(MicroParticleSystem):
             particle_group=0,
             sampling_distance=None,
             max_samples=5e5,
+            min_samples_for_success=1,
             self_collision=True,
             prototype_indices_choices=None,
     ):
@@ -933,6 +936,8 @@ class PhysicalParticleSystem(MicroParticleSystem):
             sampling_distance (None or float): If specified, sets the distance between sampled particles. If None,
                 a simulator autocomputed value will be used
             max_samples (int): Maximum number of particles to sample
+            min_samples_for_success (int): Minimum number of particles required to be sampled successfully in order
+                for this generation process to be considered successful
             self_collision (bool): Whether to enable particle-particle collision within the set
                 (as defined by @particle_group) or not. Only used if a new particle instancer is created!
             prototype_indices_choices (None or int or list of int): If specified, should specify which prototype(s)
@@ -941,8 +946,11 @@ class PhysicalParticleSystem(MicroParticleSystem):
                 sample from those IDs for each particle.
 
         Returns:
-            PhysxParticleInstancer: Particle instancer that includes the generated particles
+            bool: True if enough particles were generated successfully (number of successfully sampled points >=
+                min_samples_for_success), otherwise False
         """
+        assert max_samples >= min_samples_for_success, "number of particles to sample should exceed the min for success"
+
         # We densely sample a grid of points by ray-casting from top to bottom to find the valid positions
         radius = cls.particle_radius
         results = sample_cuboid_on_object_full_grid_topdown(
@@ -973,13 +981,18 @@ class PhysicalParticleSystem(MicroParticleSystem):
         else:
             prototype_indices = None
 
-        return cls.generate_particles(
-            instancer_idn=instancer_idn,
-            particle_group=particle_group,
-            positions=particle_positions,
-            self_collision=self_collision,
-            prototype_indices=prototype_indices,
-        )
+        success = n_particles >= min_samples_for_success
+        # If we generated a sufficient number of points, generate them in the simulator
+        if success:
+            cls.generate_particles(
+                instancer_idn=instancer_idn,
+                particle_group=particle_group,
+                positions=particle_positions,
+                self_collision=self_collision,
+                prototype_indices=prototype_indices,
+            )
+
+        return success
 
     @classmethod
     def remove_particle_instancer(cls, name):
@@ -993,7 +1006,7 @@ class PhysicalParticleSystem(MicroParticleSystem):
         assert_valid_key(key=name, valid_keys=cls.particle_instancers, name="particle instancer")
         # Remove instancer from our tracking and delete its prim
         instancer = cls.particle_instancers.pop(name)
-        instancer.remove(simulator=og.sim)
+        instancer.remove()
         og.sim.stage.RemovePrim(f"{cls.prim_path}/{name}")
 
     @classmethod
@@ -1166,7 +1179,7 @@ class PhysicalParticleSystem(MicroParticleSystem):
         Utility function to programmatically generate monolithic fluid system classes.
 
         Args:
-            name (str): Name of the system
+            name (str): Name of the system, in snake case.
             particle_contact_offset (float): Contact offset for the generated system
             particle_density (float): Particle density for the generated system
             **kwargs (any): keyword-mapped parameters to override / set in the child class, where the keys represent
@@ -1197,7 +1210,7 @@ class PhysicalParticleSystem(MicroParticleSystem):
         kwargs["particle_density"] = cp_particle_density
 
         # Create and return the class
-        return subclass_factory(name=f"{name}System", base_classes=cls, **kwargs)
+        return subclass_factory(name=snake_case_to_camel_case(name), base_classes=cls, **kwargs)
 
 
 class FluidSystem(PhysicalParticleSystem):
@@ -1214,9 +1227,9 @@ class FluidSystem(PhysicalParticleSystem):
     _color = np.array([0.0, 0.0, 1.0])
 
     @classmethod
-    def initialize(cls, simulator):
+    def initialize(cls):
         # Run super first
-        super().initialize(simulator=simulator)
+        super().initialize()
 
         # Create the particle material
         cls._material = cls._create_particle_material_template()
@@ -1470,31 +1483,30 @@ class GranularSystem(PhysicalParticleSystem):
             **kwargs,
         )
 
-
-WaterSystem = FluidSystem.create(
-    name="Water",
+FluidSystem.create(
+    name="water",
     particle_contact_offset=0.012,
     particle_density=500.0,
     material_mtl_name="DeepWater",
 )
 
-MilkSystem = FluidSystem.create(
-    name="Milk",
+FluidSystem.create(
+    name="milk",
     particle_contact_offset=0.008,
     particle_density=500.0,
     material_mtl_name="WholeMilk",
 )
 
-StrawberrySmoothieSystem = FluidSystem.create(
-    name="StrawberrySmoothie",
+FluidSystem.create(
+    name="strawberry_smoothie",
     particle_contact_offset=0.008,
     particle_density=500.0,
     material_mtl_name="SkimMilk",
     customize_particle_material=customize_particle_material_factory("specular_reflection_color", [1.0, 0.64, 0.64]),
 )
 
-DicedAppleSystem = GranularSystem.create(
-    name="DicedApple",
+GranularSystem.create(
+    name="diced_apple",
     particle_contact_offset=0.015,
     particle_density=500.0,
     create_particle_template=lambda prim_path, name: og.objects.DatasetObject(
@@ -1510,8 +1522,8 @@ DicedAppleSystem = GranularSystem.create(
     ),
 )
 
-DangoSystem = GranularSystem.create(
-    name="Dango",
+GranularSystem.create(
+    name="dango",
     particle_contact_offset=0.015,
     particle_density=500.0,
     create_particle_template=lambda prim_path, name: og.objects.PrimitiveObject(
@@ -1528,7 +1540,7 @@ DangoSystem = GranularSystem.create(
 )
 
 
-class ClothSystem(MicroParticleSystem):
+class Cloth(MicroParticleSystem):
     """
     Particle system class to simulate cloth.
     """
