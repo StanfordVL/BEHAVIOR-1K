@@ -57,9 +57,10 @@ class MacroParticleSystem(BaseSystem):
         # Create the system prim -- this is merely a scope prim
         og.sim.stage.DefinePrim(f"/World/{cls.name}", "Scope")
 
-        # Load the particle template
+        # Load the particle template, and make it kinematic only because it's not interacting with anything
         particle_template = cls._create_particle_template()
         og.sim.import_object(obj=particle_template, register=False, auto_initialize=True)
+        particle_template.kinematic_only = True
 
         # Make sure there is no ambiguity about which mesh to use as the particle from this template
         assert len(particle_template.links) == 1, "MacroParticleSystem particle template has more than one link"
