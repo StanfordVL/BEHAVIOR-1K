@@ -603,8 +603,8 @@ class Simulator(SimulationContext, Serializable):
         that subclass ContactSubscribedStateMixin. These states update based on contact events.
         """
         if gm.ENABLE_OBJECT_STATES:
-            combos = set()
-            headers = defaultdict(list)
+            headers = dict()
+            combos = dict()
             for contact_header in contact_headers:
                 actor0 = str(PhysicsSchemaTools.intToSdfPath(contact_header.actor0))
                 actor1 = str(PhysicsSchemaTools.intToSdfPath(contact_header.actor1))
@@ -613,15 +613,22 @@ class Simulator(SimulationContext, Serializable):
                 actor1_obj = self._scene.object_registry("prim_path", "/".join(actor1.split("/")[:-1]))
                 if actor0_obj is None or actor1_obj is None or not actor0_obj.initialized or not actor1_obj.initialized:
                     continue
-                headers[tuple(sorted((actor0_obj, actor1_obj), key=lambda x:x.uuid))].append(contact_header)
+                # Unique reference via uuid hashing
+                idn = actor0_obj.uuid * actor1_obj.uuid
+                if idn in combos:
+                    headers[idn].append(contact_header)
+                else:
+                    headers[idn] = []
+                    combos[idn] = (actor0_obj, actor1_obj)
 
-            for (actor0_obj, actor1_obj) in combos:
+            for idn, headers in headers.items():
+                actor0_obj, actor1_obj = combos[idn]
                 if not isinstance(actor0_obj, StatefulObject) or not isinstance(actor1_obj, StatefulObject):
                     continue
                 for obj0, obj1 in [(actor0_obj, actor1_obj), (actor1_obj, actor0_obj)]:
                     for state_type in self.object_state_types_on_contact:
                         if state_type in obj0.states:
-                            obj0.states[state_type].on_contact(obj1, headers[(actor0_obj, actor1_obj)], contact_data)
+                            obj0.states[state_type].on_contact(obj1, headers, contact_data)
 
     def is_paused(self):
         """
