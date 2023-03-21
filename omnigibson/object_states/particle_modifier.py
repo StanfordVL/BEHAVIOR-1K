@@ -216,6 +216,8 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
         super().__init__(obj)
 
     def _initialize(self):
+        super()._initialize()
+
         # Run link initialization
         self.initialize_link_mixin()
 

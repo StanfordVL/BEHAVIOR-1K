@@ -147,7 +147,7 @@ def get_semantic_objects_pose():
     return pose
 
 
-def create_joint(prim_path, joint_type, body0=None, body1=None, enabled=True, stage=None):
+def create_joint(prim_path, joint_type, body0=None, body1=None, enabled=True):
     """
     Creates a joint between @body0 and @body1 of specified type @joint_type
 
@@ -159,8 +159,6 @@ def create_joint(prim_path, joint_type, body0=None, body1=None, enabled=True, st
         body0 (str): absolute path to the first body's prim. At least @body0 or @body1 must be specified.
         body1 (str): absolute path to the second body's prim. At least @body0 or @body1 must be specified.
         enabled (bool): whether to enable this joint or not
-        stage (Usd.Stage): if specified, should be specific stage to be used to load the joint.
-            Otherwise, the current active stage will be used.
 
     Returns:
         Usd.Prim: Created joint prim
@@ -173,11 +171,8 @@ def create_joint(prim_path, joint_type, body0=None, body1=None, enabled=True, st
     assert body0 is not None or body1 is not None, \
         f"At least either body0 or body1 must be specified when creating a joint!"
 
-    # Define an Xform prim at the current stage, or the simulator's stage if specified
-    stage = get_current_stage() if stage is None else stage
-
     # Create the joint
-    joint = UsdPhysics.__dict__[joint_type].Define(stage, prim_path)
+    joint = UsdPhysics.__dict__[joint_type].Define(og.sim.stage, prim_path)
 
     # Possibly add body0, body1 targets
     if body0 is not None:
@@ -196,8 +191,8 @@ def create_joint(prim_path, joint_type, body0=None, body1=None, enabled=True, st
     # Possibly (un-/)enable this joint
     joint_prim.GetAttribute("physics:jointEnabled").Set(enabled)
 
-    # We need to step rendering once to auto-fill the local pose before overwriting it.
-    og.sim.render()
+    # # We need to step rendering once to auto-fill the local pose before overwriting it.
+    # og.sim.render()
 
     # Return this joint
     return joint_prim
@@ -503,15 +498,13 @@ def clear():
     BoundingBoxAPI.clear()
 
 
-def create_mesh_prim_with_default_xform(primitive_type, prim_path, stage=None, u_patches=None, v_patches=None):
+def create_mesh_prim_with_default_xform(primitive_type, prim_path, u_patches=None, v_patches=None):
     """
     Creates a mesh prim of the specified @primitive_type at the specified @prim_path
 
     Args:
         primitive_type (str): Primitive mesh type, should be one of PRIMITIVE_MESH_TYPES to be valid
         prim_path (str): Destination prim path to store the mesh prim
-        stage (Usd.Stage or None): If specified, should be specific stage to be used to load the mesh prim.
-            Otherwise, the current active stage will be used.
         u_patches (int or None): If specified, should be an integer that represents how many segments to create in the
             u-direction. E.g. 10 means 10 segments (and therefore 11 vertices) will be created.
         v_patches (int or None): If specified, should be an integer that represents how many segments to create in the
@@ -597,7 +590,7 @@ def create_primitive_mesh(prim_path, primitive_type, extents=1.0, u_patches=None
         UsdGeom.Mesh: Generated primitive mesh as a prim on the active stage
     """
     assert_valid_key(key=primitive_type, valid_keys=PRIMITIVE_MESH_TYPES, name="primitive mesh type")
-    create_mesh_prim_with_default_xform(primitive_type, prim_path, stage=og.sim.stage, u_patches=u_patches, v_patches=v_patches)
+    create_mesh_prim_with_default_xform(primitive_type, prim_path, u_patches=u_patches, v_patches=v_patches)
     mesh = UsdGeom.Mesh.Define(og.sim.stage, prim_path)
 
     # Modify the points and normals attributes so that total extents is the desired

@@ -603,7 +603,6 @@ class Simulator(SimulationContext, Serializable):
         that subclass ContactSubscribedStateMixin. These states update based on contact events.
         """
         if gm.ENABLE_OBJECT_STATES:
-            combos = set()
             headers = defaultdict(list)
             for contact_header in contact_headers:
                 actor0 = str(PhysicsSchemaTools.intToSdfPath(contact_header.actor0))
@@ -613,9 +612,9 @@ class Simulator(SimulationContext, Serializable):
                 actor1_obj = self._scene.object_registry("prim_path", "/".join(actor1.split("/")[:-1]))
                 if actor0_obj is None or actor1_obj is None or not actor0_obj.initialized or not actor1_obj.initialized:
                     continue
-                headers[tuple(sorted((actor0_obj, actor1_obj), key=lambda x:x.uuid))].append(contact_header)
+                headers[tuple(sorted((actor0_obj, actor1_obj), key=lambda x: x.name))].append(contact_header)
 
-            for (actor0_obj, actor1_obj) in combos:
+            for (actor0_obj, actor1_obj) in headers:
                 if not isinstance(actor0_obj, StatefulObject) or not isinstance(actor1_obj, StatefulObject):
                     continue
                 for obj0, obj1 in [(actor0_obj, actor1_obj), (actor1_obj, actor0_obj)]:

@@ -1036,7 +1036,6 @@ class ManipulationRobot(BaseRobot):
             body0=self.eef_links[arm].prim_path,
             body1=ag_link.prim_path,
             enabled=False,
-            stage=og.sim.stage,
         )
 
         # Set the local pose of this joint
@@ -1232,7 +1231,6 @@ class ManipulationRobot(BaseRobot):
             body0=ag_link.prim_path,
             body1=None,
             enabled=False,
-            stage=og.sim.stage,
         )
 
         # Set the local pose of this joint
