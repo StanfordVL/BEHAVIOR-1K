@@ -371,6 +371,10 @@ class VisualParticleSystem(MacroParticleSystem):
     # Maps particle name to dict of {obj, link}
     _particles_info = None
 
+    # Pre-cached information about visual particles so that we have efficient runtime computations
+    # Maps particle name to local pose matrix for computing global poses for the particle
+    _particles_local_mat = None
+
     # Default behavior for this class -- whether to clip generated particles halfway into objects when sampling
     # their locations on the surface of the given object
     _CLIP_INTO_OBJECTS = False
@@ -392,6 +396,7 @@ class VisualParticleSystem(MacroParticleSystem):
         cls._group_particles = dict()
         cls._group_objects = dict()
         cls._particles_info = dict()
+        cls._particles_local_mat = dict()
 
     @classproperty
     def groups(cls):
@@ -433,11 +438,6 @@ class VisualParticleSystem(MacroParticleSystem):
         super().set_particle_template_object(obj=obj)
 
     @classmethod
-    def remove_all_particles(cls):
-        # Run super method first
-        super().remove_all_particles()
-
-    @classmethod
     def clear(cls):
         # Run super method first
         super().clear()
@@ -446,6 +446,7 @@ class VisualParticleSystem(MacroParticleSystem):
         cls._group_particles = dict()
         cls._group_objects = dict()
         cls._particles_info = dict()
+        cls._particles_local_mat = dict()
 
     @classmethod
     def remove_particle(cls, name):
@@ -461,6 +462,7 @@ class VisualParticleSystem(MacroParticleSystem):
         # Remove this particle from its respective group as well
         cls._group_particles[cls._particles_info[name]["obj"].name].pop(name)
         cls._particles_info.pop(name)
+        cls._particles_local_mat.pop(name)
 
     @classmethod
     def remove_all_group_particles(cls, group):
@@ -673,6 +675,9 @@ class VisualParticleSystem(MacroParticleSystem):
             cls._group_particles[group][particle.name] = particle
             cls._particles_info[particle.name] = dict(obj=cls._group_objects[group], link=link)
 
+            # Update particle local matrix
+            cls._particles_local_mat[particle.name] = cls._compute_particle_local_mat(name=particle.name)
+
     @classmethod
     def generate_group_particles_on_object(cls, group, max_samples, min_samples_for_success=1):
         """
@@ -747,10 +752,45 @@ class VisualParticleSystem(MacroParticleSystem):
         return success
 
     @classmethod
+    def get_particles_position_orientation(cls):
+        """
+        Computes all particles' global positions and orientations that belong to this system
+
+        Note: This is more optimized than doing a for loop with self.get_particle_position_orientation()
+
+        Returns:
+            2-tuple:
+                - (n, 3)-array: per-particle (x,y,z) position in the world frame
+                - (n, 4)-array: per-particle (x,y,z,w) quaternion orientation in the world frame
+        """
+        # Iterate over all particles and compute link tfs programmatically, then batch the matrix transform
+        link_tfs = dict()
+        A = np.zeros((cls.n_particles, 4, 4))
+        B = np.zeros_like(A)
+        for i, name in enumerate(cls.particles):
+            link = cls._particles_info[name]["link"]
+            if link in link_tfs:
+                link_tf = link_tfs[link]
+            else:
+                link_tf = T.pose2mat(link.get_position_orientation())
+                link_tfs[link] = link_tf
+            A[i] = link_tf
+            B[i] = cls._particles_local_mat[name]
+
+        # Compute once
+        global_poses = np.matmul(A, B)
+
+        # Decompose back into positions and orientations
+        return global_poses[:, :3, 3], T.mat2quat_batch(global_poses[:, :3, :3])
+
+    @classmethod
     def get_particle_position_orientation(cls, name):
         """
         Compute particle's global position and orientation. This automatically takes into account the relative
         pose w.r.t. its parent link and the global pose of that parent link.
+
+        Args:
+            name (str): Name of the particle to compute global position and orientation for
 
         Returns:
             2-tuple:
@@ -758,14 +798,29 @@ class VisualParticleSystem(MacroParticleSystem):
                 - 4-array: (x,y,z,w) quaternion orientation in the world frame
         """
         # First, get local pose, scale it by the parent link's scale, and then convert into a matrix
-        particle = cls.particles[name]
         parent_link = cls._particles_info[name]["link"]
-        local_pos, local_quat = particle.get_local_pose()
-        local_mat = T.pose2mat((parent_link.scale * local_pos, local_quat))
+        local_mat = cls._particles_local_mat[name]
         link_tf = T.pose2mat(parent_link.get_position_orientation())
 
         # Multiply the local pose by the link's global transform, then return as pos, quat tuple
-        return T.mat2pose(link_tf @ local_mat)
+        val = T.mat2pose(link_tf @ local_mat)
+        return val
+
+    @classmethod
+    def _compute_particle_local_mat(cls, name):
+        """
+        Computes particle @name's local transform as a homogeneous 4x4 matrix
+
+        Args:
+            name (str): Name of the particle to compute local transform matrix for
+
+        Returns:
+            np.array: (4, 4) homogeneous transform matrix
+        """
+        particle = cls.particles[name]
+        parent_link = cls._particles_info[name]["link"]
+        local_pos, local_quat = particle.get_local_pose()
+        return T.pose2mat((parent_link.scale * local_pos, local_quat))
 
     @classmethod
     def _validate_group(cls, group):
@@ -945,6 +1000,10 @@ class VisualParticleSystem(MacroParticleSystem):
 
         # Run super
         super()._load_state(state=state)
+
+        # Make sure we update all the local transforms
+        for name in cls.particles:
+            cls._particles_local_mat[name] = cls._compute_particle_local_mat(name=name)
 
     @classmethod
     def _serialize(cls, state):

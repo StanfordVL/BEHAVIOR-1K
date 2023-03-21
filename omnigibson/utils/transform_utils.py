@@ -394,6 +394,19 @@ def mat2quat(rmat):
     return R.from_matrix(M).as_quat()
 
 
+def mat2quat_batch(rmat):
+    """
+    Converts given rotation matrix to quaternion.
+
+    Args:
+        rmat (np.array): (..., 3, 3) rotation matrix
+
+    Returns:
+        np.array: (..., 4) (x,y,z,w) float quaternion angles
+    """
+    return R.from_matrix(rmat).as_quat()
+
+
 def vec2quat(vec, up=(0, 0, 1.0)):
     """
     Converts given 3d-direction vector @vec to quaternion orientation with respect to another direction vector @up

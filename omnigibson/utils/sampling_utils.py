@@ -720,9 +720,9 @@ def sample_cuboid_on_object(
         assert cuboid_dimensions.shape[0] == num_samples, "Need as many offsets as samples requested."
 
     results = [(None, None, None, None, defaultdict(list)) for _ in range(num_samples)]
-    rigid_bodies = None if obj is None else [link.prim_path for link in obj.links.values()]
+    rigid_bodies = None if obj is None else {link.prim_path for link in obj.links.values()}
     ignore_rigid_bodies = None if ignore_objs is None else \
-        [link.prim_path for ignore_obj in ignore_objs for link in ignore_obj.links.values()]
+        {link.prim_path for ignore_obj in ignore_objs for link in ignore_obj.links.values()}
 
     for i in range(num_samples):
         refusal_reasons = results[i][4]
@@ -748,11 +748,11 @@ def sample_cuboid_on_object(
                 destinations = np.array([end_pos])
 
             # Time to cast the rays.
-            cast_results = raytest_batch(start_points=sources, end_points=destinations)
+            cast_results = raytest_batch(start_points=sources, end_points=destinations, ignore_bodies=ignore_rigid_bodies)
 
             # Check whether sufficient number of rays hit the object
             hits = check_rays_hit_object(
-                cast_results, hit_proportion, refusal_reasons["missed_object"], rigid_bodies, ignore_rigid_bodies)
+                cast_results, hit_proportion, refusal_reasons["missed_object"], rigid_bodies)
             if hits is None:
                 continue
 
