@@ -21,7 +21,7 @@ nest_asyncio.apply()
 
 __version__ = "0.0.5"
 
-log.setLevel(logging.INFO)
+log.setLevel(logging.DEBUG if gm.DEBUG else logging.INFO)
 
 with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), "global_config.yaml")) as f:
     global_config = yaml.load(f, Loader=yaml.FullLoader)
@@ -74,9 +74,6 @@ example_config_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 
 log.info("Example path: {}".format(example_path))
 log.info("Example config path: {}".format(example_config_path))
 
-# whether to enable debugging mode for object sampling
-debug_sampling = False
-
 # Initialize global variables
 app = None  # (this is a singleton so it's okay that it's global)
 sim = None  # (this is a singleton so it's okay that it's global)
@@ -101,7 +98,7 @@ def create_app():
     import omni
 
     # Possibly hide windows if in debug mode
-    if not gm.DEBUG:
+    if gm.GUI_VIEWPORT_ONLY:
         hide_window_names = ["Console", "Main ToolBar", "Stage", "Layer", "Property", "Render Settings", "Content",
                              "Flow", "Semantics Schema Editor"]
         for name in hide_window_names:

@@ -2,6 +2,7 @@ import numpy as np
 from collections import Iterable, namedtuple
 
 import omnigibson as og
+from omnigibson.macros import gm
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.usd_utils import BoundingBoxAPI
 from omni.physx import get_physx_simulation_interface
@@ -206,7 +207,7 @@ def get_collisions(prims=None, prims_check=None, prims_exclude=None, step_physic
             collisions = valid_other_collisions.union(valid_intersect_collisions)
 
     # Only going into this if it is for logging --> efficiency
-    if og.debug_sampling:
+    if gm.DEBUG:
         for item in collisions:
             log.debug("linkA:{}, linkB:{}".format(item[0], item[1]))
 

@@ -123,7 +123,10 @@ def suppress_omni_log(channels):
     # Record the state to restore to after the context exists
     log = omni.log.get_log()
 
-    if channels is None:
+    if gm.DEBUG:
+        # Do nothing
+        pass
+    elif channels is None:
         # Globally disable log
         log.enabled = False
     else:
@@ -138,7 +141,10 @@ def suppress_omni_log(channels):
 
     yield
 
-    if channels is None:
+    if gm.DEBUG:
+        # Do nothing
+        pass
+    elif channels is None:
         # Globallly re-enable log
         log.enabled = True
     else:
@@ -155,18 +161,20 @@ def suppress_loggers(logger_names):
     Args:
         logger_names (list of str): Logger name(s) whose corresponding loggers should be suppressed
     """
-    # Store prior states so we can restore them after this context exits
-    logger_levels = {name: logging.getLogger(name).getEffectiveLevel() for name in logger_names}
+    if not gm.DEBUG:
+        # Store prior states so we can restore them after this context exits
+        logger_levels = {name: logging.getLogger(name).getEffectiveLevel() for name in logger_names}
 
-    # Suppress the loggers (only output fatal messages)
-    for name in logger_names:
-        logging.getLogger(name).setLevel(logging.FATAL)
+        # Suppress the loggers (only output fatal messages)
+        for name in logger_names:
+            logging.getLogger(name).setLevel(logging.FATAL)
 
     yield
 
-    # Unsuppress the loggers
-    for name in logger_names:
-        logging.getLogger(name).setLevel(logger_levels[name])
+    if not gm.DEBUG:
+        # Unsuppress the loggers
+        for name in logger_names:
+            logging.getLogger(name).setLevel(logger_levels[name])
 
 
 def create_module_logger(module_name):

@@ -16,8 +16,13 @@ gm = macros.globals
 # Whether to generate a headless or non-headless application upon OmniGibson startup
 gm.HEADLESS = (os.getenv("OMNIGIBSON_HEADLESS", 'False').lower() in ('true', '1', 't'))
 
-# Whether to use extra settings (verboseness, extra GUI features) for debugging
-gm.DEBUG = True
+# Whether only the viewport should be shown in the GUI or not (if not, other peripherals are additionally shown)
+gm.GUI_VIEWPORT_ONLY = False
+
+# Do not suppress known omni warnings / errors, and also put omnigibson in a debug state
+# This includes extra information for things such as object sampling, and also any debug
+# logging messages
+gm.DEBUG = False
 
 # Whether to print out disclaimers (i.e.: known failure cases resulting from Omniverse's current bugs / limitations)
 gm.SHOW_DISCLAIMERS = True
