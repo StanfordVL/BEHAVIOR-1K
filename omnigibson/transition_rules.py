@@ -1,5 +1,6 @@
 from abc import ABCMeta, abstractmethod
 from collections import namedtuple
+import numpy as np
 import omnigibson as og
 from omnigibson.systems import get_system, is_system_active
 from omnigibson.objects.dataset_object import DatasetObject
@@ -341,7 +342,7 @@ class DicingRule(BaseTransitionRule):
 
     def condition(self, individual_objects, group_objects):
         slicer_obj, diced_obj = individual_objects["slicer"], individual_objects["diceable"]
-        slicer_position = slicer_obj.states[Slicer].get_link_position()
+        slicer_position = slicer_obj.states[Slicer].link.get_position()
         if slicer_position is None:
             return False
 
