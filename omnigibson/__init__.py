@@ -149,6 +149,11 @@ if not (os.getenv("OMNIGIBSON_NO_OMNIVERSE", 'False').lower() in {'true', '1', '
 
 def shutdown():
     global app
-    log.info(f"{'-' * 10} Shutting Down OmniGibson {'-' * 10}")
-    app.close()
+    from omnigibson.utils.ui_utils import suppress_omni_log
+    log.info(f"{'-' * 10} Shutting Down {logo_small()} {'-' * 10}")
+
+    # Suppress carb warning here that we have no control over -- it's expected
+    with suppress_omni_log(channels=["carb"]):
+        app.close()
+
     exit(0)

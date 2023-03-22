@@ -19,6 +19,7 @@ from omnigibson.utils.constants import ParticleModifyMethod, PrimType
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function, get_particle_positions_from_frame
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
 from omnigibson.utils.deprecated_utils import Core
+from omnigibson.utils.ui_utils import suppress_omni_log
 from omnigibson.utils.usd_utils import create_primitive_mesh, FlatcacheAPI
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object
@@ -116,7 +117,12 @@ def create_projection_visualization(
     UsdGeom.Imageable(source.GetPrim()).MakeInvisible()
     # Generate the ComputeGraph nodes to render the projection
     core = Core(lambda val: None, particle_system_name=projection_name)
-    system_path, _, emitter_path, vis_path, instancer_path, sprite_path, mat_path, output_path = core.create_particle_system(display="point_instancer", paths=[prim_path])
+
+    # Suppress omni warnings here -- we don't have control over this API, but omni likes to complain about this
+    with suppress_omni_log(channels=["omni.graph.core.plugin", "omni.usd", "rtx.neuraylib.plugin"]):
+        system_path, _, emitter_path, vis_path, instancer_path, sprite_path, mat_path, output_path = \
+            core.create_particle_system(display="point_instancer", paths=[prim_path])
+
     # Override the prototype with our own sphere with optional material
     prototype_path = "/".join(sprite_path.split("/")[:-1]) + "/prototype"
     create_primitive_mesh(prototype_path, primitive_type="Sphere")
@@ -144,10 +150,11 @@ def create_projection_visualization(
     emitter_prim.GetProperty("inputs:directionRandom").Set(Gf.Vec3f(*spread))
     emitter_prim.GetProperty("inputs:addSourceVelocity").Set(1.0)
 
-    # Move the output path so it moves with the particle system prim
-    og.sim.render()
-    output_name = output_path.split("/")[-1]
-    move_prim(output_path, f"{system_path}/{output_name}")
+    # Make sure we render 4 times to fully propagate changes (validated empirically)
+    # Omni likes to complain here again, but we have no control over the low-level information, so we suppress warnings
+    with suppress_omni_log(channels=["omni.particle.system.core.plugin", "omni.hydra.scene_delegate.plugin", "omni.usd"]):
+        for i in range(4):
+            og.sim.render()
 
     # Return the particle system prim which "owns" everything
     return get_prim_at_path(system_path), emitter_prim
