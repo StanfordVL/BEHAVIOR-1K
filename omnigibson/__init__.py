@@ -2,8 +2,7 @@ import logging
 import os
 import shutil
 import tempfile
-import weakref
-
+import signal
 import yaml
 import builtins
 
@@ -73,10 +72,6 @@ log.info("OmniGibson Key path: {}".format(key_path))
 
 example_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "examples")
 example_config_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "configs")
-
-# Create and expose a temporary directory for any use cases. It will get destroyed *after* omni
-# shutdown by the _kill_omni function.
-tempdir = tempfile.mkdtemp()
 
 log.info("Example path: {}".format(example_path))
 log.info("Example config path: {}".format(example_config_path))
@@ -158,19 +153,24 @@ if not (os.getenv("OMNIGIBSON_NO_OMNIVERSE", 'False').lower() in {'true', '1', '
     app, sim, Environment, REGISTERED_SCENES, REGISTERED_OBJECTS, REGISTERED_ROBOTS, REGISTERED_CONTROLLERS, \
         REGISTERED_TASKS, ALL_SENSOR_MODALITIES = start()
 
+# Create and expose a temporary directory for any use cases. It will get destroyed *after* omni
+# shutdown by the _kill_omni function.
+tempdir = tempfile.mkdtemp()
 
 def _kill_omni():
     global app
+    global sim
+    sim.clear()
+    shutil.rmtree(tempdir)
     log.info(f"{'-' * 10} Shutting Down OmniGibson {'-' * 10}")
     app.close()
-    shutil.rmtree(tempdir)
-    log.info("Cleaned up temporary directory {tempdir}.")
-
-
-# Call the _kill_omni() function when it is getting removed, e.g. the interpreter is shutting down
-_finalizer = weakref.finalize(_kill_omni, _kill_omni)
-
 
 def shutdown():
     _kill_omni()
     exit(0)
+
+# register signal handler for CTRL + C
+def signal_handler(signal, frame):
+    shutdown()
+#Assign Handler Function
+signal.signal(signal.SIGINT, signal_handler)
