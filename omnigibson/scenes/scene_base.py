@@ -78,6 +78,14 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         return self._registry
 
     @property
+    def skybox(self):
+        """
+        Returns:
+            None or LightObject: Skybox light associated with this scene, if it is used
+        """
+        return self._skybox
+
+    @property
     def object_registry(self):
         """
         Returns:
@@ -166,7 +174,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 light_type="Dome",
                 intensity=1500,
             )
-            og.sim.import_object(self._skybox)
+            og.sim.import_object(self._skybox, register=False)
             light_prim = self._skybox.light_link.prim
             light_prim.GetAttribute("color").Set(Gf.Vec3f(1.07, 0.85, 0.61))
             light_prim.GetAttribute("texture:file").Set(Sdf.AssetPath(m.DEFAULT_SKYBOX_TEXTURE))
