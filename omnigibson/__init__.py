@@ -153,7 +153,7 @@ if not (os.getenv("OMNIGIBSON_NO_OMNIVERSE", 'False').lower() in {'true', '1', '
     app, sim, Environment, REGISTERED_SCENES, REGISTERED_OBJECTS, REGISTERED_ROBOTS, REGISTERED_CONTROLLERS, \
         REGISTERED_TASKS, ALL_SENSOR_MODALITIES = start()
 
-# Create and expose a temporary directory for any use cases. It will get destroyed *after* omni
+# Create and expose a temporary directory for any use cases. It will get destroyed upon omni
 # shutdown by the _kill_omni function.
 tempdir = tempfile.mkdtemp()
 
@@ -172,5 +172,4 @@ def shutdown():
 # register signal handler for CTRL + C
 def signal_handler(signal, frame):
     shutdown()
-#Assign Handler Function
 signal.signal(signal.SIGINT, signal_handler)
