@@ -57,14 +57,10 @@ class AttachedTo(RelativeObjectState, BooleanState, ContactSubscribedStateMixin,
     def get_dependencies():
         return RelativeObjectState.get_dependencies() + [ContactBodies]
 
-    def __init__(self, obj):
-        super().__init__(obj)
-
-        self.parent = None
-
     def _initialize(self):
         super()._initialize()
         self.initialize_link_mixin()
+        self.parent = None
         self.children = {link_name: None for link_name in self.links if link_name.split("_")[1].endswith("F")}
         self.parent_link_candidates = dict()
 
@@ -183,24 +179,22 @@ class AttachedTo(RelativeObjectState, BooleanState, ContactSubscribedStateMixin,
 
         self.obj.set_position_orientation(new_child_root_pos, new_child_root_quat)
 
-        attached_joint = create_joint(
-            prim_path=f"{parent_link.prim_path}/{self.obj.name}_attachment_joint",
-            joint_type=joint_type,
-            body0=f"{parent_link.prim_path}",
-            body1=f"{child_link.prim_path}",
-        )
-
         if joint_type == JointType.JOINT_FIXED:
             parent_local_quat = np.array([0.0, 0.0, 0.0, 1.0])
         else:
             _, parent_local_quat = T.relative_pose_transform([0, 0, 0], child_quat, [0, 0, 0], parent_quat)
 
-        parent_local_quat = parent_local_quat[[3, 0, 1, 2]]
-
-        attached_joint.GetAttribute("physics:localPos0").Set(Gf.Vec3f(0.0, 0.0, 0.0))
-        attached_joint.GetAttribute("physics:localRot0").Set(Gf.Quatf(*parent_local_quat))
-        attached_joint.GetAttribute("physics:localPos1").Set(Gf.Vec3f(0.0, 0.0, 0.0))
-        attached_joint.GetAttribute("physics:localRot1").Set(Gf.Quatf(1.0, 0.0, 0.0, 0.0))
+        print("parent_local_quat", parent_local_quat)
+        attached_joint = create_joint(
+            prim_path=f"{parent_link.prim_path}/{self.obj.name}_attachment_joint",
+            joint_type=joint_type,
+            body0=f"{parent_link.prim_path}",
+            body1=f"{child_link.prim_path}",
+            joint_frame_in_parent_frame_pos=np.zeros(3),
+            joint_frame_in_parent_frame_quat=parent_local_quat,
+            joint_frame_in_child_frame_pos=np.zeros(3),
+            joint_frame_in_child_frame_quat=np.array([0.0, 0.0, 0.0, 1.0]),
+        )
 
         # We update the simulation now without stepping physics so we can bypass the snapping warning from PhysicsUSD
         with suppress_omni_log(channels=["omni.physx.plugin"]):

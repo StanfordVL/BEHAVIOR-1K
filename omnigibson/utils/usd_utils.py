@@ -147,7 +147,9 @@ def get_semantic_objects_pose():
     return pose
 
 
-def create_joint(prim_path, joint_type, body0=None, body1=None, enabled=True):
+def create_joint(prim_path, joint_type, body0=None, body1=None, enabled=True,
+                 joint_frame_in_parent_frame_pos=None, joint_frame_in_parent_frame_quat=None,
+                 joint_frame_in_child_frame_pos=None, joint_frame_in_child_frame_quat=None):
     """
     Creates a joint between @body0 and @body1 of specified type @joint_type
 
@@ -185,11 +187,22 @@ def create_joint(prim_path, joint_type, body0=None, body1=None, enabled=True):
     # Get the prim pointed to at this path
     joint_prim = get_prim_at_path(prim_path)
 
-    # Apply joint API interface
-    PhysxSchema.PhysxJointAPI.Apply(joint_prim)
+    if joint_frame_in_parent_frame_pos is not None:
+        joint_prim.GetAttribute("physics:localPos0").Set(Gf.Vec3f(*joint_frame_in_parent_frame_pos))
+    if joint_frame_in_parent_frame_quat is not None:
+        joint_frame_in_parent_frame_quat = joint_frame_in_parent_frame_quat[[3, 0, 1, 2]]
+        joint_prim.GetAttribute("physics:localRot0").Set(Gf.Quatf(*joint_frame_in_parent_frame_quat))
+    if joint_frame_in_child_frame_pos is not None:
+        joint_prim.GetAttribute("physics:localPos1").Set(Gf.Vec3f(*joint_frame_in_child_frame_pos))
+    if joint_frame_in_child_frame_quat is not None:
+        joint_frame_in_child_frame_quat = joint_frame_in_child_frame_quat[[3, 0, 1, 2]]
+        joint_prim.GetAttribute("physics:localRot1").Set(Gf.Quatf(*joint_frame_in_child_frame_quat))
 
     # Possibly (un-/)enable this joint
     joint_prim.GetAttribute("physics:jointEnabled").Set(enabled)
+
+    # Apply joint API interface
+    PhysxSchema.PhysxJointAPI.Apply(joint_prim)
 
     # # We need to step rendering once to auto-fill the local pose before overwriting it.
     # og.sim.render()

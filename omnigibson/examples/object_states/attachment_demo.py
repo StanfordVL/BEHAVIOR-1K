@@ -40,8 +40,8 @@ def setup_scene():
         name="shelf_shelf_0",
         category="shelf_shelf",
         model="ymtnqa",
-        position=[0, 0, 0.2],
-        orientation=[ 0, 0, 0.3826834, 0.9238795 ],
+        position=[0, 0, 0.5],
+        orientation=[ 0, 0, 0.3826834, 0.9238795],
         abilities={"attachable": {}},
     )
 
