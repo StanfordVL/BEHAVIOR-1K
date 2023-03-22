@@ -75,9 +75,9 @@ class MacroParticleSystem(BaseSystem):
     def particle_idns(cls):
         """
         Returns:
-            list: idn of all the particles across all groups.
+            set: idn of all the particles across all groups.
         """
-        return [cls.particle_name2idn(particle_name) for particle_name in cls.particles]
+        return {cls.particle_name2idn(particle_name) for particle_name in cls.particles}
 
     @classproperty
     def next_available_particle_idn(cls):
@@ -88,9 +88,9 @@ class MacroParticleSystem(BaseSystem):
         if cls.n_particles == 0:
             return 0
         else:
-            for idn in range(max(cls.particle_idns) + 2):
-                if idn not in cls.particle_idns:
-                    return idn
+            # We don't fill in any holes, just simply use the next subsequent integer after the largest
+            # current ID
+            return max(cls.particle_idns) + 1
 
     @classmethod
     def _create_particle_template(cls):
