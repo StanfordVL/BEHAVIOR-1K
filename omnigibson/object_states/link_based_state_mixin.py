@@ -11,6 +11,7 @@ class LinkBasedStateMixin:
         super().__init__()
 
         self._link = None
+        self._links = dict()
 
     @classproperty
     def metalink_prefix(cls):
@@ -29,6 +30,14 @@ class LinkBasedStateMixin:
         return self._default_link if self._link is None else self._link
 
     @property
+    def links(self):
+        """
+        Returns:
+            None or RigidPrim: The link associated with this link-based state, if it exists
+        """
+        return self._links
+
+    @property
     def _default_link(self):
         """
         Returns:
@@ -43,12 +52,13 @@ class LinkBasedStateMixin:
     def initialize_link_mixin(self):
         assert not self._initialized
 
-        self._link = None
         # TODO: Extend logic to account for multiple instances of the same metalink? e.g: _0, _1, ... suffixes
         for name, link in self.obj.links.items():
             if self.metalink_prefix in name:
-                self._link = link
-                break
+                self._links[name] = link
+
+        if len(self._links) > 0:
+            self._link = list(self._links.values())[0]
 
         # Raise an error if we did not find a valid link
         # Note that we check the public accessor for self.link because a subclass might implement a fallback
