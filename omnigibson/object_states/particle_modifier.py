@@ -481,6 +481,15 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
         raise NotImplementedError()
 
     @property
+    def link(self):
+        # If self._link exists and we're using ParticleModifyMethod.ADJACENCY, we make sure it has some actual
+        # geometry to it, otherwise we use the default link
+        return self._default_link if self.method == ParticleModifyMethod.ADJACENCY and \
+                                     self._link is not None and \
+                                     len(self._link.collision_meshes) == 0 and \
+                                     len(self._link.visual_meshes) == 0 else super().link
+
+    @property
     def state_size(self):
         # One entry per system plus the current_step
         return len(self.modified_particle_count) + 1
@@ -855,7 +864,7 @@ class ParticleApplier(ParticleModifier):
                     velocities=velocities,
                 )
                 # Update our particle count
-                self.modified_particle_count[system] += n_particles
+                self.modified_particle_count[system.name] += n_particles
 
     def _apply_particle_in_projection_volume(self, system):
         """
@@ -884,7 +893,7 @@ class ParticleApplier(ParticleModifier):
             directions = self._in_mesh_local_particle_directions @ T.quat2mat(quat).T
 
             # Compile the particle poses to generate and sample the particles
-            n_particles = min(len(points), m.PHYSICAL_PARTICLES_APPLICATION_LIMIT - self.modified_particle_count[system])
+            n_particles = min(len(points), m.PHYSICAL_PARTICLES_APPLICATION_LIMIT - self.modified_particle_count[system.name])
             # Generate particles
             if n_particles > 0:
                 velocities = None if self._initial_speed == 0 else self._initial_speed * directions[:n_particles]
