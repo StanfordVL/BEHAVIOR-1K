@@ -3,6 +3,8 @@ import os
 
 import yaml
 import builtins
+from termcolor import colored
+
 
 # TODO: Need to fix somehow -- omnigibson gets imported first BEFORE we can actually modify the macros
 from omnigibson.macros import gm
@@ -119,15 +121,42 @@ def create_sim():
     return sim
 
 
+def print_logo():
+    raw_texts = [
+        ("       ___                  _", "  ____ _ _                     "),
+        ("      / _ \ _ __ ___  _ __ (_)", "/ ___(_) |__  ___  ___  _ __  "),
+        ("     | | | | '_ ` _ \| '_ \| |", " |  _| | '_ \/ __|/ _ \| '_ \ "),
+        ("     | |_| | | | | | | | | | |", " |_| | | |_) \__ \ (_) | | | |"),
+        ("      \___/|_| |_| |_|_| |_|_|", "\____|_|_.__/|___/\___/|_| |_|"),
+    ]
+
+    print()
+    for (red_text, grey_text) in raw_texts:
+        red_text = colored(red_text, "light_red", attrs=["bold"])
+        grey_text = colored(grey_text, "light_grey", attrs=["bold", "dark"])
+        print(red_text + grey_text)
+
+    print()
+
+
+def logo_small():
+    red_text = colored("Omni", "light_red", attrs=["bold"])
+    grey_text = colored("Gibson", "light_grey", attrs=["bold", "dark"])
+    return red_text + grey_text
+
+
 def start():
     global app, sim, Environment, REGISTERED_SCENES, REGISTERED_OBJECTS, REGISTERED_ROBOTS, REGISTERED_CONTROLLERS, \
         REGISTERED_TASKS, ALL_SENSOR_MODALITIES
 
-    log.info(f"{'-' * 10} Starting OmniGibson {'-' * 10}")
+    log.info(f"{'-' * 10} Starting {logo_small()} {'-' * 10}")
 
     # First create the app, then create the sim
     app = create_app()
     sim = create_sim()
+
+    print_logo()
+    log.info(f"{'-' * 10} Welcome to {logo_small()}! {'-' * 10}")
 
     # Import any remaining items we want to access directly from the main omnigibson import
     from omnigibson.envs import Environment
