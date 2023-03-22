@@ -370,10 +370,15 @@ class Simulator(SimulationContext, Serializable):
         """
         assert not self.is_stopped(), f"Simulator must not be stopped in order to run non physics step!"
         # Check to see if any objects should be initialized (only done IF we're playing)
-        if len(self._objects_to_initialize) > 0 and self.is_playing():
-            for obj in self._objects_to_initialize:
-                obj.initialize()
-            self._objects_to_initialize = []
+        n_objects_to_initialize = len(self._objects_to_initialize)
+        if n_objects_to_initialize > 0 and self.is_playing():
+            # We iterate through the objects to initialize
+            # Note that we don't explicitly do for obj in self._objects_to_initialize because additional objects
+            # may be added mid-iteration!!
+            # For this same reason, after we finish the loop, we keep any objects that are yet to be initialized
+            for i in range(n_objects_to_initialize):
+                self._objects_to_initialize[i].initialize()
+            self._objects_to_initialize = self._objects_to_initialize[n_objects_to_initialize:]
 
         # Propagate states if the feature is enabled
         if gm.ENABLE_OBJECT_STATES:
@@ -513,7 +518,6 @@ class Simulator(SimulationContext, Serializable):
                     # Only need to update if object is already initialized as well
                     if obj.initialized:
                         obj.update_handles()
-
 
             if was_stopped:
                 # We need to update controller mode because kp and kd were set to the original (incorrect) values when
