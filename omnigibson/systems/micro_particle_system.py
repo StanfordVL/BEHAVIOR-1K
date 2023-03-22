@@ -1513,7 +1513,7 @@ GranularSystem.create(
         prim_path=prim_path,
         name=name,
         category="apple",
-        model="00_0",
+        model="agveuv",
         visible=False,
         fixed_base=False,
         visual_only=True,
