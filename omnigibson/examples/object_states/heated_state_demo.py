@@ -16,7 +16,7 @@ def main():
         light_type="Sphere",
         name="light",
         radius=0.01,
-        intensity=1e5,
+        intensity=1e8,
         position=[-2.0, -2.0, 1.0],
     ))
 
@@ -25,7 +25,7 @@ def main():
             type="DatasetObject",
             name=f"bowl{i}",
             category="bowl",
-            model="68_0",
+            model="ajzltc",
             scale=scale,
             abilities={"heatable": {}},
             position=[x, 0, 0.2],
@@ -47,6 +47,9 @@ def main():
         position=np.array([ 0.182103, -2.07295 ,  0.14017 ]),
         orientation=np.array([0.77787037, 0.00267566, 0.00216149, 0.62841535]),
     )
+
+    # Dim the skybox so we can see the bowls' steam effectively
+    env.scene.skybox.intensity = 100.0
 
     # Grab reference to objects of relevance
     objs = list(env.scene.object_registry("category", "bowl"))

@@ -31,7 +31,7 @@ def setup_scene_for_abilities(abilities1, abilities2):
         type="DatasetObject",
         name="apple",
         category="apple",
-        model="00_0",
+        model="agveuv",
         abilities=abilities1,
         position=[0, 0, 0.04],
     )
@@ -40,7 +40,7 @@ def setup_scene_for_abilities(abilities1, abilities2):
         type="DatasetObject",
         name="fridge",
         category="fridge",
-        model="12252",
+        model="hivvdf",
         abilities=abilities2,
         position=[2, 0, 0.8],
     )

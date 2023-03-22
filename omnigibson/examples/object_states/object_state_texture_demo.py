@@ -24,14 +24,14 @@ def main():
                 "name": "light",
                 "light_type": "Sphere",
                 "radius": 0.01,
-                "intensity": 1e5,
+                "intensity": 1e8,
                 "position": [-2.0, -2.0, 1.0],
             },
             {
                 "type": "DatasetObject",
                 "name": "cabinet",
                 "category": "bottom_cabinet",
-                "model": "45087",
+                "model": "zuwvdo",
                 "abilities": {
                     "freezable": {},
                     "cookable": {},
@@ -54,7 +54,7 @@ def main():
                         },
             },
                 },
-                "position": [0, 0, 0.55],
+                "position": [0, 0, 0.59],
             },
         ],
     }
