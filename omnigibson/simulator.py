@@ -801,7 +801,7 @@ class Simulator(SimulationContext, Serializable):
         self._data_logger = DataLogger()
 
         # Load dummy stage, but don't clear sim to prevent circular loops
-        self.load_stage(usd_path=f"{og.assets_path}/models/misc/clear_stage.usd")
+        self.load_stage(usd_path=f"{gm.ASSET_PATH}/models/misc/clear_stage.usd")
 
     def restore(self, json_path):
         """

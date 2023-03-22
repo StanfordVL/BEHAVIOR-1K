@@ -4,7 +4,7 @@ from itertools import combinations
 from omni.isaac.core.objects.ground_plane import GroundPlane
 import numpy as np
 import omnigibson as og
-from omnigibson.macros import create_module_macros
+from omnigibson.macros import create_module_macros, gm
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.python_utils import classproperty, Serializable, Registerable, Recreatable, \
     create_object_from_init_info
@@ -23,7 +23,7 @@ log = create_module_logger(module_name=__name__)
 m = create_module_macros(module_path=__file__)
 
 # Default texture to use for skybox
-m.DEFAULT_SKYBOX_TEXTURE = f"{og.assets_path}/models/background/sky.jpg"
+m.DEFAULT_SKYBOX_TEXTURE = f"{gm.ASSET_PATH}/models/background/sky.jpg"
 
 # Global dicts that will contain mappings
 REGISTERED_SCENES = dict()

@@ -11,8 +11,8 @@ from scipy.spatial.transform import Rotation
 from omni.isaac.core.utils.rotations import gf_quat_to_np_array
 
 import omnigibson as og
+from omnigibson.macros import gm
 from omnigibson.objects.usd_object import USDObject
-from omnigibson.prims.rigid_prim import RigidPrim
 from omnigibson.utils.constants import AVERAGE_CATEGORY_SPECS, DEFAULT_JOINT_FRICTION, SPECIAL_JOINT_FRICTIONS, JointType
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.usd_utils import BoundingBoxAPI
@@ -124,7 +124,7 @@ class DatasetObject(USDObject):
         if usd_path is None:
             assert model is not None, f"Either usd_path or model and category must be specified in order to create a" \
                                       f"DatasetObject!"
-            usd_path = f"{og.og_dataset_path}/objects/{category}/{model}/usd/{model}.usd"
+            usd_path = f"{gm.DATASET_PATH}/objects/{category}/{model}/usd/{model}.usd"
 
         # Post-process the usd path if we're generating a cloth object
         if prim_type == PrimType.CLOTH:

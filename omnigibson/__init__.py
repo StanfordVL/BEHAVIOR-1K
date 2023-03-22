@@ -25,56 +25,29 @@ __version__ = "0.0.5"
 
 log.setLevel(logging.DEBUG if gm.DEBUG else logging.INFO)
 
-with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), "global_config.yaml")) as f:
-    global_config = yaml.load(f, Loader=yaml.FullLoader)
-
 # can override assets_path and dataset_path from environment variable
-if "OMNIGIBSON_ASSETS_PATH" in os.environ:
-    assets_path = os.environ["OMNIGIBSON_ASSETS_PATH"]
-else:
-    assets_path = global_config["assets_path"]
-assets_path = os.path.expanduser(assets_path)
-
-if "GIBSON_DATASET_PATH" in os.environ:
-    g_dataset_path = os.environ["GIBSON_DATASET_PATH"]
-else:
-    g_dataset_path = global_config["g_dataset_path"]
-g_dataset_path = os.path.expanduser(g_dataset_path)
+if "OMNIGIBSON_ASSET_PATH" in os.environ:
+    gm.ASSET_PATH = os.environ["OMNIGIBSON_ASSET_PATH"]
+gm.ASSET_PATH = os.path.expanduser(gm.ASSET_PATH)
+if not os.path.isabs(gm.ASSET_PATH):
+    gm.ASSET_PATH = os.path.join(os.path.dirname(os.path.realpath(__file__)), gm.ASSET_PATH)
 
 if "OMNIGIBSON_DATASET_PATH" in os.environ:
-    og_dataset_path = os.environ["OMNIGIBSON_DATASET_PATH"]
-else:
-    og_dataset_path = global_config["og_dataset_path"]
-og_dataset_path = os.path.expanduser(og_dataset_path)
+    gm.DATASET_PATH = os.environ["OMNIGIBSON_DATASET_PATH"]
+gm.DATASET_PATH = os.path.expanduser(gm.DATASET_PATH)
+if not os.path.isabs(gm.DATASET_PATH):
+    gm.DATASET_PATH = os.path.join(os.path.dirname(os.path.realpath(__file__)), gm.DATASET_PATH)
 
 if "OMNIGIBSON_KEY_PATH" in os.environ:
-    key_path = os.environ["OMNIGIBSON_KEY_PATH"]
-else:
-    key_path = global_config["key_path"]
-key_path = os.path.expanduser(key_path)
+    gm.KEY_PATH = os.environ["OMNIGIBSON_KEY_PATH"]
+gm.KEY_PATH = os.path.expanduser(gm.KEY_PATH)
+if not os.path.isabs(gm.KEY_PATH):
+    gm.KEY_PATH = os.path.join(os.path.dirname(os.path.realpath(__file__)), gm.KEY_PATH)
 
 root_path = os.path.dirname(os.path.realpath(__file__))
 
-if not os.path.isabs(assets_path):
-    assets_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), assets_path)
-if not os.path.isabs(g_dataset_path):
-    g_dataset_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), g_dataset_path)
-if not os.path.isabs(og_dataset_path):
-    og_dataset_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), og_dataset_path)
-if not os.path.isabs(key_path):
-    key_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), key_path)
-
-log.info("Importing OmniGibson (omnigibson module)")
-log.info("Assets path: {}".format(assets_path))
-log.info("Gibson Dataset path: {}".format(g_dataset_path))
-log.info("OmniGibson Dataset path: {}".format(og_dataset_path))
-log.info("OmniGibson Key path: {}".format(key_path))
-
-example_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "examples")
+# Store paths to example configs
 example_config_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "configs")
-
-log.info("Example path: {}".format(example_path))
-log.info("Example config path: {}".format(example_config_path))
 
 # Initialize global variables
 app = None  # (this is a singleton so it's okay that it's global)

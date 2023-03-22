@@ -1109,7 +1109,7 @@ VisualParticleSystem.create(
     name="stain",
     create_particle_template=lambda prim_path, name: og.objects.USDObject(
         prim_path=prim_path,
-        usd_path=os.path.join(og.assets_path, "models", "stain", "stain.usd"),
+        usd_path=os.path.join(gm.ASSET_PATH, "models", "stain", "stain.usd"),
         name=name,
         class_id=SemanticClass.DIRT,
         visible=False,

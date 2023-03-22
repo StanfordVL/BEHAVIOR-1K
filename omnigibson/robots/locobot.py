@@ -1,7 +1,7 @@
 import os
 import numpy as np
 
-import omnigibson
+from omnigibson.macros import gm
 from omnigibson.robots.two_wheel_robot import TwoWheelRobot
 
 
@@ -37,8 +37,8 @@ class Locobot(TwoWheelRobot):
 
     @property
     def usd_path(self):
-        return os.path.join(omnigibson.assets_path, "models/locobot/locobot/locobot.usd")
+        return os.path.join(gm.ASSET_PATH, "models/locobot/locobot/locobot.usd")
 
     @property
     def urdf_path(self):
-        return os.path.join(omnigibson.assets_path, "models/locobot/locobot.urdf")
+        return os.path.join(gm.ASSET_PATH, "models/locobot/locobot.urdf")
