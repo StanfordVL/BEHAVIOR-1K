@@ -6,8 +6,7 @@ if [ x"${ISAAC_SIM_PATH}" == "x" ]; then
   exit
 fi
 
-# Next, we prune some packages from Isaac Sim that are outdated relative to what we need in OmniGibson
-rm -r "${ISAAC_SIM_PATH}/exts/omni.isaac.ml_archive/pip_prebundle/gym*"
+# TODO: Make sure newest version is being used -- Isaac 2022.2.1!!
 
 # Create a conda environment with python 3.7
 conda create -y -n omnigibson python=3.7
