@@ -916,9 +916,8 @@ class Simulator(SimulationContext, Serializable):
         # Clear simulation state
         self._clear_state()
 
-        # Open new stage
-        # The UI likes to dump some really scary looking errors which does nothing, so we suppress it here
-        with suppress_omni_log(channels=["omni.ui.python"]):
+        # Open new stage -- suppressing warning that we're opening a new stage
+        with suppress_omni_log(None):
             open_stage(usd_path=usd_path)
 
         # Re-initialize necessary internal vars
