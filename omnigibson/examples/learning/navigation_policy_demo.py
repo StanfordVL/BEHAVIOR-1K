@@ -6,14 +6,17 @@ This only serves as a starting point that users can further build upon.
 
 import argparse
 import os, time, cv2
+import yaml
 
 import omnigibson as og
 from omnigibson import example_config_path
+from omnigibson.macros import gm
 
 try:
     import gym
     import torch as th
     import torch.nn as nn
+    import tensorboard
     from stable_baselines3 import PPO
     from stable_baselines3.common.evaluation import evaluate_policy
     from stable_baselines3.common.preprocessing import maybe_transpose
@@ -22,17 +25,25 @@ try:
     from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback, EvalCallback
 
 except ModuleNotFoundError:
-    og.log.error("stable-baselines3 is not installed. You would need to do: pip install stable-baselines3")
+    og.log.error("torch, stable-baselines3, or tensorboard is not installed. "
+                 "See which packages are missing, and then run the following for any missing packages:\n"
+                 "pip install torch\n"
+                 "pip install stable-baselines3\n"
+                 "pip install tensorboard")
     exit(1)
+
+
+# We don't need object states nor transitions rules, so we disable them now, and also enable flatcache for maximum speed
+gm.ENABLE_OBJECT_STATES = False
+gm.ENABLE_TRANSITION_RULES = False
+gm.ENABLE_FLATCACHE = True
 
 
 class CustomCombinedExtractor(BaseFeaturesExtractor):
     def __init__(self, observation_space: gym.spaces.Dict):
         # We do not know features-dim here before going over all the items,
         # so put something dummy for now. PyTorch requires calling
-        super(CustomCombinedExtractor, self).__init__(observation_space, features_dim=1)
-        self.debug_length = 10
-        self.debug_mode = True
+        super().__init__(observation_space, features_dim=1)
         extractors = {}
         self.step_index = 0
         self.img_save_dir = 'img_save_dir'
@@ -40,9 +51,10 @@ class CustomCombinedExtractor(BaseFeaturesExtractor):
         total_concat_size = 0
         feature_size = 128
         for key, subspace in observation_space.spaces.items():
-            if key in ["rgb", "ins_seg"]:
+            # For now, only keep RGB observations
+            if "rgb" in key:
                 og.log.info(f"obs {key} shape: {subspace.shape}")
-                n_input_channels = subspace.shape[2]  # channel last
+                n_input_channels = subspace.shape[0]  # channel first
                 cnn = nn.Sequential(
                     nn.Conv2d(n_input_channels, 4, kernel_size=8, stride=4, padding=0),
                     nn.ReLU(),
@@ -54,16 +66,12 @@ class CustomCombinedExtractor(BaseFeaturesExtractor):
                     nn.ReLU(),
                     nn.Flatten(),
                 )
-                test_tensor = th.zeros([subspace.shape[2], subspace.shape[0], subspace.shape[1]])
+                test_tensor = th.zeros(subspace.shape)
                 with th.no_grad():
                     n_flatten = cnn(test_tensor[None]).shape[1]
                 fc = nn.Sequential(nn.Linear(n_flatten, feature_size), nn.ReLU())
                 extractors[key] = nn.Sequential(cnn, fc)
-            elif key in ["accum_reward", 'obj_joint']:
-                extractors[key] = nn.Sequential(nn.Linear(subspace.shape[0], feature_size))
-            else:
-                continue
-            total_concat_size += feature_size
+                total_concat_size += feature_size
         self.extractors = nn.ModuleDict(extractors)
 
         # Update the features dim manually
@@ -75,18 +83,6 @@ class CustomCombinedExtractor(BaseFeaturesExtractor):
 
         # self.extractors contain nn.Modules that do all the processing.
         for key, extractor in self.extractors.items():
-            if key in ["rgb",]:
-                if self.debug_mode:
-                    cv2.imwrite(os.path.join(self.img_save_dir, '{0:06d}.png'.format(self.step_index % self.debug_length)), cv2.cvtColor((observations[key][0].cpu().numpy()*255).astype('uint8'), cv2.COLOR_RGB2BGR))
-                observations[key] = observations[key].permute((0, 3, 1, 2))
-            elif key in ["ins_seg"]:
-                observations[key] = observations[key].permute((0, 3, 1, 2)) / 500.
-            elif key in ['accum_reward', 'obj_joint']:
-                if len(observations[key].shape) == 3:
-                    observations[key] = observations[key].squeeze(-1)  # [:, :, 0]
-            else:
-                continue
-
             encoded_tensor_list.append(extractor(observations[key]))
 
         feature = th.cat(encoded_tensor_list, dim=1)
@@ -96,12 +92,6 @@ class CustomCombinedExtractor(BaseFeaturesExtractor):
 def main():
     # Parse args
     parser = argparse.ArgumentParser(description="Train or evaluate a PPO agent in BEHAVIOR")
-    parser.add_argument(
-        "--config",
-        type=str,
-        default=f"{example_config_path}/fetch_behavior.yaml",
-        help="Absolute path to desired OmniGibson environment config to load",
-    )
 
     parser.add_argument(
         "--checkpoint",
@@ -122,7 +112,24 @@ def main():
     prefix = ''
     seed = 0
 
-    env = og.Environment(configs=args.config, action_timestep=1 / 60., physics_timestep=1 / 60.)
+    # Load config
+    with open(f"{example_config_path}/turtlebot_nav.yaml", "r") as f:
+        cfg = yaml.load(f, Loader=yaml.FullLoader)
+
+    # Only use RGB obs
+    cfg["robots"][0]["obs_modalities"] = ["rgb"]
+
+    # If we're not eval, turn off the start / goal markers so the agent doesn't see them
+    if not args.eval:
+        cfg["task"]["visualize_goal"] = False
+
+    env = og.Environment(
+        configs=cfg,
+        action_timestep=1 / 60.,
+        physics_timestep=1 / 60.,
+        flatten_action_space=True,
+        flatten_obs_space=True,
+    )
 
     # If we're evaluating, hide the ceilings and enable camera teleoperation so the user can easily
     # visualize the rollouts dynamically
@@ -161,13 +168,17 @@ def main():
             device='cuda',
         )
         checkpoint_callback = CheckpointCallback(save_freq=1000, save_path=tensorboard_log_dir, name_prefix=prefix)
+        eval_callback = EvalCallback(eval_env=env, eval_freq=1000, n_eval_episodes=20)
+        callback = CallbackList([checkpoint_callback, eval_callback])
+
         og.log.debug(model.policy)
         og.log.info(f"model: {model}")
 
         og.log.info("Starting training...")
-        model.learn(total_timesteps=10000000, callback=checkpoint_callback,
-                    eval_env=env, eval_freq=1000,
-                    n_eval_episodes=20)
+        model.learn(
+            total_timesteps=10000000,
+            callback=callback,
+        )
         og.log.info("Finished training!")
 
 
