@@ -72,6 +72,11 @@ def create_app():
     app = SimulationApp({"headless": gm.HEADLESS})
     import omni
 
+    # Enable additional extensions we need
+    from omni.isaac.core.utils.extensions import enable_extension
+    enable_extension("omni.flowusd")
+    enable_extension("omni.particle.system.bundle")
+
     # Possibly hide windows if in debug mode
     if gm.GUI_VIEWPORT_ONLY:
         hide_window_names = ["Console", "Main ToolBar", "Stage", "Layer", "Property", "Render Settings", "Content",
