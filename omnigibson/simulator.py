@@ -219,7 +219,7 @@ class Simulator(SimulationContext, Serializable):
         carb.settings.get_settings().set_bool("/rtx/directLighting/sampledLighting/enabled", True)
         carb.settings.get_settings().set_int("/rtx/raytracing/showLights", 1)
         carb.settings.get_settings().set_float("/rtx/sceneDb/ambientLightIntensity", 0.1)
-        carb.settings.get_settings().set_int("/rtx/domeLight/upperLowerStrategy", 3)  # "Limited image-based"
+        # carb.settings.get_settings().set_int("/rtx/domeLight/upperLowerStrategy", 3)  # "Limited image-based"
 
     @property
     def viewer_visibility(self):
@@ -918,9 +918,8 @@ class Simulator(SimulationContext, Serializable):
         # Clear simulation state
         self._clear_state()
 
-        # Open new stage -- suppressing warning that we're opening a new stage
-        with suppress_omni_log(None):
-            open_stage(usd_path=usd_path)
+        # Open new stage
+        open_stage(usd_path=usd_path)
 
         # Re-initialize necessary internal vars
         self._app = omni.kit.app.get_app_interface()
