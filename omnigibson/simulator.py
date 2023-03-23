@@ -815,9 +815,6 @@ class Simulator(SimulationContext, Serializable):
             log.error(f"You have to define the full json_path to load from. Got: {json_path}")
             return
 
-        # Clear the current stage
-        self.clear()
-
         # Load the info from the json
         with open(json_path, "r") as f:
             scene_info = json.load(f)
@@ -831,6 +828,7 @@ class Simulator(SimulationContext, Serializable):
         og.REGISTERED_SCENES[init_info["class_name"]].modify_init_info_for_restoring(init_info=init_info)
 
         # Recreate and import the saved scene
+        og.sim.stop()
         recreated_scene = create_object_from_init_info(init_info)
         self.import_scene(scene=recreated_scene)
 
@@ -919,7 +917,9 @@ class Simulator(SimulationContext, Serializable):
         self._clear_state()
 
         # Open new stage
-        open_stage(usd_path=usd_path)
+        # The UI likes to dump some really scary looking errors which does nothing, so we suppress it here
+        with suppress_omni_log(channels=["omni.ui.python"]):
+            open_stage(usd_path=usd_path)
 
         # Re-initialize necessary internal vars
         self._app = omni.kit.app.get_app_interface()
