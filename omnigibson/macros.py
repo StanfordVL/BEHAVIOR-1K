@@ -31,7 +31,7 @@ gm.GUI_VIEWPORT_ONLY = False
 gm.DEBUG = False
 
 # Whether to print out disclaimers (i.e.: known failure cases resulting from Omniverse's current bugs / limitations)
-gm.SHOW_DISCLAIMERS = True
+gm.SHOW_DISCLAIMERS = False
 
 # Whether to use omni's GPU dynamics
 # This is necessary for certain features; e.g. particles (fluids / cloth)
