@@ -407,7 +407,7 @@ class CameraMover:
             path_length = int(dist / per_step_distance)
             interpolated_points = np.zeros((path_length, 3))
             for i in range(path_length):
-                curr_step = step + (1.0 / path_length * i)
+                curr_step = step + (i / path_length)
                 interpolated_points[i, :] = np.array([spline(curr_step) for spline in splines])
             return interpolated_points
 
@@ -426,7 +426,7 @@ class CameraMover:
                 tilt_angle = np.arcsin(z)
                 # Infer global quat orientation from these angles
                 quat = T.euler2quat([np.pi / 2 - tilt_angle, 0.0, pan_angle])
-                poses.append([positions[i], quat])
+                poses.append([positions[j], quat])
 
         # Record the generated trajectory
         self.record_trajectory(poses=poses, fps=fps, steps_per_frame=steps_per_frame, fpath=fpath)

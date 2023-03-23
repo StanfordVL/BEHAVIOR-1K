@@ -82,7 +82,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         key=carb.input.KeyboardInput.J,
         callback_fn=lambda: cam_mover.record_trajectory_from_waypoints(
             waypoints=np.array(waypoints),
-            per_step_distance=0.05,
+            per_step_distance=0.02,
             fps=30,
             steps_per_frame=1,
             fpath=None,             # This corresponds to the default path inferred from cam_mover.save_dir
