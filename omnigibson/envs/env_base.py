@@ -436,10 +436,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
         """
         Reset episode.
         """
-        # # Stop and restart the simulation
-        # og.sim.stop()
-        # og.sim.play()
-
         # Reset the task
         self.task.reset(self)
 
