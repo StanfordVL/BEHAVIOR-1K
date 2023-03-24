@@ -1036,19 +1036,11 @@ class ManipulationRobot(BaseRobot):
             body0=self.eef_links[arm].prim_path,
             body1=ag_link.prim_path,
             enabled=False,
+            joint_frame_in_parent_frame_pos=parent_frame_pos / self.scale,
+            joint_frame_in_parent_frame_quat=parent_frame_orn,
+            joint_frame_in_child_frame_pos=child_frame_pos / ag_obj.scale,
+            joint_frame_in_child_frame_quat=child_frame_orn,
         )
-
-        # Set the local pose of this joint
-        joint_prim.GetAttribute("physics:localPos0").Set(Gf.Vec3f(*(parent_frame_pos / self.scale)))
-        joint_prim.GetAttribute("physics:localRot0").Set(Gf.Quatf(*(parent_frame_orn[[3, 0, 1, 2]])))
-        joint_prim.GetAttribute("physics:localPos1").Set(Gf.Vec3f(*(child_frame_pos / ag_obj.scale)))
-        joint_prim.GetAttribute("physics:localRot1").Set(Gf.Quatf(*(child_frame_orn[[3, 0, 1, 2]])))
-
-        # We have to toggle the joint from off to on after a physics step because of an omni quirk
-        # Otherwise the joint transform is very weird
-        with suppress_omni_log(channels=["omni.physx.plugin"]):
-            og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
-        joint_prim.GetAttribute("physics:jointEnabled").Set(True)
 
         # Save a reference to this joint prim
         self._ag_obj_constraints[arm] = joint_prim
@@ -1231,16 +1223,8 @@ class ManipulationRobot(BaseRobot):
             body0=ag_link.prim_path,
             body1=None,
             enabled=False,
+            joint_frame_in_child_frame_pos=attachment_point_pos,
         )
-
-        # Set the local pose of this joint
-        joint_prim.GetAttribute("physics:localPos1").Set(Gf.Vec3f(*attachment_point_pos))
-
-        # We have to toggle the joint from off to on after a physics step because of an omni quirk
-        # Otherwise the joint transform is very weird
-        with suppress_omni_log(channels=["omni.physx.plugin"]):
-            og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
-        joint_prim.GetAttribute("physics:jointEnabled").Set(True)
 
         # Save a reference to this joint prim
         self._ag_obj_constraints[arm] = joint_prim

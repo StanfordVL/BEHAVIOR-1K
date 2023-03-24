@@ -13,6 +13,7 @@ from omni.isaac.core.utils.prims import is_prim_ancestral, get_prim_type_name, i
     is_prim_path_valid
 from omni.isaac.core.utils.stage import open_stage
 from omni.isaac.dynamic_control import _dynamic_control
+from omni.physx.bindings._physx import ContactEventType, SimulationEvent
 import omni.kit.loop._loop as omni_loop
 from pxr import Usd, Gf, UsdGeom, Sdf, UsdPhysics, PhysxSchema, PhysicsSchemaTools, UsdUtils
 from omni.isaac.core.loggers import DataLogger
@@ -30,6 +31,7 @@ from omnigibson.objects.object_base import BaseObject
 from omnigibson.objects.stateful_object import StatefulObject
 from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.object_states.contact_subscribed_state_mixin import ContactSubscribedStateMixin
+from omnigibson.object_states.joint_break_subscribed_state_mixin import JointBreakSubscribedStateMixin
 from omnigibson.object_states.factory import get_states_by_dependency_order
 from omnigibson.object_states.update_state_mixin import UpdateStateMixin
 from omnigibson.sensors.vision_sensor import VisionSensor
@@ -93,6 +95,7 @@ class Simulator(SimulationContext, Serializable):
         self._physx_scene_query_interface = get_physx_scene_query_interface()
         self._data_logger = DataLogger()
         self._contact_callback = self._physics_context._physx_sim_interface.subscribe_contact_report_events(self._on_contact)
+        self._simulation_event_callback = self._physx_interface.get_simulation_event_stream_v2().create_subscription_to_pop(self._on_simulation_event)
 
         # Store other internal vars
         self.gravity = gravity
@@ -119,7 +122,9 @@ class Simulator(SimulationContext, Serializable):
         self.object_state_types_requiring_update = \
             [state for state in self.object_state_types if issubclass(state, UpdateStateMixin)]
         self.object_state_types_on_contact = \
-            [state for state in self.object_state_types if issubclass(state, ContactSubscribedStateMixin)]
+            {state for state in self.object_state_types if issubclass(state, ContactSubscribedStateMixin)}
+        self.object_state_types_on_joint_break = \
+            {state for state in self.object_state_types if issubclass(state, JointBreakSubscribedStateMixin)}
 
         # Set of all non-Omniverse transition rules to apply.
         self._transition_rules = DEFAULT_RULES
@@ -610,17 +615,48 @@ class Simulator(SimulationContext, Serializable):
                 # actor0/1 are prim paths for links that are in contact. Find the corresponding objects.
                 actor0_obj = self._scene.object_registry("prim_path", "/".join(actor0.split("/")[:-1]))
                 actor1_obj = self._scene.object_registry("prim_path", "/".join(actor1.split("/")[:-1]))
-                if actor0_obj is None or actor1_obj is None or not actor0_obj.initialized or not actor1_obj.initialized:
+                # If any of the objects cannot be found, skip
+                if actor0_obj is None or actor1_obj is None:
+                    continue
+                # If any of the objects is not initialized, skip
+                if not actor0_obj.initialized or not actor1_obj.initialized:
+                    continue
+                # If any of the objects is not stateful, skip
+                if not isinstance(actor0_obj, StatefulObject) or not isinstance(actor1_obj, StatefulObject):
+                    continue
+                # If any of the objects doesn't have states that require on_contact callbacks, skip
+                if len(actor0_obj.states.keys() & self.object_state_types_on_contact) == 0 or len(actor1_obj.states.keys() & self.object_state_types_on_contact) == 0:
                     continue
                 headers[tuple(sorted((actor0_obj, actor1_obj), key=lambda x: x.name))].append(contact_header)
 
             for (actor0_obj, actor1_obj) in headers:
-                if not isinstance(actor0_obj, StatefulObject) or not isinstance(actor1_obj, StatefulObject):
-                    continue
                 for obj0, obj1 in [(actor0_obj, actor1_obj), (actor1_obj, actor0_obj)]:
                     for state_type in self.object_state_types_on_contact:
                         if state_type in obj0.states:
                             obj0.states[state_type].on_contact(obj1, headers[(actor0_obj, actor1_obj)], contact_data)
+
+    def _on_simulation_event(self, event):
+        """
+        This callback will be invoked if there is any simulation event. Currently it only processes JOINT_BREAK event.
+        """
+        if gm.ENABLE_OBJECT_STATES:
+            if event.type == int(SimulationEvent.JOINT_BREAK):
+                joint_path = str(PhysicsSchemaTools.decodeSdfPath(event.payload["jointPath"][0], event.payload["jointPath"][1]))
+                obj = None
+                # TODO: recursively try to find the parent object of this joint
+                tokens = joint_path.split("/")
+                for i in range(2, len(tokens) + 1):
+                    obj = self._scene.object_registry("prim_path", "/".join(tokens[:i]))
+                    if obj is not None:
+                        break
+
+                if obj is None or not obj.initialized or not isinstance(obj, StatefulObject):
+                    return
+                if len(obj.states.keys() & self.object_state_types_on_joint_break) == 0:
+                    return
+                for state_type in self.object_state_types_on_joint_break:
+                    if state_type in obj.states:
+                        obj.states[state_type].on_joint_break(joint_path)
 
     def is_paused(self):
         """
@@ -933,6 +969,7 @@ class Simulator(SimulationContext, Serializable):
             omni.usd.get_context().get_stage_event_stream().create_subscription_to_pop(self._stage_open_callback_fn)
         )
         self._contact_callback = self._physics_context._physx_sim_interface.subscribe_contact_report_events(self._on_contact)
+        self._simulation_event_callback = self._physx_interface.get_simulation_event_stream_v2().create_subscription_to_pop(self._on_simulation_event)
 
         # Set the lighting mode to be stage by default
         self.set_lighting_mode(mode=LightingMode.STAGE)
