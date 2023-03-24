@@ -371,6 +371,7 @@ def test_temperature():
     dishtowel_new_temp = dishtowel.states[Temperature].get_value()
     assert bagel.states[Temperature].get_value() > m.object_states.temperature.DEFAULT_TEMPERATURE
     assert dishtowel.states[Temperature].get_value() > m.object_states.temperature.DEFAULT_TEMPERATURE
+    from IPython import embed; embed()
 
     # Set the objects to be far away
     bagel.set_position_orientation([-0.5, 0., 0.03], [0, 0, 0, 1])
@@ -695,3 +696,5 @@ def test_toggled_on():
     # Setter should work
     assert stove.states[ToggledOn].set_value(False)
     assert not stove.states[ToggledOn].get_value()
+
+test_temperature()
