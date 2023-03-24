@@ -809,7 +809,7 @@ class ParticleApplier(ParticleModifier):
 
             self._apply_particles_at_raycast_hits(system=system, hits=hits, scales=scales)
         else:
-            self._apply_particle_in_projection_volume(system=system)
+            self._apply_particles_in_projection_volume(system=system)
 
     def _apply_particles_at_raycast_hits(self, system, hits, scales=None):
         """
@@ -873,7 +873,7 @@ class ParticleApplier(ParticleModifier):
                 # Update our particle count
                 self.modified_particle_count[system.name] += n_particles
 
-    def _apply_particle_in_projection_volume(self, system):
+    def _apply_particles_in_projection_volume(self, system):
         """
         Helper function to apply particles form system @system within the projection volume owned by this
         ParticleApplier.
@@ -886,30 +886,30 @@ class ParticleApplier(ParticleModifier):
         """
         assert self.method == ParticleModifyMethod.PROJECTION, \
             "Can only apply particles within projection volume if ParticleModifyMethod.PROJECTION method is used!"
+        assert issubclass(system, PhysicalParticleSystem), \
+            "Can only apply particles within projection volume if system is PhysicalParticleSystem!"
 
-        # Check the system
-        if issubclass(system, PhysicalParticleSystem):
-            # Transform pre-cached particle positions into the world frame
-            pos, quat = self.link.get_position_orientation()
-            points = get_particle_positions_from_frame(
-                pos=pos,
-                quat=quat,
-                scale=np.ones(3),
-                particle_positions=self._in_mesh_local_particle_positions,
+        # Transform pre-cached particle positions into the world frame
+        pos, quat = self.link.get_position_orientation()
+        points = get_particle_positions_from_frame(
+            pos=pos,
+            quat=quat,
+            scale=np.ones(3),
+            particle_positions=self._in_mesh_local_particle_positions,
+        )
+        directions = self._in_mesh_local_particle_directions @ T.quat2mat(quat).T
+
+        # Compile the particle poses to generate and sample the particles
+        n_particles = min(len(points), m.PHYSICAL_PARTICLES_APPLICATION_LIMIT - self.modified_particle_count[system.name])
+        # Generate particles
+        if n_particles > 0:
+            velocities = None if self._initial_speed == 0 else self._initial_speed * directions[:n_particles]
+            system.default_particle_instancer.add_particles(
+                positions=points[:n_particles],
+                velocities=velocities,
             )
-            directions = self._in_mesh_local_particle_directions @ T.quat2mat(quat).T
-
-            # Compile the particle poses to generate and sample the particles
-            n_particles = min(len(points), m.PHYSICAL_PARTICLES_APPLICATION_LIMIT - self.modified_particle_count[system.name])
-            # Generate particles
-            if n_particles > 0:
-                velocities = None if self._initial_speed == 0 else self._initial_speed * directions[:n_particles]
-                system.default_particle_instancer.add_particles(
-                    positions=points[:n_particles],
-                    velocities=velocities,
-                )
-                # Update our particle count
-                self.modified_particle_count[system.name] += n_particles
+            # Update our particle count
+            self.modified_particle_count[system.name] += n_particles
 
     def _sample_particle_locations_from_projection_volume(self, system):
         """

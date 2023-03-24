@@ -130,7 +130,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     }
 
     # Sanity check inputs: Remover + Adjacency + Fluid will not work because we are using a visual_only
-    # object, so contacts will not be triggered with fthis object
+    # object, so contacts will not be triggered with this object
 
     # Load the environment, then immediately stop the simulator since we need to add in the modifier object
     env = og.Environment(configs=cfg, action_timestep=1/60., physics_timestep=1/60.)
