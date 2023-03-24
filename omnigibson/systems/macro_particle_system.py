@@ -782,7 +782,7 @@ class VisualParticleSystem(MacroParticleSystem):
         global_poses = np.matmul(A, B)
 
         # Decompose back into positions and orientations
-        return global_poses[:, :3, 3], T.mat2quat_batch(global_poses[:, :3, :3])
+        return global_poses[:, :3, 3], T.mat2quat(global_poses[:, :3, :3])
 
     @classmethod
     def get_particle_position_orientation(cls, name):
