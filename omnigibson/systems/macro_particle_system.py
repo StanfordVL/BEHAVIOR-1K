@@ -766,8 +766,8 @@ class VisualParticleSystem(MacroParticleSystem):
         """
         # Iterate over all particles and compute link tfs programmatically, then batch the matrix transform
         link_tfs = dict()
-        A = np.zeros((cls.n_particles, 4, 4))
-        B = np.zeros_like(A)
+        link_tfs_batch = np.zeros((cls.n_particles, 4, 4))
+        particle_local_poses_batch = np.zeros_like(link_tfs_batch)
         for i, name in enumerate(cls.particles):
             link = cls._particles_info[name]["link"]
             if link in link_tfs:
@@ -775,11 +775,11 @@ class VisualParticleSystem(MacroParticleSystem):
             else:
                 link_tf = T.pose2mat(link.get_position_orientation())
                 link_tfs[link] = link_tf
-            A[i] = link_tf
-            B[i] = cls._particles_local_mat[name]
+            link_tfs_batch[i] = link_tf
+            particle_local_poses_batch[i] = cls._particles_local_mat[name]
 
         # Compute once
-        global_poses = np.matmul(A, B)
+        global_poses = np.matmul(link_tfs_batch, particle_local_poses_batch)
 
         # Decompose back into positions and orientations
         return global_poses[:, :3, 3], T.mat2quat(global_poses[:, :3, :3])
