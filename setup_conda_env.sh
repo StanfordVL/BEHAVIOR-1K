@@ -6,8 +6,6 @@ if [ x"${ISAAC_SIM_PATH}" == "x" ]; then
   exit
 fi
 
-# TODO: Make sure newest version is being used -- Isaac 2022.2.1!!
-
 # Create a conda environment with python 3.7
 conda create -y -n omnigibson python=3.7
 
