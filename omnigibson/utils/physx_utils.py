@@ -248,5 +248,9 @@ def create_physx_particleset_pointinstancer(
         for i in range(3):
             og.sim.render()
 
+    # Isosurfaces require an additional physics timestep before they're actually rendered
+    if is_isosurface:
+        og.log.warning(f"Creating an instancer that uses isosurface {instancer_prim_path}. "
+                       f"The rendering of these particles will have a delay of one timestep.")
 
     return instancer_prim
