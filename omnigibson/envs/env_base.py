@@ -79,15 +79,15 @@ class Environment(gym.Env, GymObservable, Recreatable):
         This allows one to change the configuration and hot-reload the environment on the fly.
 
         Args:
-            configs (str or list of str): config_file path(s). If multiple configs are specified, they will
-                be merged sequentially in the order specified. This allows procedural generation of a "full" config from
-                small sub-configs.
+            configs (dict or str or list of dict or list of str): config_file dict(s) or path(s). 
+                If multiple configs are specified, they will be merged sequentially in the order specified. 
+                This allows procedural generation of a "full" config from small sub-configs.
             overwrite_old (bool): If True, will overwrite the internal self.config with @configs. Otherwise, will
                 merge in the new config(s) into the pre-existing one. Setting this to False allows for minor
                 modifications to be made without having to specify entire configs during each reload.
         """
         # Convert config file(s) into a single parsed dict
-        configs = [configs] if isinstance(configs, str) else configs
+        configs = [configs] if isinstance(configs, dict) or isinstance(configs, str) else configs
 
         # Initial default config
         new_config = self.default_config
