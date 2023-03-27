@@ -500,6 +500,7 @@ def sample_cuboid_on_object_symmetric_bimodal_distribution(
     hit_to_plane_threshold=m.DEFAULT_HIT_TO_PLANE_THRESHOLD,
     cuboid_bottom_padding=m.DEFAULT_CUBOID_BOTTOM_PADDING,
     undo_cuboid_bottom_padding=True,
+    verify_cuboid_empty=True,
     refuse_downwards=False,
 ):
     """
@@ -534,12 +535,14 @@ def sample_cuboid_on_object_symmetric_bimodal_distribution(
         cuboid_bottom_padding (float): additional padding applied to the bottom of the cuboid. This is needed for the
             emptiness check (@check_cuboid_empty) within the cuboid. un_padding=True can be set if the user wants to remove
             the padding after the emptiness check.
-        refuse_downwards (bool): whether downward-facing hits (as defined by max_angle_with_z_axis) are allowed.
         undo_cuboid_bottom_padding (bool): Whether the bottom padding that's applied to the cuboid should be removed before return.
             Useful when the cuboid needs to be flush with the surface for whatever reason. Note that the padding will still
             be applied initially (since it's not possible to do the cuboid emptiness check without doing this - otherwise
             the rays will hit the sampled-on object), so the emptiness check still checks a padded cuboid. This flag will
             simply make the sampler undo the padding prior to returning.
+        verify_cuboid_empty (bool): Whether to filter out sampled cuboid locations that are not collision-free. Note
+            that this check will only potentially occur if nonzero cuboid dimensions are specified.
+        refuse_downwards (bool): whether downward-facing hits (as defined by max_angle_with_z_axis) are allowed.
 
     Returns:
         list of tuple: list of length num_samples elements where each element is a tuple in the form of
@@ -561,13 +564,14 @@ def sample_cuboid_on_object_symmetric_bimodal_distribution(
         start_points,
         end_points,
         cuboid_dimensions,
-        undo_cuboid_bottom_padding=undo_cuboid_bottom_padding,
         new_ray_per_horizontal_distance=new_ray_per_horizontal_distance,
         hit_proportion=hit_proportion,
         max_angle_with_z_axis=max_angle_with_z_axis,
         parallel_ray_normal_angle_tolerance=parallel_ray_normal_angle_tolerance,
         hit_to_plane_threshold=hit_to_plane_threshold,
         cuboid_bottom_padding=cuboid_bottom_padding,
+        undo_cuboid_bottom_padding=undo_cuboid_bottom_padding,
+        verify_cuboid_empty=verify_cuboid_empty,
         refuse_downwards=refuse_downwards,
     )
 
@@ -584,6 +588,7 @@ def sample_cuboid_on_object_full_grid_topdown(
     hit_to_plane_threshold=m.DEFAULT_HIT_TO_PLANE_THRESHOLD,
     cuboid_bottom_padding=m.DEFAULT_CUBOID_BOTTOM_PADDING,
     undo_cuboid_bottom_padding=True,
+    verify_cuboid_empty=True,
     refuse_downwards=False,
 ):
     """
@@ -613,12 +618,14 @@ def sample_cuboid_on_object_full_grid_topdown(
         cuboid_bottom_padding (float): additional padding applied to the bottom of the cuboid. This is needed for the
             emptiness check (@check_cuboid_empty) within the cuboid. un_padding=True can be set if the user wants to remove
             the padding after the emptiness check.
-        refuse_downwards (bool): whether downward-facing hits (as defined by max_angle_with_z_axis) are allowed.
         undo_cuboid_bottom_padding (bool): Whether the bottom padding that's applied to the cuboid should be removed before return.
             Useful when the cuboid needs to be flush with the surface for whatever reason. Note that the padding will still
             be applied initially (since it's not possible to do the cuboid emptiness check without doing this - otherwise
             the rays will hit the sampled-on object), so the emptiness check still checks a padded cuboid. This flag will
             simply make the sampler undo the padding prior to returning.
+        verify_cuboid_empty (bool): Whether to filter out sampled cuboid locations that are not collision-free. Note
+            that this check will only potentially occur if nonzero cuboid dimensions are specified.
+        refuse_downwards (bool): whether downward-facing hits (as defined by max_angle_with_z_axis) are allowed.
 
     Returns:
         list of tuple: list of length num_samples elements where each element is a tuple in the form of
@@ -636,13 +643,14 @@ def sample_cuboid_on_object_full_grid_topdown(
         start_points,
         end_points,
         cuboid_dimensions,
-        undo_cuboid_bottom_padding=undo_cuboid_bottom_padding,
         new_ray_per_horizontal_distance=new_ray_per_horizontal_distance,
         hit_proportion=hit_proportion,
         max_angle_with_z_axis=max_angle_with_z_axis,
         parallel_ray_normal_angle_tolerance=parallel_ray_normal_angle_tolerance,
         hit_to_plane_threshold=hit_to_plane_threshold,
         cuboid_bottom_padding=cuboid_bottom_padding,
+        undo_cuboid_bottom_padding=undo_cuboid_bottom_padding,
+        verify_cuboid_empty=verify_cuboid_empty,
         refuse_downwards=refuse_downwards,
     )
 
@@ -660,6 +668,7 @@ def sample_cuboid_on_object(
     hit_to_plane_threshold=m.DEFAULT_HIT_TO_PLANE_THRESHOLD,
     cuboid_bottom_padding=m.DEFAULT_CUBOID_BOTTOM_PADDING,
     undo_cuboid_bottom_padding=True,
+    verify_cuboid_empty=True,
     refuse_downwards=False,
 ):
     """
@@ -692,12 +701,14 @@ def sample_cuboid_on_object(
         cuboid_bottom_padding (float): additional padding applied to the bottom of the cuboid. This is needed for the
             emptiness check (@check_cuboid_empty) within the cuboid. un_padding=True can be set if the user wants to remove
             the padding after the emptiness check.
-        refuse_downwards (bool): whether downward-facing hits (as defined by max_angle_with_z_axis) are allowed.
         undo_cuboid_bottom_padding (bool): Whether the bottom padding that's applied to the cuboid should be removed before return.
             Useful when the cuboid needs to be flush with the surface for whatever reason. Note that the padding will still
             be applied initially (since it's not possible to do the cuboid emptiness check without doing this - otherwise
             the rays will hit the sampled-on object), so the emptiness check still checks a padded cuboid. This flag will
             simply make the sampler undo the padding prior to returning.
+        verify_cuboid_empty (bool): Whether to filter out sampled cuboid locations that are not collision-free. Note
+            that this check will only potentially occur if nonzero cuboid dimensions are specified.
+        refuse_downwards (bool): whether downward-facing hits (as defined by max_angle_with_z_axis) are allowed.
 
     Returns:
         list of tuple: list of length num_samples elements where each element is a tuple in the form of
@@ -847,12 +858,11 @@ def sample_cuboid_on_object(
                 )
 
                 # Now we use the cuboid's diagonals to check that the cuboid is actually empty
-                if not check_cuboid_empty(
+                if verify_cuboid_empty and not check_cuboid_empty(
                         plane_normal,
                         corner_positions,
                         this_cuboid_dimensions,
                         refusal_reasons["cuboid_not_empty"],
-                        ignore_body_names=ignore_rigid_bodies,
                 ):
                     continue
 
@@ -951,7 +961,7 @@ def check_normal_similarity(center_hit_normal, hit_normals, tolerance, refusal_l
     return True
 
 
-def check_rays_hit_object(cast_results, threshold, refusal_log, body_names=None, ignore_body_names=None):
+def check_rays_hit_object(cast_results, threshold, refusal_log, body_names=None):
     """
     Checks whether rays hit a specific object, as specified by a list of @body_names
 
@@ -962,8 +972,6 @@ def check_rays_hit_object(cast_results, threshold, refusal_log, body_names=None,
         refusal_log (list of str): Logging array for adding debug logs
         body_names (None or list or set of str): absolute USD paths to rigid bodies to check for hit. If not
             specified, then any valid hit will be accepted
-        ignore_body_names (None or list or set of str): absolute USD paths to rigid bodies to ignore for hit. If not
-            specified, then any valid hit will be accepted
 
     Returns:
         None or list of bool: Individual T/F for each ray -- whether it hit the object or not
@@ -971,8 +979,7 @@ def check_rays_hit_object(cast_results, threshold, refusal_log, body_names=None,
     body_names = None if body_names is None else set(body_names)
     ray_hits = [
         ray_res["hit"] and
-        (body_names is None or ray_res["rigidBody"] in body_names) and
-        (ignore_body_names is None or ray_res["rigidBody"] not in ignore_body_names)
+        (body_names is None or ray_res["rigidBody"] in body_names)
         for ray_res in cast_results
     ]
     if sum(ray_hits) / len(cast_results) < threshold:
@@ -1052,7 +1059,7 @@ def compute_ray_destination(axis, is_top, start_pos, aabb_min, aabb_max):
     return point_on_face
 
 
-def check_cuboid_empty(hit_normal, bottom_corner_positions, this_cuboid_dimensions, refusal_log, ignore_body_names=None):
+def check_cuboid_empty(hit_normal, bottom_corner_positions, this_cuboid_dimensions, refusal_log):
     """
     Check whether the cuboid defined by @this_cuboid_dimensions and @bottom_corner_positions contains
     empty space or not
@@ -1074,21 +1081,20 @@ def check_cuboid_empty(hit_normal, bottom_corner_positions, this_cuboid_dimensio
     top_corner_positions = bottom_corner_positions + hit_normal * this_cuboid_dimensions[2]
 
     # We only generate valid rays that have nonzero distances. If the inputted cuboid is flat (i.e.: one dimension
-    # is zero, i.e.: it is in fact a rectangle), some of our generated rays will have zero distance
+    # is zero, i.e.: it is in fact a rectangle), raise an error
+    assert this_cuboid_dimensions[2] != 0, "Cannot check empty cuboid for cuboid with zero height!"
 
-    # Get all the top-to-bottom corner pairs. When we cast these rays, we check for two things: that the cuboid
-    # height is actually available, and the faces & volume of the cuboid are unoccupied.
-    top_to_bottom_pairs = [] if this_cuboid_dimensions[2] == 0 else \
-        list(itertools.product(top_corner_positions, bottom_corner_positions))
+    # Get all the top-to-bottom corner pairs.
+    # When we cast these rays, we check that the faces & volume of the cuboid are unoccupied.
+    top_to_bottom_pairs = list(itertools.product(top_corner_positions, bottom_corner_positions))
 
     # Get all the same-height pairs. These also check that the surfaces areas are empty.
-    # Note: These are redundant if our cuboid has zero height!
     bottom_pairs = list(itertools.combinations(bottom_corner_positions, 2))
-    top_pairs = [] if this_cuboid_dimensions[2] == 0 else list(itertools.combinations(top_corner_positions, 2))
+    top_pairs = list(itertools.combinations(top_corner_positions, 2))
 
     # Combine all these pairs, cast the rays, and make sure the rays don't hit anything.
     all_pairs = np.array(top_to_bottom_pairs + bottom_pairs + top_pairs)
-    check_cast_results = raytest_batch(start_points=all_pairs[:, 0, :], end_points=all_pairs[:, 1, :], ignore_bodies=ignore_body_names)
+    check_cast_results = raytest_batch(start_points=all_pairs[:, 0, :], end_points=all_pairs[:, 1, :])
     if any(ray["hit"] for ray in check_cast_results):
         if gm.DEBUG:
             refusal_log.append("check ray info: %r" % (check_cast_results))

@@ -790,9 +790,10 @@ class ParticleApplier(ParticleModifier):
                 cuboid_dimensions=cuboid_dimensions,
                 ignore_objs=[self.obj],
                 hit_proportion=0.0,             # We want all hits
-                undo_cuboid_bottom_padding=issubclass(system, VisualParticleSystem),      # micro particles have zero cuboid dimensions so we need to maintain padding
                 cuboid_bottom_padding=system.particle_radius if issubclass(system, PhysicalParticleSystem) else
                 macros.utils.sampling_utils.DEFAULT_CUBOID_BOTTOM_PADDING,
+                undo_cuboid_bottom_padding=issubclass(system, VisualParticleSystem),      # micro particles have zero cuboid dimensions so we need to maintain padding
+                verify_cuboid_empty=False,
             )
 
             hits = [result for result in results if result[0] is not None]
