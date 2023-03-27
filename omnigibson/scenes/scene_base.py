@@ -210,8 +210,19 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         fixed_objs = self.object_registry("fixed_base", True, default_val=[])
         if len(fixed_objs) > 1:
             # We iterate over all pairwise combinations of fixed objects
+            building_categories = {"walls", "floors", "ceilings"}
             for obj_a, obj_b in combinations(fixed_objs, 2):
-                obj_a.root_link.add_filtered_collision_pair(obj_b.root_link)
+                # TODO: Remove this hotfix once asset collision meshes are fixed!
+                # Filter out collisions between walls / ceilings / floors and ALL links of the other object
+                if obj_a.category in building_categories:
+                    for link in obj_b.links.values():
+                        obj_a.root_link.add_filtered_collision_pair(link)
+                elif obj_b.category in building_categories:
+                    for link in obj_a.links.values():
+                        obj_b.root_link.add_filtered_collision_pair(link)
+                else:
+                    # Only filter out root links
+                    obj_a.root_link.add_filtered_collision_pair(obj_b.root_link)
 
     def _should_load_object(self, obj_info):
         """
