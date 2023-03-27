@@ -46,7 +46,8 @@ class PointNavigationTask(BaseTask):
         visualize_goal (bool): Whether to visualize the initial / goal locations
         visualize_path (bool): Whether to visualize the path from initial to goal location, as represented by
             discrete waypoints
-        marker_height (float): If visualizing, specifies the height of the visual markers (m)
+        goal_height (float): If visualizing, specifies the height of the visual goals (m)
+        waypoint_height (float): If visualizing, specifies the height of the visual waypoints (m)
         waypoint_width (float): If visualizing, specifies the width of the visual waypoints (m)
         n_vis_waypoints (int): If visualizing, specifies the number of waypoints to generate
         reward_type (str): Type of reward to use. Valid options are: {"l2", "geodesic"}
@@ -72,7 +73,8 @@ class PointNavigationTask(BaseTask):
             path_range=None,
             visualize_goal=False,
             visualize_path=False,
-            marker_height=0.05,
+            goal_height=0.06,
+            waypoint_height=0.05,
             waypoint_width=0.1,
             n_vis_waypoints=10,
             reward_type="l2",
@@ -93,7 +95,8 @@ class PointNavigationTask(BaseTask):
         self._randomize_goal_pos = goal_pos is None
         self._visualize_goal = visualize_goal
         self._visualize_path = visualize_path
-        self._marker_height = marker_height
+        self._goal_height = goal_height
+        self._waypoint_height = waypoint_height
         self._waypoint_width = waypoint_width
         self._n_vis_waypoints = n_vis_waypoints
         assert_valid_key(key=reward_type, valid_keys=POINT_NAVIGATION_REWARD_TYPES, name="reward type")
@@ -163,7 +166,7 @@ class PointNavigationTask(BaseTask):
                 primitive_type="Cylinder",
                 name="task_initial_pos_marker",
                 radius=self._goal_tolerance,
-                height=self._marker_height * 1.1,
+                height=self._goal_height,
                 visual_only=True,
                 rgba=np.array([1, 0, 0, 0.3]),
             )
@@ -172,7 +175,7 @@ class PointNavigationTask(BaseTask):
                 primitive_type="Cylinder",
                 name="task_goal_pos_marker",
                 radius=self._goal_tolerance,
-                height=self._marker_height * 1.1,
+                height=self._goal_height,
                 visual_only=True,
                 rgba=np.array([0, 0, 1, 0.3]),
             )
@@ -190,7 +193,7 @@ class PointNavigationTask(BaseTask):
                     primitive_type="Cylinder",
                     name=f"task_waypoint_marker{i}",
                     radius=self._waypoint_width,
-                    height=self._marker_height,
+                    height=self._waypoint_height,
                     visual_only=True,
                     rgba=np.array([0, 1, 0, 0.3]),
                 )
