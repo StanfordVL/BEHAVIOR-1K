@@ -8,11 +8,8 @@ import numpy as np
 
 import omnigibson as og
 from omnigibson.macros import gm
-from omnigibson.object_states import Filled
-from omnigibson.systems import WaterSystem
 from omnigibson.robots.turtlebot import Turtlebot
 from omnigibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
-from omnigibson.simulator import Simulator
 from omnigibson.utils.asset_utils import get_og_assets_version
 
 
@@ -63,25 +60,8 @@ def benchmark_scene(scene_name, optimized=False, import_robot=True):
         if scene_name == "restaurant_hotel":
             turtlebot.set_position_orientation([-12.2627573, -10.60511875, -3.4790891], [0, 0, 0, 1.0])
 
-    # from IPython import embed; embed()
-
-    # sink = list(scene.object_registry("category", "sink"))[0]
-    # sink_filled_state = Filled(sink)
-    # sink.add_state(sink_filled_state)
-    # og.sim.play()
-    # og.sim.step()
-    # sink_filled_state.initialize(simulator=og.sim)
-    # og.sim.stop()
-    # og.sim.step()
-    # sink.states[Filled].set_value(WaterSystem, True)
-    # og.sim.step()
-    # og.sim.step()
-
     og.sim.play()
     og.sim.step()
-    # from IPython import embed; embed()
-    # for obj in scene.objects:
-    #     obj.sleep()
     fps = []
     physics_fps = []
     render_fps = []
