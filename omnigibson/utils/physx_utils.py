@@ -1,6 +1,6 @@
 import numpy as np
 
-from pxr import Usd, UsdGeom, Sdf, Gf, Vt, PhysxSchema
+from pxr import Usd, UsdGeom, Sdf, Gf, Vt, PhysxSchema, PhysicsSchemaTools
 import omni
 from omni.isaac.core.utils.prims import get_prim_at_path
 from omni.isaac.core.utils.stage import get_current_stage
@@ -242,3 +242,11 @@ def create_physx_particleset_pointinstancer(
         og.log.warning(f"Creating an instancer that uses isosurface {instancer_prim_path}. The rendering of these particles will have a delay of one timestep.")
 
     return instancer_prim
+
+def apply_force_at_pos(prim, force, pos):
+    prim_id = PhysicsSchemaTools.sdfPathToInt(prim.prim_path)
+    og.sim.psi.apply_force_at_pos(og.sim.stage_id, prim_id, force, pos)
+
+def apply_torque(prim, foward_vect, roll_torque_scalar):
+    prim_id = PhysicsSchemaTools.sdfPathToInt(prim.prim_path)
+    og.sim.psi.apply_torque(og.sim.stage_id, prim_id, foward_vect * roll_torque_scalar)

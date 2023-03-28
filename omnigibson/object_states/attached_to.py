@@ -29,8 +29,8 @@ m.ATTACHMENT_LINK_PREFIX = "attachment"
 m.DEFAULT_POSITION_THRESHOLD = 0.05  # 5cm
 m.DEFAULT_ORIENTATION_THRESHOLD = np.deg2rad(5.0)  # 5 degrees
 m.DEFAULT_JOINT_TYPE = JointType.JOINT_FIXED
-m.DEFAULT_BREAK_FORCE = 1000  # Newton
-m.DEFAULT_BREAK_TORQUE = 1000  # Newton-Meter
+m.DEFAULT_BREAK_FORCE = 10000  # Newton
+m.DEFAULT_BREAK_TORQUE = 10000  # Newton-Meter
 
 
 class AttachedTo(RelativeObjectState, BooleanState, ContactSubscribedStateMixin, JointBreakSubscribedStateMixin, LinkBasedStateMixin):
@@ -87,17 +87,20 @@ class AttachedTo(RelativeObjectState, BooleanState, ContactSubscribedStateMixin,
                 self.set_value(other, True)
                 break
 
-    def _set_value(self, other, new_value):
+    def _set_value(self, other, new_value, bypass_alignment_checking=False):
         # Attempt to attach
         if new_value:
             if self.parent == other:
                 # Already attached to this object. Do nothing.
-                pass
+                return True
             elif self.parent is None:
                 # Find attachment links that satisfy the proximity requirements
-                child_link, parent_link = self._find_attachment_links(other)
+                child_link, parent_link = self._find_attachment_links(other, bypass_alignment_checking)
                 if child_link is not None:
                     self._attach(other, child_link, parent_link)
+                    return True
+                else:
+                    return False
             else:
                 log.debug(f"Trying to attach object {self.obj.name} to object {other.name},"
                           f"but it is already attached to object {self.parent.name}. Try detaching first.")
@@ -111,8 +114,7 @@ class AttachedTo(RelativeObjectState, BooleanState, ContactSubscribedStateMixin,
                 # Wake up objects so that passive forces like gravity can be applied.
                 self.obj.wake()
                 other.wake()
-
-        return True
+            return True
 
     def _get_value(self, other):
         # Simply return if the current parent matches other
@@ -120,10 +122,13 @@ class AttachedTo(RelativeObjectState, BooleanState, ContactSubscribedStateMixin,
 
     def _find_attachment_links(self,
                                other,
+                               bypass_alignment_checking=False,
                                pos_thresh=m.DEFAULT_POSITION_THRESHOLD,
                                orn_thresh=m.DEFAULT_ORIENTATION_THRESHOLD):
         """
         Args:
+            other (DatasetObject): parent object to find potential attachment links.
+            bypass_alignment_checking (bool): whether to bypass alignment checking when finding attachment links.
             pos_thresh (float): position difference threshold to activate attachment, in meters.
             orn_thresh (float): orientation difference threshold to activate attachment, in radians.
 
@@ -142,7 +147,7 @@ class AttachedTo(RelativeObjectState, BooleanState, ContactSubscribedStateMixin,
                 if other.states[AttachedTo].children[parent_link_name] is None:
                     pos_diff = np.linalg.norm(child_link.get_position() - parent_link.get_position())
                     orn_diff = T.get_orientation_diff_in_radian(child_link.get_orientation(), parent_link.get_orientation())
-                    if pos_diff < pos_thresh and orn_diff < orn_thresh:
+                    if bypass_alignment_checking or (pos_diff < pos_thresh and orn_diff < orn_thresh):
                         return child_link, parent_link
 
         return None, None
@@ -191,7 +196,6 @@ class AttachedTo(RelativeObjectState, BooleanState, ContactSubscribedStateMixin,
             break_torque (float or None): break torque for angular dofs, unit is Newton-meter.
         """
         assert joint_type in {JointType.JOINT_FIXED, JointType.JOINT_SPHERICAL}, f"Unsupported joint type {joint_type}"
-
         # Set the parent references
         self.parent = other
         self.parent_link = parent_link
