@@ -116,6 +116,8 @@ class Simulator(SimulationContext, Serializable):
 
         # List of objects that need to be initialized during whenever the next sim step occurs
         self._objects_to_initialize = []
+        self._objects_require_contact_callback = False
+        self._objects_require_joint_break_callback = False
 
         # Set of categories that can be grasped by assisted grasping
         self.object_state_types = get_states_by_dependency_order()
@@ -378,6 +380,11 @@ class Simulator(SimulationContext, Serializable):
         if len(self._objects_to_initialize) > 0 and self.is_playing():
             for obj in self._objects_to_initialize:
                 obj.initialize()
+                if len(obj.states.keys() & self.object_state_types_on_contact) > 0:
+                    self._objects_require_contact_callback = True
+                if len(obj.states.keys() & self.object_state_types_on_joint_break) > 0:
+                    self._objects_require_joint_break_callback = True
+
             self._objects_to_initialize = []
 
         # Propagate states if the feature is enabled
@@ -607,7 +614,7 @@ class Simulator(SimulationContext, Serializable):
         For each of the pair of objects in each contact, we invoke the on_contact function for each of its states
         that subclass ContactSubscribedStateMixin. These states update based on contact events.
         """
-        if gm.ENABLE_OBJECT_STATES:
+        if gm.ENABLE_OBJECT_STATES and self._objects_require_contact_callback:
             headers = defaultdict(list)
             for contact_header in contact_headers:
                 actor0 = str(PhysicsSchemaTools.intToSdfPath(contact_header.actor0))
@@ -640,7 +647,7 @@ class Simulator(SimulationContext, Serializable):
         This callback will be invoked if there is any simulation event. Currently it only processes JOINT_BREAK event.
         """
         if gm.ENABLE_OBJECT_STATES:
-            if event.type == int(SimulationEvent.JOINT_BREAK):
+            if event.type == int(SimulationEvent.JOINT_BREAK) and self._objects_require_joint_break_callback:
                 joint_path = str(PhysicsSchemaTools.decodeSdfPath(event.payload["jointPath"][0], event.payload["jointPath"][1]))
                 obj = None
                 # TODO: recursively try to find the parent object of this joint

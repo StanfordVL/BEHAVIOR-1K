@@ -221,56 +221,13 @@ def create_joint(prim_path, joint_type, body0=None, body1=None, enabled=True,
     # Possibly (un-/)enable this joint
     joint_prim.GetAttribute("physics:jointEnabled").Set(enabled)
 
-    # We update the simulation now without stepping physics so we can bypass the snapping warning from PhysicsUSD
-    with suppress_omni_log(channels=["omni.physx.plugin"]):
-        og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
+    # We update the simulation now without stepping physics if sim is playing so we can bypass the snapping warning from PhysicsUSD
+    if og.sim.is_playing():
+        with suppress_omni_log(channels=["omni.physx.plugin"]):
+            og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
 
     # Return this joint
     return joint_prim
-
-
-class CollisionAPI:
-    """
-    Class containing class methods to facilitate collision handling, e.g. collision groups
-    """
-    ACTIVE_COLLISION_GROUPS = {}
-
-    @classmethod
-    def add_to_collision_group(cls, col_group, prim_path, create_if_not_exist=False):
-        """
-        Adds the prim and all nested prims specified by @prim_path to the global collision group @col_group. If @col_group
-        does not exist, then it will either be created if @create_if_not_exist is True, otherwise will raise an Error.
-
-        Args:
-            col_group (str): Name of the collision group to assign the prim at @prim_path to
-            prim_path (str): Prim (and all nested prims) to assign to this @col_group
-            create_if_not_exist (bool): True if @col_group should be created if it does not already exist, otherwise an
-                error will be raised
-        """
-        # TODO: This slows things down and / or crashes the sim with large number of objects. Skipping this for now, look into this later
-        pass
-        # # Check if collision group exists or not
-        # if col_group not in cls.ACTIVE_COLLISION_GROUPS:
-        #     # Raise error if we don't explicitly want to create a new group
-        #     if not create_if_not_exist:
-        #         raise ValueError(f"Collision group {col_group} not found in current registry, and create_if_not_exist"
-        #                          f"was set to False!")
-        #     # Otherwise, create the new group
-        #     col_group_name = f"/World/collisionGroup_{col_group}"
-        #     group = UsdPhysics.CollisionGroup.Define(get_current_stage(), col_group_name)
-        #     group.GetFilteredGroupsRel().AddTarget(col_group_name)  # Make sure that we can collide within our own group
-        #     cls.ACTIVE_COLLISION_GROUPS[col_group] = group
-        #
-        # # Add this prim to the collision group
-        # cls.ACTIVE_COLLISION_GROUPS[col_group].GetCollidersCollectionAPI().GetIncludesRel().AddTarget(prim_path)
-
-    @classmethod
-    def clear(cls):
-        """
-        Clears the internal state of this CollisionAPI
-        """
-        cls.ACTIVE_COLLISION_GROUPS = {}
-
 
 class BoundingBoxAPI:
     """
@@ -525,7 +482,6 @@ def clear():
     """
     Clear state tied to singleton classes
     """
-    CollisionAPI.clear()
     BoundingBoxAPI.clear()
 
 
