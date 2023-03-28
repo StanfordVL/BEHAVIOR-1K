@@ -147,7 +147,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             list of str: Keys with which to index into the object registry. These should be valid public attributes of
                 prims that we can use as grouping IDs to reference prims, e.g., prim.in_rooms
         """
-        return ["prim_type", "states", "category", "fixed_base", "in_rooms", "states", "abilities"]
+        return ["prim_type", "states", "category", "fixed_base", "in_rooms", "abilities"]
 
     @property
     def loaded(self):
