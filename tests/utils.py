@@ -5,9 +5,6 @@ from omnigibson.utils.constants import PrimType
 import omnigibson.utils.transform_utils as T
 import numpy as np
 
-# Make sure GPU dynamics are enabled (GPU dynamics needed for cloth)
-gm.ENABLE_OBJECT_STATES = True
-gm.USE_GPU_DYNAMICS = True
 
 TEMP_RELATED_ABILITIES = {"cookable": {}, "freezable": {}, "burnable": {}, "heatable": {}}
 
@@ -38,24 +35,36 @@ def get_obj_cfg(name, category, model, prim_type=PrimType.RIGID, scale=None, abi
     }
 
 def assert_test_scene():
+    objects_cfg = [
+        get_obj_cfg("breakfast_table", "breakfast_table", "skczfi"),
+        get_obj_cfg("bottom_cabinet", "bottom_cabinet", "immwzb"),
+        get_obj_cfg("dishtowel", "dishtowel", "dtfspn", prim_type=PrimType.CLOTH),
+        get_obj_cfg("carpet", "carpet", "ctclvd", prim_type=PrimType.CLOTH),
+        get_obj_cfg("bowl", "bowl", "ajzltc"),
+        get_obj_cfg("bagel", "bagel", "zlxkry", abilities=TEMP_RELATED_ABILITIES),
+        get_obj_cfg("cookable_dishtowel", "dishtowel", "dtfspn", prim_type=PrimType.CLOTH, abilities=TEMP_RELATED_ABILITIES),
+        get_obj_cfg("microwave", "microwave", "hjjxmi"),
+        get_obj_cfg("stove", "stove", "yhjzwg"),
+        get_obj_cfg("fridge", "fridge", "dszchb"),
+        get_obj_cfg("plywood", "plywood", "fkmkqa", abilities={"flammable": {}}),
+    ]
+
+    # Create the scene if there's any mismatch in objects
+    create_scene = False
     if og.sim.scene is None:
+        create_scene = True
+    else:
+        for obj_cfg in objects_cfg:
+            if og.sim.scene.object_registry("name", obj_cfg["name"]) is None:
+                create_scene = True
+                break
+
+    if create_scene:
         cfg = {
             "scene": {
                 "type": "Scene",
             },
-            "objects": [
-                get_obj_cfg("breakfast_table", "breakfast_table", "skczfi"),
-                get_obj_cfg("bottom_cabinet", "bottom_cabinet", "immwzb"),
-                get_obj_cfg("dishtowel", "dishtowel", "dtfspn", prim_type=PrimType.CLOTH),
-                get_obj_cfg("carpet", "carpet", "ctclvd", prim_type=PrimType.CLOTH),
-                get_obj_cfg("bowl", "bowl", "ajzltc"),
-                get_obj_cfg("bagel", "bagel", "zlxkry", abilities=TEMP_RELATED_ABILITIES),
-                get_obj_cfg("cookable_dishtowel", "dishtowel", "dtfspn", prim_type=PrimType.CLOTH, abilities=TEMP_RELATED_ABILITIES),
-                get_obj_cfg("microwave", "microwave", "hjjxmi"),
-                get_obj_cfg("stove", "stove", "yhjzwg"),
-                get_obj_cfg("fridge", "fridge", "dszchb"),
-                get_obj_cfg("plywood", "plywood", "fkmkqa", abilities={"flammable": {}}),
-            ],
+            "objects": objects_cfg,
             "robots": [
                 {
                     "type": "Fetch",
@@ -63,6 +72,10 @@ def assert_test_scene():
                 }
             ]
         }
+
+        # Make sure GPU dynamics are enabled (GPU dynamics needed for cloth)
+        gm.ENABLE_OBJECT_STATES = True
+        gm.USE_GPU_DYNAMICS = True
 
         # Create the environment
         env = og.Environment(configs=cfg, action_timestep=1 / 60., physics_timestep=1 / 60.)
