@@ -620,11 +620,10 @@ class Simulator(SimulationContext, Serializable):
                     continue
                 # Unique reference via uuid hashing
                 idn = actor0_obj.uuid * actor1_obj.uuid
-                if idn in combos:
-                    headers[idn].append(contact_header)
-                else:
+                if idn not in combos:
                     headers[idn] = []
                     combos[idn] = (actor0_obj, actor1_obj)
+                headers[idn].append(contact_header)
 
             for idn, headers in headers.items():
                 actor0_obj, actor1_obj = combos[idn]
