@@ -6,7 +6,7 @@ from scipy.spatial.transform import Rotation as R
 from scipy.spatial import ConvexHull, distance_matrix
 
 import omnigibson as og
-from omnigibson.macros import create_module_macros, Dict
+from omnigibson.macros import create_module_macros, Dict, gm
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.contact_bodies import ContactBodies
 from omnigibson.utils import sampling_utils
@@ -226,7 +226,7 @@ def sample_kinematics(
             objA.keep_still()
             success = len(objA.states[ContactBodies].get_value()) == 0
 
-        if og.debug_sampling:
+        if gm.DEBUG:
             debug_breakpoint(f"sample_kinematics: {success}")
 
         if success:

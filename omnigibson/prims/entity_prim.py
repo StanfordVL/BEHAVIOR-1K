@@ -17,6 +17,7 @@ from omnigibson.prims.joint_prim import JointPrim
 from omnigibson.prims.rigid_prim import RigidPrim
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.constants import PrimType, GEOM_TYPES
+from omnigibson.utils.ui_utils import suppress_omni_log
 from omnigibson.macros import gm
 
 
@@ -53,6 +54,7 @@ class EntityPrim(XFormPrim):
         self._n_dof = None                      # dof with dynamic control
         self._links = None
         self._joints = None
+        self._materials = None
         self._visual_only = None
 
         # This needs to be initialized to be used for _load() of PrimitiveObject
@@ -68,6 +70,13 @@ class EntityPrim(XFormPrim):
     def _initialize(self):
         # Run super method
         super()._initialize()
+
+        # Force populate inputs and outputs of the shaders of all materials
+        # We suppress errors from omni.hydra if we're using encrypted assets, because we're loading from tmp location,
+        # not the original location
+        with suppress_omni_log(channels=["omni.hydra"] if gm.USE_ENCRYPTED_ASSETS else []):
+            for material in self.materials:
+                material.shader_force_populate(render=False)
 
         # Initialize all the links
         # This must happen BEFORE the handle is generated for this prim, because things changing in the RigidPrims may
@@ -107,6 +116,20 @@ class EntityPrim(XFormPrim):
 
         # Run super
         super()._post_load()
+
+        # Cache material information
+        materials = set()
+        material_paths = set()
+        for link in self._links.values():
+            xforms = [link] + list(link.visual_meshes.values()) if self.prim_type == PrimType.RIGID else [link]
+            for xform in xforms:
+                if xform.has_material():
+                    mat_path = xform.material.prim_path
+                    if mat_path not in material_paths:
+                        materials.add(xform.material)
+                        material_paths.add(mat_path)
+
+        self._materials = materials
 
     def update_links(self):
         """
@@ -364,19 +387,9 @@ class EntityPrim(XFormPrim):
         Loop through each link and their visual meshes to gather all the materials that belong to this object
 
         Returns:
-            materials: a list of MaterialPrim that belongs to this object
+            set of MaterialPrim: a set of MaterialPrim that belongs to this object
         """
-        materials = set()
-        material_paths = set()
-        for link in self._links.values():
-            xforms = [link] + list(link.visual_meshes.values()) if self.prim_type == PrimType.RIGID else [link]
-            for xform in xforms:
-                if xform.has_material():
-                    mat_path = xform.material.prim_path
-                    if mat_path not in material_paths:
-                        materials.add(xform.material)
-                        material_paths.add(mat_path)
-        return materials
+        return self._materials
 
     @property
     def dof_properties(self):

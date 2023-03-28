@@ -37,6 +37,7 @@ setup(
         "opencv-python",
         "nest_asyncio",
         "imageio",
+        "termcolor",
     ],
     tests_require=[],
     python_requires=">=3",

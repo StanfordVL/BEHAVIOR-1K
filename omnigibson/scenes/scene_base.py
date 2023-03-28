@@ -4,7 +4,7 @@ from itertools import combinations
 from omni.isaac.core.objects.ground_plane import GroundPlane
 import numpy as np
 import omnigibson as og
-from omnigibson.macros import create_module_macros
+from omnigibson.macros import create_module_macros, gm
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.python_utils import classproperty, Serializable, Registerable, Recreatable, \
     create_object_from_init_info
@@ -23,7 +23,7 @@ log = create_module_logger(module_name=__name__)
 m = create_module_macros(module_path=__file__)
 
 # Default texture to use for skybox
-m.DEFAULT_SKYBOX_TEXTURE = f"{og.assets_path}/models/background/sky.jpg"
+m.DEFAULT_SKYBOX_TEXTURE = f"{gm.ASSET_PATH}/models/background/sky.jpg"
 
 # Global dicts that will contain mappings
 REGISTERED_SCENES = dict()
@@ -76,6 +76,14 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             SerializableRegistry: Master registry containing sub-registries of objects, robots, systems, etc.
         """
         return self._registry
+
+    @property
+    def skybox(self):
+        """
+        Returns:
+            None or LightObject: Skybox light associated with this scene, if it is used
+        """
+        return self._skybox
 
     @property
     def object_registry(self):
@@ -139,7 +147,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             list of str: Keys with which to index into the object registry. These should be valid public attributes of
                 prims that we can use as grouping IDs to reference prims, e.g., prim.in_rooms
         """
-        return ["prim_type", "states", "category", "fixed_base", "in_rooms", "states", "abilities"]
+        return ["prim_type", "states", "category", "fixed_base", "in_rooms", "abilities"]
 
     @property
     def loaded(self):
@@ -166,7 +174,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 light_type="Dome",
                 intensity=1500,
             )
-            og.sim.import_object(self._skybox)
+            og.sim.import_object(self._skybox, register=False)
             light_prim = self._skybox.light_link.prim
             light_prim.GetAttribute("color").Set(Gf.Vec3f(1.07, 0.85, 0.61))
             light_prim.GetAttribute("texture:file").Set(Sdf.AssetPath(m.DEFAULT_SKYBOX_TEXTURE))
@@ -202,8 +210,19 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         fixed_objs = self.object_registry("fixed_base", True, default_val=[])
         if len(fixed_objs) > 1:
             # We iterate over all pairwise combinations of fixed objects
+            building_categories = {"walls", "floors", "ceilings"}
             for obj_a, obj_b in combinations(fixed_objs, 2):
-                obj_a.root_link.add_filtered_collision_pair(obj_b.root_link)
+                # TODO: Remove this hotfix once asset collision meshes are fixed!
+                # Filter out collisions between walls / ceilings / floors and ALL links of the other object
+                if obj_a.category in building_categories:
+                    for link in obj_b.links.values():
+                        obj_a.root_link.add_filtered_collision_pair(link)
+                elif obj_b.category in building_categories:
+                    for link in obj_a.links.values():
+                        obj_b.root_link.add_filtered_collision_pair(link)
+                else:
+                    # Only filter out root links
+                    obj_a.root_link.add_filtered_collision_pair(obj_b.root_link)
 
     def _should_load_object(self, obj_info):
         """

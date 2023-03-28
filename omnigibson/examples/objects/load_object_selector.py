@@ -41,7 +41,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         model=obj_model,
         bounding_box=avg_category_spec.get(obj_category),
         fit_avg_dim_volume=True,
-        position=[0.5, -0.5, 1.01],
+        position=[0, 0, 50.0],
     )
 
     cfg = {
@@ -55,6 +55,11 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Create the environment
     env = og.Environment(configs=cfg, action_timestep=1 / 60., physics_timestep=1 / 60.)
+
+    # Place the object so it rests on the floor
+    obj = env.scene.object_registry("name", "obj")
+    center_offset = obj.get_position() - obj.aabb_center + np.array([0, 0, obj.aabb_extent[2] / 2.0])
+    obj.set_position(center_offset)
 
     # Step through the environment
     max_steps = 100 if short_exec else 10000

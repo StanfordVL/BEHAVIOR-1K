@@ -216,7 +216,7 @@ class PrimitiveObject(StatefulObject):
         """
         assert_valid_key(key=self._primitive_type, valid_keys=VALID_RADIUS_OBJECTS, name="primitive object with radius")
         # Update the extents variable
-        original_extent = self._extents
+        original_extent = np.array(self._extents)
         self._extents = np.ones(3) * radius * 2.0 if self._primitive_type == "Sphere" else \
             np.array([radius * 2.0, radius * 2.0, self._extents[2]])
         attr_pairs = []
@@ -264,7 +264,7 @@ class PrimitiveObject(StatefulObject):
         """
         assert_valid_key(key=self._primitive_type, valid_keys=VALID_HEIGHT_OBJECTS, name="primitive object with height")
         # Update the extents variable
-        original_extent = self._extents
+        original_extent = np.array(self._extents)
         self._extents[2] = height
 
         # Calculate the correct scaling factor and scale the points and normals appropriately
@@ -304,7 +304,7 @@ class PrimitiveObject(StatefulObject):
         assert_valid_key(key=self._primitive_type, valid_keys=VALID_SIZE_OBJECTS, name="primitive object with size")
 
         # Update the extents variable
-        original_extent = self._extents
+        original_extent = np.array(self._extents)
         self._extents = np.ones(3) * size
 
         # Calculate the correct scaling factor and scale the points and normals appropriately

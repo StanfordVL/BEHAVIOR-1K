@@ -7,19 +7,19 @@ from omnigibson.systems import get_system
 from omnigibson.utils.usd_utils import create_joint
 from omnigibson.utils.ui_utils import choose_from_options
 from omnigibson.utils.constants import ParticleModifyMethod
-from omni.isaac.core.utils.stage import add_reference_to_stage
 from pxr import Gf
 
 # Set macros for this example
 macros.object_states.particle_modifier.VISUAL_PARTICLES_REMOVAL_LIMIT = 1000
 macros.object_states.particle_modifier.PHYSICAL_PARTICLES_REMOVAL_LIMIT = 8000
-macros.object_states.particle_modifier.MAX_VISUAL_PARTICLES_APPLIED_PER_STEP = 10
+macros.object_states.particle_modifier.MAX_VISUAL_PARTICLES_APPLIED_PER_STEP = 4
 macros.object_states.particle_modifier.MAX_PHYSICAL_PARTICLES_APPLIED_PER_STEP = 40
 macros.object_states.covered.MAX_VISUAL_PARTICLES = 300
 
 # Make sure object states and GPU dynamics are enabled (GPU dynamics needed for fluids)
 gm.ENABLE_OBJECT_STATES = True
 gm.USE_GPU_DYNAMICS = True
+gm.ENABLE_HQ_RENDERING = True
 
 
 def main(random_selection=False, headless=False, short_exec=False):
@@ -30,6 +30,13 @@ def main(random_selection=False, headless=False, short_exec=False):
     Loads an empty scene with a table, and starts clean to allow particles to be applied or pre-covers the table
     with particles to be removed. The ParticleApplier / ParticleRemover state is applied to an imported cloth object
     and allowed to interact with the table, applying / removing particles from the table.
+
+    NOTE: The key difference between ParticleApplier/Removers and ParticleSource/Sinks is that Applier/Removers
+    requires contact (if using ParticleProjectionMethod.ADJACENCY) or overlap
+    (if using ParticleProjectionMethod.PROJECTION) in order to spawn / remove particles, and generally only spawn
+    particles at the contact points. ParticleSource/Sinks are special cases of ParticleApplier/Removers that
+    always use ParticleProjectionMethod.PROJECTION and always spawn / remove particles within their projection volume,
+    irregardless of overlap with other objects!
     """
     og.log.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
 
@@ -101,7 +108,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         name="light",
         light_type="Sphere",
         radius=0.01,
-        intensity=1e5,
+        intensity=1e8,
         position=[-2.0, -2.0, 2.0],
     )
 
@@ -109,9 +116,9 @@ def main(random_selection=False, headless=False, short_exec=False):
         type="DatasetObject",
         name="table",
         category="breakfast_table",
-        model="265851637a59eb2f882f822c83877cbc",
+        model="kwmfdg",
         scale=[4.0, 4.0, 4.0],
-        position=[0, 0, 0.7],
+        position=[0, 0, 0.98],
     )
 
     # Create the scene config to load -- empty scene with a light and table
@@ -140,12 +147,11 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # If we're using a projection volume, we manually add in the required metalink required in order to use the volume
     modifier = DatasetObject(
-        prim_path="/World/modifier",
         name="modifier",
         category="dishtowel",
-        model="Tag_Dishtowel_Basket_Weave_Red",
+        model="dtfspn",
         scale=np.ones(3) * 2.0,
-        visual_only=method_type == "Projection" or particle_type == "stain",  # Fluid + adjacency requires the object to have collision geoms active
+        visual_only=method_type == "Projection",  # Non-fluid adjacency requires the object to have collision geoms active
         abilities=abilities,
     )
     modifier_root_link_path = f"{modifier.prim_path}/base_link"
@@ -208,8 +214,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     for t, delta in deltas:
         for i in range(t):
             modifier.set_position(modifier.get_position() + delta)
-            # env.step(np.array([]))
-            og.sim.step()
+            env.step(np.array([]))
 
     # Always shut down environment at the end
     env.close()

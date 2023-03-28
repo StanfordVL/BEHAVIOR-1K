@@ -385,13 +385,12 @@ def mat2quat(rmat):
     Converts given rotation matrix to quaternion.
 
     Args:
-        rmat (np.array): 3x3 rotation matrix
+        rmat (np.array): (..., 3, 3) rotation matrix
 
     Returns:
-        np.array: (x,y,z,w) float quaternion angles
+        np.array: (..., 4) (x,y,z,w) float quaternion angles
     """
-    M = np.asarray(rmat).astype(np.float32)[:3, :3]
-    return R.from_matrix(M).as_quat()
+    return R.from_matrix(rmat).as_quat()
 
 
 def vec2quat(vec, up=(0, 0, 1.0)):

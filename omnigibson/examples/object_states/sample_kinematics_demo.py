@@ -24,8 +24,72 @@ def main(random_selection=False, headless=False, short_exec=False):
     cfg = {
         "scene": {
             "type": "Scene",
-        }
+        },
     }
+
+    # Define objects we want to sample at runtime
+    microwave_cfg = dict(
+            type="DatasetObject",
+            name="microwave",
+            category="microwave",
+            model="hjjxmi",
+            scale=0.5,
+    )
+
+    cabinet_cfg = dict(
+            type="DatasetObject",
+            name="cabinet",
+            category="bottom_cabinet",
+            model="bamfsz",
+    )
+
+    plate_cfgs = [dict(
+            type="DatasetObject",
+            name=f"plate{i}",
+            category="plate",
+            model="iawoof",
+            bounding_box=np.array([0.25, 0.25, 0.05]),
+    ) for i in range(2)]
+
+    apple_cfgs = [dict(
+            type="DatasetObject",
+            name=f"apple{i}",
+            category="apple",
+            model="agveuv",
+    ) for i in range(4)]
+
+    shelf_cfg = dict(
+            type="DatasetObject",
+            name=f"shelf",
+            category="shelf",
+            model="pkgbcp",
+            bounding_box=np.array([1.0, 0.4, 2.0]),
+    )
+
+    box_cfgs = [dict(
+            type="DatasetObject",
+            name=f"box{i}",
+            category="cracker_box",
+            model="cmdigf",
+            bounding_box=np.array([0.2, 0.05, 0.3]),
+    ) for i in range(5)]
+
+
+    # Compose objects cfg
+    objects_cfg = [
+        microwave_cfg,
+        cabinet_cfg,
+        *plate_cfgs,
+        *apple_cfgs,
+        shelf_cfg,
+        *box_cfgs,
+    ]
+
+    # Update their spawn positions so they don't collide immediately
+    for i, obj_cfg in enumerate(objects_cfg):
+        obj_cfg["position"] = [100 + i, 100 + i, 100 + i]
+
+    cfg["objects"] = objects_cfg
 
     # Create the environment
     env = og.Environment(configs=cfg, action_timestep=1/60., physics_timestep=1/60.)
@@ -46,109 +110,69 @@ def main(random_selection=False, headless=False, short_exec=False):
 
 
 def sample_microwave_plates_apples(env):
-    # Load cabinet, set position manually, and step 100 times
-    og.log.info("Loading cabinet and microwave")
+    microwave = env.scene.object_registry("name", "microwave")
+    cabinet = env.scene.object_registry("name", "cabinet")
+    plates = list(env.scene.object_registry("category", "plate"))
+    apples = list(env.scene.object_registry("category", "apple"))
 
-    microwave = DatasetObject(
-        prim_path="/World/microwave",
-        name="microwave",
-        category="microwave",
-        model="7128",
-        scale=0.5,
-    )
-    og.sim.import_object(microwave)
-    microwave.set_position(np.array([0, 0, 5.0]))
-    env.step(np.array([]))              # One step is needed for the object to be fully initialized
-
-    cabinet = DatasetObject(
-        prim_path="/World/cabinet",
-        name="cabinet",
-        category="bottom_cabinet",
-        model="46380",
-    )
-
-    og.sim.import_object(cabinet)
-    z_offset = -cabinet.aabb_center[2] + cabinet.aabb_extent[2] / 2
-    cabinet.set_position(np.array([1.0, 0, z_offset]))
-    env.step(np.array([]))              # One step is needed for the object to be fully initialized
+    # Place the cabinet at a pre-determined location on the floor
+    og.log.info("Placing cabinet on the floor...")
+    cabinet.set_orientation([0, 0, 0, 1.0])
+    env.step(np.array([]))
+    offset = cabinet.get_position()[2] - cabinet.aabb_center[2]
+    cabinet.set_position(np.array([1.0, 0, cabinet.aabb_extent[2] / 2]) + offset)
+    env.step(np.array([]))
 
     # Set microwave on top of the cabinet, open it, and step 100 times
-    og.log.info("Placing microwave OnTop of the cabinet")
+    og.log.info("Placing microwave OnTop of the cabinet...")
     assert microwave.states[object_states.OnTop].set_value(cabinet, True)
     assert microwave.states[object_states.Open].set_value(True)
-    og.log.info("Microwave loaded and placed")
+    og.log.info("Microwave placed.")
     for _ in range(50):
         env.step(np.array([]))
 
-    og.log.info("Loading plates")
-    n_plates = 2
-    n_apples = 2
-    for i in range(n_plates):
-        plate = DatasetObject(
-            prim_path=f"/World/plate{i}",
-            name=f"plate{i}",
-            category="plate",
-            model="plate_000",
-            bounding_box=np.array([0.25, 0.25, 0.05]),
-        )
-        og.sim.import_object(plate)
-        env.step(np.array([]))              # One step is needed for the object to be fully initialized
-
+    og.log.info("Placing plates")
+    n_apples_per_plate = int(len(apples) / len(plates))
+    for i, plate in enumerate(plates):
         # Put the 1st plate in the microwave
         if i == 0:
-            og.log.info("Loading plate Inside the microwave")
+            og.log.info(f"Placing plate {i} Inside the microwave...")
             assert plate.states[object_states.Inside].set_value(microwave, True)
         else:
-            og.log.info("Loading plate OnTop the microwave")
+            og.log.info(f"Placing plate {i} OnTop the microwave...")
             assert plate.states[object_states.OnTop].set_value(microwave, True)
 
-        og.log.info("Plate %d loaded and placed." % i)
+        og.log.info(f"Plate {i} placed.")
         for _ in range(50):
             env.step(np.array([]))
 
-        og.log.info("Loading three apples OnTop of the plate")
-        for j in range(n_apples):
-            apple = DatasetObject(
-                prim_path=f"/World/apple{i * n_apples + j}",
-                name=f"apple{i * n_apples + j}",
-                category="apple",
-                model="00_0",
-            )
-            og.sim.import_object(apple)
-            env.step(np.array([]))  # One step is needed for the object to be fully initialized
+        og.log.info(f"Placing {n_apples_per_plate} apples OnTop of the plate...")
+        for j in range(n_apples_per_plate):
+            apple_idx = i * n_apples_per_plate + j
+            apple = apples[apple_idx]
             assert apple.states[object_states.OnTop].set_value(plate, True)
-            og.log.info("Apple %d loaded and placed." % j)
+            og.log.info(f"Apple {apple_idx} placed.")
             for _ in range(50):
                 env.step(np.array([]))
 
 
 def sample_boxes_on_shelf(env):
-    shelf = DatasetObject(
-        prim_path=f"/World/shelf",
-        name=f"shelf",
-        category="shelf",
-        model="1170df5b9512c1d92f6bce2b7e6c12b7",
-        bounding_box=np.array([1.0, 0.4, 2.0]),
-    )
-    og.sim.import_object(shelf)
-    z_offset = -shelf.aabb_center[2] + shelf.aabb_extent[2] / 2
-    shelf.set_position(np.array([-1.0, 0, z_offset]))
+    shelf = env.scene.object_registry("name", "shelf")
+    boxes = list(env.scene.object_registry("category", "cracker_box"))
+    # Place the shelf at a pre-determined location on the floor
+    og.log.info("Placing shelf on the floor...")
+    shelf.set_orientation([0, 0, 0, 1.0])
+    env.step(np.array([]))
+    offset = shelf.get_position()[2] - shelf.aabb_center[2]
+    shelf.set_position(np.array([-1.0, 0, shelf.aabb_extent[2] / 2]) + offset)
     env.step(np.array([]))  # One step is needed for the object to be fully initialized
 
-    og.log.info("Shelf placed")
+    og.log.info("Shelf placed.")
     for _ in range(50):
         env.step(np.array([]))
 
-    for i in range(5):
-        box = DatasetObject(
-            prim_path=f"/World/box{i}",
-            name=f"box{i}",
-            category="cracker_box",
-            model="cracker_box_000",
-            bounding_box=np.array([0.2, 0.05, 0.3]),
-        )
-        og.sim.import_object(box)
-        env.step(np.array([]))  # One step is needed for the object to be fully initialized
+    og.log.info("Placing boxes...")
+    for i, box in enumerate(boxes):
         box.states[object_states.Inside].set_value(shelf, True)
         og.log.info(f"Box {i} placed.")
 

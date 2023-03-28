@@ -5,9 +5,6 @@ from omnigibson.utils.constants import PrimType
 import omnigibson.utils.transform_utils as T
 import numpy as np
 
-# Make sure GPU dynamics are enabled (GPU dynamics needed for cloth)
-gm.ENABLE_OBJECT_STATES = True
-gm.USE_GPU_DYNAMICS = True
 
 TEMP_RELATED_ABILITIES = {"cookable": {}, "freezable": {}, "burnable": {}, "heatable": {}}
 
@@ -69,6 +66,10 @@ def assert_test_scene():
 
         # Make sure sim is stopped
         og.sim.stop()
+
+        # Make sure GPU dynamics are enabled (GPU dynamics needed for cloth)
+        gm.ENABLE_OBJECT_STATES = True
+        gm.USE_GPU_DYNAMICS = True
 
         # Create the environment
         env = og.Environment(configs=cfg, action_timestep=1 / 60., physics_timestep=1 / 60.)
