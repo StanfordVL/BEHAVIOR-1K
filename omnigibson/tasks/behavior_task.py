@@ -18,6 +18,7 @@ from bddl.logic_base import AtomicFormula
 from bddl.object_taxonomy import ObjectTaxonomy
 
 import omnigibson as og
+from omnigibson.macros import gm
 from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.reward_functions.potential_reward import PotentialReward
 from omnigibson.robots.robot_base import BaseRobot
@@ -663,7 +664,7 @@ class BehaviorTask(BaseTask):
                             if condition.STATE_NAME in KINEMATICS_STATES and positive and scene_obj in condition.body:
                                 # Use pybullet GUI for debugging
                                 if self.debug_object_sampling is not None and self.debug_object_sampling == condition.body[0]:
-                                    og.debug_sampling = True
+                                    gm.DEBUG = True
 
                                 success = condition.sample(binary_state=positive)
                                 log_msg = " ".join(

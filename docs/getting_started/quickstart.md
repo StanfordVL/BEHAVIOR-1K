@@ -11,12 +11,14 @@ Let's start with the following:
 
 ```{.python .annotate}
 import omnigibson as og # (1)!
+from omnigibson.macros import gm # (2)!
 
 # Start with an empty configuration
 cfg = dict()
 ```
 
 1. All python scripts should start with this line! This allows access to key global variables through the top-level package.
+2. Global macros (`gm`) can always be accessed directly and modified on the fly!
 
 ## 🏔️ **Defining a scene**
 Next, let's define a scene:
@@ -39,7 +41,7 @@ cfg["objects"] = [ # (1)!
     {
         "type": "USDObject", # (2)!
         "name": "ghost_apple", # (3)!
-        "usd_path": f"{og.og_dataset_path}/objects/apple/00_0/usd/00_0.usd",
+        "usd_path": f"{gm.DATASET_PATH}/objects/apple/00_0/usd/00_0.usd",
         "category": "apple", # (4)!
         "visual_only": True, # (5)!
         "scale": [2.0, 1.0, 2.0], # (6)!
@@ -163,7 +165,7 @@ obs, rew, done, info = env.step(env.action_space.sample())
         {
             "type": "USDObject",
             "name": "ghost_apple",
-            "usd_path": f"{og.og_dataset_path}/objects/apple/00_0/usd/00_0.usd",
+            "usd_path": f"{gm.DATASET_PATH}/objects/apple/00_0/usd/00_0.usd",
             "category": "apple",
             "visual_only": True,
             "scale": [2.0, 1.0, 2.0],

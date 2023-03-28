@@ -13,14 +13,25 @@ from addict import Dict
 macros = Dict()
 gm = macros.globals
 
+# Paths (either relative to this directory or global absolute paths) for assets
+# Assets correspond to non-objects / scenes (e.g.: robots), and dataset incliudes objects + scene
+gm.ASSET_PATH = "data/assets"
+gm.DATASET_PATH = "data/og_dataset"
+gm.KEY_PATH = "data/omnigibson.key"
+
 # Whether to generate a headless or non-headless application upon OmniGibson startup
 gm.HEADLESS = (os.getenv("OMNIGIBSON_HEADLESS", 'False').lower() in ('true', '1', 't'))
 
-# Whether to use extra settings (verboseness, extra GUI features) for debugging
-gm.DEBUG = True
+# Whether only the viewport should be shown in the GUI or not (if not, other peripherals are additionally shown)
+gm.GUI_VIEWPORT_ONLY = False
+
+# Do not suppress known omni warnings / errors, and also put omnigibson in a debug state
+# This includes extra information for things such as object sampling, and also any debug
+# logging messages
+gm.DEBUG = False
 
 # Whether to print out disclaimers (i.e.: known failure cases resulting from Omniverse's current bugs / limitations)
-gm.SHOW_DISCLAIMERS = True
+gm.SHOW_DISCLAIMERS = False
 
 # Whether to use omni's GPU dynamics
 # This is necessary for certain features; e.g. particles (fluids / cloth)

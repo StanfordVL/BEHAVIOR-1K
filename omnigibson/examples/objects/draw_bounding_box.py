@@ -23,7 +23,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         type="DatasetObject",
         name="banana",
         category="banana",
-        model="09_0",
+        model="vvyyyv",
         scale=[3.0, 5.0, 2.0],
         position=[-0.906661, -0.545106,  0.136824],
         orientation=[0, 0, 0.76040583, -0.6494482 ],
@@ -33,7 +33,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         type="DatasetObject",
         name="door",
         category="door",
-        model="8930",
+        model="ohagsq",
         position=[-2.0, 0, 0.70000001],
         orientation=[0, 0, -0.38268343,  0.92387953],
     )
@@ -75,7 +75,9 @@ def main(random_selection=False, headless=False, short_exec=False):
         # Also write the 2d loose bounding box to disk
         if "3d" not in bbox_modality:
             colorized_img = colorize_bboxes(bboxes_2d_data=obs[bbox_modality], bboxes_2d_rgb=obs["rgb"], num_channels=4)
-            plt.imsave(f"{bbox_modality}_img.png", colorized_img)
+            fpath = f"{bbox_modality}_img.png"
+            plt.imsave(fpath, colorized_img)
+            og.log.info(f"Saving modality [{bbox_modality}] image to: {fpath}")
 
     # Always close environment down at end
     env.close()

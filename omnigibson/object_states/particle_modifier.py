@@ -19,6 +19,7 @@ from omnigibson.utils.constants import ParticleModifyMethod, PrimType
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function, get_particle_positions_from_frame
 from omnigibson.utils.python_utils import assert_valid_key, classproperty
 from omnigibson.utils.deprecated_utils import Core
+from omnigibson.utils.ui_utils import suppress_omni_log
 from omnigibson.utils.usd_utils import create_primitive_mesh, FlatcacheAPI
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object
@@ -116,7 +117,12 @@ def create_projection_visualization(
     UsdGeom.Imageable(source.GetPrim()).MakeInvisible()
     # Generate the ComputeGraph nodes to render the projection
     core = Core(lambda val: None, particle_system_name=projection_name)
-    system_path, _, emitter_path, vis_path, instancer_path, sprite_path, mat_path, output_path = core.create_particle_system(display="point_instancer", paths=[prim_path])
+
+    # Suppress omni warnings here -- we don't have control over this API, but omni likes to complain about this
+    with suppress_omni_log(channels=["omni.graph.core.plugin", "omni.usd", "rtx.neuraylib.plugin"]):
+        system_path, _, emitter_path, vis_path, instancer_path, sprite_path, mat_path, output_path = \
+            core.create_particle_system(display="point_instancer", paths=[prim_path])
+
     # Override the prototype with our own sphere with optional material
     prototype_path = "/".join(sprite_path.split("/")[:-1]) + "/prototype"
     create_primitive_mesh(prototype_path, primitive_type="Sphere")
@@ -144,10 +150,11 @@ def create_projection_visualization(
     emitter_prim.GetProperty("inputs:directionRandom").Set(Gf.Vec3f(*spread))
     emitter_prim.GetProperty("inputs:addSourceVelocity").Set(1.0)
 
-    # Move the output path so it moves with the particle system prim
-    og.sim.render()
-    output_name = output_path.split("/")[-1]
-    move_prim(output_path, f"{system_path}/{output_name}")
+    # Make sure we render 4 times to fully propagate changes (validated empirically)
+    # Omni likes to complain here again, but we have no control over the low-level information, so we suppress warnings
+    with suppress_omni_log(channels=["omni.particle.system.core.plugin", "omni.hydra.scene_delegate.plugin", "omni.usd"]):
+        for i in range(4):
+            og.sim.render()
 
     # Return the particle system prim which "owns" everything
     return get_prim_at_path(system_path), emitter_prim
@@ -530,7 +537,7 @@ class ParticleRemover(ParticleModifier):
         if issubclass(system, VisualParticleSystem):
             # Iterate over all particles and remove any that are within the relaxed AABB of the remover volume
             particle_names = list(system.particles.keys())
-            particle_positions = np.array([system.get_particle_position_orientation(name=name)[0] for name in system.particles.keys()])
+            particle_positions = system.get_particles_position_orientation()[0]
             inbound_idxs = self._check_in_mesh(particle_positions).nonzero()[0]
             max_particle_absorbed = self.visual_particle_modification_limit - self.modified_particle_count[system.name]
             for idx in inbound_idxs[:max_particle_absorbed]:
@@ -783,9 +790,10 @@ class ParticleApplier(ParticleModifier):
                 cuboid_dimensions=cuboid_dimensions,
                 ignore_objs=[self.obj],
                 hit_proportion=0.0,             # We want all hits
-                undo_cuboid_bottom_padding=issubclass(system, VisualParticleSystem),      # micro particles have zero cuboid dimensions so we need to maintain padding
                 cuboid_bottom_padding=system.particle_radius if issubclass(system, PhysicalParticleSystem) else
                 macros.utils.sampling_utils.DEFAULT_CUBOID_BOTTOM_PADDING,
+                undo_cuboid_bottom_padding=issubclass(system, VisualParticleSystem),      # micro particles have zero cuboid dimensions so we need to maintain padding
+                verify_cuboid_empty=False,
             )
 
             hits = [result for result in results if result[0] is not None]
@@ -793,7 +801,7 @@ class ParticleApplier(ParticleModifier):
 
             self._apply_particles_at_raycast_hits(system=system, hits=hits, scales=scales)
         else:
-            self._apply_particle_in_projection_volume(system=system)
+            self._apply_particles_in_projection_volume(system=system)
 
     def _apply_particles_at_raycast_hits(self, system, hits, scales=None):
         """
@@ -855,9 +863,9 @@ class ParticleApplier(ParticleModifier):
                     velocities=velocities,
                 )
                 # Update our particle count
-                self.modified_particle_count[system] += n_particles
+                self.modified_particle_count[system.name] += n_particles
 
-    def _apply_particle_in_projection_volume(self, system):
+    def _apply_particles_in_projection_volume(self, system):
         """
         Helper function to apply particles form system @system within the projection volume owned by this
         ParticleApplier.
@@ -870,30 +878,30 @@ class ParticleApplier(ParticleModifier):
         """
         assert self.method == ParticleModifyMethod.PROJECTION, \
             "Can only apply particles within projection volume if ParticleModifyMethod.PROJECTION method is used!"
+        assert issubclass(system, PhysicalParticleSystem), \
+            "Can only apply particles within projection volume if system is PhysicalParticleSystem!"
 
-        # Check the system
-        if issubclass(system, PhysicalParticleSystem):
-            # Transform pre-cached particle positions into the world frame
-            pos, quat = self.link.get_position_orientation()
-            points = get_particle_positions_from_frame(
-                pos=pos,
-                quat=quat,
-                scale=np.ones(3),
-                particle_positions=self._in_mesh_local_particle_positions,
+        # Transform pre-cached particle positions into the world frame
+        pos, quat = self.link.get_position_orientation()
+        points = get_particle_positions_from_frame(
+            pos=pos,
+            quat=quat,
+            scale=np.ones(3),
+            particle_positions=self._in_mesh_local_particle_positions,
+        )
+        directions = self._in_mesh_local_particle_directions @ T.quat2mat(quat).T
+
+        # Compile the particle poses to generate and sample the particles
+        n_particles = min(len(points), m.PHYSICAL_PARTICLES_APPLICATION_LIMIT - self.modified_particle_count[system.name])
+        # Generate particles
+        if n_particles > 0:
+            velocities = None if self._initial_speed == 0 else self._initial_speed * directions[:n_particles]
+            system.default_particle_instancer.add_particles(
+                positions=points[:n_particles],
+                velocities=velocities,
             )
-            directions = self._in_mesh_local_particle_directions @ T.quat2mat(quat).T
-
-            # Compile the particle poses to generate and sample the particles
-            n_particles = min(len(points), m.PHYSICAL_PARTICLES_APPLICATION_LIMIT - self.modified_particle_count[system])
-            # Generate particles
-            if n_particles > 0:
-                velocities = None if self._initial_speed == 0 else self._initial_speed * directions[:n_particles]
-                system.default_particle_instancer.add_particles(
-                    positions=points[:n_particles],
-                    velocities=velocities,
-                )
-                # Update our particle count
-                self.modified_particle_count[system.name] += n_particles
+            # Update our particle count
+            self.modified_particle_count[system.name] += n_particles
 
     def _sample_particle_locations_from_projection_volume(self, system):
         """

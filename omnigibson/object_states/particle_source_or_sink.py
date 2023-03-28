@@ -34,9 +34,9 @@ class ParticleSource(ParticleApplier):
 
         Args:
             obj (StatefulObject): Object to which this state will be applied
-            conditions (dict): Dictionary mapping ParticleSystem to None or corresponding condition / list of conditions
-                (where None represents no conditions) necessary in order for this particle modifier to be able to
-                modify particles belonging to @ParticleSystem. Each condition should be a function, whose signature
+            conditions (dict): Dictionary mapping the names of ParticleSystem (str) to None or the corresponding condition /
+                list of conditions (where None represents no conditions) necessary in order for this particle modifier to be
+                able to modify particles belonging to @ParticleSystem. Each condition should be a function, whose signature
                 is as follows:
 
                     def condition(obj) --> bool
@@ -103,9 +103,9 @@ class ParticleSink(ParticleRemover):
 
         Args:
             obj (StatefulObject): Object to which this state will be applied
-            conditions (dict): Dictionary mapping ParticleSystem to None or corresponding condition / list of conditions
-                (where None represents no conditions) necessary in order for this particle modifier to be able to
-                modify particles belonging to @ParticleSystem. Each condition should be a function, whose signature
+            conditions (dict): Dictionary mapping the names of ParticleSystem (str) to None or the corresponding condition /
+                list of conditions (where None represents no conditions) necessary in order for this particle modifier to be
+                able to modify particles belonging to @ParticleSystem. Each condition should be a function, whose signature
                 is as follows:
 
                     def condition(obj) --> bool

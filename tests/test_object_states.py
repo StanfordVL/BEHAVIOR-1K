@@ -9,7 +9,6 @@ from utils import og_test, get_random_pose
 import pytest
 import numpy as np
 
-from IPython import embed
 
 @og_test
 def test_on_top():

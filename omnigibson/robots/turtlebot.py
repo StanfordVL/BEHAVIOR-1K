@@ -1,7 +1,7 @@
 import os
 import numpy as np
 
-import omnigibson as og
+from omnigibson.macros import gm
 from omnigibson.robots.two_wheel_robot import TwoWheelRobot
 
 
@@ -34,8 +34,8 @@ class Turtlebot(TwoWheelRobot):
 
     @property
     def usd_path(self):
-        return os.path.join(og.assets_path, "models/turtlebot/turtlebot/turtlebot.usd")
+        return os.path.join(gm.ASSET_PATH, "models/turtlebot/turtlebot/turtlebot.usd")
 
     @property
     def urdf_path(self):
-        return os.path.join(og.assets_path, "models/turtlebot/turtlebot.urdf")
+        return os.path.join(gm.ASSET_PATH, "models/turtlebot/turtlebot.urdf")

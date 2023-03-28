@@ -20,25 +20,25 @@ def main(random_selection=False, headless=False, short_exec=False):
         type="DatasetObject",
         name="table",
         category="breakfast_table",
-        model="19203",
+        model="rjgmmy",
         scale=0.9,
-        position=[0, 0, 0.532],
+        position=[0, 0, 0.58],
     )
 
     apple_cfg = dict(
         type="DatasetObject",
         name="apple",
         category="apple",
-        model="00_0",
+        model="agveuv",
         scale=1.5,
-        position=[0.085, 0,  0.90],
+        position=[0.085, 0,  0.92],
     )
 
     knife_cfg = dict(
         type="DatasetObject",
         name="knife",
         category="table_knife",
-        model="4",
+        model="lrdmpf",
         scale=2.5,
         position=[0, 0, 10.0],
     )

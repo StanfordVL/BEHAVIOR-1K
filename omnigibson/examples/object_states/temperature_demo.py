@@ -26,7 +26,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         light_type="Sphere",
         name="light",
         radius=0.01,
-        intensity=1e5,
+        intensity=1e8,
         position=[-2.0, -2.0, 1.0],
     ))
 
@@ -35,8 +35,8 @@ def main(random_selection=False, headless=False, short_exec=False):
         type="DatasetObject",
         name="stove",
         category="stove",
-        model="101943",
-        position=[0, 0, 0.65],
+        model="yhjzwg",
+        position=[0, 0, 0.69],
     ))
 
     # Microwave
@@ -44,9 +44,9 @@ def main(random_selection=False, headless=False, short_exec=False):
         type="DatasetObject",
         name="microwave",
         category="microwave",
-        model="7128",
+        model="hjjxmi",
         scale=0.25,
-        position=[2.5, 0, 0.094],
+        position=[2.5, 0, 0.10],
     ))
 
     # Oven
@@ -54,8 +54,8 @@ def main(random_selection=False, headless=False, short_exec=False):
         type="DatasetObject",
         name="oven",
         category="oven",
-        model="7120",
-        position=[-1.25, 0, 0.80],
+        model="wuinhm",
+        position=[-1.25, 0, 0.88],
     ))
 
     # Tray
@@ -63,9 +63,9 @@ def main(random_selection=False, headless=False, short_exec=False):
         type="DatasetObject",
         name="tray",
         category="tray",
-        model="tray_000",
+        model="xzcnjq",
         scale=0.15,
-        position=[0, 0, 1.24],
+        position=[-0.25, -0.12, 1.26],
     ))
 
     # Fridge
@@ -73,14 +73,14 @@ def main(random_selection=False, headless=False, short_exec=False):
         type="DatasetObject",
         name="fridge",
         category="fridge",
-        model="12252",
+        model="hivvdf",
         abilities={
             "coldSource": {
                 "temperature": -100.0,
                 "requires_inside": True,
             }
         },
-        position=[1.25, 0, 0.90],
+        position=[1.25, 0, 0.81],
     ))
 
     # 5 Apples
@@ -89,8 +89,8 @@ def main(random_selection=False, headless=False, short_exec=False):
             type="DatasetObject",
             name=f"apple{i}",
             category="apple",
-            model="00_0",
-            position=[0, i * 0.05, 1.65],
+            model="agveuv",
+            position=[0, i * 0.1, 5.0],
         ))
 
     # Create the scene config to load -- empty scene with desired objects

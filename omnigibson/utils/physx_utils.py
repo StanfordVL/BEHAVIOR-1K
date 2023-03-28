@@ -6,7 +6,7 @@ from omni.isaac.core.utils.prims import get_prim_at_path
 from omni.isaac.core.utils.stage import get_current_stage
 from omnigibson.macros import gm, create_module_macros
 from omni.physx.scripts import physicsUtils, particleUtils
-from omnigibson.utils.usd_utils import array_to_vtarray
+from omnigibson.utils.ui_utils import suppress_omni_log
 import omnigibson as og
 
 # Create settings for this module
@@ -151,7 +151,7 @@ def create_physx_particleset_pointinstancer(
     Returns:
         UsdGeom.PointInstancer: Created point instancer prim
     """
-    stage = get_current_stage()
+    stage = og.sim.stage
     n_particles = len(positions)
     particle_system = get_prim_at_path(physx_particle_system_path)
 
@@ -215,7 +215,10 @@ def create_physx_particleset_pointinstancer(
 
     # Take a render step to "lock" the visuals of the prototypes at the graveyard position
     # This needs to happen AFTER setting particle states
-    og.sim.render()
+    # We suppress a known warning that we have no control over where omni complains about a prototype
+    # not being populated yet
+    with suppress_omni_log(channels=["omni.hydra.scene_delegate.plugin"]):
+        og.sim.render()
 
     # Then we move the prototypes back to zero offset because otherwise all the generated particles will be offset by
     # the graveyard position. At this point, the prototypes themselves no longer appear at the zero offset (locked at
@@ -238,7 +241,16 @@ def create_physx_particleset_pointinstancer(
     # Set whether the instancer is enabled or not
     instancer_prim.GetAttribute("physxParticle:particleEnabled").Set(enabled)
 
+    # Render three more times to fully propagate changes
+    # Omni always complains about a low-level USD thing we have no control over
+    # so we suppress the warnings
+    with suppress_omni_log(channels=["omni.usd"]):
+        for i in range(3):
+            og.sim.render()
+
+    # Isosurfaces require an additional physics timestep before they're actually rendered
     if is_isosurface:
-        og.log.warning(f"Creating an instancer that uses isosurface {instancer_prim_path}. The rendering of these particles will have a delay of one timestep.")
+        og.log.warning(f"Creating an instancer that uses isosurface {instancer_prim_path}. "
+                       f"The rendering of these particles will have a delay of one timestep.")
 
     return instancer_prim
