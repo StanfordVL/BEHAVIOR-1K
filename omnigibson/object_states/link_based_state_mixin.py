@@ -33,7 +33,7 @@ class LinkBasedStateMixin:
     def links(self):
         """
         Returns:
-            None or RigidPrim: The link associated with this link-based state, if it exists
+            dict: mapping from link names to links that match the metalink_prefix
         """
         return self._links
 

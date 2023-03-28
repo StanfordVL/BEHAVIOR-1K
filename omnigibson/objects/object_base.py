@@ -9,8 +9,7 @@ from omnigibson.utils.constants import (
     SemanticClass,
 )
 from pxr import UsdPhysics, PhysxSchema
-from omnigibson.utils.constants import JointType
-from omnigibson.utils.usd_utils import create_joint
+from omnigibson.utils.usd_utils import create_joint, CollisionAPI
 from omnigibson.prims.entity_prim import EntityPrim
 from omnigibson.utils.python_utils import Registerable, classproperty, get_uuid
 from omnigibson.utils.constants import PrimType, CLASS_NAME_TO_CLASS_ID
@@ -161,7 +160,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
                 # Create fixed joint, and set Body0 to be this object's root prim
                 create_joint(
                     prim_path=f"{self._prim_path}/rootJoint",
-                    joint_type=JointType.JOINT_FIXED,
+                    joint_type="FixedJoint",
                     body1=f"{self._prim_path}/{self._root_link_name}",
                 )
 
@@ -171,6 +170,14 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             UsdPhysics.ArticulationRootAPI.Apply(root_prim)
             PhysxSchema.PhysxArticulationAPI.Apply(root_prim)
             self.self_collisions = self._load_config["self_collisions"]
+
+        # TODO: Do we need to explicitly add all links? or is adding articulation root itself sufficient?
+        # Set the collision group
+        CollisionAPI.add_to_collision_group(
+            col_group=self.collision_group,
+            prim_path=self.prim_path,
+            create_if_not_exist=True,
+        )
 
         # Update semantics
         add_update_semantics(

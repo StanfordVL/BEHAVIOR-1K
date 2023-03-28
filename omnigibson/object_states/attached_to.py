@@ -37,8 +37,9 @@ class AttachedTo(RelativeObjectState, BooleanState, ContactSubscribedStateMixin,
     """
         Handles attachment between two rigid objects, by creating a fixed/spherical joint between self.obj (child) and
         other (parent). At any given moment, an object can only be attached to at most one other object, i.e.
-        a parent can have multiple children, but a child can only have one parent. Note that only
-        child.states[AttachedTo].get_value(parent) will return True.
+        a parent can have multiple children, but a child can only have one parent.
+        Note that generally speaking only child.states[AttachedTo].get_value(parent) will return True.
+        One of the child's male meta links will be attached to one of the parent's female meta links.
 
         Subclasses ContactSubscribedStateMixin, JointBreakSubscribedStateMixin
         on_contact function attempts to attach self.obj to other when a CONTACT_FOUND event happens
@@ -71,7 +72,7 @@ class AttachedTo(RelativeObjectState, BooleanState, ContactSubscribedStateMixin,
         self.children = {link_name: None for link_name in self.links if link_name.split("_")[1].endswith("F")}
 
         # Cache of parent link candidates for other objects (Dict[DatasetObject, Dict[str, str]])
-        # Map from the male meta link names of self.obj to the correspounding female meta link names of other
+        # @other -> (the male meta link names of @self.obj -> the correspounding female meta link names of @other))
         self.parent_link_candidates = dict()
 
     def on_joint_break(self, joint_prim_path):
@@ -84,8 +85,9 @@ class AttachedTo(RelativeObjectState, BooleanState, ContactSubscribedStateMixin,
     def on_contact(self, other, contact_headers, contact_data):
         for contact_header in contact_headers:
             if contact_header.type == ContactEventType.CONTACT_FOUND:
-                self.set_value(other, True)
-                break
+                # If it has successfully attached to something, break.
+                if self.set_value(other, True):
+                    break
 
     def _set_value(self, other, new_value, bypass_alignment_checking=False):
         # Attempt to attach
@@ -129,12 +131,16 @@ class AttachedTo(RelativeObjectState, BooleanState, ContactSubscribedStateMixin,
         Args:
             other (DatasetObject): parent object to find potential attachment links.
             bypass_alignment_checking (bool): whether to bypass alignment checking when finding attachment links.
+                Normally when finding attachment links, we check if the child and parent links have aligned positions
+                or poses. This flag allows users to bypass this check and find attachment links solely based on the
+                attachment meta link types. Default is False.
             pos_thresh (float): position difference threshold to activate attachment, in meters.
             orn_thresh (float): orientation difference threshold to activate attachment, in radians.
 
         Returns:
-            RigidPrim or None: link belonging to @self.obj that should be aligned to that corresponding link of @other
-            RigidPrim or None: the corresponding link of @other
+            2-tuple:
+                - RigidPrim or None: link belonging to @self.obj that should be aligned to that corresponding link of @other
+                - RigidPrim or None: the corresponding link of @other
         """
         parent_candidates = self._get_parent_candidates(other)
         if not parent_candidates:
@@ -145,9 +151,11 @@ class AttachedTo(RelativeObjectState, BooleanState, ContactSubscribedStateMixin,
             for parent_link_name in parent_link_names:
                 parent_link = other.states[AttachedTo].links[parent_link_name]
                 if other.states[AttachedTo].children[parent_link_name] is None:
+                    if bypass_alignment_checking:
+                        return child_link, parent_link
                     pos_diff = np.linalg.norm(child_link.get_position() - parent_link.get_position())
                     orn_diff = T.get_orientation_diff_in_radian(child_link.get_orientation(), parent_link.get_orientation())
-                    if bypass_alignment_checking or (pos_diff < pos_thresh and orn_diff < orn_thresh):
+                    if pos_diff < pos_thresh and orn_diff < orn_thresh:
                         return child_link, parent_link
 
         return None, None
@@ -223,10 +231,11 @@ class AttachedTo(RelativeObjectState, BooleanState, ContactSubscribedStateMixin,
         self.obj.keep_still()
 
         if joint_type == JointType.JOINT_FIXED:
-            # For FixedJoint: the parent link, the child link and the joint frame align
+            # FixedJoint: the parent link, the child link and the joint frame all align.
             parent_local_quat = np.array([0.0, 0.0, 0.0, 1.0])
         else:
-            # SphericalJoint: the same except that the rotation of the parent link doesn't align with the joint frame
+            # SphericalJoint: the same except that the rotation of the parent link doesn't align with the joint frame.
+            # The child link and the joint frame still align.
             _, parent_local_quat = T.relative_pose_transform([0, 0, 0], child_quat, [0, 0, 0], parent_quat)
 
         # Create the joint

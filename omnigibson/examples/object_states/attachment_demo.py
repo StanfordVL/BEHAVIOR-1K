@@ -99,12 +99,11 @@ def main(random_selection=False, headless=False, short_exec=False):
     shelf_baseboard.keep_still()
     shelf_baseboard.set_linear_velocity([-0.2, 0, 0])
 
-    steps = 0
-    max_steps = -1 if not short_exec else 100
+    input("Shelf parts fall to their correct poses and get automatically attached to the back panel.\n"
+          "You can try to drag the shelf to hit the floor to break it apart. Press [ENTER] to continue.\n")
 
-    while steps != max_steps:
-        env.step([])
-        steps += 1
+    for _ in range(1000):
+        og.sim.step()
 
     og.shutdown()
 
