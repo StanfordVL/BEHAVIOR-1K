@@ -198,6 +198,8 @@ def create_joint(prim_path, joint_type, body0=None, body1=None, enabled=True,
     PhysxSchema.PhysxJointAPI.Apply(joint_prim)
 
     # We need to step rendering once to auto-fill the local pose before overwriting it.
+    # Note that for some reason, if multi_gpu is used, this line will crash if create_joint is called during on_contact
+    # callback, e.g. when an attachment joint is being created due to contacts.
     og.sim.render()
 
     if joint_frame_in_parent_frame_pos is not None:
