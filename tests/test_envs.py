@@ -1,4 +1,5 @@
 import omnigibson as og
+from omnigibson.macros import gm
 
 
 def task_tester(task_type):

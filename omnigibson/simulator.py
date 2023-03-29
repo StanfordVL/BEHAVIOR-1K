@@ -653,7 +653,7 @@ class Simulator(SimulationContext, Serializable):
                 for obj0, obj1 in [(actor0_obj, actor1_obj), (actor1_obj, actor0_obj)]:
                     for state_type in self.object_state_types_on_contact:
                         if state_type in obj0.states:
-                            obj0.states[state_type].on_contact(obj1, headers, contact_data)
+                            obj0.states[state_type].on_contact(obj1, headers[(actor0_obj, actor1_obj)], contact_data)
 
     def _on_simulation_event(self, event):
         """
