@@ -13,7 +13,7 @@ m.SLICER_LINK_PREFIX = "slicer"
 
 class Slicer(AbsoluteObjectState, LinkBasedStateMixin):
     def __init__(self, obj):
-        super(Slicer, self).__init__(obj)
+        super().__init__(obj)
 
     @classproperty
     def metalink_prefix(cls):
@@ -24,6 +24,7 @@ class Slicer(AbsoluteObjectState, LinkBasedStateMixin):
         return self.obj.root_link
 
     def _initialize(self):
+        super()._initialize()
         self.initialize_link_mixin()
 
     def _set_value(self, new_value):

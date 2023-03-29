@@ -112,7 +112,6 @@ class JointPrim(BasePrim):
         prim = create_joint(
             prim_path=self._prim_path,
             joint_type=self._load_config.get("joint_type", JointType.JOINT),
-            stage=og.sim.stage,
         )
 
         return prim

@@ -52,6 +52,7 @@ class Covered(RelativeObjectState, BooleanState):
                 system.remove_attachment_group(self._visual_particle_group)
 
     def _initialize(self):
+        super()._initialize()
         # Grab group name
         self._visual_particle_group = VisualParticleSystem.get_group_name(obj=self.obj)
 

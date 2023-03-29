@@ -22,6 +22,7 @@ m.NORMAL_Z_PERCENTAGE = 0.5
 
 class Unfolded(AbsoluteObjectState, BooleanState):
     def _initialize(self):
+        super()._initialize()
         # Assume the initial state is unfolded
         self.area_unfolded, self.diagonal_unfolded = calculate_projection_area_and_diagonal_maximum(self.obj)
 

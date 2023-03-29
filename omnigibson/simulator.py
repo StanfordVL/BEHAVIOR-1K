@@ -12,6 +12,7 @@ from omni.isaac.core.simulation_context import SimulationContext
 from omni.isaac.core.utils.prims import get_prim_at_path
 from omni.isaac.core.utils.stage import open_stage
 from omni.isaac.dynamic_control import _dynamic_control
+from omni.physx.bindings._physx import ContactEventType, SimulationEvent
 import omni.kit.loop._loop as omni_loop
 from pxr import Usd, PhysicsSchemaTools, UsdUtils
 from omni.physx import get_physx_interface, get_physx_simulation_interface, get_physx_scene_query_interface
@@ -28,6 +29,7 @@ from omnigibson.objects.object_base import BaseObject
 from omnigibson.objects.stateful_object import StatefulObject
 from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.object_states.contact_subscribed_state_mixin import ContactSubscribedStateMixin
+from omnigibson.object_states.joint_break_subscribed_state_mixin import JointBreakSubscribedStateMixin
 from omnigibson.object_states.factory import get_states_by_dependency_order
 from omnigibson.object_states.update_state_mixin import UpdateStateMixin
 from omnigibson.sensors.vision_sensor import VisionSensor
@@ -97,9 +99,11 @@ class Simulator(SimulationContext, Serializable):
         self._physx_simulation_interface = None
         self._physx_scene_query_interface = None
         self._contact_callback = None
-
+        self._simulation_event_callback = None
         # List of objects that need to be initialized during whenever the next sim step occurs
         self._objects_to_initialize = []
+        self._objects_require_contact_callback = False
+        self._objects_require_joint_break_callback = False
 
         # Mapping from link IDs assigned from omni to the object that they reference
         self._link_id_to_objects = dict()
@@ -109,7 +113,9 @@ class Simulator(SimulationContext, Serializable):
         self.object_state_types_requiring_update = \
             [state for state in self.object_state_types if issubclass(state, UpdateStateMixin)]
         self.object_state_types_on_contact = \
-            [state for state in self.object_state_types if issubclass(state, ContactSubscribedStateMixin)]
+            {state for state in self.object_state_types if issubclass(state, ContactSubscribedStateMixin)}
+        self.object_state_types_on_joint_break = \
+            {state for state in self.object_state_types if issubclass(state, JointBreakSubscribedStateMixin)}
 
         # Set of all non-Omniverse transition rules to apply.
         self._transition_rules = DEFAULT_RULES
@@ -389,7 +395,13 @@ class Simulator(SimulationContext, Serializable):
             # may be added mid-iteration!!
             # For this same reason, after we finish the loop, we keep any objects that are yet to be initialized
             for i in range(n_objects_to_initialize):
-                self._objects_to_initialize[i].initialize()
+                obj = self._objects_to_initialize[i]
+                obj.initialize()
+                if len(obj.states.keys() & self.object_state_types_on_contact) > 0:
+                    self._objects_require_contact_callback = True
+                if len(obj.states.keys() & self.object_state_types_on_joint_break) > 0:
+                    self._objects_require_joint_break_callback = True
+
             self._objects_to_initialize = self._objects_to_initialize[n_objects_to_initialize:]
 
         # Propagate states if the feature is enabled
@@ -517,11 +529,13 @@ class Simulator(SimulationContext, Serializable):
             # We suppress warnings from omni.usd because it complains about values set in the native USD
             # These warnings occur because the native USD file has some type mismatch in the `scale` property,
             # where the property expects a double but for whatever reason the USD interprets its values as floats
-            with suppress_omni_log(channels=["omni.usd"]):
+            # We also need to suppress the following error when flat cache is used:
+            # [omni.physx.plugin] Transformation change on non-root links is not supported.
+            with suppress_omni_log(channels=["omni.usd", "omni.physx.plugin"] if gm.ENABLE_FLATCACHE else ["omni.usd"]):
                 super().play()
 
             # Take a render step -- this is needed so that certain (unknown, maybe omni internal state?) is populated
-            # correctly
+            # correctly.
             self.render()
 
             # Update all object handles
@@ -618,29 +632,53 @@ class Simulator(SimulationContext, Serializable):
         For each of the pair of objects in each contact, we invoke the on_contact function for each of its states
         that subclass ContactSubscribedStateMixin. These states update based on contact events.
         """
-        if gm.ENABLE_OBJECT_STATES:
-            headers = dict()
-            combos = dict()
+        if gm.ENABLE_OBJECT_STATES and self._objects_require_contact_callback:
+            headers = defaultdict(list)
             for contact_header in contact_headers:
                 actor0_obj = self._link_id_to_objects.get(contact_header.actor0, None)
                 actor1_obj = self._link_id_to_objects.get(contact_header.actor1, None)
-                if actor0_obj is None or actor1_obj is None or not actor0_obj.initialized or not actor1_obj.initialized:
+                # If any of the objects cannot be found, skip
+                if actor0_obj is None or actor1_obj is None:
                     continue
-                # Unique reference via uuid hashing
-                idn = actor0_obj.uuid * actor1_obj.uuid
-                if idn not in combos:
-                    headers[idn] = []
-                    combos[idn] = (actor0_obj, actor1_obj)
-                headers[idn].append(contact_header)
-
-            for idn, headers in headers.items():
-                actor0_obj, actor1_obj = combos[idn]
+                # If any of the objects is not initialized, skip
+                if not actor0_obj.initialized or not actor1_obj.initialized:
+                    continue
+                # If any of the objects is not stateful, skip
                 if not isinstance(actor0_obj, StatefulObject) or not isinstance(actor1_obj, StatefulObject):
                     continue
+                # If any of the objects doesn't have states that require on_contact callbacks, skip
+                if len(actor0_obj.states.keys() & self.object_state_types_on_contact) == 0 or len(actor1_obj.states.keys() & self.object_state_types_on_contact) == 0:
+                    continue
+                headers[tuple(sorted((actor0_obj, actor1_obj), key=lambda x: x.uuid))].append(contact_header)
+
+            for (actor0_obj, actor1_obj) in headers:
                 for obj0, obj1 in [(actor0_obj, actor1_obj), (actor1_obj, actor0_obj)]:
                     for state_type in self.object_state_types_on_contact:
                         if state_type in obj0.states:
-                            obj0.states[state_type].on_contact(obj1, headers, contact_data)
+                            obj0.states[state_type].on_contact(obj1, headers[(actor0_obj, actor1_obj)], contact_data)
+
+    def _on_simulation_event(self, event):
+        """
+        This callback will be invoked if there is any simulation event. Currently it only processes JOINT_BREAK event.
+        """
+        if gm.ENABLE_OBJECT_STATES:
+            if event.type == int(SimulationEvent.JOINT_BREAK) and self._objects_require_joint_break_callback:
+                joint_path = str(PhysicsSchemaTools.decodeSdfPath(event.payload["jointPath"][0], event.payload["jointPath"][1]))
+                obj = None
+                # TODO: recursively try to find the parent object of this joint
+                tokens = joint_path.split("/")
+                for i in range(2, len(tokens) + 1):
+                    obj = self._scene.object_registry("prim_path", "/".join(tokens[:i]))
+                    if obj is not None:
+                        break
+
+                if obj is None or not obj.initialized or not isinstance(obj, StatefulObject):
+                    return
+                if len(obj.states.keys() & self.object_state_types_on_joint_break) == 0:
+                    return
+                for state_type in self.object_state_types_on_joint_break:
+                    if state_type in obj.states:
+                        obj.states[state_type].on_joint_break(joint_path)
 
     def is_paused(self):
         """
@@ -803,6 +841,8 @@ class Simulator(SimulationContext, Serializable):
         clear_pu()
         clear_uu()
         self._objects_to_initialize = []
+        self._objects_require_contact_callback = False
+        self._objects_require_joint_break_callback = False
         self._link_id_to_objects = dict()
 
         # Load dummy stage, but don't clear sim to prevent circular loops
@@ -944,6 +984,7 @@ class Simulator(SimulationContext, Serializable):
             omni.usd.get_context().get_stage_event_stream().create_subscription_to_pop(self._stage_open_callback_fn)
         )
         self._contact_callback = self._physics_context._physx_sim_interface.subscribe_contact_report_events(self._on_contact)
+        self._simulation_event_callback = self._physx_interface.get_simulation_event_stream_v2().create_subscription_to_pop(self._on_simulation_event)
 
         # Set the lighting mode to be stage by default
         self.set_lighting_mode(mode=LightingMode.STAGE)

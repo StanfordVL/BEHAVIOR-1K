@@ -159,15 +159,14 @@ def main(random_selection=False, headless=False, short_exec=False):
     if method_type == "Projection":
         metalink_path = f"{modifier.prim_path}/{modification_metalink[modifier_type]}"
         og.sim.stage.DefinePrim(metalink_path, "Xform")
-        joint_prim = create_joint(
+        create_joint(
             prim_path=f"{modifier_root_link_path}/{modification_metalink[modifier_type]}_joint",
             body0=modifier_root_link_path,
             body1=metalink_path,
             joint_type="FixedJoint",
             enabled=True,
+            joint_frame_in_parent_frame_quat=np.array([0, 0.707, 0, 0.707]),  # Needs to rotated so the metalink points downwards from cloth
         )
-        local_area_quat = np.array([0, 0.707, 0, 0.707])    # Needs to rotated so the metalink points downwards from cloth
-        joint_prim.GetAttribute("physics:localRot0").Set(Gf.Quatf(*(local_area_quat[[3, 0, 1, 2]])))
     modifier._post_load()
     modifier._loaded = True
     og.sim.import_object(modifier)

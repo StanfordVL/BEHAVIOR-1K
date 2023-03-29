@@ -1,4 +1,5 @@
 import omnigibson as og
+from omnigibson.macros import gm
 
 
 def task_tester(task_type):
@@ -24,6 +25,13 @@ def task_tester(task_type):
         },
     }
 
+    # Make sure sim is stopped
+    og.sim.stop()
+
+    # Make sure GPU dynamics are enabled (GPU dynamics needed for cloth)
+    gm.ENABLE_OBJECT_STATES = True
+    gm.USE_GPU_DYNAMICS = True
+
     # Create the environment
     env = og.Environment(configs=cfg, action_timestep=1 / 60., physics_timestep=1 / 60.)
 
@@ -31,7 +39,8 @@ def task_tester(task_type):
     for _ in range(5):
         env.step(env.robots[0].action_space.sample())
 
-    og.sim.stop()
+    # Clear the sim
+    og.sim.clear()
 
 
 def test_dummy_task():

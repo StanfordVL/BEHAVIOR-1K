@@ -2,6 +2,7 @@ from omnigibson.object_states import *
 from omnigibson.utils.usd_utils import BoundingBoxAPI
 from omnigibson.macros import macros as m
 import omnigibson.utils.transform_utils as T
+from omnigibson.utils.physx_utils import apply_force_at_pos, apply_torque
 import omnigibson as og
 
 from utils import og_test, get_random_pose
@@ -389,7 +390,7 @@ def test_temperature():
 
     # Set the objects to be on top of the stove
     bagel.set_position_orientation([0.71, 0.11, 0.88], [0, 0, 0, 1])
-    dishtowel.set_position_orientation([0.82, 0.11, 0.88], [0, 0, 0, 1])
+    dishtowel.set_position_orientation([0.84, 0.11, 0.88], [0, 0, 0, 1])
 
     for _ in range(5):
         og.sim.step()
@@ -694,3 +695,66 @@ def test_toggled_on():
     # Setter should work
     assert stove.states[ToggledOn].set_value(False)
     assert not stove.states[ToggledOn].get_value()
+
+@og_test
+def test_attached_to():
+    shelf_back_panel = og.sim.scene.object_registry("name", "shelf_back_panel")
+    shelf_shelf = og.sim.scene.object_registry("name", "shelf_shelf")
+    shelf_baseboard = og.sim.scene.object_registry("name", "shelf_baseboard")
+
+    shelf_back_panel.set_position_orientation([0, 0, 0.01], [0, 0, 0, 1])
+    shelf_back_panel.keep_still()
+    shelf_shelf.set_position_orientation([0, 0.03, 0.17], [0, 0, 0, 1])
+    shelf_shelf.keep_still()
+
+    # The shelf should not be attached to the back panel (no contact yet)
+    assert not shelf_shelf.states[AttachedTo].get_value(shelf_back_panel)
+
+    # Let the shelf fall
+    for _ in range(10):
+        og.sim.step()
+
+    # The shelf should be attached to the back panel
+    assert shelf_shelf.states[AttachedTo].get_value(shelf_back_panel)
+
+    assert shelf_shelf.states[AttachedTo].set_value(shelf_back_panel, True)
+    # The shelf should still be attached to the back panel
+    assert shelf_shelf.states[AttachedTo].get_value(shelf_back_panel)
+
+    assert shelf_shelf.states[AttachedTo].set_value(shelf_back_panel, False)
+    # The shelf should not be attached to the back panel
+    assert not shelf_shelf.states[AttachedTo].get_value(shelf_back_panel)
+
+    assert shelf_shelf.states[AttachedTo].set_value(shelf_back_panel, True)
+    # shelf should be attached to the back panel
+    assert shelf_shelf.states[AttachedTo].get_value(shelf_back_panel)
+
+    force_dir = np.array([0, 0, 1])
+    # A small force will not break the attachment
+    force_mag = 10
+    apply_force_at_pos(shelf_shelf.root_link, force_dir * force_mag, shelf_shelf.get_position())
+    og.sim.step()
+    assert shelf_shelf.states[AttachedTo].get_value(shelf_back_panel)
+
+    # A large force will break the attachment
+    force_mag = 1000
+    apply_force_at_pos(shelf_shelf.root_link, force_dir * force_mag, shelf_shelf.get_position())
+    og.sim.step()
+    assert not shelf_shelf.states[AttachedTo].get_value(shelf_back_panel)
+
+    shelf_shelf.set_position_orientation([0, 0, 10], [0, 0, 0, 1])
+    assert not shelf_shelf.states[AttachedTo].set_value(shelf_back_panel, True)
+    # The shelf should not be attached to the back panel because the alignment is wrong
+    assert not shelf_shelf.states[AttachedTo].get_value(shelf_back_panel)
+
+    assert shelf_shelf.states[AttachedTo].set_value(shelf_back_panel, True, bypass_alignment_checking=True)
+    # The shelf should be attached to the back panel because the alignment checking is bypassed
+    assert shelf_shelf.states[AttachedTo].get_value(shelf_back_panel)
+
+    # The shelf baseboard should NOT be attached because the attachment has the wrong type
+    shelf_baseboard.set_position_orientation([0.37, -0.93,  0.03], [0, 0, 0, 1])
+    assert not shelf_baseboard.states[AttachedTo].set_value(shelf_back_panel, True, bypass_alignment_checking=True)
+    assert not shelf_baseboard.states[AttachedTo].get_value(shelf_back_panel)
+
+def test_clear_sim():
+    og.sim.clear()
