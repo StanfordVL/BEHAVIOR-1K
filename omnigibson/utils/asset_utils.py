@@ -12,26 +12,20 @@ import omnigibson as og
 from omnigibson.macros import gm
 from omnigibson.utils.ui_utils import create_module_logger
 
-if os.name == "nt":
-    import win32api
-    import win32con
-
 # Create module logger
 log = create_module_logger(module_name=__name__)
 
 
-def folder_is_hidden(p):
+def is_dot_file(p):
     """
-    Removes hidden folders from a list. Works on Linux, Mac and Windows
+    Check if a filename starts with a dot.
+    Note that while this does not actually correspond to checking for hidden files on Windows, the
+    files we want to ignore will still start with a dot and thus this works.
 
     Returns:
         bool: true if a folder is hidden in the OS
     """
-    if os.name == "nt":
-        attribute = win32api.GetFileAttributes(p)
-        return attribute & (win32con.FILE_ATTRIBUTE_HIDDEN | win32con.FILE_ATTRIBUTE_SYSTEM)
-    else:
-        return p.startswith(".")  # linux-osx
+    return p.startswith(".")
 
 
 def get_og_avg_category_specs():
@@ -95,7 +89,7 @@ def get_available_og_scenes():
     og_dataset_path = gm.DATASET_PATH
     og_scenes_path = os.path.join(og_dataset_path, "scenes")
     available_og_scenes = sorted(
-        [f for f in os.listdir(og_scenes_path) if (not folder_is_hidden(f) and f != "background")]
+        [f for f in os.listdir(og_scenes_path) if (not is_dot_file(f) and f != "background")]
     )
     return available_og_scenes
 
@@ -193,7 +187,7 @@ def get_all_object_categories():
     og_dataset_path = gm.DATASET_PATH
     og_categories_path = os.path.join(og_dataset_path, "objects")
 
-    categories =[f for f in os.listdir(og_categories_path) if not folder_is_hidden(f)]
+    categories =[f for f in os.listdir(og_categories_path) if not is_dot_file(f)]
     return sorted(categories)
 
 
@@ -237,7 +231,7 @@ def get_available_g_scenes():
         list: available Gibson scenes
     """
     data_path = og.g_dataset_path
-    available_g_scenes = sorted([f for f in os.listdir(data_path) if not folder_is_hidden(f)])
+    available_g_scenes = sorted([f for f in os.listdir(data_path) if not is_dot_file(f)])
     return available_g_scenes
 
 
@@ -289,13 +283,14 @@ def download_assets():
     if os.path.exists(gm.ASSET_PATH):
         print("Assets already downloaded.")
     else:
-        tmp_file = os.path.join(tempfile.gettempdir(), "og_assets.tar.gz")
-        os.makedirs(gm.ASSET_PATH, exist_ok=True)
-        path = "https://storage.googleapis.com/gibson_scenes/og_assets.tar.gz"
-        log.info(f"Downloading and decompressing demo OmniGibson assets from {path}")
-        assert subprocess.call(["wget", "-c", "--no-check-certificate", "--retry-connrefused", "--tries=5", "--timeout=5", path, "-O", tmp_file]) == 0, "Assets download failed."
-        assert subprocess.call(["tar", "-zxf", tmp_file, "--strip-components=1", "--directory", gm.ASSET_PATH]) == 0, "Assets extraction failed."
-        # These datasets come as folders; in these folder there are scenes, so --strip-components are needed.
+        with tempfile.TemporaryDirectory() as td:
+            tmp_file = os.path.join(td, "og_assets.tar.gz")
+            os.makedirs(gm.ASSET_PATH, exist_ok=True)
+            path = "https://storage.googleapis.com/gibson_scenes/og_assets.tar.gz"
+            log.info(f"Downloading and decompressing demo OmniGibson assets from {path}")
+            assert subprocess.call(["wget", "-c", "--no-check-certificate", "--retry-connrefused", "--tries=5", "--timeout=5", path, "-O", tmp_file]) == 0, "Assets download failed."
+            assert subprocess.call(["tar", "-zxf", tmp_file, "--strip-components=1", "--directory", gm.ASSET_PATH]) == 0, "Assets extraction failed."
+            # These datasets come as folders; in these folder there are scenes, so --strip-components are needed.
 
 
 def download_demo_data():
@@ -380,7 +375,7 @@ def change_data_path():
             yaml.dump(global_config, f)
 
 
-def decrypt_file(encrypted_filename, decrypted_filename=None, decrypted_file=None):
+def decrypt_file(encrypted_filename, decrypted_filename):
     with open(gm.KEY_PATH, "rb") as filekey:
         key = filekey.read()
     fernet = Fernet(key)
@@ -390,11 +385,8 @@ def decrypt_file(encrypted_filename, decrypted_filename=None, decrypted_file=Non
 
     decrypted = fernet.decrypt(encrypted)
 
-    if decrypted_file is not None:
+    with open(decrypted_filename, "wb") as decrypted_file:
         decrypted_file.write(decrypted)
-    else:
-        with open(decrypted_filename, "wb") as decrypted_file:
-            decrypted_file.write(decrypted)
 
 
 def encrypt_file(original_filename, encrypted_filename=None, encrypted_file=None):

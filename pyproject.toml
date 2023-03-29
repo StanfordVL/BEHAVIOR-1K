@@ -1,7 +1,7 @@
 [tool.black]
 line-length = 120
 target-version = ['py27', 'py36', 'py37']
-force-exclude = 'omnigibson/(data|external|render/(cpp|cryptopp|glad|glfw|glm|openvr|pybind11|sranipal))'
+force-exclude = 'omnigibson/(data|external)'
 
 [tool.isort]
 profile = "black"
@@ -10,30 +10,14 @@ py_version = 'all'
 filter_files = true
 extend_skip_glob = [
     'omnigibson/data/*',
-    'omnigibson/external/*',
-    'omnigibson/render/cpp/*',
-    'omnigibson/render/cryptopp/*',
-    'omnigibson/render/glad/*',
-    'omnigibson/render/glfw/*',
-    'omnigibson/render/glm/*',
-    'omnigibson/render/openvr/*',
-    'omnigibson/render/pybind11/*',
-    'omnigibson/render/sranipal/*',
+    'omnigibson/external/*'
 ]
 
 [tool.pyright]
 exclude = [
   'omnigibson/data',
   'omnigibson/docs',
-  'omnigibson/docker',
-  'omnigibson/render/cryptopp',
-  'omnigibson/render/cpp',
-  'omnigibson/render/openvr',
-  'omnigibson/render/glfw',
-  'omnigibson/render/glad',
-  'omnigibson/render/glm',
-  'omnigibson/render/pybind11',
-  'omnigibson/render/sranipal'
+  'omnigibson/docker'
 ]
 
 [tool.pytest.ini_options]

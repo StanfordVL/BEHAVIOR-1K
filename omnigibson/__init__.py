@@ -1,6 +1,8 @@
 import logging
 import os
-
+import shutil
+import tempfile
+import signal
 import yaml
 import builtins
 from termcolor import colored
@@ -78,6 +80,7 @@ def create_app():
     from omni.isaac.core.utils.extensions import enable_extension
     enable_extension("omni.flowusd")
     enable_extension("omni.particle.system.bundle")
+    enable_extension("omni.kit.window.viewport")    # This is needed for windows
 
     # Possibly hide windows if in debug mode
     if gm.GUI_VIEWPORT_ONLY:
@@ -178,9 +181,15 @@ if not (os.getenv("OMNIGIBSON_NO_OMNIVERSE", 'False').lower() in {'true', '1', '
     app, sim, Environment, REGISTERED_SCENES, REGISTERED_OBJECTS, REGISTERED_ROBOTS, REGISTERED_CONTROLLERS, \
         REGISTERED_TASKS, ALL_SENSOR_MODALITIES = start()
 
+# Create and expose a temporary directory for any use cases. It will get destroyed upon omni
+# shutdown by the shutdown function.
+tempdir = tempfile.mkdtemp()
 
 def shutdown():
     global app
+    global sim
+    sim.clear()
+    shutil.rmtree(tempdir)
     from omnigibson.utils.ui_utils import suppress_omni_log
     log.info(f"{'-' * 10} Shutting Down {logo_small()} {'-' * 10}")
 
@@ -189,3 +198,8 @@ def shutdown():
         app.close()
 
     exit(0)
+
+# register signal handler for CTRL + C
+def signal_handler(signal, frame):
+    shutdown()
+signal.signal(signal.SIGINT, signal_handler)
