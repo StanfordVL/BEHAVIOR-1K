@@ -25,7 +25,7 @@ class ToggledOn(AbsoluteObjectState, BooleanState, LinkBasedStateMixin, UpdateSt
         self.value = False
         self.robot_can_toggle_steps = 0
         self.visual_marker = None
-        super(ToggledOn, self).__init__(obj)
+        super().__init__(obj)
 
     @classproperty
     def metalink_prefix(cls):
@@ -39,7 +39,7 @@ class ToggledOn(AbsoluteObjectState, BooleanState, LinkBasedStateMixin, UpdateSt
         return True
 
     def _initialize(self):
-        super(ToggledOn, self)._initialize()
+        super()._initialize()
         self.initialize_link_mixin()
         mesh_prim_path = f"{self.link.prim_path}/visual_marker"
         # Create a primitive mesh if it doesn't already exist

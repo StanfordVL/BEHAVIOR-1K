@@ -18,12 +18,12 @@ def main():
                 "type": "DatasetObject",
                 "name": "stove",
                 "category": "stove",
-                "model": "101908",
+                "model": "qbjiva",
                 "abilities": {
                     "heatSource": {"requires_toggled_on": True},
                     "toggleable": {},
                 },
-                "position": [0, 0, 0.4],
+                "position": [0, 0, 0.61],
             }
         ],
     }
@@ -77,7 +77,7 @@ def main():
 
     # Move stove, notify user
     input("Heat source is now moving: Press ENTER to continue.")
-    stove.set_position(np.array([0, 1.0, 0.4]))
+    stove.set_position(np.array([0, 1.0, 0.61]))
     for i in range(100):
         env.step(np.array([]))
 

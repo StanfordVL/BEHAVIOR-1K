@@ -1,12 +1,13 @@
 from abc import ABCMeta, abstractmethod
 from collections import namedtuple
+import numpy as np
 import omnigibson as og
+from omnigibson.macros import gm
 from omnigibson.systems import get_system, is_system_active
 from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.object_states import *
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.usd_utils import BoundingBoxAPI
-from omnigibson import og_dataset_path
 
 
 # Tuple of attributes of objects created in transitions.
@@ -341,7 +342,7 @@ class DicingRule(BaseTransitionRule):
 
     def condition(self, individual_objects, group_objects):
         slicer_obj, diced_obj = individual_objects["slicer"], individual_objects["diceable"]
-        slicer_position = slicer_obj.states[Slicer].get_link_position()
+        slicer_position = slicer_obj.states[Slicer].link.get_position()
         if slicer_position is None:
             return False
 
@@ -438,7 +439,7 @@ class ContainerRule(BaseTransitionRule):
         self._counter += 1
         scale = self.obj_attrs.scale
 
-        model_root_path = f"{og.og_dataset_path}/objects/{category}/{model}"
+        model_root_path = f"{gm.DATASET_PATH}/objects/{category}/{model}"
         usd_path = f"{model_root_path}/usd/{model}.usd"
 
         final_obj = DatasetObject(
@@ -516,7 +517,7 @@ class ContainerGarbageRule(BaseTransitionRule):
         self._counter += 1
         scale = self.obj_attrs.scale
 
-        model_root_path = f"{og.og_dataset_path}/objects/{category}/{model}"
+        model_root_path = f"{gm.DATASET_PATH}/objects/{category}/{model}"
         usd_path = f"{model_root_path}/usd/{model}.usd"
 
         garbage_obj = DatasetObject(

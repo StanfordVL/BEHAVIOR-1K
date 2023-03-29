@@ -1,7 +1,7 @@
 from omnigibson.object_states.object_state_base import REGISTERED_OBJECT_STATES
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.adjacency import HorizontalAdjacency, VerticalAdjacency
-from omnigibson.object_states.attachment import Attached
+from omnigibson.object_states.attached_to import AttachedTo
 from omnigibson.object_states.burnt import Burnt
 from omnigibson.object_states.contact_bodies import ContactBodies
 from omnigibson.object_states.contact_particles import ContactParticles

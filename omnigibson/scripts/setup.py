@@ -3,6 +3,7 @@ Helper script to setup this OmniGibson repository. Configures environment and do
 """
 import os
 import omnigibson as og
+from omnigibson.macros import gm
 from omnigibson.utils.asset_utils import download_demo_data, download_og_dataset, download_assets
 from omnigibson.utils.ui_utils import choose_from_options
 
@@ -14,7 +15,7 @@ def main():
     print()
 
     # Only download if the dataset path doesn't exist
-    if not os.path.exists(og.og_dataset_path):
+    if not os.path.exists(gm.DATASET_PATH):
         print("Downloading dataset...")
         # dataset_options = {
         #     "Demo": "Download the demo OmniGibson dataset",

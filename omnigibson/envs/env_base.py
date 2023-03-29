@@ -1,11 +1,12 @@
 import gym
+import numpy as np
 
 import omnigibson as og
 from omnigibson.objects import REGISTERED_OBJECTS
 from omnigibson.robots import REGISTERED_ROBOTS
 from omnigibson.tasks import REGISTERED_TASKS
 from omnigibson.scenes import REGISTERED_SCENES
-from omnigibson.utils.gym_utils import GymObservable
+from omnigibson.utils.gym_utils import GymObservable, recursively_generate_flat_dict
 from omnigibson.utils.config_utils import parse_config
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.python_utils import assert_valid_key, merge_nested_dicts, create_class_from_registry_and_config,\
@@ -27,6 +28,8 @@ class Environment(gym.Env, GymObservable, Recreatable):
         physics_timestep=1 / 60.0,
         device=None,
         automatic_reset=False,
+        flatten_action_space=False,
+        flatten_obs_space=False,
     ):
         """
         Args:
@@ -37,12 +40,16 @@ class Environment(gym.Env, GymObservable, Recreatable):
             physics_timestep: physics timestep for physx
             device (None or str): specifies the device to be used if running on the gpu with torch backend
             automatic_reset (bool): whether to automatic reset after an episode finishes
+            flatten_action_space (bool): whether to flatten the action space as a sinle 1D-array
+            flatten_obs_space (bool): whether the observation space should be flattened when generated
         """
         # Call super first
         super().__init__()
 
         # Store settings and other initialized values
         self._automatic_reset = automatic_reset
+        self._flatten_action_space = flatten_action_space
+        self._flatten_obs_space = flatten_obs_space
         self.action_timestep = action_timestep
 
         # Initialize other placeholders that will be filled in later
@@ -79,15 +86,15 @@ class Environment(gym.Env, GymObservable, Recreatable):
         This allows one to change the configuration and hot-reload the environment on the fly.
 
         Args:
-            configs (str or list of str): config_file path(s). If multiple configs are specified, they will
-                be merged sequentially in the order specified. This allows procedural generation of a "full" config from
-                small sub-configs.
+            configs (dict or str or list of dict or list of str): config_file dict(s) or path(s). 
+                If multiple configs are specified, they will be merged sequentially in the order specified. 
+                This allows procedural generation of a "full" config from small sub-configs.
             overwrite_old (bool): If True, will overwrite the internal self.config with @configs. Otherwise, will
                 merge in the new config(s) into the pre-existing one. Setting this to False allows for minor
                 modifications to be made without having to specify entire configs during each reload.
         """
         # Convert config file(s) into a single parsed dict
-        configs = [configs] if isinstance(configs, str) else configs
+        configs = [configs] if isinstance(configs, dict) or isinstance(configs, str) else configs
 
         # Initial default config
         new_config = self.default_config
@@ -266,11 +273,37 @@ class Environment(gym.Env, GymObservable, Recreatable):
         obs_space["task"] = self._task.load_observation_space()
         return obs_space
 
+    def load_observation_space(self):
+        # Call super first
+        obs_space = super().load_observation_space()
+
+        # If we want to flatten it, modify the observation space by recursively searching through all
+        if self._flatten_obs_space:
+            self.observation_space = gym.spaces.Dict(recursively_generate_flat_dict(dic=obs_space))
+
+        return self.observation_space
+
     def _load_action_space(self):
         """
         Load action space for each robot
         """
-        self.action_space = gym.spaces.Dict({robot.name: robot.action_space for robot in self.robots})
+        action_space = gym.spaces.Dict({robot.name: robot.action_space for robot in self.robots})
+
+        # Convert into flattened 1D Box space if requested
+        if self._flatten_action_space:
+            lows = []
+            highs = []
+            for space in action_space.values():
+                assert isinstance(space, gym.spaces.Box), \
+                    "Can only flatten action space where all individual spaces are gym.space.Box instances!"
+                assert len(space.shape) == 1, \
+                    "Can only flatten action space where all individual spaces are 1D instances!"
+                lows.append(space.low)
+                highs.append(space.high)
+            action_space = gym.spaces.Box(np.concatenate(lows), np.concatenate(highs), dtype=np.float32)
+
+        # Store action space
+        self.action_space = action_space
 
     def load(self):
         """
@@ -319,6 +352,10 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
         # Add task observations
         obs["task"] = self._task.get_obs(env=self)
+
+        # Possibly flatten obs if requested
+        if self._flatten_obs_space:
+            obs = recursively_generate_flat_dict(dic=obs)
 
         return obs
 
@@ -399,10 +436,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
         """
         Reset episode.
         """
-        # Stop and restart the simulation
-        og.sim.stop()
-        og.sim.play()
-
         # Reset the task
         self.task.reset(self)
 
@@ -416,14 +449,13 @@ class Environment(gym.Env, GymObservable, Recreatable):
         obs = self.get_obs()
 
         if self.observation_space is not None and not self.observation_space.contains(obs):
-            # Print out all observations for all robots and task
-            for robot in self.robots:
-                for key, value in self.observation_space[robot.name].items():
-                    log.error(("obs_space", key, value.dtype, value.shape))
-                    log.error(("obs", key, obs[robot.name][key].dtype, obs[robot.name][key].shape))
-            for key, value in self.observation_space["task"].items():
+            # Flatten obs, and print out all keys and values
+            log.error("OBSERVATION SPACE:")
+            for key, value in recursively_generate_flat_dict(dic=self.observation_space):
                 log.error(("obs_space", key, value.dtype, value.shape))
-                log.error(("obs", key, obs["task"][key].dtype, obs["task"][key].shape))
+            log.error("ACTUAL OBSERVATIONS:")
+            for key, value in recursively_generate_flat_dict(dic=obs):
+                log.error(("obs", key, value.dtype, value.shape))
             raise ValueError("Observation space does not match returned observations!")
 
         return obs

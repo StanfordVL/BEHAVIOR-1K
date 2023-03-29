@@ -385,13 +385,12 @@ def mat2quat(rmat):
     Converts given rotation matrix to quaternion.
 
     Args:
-        rmat (np.array): 3x3 rotation matrix
+        rmat (np.array): (..., 3, 3) rotation matrix
 
     Returns:
-        np.array: (x,y,z,w) float quaternion angles
+        np.array: (..., 4) (x,y,z,w) float quaternion angles
     """
-    M = np.asarray(rmat).astype(np.float32)[:3, :3]
-    return R.from_matrix(M).as_quat()
+    return R.from_matrix(rmat).as_quat()
 
 
 def vec2quat(vec, up=(0, 0, 1.0)):
@@ -927,6 +926,24 @@ def get_orientation_error(target_orn, current_orn):
     return orn_error
 
 
+def get_orientation_diff_in_radian(orn0, orn1):
+    """
+    Returns the difference between two quaternion orientations in radian
+
+    Args:
+        orn0 (np.array): (x, y, z, w)
+        orn1 (np.array): (x, y, z, w)
+
+    Returns:
+        orn_diff (float): orientation difference in radian
+    """
+    vec0 = quat2axisangle(orn0)
+    vec0 /= np.linalg.norm(vec0)
+    vec1 = quat2axisangle(orn1)
+    vec1 /= np.linalg.norm(vec1)
+    return np.arccos(np.dot(vec0, vec1))
+
+
 def get_pose_error(target_pose, current_pose):
     """
     Computes the error corresponding to target pose - current pose as a 6-dim vector.
@@ -988,7 +1005,6 @@ def vecs2axisangle(vec0, vec1):
 
     # Get cross product for direction of angle, and multiply by arcos of the dot product which is the angle
     return np.cross(vec0, vec1) * np.arccos(np.dot(vec0, vec1))
-
 
 
 def l2_distance(v1, v2):

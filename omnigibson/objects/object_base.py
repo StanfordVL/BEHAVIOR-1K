@@ -190,13 +190,6 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         # Run super first
         super()._initialize()
 
-        # Force populate inputs and outputs of the shaders of all materials
-        # We suppress errors from omni.hydra if we're using encrypted assets, because we're loading from tmp location,
-        # not the original location
-        with suppress_omni_log(channels=["omni.hydra"] if gm.USE_ENCRYPTED_ASSETS else []):
-            for material in self.materials:
-                material.shader_force_populate(render=False)
-
         # Iterate over all links and grab their relevant material info for highlighting (i.e.: emissivity info)
         self._highlighted = False
         self._highlight_cached_values = dict()

@@ -22,19 +22,6 @@ if [[ x"${ISAAC_SIM_PATH}" == "x" ]]; then
   return
 fi
 
-# We search to see if we've already modified this config; if not, we add a couple additional dependencies
-# Ideally this would be a lot cleaner by having a separate config altogether, but isaac sim complains if we
-# don't use this EXACT file in this EXACT location
-CFG_PATH="${ISAAC_SIM_PATH}/apps/omni.isaac.sim.python.kit"
-if grep -qxF '# OmniGibson additional dependencies' ${CFG_PATH}; then
-  echo 'Already found OmniGibson additional dependencies; skipping modifying isaac-sim python config!'
-else
-  echo '' >> ${CFG_PATH}
-  echo '# OmniGibson additional dependencies' >> ${CFG_PATH}
-  echo '"omni.flowusd" = {}' >> ${CFG_PATH}
-  echo '"omni.particle.system.bundle" = {}' >> ${CFG_PATH}
-fi
-
 # Create a conda environment with python 3.7
 conda create -y -n omnigibson python=3.7
 

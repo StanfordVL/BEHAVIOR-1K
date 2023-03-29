@@ -12,7 +12,7 @@ _ALL_STATES = frozenset(
         Cooked,
         Covered,
         Heated,
-        Attached,
+        AttachedTo,
         Frozen,
         HeatSourceOrSink,
         HorizontalAdjacency,
@@ -43,7 +43,7 @@ _ALL_STATES = frozenset(
 )
 
 _ABILITY_TO_STATE_MAPPING = {
-    "attachable": [Attached],
+    "attachable": [AttachedTo],
     "burnable": [Burnt],
     "particleApplier": [ParticleApplier],
     "particleRemover": [ParticleRemover],
