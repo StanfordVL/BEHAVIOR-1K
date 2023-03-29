@@ -529,11 +529,13 @@ class Simulator(SimulationContext, Serializable):
             # We suppress warnings from omni.usd because it complains about values set in the native USD
             # These warnings occur because the native USD file has some type mismatch in the `scale` property,
             # where the property expects a double but for whatever reason the USD interprets its values as floats
-            with suppress_omni_log(channels=["omni.usd"]):
+            # We also need to suppress the following error when flat cache is used:
+            # [omni.physx.plugin] Transformation change on non-root links is not supported.
+            with suppress_omni_log(channels=["omni.usd", "omni.physx.plugin"] if gm.ENABLE_FLATCACHE else ["omni.usd"]):
                 super().play()
 
             # Take a render step -- this is needed so that certain (unknown, maybe omni internal state?) is populated
-            # correctly
+            # correctly.
             self.render()
 
             # Update all object handles
