@@ -12,20 +12,6 @@ if not exist %ISAAC_SIM_PATH%\setup_python_env.bat (
     exit /b
 )
 
-:: We search to see if we've already modified this config; if not, we add a couple additional dependencies
-:: Ideally this would be a lot cleaner by having a separate config altogether, but isaac sim complains if we
-:: don't use this EXACT file in this EXACT location
-set CFG_PATH=%ISAAC_SIM_PATH%\apps\omni.isaac.sim.python.kit
-findstr /c:"# OmniGibson additional dependencies" %CFG_PATH% > NUL
-if not errorlevel 1 (
-  echo Already found OmniGibson additional dependencies; skipping modifying isaac-sim python config!
-) else (
-  echo. >>%CFG_PATH%
-  echo # OmniGibson additional dependencies>>%CFG_PATH%
-  echo "omni.flowusd" = {}>>%CFG_PATH%
-  echo "omni.particle.system.bundle" = {}>>%CFG_PATH%
-)
-
 :: Create a conda environment with python 3.7
 call conda create -y -n omnigibson python=3.7
 call conda activate omnigibson

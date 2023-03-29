@@ -22,6 +22,12 @@ if [[ x"${ISAAC_SIM_PATH}" == "x" ]]; then
   return
 fi
 
+# Sanity check whether env variable is set correctly
+if [[ ! -f "${ISAAC_SIM_PATH}/setup_conda_env.sh" ]]; then
+  echo "setup_conda_env.sh not found in ${ISAAC_SIM_PATH}! Make sure you have set the correct ISAAC_SIM_PATH"
+  return
+fi
+
 # Create a conda environment with python 3.7
 conda create -y -n omnigibson python=3.7
 
