@@ -256,7 +256,7 @@ class DatasetObject(USDObject):
         if self._load_config["fit_avg_dim_volume"]:
             # By default, we assume scale does not change if no avg obj specs are given, otherwise, scale accordingly
             scale = np.ones(3)
-            if self.avg_obj_dims is not None:
+            if self.avg_obj_dims is not None and self.avg_obj_dims["size"] is not None:
                 # Find the average volume, and scale accordingly relative to the native volume based on the bbox
                 volume_ratio = np.product(self.avg_obj_dims["size"]) / np.product(self.native_bbox)
                 size_ratio = np.cbrt(volume_ratio)
@@ -285,7 +285,7 @@ class DatasetObject(USDObject):
                 material.shader_update_asset_paths_with_root_path(root_path)
 
         # Assign realistic density and mass based on average object category spec
-        if self.avg_obj_dims is not None:
+        if self.avg_obj_dims is not None and self.avg_obj_dims["size"] is not None and self.avg_obj_dims["mass"] is not None:
             # Assume each link has the same density
             v_ratio = (np.product(self.native_bbox) * np.product(self.scale)) / np.product(self.avg_obj_dims["size"])
             mass = self.avg_obj_dims["mass"] * v_ratio
