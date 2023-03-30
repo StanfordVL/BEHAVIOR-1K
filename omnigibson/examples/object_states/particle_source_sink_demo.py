@@ -51,16 +51,16 @@ def main(random_selection=False, headless=False, short_exec=False):
                 "conditions": {
                     "water": [check_toggledon],   # Must be toggled on for water source to be active
                 },
-                "source_radius": 0.025,
-                "source_height": 0.10,
+                "source_radius": 0.0125,
+                "source_height": 0.05,
                 "initial_speed": 0.0,               # Water merely falls out of the spout
             },
             "particleSink": {
                 "conditions": {
                     "water": None,  # No conditions, always sinking nearby particles
                 },
-                "sink_radius": 0.20,
-                "sink_height": 0.20,
+                "sink_radius": 0.05,
+                "sink_height": 0.05,
             },
         },
         position=[-0.7, 0, 0.56],

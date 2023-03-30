@@ -56,6 +56,8 @@ class LinkBasedStateMixin:
         for name, link in self.obj.links.items():
             if self.metalink_prefix in name:
                 self._links[name] = link
+                assert np.allclose(link.scale, self.obj.scale), \
+                    f"the meta link {name} has a inconsistent scale with the object {self.obj.name}"
 
         if len(self._links) > 0:
             self._link = list(self._links.values())[0]

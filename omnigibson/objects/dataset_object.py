@@ -292,8 +292,8 @@ class DatasetObject(USDObject):
             if self._prim_type == PrimType.RIGID:
                 density = mass / self.volume
                 for link in self._links.values():
-                    # If we're not a metalink, overwrite the original, inaccurate mass value
-                    if not bool(link.prim.GetAttribute("ig:is_metalink").Get()):
+                    # If not a meta (virtual) link, set the density based on avg_obj_dims and a zero mass (ignored)
+                    if link.has_collision_meshes:
                         link.mass = 0.0
                         link.density = density
 
@@ -301,16 +301,6 @@ class DatasetObject(USDObject):
                 # Cloth cannot set density. Internally omni evenly distributes the mass to each particle
                 mass = self.avg_obj_dims["mass"] * v_ratio
                 self._links["base_link"].mass = mass
-
-        # Lastly, after post loading (which includes loading / registering the links internally)
-        # check for any metalinks. If there are any, we disable gravity and collisions for them, and also reduce
-        # their density and mass
-        for link in self._links.values():
-            if bool(link.prim.GetAttribute("ig:is_metalink").Get()):
-                # Make sure this link is only visual (i.e.: no collisions or gravity enabled), and also set small mass
-                link.visual_only = True
-                link.mass = 1e-6
-                link.density = 0.0
 
     def _update_texture_change(self, object_state):
         """
