@@ -21,7 +21,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     without explicitly utilizing all of OmniGibson's class abstractions, and also showcases how to manipulate
     the simulator at a lower-level than the main Environment entry point.
     """
-    og.log.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
+    og.log.info(f"Demo {__file__}\n    " + "*" * 80 + "\n    Description:\n" + main.__doc__ + "*" * 80)
 
     # Assuming that if random_selection=True, headless=True, short_exec=True, we are calling it from tests and we
     # do not want to parse args (it would fail because the calling function is pytest "testfile.py")

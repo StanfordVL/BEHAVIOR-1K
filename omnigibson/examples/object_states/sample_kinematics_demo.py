@@ -18,7 +18,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     Loads a cabinet, a microwave open on top of it, and two plates with apples on top, one inside and one on top of the cabinet
     Then loads a shelf and cracker boxes inside of it
     """
-    og.log.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
+    og.log.info(f"Demo {__file__}\n    " + "*" * 80 + "\n    Description:\n" + main.__doc__ + "*" * 80)
 
     # Create the scene config to load -- empty scene
     cfg = {

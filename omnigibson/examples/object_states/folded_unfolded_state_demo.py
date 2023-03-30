@@ -14,7 +14,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     """
     Demo of cloth objects that can potentially be folded.
     """
-    og.log.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
+    og.log.info(f"Demo {__file__}\n    " + "*" * 80 + "\n    Description:\n" + main.__doc__ + "*" * 80)
 
     # Create the scene config to load -- empty scene + custom cloth object
     cfg = {

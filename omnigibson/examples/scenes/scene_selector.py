@@ -16,7 +16,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     It steps the environment 100 times with random actions sampled from the action space,
     using the Gym interface, resetting it 10 times.
     """
-    og.log.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
+    og.log.info(f"Demo {__file__}\n    " + "*" * 80 + "\n    Description:\n" + main.__doc__ + "*" * 80)
 
     # Choose the scene type to load
     scene_options = {

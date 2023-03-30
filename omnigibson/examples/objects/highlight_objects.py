@@ -11,7 +11,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     It also demonstrates how to apply an action on all instances of objects of a given category
     ONLY WORKS WITH OPTIMIZED RENDERING (not on Mac)
     """
-    og.log.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
+    og.log.info(f"Demo {__file__}\n    " + "*" * 80 + "\n    Description:\n" + main.__doc__ + "*" * 80)
 
     # Create the scene config to load -- empty scene
     cfg = {

@@ -15,7 +15,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     The user can move the apples to see them change from frozen, to normal temperature, to cooked and burnt
     This demo also shows how to load objects ToggledOn and how to set the initial temperature of an object
     """
-    og.log.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
+    og.log.info(f"Demo {__file__}\n    " + "*" * 80 + "\n    Description:\n" + main.__doc__ + "*" * 80)
 
     # Define specific objects we want to load in with the scene directly
     obj_configs = []

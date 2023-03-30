@@ -14,7 +14,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     Loads a stove (toggled on), and two apples.
     The first apple will be ignited by the stove first, then the second apple will be ignited by the first apple.
     """
-    og.log.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
+    og.log.info(f"Demo {__file__}\n    " + "*" * 80 + "\n    Description:\n" + main.__doc__ + "*" * 80)
 
     # Define specific objects we want to load in with the scene directly
     obj_configs = []

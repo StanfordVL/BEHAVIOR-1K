@@ -26,7 +26,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     always use ParticleProjectionMethod.PROJECTION and always spawn / remove particles within their projection volume,
     irregardless of overlap with other objects!
     """
-    og.log.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
+    og.log.info(f"Demo {__file__}\n    " + "*" * 80 + "\n    Description:\n" + main.__doc__ + "*" * 80)
 
     # Create the scene config to load -- empty scene
     cfg = {
