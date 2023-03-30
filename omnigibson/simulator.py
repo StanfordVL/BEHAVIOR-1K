@@ -372,7 +372,7 @@ class Simulator(SimulationContext, Serializable):
         """
         # pop all link ids
         for link in obj.links.values():
-            self._link_id_to_objects.pop(PhysicsSchemaTools.sdfPathtoInt(link.prim_path))
+            self._link_id_to_objects.pop(PhysicsSchemaTools.sdfPathToInt(link.prim_path))
         self._scene.remove_object(obj)
         self.app.update()
 

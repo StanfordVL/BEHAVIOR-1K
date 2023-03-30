@@ -73,7 +73,7 @@ def main(random_selection=False, headless=False, short_exec=False):
             # Either Cone or Cylinder; shape of the projection where particles can be applied / removed
             "type": "Cone",
             # Size of the cone
-            "extents": np.array([0.375, 0.375, 0.75]),
+            "extents": np.array([0.1875, 0.1875, 0.375]),
             "visualize": True,
         },
     }
@@ -165,7 +165,6 @@ def main(random_selection=False, headless=False, short_exec=False):
             body1=metalink_path,
             joint_type="FixedJoint",
             enabled=True,
-            joint_frame_in_parent_frame_quat=np.array([0, 0.707, 0, 0.707]),  # Needs to rotated so the metalink points downwards from cloth
         )
     modifier._post_load()
     modifier._loaded = True
