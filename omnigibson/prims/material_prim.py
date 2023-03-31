@@ -104,7 +104,7 @@ class MaterialPrim(BasePrim):
                 occurred externally, no additional rendering step is needed
         """
         assert self._shader is not None
-        asyncio.run(asyncio.wait([self._load_mdl_parameters(render=render)]))
+        asyncio.run(self._load_mdl_parameters(render=render))
 
     def shader_update_asset_paths_with_root_path(self, root_path):
         """

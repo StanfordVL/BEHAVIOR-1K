@@ -14,7 +14,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         type="DatasetObject",
         name="banana",
         category="banana",
-        model="09_0",
+        model="vvyyyv",
         scale=[3.0, 5.0, 2.0],
         position=[-0.906661, -0.545106,  0.136824],
         orientation=[0, 0, 0.76040583, -0.6494482 ],
@@ -24,7 +24,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         type="DatasetObject",
         name="door",
         category="door",
-        model="8930",
+        model="ohagsq",
         position=[-2.0, 0, 0.70000001],
         orientation=[0, 0, -0.38268343,  0.92387953],
     )
