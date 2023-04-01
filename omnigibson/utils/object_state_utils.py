@@ -259,6 +259,7 @@ m.NORMAL_Z_ANGLE_DIFF = np.deg2rad(45.0)
 # Subsample cloth particle points to fit a convex hull for efficiency purpose
 m.N_POINTS_CONVEX_HULL = 1000
 
+
 def calculate_projection_area_and_diagonal_maximum(obj):
     """
     Calculate the maximum projection area and the diagonal length along different axes
@@ -283,6 +284,7 @@ def calculate_projection_area_and_diagonal_maximum(obj):
 
     return area_max, diagonal_max
 
+
 def calculate_projection_area_and_diagonal(obj, dims):
     """
     Calculate the projection area and the diagonal length when projecting to the plane defined by the input dims
@@ -298,7 +300,7 @@ def calculate_projection_area_and_diagonal(obj, dims):
         diagonal (float): diagonal of the convex hull of the projected points
     """
     cloth = obj.links["base_link"]
-    points = cloth.particle_positions[:, dims]
+    points = cloth.get_particle_positions(keypoints_only=True)[:, dims]
 
     if points.shape[0] > m.N_POINTS_CONVEX_HULL:
         # If there are too many points, subsample m.N_POINTS_CONVEX_HULL deterministically for efficiency purpose
@@ -327,6 +329,7 @@ def calculate_projection_area_and_diagonal(obj, dims):
 
     return area, diagonal
 
+
 def calculate_smoothness(obj):
     """
     Calculate the percantage of surface normals that are sufficiently close to the z-axis.
@@ -335,7 +338,7 @@ def calculate_smoothness(obj):
     face_vertex_counts = np.array(cloth.get_attribute("faceVertexCounts"))
     assert (face_vertex_counts == 3).all(), "cloth prim is expected to only contain triangle faces"
     face_vertex_indices = np.array(cloth.get_attribute("faceVertexIndices"))
-    points = cloth.particle_positions[face_vertex_indices]
+    points = cloth.get_particle_positions(keypoints_only=False)[face_vertex_indices]
     # Shape [F, 3, 3] where F is the number of faces
     points = points.reshape((face_vertex_indices.shape[0] // 3, 3, 3))
 

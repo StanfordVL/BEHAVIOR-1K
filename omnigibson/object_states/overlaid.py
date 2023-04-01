@@ -21,11 +21,9 @@ m = create_module_macros(module_path=__file__)
 # Percentage of xy-plane of the object's base aligned bbox that needs to covered by the cloth
 m.OVERLAP_AREA_PERCENTAGE = 0.5
 
-# Subsample cloth particle points to fit a convex hull for efficiency purpose
-m.N_POINTS_CONVEX_HULL = 1000
-
 # z-offset for sampling
 m.SAMPLING_Z_OFFSET = 0.01
+
 
 class Overlaid(KinematicsMixin, RelativeObjectState, BooleanState):
     @staticmethod
@@ -88,12 +86,7 @@ class Overlaid(KinematicsMixin, RelativeObjectState, BooleanState):
             return False
 
         # Compute the convex hull of the particles of the cloth object.
-        points = self.obj.root_link.particle_positions[:, :2]
-        if points.shape[0] > m.N_POINTS_CONVEX_HULL:
-            # If there are too many points, subsample m.N_POINTS_CONVEX_HULL deterministically for efficiency purpose.
-            np.random.seed(0)
-            random_idx = np.random.randint(0, points.shape[0], m.N_POINTS_CONVEX_HULL)
-            points = points[random_idx]
+        points = self.obj.root_link.get_particle_positions(keypoints_only=True)[:, :2]
         cloth_hull = ConvexHull(points)
 
         # Compute the base aligned bounding box of the rigid object.

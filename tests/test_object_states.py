@@ -263,7 +263,7 @@ def test_aabb():
     assert np.allclose(breakfast_table.states[AABB].get_value(), BoundingBoxAPI.compute_aabb(breakfast_table))
     assert np.all((breakfast_table.states[AABB].get_value()[0] < pos1) & (pos1 < breakfast_table.states[AABB].get_value()[1]))
 
-    pp = dishtowel.root_link.particle_positions
+    pp = dishtowel.root_link.get_particle_positions(keypoints_only=False)
     assert np.allclose(dishtowel.states[AABB].get_value(), (pp.min(axis=0), pp.max(axis=0)))
     assert np.all((dishtowel.states[AABB].get_value()[0] < pos2) & (pos2 < dishtowel.states[AABB].get_value()[1]))
 
