@@ -1035,7 +1035,7 @@ class ManipulationRobot(BaseRobot):
             joint_type=joint_type,
             body0=self.eef_links[arm].prim_path,
             body1=ag_link.prim_path,
-            enabled=False,
+            enabled=True,
             joint_frame_in_parent_frame_pos=parent_frame_pos / self.scale,
             joint_frame_in_parent_frame_quat=parent_frame_orn,
             joint_frame_in_child_frame_pos=child_frame_pos / ag_obj.scale,
