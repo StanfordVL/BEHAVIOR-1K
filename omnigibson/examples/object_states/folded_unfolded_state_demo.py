@@ -26,7 +26,7 @@ def main(random_selection=False, headless=False, short_exec=False):
                 "type": "DatasetObject",
                 "name": "carpet",
                 "category": "carpet",
-                "model": "carpet_0",
+                "model": "ctclvd",
                 "prim_type": PrimType.CLOTH,
                 "abilities": {"foldable": {}, "unfoldable": {}},
                 "position": [0, 0, 0.5],
@@ -35,7 +35,7 @@ def main(random_selection=False, headless=False, short_exec=False):
                 "type": "DatasetObject",
                 "name": "dishtowel",
                 "category": "dishtowel",
-                "model": "Tag_Dishtowel_Basket_Weave_Red",
+                "model": "dtfspn",
                 "prim_type": PrimType.CLOTH,
                 "scale": 5.0,
                 "abilities": {"foldable": {}, "unfoldable": {}},
@@ -44,8 +44,8 @@ def main(random_selection=False, headless=False, short_exec=False):
             {
                 "type": "DatasetObject",
                 "name": "shirt",
-                "category": "t-shirt",
-                "model": "t-shirt_000",
+                "category": "t_shirt",
+                "model": "kvidcx",
                 "prim_type": PrimType.CLOTH,
                 "scale": 0.05,
                 "abilities": {"foldable": {}, "unfoldable": {}},
@@ -64,6 +64,12 @@ def main(random_selection=False, headless=False, short_exec=False):
     shirt = env.scene.object_registry("name", "shirt")
     objs = [carpet, dishtowel, shirt]
 
+    # Set viewer camera
+    og.sim.viewer_camera.set_position_orientation(
+        position=np.array([0.46382895, -2.66703958, 1.22616824]),
+        orientation=np.array([0.58779174, -0.00231237, -0.00318273, 0.80900271]),
+    )
+
     def print_state():
         folded = carpet.states[Folded].get_value()
         unfolded = carpet.states[Unfolded].get_value()
@@ -77,16 +83,18 @@ def main(random_selection=False, headless=False, short_exec=False):
         unfolded = shirt.states[Unfolded].get_value()
         info += " || tshirt: [folded] %d [unfolded] %d" % (folded, unfolded)
 
-        print(info)
+        print(f"{info}{' ' * (110 - len(info))}", end="\r")
 
     for _ in range(100):
         og.sim.step()
+
+    print("\nCloth state:\n")
 
     if not short_exec:
         # Fold all three cloths along the x-axis
         for i in range(3):
             obj = objs[i]
-            pos = obj.root_link.particle_positions
+            pos = obj.root_link.get_particle_positions(keypoints_only=False)
             x_min, x_max = np.min(pos, axis=0)[0], np.max(pos, axis=0)[0]
             x_extent = x_max - x_min
             # Get indices for the bottom 10 percent vertices in the x-axis
@@ -103,16 +111,16 @@ def main(random_selection=False, headless=False, short_exec=False):
 
             increments = 25
             for ctrl_pts in np.concatenate([np.linspace(start, mid, increments), np.linspace(mid, end, increments)]):
-                pos = obj.root_link.particle_positions
+                pos = obj.root_link.get_particle_positions(keypoints_only=False)
                 pos[indices] = ctrl_pts
-                obj.root_link.particle_positions = pos
+                obj.root_link.set_particle_positions(pos, keypoints_only=False)
                 og.sim.step()
                 print_state()
 
         # Fold the t-shirt twice again along the y-axis
         for direction in [-1, 1]:
             obj = shirt
-            pos = obj.root_link.particle_positions
+            pos = obj.root_link.get_particle_positions(keypoints_only=False)
             y_min, y_max = np.min(pos, axis=0)[1], np.max(pos, axis=0)[1]
             y_extent = y_max - y_min
             if direction == 1:
@@ -131,17 +139,18 @@ def main(random_selection=False, headless=False, short_exec=False):
 
             increments = 25
             for ctrl_pts in np.concatenate([np.linspace(start, mid, increments), np.linspace(mid, end, increments)]):
-                pos = obj.root_link.particle_positions
+                pos = obj.root_link.get_particle_positions(keypoints_only=False)
                 pos[indices] = ctrl_pts
-                obj.root_link.particle_positions = pos
-                og.sim.step()
+                obj.root_link.set_particle_positions(pos, keypoints_only=False)
+                env.step(np.array([]))
                 print_state()
 
         while True:
-            og.sim.step()
+            env.step(np.array([]))
             print_state()
 
     # Shut down env at the end
+    print()
     env.close()
 
 
