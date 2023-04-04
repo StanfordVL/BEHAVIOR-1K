@@ -207,6 +207,59 @@ def check_points_in_convex_hull_mesh(mesh_face_centroids, mesh_face_normals, pos
     return in_range
 
 
+def _generate_convex_hull_volume_checker_functions(convex_hull_mesh):
+    """
+    An internal helper function used to programmatically generate lambda funtions to check for particle
+    points within a convex hull mesh defined by face centroids @mesh_face_centroids and @mesh_face_normals.
+
+    Note that this is needed as an EXTERNAL helper function to @generate_points_in_volume_checker_function
+    because we "bake" certain arguments as part of the lambda internal scope, and
+    directly generating functions in a for loop results in these local variables being overwritten each time
+    (meaning that all the generated lambda functions reference the SAME variables!!)
+
+    Args:
+        convex_hull_mesh (Usd.Prim): Raw USD convex hull mesh to generate the volume checker functions
+
+    Returns:
+        2-tuple:
+            - function: Generated lambda function with signature:
+
+                    in_range = check_in_volume(mesh, particle_positions)
+
+                where @in_range is a N-array boolean numpy array, (True where the particle is in the convex hull mesh
+                    volume), @mesh is the raw USD mesh, and @particle_positions is a (N, 3) array specifying the particle
+                    positions in the SAME coordinate frame as @mesh
+
+            - function: Function for grabbing real-time LOCAL scale volume of the container. Signature:
+
+                vol = calc_volume(mesh)
+
+            where @vol is the total volume being checked (expressed in the mesh's LOCAL scale), and @mesh is the raw
+                USD mesh
+    """
+    # For efficiency, we pre-compute the mesh using trimesh and find its corresponding faces and normals
+    trimesh_mesh = mesh_prim_to_trimesh_mesh(convex_hull_mesh).convex_hull
+    assert trimesh_mesh.is_convex, \
+        f"Trying to generate a volume checker function for a non-convex mesh {convex_hull_mesh.GetPath().pathString}"
+    face_centroids = trimesh_mesh.vertices[trimesh_mesh.faces].mean(axis=1)
+    face_normals = trimesh_mesh.face_normals
+
+    # This function assumes that:
+    # 1. @particle_positions are in the local container_link frame
+    # 2. the @check_points_in_[...] function will convert them into the local @mesh frame
+    in_volume = lambda mesh, particle_positions: check_points_in_convex_hull_mesh(
+        mesh_face_centroids=face_centroids,
+        mesh_face_normals=face_normals,
+        pos=np.array(mesh.GetAttribute("xformOp:translate").Get()),
+        quat=np.array(
+            [*(mesh.GetAttribute("xformOp:orient").Get().imaginary), mesh.GetAttribute("xformOp:orient").Get().real]),
+        scale=np.array(mesh.GetAttribute("xformOp:scale").Get()),
+        particle_positions=particle_positions,
+    )
+    calc_volume = lambda mesh: trimesh_mesh.volume if trimesh_mesh.is_volume else trimesh_mesh.convex_hull.volume
+    return in_volume, calc_volume
+
+
 def generate_points_in_volume_checker_function(obj, volume_link, use_visual_meshes=True, mesh_name_prefixes=None):
     """
     Generates a function for quickly checking which of a group of points are contained within any container volumes.
@@ -266,24 +319,7 @@ def generate_points_in_volume_checker_function(obj, volume_link, use_visual_mesh
     for sub_container_mesh in container_meshes:
         mesh_type = sub_container_mesh.GetTypeName()
         if mesh_type == "Mesh":
-            # For efficiency, we pre-compute the mesh using trimesh and find its corresponding faces and normals
-            trimesh_mesh = mesh_prim_to_trimesh_mesh(sub_container_mesh)
-            assert trimesh_mesh.is_convex, f"Trying to generate a volume checker function for a non-convex mesh {sub_container_mesh.GetPath().pathString}"
-            face_centroids = trimesh_mesh.vertices[trimesh_mesh.faces].mean(axis=1)
-            face_normals = trimesh_mesh.face_normals
-
-            # This function assumes that:
-            # 1. @particle_positions are in the local container_link frame
-            # 2. the @check_points_in_[...] function will convert them into the local @mesh frame
-            fcn = lambda mesh, particle_positions: check_points_in_convex_hull_mesh(
-                mesh_face_centroids=face_centroids,
-                mesh_face_normals=face_normals,
-                pos=np.array(mesh.GetAttribute("xformOp:translate").Get()),
-                quat=np.array([*(mesh.GetAttribute("xformOp:orient").Get().imaginary), mesh.GetAttribute("xformOp:orient").Get().real]),
-                scale=np.array(mesh.GetAttribute("xformOp:scale").Get()),
-                particle_positions=particle_positions,
-            )
-            vol_fcn = lambda mesh: trimesh_mesh.volume if trimesh_mesh.is_volume else trimesh_mesh.convex_hull.volume
+            fcn, vol_fcn = _generate_convex_hull_volume_checker_functions(convex_hull_mesh=sub_container_mesh)
         elif mesh_type == "Sphere":
             fcn = lambda mesh, particle_positions: check_points_in_sphere(
                 size=mesh.GetAttribute("radius").Get(),
