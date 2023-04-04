@@ -103,7 +103,7 @@ class ClothPrim(GeomPrim):
             self_collision=True,
             self_collision_filter=True,
         )
-        positions = self.get_particle_positions(keypoints_only=False)
+        positions = self.particle_positions
         self._n_particles = len(positions)
 
         # Deterministically sample keypoints and sanity check the AABB of these subsampled points vs. the actual points
@@ -149,9 +149,9 @@ class ClothPrim(GeomPrim):
         """
         return False
 
-    def get_particle_positions(self, keypoints_only=False):
+    def _compute_particle_positions(self, keypoints_only=False):
         """
-        Grabs individual particle positions for this cloth prim
+        Compute individual particle positions for this cloth prim
 
         Args:
             keypoints_only (bool): If True, will only return the keypoint particle state
@@ -170,66 +170,69 @@ class ClothPrim(GeomPrim):
 
         return p_world
 
-    def set_particle_positions(self, pos, keypoints_only=False):
+    @property
+    def keypoint_particle_positions(self):
+        """
+        Grabs individual keypoint particle positions for this cloth prim.
+        Total number of keypoints is m.N_CLOTH_KEYPOINTS
+
+        Returns:
+            np.array: (N, 3) numpy array, where each of the N keypoint particles' positions are expressed in (x,y,z)
+                cartesian coordinates relative to the world frame
+        """
+        return self._compute_particle_positions(keypoints_only=True)
+
+    @property
+    def particle_positions(self):
+        """
+        Grabs individual particle positions for this cloth prim
+
+        Returns:
+            np.array: (N, 3) numpy array, where each of the N particles' positions are expressed in (x,y,z)
+                cartesian coordinates relative to the world frame
+        """
+        return self._compute_particle_positions(keypoints_only=False)
+
+    @particle_positions.setter
+    def particle_positions(self, pos):
         """
         Set the particle positions of this cloth
 
         Args:
             np.array: (N, 3) numpy array, where each of the N particles' desired positions are expressed in (x,y,z)
                 cartesian coordinates relative to the world frame
-            keypoints_only (bool): If True, will only set the keypoint particle state
         """
+        assert pos.shape[0] == self._n_particles, \
+            f"Got mismatch in particle setting size: {pos.shape[0]}, vs. number of particles {self._n_particles}!"
+
         r = T.quat2mat(self.get_orientation())
         t = self.get_position()
         s = self.scale
         p_local = (r.T @ (pos - t).T).T / s
 
-        if keypoints_only:
-            assert pos.shape[0] == len(self._keypoint_idx), \
-                f"Got mismatch in particle keypoint setting size: {pos.shape[0]}, " \
-                f"vs. number of particle keypoints {len(self._keypoint_idx)}!"
-            # Grab the particle positions and overwrite the specific values
-            # We don't use our API to avoid the transformation overhead
-            raw_pos = np.array(self.get_attribute(attr="points"))
-            raw_pos[self._keypoint_idx] = p_local
-            p_local = raw_pos
-        assert pos.shape[0] == self._n_particles, \
-            f"Got mismatch in particle setting size: {pos.shape[0]}, vs. number of particles {self._n_particles}!"
-
         self.set_attribute(attr="points", val=Vt.Vec3fArray.FromNumpy(p_local))
 
-    def get_particle_velocities(self, keypoints_only=False):
+    @property
+    def particle_velocities(self):
         """
         Grabs individual particle velocities for this cloth prim
-
-        Args:
-            keypoints_only (bool): If True, will only return the keypoint particle state
 
         Returns:
             np.array: (N, 3) numpy array, where each of the N particles' velocities are expressed in (x,y,z)
                 cartesian coordinates with respect to the world frame.
         """
         # the velocities attribute is w.r.t the world frame already
-        val = np.array(self.get_attribute(attr="velocities"))
-        return val[self._keypoint_idx] if keypoints_only else val
+        return np.array(self.get_attribute(attr="velocities"))
 
-    def set_particle_velocities(self, vel, keypoints_only=False):
+    @particle_velocities.setter
+    def particle_velocities(self, vel):
         """
         Set the particle velocities of this cloth
 
         Args:
             np.array: (N, 3) numpy array, where each of the N particles' velocities are expressed in (x,y,z)
-                cartesian coordinates with respect to the world frame.
-            keypoints_only (bool): If True, will only set the keypoint particle state
+                cartesian coordinates with respect to the world frame
         """
-        if keypoints_only:
-            assert vel.shape[0] == len(self._keypoint_idx), \
-                f"Got mismatch in particle keypoint setting size: {vel.shape[0]}, " \
-                f"vs. number of particle keypoints {len(self._keypoint_idx)}!"
-            # Grab the particle velocities and overwrite the specific values
-            raw_vel = self.get_particle_velocities(keypoints_only=False)
-            raw_vel[self._keypoint_idx] = vel
-            vel = raw_vel
         assert vel.shape[0] == self._n_particles, \
             f"Got mismatch in particle setting size: {vel.shape[0]}, vs. number of particles {self._n_particles}!"
 
@@ -259,7 +262,8 @@ class ClothPrim(GeomPrim):
             ))
             return True
 
-        for pos in self.get_particle_positions(keypoints_only=keypoints_only):
+        positions = self.keypoint_particle_positions if keypoints_only else self.particle_positions
+        for pos in positions:
             og.sim.psqi.overlap_sphere(ClothPrim.cloth_system.particle_contact_offset, pos, report_hit, False)
 
         return contacts
@@ -351,9 +355,9 @@ class ClothPrim(GeomPrim):
         Args:
             velocity (np.ndarray): linear velocity to set all the particles of the cloth prim to. Shape (3,).
         """
-        vel = self.get_particle_velocities(keypoints_only=False)
+        vel = self.particle_velocities
         vel[:] = velocity
-        self.set_particle_velocities(vel, keypoints_only=False)
+        self.particle_velocities = vel
 
     def set_angular_velocity(self, velocity):
         """
@@ -453,8 +457,8 @@ class ClothPrim(GeomPrim):
         state = super()._dump_state()
         state["particle_group"] = self.particle_group
         state["n_particles"] = self.n_particles
-        state["particle_positions"] = self.get_particle_positions(keypoints_only=False)
-        state["particle_velocities"] = self.get_particle_velocities(keypoints_only=False)
+        state["particle_positions"] = self.particle_positions
+        state["particle_velocities"] = self.particle_velocities
         return state
 
     def _load_state(self, state):
@@ -466,12 +470,12 @@ class ClothPrim(GeomPrim):
 
         # Set values appropriately
         self._n_particles = state["n_particles"]
-        for attr, setter in zip(("positions", "velocities"), (self.set_particle_positions, self.set_particle_velocities)):
+        for attr in ("positions", "velocities"):
             attr_name = f"particle_{attr}"
             # Make sure the loaded state is a numpy array, it could have been accidentally casted into a list during
             # JSON-serialization
             attr_val = np.array(state[attr_name]) if not isinstance(attr_name, np.ndarray) else state[attr_name]
-            setter(attr_val, keypoints_only=False)
+            setattr(self, attr_name, attr_val)
 
     def _serialize(self, state):
         # Run super first

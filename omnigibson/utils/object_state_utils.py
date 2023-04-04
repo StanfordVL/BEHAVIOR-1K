@@ -256,8 +256,6 @@ def sample_kinematics(
 m.DEBUG_CLOTH_PROJ_VIS = False
 # Angle threshold for checking smoothness of the cloth; surface normals need to be close enough to the z-axis
 m.NORMAL_Z_ANGLE_DIFF = np.deg2rad(45.0)
-# Subsample cloth particle points to fit a convex hull for efficiency purpose
-m.N_POINTS_CONVEX_HULL = 1000
 
 
 def calculate_projection_area_and_diagonal_maximum(obj):
@@ -300,14 +298,7 @@ def calculate_projection_area_and_diagonal(obj, dims):
         diagonal (float): diagonal of the convex hull of the projected points
     """
     cloth = obj.links["base_link"]
-    points = cloth.get_particle_positions(keypoints_only=True)[:, dims]
-
-    if points.shape[0] > m.N_POINTS_CONVEX_HULL:
-        # If there are too many points, subsample m.N_POINTS_CONVEX_HULL deterministically for efficiency purpose
-        np.random.seed(0)
-        random_idx = np.random.randint(0, points.shape[0], m.N_POINTS_CONVEX_HULL)
-        points = points[random_idx]
-
+    points = cloth.keypoint_particle_positions[:, dims]
     hull = ConvexHull(points)
 
     # When input points are 2-dimensional, this is the area of the convex hull.
@@ -338,7 +329,7 @@ def calculate_smoothness(obj):
     face_vertex_counts = np.array(cloth.get_attribute("faceVertexCounts"))
     assert (face_vertex_counts == 3).all(), "cloth prim is expected to only contain triangle faces"
     face_vertex_indices = np.array(cloth.get_attribute("faceVertexIndices"))
-    points = cloth.get_particle_positions(keypoints_only=False)[face_vertex_indices]
+    points = cloth.particle_positions[face_vertex_indices]
     # Shape [F, 3, 3] where F is the number of faces
     points = points.reshape((face_vertex_indices.shape[0] // 3, 3, 3))
 

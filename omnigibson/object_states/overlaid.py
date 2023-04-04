@@ -86,7 +86,7 @@ class Overlaid(KinematicsMixin, RelativeObjectState, BooleanState):
             return False
 
         # Compute the convex hull of the particles of the cloth object.
-        points = self.obj.root_link.get_particle_positions(keypoints_only=True)[:, :2]
+        points = self.obj.root_link.keypoint_particle_positions[:, :2]
         cloth_hull = ConvexHull(points)
 
         # Compute the base aligned bounding box of the rigid object.
