@@ -256,8 +256,7 @@ def sample_kinematics(
 m.DEBUG_CLOTH_PROJ_VIS = False
 # Angle threshold for checking smoothness of the cloth; surface normals need to be close enough to the z-axis
 m.NORMAL_Z_ANGLE_DIFF = np.deg2rad(45.0)
-# Subsample cloth particle points to fit a convex hull for efficiency purpose
-m.N_POINTS_CONVEX_HULL = 1000
+
 
 def calculate_projection_area_and_diagonal_maximum(obj):
     """
@@ -283,6 +282,7 @@ def calculate_projection_area_and_diagonal_maximum(obj):
 
     return area_max, diagonal_max
 
+
 def calculate_projection_area_and_diagonal(obj, dims):
     """
     Calculate the projection area and the diagonal length when projecting to the plane defined by the input dims
@@ -298,14 +298,7 @@ def calculate_projection_area_and_diagonal(obj, dims):
         diagonal (float): diagonal of the convex hull of the projected points
     """
     cloth = obj.links["base_link"]
-    points = cloth.particle_positions[:, dims]
-
-    if points.shape[0] > m.N_POINTS_CONVEX_HULL:
-        # If there are too many points, subsample m.N_POINTS_CONVEX_HULL deterministically for efficiency purpose
-        np.random.seed(0)
-        random_idx = np.random.randint(0, points.shape[0], m.N_POINTS_CONVEX_HULL)
-        points = points[random_idx]
-
+    points = cloth.keypoint_particle_positions[:, dims]
     hull = ConvexHull(points)
 
     # When input points are 2-dimensional, this is the area of the convex hull.
@@ -326,6 +319,7 @@ def calculate_projection_area_and_diagonal(obj, dims):
         plt.show()
 
     return area, diagonal
+
 
 def calculate_smoothness(obj):
     """

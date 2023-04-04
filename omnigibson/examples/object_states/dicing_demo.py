@@ -4,10 +4,9 @@ import omnigibson as og
 from omnigibson.macros import gm
 import omnigibson.utils.transform_utils as T
 
-# Make sure object states, contact reporting, and transition rules are enabled
+# Make sure object states, GPU dynamics, and transition rules are enabled
 gm.ENABLE_OBJECT_STATES = True
 gm.USE_GPU_DYNAMICS = True
-gm.ENABLE_GLOBAL_CONTACT_REPORTING = True
 gm.ENABLE_TRANSITION_RULES = True
 
 
@@ -15,25 +14,25 @@ def main(random_selection=False, headless=False, short_exec=False):
     """
     Demo of dicing an apple into apple dices
     """
-    og.log.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
+    og.log.info(f"Demo {__file__}\n    " + "*" * 80 + "\n    Description:\n" + main.__doc__ + "*" * 80)
 
     # Create the scene config to load -- empty scene with table, knife, and apple
     table_cfg = dict(
         type="DatasetObject",
         name="table",
         category="breakfast_table",
-        model="19203",
+        model="rjgmmy",
         scale=0.9,
-        position=[0, 0, 0.532],
+        position=[0, 0, 0.58],
     )
 
     apple_cfg = dict(
         type="DatasetObject",
         name="apple",
         category="apple",
-        model="00_0",
+        model="agveuv",
         scale=1.5,
-        position=[0.085, 0,  0.90],
+        position=[0.085, 0,  0.92],
         abilities={"diceable": {}}
     )
 
@@ -41,7 +40,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         type="DatasetObject",
         name="knife",
         category="table_knife",
-        model="4",
+        model="lrdmpf",
         scale=2.5,
         position=[0, 0, 10.0],
     )
@@ -51,7 +50,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         name="light0",
         light_type="Sphere",
         radius=0.01,
-        intensity=4000.0,
+        intensity=1e7,
         position=[1.217, -0.848, 1.388],
     )
 
@@ -60,7 +59,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         name="light1",
         light_type="Sphere",
         radius=0.01,
-        intensity=4000.0,
+        intensity=1e7,
         position=[-1.217, 0.848, 1.388],
     )
 

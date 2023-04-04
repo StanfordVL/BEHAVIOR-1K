@@ -14,7 +14,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     It sets the camera to various poses and records images, and then generates a trajectory from a set of waypoints
     and records the resulting video.
     """
-    og.log.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
+    og.log.info(f"Demo {__file__}\n    " + "*" * 80 + "\n    Description:\n" + main.__doc__ + "*" * 80)
 
     # Make sure the example is not being run headless. If so, terminate early
     if gm.HEADLESS:

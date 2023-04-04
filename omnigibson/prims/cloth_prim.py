@@ -27,6 +27,10 @@ import numpy as np
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
+# Subsample cloth particle points to boost performance
+m.N_CLOTH_KEYPOINTS = 1000
+m.KEYPOINT_COVERAGE_THRESHOLD = 0.80
+
 # TODO: Tune these default values!
 m.CLOTH_STRETCH_STIFFNESS = 10000.0
 m.CLOTH_BEND_STIFFNESS = 200.0
@@ -62,6 +66,9 @@ class ClothPrim(GeomPrim):
         name,
         load_config=None,
     ):
+        # Internal vars stored
+        self._keypoint_idx = None
+
         # Run super init
         super().__init__(
             prim_path=prim_path,
@@ -96,7 +103,22 @@ class ClothPrim(GeomPrim):
             self_collision=True,
             self_collision_filter=True,
         )
-        self._n_particles = len(self.particle_positions)
+        positions = self.particle_positions
+        self._n_particles = len(positions)
+
+        # Deterministically sample keypoints and sanity check the AABB of these subsampled points vs. the actual points
+        np.random.seed(0)
+        self._keypoint_idx = np.random.randint(0, self._n_particles, m.N_CLOTH_KEYPOINTS) if \
+            self._n_particles > m.N_CLOTH_KEYPOINTS else np.arange(self._n_particles)
+        keypoint_positions = positions[self._keypoint_idx]
+        keypoint_aabb = keypoint_positions.min(axis=0), keypoint_positions.max(axis=0)
+        true_aabb = positions.min(axis=0), positions.max(axis=0)
+        overlap_vol = max(min(true_aabb[1][0], keypoint_aabb[1][0]) - max(true_aabb[0][0], keypoint_aabb[0][0]), 0) * \
+            max(min(true_aabb[1][1], keypoint_aabb[1][1]) - max(true_aabb[0][1], keypoint_aabb[0][1]), 0) * \
+            max(min(true_aabb[1][2], keypoint_aabb[1][2]) - max(true_aabb[0][2], keypoint_aabb[0][2]), 0)
+        true_vol = np.product(true_aabb[1] - true_aabb[0])
+        assert overlap_vol / true_vol > m.KEYPOINT_COVERAGE_THRESHOLD, \
+            f"Did not adequately subsample keypoints for cloth {self.name}!"
 
     def _initialize(self):
         super()._initialize()
@@ -127,9 +149,13 @@ class ClothPrim(GeomPrim):
         """
         return False
 
-    @property
-    def particle_positions(self):
+    def _compute_particle_positions(self, keypoints_only=False):
         """
+        Compute individual particle positions for this cloth prim
+
+        Args:
+            keypoints_only (bool): If True, will only return the keypoint particle state
+
         Returns:
             np.array: (N, 3) numpy array, where each of the N particles' positions are expressed in (x,y,z)
                 cartesian coordinates relative to the world frame
@@ -139,14 +165,38 @@ class ClothPrim(GeomPrim):
         s = self.scale
 
         p_local = np.array(self.get_attribute(attr="points"))
+        p_local = p_local[self._keypoint_idx] if keypoints_only else p_local
         p_world = (r @ (p_local * s).T).T + t
 
         return p_world
 
+    @property
+    def keypoint_particle_positions(self):
+        """
+        Grabs individual keypoint particle positions for this cloth prim.
+        Total number of keypoints is m.N_CLOTH_KEYPOINTS
+
+        Returns:
+            np.array: (N, 3) numpy array, where each of the N keypoint particles' positions are expressed in (x,y,z)
+                cartesian coordinates relative to the world frame
+        """
+        return self._compute_particle_positions(keypoints_only=True)
+
+    @property
+    def particle_positions(self):
+        """
+        Grabs individual particle positions for this cloth prim
+
+        Returns:
+            np.array: (N, 3) numpy array, where each of the N particles' positions are expressed in (x,y,z)
+                cartesian coordinates relative to the world frame
+        """
+        return self._compute_particle_positions(keypoints_only=False)
+
     @particle_positions.setter
     def particle_positions(self, pos):
         """
-        Set the particle positions for this instancer
+        Set the particle positions of this cloth
 
         Args:
             np.array: (N, 3) numpy array, where each of the N particles' desired positions are expressed in (x,y,z)
@@ -158,13 +208,15 @@ class ClothPrim(GeomPrim):
         r = T.quat2mat(self.get_orientation())
         t = self.get_position()
         s = self.scale
-
         p_local = (r.T @ (pos - t).T).T / s
+
         self.set_attribute(attr="points", val=Vt.Vec3fArray.FromNumpy(p_local))
 
     @property
     def particle_velocities(self):
         """
+        Grabs individual particle velocities for this cloth prim
+
         Returns:
             np.array: (N, 3) numpy array, where each of the N particles' velocities are expressed in (x,y,z)
                 cartesian coordinates with respect to the world frame.
@@ -179,7 +231,7 @@ class ClothPrim(GeomPrim):
 
         Args:
             np.array: (N, 3) numpy array, where each of the N particles' velocities are expressed in (x,y,z)
-                cartesian coordinates with respect to the world frame.
+                cartesian coordinates with respect to the world frame
         """
         assert vel.shape[0] == self._n_particles, \
             f"Got mismatch in particle setting size: {vel.shape[0]}, vs. number of particles {self._n_particles}!"
@@ -187,9 +239,12 @@ class ClothPrim(GeomPrim):
         # the velocities attribute is w.r.t the world frame already
         self.set_attribute(attr="velocities", val=Vt.Vec3fArray.FromNumpy(vel))
 
-    def contact_list(self):
+    def contact_list(self, keypoints_only=True):
         """
         Get list of all current contacts with this cloth body
+
+        Args:
+            keypoints_only (bool): If True, will only check contact with this cloth's keypoints
 
         Returns:
             list of CsRawData: raw contact info for this cloth body
@@ -207,7 +262,8 @@ class ClothPrim(GeomPrim):
             ))
             return True
 
-        for pos in self.particle_positions:
+        positions = self.keypoint_particle_positions if keypoints_only else self.particle_positions
+        for pos in positions:
             og.sim.psqi.overlap_sphere(ClothPrim.cloth_system.particle_contact_offset, pos, report_hit, False)
 
         return contacts
@@ -299,7 +355,7 @@ class ClothPrim(GeomPrim):
         Args:
             velocity (np.ndarray): linear velocity to set all the particles of the cloth prim to. Shape (3,).
         """
-        vel = np.copy(self.particle_velocities)
+        vel = self.particle_velocities
         vel[:] = velocity
         self.particle_velocities = vel
 

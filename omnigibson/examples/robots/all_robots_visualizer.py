@@ -9,7 +9,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     Robot demo
     Loads all robots in an empty scene, generate random actions
     """
-    og.log.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
+    og.log.info(f"Demo {__file__}\n    " + "*" * 80 + "\n    Description:\n" + main.__doc__ + "*" * 80)
     # Create empty scene with no robots in it initially
     cfg = {
         "scene": {

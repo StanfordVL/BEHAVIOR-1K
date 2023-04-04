@@ -16,7 +16,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     Loads the floor plan and obstacles for the requested scene, and overlays them in a visual figure such that the
     highlighted area reflects the traversable (free-space) area
     """
-    og.log.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
+    og.log.info(f"Demo {__file__}\n    " + "*" * 80 + "\n    Description:\n" + main.__doc__ + "*" * 80)
 
     scenes = get_available_og_scenes()
     scene_model = choose_from_options(options=scenes, name="scene model", random_selection=random_selection)

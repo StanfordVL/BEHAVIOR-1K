@@ -23,7 +23,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     Robot grasping mode demo with selection
     Queries the user to select a type of grasping mode and GUI
     """
-    og.log.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
+    og.log.info(f"Demo {__file__}\n    " + "*" * 80 + "\n    Description:\n" + main.__doc__ + "*" * 80)
 
     # Choose type of grasping
     grasping_mode = choose_from_options(options=GRASPING_MODES, name="grasping mode", random_selection=random_selection)

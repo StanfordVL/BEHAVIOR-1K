@@ -1,8 +1,10 @@
-from omnigibson.utils.constants import PrimType
-from omnigibson.object_states import Overlaid
-from omnigibson.macros import gm
+import numpy as np
 
 import omnigibson as og
+from omnigibson.macros import gm
+from omnigibson.utils.constants import PrimType
+from omnigibson.object_states import Overlaid
+
 
 # Make sure object states and GPU dynamics are enabled (GPU dynamics needed for cloth)
 gm.ENABLE_OBJECT_STATES = True
@@ -16,7 +18,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     Loads a carpet on top of a table. Initially Overlaid will be True because the carpet largely covers the table.
     If you drag the carpet off the table or even just fold it into half, Overlaid will become False.
     """
-    og.log.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
+    og.log.info(f"Demo {__file__}\n    " + "*" * 80 + "\n    Description:\n" + main.__doc__ + "*" * 80)
 
     # Create the scene config to load -- empty scene + custom cloth object + custom rigid object
     cfg = {
@@ -28,7 +30,7 @@ def main(random_selection=False, headless=False, short_exec=False):
                 "type": "DatasetObject",
                 "name": "carpet",
                 "category": "carpet",
-                "model": "carpet_0",
+                "model": "ctclvd",
                 "prim_type": PrimType.CLOTH,
                 "abilities": {"foldable": {}},
                 "position": [0, 0, 1.0],
@@ -38,9 +40,10 @@ def main(random_selection=False, headless=False, short_exec=False):
                 "type": "DatasetObject",
                 "name": "breakfast_table",
                 "category": "breakfast_table",
-                "model": "19203",
+                "model": "rjgmmy",
                 "prim_type": PrimType.RIGID,
-                "position": [0, 0, 0.6],
+                "scale": 0.9,
+                "position": [0, 0, 0.58],
             },
         ],
     }
@@ -52,12 +55,20 @@ def main(random_selection=False, headless=False, short_exec=False):
     carpet = env.scene.object_registry("name", "carpet")
     breakfast_table = env.scene.object_registry("name", "breakfast_table")
 
+    # Set camera pose
+    og.sim.viewer_camera.set_position_orientation(
+        position=np.array([ 0.88215526, -1.40086216,  2.00311063]),
+        orientation=np.array([0.42013364, 0.12342107, 0.25339685, 0.86258043]),
+    )
+
     max_steps = 100 if short_exec else -1
     steps = 0
 
+    print("\nTry dragging cloth around with CTRL + Left-Click to see the Overlaid state change:\n")
+
     while steps != max_steps:
-        print(f"Overlaid {carpet.states[Overlaid].get_value(breakfast_table)}")
-        og.sim.step()
+        print(f"Overlaid {carpet.states[Overlaid].get_value(breakfast_table)}    ", end="\r")
+        env.step(np.array([]))
 
     # Shut down env at the end
     env.close()
