@@ -88,7 +88,7 @@ Then, simply launch the desired script:
 
     2. Install NVIDIA's [Isaac Sim platform](https://docs.omniverse.nvidia.com/app_isaacsim/app_isaacsim/install_workstation.html) (1) (2)
 
-        !!! warning "The latest version of Isaac Sim (2022.2.1) has known issues when loading large OG scenes. If you encounter such problems, it is recommended to use 2022.2.0 instead."
+        !!! warning "The latest version of Isaac Sim (2022.2.1) has known issues when loading large **`OmniGibson`** scenes. If you encounter such problems, it is recommended to use 2022.2.0 instead."
 
     3. Export IsaacSim directory path as an environment variable: (3)
 
@@ -122,17 +122,24 @@ Then, simply launch the desired script:
         ```
 
         ??? info "Note for zsh users"
-            bash is **strongly** recommended on Linux. If you are using zsh, you need to change `${BASH_SOURCE[0]}` and `${BASH_SOURCE}` to `$0` in the first line of `<ISAAC_SIM_PATH>/setup_conda_env.sh` and `<ISAAC_SIM_PATH>/setup_python_env.sh` respectively in order for OG to work properly.
+            bash is **strongly** recommended on Linux. If you are using zsh, you need to change `${BASH_SOURCE[0]}` and `${BASH_SOURCE}` to `$0` in the first line of `<ISAAC_SIM_PATH>/setup_conda_env.sh` and `<ISAAC_SIM_PATH>/setup_python_env.sh` respectively in order for **`OmniGibson`** to work properly.
         
     6. This will automatically create an dump you into a conda env called `omnigibson`. If you need to activate this environment later, simply call:
 
         ```shell
         conda activate omnigibson
         ```
-    7. Download OG assets and datasets:
 
+    7. Download **`OmniGibson`** assets and datasets:
+
+        On Linux (bash):
         ```shell
-        python omnigibson/scripts/setup.py
+        OMNIGIBSON_NO_OMNIVERSE=1 python omnigibson/scripts/setup.py
+        ```
+
+        On Windows (cmd):
+        ```shell
+        set OMNIGIBSON_NO_OMNIVERSE=1&&python omnigibson/scripts/setup.py&&set OMNIGIBSON_NO_OMNIVERSE=
         ```
 
     8. 🎉 Congrats! You installed **`OmniGibson`** successfully.  

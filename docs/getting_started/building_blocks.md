@@ -481,7 +481,7 @@ This demo loads in various heat sources and sinks, and places an apple within cl
     --8<-- "src/examples/object_states/temperature_demo.py"
     ```
 
-## 🤖 **Rendering**
+## 🖼️ **Rendering**
 These examples showcase how to change renderer settings in **`OmniGibson`**.
 
 ### **Renderer Settings Demo**
@@ -493,7 +493,7 @@ These examples showcase how to change renderer settings in **`OmniGibson`**.
 python -m omnigibson.examples.renderer_settings.renderer_settings_example
 ```
 
-This demo iterates over all robots in **`OmniGibson`**, loading each one into an empty scene and randomly moving its joints for a brief amount of time.
+This demo iterates over different renderer settings of and shows how they can be programmatically set with **`OmniGibson`** interface.
 
 ??? code "renderer_settings_example.py"
 

@@ -16,7 +16,6 @@ from scipy.spatial.transform import Rotation as R
 from scipy.interpolate import CubicSpline
 from scipy.integrate import quad
 import omni
-import omni.ui
 import omni.log
 import carb
 import random
