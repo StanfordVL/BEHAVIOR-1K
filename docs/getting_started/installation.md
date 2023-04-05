@@ -84,9 +84,11 @@ Then, simply launch the desired script:
     This method is recommended for deeper users looking to develop upon **`OmniGibson`** or use it extensively for research. 
 
     
-    1. Install [Conda](https://www.google.com/search?q=install+conda&rlz=1C5GCEA_enUS978US978&oq=install+conda&aqs=chrome..69i57l2j69i59l2j0i271j69i60l3.922j0j7&sourceid=chrome&ie=UTF-8)
+    1. Install [Conda](https://conda.io/projects/conda/en/latest/user-guide/install/index.html)
 
-    2. Install NVIDIA's [Isaac Sim platform](https://docs.omniverse.nvidia.com/app_isaacsim/app_isaacsim/install_basic.html) (1) (2)
+    2. Install NVIDIA's [Isaac Sim platform](https://docs.omniverse.nvidia.com/app_isaacsim/app_isaacsim/install_workstation.html) (1) (2)
+
+        !!! warning "The latest version of Isaac Sim (2022.2.1) has known issues when loading large OG scenes. If you encounter such problems, it is recommended to use 2022.2.0 instead."
 
     3. Export IsaacSim directory path as an environment variable: (3)
 
@@ -107,7 +109,7 @@ Then, simply launch the desired script:
         cd OmniGibson
         ```
 
-    5. Run the command to setup a virtual conda environment to run **`OmniGibson`**:
+    5. Setup a virtual conda environment to run **`OmniGibson`**:
 
         On Linux (bash):
         ```shell
@@ -127,12 +129,17 @@ Then, simply launch the desired script:
         ```shell
         conda activate omnigibson
         ```
+    7. Download OG assets and datasets:
 
-    7. 🎉 Congrats! You installed **`OmniGibson`** successfully.  
+        ```shell
+        python omnigibson/scripts/setup.py
+        ```
+
+    8. 🎉 Congrats! You installed **`OmniGibson`** successfully.  
 
 1. Be sure keep track of where you choose Omniverse to write package files! By default this should be `~/.local/share/ov/pkg`
 
-2. The latest version of Isaac Sim (2022.2.1) has known issues when loading large OG scenes. If you encounter such problems, it is recommended to use 2022.2.0 instead.
+2. Cache and Nucleus is not required for our project. It is sufficient to install Isaac Sim after installing Omniverse Launcher
 
 3. If you installed Isaac Sim to the default location, this is `~/.local/share/ov/pkg/isaac_sim-2022.2.1`
 

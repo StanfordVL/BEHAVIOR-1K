@@ -21,7 +21,7 @@ gm.ENABLE_FLATCACHE = True
 def main(random_selection=False, headless=False, short_exec=False):
     """
     Robot grasping mode demo with selection
-    Queries the user to select a type of grasping mode and GUI
+    Queries the user to select a type of grasping mode
     """
     og.log.info(f"Demo {__file__}\n    " + "*" * 80 + "\n    Description:\n" + main.__doc__ + "*" * 80)
 

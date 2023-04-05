@@ -10,9 +10,9 @@ from omnigibson.utils.ui_utils import choose_from_options
 
 def main(random_selection=False, headless=False, short_exec=False):
     """
-    This demo shows how to load any scaled objects from the iG object model dataset
+    This demo shows how to load any scaled objects from the OG object model dataset
     The user selects an object model to load
-    The objects can be loaded into an empty scene, an interactive scene (iG) or a static scene (Gibson)
+    The objects can be loaded into an empty scene or an interactive scene (OG)
     The example also shows how to use the Environment API or directly the Simulator API, loading objects and robots
     and executing actions
     """

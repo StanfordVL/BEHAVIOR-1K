@@ -12,7 +12,7 @@ gm.ENABLE_OBJECT_STATES = True
 
 def main(random_selection=False, headless=False, short_exec=False):
     """
-    Generates a BEHAVIOR Task environment from a pre-defined configuration file.
+    Generates a BEHAVIOR Task environment in an online fashion.
 
     It steps the environment 100 times with random actions sampled from the action space,
     using the Gym interface, resetting it 10 times.
