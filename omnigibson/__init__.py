@@ -189,7 +189,11 @@ def shutdown():
     global app
     global sim
     sim.clear()
-    shutil.rmtree(tempdir)
+    # TODO: Currently tempfile removal will fail due to CopyPrim command (for example, GranularSystem in dicing_apple example.)
+    try:
+        shutil.rmtree(tempdir)
+    except PermissionError:
+        log.info("Permission error when removing temp files. Ignoring")
     from omnigibson.utils.ui_utils import suppress_omni_log
     log.info(f"{'-' * 10} Shutting Down {logo_small()} {'-' * 10}")
 

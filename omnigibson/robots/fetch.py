@@ -41,6 +41,7 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         visual_only=False,
         self_collisions=False,
         load_config=None,
+        fixed_base=False,
 
         # Unique to USDObject hierarchy
         abilities=None,
@@ -136,7 +137,7 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
             uuid=uuid,
             scale=scale,
             visible=visible,
-            fixed_base=False,
+            fixed_base=fixed_base,
             visual_only=visual_only,
             self_collisions=self_collisions,
             load_config=load_config,
