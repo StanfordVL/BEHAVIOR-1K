@@ -13,7 +13,7 @@ if not exist %ISAAC_SIM_PATH%\setup_python_env.bat (
 )
 
 :: Create a conda environment with python 3.7
-call conda create -y -n omnigibson python=3.7
+call conda create -y -n omnigibson python=3.7 || goto :error
 call conda activate omnigibson
 
 mkdir %CONDA_PREFIX%\etc\conda\activate.d
@@ -40,10 +40,14 @@ echo set EXP_PATH=%%~dp0apps>>%ISAAC_SIM_PATH%\setup_python_env.bat
 echo set ISAAC_PATH=%%~dp0>>%ISAAC_SIM_PATH%\setup_python_env.bat
 
 :: Install omnigibson!
-call pip install -e .
+call pip install -e . || goto :error
 
 :: Cycle conda environment so that all dependencies are propagated
 call conda deactivate
 call conda activate omnigibson
 
 echo OmniGibson successfully installed!
+
+:error
+An error occurred during installation. Please check the error message above.
+exit /b

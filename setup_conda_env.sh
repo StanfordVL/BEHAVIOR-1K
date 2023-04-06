@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -eo
+
 # Helper function to check whether the script is soruced
 is_sourced() {
   if [ -n "$ZSH_VERSION" ]; then 
