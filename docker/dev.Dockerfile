@@ -10,10 +10,6 @@ RUN apt-get update && apt-get install -y \
 RUN rm -rf /isaac-sim/exts/omni.isaac.ml_archive/pip_prebundle/gym
 RUN rm -rf /isaac-sim/kit/extscore/omni.kit.pip_archive/pip_prebundle/numpy
 
-# Add OmniGibson
-ADD . /omnigibson
-WORKDIR /omnigibson
-
 # Mount the data directory
 VOLUME ["/data"]
 ENV OMNIGIBSON_DATASET_PATH /data/og_dataset
@@ -33,10 +29,6 @@ RUN echo "source /isaac-sim/setup_conda_env.sh" >> /root/.bashrc
 SHELL ["micromamba", "run", "-n", "omnigibson", "/bin/bash", "--login", "-c"]
 RUN micromamba install -c conda-forge opencv
 
-# Install OmniGibson
-RUN pip install -e .
-
-RUN echo "OMNIGIBSON_NO_OMNIVERSE=1 python -m omnigibson.scripts.setup" >> /root/.bashrc
 ENTRYPOINT []
 
 CMD ["/bin/bash"]
