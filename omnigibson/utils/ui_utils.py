@@ -144,7 +144,7 @@ def suppress_omni_log(channels):
         # Do nothing
         pass
     elif channels is None:
-        # Globallly re-enable log
+        # Globally re-enable log
         log.enabled = True
     else:
         # Unsuppress the channels

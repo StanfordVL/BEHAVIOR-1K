@@ -23,6 +23,7 @@ gm.KEY_PATH = "data/omnigibson.key"
 gm.HEADLESS = (os.getenv("OMNIGIBSON_HEADLESS", 'False').lower() in ('true', '1', 't'))
 
 # Whether only the viewport should be shown in the GUI or not (if not, other peripherals are additionally shown)
+# CANNOT be set at runtime
 gm.GUI_VIEWPORT_ONLY = False
 
 # Do not suppress known omni warnings / errors, and also put omnigibson in a debug state
