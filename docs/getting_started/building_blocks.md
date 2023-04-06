@@ -116,13 +116,13 @@ This demo lets you choose a scene from the BEHAVIOR dataset, loads it along with
 !!! abstract "This demo is useful for..."
 
     * Understanding how to load a scene into **`OmniGibson`**
-    * Accessing all BEHAVIOR dataset scenes
+    * Understanding how to generate a trajectory from a set of waypoints
 
 ```{.python .annotate}
 python -m omnigibson.examples.scenes.scene_selector
 ```
 
-This demo lets you choose a scene from the BEHAVIOR dataset, and move around the scene with keyboard control.
+This demo lets you choose a scene from the BEHAVIOR dataset. It allows you to move the camera using the keyboard, select waypoints, and then programmatically generates a video trajectory from the selected waypoints
 
 ??? code "scene_tour_demo.py"
 
@@ -365,7 +365,7 @@ This demo loads in a stove (toggled on) and two apples. The first apple will be 
 !!! abstract "This demo is useful for..."
 
     * Understanding how cloth objects can be overlaid on rigid objects
-    * Understanding current heuristics used for gauging a cloth's "foldness"
+    * Understanding current heuristics used for gauging a cloth's "overlaid" status
 
 ```{.python .annotate}
 python -m omnigibson.examples.object_states.overlaid_demo

@@ -6,7 +6,6 @@ def main(random_selection=False, headless=False, short_exec=False):
     """
     Highlights visually all object instances of windows and then removes the highlighting
     It also demonstrates how to apply an action on all instances of objects of a given category
-    ONLY WORKS WITH OPTIMIZED RENDERING
     """
     og.log.info(f"Demo {__file__}\n    " + "*" * 80 + "\n    Description:\n" + main.__doc__ + "*" * 80)
 
