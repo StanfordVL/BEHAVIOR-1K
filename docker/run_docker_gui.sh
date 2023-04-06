@@ -36,10 +36,10 @@ if [ ! -e "$EGL_VENDOR_PATH" ]; then
 fi
 
 # Move directories from their legacy paths.
-if [ -e "${DATA_PATH}/og_dataset"]; then
+if [ -e "${DATA_PATH}/og_dataset" ]; then
     mv "${DATA_PATH}/og_dataset" "${DATA_PATH}/datasets/og_dataset"
 fi
-if [ -e "${DATA_PATH}/assets"]; then
+if [ -e "${DATA_PATH}/assets" ]; then
     mv "${DATA_PATH}/assets" "${DATA_PATH}/datasets/assets"
 fi
 

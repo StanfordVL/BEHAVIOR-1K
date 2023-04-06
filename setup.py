@@ -38,6 +38,7 @@ setup(
         "nest_asyncio",
         "imageio",
         "termcolor",
+        "progressbar",
     ],
     tests_require=[],
     python_requires=">=3",
