@@ -8,12 +8,12 @@ icon: material/hammer-wrench
 
 Please make sure your system meets the following specs:
 
-- [x] **OS:** Ubuntu 20.04+ / Windows 10+
+- [x] **OS:** 
+    - Install with Docker: Ubuntu 20.04+
+    - Install from source: Ubuntu 20.04+ / Windows 10+
 - [x] **RAM:** 32GB+
 - [x] **GPU:** NVIDIA RTX 2070+
 - [x] **VRAM:** 8GB+
-
-!!! warning "Docker install is currently not supported on Windows"
 
 ??? question "Why these specs?"
     
@@ -21,67 +21,69 @@ Please make sure your system meets the following specs:
 
 ## 💻 **Setup**
 
-You can quickly get **`OmniGibson`** immediately up and running from our pre-built 🐳 docker image:
+There are two ways to setup **`OmniGibson`**:
 
-??? info "Need to install docker or NVIDIA docker?"
-    
-    ```{.shell .annotate}
-    # Install docker
-    curl https://get.docker.com | sh && sudo systemctl --now enable docker
+- **Install with Docker**: You can quickly get **`OmniGibson`** immediately up and running from our pre-built 🐳 docker image:
+- **Install from source**: This method is recommended for deeper users looking to develop upon **`OmniGibson`** or use it extensively for research. 
 
-    # Install nvidia-docker runtime
-    distribution=$(. /etc/os-release;echo $ID$VERSION_ID) \
-        && curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | \
-        sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg \
-        && curl -s -L https://nvidia.github.io/libnvidia-container/$distribution/libnvidia-container.list | \
-        sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
-        sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
-    sudo apt-get update
-    sudo apt-get install -y nvidia-docker2 # install
-    sudo systemctl restart docker # restart docker engine
+=== "Docker"
+
+    ??? info "Need to install docker or NVIDIA docker?"
+        
+        ```{.shell .annotate}
+        # Install docker
+        curl https://get.docker.com | sh && sudo systemctl --now enable docker
+
+        # Install nvidia-docker runtime
+        distribution=$(. /etc/os-release;echo $ID$VERSION_ID) \
+            && curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | \
+            sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg \
+            && curl -s -L https://nvidia.github.io/libnvidia-container/$distribution/libnvidia-container.list | \
+            sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
+            sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+        sudo apt-get update
+        sudo apt-get install -y nvidia-docker2 # install
+        sudo systemctl restart docker # restart docker engine
+        ```
+
+    Install our docker launching scripts:
+    ```shell
+    curl -LJO https://raw.githubusercontent.com/StanfordVL/OmniGibson/main/docker/run_docker.sh
+    chmod a+x run_docker.sh
     ```
 
-Install our docker launching scripts:
-```shell
-curl -LJO https://raw.githubusercontent.com/StanfordVL/OmniGibson/main/docker/run_docker.sh
-curl -LJO https://raw.githubusercontent.com/StanfordVL/OmniGibson/main/docker/run_docker_gui.sh
-chmod a+x run_docker.sh
-chmod a+x run_docker_gui.sh
-```
+    ??? question annotate "What is being installed?"
 
-??? question annotate "What is being installed?"
+        Our docker image automatically ships with a pre-configured conda virtual environment named `omnigibson` with Isaac Sim and **`OmniGibson`** pre-installed. Upon running the first time, our scene and object assets will automatically be downloaded as well. (1)
 
-    Our docker image automatically ships with a pre-configured conda virtual environment named `omnigibson` with Isaac Sim and **`OmniGibson`** pre-installed. Upon running the first time, our scene and object assets will automatically be downloaded as well. (1)
+    1.  📊 **Worried about dataset size?** We will ask whether you want to install our small demo dataset or full dataset of assets!
 
-1.  📊 **Worried about dataset size?** We will ask whether you want to install our small demo dataset or full dataset of assets!
+    Then, simply launch the shell script:
 
+    === "Headless"
 
-Then, simply launch the desired script:
+        ```{.shell .annotate}
+        sudo ./run_docker.sh -h <DATA_PATH> # (1)!
+        ```
 
-=== "Headless"
-
-    ```{.shell .annotate}
-    sudo ./run_docker.sh <DATA_PATH> # (1)!
-    ```
-
-    1.  `<DATA_PATH>` specifies where data will be stored on your machine (if no `<DATA_PATH>` is specified, it defaults to `./omnigibson_data`). This needs to be called each time the docker container is run!
+        1.  `<DATA_PATH>` specifies where data will be stored on your machine (if no `<DATA_PATH>` is specified, it defaults to `./omnigibson_data`). This needs to be called each time the docker container is run!
 
 
-=== "GUI"
+    === "GUI"
 
-    ```{.shell .annotate}
-    sudo ./run_docker_gui.sh <DATA_PATH> # (1)!
-    ```
+        ```{.shell .annotate}
+        sudo ./run_docker.sh <DATA_PATH> # (1)!
+        ```
 
-    1.  `<DATA_PATH>` specifies where data will be stored on your machine (if no `<DATA_PATH>` is specified, it defaults to `./omnigibson_data`). This needs to be called each time the docker container is run!
+        1.  `<DATA_PATH>` specifies where data will be stored on your machine (if no `<DATA_PATH>` is specified, it defaults to `./omnigibson_data`). This needs to be called each time the docker container is run!
 
-??? warning annotate "Are you using NFS or AFS?"
+    ??? warning annotate "Are you using NFS or AFS?"
 
-    Docker containers are unable to access NFS or AFS drives, so if `run_docker.sh` or `run_docker_gui.sh` are located on an NFS / AFS partition, please set `<DATA_PATH>` to an alternative data directory located on a non-NFS / AFS partition.
+        Docker containers are unable to access NFS or AFS drives, so if `run_docker.sh` are located on an NFS / AFS partition, please set `<DATA_PATH>` to an alternative data directory located on a non-NFS / AFS partition.
 
-??? example annotate "Advanced: Installing from Source"
+=== "Source"
 
-    This method is recommended for deeper users looking to develop upon **`OmniGibson`** or use it extensively for research. 
+    Both Linux and Windows are supported to install **`OmniGibson`** from source.
 
     === "Linux (bash)"
     
@@ -168,20 +170,20 @@ Then, simply launch the desired script:
 
         7. 🎉 Congrats! You installed **`OmniGibson`** successfully.
 
+    { .annotate }
+    1. Be sure keep track of where you choose Omniverse to write package files! By default this should be `~/.local/share/ov/pkg`
 
-1. Be sure keep track of where you choose Omniverse to write package files! By default this should be `~/.local/share/ov/pkg`
+    2. If you installed Isaac Sim to the default location, this is `~/.local/share/ov/pkg/isaac_sim-2022.2.1`
 
-2. If you installed Isaac Sim to the default location, this is `~/.local/share/ov/pkg/isaac_sim-2022.2.1`
+    3. Be sure keep track of where you choose Omniverse to write package files! By default this should be `C:\Users\<USER_NAME>\AppData\Local\ov\pkg`
 
-3. Be sure keep track of where you choose Omniverse to write package files! By default this should be `C:\Users\<USER_NAME>\AppData\Local\ov\pkg`
-
-4. If you installed Isaac Sim to the default location, this is `C:\Users\<USER_NAME>\AppData\Local\ov\pkg\isaac_sim-2022.2.1`
+    4. If you installed Isaac Sim to the default location, this is `C:\Users\<USER_NAME>\AppData\Local\ov\pkg\isaac_sim-2022.2.1`
 
 
 
 ## 🌎 **Explore `OmniGibson`!**
 
-??? warning annotate "Expect slowdown during first execution"
+!!! warning annotate "Expect slowdown during first execution"
 
     Omniverse requires some one-time startup setup (up to ~5 minutes) when **`OmniGibson`** is imported for the first time. This is expected behavior, and should only occur once!
 
