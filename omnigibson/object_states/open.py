@@ -87,12 +87,12 @@ def _get_relevant_joints(obj):
     default_joint_directions = [1] * len(default_relevant_joints)
 
     if not hasattr(obj, "metadata"):
-        log.warning("No openable joint metadata found for object %s" % obj.name)
+        log.debug("No openable joint metadata found for object %s" % obj.name)
         return default_both_sides, default_relevant_joints, default_joint_directions
 
     # Get joint IDs and names from metadata annotation. If not, return default values.
     if m.METADATA_FIELD not in obj.metadata:
-        log.warning(f"No openable joint metadata found for object {obj.name}")
+        log.debug(f"No openable joint metadata found for object {obj.name}")
         return default_both_sides, default_relevant_joints, default_joint_directions
 
     both_sides = obj.metadata[m.BOTH_SIDES_METADATA_FIELD] if m.BOTH_SIDES_METADATA_FIELD in obj.metadata else False
