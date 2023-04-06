@@ -70,24 +70,6 @@ This demo instantiates one of our navigation tasks in a fully-populated scene an
     --8<-- "src/examples/environments/navigation_env_demo.py"
     ```
 
-### **Config Selection Demo**
-!!! abstract "This demo is useful for..."
-
-    * Understanding how pre-defined configuration files are used
-
-```{.python .annotate}
-python -m omnigibson.examples.environments.config_selector
-```
-
-This demo allows you to choose one of our environment configuration files, loads the environment, and then cycles the environment periodically.
-
-??? code "config_selector.py"
-
-    ``` py linenums="1"
-    --8<-- "src/examples/environments/config_selector.py"
-    ```
-
-
 ## 🧑‍🏫 **Learning**
 These examples showcase how **`OmniGibson`** can be used to train embodied AI agents.
 
@@ -98,15 +80,15 @@ These examples showcase how **`OmniGibson`** can be used to train embodied AI ag
     * Understanding how to train and evaluate a policy
 
 ```{.python .annotate}
-python -m omnigibson.examples.learning.stable_baselines3_ppo_example
+python -m omnigibson.examples.learning.navigation_policy_demo
 ```
 
 This demo loads a BEHAVIOR task with a `Fetch` robot, and trains / evaluates the agent using [Stable Baseline3](https://stable-baselines3.readthedocs.io/en/master/)'s PPO algorithm.
 
-??? code "stable_baselines3_ppo_example.py"
+??? code "navigation_policy_demo.py"
 
     ``` py linenums="1"
-    --8<-- "src/examples/learning/stable_baselines3_ppo_example.py"
+    --8<-- "src/examples/learning/navigation_policy_demo.py"
     ```
 
 ## 🏔️ **Scenes**
@@ -128,6 +110,24 @@ This demo lets you choose a scene from the BEHAVIOR dataset, loads it along with
 
     ``` py linenums="1"
     --8<-- "src/examples/scenes/scene_selector.py"
+    ```
+
+### **Scene Tour Demo**
+!!! abstract "This demo is useful for..."
+
+    * Understanding how to load a scene into **`OmniGibson`**
+    * Understanding how to generate a trajectory from a set of waypoints
+
+```{.python .annotate}
+python -m omnigibson.examples.scenes.scene_selector
+```
+
+This demo lets you choose a scene from the BEHAVIOR dataset. It allows you to move the camera using the keyboard, select waypoints, and then programmatically generates a video trajectory from the selected waypoints
+
+??? code "scene_tour_demo.py"
+
+    ``` py linenums="1"
+    --8<-- "src/examples/scenes/scene_tour_demo.py"
     ```
 
 ### **Traversability Map Demo**
@@ -198,7 +198,7 @@ This demo lets you choose a specific object from the BEHAVIOR dataset, and rotat
 python -m omnigibson.examples.objects.highlight_objects
 ```
 
-This demo lets you choose a specific object from the BEHAVIOR dataset, and rotates the object in-place. If the object is articulated, it additionally moves its joints through its full range of motion.
+This demo loads the Rs_int scene and highlights windows on/off repeatedly.
 
 ??? code "highlight_objects.py"
 
@@ -248,63 +248,33 @@ This demo loads an apple and a fridge, and showcases how they may or may not be 
     --8<-- "src/examples/object_states/attachment_demo.py"
     ```
 
-### **Cleaning Demo**
+### **Dicing Demo**
 !!! abstract "This demo is useful for..."
 
-    * Understanding how `WaterSource`-enabled objects can be toggled on to generate water particles
-    * Understanding how to programmatically generate `Stain` and `Dusty` particles on objects
-    * Understanding how particles can be removed via a `ParticleRemover` object
+    * Understanding how to leverage the `Dicing` state
+    * Understanding how to enable objects to be `diceable`
 
 ```{.python .annotate}
-python -m omnigibson.examples.object_states.cleaning_demo
+python -m omnigibson.examples.object_states.dicing_demo
 ```
 
-This demo first loads a basic cube object with the ability to remove particles into fully populated scene, and then spawns dust and stain particles on various objects and turns on the sink. You can then move (1) the cube object around to first absorb water particles so that it's "soaked" with water, and then can drag it across objects with dust or stain particles to remove them.
-{ .annotate }
+This demo loads an apple and a knife, and showcases how apple can be diced into smaller chunks with the knife.
 
-1. Manipulate the object by holding down **`Shift`** and then **`Left-click + Drag`**!
-
-??? code "cleaning_demo.py"
+??? code "dicing_demo.py"
 
     ``` py linenums="1"
-    --8<-- "src/examples/object_states/cleaning_demo.py"
+    --8<-- "src/examples/object_states/dicing_demo.py"
     ```
 
-### **Simple Cleaning Demo**
-!!! abstract "This demo is useful for..."
-
-    * Understanding how `WaterSource`-enabled objects can be toggled on to generate water particles
-    * Understanding how to programmatically generate `Stain` and `Dusty` particles on objects
-    * Understanding how particles can be removed via a `ParticleRemover` object
-
-```{.python .annotate}
-python -m omnigibson.examples.object_states.cleaning_demo_simple
-```
-
-This demo is similar in functionality to the [full cleaning demo](#cleaning-demo), but instead of loading a fully populated scene only a select few objects are loaded. In this case, the loaded `scrub_brush` object is the `ParticleRemover` object. As before, you can move (1) the brush around to first absorb water particles so that it's "soaked" with water, and then can drag it across objects with dust or stain particles to remove them.
-{ .annotate }
-
-1. Manipulate the object by holding down **`Shift`** and then **`Left-click + Drag`**!
-
-??? code "cleaning_demo_simple.py"
-
-    ``` py linenums="1"
-    --8<-- "src/examples/object_states/cleaning_demo_simple.py"
-    ```
-
-### **Folded Demo**
+### **Folded and Unfolded Demo**
 !!! abstract "This demo is useful for..."
 
     * Understanding how to load a softbody (cloth) version of a BEHAVIOR dataset object
     * Understanding how to enable cloth objects to be `foldable` 
     * Understanding the current heuristics used for gauging a cloth's "foldness"
 
-!!! warning "This is a beta feature"
-
-    Our `Folded` state is still a WIP, and should not be used to accurately capture the full semantics of folding cloth-enabled objects.
-
 ```{.python .annotate}
-python -m omnigibson.examples.object_states.folded_state_demo
+python -m omnigibson.examples.object_states.folded_unfolded_state_demo
 ```
 
 This demo loads in three different cloth objects, and allows you to manipulate them (1) while printing out their `Folded` state status in real-time.
@@ -312,29 +282,10 @@ This demo loads in three different cloth objects, and allows you to manipulate t
 
 1. Manipulate the object by holding down **`Shift`** and then **`Left-click + Drag`**!
 
-??? code "folded_state_demo.py"
+??? code "folded_unfolded_state_demo.py"
 
     ``` py linenums="1"
-    --8<-- "src/examples/object_states/folded_state_demo.py"
-    ```
-
-
-### **Temperature Demo**
-!!! abstract "This demo is useful for..."
-
-    * Understanding how to dynamically sample kinematic states for BEHAVIOR dataset objects
-    * Understanding how temperature changes are propagated to individual objects from individual heat sources or sinks
-
-```{.python .annotate}
-python -m omnigibson.examples.object_states.temperature_demo
-```
-
-This demo loads in various heat sources and sinks, and places an apple within close proximity to each of them. As the environment steps, each apple's temperature is printed in real-time, showcasing **`OmniGibson`**'s rudimentary temperature dynamics.
-
-??? code "temperature_demo.py"
-
-    ``` py linenums="1"
-    --8<-- "src/examples/object_states/temperature_demo.py"
+    --8<-- "src/examples/object_states/folded_unfolded_state_demo.py"
     ```
 
 ### **Heat Source or Sink Demo**
@@ -392,6 +343,44 @@ This demo loads in a single object, and then dynamically modifies its state so t
     --8<-- "src/examples/object_states/object_state_texture_demo.py"
     ```
 
+### **Onfire Demo**
+!!! abstract "This demo is useful for..."
+
+    * Understanding how changing onfire state can cause objects' visual changes
+    * Understanding how onfire can be triggered by nearby onfire objects
+
+```{.python .annotate}
+python -m omnigibson.examples.object_states.onfire_demo
+```
+
+This demo loads in a stove (toggled on) and two apples. The first apple will be ignited by the stove first, then the second apple will be ignited by the first apple.
+
+??? code "onfire_demo.py"
+
+    ``` py linenums="1"
+    --8<-- "src/examples/object_states/onfire_demo.py"
+    ```
+
+### **Overlaid Demo**
+!!! abstract "This demo is useful for..."
+
+    * Understanding how cloth objects can be overlaid on rigid objects
+    * Understanding current heuristics used for gauging a cloth's "overlaid" status
+
+```{.python .annotate}
+python -m omnigibson.examples.object_states.overlaid_demo
+```
+
+This demo loads in a carpet on top of a table. The demo allows you to manipulate the carpet (1) while printing out their `Overlaid` state status in real-time.
+{ .annotate }
+
+1. Manipulate the object by holding down **`Shift`** and then **`Left-click + Drag`**!
+
+??? code "overlaid_demo.py"
+
+    ``` py linenums="1"
+    --8<-- "src/examples/object_states/overlaid_demo.py"
+    ```
 
 ### **Particle Applier and Remover Demo**
 !!! abstract "This demo is useful for..."
@@ -410,6 +399,32 @@ This demo loads in a washtowel and table and lets you choose the ability configu
 
     ``` py linenums="1"
     --8<-- "src/examples/object_states/particle_applier_remover_demo.py"
+    ```
+
+### **Particle Source and Sink Demo**
+!!! abstract "This demo is useful for..."
+
+    * Understanding how a `ParticleSource` or `ParticleSink` object can be generated
+    * Understanding how particles can be dynamically generated and destroyed via such objects
+
+```{.python .annotate}
+python -m omnigibson.examples.object_states.particle_source_sink_demo
+```
+
+This demo loads in a sink, which is enabled with both the ParticleSource and ParticleSink states. The sink's particle source is located at the faucet spout and spawns a continuous stream of water particles, which is then destroyed ("sunk") by the sink's particle sink located at the drain.
+
+??? note "Difference bewteen `ParticleApplier/Removers` and `ParticleSource/Sinks`"
+    The key difference between `ParticleApplier/Removers` and `ParticleSource/Sinks` is that `Applier/Removers`
+    requires contact (if using `ParticleProjectionMethod.ADJACENCY`) or overlap
+    (if using `ParticleProjectionMethod.PROJECTION`) in order to spawn / remove particles, and generally only spawn
+    particles at the contact points. `ParticleSource/Sinks` are special cases of `ParticleApplier/Removers` that
+    always use `ParticleProjectionMethod.PROJECTION` and always spawn / remove particles within their projection volume,
+    irregardless of overlap with other objects.
+
+??? code "particle_source_sink_demo.py"
+
+    ``` py linenums="1"
+    --8<-- "src/examples/object_states/particle_source_sink_demo.py"
     ```
 
 ### **Kinematics Demo**
@@ -446,6 +461,44 @@ This demo spawns an apple on a table with a knife above it, and lets the knife f
 
     ``` py linenums="1"
     --8<-- "src/examples/object_states/slicing_demo.py"
+    ```
+
+### **Temperature Demo**
+!!! abstract "This demo is useful for..."
+
+    * Understanding how to dynamically sample kinematic states for BEHAVIOR dataset objects
+    * Understanding how temperature changes are propagated to individual objects from individual heat sources or sinks
+
+```{.python .annotate}
+python -m omnigibson.examples.object_states.temperature_demo
+```
+
+This demo loads in various heat sources and sinks, and places an apple within close proximity to each of them. As the environment steps, each apple's temperature is printed in real-time, showcasing **`OmniGibson`**'s rudimentary temperature dynamics.
+
+??? code "temperature_demo.py"
+
+    ``` py linenums="1"
+    --8<-- "src/examples/object_states/temperature_demo.py"
+    ```
+
+## 🖼️ **Rendering**
+These examples showcase how to change renderer settings in **`OmniGibson`**.
+
+### **Renderer Settings Demo**
+!!! abstract "This demo is useful for..."
+
+    * Understanding how to use RendererSettings class
+
+```{.python .annotate}
+python -m omnigibson.examples.renderer_settings.renderer_settings_example
+```
+
+This demo iterates over different renderer settings of and shows how they can be programmatically set with **`OmniGibson`** interface.
+
+??? code "renderer_settings_example.py"
+
+    ``` py linenums="1"
+    --8<-- "src/examples/renderer_settings/renderer_settings_example.py"
     ```
 
 ## 🤖 **Robots**
@@ -506,6 +559,24 @@ This demo lets you choose a grasping mode and then loads a `Fetch` robot and a c
 
     ``` py linenums="1"
     --8<-- "src/examples/robots/grasping_mode_example.py"
+    ```
+
+### **Advanced: IK Demo**
+!!! abstract "This demo is useful for..."
+
+    * Understanding how to construct your own IK functionality using omniverse's native lula library without explicitly utilizing all of OmniGibson's class abstractions
+    * Understanding how to manipulate the simulator at a lower-level than the main Environment entry point
+
+```{.python .annotate}
+python -m omnigibson.examples.robots.advanced.ik_example
+```
+
+This demo loads in `Fetch` robot and a IK solver to control the robot, and then lets you teleoperate the robot using your keyboard.
+
+??? code "ik_example.py"
+
+    ``` py linenums="1"
+    --8<-- "src/examples/robots/advanced/ik_example.py"
     ```
 
 ## 🧰 **Simulator**

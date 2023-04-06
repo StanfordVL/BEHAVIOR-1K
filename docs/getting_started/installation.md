@@ -8,10 +8,12 @@ icon: material/hammer-wrench
 
 Please make sure your system meets the following specs:
 
-- [x] **OS:** Ubuntu 18.04+
+- [x] **OS:** Ubuntu 20.04+ / Windows 10+
 - [x] **RAM:** 32GB+
 - [x] **GPU:** NVIDIA RTX 2070+
 - [x] **VRAM:** 8GB+
+
+!!! warning "Docker install is currently not supported on Windows"
 
 ??? question "Why these specs?"
     
@@ -81,42 +83,100 @@ Then, simply launch the desired script:
 
     This method is recommended for deeper users looking to develop upon **`OmniGibson`** or use it extensively for research. 
 
+    === "Linux (bash)"
     
-    1. Install [Conda](https://www.google.com/search?q=install+conda&rlz=1C5GCEA_enUS978US978&oq=install+conda&aqs=chrome..69i57l2j69i59l2j0i271j69i60l3.922j0j7&sourceid=chrome&ie=UTF-8)
+        1. Install [Conda](https://conda.io/projects/conda/en/latest/user-guide/install/index.html)
 
-    1. Install NVIDIA's [Isaac Sim platform](https://docs.omniverse.nvidia.com/app_isaacsim/app_isaacsim/install_basic.html) (1)
+        2. Install NVIDIA's [Isaac Sim platform](https://docs.omniverse.nvidia.com/app_isaacsim/app_isaacsim/install_workstation.html) (1)
 
-    2. Export IsaacSim directory path as an environment variable: (2)
+            !!! warning "The latest version of Isaac Sim (2022.2.1) has known issues when loading large **`OmniGibson`** scenes. If you encounter such problems, it is recommended to use 2022.2.0 instead."
 
-        ```shell
-        export ISAAC_SIM_PATH = <YOUR_PATH_TO_ISAAC_SIM>
-        ```
+        3. Export IsaacSim directory path as an environment variable: (2)
 
-    3. Clone [**`OmniGibson`**](https://github.com/StanfordVL/OmniGibson) and move into the directory:
+            ```shell
+            export ISAAC_SIM_PATH=<YOUR_PATH_TO_ISAAC_SIM>
+            ```
 
-        ```shell
-        git clone https://github.com/StanfordVL/OmniGibson.git
-        cd OmniGibson
-        ```
+        4. Clone [**`OmniGibson`**](https://github.com/StanfordVL/OmniGibson) and move into the directory:
 
-    4. Run the command to setup a virtual conda environment to run **`OmniGibson`**:
+            ```shell
+            git clone https://github.com/StanfordVL/OmniGibson.git
+            cd OmniGibson
+            ```
 
-        ```shell
-        chmod +x setup_conda_env.sh
-        ./setup_conda_env.sh
-        ```
+        5. Setup a virtual conda environment to run **`OmniGibson`**:
 
-    5. This will automatically create an dump you into a conda env called `omnigibson`. If you need to activate this environment later, simply call:
+            ```shell
+            source setup_conda_env.sh
+            ```
 
-        ```shell
-        conda activate omnigibson
-        ```
+            This will automatically create an dump you into a conda env called `omnigibson`. If you need to activate this environment later, simply call:
 
-    6. 🎉 Congrats! You installed **`OmniGibson`** successfully.  
+            ```shell
+            conda activate omnigibson
+            ```
+
+            ??? info "Note for zsh users"
+                bash is **strongly** recommended on Linux. If you are using zsh, you need to change `${BASH_SOURCE[0]}` and `${BASH_SOURCE}` to `$0` in the first line of `<ISAAC_SIM_PATH>/setup_conda_env.sh` and `<ISAAC_SIM_PATH>/setup_python_env.sh` respectively in order for **`OmniGibson`** to work properly.
+
+        7. Download **`OmniGibson`** assets and datasets:
+
+            ```shell
+            OMNIGIBSON_NO_OMNIVERSE=1 python omnigibson/scripts/setup.py
+            ```
+
+        8. 🎉 Congrats! You installed **`OmniGibson`** successfully.  
+
+    === "Windows (cmd)"
+
+        1. Install [Conda](https://conda.io/projects/conda/en/latest/user-guide/install/index.html)
+
+        2. Install NVIDIA's [Isaac Sim platform](https://docs.omniverse.nvidia.com/app_isaacsim/app_isaacsim/install_workstation.html) (3)
+
+            !!! warning "The latest version of Isaac Sim (2022.2.1) has known issues when loading large **`OmniGibson`** scenes. If you encounter such problems, it is recommended to use 2022.2.0 instead."
+
+        3. Export IsaacSim directory path as an environment variable: (4)
+
+            ```shell
+            set ISAAC_SIM_PATH=<YOUR_PATH_TO_ISAAC_SIM>
+            ```
+
+        4. Clone [**`OmniGibson`**](https://github.com/StanfordVL/OmniGibson) and move into the directory:
+
+            ```shell
+            git clone https://github.com/StanfordVL/OmniGibson.git
+            cd OmniGibson
+            ```
+
+        5. Setup a virtual conda environment to run **`OmniGibson`**:
+
+            ```shell
+            setup_conda_env.bat
+            ```
+            
+            This will automatically create an dump you into a conda env called `omnigibson`. If you need to activate this environment later, simply call:
+
+            ```shell
+            conda activate omnigibson
+            ```
+
+        6. Download **`OmniGibson`** assets and datasets:
+
+            ```shell
+            set OMNIGIBSON_NO_OMNIVERSE=1&&python omnigibson/scripts/setup.py&&set OMNIGIBSON_NO_OMNIVERSE=
+            ```
+
+        7. 🎉 Congrats! You installed **`OmniGibson`** successfully.
+
 
 1. Be sure keep track of where you choose Omniverse to write package files! By default this should be `~/.local/share/ov/pkg`
 
-2. If you installed Isaac Sim to the default location, this is `~/.local/share/ov/pkg/isaac_sim-2022.1.1`
+2. If you installed Isaac Sim to the default location, this is `~/.local/share/ov/pkg/isaac_sim-2022.2.1`
+
+3. Be sure keep track of where you choose Omniverse to write package files! By default this should be `C:\Users\<USER_NAME>\AppData\Local\ov\pkg`
+
+4. If you installed Isaac Sim to the default location, this is `C:\Users\<USER_NAME>\AppData\Local\ov\pkg\isaac_sim-2022.2.1`
+
 
 
 ## 🌎 **Explore `OmniGibson`!**

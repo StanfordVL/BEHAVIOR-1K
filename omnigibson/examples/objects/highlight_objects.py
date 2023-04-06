@@ -1,15 +1,11 @@
-"""
-Generate example top-down segmentation map via renderer
-"""
 import numpy as np
 import omnigibson as og
 
 
 def main(random_selection=False, headless=False, short_exec=False):
     """
-    Highlights visually all object instances of some given category and then removes the highlighting
+    Highlights visually all object instances of windows and then removes the highlighting
     It also demonstrates how to apply an action on all instances of objects of a given category
-    ONLY WORKS WITH OPTIMIZED RENDERING (not on Mac)
     """
     og.log.info(f"Demo {__file__}\n    " + "*" * 80 + "\n    Description:\n" + main.__doc__ + "*" * 80)
 
