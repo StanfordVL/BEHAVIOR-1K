@@ -205,7 +205,10 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 position=init_state[obj_name]["root_link"]["pos"],
                 orientation=init_state[obj_name]["root_link"]["ori"],
             )
+        
+        self.disable_collisions_for_fixed_objects()
 
+    def disable_collisions_for_fixed_objects(self):
         # disable collision between the fixed links of the fixed objects
         fixed_objs = self.object_registry("fixed_base", True, default_val=[])
         if len(fixed_objs) > 1:
