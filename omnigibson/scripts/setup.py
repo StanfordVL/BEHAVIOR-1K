@@ -17,18 +17,12 @@ def main():
     # Only download if the dataset path doesn't exist
     if not os.path.exists(gm.DATASET_PATH):
         print("Downloading dataset...")
-        # dataset_options = {
-        #     "Demo": "Download the demo OmniGibson dataset",
-        #     "Full": "Download the full OmniGibson dataset",
-        # }
-        # dataset = choose_from_options(options=dataset_options, name="dataset")
-        # if dataset == "Demo":
-        download_demo_data()
-        # else:
-        #     download_og_dataset()
+        download_og_dataset()
 
-    print("Downloading assets...")
-    download_assets()
+    # Only download if the asset path doesn't exist
+    if not os.path.exists(gm.ASSET_PATH):
+        print("Downloading assets...")
+        download_assets()
 
     print("\nOmniGibson setup completed!\n")
 

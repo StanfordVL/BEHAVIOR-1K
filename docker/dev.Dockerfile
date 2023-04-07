@@ -13,7 +13,7 @@ RUN rm -rf /isaac-sim/kit/extscore/omni.kit.pip_archive/pip_prebundle/numpy
 # Mount the data directory
 VOLUME ["/data"]
 ENV OMNIGIBSON_DATASET_PATH /data/og_dataset
-ENV OMNIGIBSON_ASSETS_PATH /data/assets
+ENV OMNIGIBSON_ASSET_PATH /data/assets
 ENV GIBSON_DATASET_PATH /data/g_dataset
 ENV OMNIGIBSON_KEY_PATH /data/omnigibson.key
 
