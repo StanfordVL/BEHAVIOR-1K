@@ -206,24 +206,6 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 orientation=init_state[obj_name]["root_link"]["ori"],
             )
 
-        # disable collision between the fixed links of the fixed objects
-        fixed_objs = self.object_registry("fixed_base", True, default_val=[])
-        if len(fixed_objs) > 1:
-            # We iterate over all pairwise combinations of fixed objects
-            building_categories = {"walls", "floors", "ceilings"}
-            for obj_a, obj_b in combinations(fixed_objs, 2):
-                # TODO: Remove this hotfix once asset collision meshes are fixed!
-                # Filter out collisions between walls / ceilings / floors and ALL links of the other object
-                if obj_a.category in building_categories:
-                    for link in obj_b.links.values():
-                        obj_a.root_link.add_filtered_collision_pair(link)
-                elif obj_b.category in building_categories:
-                    for link in obj_a.links.values():
-                        obj_b.root_link.add_filtered_collision_pair(link)
-                else:
-                    # Only filter out root links
-                    obj_a.root_link.add_filtered_collision_pair(obj_b.root_link)
-
     def _should_load_object(self, obj_info):
         """
         Helper function to check whether we should load an object given its init_info. Useful for potentially filtering
@@ -415,6 +397,21 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # If the scene is already loaded, we need to load this object separately. Otherwise, don't do anything now,
         # let scene._load() load the object when called later on.
         prim = obj.load()
+
+        # TODO: Remove building hotfix once asset collision meshes are fixed!!
+        # If this object is fixed, disable collisions between the fixed links of the fixed objects
+        building_categories = {"walls", "floors", "ceilings"}
+        for fixed_obj in self.fixed_objects.values():
+            # Filter out collisions between walls / ceilings / floors and ALL links of the other object
+            if obj.category in building_categories:
+                for link in fixed_obj.links.values():
+                    obj.root_link.add_filtered_collision_pair(link)
+            elif fixed_obj.category in building_categories:
+                for link in obj.links.values():
+                    fixed_obj.root_link.add_filtered_collision_pair(link)
+            else:
+                # Only filter out root links
+                obj.root_link.add_filtered_collision_pair(fixed_obj.root_link)
 
         # Add this object to our registry based on its type, if we want to register it
         if register:
