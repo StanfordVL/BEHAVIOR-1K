@@ -398,20 +398,21 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # let scene._load() load the object when called later on.
         prim = obj.load()
 
-        # TODO: Remove building hotfix once asset collision meshes are fixed!!
         # If this object is fixed, disable collisions between the fixed links of the fixed objects
-        building_categories = {"walls", "floors", "ceilings"}
-        for fixed_obj in self.fixed_objects.values():
-            # Filter out collisions between walls / ceilings / floors and ALL links of the other object
-            if obj.category in building_categories:
-                for link in fixed_obj.links.values():
-                    obj.root_link.add_filtered_collision_pair(link)
-            elif fixed_obj.category in building_categories:
-                for link in obj.links.values():
-                    fixed_obj.root_link.add_filtered_collision_pair(link)
-            else:
-                # Only filter out root links
-                obj.root_link.add_filtered_collision_pair(fixed_obj.root_link)
+        if obj.fixed_base:
+            # TODO: Remove building hotfix once asset collision meshes are fixed!!
+            building_categories = {"walls", "floors", "ceilings"}
+            for fixed_obj in self.fixed_objects.values():
+                # Filter out collisions between walls / ceilings / floors and ALL links of the other object
+                if obj.category in building_categories:
+                    for link in fixed_obj.links.values():
+                        obj.root_link.add_filtered_collision_pair(link)
+                elif fixed_obj.category in building_categories:
+                    for link in obj.links.values():
+                        fixed_obj.root_link.add_filtered_collision_pair(link)
+                else:
+                    # Only filter out root links
+                    obj.root_link.add_filtered_collision_pair(fixed_obj.root_link)
 
         # Add this object to our registry based on its type, if we want to register it
         if register:
@@ -471,7 +472,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             dict: Keyword-mapped objects that are fixed in the scene. Maps object name to their object class instances
                 (DatasetObject)
         """
-        return {obj.name: obj for obj in self.object_registry("fixed_base", True)}
+        return {obj.name: obj for obj in self.object_registry("fixed_base", True, default_val=[])}
 
     def get_random_floor(self):
         """
