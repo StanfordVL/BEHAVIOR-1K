@@ -4,6 +4,7 @@ import numpy as np
 
 import omnigibson as og
 from omnigibson.macros import gm, create_module_macros
+from omnigibson.object_states import ContactBodies
 from omnigibson.utils.asset_utils import get_assisted_grasping_categories
 import omnigibson.utils.transform_utils as T
 from omnigibson.controllers import (
@@ -238,7 +239,7 @@ class ManipulationRobot(BaseRobot):
         Args:
             arm (str): specific arm to check for grasping. Default is "default" which corresponds to the first entry
                 in self.arm_names
-            candidate_obj (EntityPrim or None): object to check if this robot is currently grasping. If None, then
+            candidate_obj (StatefulObject or None): object to check if this robot is currently grasping. If None, then
                 will be a general (object-agnostic) check for grasping.
                 Note: if self.grasping_mode is "physical", then @candidate_obj will be ignored completely
 
@@ -264,17 +265,8 @@ class ManipulationRobot(BaseRobot):
             is_grasping = self._controllers["gripper_{}".format(arm)].is_grasping()
             # If candidate obj is not None, we also check to see if our fingers are in contact with the object
             if is_grasping and candidate_obj is not None:
-                grasping_obj = False
-                obj_links = {link.prim_path for link in candidate_obj.links.values()}
-                finger_links = {link.prim_path for link in self.finger_links[arm]}
-                for c in self.contact_list():
-                    c_set = {c.body0, c.body1}
-                    # Valid grasping of object if one of the set is a finger link and the other is the grasped object
-                    if len(c_set - finger_links) == 1 and len(c_set - obj_links) == 1:
-                        grasping_obj = True
-                        break
-                # Update is_grasping
-                is_grasping = grasping_obj
+                finger_links = {link for link in self.finger_links[arm]}
+                is_grasping = len(candidate_obj.states[ContactBodies].get_value().intersection(finger_links)) > 0
 
         return is_grasping
 

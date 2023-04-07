@@ -19,6 +19,7 @@ from bddl.object_taxonomy import ObjectTaxonomy
 
 import omnigibson as og
 from omnigibson.macros import gm
+from omnigibson.object_states import Pose
 from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.reward_functions.potential_reward import PotentialReward
 from omnigibson.robots.robot_base import BaseRobot
@@ -35,6 +36,7 @@ from omnigibson.utils.constants import (
     WATER_SYNSETS,
     SYSTEM_SYNSETS_TO_SYSTEM_NAMES,
 )
+import omnigibson.utils.transform_utils as T
 from omnigibson.utils.python_utils import classproperty, assert_valid_key
 from omnigibson.systems import get_system
 from omnigibson.utils.ui_utils import create_module_logger
@@ -951,14 +953,17 @@ class BehaviorTask(BaseTask):
         low_dim_obs["robot_ori_cos"] = np.cos(env.robots[0].get_rpy())
         low_dim_obs["robot_ori_sin"] = np.sin(env.robots[0].get_rpy())
 
+        # Batch rpy calculations for much better efficiency
+        objs_rpy = T.quat2euler(np.array([v.states[Pose].get_value()[1] for v in self.object_scope.values()]))
+
         i = 0
-        for _, v in self.object_scope.items():
+        for idx, v in enumerate(self.object_scope.values()):
             # TODO: May need to update checking here to USDObject? Or even baseobject?
             if isinstance(v, DatasetObject):
                 low_dim_obs[f"obj_{i}_valid"] = np.array([1.0])
-                low_dim_obs[f"obj_{i}_pos"] = v.get_position()
-                low_dim_obs[f"obj_{i}_ori_cos"] = np.cos(v.get_rpy())
-                low_dim_obs[f"obj_{i}_ori_sin"] = np.sin(v.get_rpy())
+                low_dim_obs[f"obj_{i}_pos"] = v.states[Pose].get_value()[0]
+                low_dim_obs[f"obj_{i}_ori_cos"] = np.cos(objs_rpy[idx])
+                low_dim_obs[f"obj_{i}_ori_sin"] = np.sin(objs_rpy[idx])
                 for arm in env.robots[0].arm_names:
                     grasping_object = env.robots[0].is_grasping(arm=arm, candidate_obj=v)
                     low_dim_obs[f"obj_{i}_pos_in_gripper_{arm}"] = np.array([float(grasping_object)])
