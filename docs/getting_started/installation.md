@@ -75,7 +75,6 @@ There are two ways to setup **`OmniGibson`**:
 
         1.  `<ABS_DATA_PATH>` specifies the **absolute** path data will be stored on your machine (if no `<ABS_DATA_PATH>` is specified, it defaults to `./omnigibson_data`). This needs to be called each time the docker container is run!
 
-    The `-h --headless` argument is used to switch between gui and headless mode.
     
     ??? warning annotate "Are you using NFS or AFS?"
 
