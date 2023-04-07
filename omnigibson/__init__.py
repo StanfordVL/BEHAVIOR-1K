@@ -2,6 +2,7 @@ import logging
 import os
 import shutil
 import tempfile
+import atexit
 import signal
 import yaml
 import builtins
@@ -207,3 +208,6 @@ def shutdown():
 def signal_handler(signal, frame):
     shutdown()
 signal.signal(signal.SIGINT, signal_handler)
+
+# register handler so that we always shut omiverse down correctly upon termination
+atexit.register(shutdown)

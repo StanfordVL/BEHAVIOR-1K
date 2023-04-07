@@ -144,7 +144,7 @@ def suppress_omni_log(channels):
         # Do nothing
         pass
     elif channels is None:
-        # Globallly re-enable log
+        # Globally re-enable log
         log.enabled = True
     else:
         # Unsuppress the channels
@@ -258,7 +258,7 @@ class CameraMover:
     def __init__(self, cam, delta=0.25, save_dir=f"{og.root_path}/../images"):
         self.cam = cam
         self.delta = delta
-        self.light_val = 5e5
+        self.light_val = gm.FORCE_LIGHT_INTENSITY
         self.save_dir = save_dir
 
         self._appwindow = omni.appwindow.get_default_app_window()

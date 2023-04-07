@@ -23,6 +23,7 @@ gm.KEY_PATH = "data/omnigibson.key"
 gm.HEADLESS = (os.getenv("OMNIGIBSON_HEADLESS", 'False').lower() in ('true', '1', 't'))
 
 # Whether only the viewport should be shown in the GUI or not (if not, other peripherals are additionally shown)
+# CANNOT be set at runtime
 gm.GUI_VIEWPORT_ONLY = False
 
 # Do not suppress known omni warnings / errors, and also put omnigibson in a debug state
@@ -72,7 +73,7 @@ gm.USE_ENCRYPTED_ASSETS = True
 gm.AG_CLOTH = False
 
 # Forced light intensity for all DatasetObjects. None if the USD-provided intensities should be respected.
-gm.FORCE_LIGHT_INTENSITY = 500000
+gm.FORCE_LIGHT_INTENSITY = 150000
 
 # Forced roughness for all DatasetObjects. None if the USD-provided roughness maps should be respected.
 gm.FORCE_ROUGHNESS = 0.7
