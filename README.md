@@ -1,8 +1,15 @@
 ![splash](./docs/assets/splash.png)
 
-# <h1><img align="center" height="60" src="https://github.com/StanfordVL/OmniGibson/blob/main/docs/assets/OmniGibson_logo.png"> OmniGibson</h1>
+# <h1><img align="center" height="40" src="https://github.com/StanfordVL/OmniGibson/blob/main/docs/assets/OmniGibson_logo.png"> OmniGibson</h1>
 
 ### 
+
+-------
+
+## Latest Updates
+- [04/07/22] **v0.0.6**: Significantly improved stability, performance, and ease of installation :wrench: [[release notes]](https://github.com/StanfordVL/OmniGibson/releases/tag/v0.0.6)
+
+-------
 
 **`OmniGibson`** is a platform for accelerating Embodied AI research built upon NVIDIA's [Omniverse](https://www.nvidia.com/en-us/omniverse/) platform, featuring:
 
