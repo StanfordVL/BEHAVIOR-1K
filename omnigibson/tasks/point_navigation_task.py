@@ -318,7 +318,7 @@ class PointNavigationTask(BaseTask):
 
         # Notify user if we failed to reset a collision-free sampled pose
         if not success:
-            log.warning("WARNING: Failed to reset robot without collision")
+            log.warning("Failed to reset robot without collision")
 
         # Land the robot
         land_object(env.robots[self._robot_idn], initial_pos, initial_quat, env.initial_pos_z_offset)

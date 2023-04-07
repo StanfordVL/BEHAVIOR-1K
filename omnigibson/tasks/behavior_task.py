@@ -155,8 +155,7 @@ class BehaviorTask(BaseTask):
 
         # Initialize the current activity
         success, self.feedback = self.initialize_activity(env=env)
-        if not success:
-            print(f"Failed to initialize Behavior Activity. Feedback:\n{self.feedback}")
+        assert success, f"Failed to initialize Behavior Activity. Feedback:\n{self.feedback}"
 
         # Highlight any task relevant objects if requested
         if self.highlight_task_relevant_objs:
@@ -503,22 +502,22 @@ class BehaviorTask(BaseTask):
         """
         error_msg = self.parse_non_sampleable_object_room_assignment(env)
         if error_msg:
-            log.warning(error_msg)
+            log.error(error_msg)
             return False, error_msg
 
         error_msg = self.build_sampling_order(env)
         if error_msg:
-            log.warning(error_msg)
+            log.error(error_msg)
             return False, error_msg
 
         error_msg = self.build_non_sampleable_object_scope(env)
         if error_msg:
-            log.warning(error_msg)
+            log.error(error_msg)
             return False, error_msg
 
         error_msg = self.import_sampleable_objects(env)
         if error_msg:
-            log.warning(error_msg)
+            log.error(error_msg)
             return False, error_msg
 
         self.object_scope["agent.n.01_1"] = self.get_agent(env)
@@ -555,9 +554,9 @@ class BehaviorTask(BaseTask):
             elif self.object_instance_to_category[obj_inst] in SYSTEM_SYNSETS_TO_SYSTEM_NAMES:
                 matched_sim_obj = get_system(SYSTEM_SYNSETS_TO_SYSTEM_NAMES[self.object_instance_to_category[obj_inst]])
             else:
-                log.info(f"checking objects...")
+                log.debug(f"checking objects...")
                 for sim_obj in og.sim.scene.objects:
-                    log.info(f"checking bddl obj scope for obj: {sim_obj.name}")
+                    log.debug(f"checking bddl obj scope for obj: {sim_obj.name}")
                     if hasattr(sim_obj, "bddl_object_scope") and sim_obj.bddl_object_scope == obj_inst:
                         matched_sim_obj = sim_obj
                         break
@@ -577,7 +576,7 @@ class BehaviorTask(BaseTask):
                 - bool: Whether this evaluated condition is positive or negative
         """
         if not isinstance(condition.children[0], Negation) and not isinstance(condition.children[0], AtomicFormula):
-            log.warning(("Skipping over sampling of predicate that is not a negation or an atomic formula"))
+            log.debug(("Skipping over sampling of predicate that is not a negation or an atomic formula"))
             return None, None
 
         if isinstance(condition.children[0], Negation):
@@ -679,7 +678,7 @@ class BehaviorTask(BaseTask):
                                         str(success),
                                     ]
                                 )
-                                log.warning(log_msg)
+                                log.info(log_msg)
 
                                 # If any condition fails for this candidate object, skip
                                 if not success:
@@ -761,23 +760,23 @@ class BehaviorTask(BaseTask):
                     obj_inst_to_obj_per_room_inst[obj_inst] = filtered_object_scope[room_type][obj_inst][room_inst]
                 top_nodes = []
                 log_msg = "MBM for room instance [{}]".format(room_inst)
-                log.warning((log_msg))
+                log.debug((log_msg))
                 for obj_inst in obj_inst_to_obj_per_room_inst:
                     for obj in obj_inst_to_obj_per_room_inst[obj_inst]:
                         # Create an edge between obj instance and each of the simulator obj that supports sampling
                         graph.add_edge(obj_inst, obj)
                         log_msg = "Adding edge: {} <-> {}".format(obj_inst, obj.name)
-                        log.warning((log_msg))
+                        log.debug((log_msg))
                         top_nodes.append(obj_inst)
                 # Need to provide top_nodes that contain all nodes in one bipartite node set
                 # The matches will have two items for each match (e.g. A -> B, B -> A)
                 matches = nx.bipartite.maximum_matching(graph, top_nodes=top_nodes)
                 if len(matches) == 2 * len(obj_inst_to_obj_per_room_inst):
-                    log.warning(("Object scope finalized:"))
+                    log.debug(("Object scope finalized:"))
                     for obj_inst, obj in matches.items():
                         if obj_inst in obj_inst_to_obj_per_room_inst:
                             self.object_scope[obj_inst] = obj
-                            log.warning((obj_inst, obj.name))
+                            log.debug((obj_inst, obj.name))
                     success = True
                     break
             if not success:
@@ -825,7 +824,7 @@ class BehaviorTask(BaseTask):
             None or str: If successful, returns None. Otherwise, returns an error message
         """
         np.random.shuffle(self.ground_goal_state_options)
-        log.warning(("number of ground_goal_state_options", len(self.ground_goal_state_options)))
+        log.debug(("number of ground_goal_state_options", len(self.ground_goal_state_options)))
         num_goal_condition_set_to_test = 10
 
         goal_condition_success = False
@@ -922,23 +921,23 @@ class BehaviorTask(BaseTask):
 
         error_msg = self.group_initial_conditions()
         if error_msg:
-            log.warning(error_msg)
+            log.error(error_msg)
             return False, error_msg
 
         error_msg = self.sample_initial_conditions()
         if error_msg:
-            log.warning(error_msg)
+            log.error(error_msg)
             return False, error_msg
 
         if validate_goal:
             error_msg = self.sample_goal_conditions()
             if error_msg:
-                log.warning(error_msg)
+                log.error(error_msg)
                 return False, error_msg
 
         error_msg = self.sample_initial_conditions_final()
         if error_msg:
-            log.warning(error_msg)
+            log.error(error_msg)
             return False, error_msg
 
         env.scene.update_initial_state()
