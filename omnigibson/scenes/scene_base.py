@@ -205,6 +205,8 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 position=init_state[obj_name]["root_link"]["pos"],
                 orientation=init_state[obj_name]["root_link"]["ori"],
             )
+        
+        self.disable_collisions_for_fixed_objects()
 
     def _should_load_object(self, obj_info):
         """
