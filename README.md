@@ -1,6 +1,6 @@
 ![splash](./docs/assets/splash.png)
 
-# <h1><img align="center" height="40" src="https://github.com/StanfordVL/OmniGibson/blob/main/docs/assets/OmniGibson_logo.png"> OmniGibson</h1>
+# <h1><img height="40" src="./docs/assets/OmniGibson_logo.png" style="float:left;padding-right:10px"> OmniGibson</h1>
 
 ### 
 
