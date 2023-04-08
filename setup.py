@@ -37,6 +37,7 @@ setup(
         "opencv-python",
         "nest_asyncio",
         "imageio",
+        "imageio-ffmpeg",
         "termcolor",
         "progressbar",
     ],
