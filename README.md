@@ -7,7 +7,7 @@
 -------
 
 ## Latest Updates
-- [04/07/22] **v0.0.6**: Significantly improved stability, performance, and ease of installation :wrench: [[release notes]](https://github.com/StanfordVL/OmniGibson/releases/tag/v0.0.6)
+- [04/10/22] **v0.1.0**: Significantly improved stability, performance, and ease of installation :wrench: [[release notes]](https://github.com/StanfordVL/OmniGibson/releases/tag/v0.1.0)
 
 -------
 
