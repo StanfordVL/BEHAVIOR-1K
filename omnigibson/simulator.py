@@ -27,13 +27,12 @@ from omnigibson.utils.ui_utils import CameraMover, disclaimer, create_module_log
 from omnigibson.scenes import Scene
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.objects.stateful_object import StatefulObject
-from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.object_states.contact_subscribed_state_mixin import ContactSubscribedStateMixin
 from omnigibson.object_states.joint_break_subscribed_state_mixin import JointBreakSubscribedStateMixin
 from omnigibson.object_states.factory import get_states_by_dependency_order
 from omnigibson.object_states.update_state_mixin import UpdateStateMixin
 from omnigibson.sensors.vision_sensor import VisionSensor
-from omnigibson.transition_rules import DEFAULT_RULES
+from omnigibson.transition_rules import TransitionRuleAPI
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -43,7 +42,6 @@ m = create_module_macros(module_path=__file__)
 
 m.DEFAULT_VIEWER_CAMERA_POS = (-0.201028, -2.72566 ,  1.0654)
 m.DEFAULT_VIEWER_CAMERA_QUAT = (0.68196617, -0.00155408, -0.00166678,  0.73138017)
-m.OBJECT_GRAVEYARD_POS = (100.0, 100.0, 100.0)
 
 
 class Simulator(SimulationContext, Serializable):
@@ -116,10 +114,6 @@ class Simulator(SimulationContext, Serializable):
             {state for state in self.object_state_types if issubclass(state, ContactSubscribedStateMixin)}
         self.object_state_types_on_joint_break = \
             {state for state in self.object_state_types if issubclass(state, JointBreakSubscribedStateMixin)}
-
-        # Set of all non-Omniverse transition rules to apply.
-        self._transition_rules = DEFAULT_RULES
-        self._transition_object_init_states = dict()    # Maps object to object state to args to pass to state setter
 
         # Auto-load the dummy stage
         self.clear()
@@ -381,43 +375,57 @@ class Simulator(SimulationContext, Serializable):
         Reset internal variables when a new stage is loaded
         """
 
-
     def _non_physics_step(self):
         """
         Complete any non-physics steps such as state updates.
         """
-        assert not self.is_stopped(), f"Simulator must not be stopped in order to run non physics step!"
-        # Check to see if any objects should be initialized (only done IF we're playing)
-        n_objects_to_initialize = len(self._objects_to_initialize)
-        if n_objects_to_initialize > 0 and self.is_playing():
-            # We iterate through the objects to initialize
-            # Note that we don't explicitly do for obj in self._objects_to_initialize because additional objects
-            # may be added mid-iteration!!
-            # For this same reason, after we finish the loop, we keep any objects that are yet to be initialized
-            for i in range(n_objects_to_initialize):
-                obj = self._objects_to_initialize[i]
-                obj.initialize()
-                if len(obj.states.keys() & self.object_state_types_on_contact) > 0:
-                    self._objects_require_contact_callback = True
-                if len(obj.states.keys() & self.object_state_types_on_joint_break) > 0:
-                    self._objects_require_joint_break_callback = True
+        # If we don't have a valid scene, immediately return
+        if self._scene is None:
+            return
 
-            self._objects_to_initialize = self._objects_to_initialize[n_objects_to_initialize:]
+        # Update omni
+        self._omni_update_step()
 
-        # Propagate states if the feature is enabled
-        if gm.ENABLE_OBJECT_STATES:
-            # Step the object states in global topological order (if the scene exists).
-            if self.scene is not None:
-                for state_type in self.object_state_types_requiring_update:
-                    for obj in self.scene.get_objects_with_state(state_type):
-                        # Only update objects that have been initialized so far
-                        if obj.initialized:
-                            obj.states[state_type].update()
+        # If we're playing we, also run additional logic
+        if self.is_playing():
+            # Check to see if any objects should be initialized (only done IF we're playing)
+            n_objects_to_initialize = len(self._objects_to_initialize)
+            if n_objects_to_initialize > 0 and self.is_playing():
+                # We iterate through the objects to initialize
+                # Note that we don't explicitly do for obj in self._objects_to_initialize because additional objects
+                # may be added mid-iteration!!
+                # For this same reason, after we finish the loop, we keep any objects that are yet to be initialized
+                for i in range(n_objects_to_initialize):
+                    obj = self._objects_to_initialize[i]
+                    obj.initialize()
+                    if len(obj.states.keys() & self.object_state_types_on_contact) > 0:
+                        self._objects_require_contact_callback = True
+                    if len(obj.states.keys() & self.object_state_types_on_joint_break) > 0:
+                        self._objects_require_joint_break_callback = True
 
-            for obj in self.scene.objects:
-                # Only update visuals for objects that have been initialized so far
-                if isinstance(obj, StatefulObject) and obj.initialized:
-                    obj.update_visuals()
+                self._objects_to_initialize = self._objects_to_initialize[n_objects_to_initialize:]
+
+                # Also refresh the transition rules that are currently active
+                TransitionRuleAPI.refresh_active_rules(objects=self.scene.objects)
+
+            # Propagate states if the feature is enabled
+            if gm.ENABLE_OBJECT_STATES:
+                # Step the object states in global topological order (if the scene exists).
+                if self.scene is not None:
+                    for state_type in self.object_state_types_requiring_update:
+                        for obj in self.scene.get_objects_with_state(state_type):
+                            # Only update objects that have been initialized so far
+                            if obj.initialized:
+                                obj.states[state_type].update()
+
+                for obj in self.scene.objects:
+                    # Only update visuals for objects that have been initialized so far
+                    if isinstance(obj, StatefulObject) and obj.initialized:
+                        obj.update_visuals()
+
+            # Possibly run transition rule step
+            if gm.ENABLE_TRANSITION_RULES:
+                TransitionRuleAPI.step()
 
     def _omni_update_step(self):
         """
@@ -425,100 +433,6 @@ class Simulator(SimulationContext, Serializable):
         """
         # Clear the bounding box cache so that it gets updated during the next time it's called
         BoundingBoxAPI.clear()
-
-    def _transition_rule_step(self):
-        """
-        Applies all internal non-Omniverse transition rules.
-        """
-        # Apply any transiiton object init states from before, and then clear the dictionary
-        for obj, states_info in self._transition_object_init_states.items():
-            for state, args in states_info.items():
-                obj.states[state].set_value(*args)
-        self._transition_object_init_states = dict()
-
-        # Create a dict from rule to filter to objects we care about.
-        obj_dict = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
-        for obj in self.scene.objects:
-            for rule in self._transition_rules:
-                for fname, f in rule.individual_filters.items():
-                    if f(obj):
-                        obj_dict[rule]["individual"][fname].append(obj)
-                for fname, f in rule.group_filters.items():
-                    if f(obj):
-                        obj_dict[rule]["group"][fname].append(obj)
-
-        # For each rule, create a subset of the dict and apply it if applicable.
-        added_obj_attrs = []
-        removed_objs = []
-        for rule in self._transition_rules:
-            # Skip any rule that has no objects
-            if rule not in obj_dict:
-                continue
-            # Skip any rule that has no group filters if it requires group filters
-            group_f_objs = dict()
-            if rule.requires_group_filters:
-                group_f_objs = obj_dict[rule]["group"]
-                if len(group_f_objs) == 0:
-                    continue
-
-            # Skip any rule that is missing an individual filter if it requires individual filters
-            if rule.requires_individual_filters:
-                individual_f_objs = obj_dict[rule]["individual"]
-                if not all(fname in individual_f_objs for fname in rule.individual_filters.keys()):
-                    continue
-                # Get all cartesian cross product over all individual filter objects, and then attempt the transition rule.
-                # If objects are to be added / removed, the transition function is
-                # expected to return an instance of TransitionResults containing
-                # information about those objects.
-                # TODO: Consider optimizing itertools.product.
-                # TODO: Track what needs to be added / removed at the Scene object level.
-                # Comments from a PR on possible changes:
-                # - Addition / removal tracking on the Scene object.
-                # - Check if the objects are still in the scene in each step.
-                for obj_tuple in itertools.product(*list(individual_f_objs.values())):
-                    individual_objects = {fname: obj for fname, obj in zip(individual_f_objs.keys(), obj_tuple)}
-                    did_transition, transition_output = rule.process(individual_objects=individual_objects, group_objects=group_f_objs)
-                    if transition_output is not None:
-                        # Transition output is a TransitionResults object
-                        added_obj_attrs.extend(transition_output.add)
-                        removed_objs.extend(transition_output.remove)
-            else:
-                # We try the transition rule once, since there's no cartesian cross product of combinations from the
-                # individual filters we need to handle
-                did_transition, transition_output = rule.process(individual_objects=dict(), group_objects=group_f_objs)
-                if transition_output is not None:
-                    added_obj_attrs.extend(transition_output.add)
-                    removed_objs.extend(transition_output.remove)
-
-        # Process all transition results.
-        if len(removed_objs) > 0:
-            disclaimer(
-                f"We are attempting to remove objects during the transition rule phase of the simulator step.\n"
-                f"However, Omniverse currently has a bug when using GPU dynamics where a segfault will occur if an "
-                f"object in contact with another object is attempted to be removed.\n"
-                f"This bug should be fixed by the next Omniverse release.\n"
-                f"In the meantime, we instead teleport these objects to a graveyard location located far outside of "
-                f"the scene."
-            )
-        for i, removed_obj in enumerate(removed_objs):
-            # TODO: Ideally we want to remove objects, but because of Omniverse's bug on GPU physics, we simply move
-            # the objects into a graveyard for now
-            # self.remove_object(removed_obj)
-            removed_obj.set_position(np.array(m.OBJECT_GRAVEYARD_POS) + np.ones(3) * i)
-
-        for added_obj_attr in added_obj_attrs:
-            new_obj = added_obj_attr.obj
-            self.import_object(new_obj)
-            # By default, added_obj_attr is populated with all Nones -- so these will all be pass-through operations
-            # unless pos / orn (or, conversely, bb_pos / bb_orn) is specified
-            if added_obj_attr.pos is not None or added_obj_attr.orn is not None:
-                new_obj.set_position_orientation(position=added_obj_attr.pos, orientation=added_obj_attr.orn)
-            elif isinstance(new_obj, DatasetObject) and \
-                    (added_obj_attr.bb_pos is not None or added_obj_attr.bb_orn is not None):
-                new_obj.set_bbox_center_position_orientation(position=added_obj_attr.bb_pos, orientation=added_obj_attr.bb_orn)
-            # Additionally record any requested states if specified to be updated during the next transition step
-            if added_obj_attr.states is not None:
-                self._transition_object_init_states[new_obj] = added_obj_attr.states
 
     def play(self):
         if not self.is_playing():
@@ -558,12 +472,8 @@ class Simulator(SimulationContext, Serializable):
 
                 self.step_physics()
 
-            # Additionally run non physics things if we have a valid scene
-            if self._scene is not None:
-                self._omni_update_step()
-                self._non_physics_step()
-                if gm.ENABLE_TRANSITION_RULES:
-                    self._transition_rule_step()
+            # Additionally run non physics things
+            self._non_physics_step()
 
     def pause(self):
         if not self.is_paused():
@@ -608,13 +518,8 @@ class Simulator(SimulationContext, Serializable):
             for i in range(self.n_physics_timesteps_per_render):
                 super().step(render=False)
 
-        # Additionally run non physics things if we have a valid scene
-        if self._scene is not None:
-            self._omni_update_step()
-            if self.is_playing():
-                self._non_physics_step()
-                if gm.ENABLE_TRANSITION_RULES:
-                    self._transition_rule_step()
+        # Additionally run non physics things
+        self._non_physics_step()
 
         # TODO (eric): After stage changes (e.g. pose, texture change), it will take two super().step(render=True) for
         #  the result to propagate to the rendering. We could have called super().render() here but it will introduce
@@ -836,6 +741,10 @@ class Simulator(SimulationContext, Serializable):
         VisionSensor.clear()
         self._viewer_camera = None
         self._camera_mover = None
+
+        # Clear all transition rules if being used
+        if gm.ENABLE_TRANSITION_RULES:
+            TransitionRuleAPI.clear()
 
         # Clear uniquely named items and other internal states
         clear_pu()
