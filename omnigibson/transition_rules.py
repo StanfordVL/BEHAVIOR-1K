@@ -439,7 +439,9 @@ class SlicingRule(BaseTransitionRule):
         t_results = TransitionResults()
 
         # Load object parts.
-        for part_idx, part in sliced_obj.metadata["object_parts"].items():
+        sliced_obj_id = int(sliced_obj.bddl_obj_scope.split("_")[-1])
+        sliced_obj_scope_prefix = "_".join(sliced_obj.bddl_obj_scope.split("_")[:-1])
+        for i, part in enumerate(sliced_obj.metadata["object_parts"].values()):
             # List of dicts gets replaced by {'0':dict, '1':dict, ...}
 
             # Get bounding box info
@@ -462,13 +464,14 @@ class SlicingRule(BaseTransitionRule):
             # Calculate global part bounding box pose.
             part_bb_pos = pos + T.quat2mat(orn) @ (part_bb_pos * scale)
             part_bb_orn = T.quat_multiply(orn, part_bb_orn)
-            part_obj_name = f"{sliced_obj.name}_part_{part_idx}"
+            part_obj_name = f"{sliced_obj.name}_part_{i}"
             part_obj = DatasetObject(
                 prim_path=f"/World/{part_obj_name}",
                 name=part_obj_name,
                 category=part["category"],
                 model=part["model"],
                 bounding_box=part["bb_size"] * scale,   # equiv. to scale=(part["bb_size"] / self.native_bbox) * (scale)
+                bddl_object_scope=f"half_{sliced_obj_scope_prefix}_{2 * sliced_obj_id - i}",
             )
 
             # Add the new object to the results.
