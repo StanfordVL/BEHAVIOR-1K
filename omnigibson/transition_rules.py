@@ -1,14 +1,21 @@
 from abc import ABCMeta, abstractmethod
-from collections import namedtuple
+from collections import namedtuple, defaultdict
 import numpy as np
+import itertools
 import omnigibson as og
-from omnigibson.macros import gm
+from omnigibson.macros import gm, create_module_macros
 from omnigibson.systems import get_system, is_system_active
 from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.object_states import *
+from omnigibson.utils.python_utils import Registerable, classproperty, subclass_factory
 import omnigibson.utils.transform_utils as T
-from omnigibson.utils.usd_utils import BoundingBoxAPI
+from omnigibson.utils.ui_utils import disclaimer
 
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
+
+# Where to place objects far out of the scene
+m.OBJECT_GRAVEYARD_POS = (100.0, 100.0, 100.0)
 
 # Tuple of attributes of objects created in transitions.
 # `states` field is dict mapping object state class to arguments to pass to setter for that class
@@ -20,9 +27,135 @@ ObjectAttrs = namedtuple(
 TransitionResults = namedtuple(
     "TransitionResults", ["add", "remove"], defaults=([], []))
 
+# Global dicts that will contain mappings
+REGISTERED_RULES = dict()
+
+
+class TransitionRuleAPI:
+    """
+    Monolithic class containing methods to check and execute arbitrary discrete state transitions within the simulator
+    """
+    # Maps BaseTransitionRule instances to list of valid object candidates combinations to check for transitions
+    ACTIVE_RULES = dict()
+
+    # Maps BaseObject instances to dictionary mapping object states to arguments to set for that state when the
+    # object is initialized
+    _INIT_STATES = dict()
+
+    @classmethod
+    def refresh_active_rules(cls, objects):
+        """
+        Refreshes the current set of active rules given the current set of objects @objects
+
+        Args:
+            objects (list of BaseObject): List of objects that will be used to infer which transition rules are
+                currently active
+        """
+        global REGISTERED_RULES
+
+        # Clear all active rules
+        cls.ACTIVE_RULES = dict()
+
+        # Iterate over all registered rules, and parse their filtering requirements
+        for rule in REGISTERED_RULES.values():
+            individual_objects, group_objects = rule.get_object_candidates(objects=objects)
+            n_individual_filters_satisfied, n_group_filters_satisfied = len(individual_objects), len(group_objects)
+            # Skip if the rule requirements are not met
+            if (rule.requires_individual_filters and n_individual_filters_satisfied != len(rule.individual_filters)) \
+               or (rule.requires_group_filters and n_group_filters_satisfied != len(rule.group_filters)):
+                continue
+
+            # Compile candidates
+            # Note: Even if there are no valid individual combos (i.e.: rule does NOT require individual filters), this
+            # will still trigger a single pass with individual objects being an empty dictionary, which is what we want
+            # since presumably the group objects are used for this rule)
+            candidates = []
+            for obj_tuple in itertools.product(*list(individual_objects.values())):
+                individual_objs = {fname: obj for fname, obj in zip(individual_objects.keys(), obj_tuple)}
+                candidates.append({"individual_objects": individual_objs, "group_objects": group_objects})
+
+            # Store candidates
+            cls.ACTIVE_RULES[rule] = candidates
+
+    @classmethod
+    def step(cls):
+        """
+        Steps all active transition rules, checking if any are satisfied, and if so, executing their transitions
+        """
+        # First apply any transition object init states from before, and then clear the dictionary
+        for obj, states_info in cls._INIT_STATES.items():
+            for state, args in states_info.items():
+                obj.states[state].set_value(*args)
+        cls._INIT_STATES = dict()
+
+        # Iterate over all active rules and process the rule for every valid object candidate combination
+        added_obj_attrs = []
+        removed_objs = []
+        for rule, candidates in cls.ACTIVE_RULES.items():
+            for candidate in candidates:
+                transition_output = rule.process(**candidate)
+                if transition_output is not None:
+                    # Transition occurred, store objects to be added / removed
+                    added_obj_attrs += transition_output.add
+                    removed_objs += transition_output.remove
+
+        # Process all transition results
+        if len(removed_objs) > 0:
+            disclaimer(
+                f"We are attempting to remove objects during the transition rule phase of the simulator step.\n"
+                f"However, Omniverse currently has a bug when using GPU dynamics where a segfault will occur if an "
+                f"object in contact with another object is attempted to be removed.\n"
+                f"This bug should be fixed by the next Omniverse release.\n"
+                f"In the meantime, we instead teleport these objects to a graveyard location located far outside of "
+                f"the scene."
+            )
+        # First remove pre-existing objects
+        for i, removed_obj in enumerate(removed_objs):
+            # TODO: Ideally we want to remove objects, but because of Omniverse's bug on GPU physics, we simply move
+            # the objects into a graveyard for now
+            # self.remove_object(removed_obj)
+            removed_obj.set_position(np.array(m.OBJECT_GRAVEYARD_POS) + np.ones(3) * i)
+
+        # Then add new objects
+        for added_obj_attr in added_obj_attrs:
+            new_obj = added_obj_attr.obj
+            og.sim.import_object(new_obj)
+            # By default, added_obj_attr is populated with all Nones -- so these will all be pass-through operations
+            # unless pos / orn (or, conversely, bb_pos / bb_orn) is specified
+            if added_obj_attr.pos is not None or added_obj_attr.orn is not None:
+                new_obj.set_position_orientation(position=added_obj_attr.pos, orientation=added_obj_attr.orn)
+            elif isinstance(new_obj, DatasetObject) and \
+                    (added_obj_attr.bb_pos is not None or added_obj_attr.bb_orn is not None):
+                new_obj.set_bbox_center_position_orientation(position=added_obj_attr.bb_pos,
+                                                             orientation=added_obj_attr.bb_orn)
+            # Additionally record any requested states if specified to be updated during the next transition step
+            if added_obj_attr.states is not None:
+                cls._INIT_STATES[new_obj] = added_obj_attr.states
+
+    @classmethod
+    def clear(cls):
+        """
+        Clears any internal state when the simulator is restarted (e.g.: when a new stage is opened)
+        """
+        global REGISTERED_RULES
+
+        # Clear internal dictionaries
+        cls.ACTIVE_RULES = dict()
+        cls._INIT_STATES = dict()
+
+        # Iterate over all registered rules and also clear their states
+        for rule in REGISTERED_RULES.values():
+            rule.clear()
+
 
 class BaseFilter(metaclass=ABCMeta):
-    """Defines a filter to apply to objects."""
+    """
+    Defines a filter to apply for inferring which objects are valid candidates for checking a transition rule's
+    condition requirements.
+
+    NOTE: These filters should describe STATIC properties about an object -- i.e.: properties that should NOT change
+    at runtime, once imported
+    """
     # Class global variable for maintaining cached state
     # Maps tuple of unique filter inputs to cached output value (T / F)
     state = None
@@ -90,57 +223,114 @@ class AndFilter(BaseFilter):
         return all(f(obj) for f in self.filters)
 
 
-class BaseTransitionRule(metaclass=ABCMeta):
+class BaseTransitionRule(Registerable):
     """
     Defines a set of categories of objects and how to transition their states.
     """
 
-    @abstractmethod
-    def __init__(self, individual_filters=None, group_filters=None):
-        """
-        TransitionRule ctor.
+    def __init_subclass__(cls, **kwargs):
+        # Call super first
+        super().__init_subclass__(**kwargs)
 
-        Args:
-            individual_filters (None or dict): Individual object filters that this filter cares about.
-                For each name, filter key-value pair, the global transition rule step will produce tuples of valid
-                filtered objects such that the cross product over all individual filter outputs occur.
-                For example, if the individual filters are:
-
-                    {"apple": CategoryFilter("apple"), "knife": CategoryFilter("knife")},
-
-                the transition rule step will produce all 2-tuples of valid (apple, knife) combinations:
-
-                    {"apple": apple_i, "knife": knife_j}
-
-                based on the current instances of each object type in the scene and pass them to @self.condition as the
-                @individual_objects entry.
-                If None is specified, then no filter will be applied
-
-            group_filters (None or dict): Group object filters that this filter cares about. For each name, filter
-                key-value pair, the global transition rule step will produce a single dictionary of valid filtered
-                objects.
-                For example, if the group filters are:
-
-                    {"apple": CategoryFilter("apple"), "knife": CategoryFilter("knife")},
-
-                the transition rule step will produce the following dictionary:
-
-                    {"apple": [apple0, apple1, ...], "knife": [knife0, knife1, ...]}
-
-                based on the current instances of each object type in the scene and pass them to @self.condition
-                as the @group_objects entry.
-                If None is specified, then no filter will be applied
-        """
         # Make sure at least one set of filters is specified -- in general, there should never be a rule
         # where no filter is specified
-        assert not (individual_filters is None and group_filters is None),\
+        assert len(cls.individual_filters) > 0 or len(cls.group_filters) > 0, \
             "At least one of individual_filters or group_filters must be specified!"
 
-        # Store the filters
-        self.individual_filters = dict() if individual_filters is None else individual_filters
-        self.group_filters = dict() if group_filters is None else group_filters
+    @classproperty
+    def individual_filters(cls):
+        """
+        Individual object filters that this filter cares about.
+        For each name, filter key-value pair, the global transition rule step will produce tuples of valid
+        filtered objects such that the cross product over all individual filter outputs occur.
+        For example, if the individual filters are:
 
-    def process(self, individual_objects, group_objects):
+            {"apple": CategoryFilter("apple"), "knife": CategoryFilter("knife")},
+
+        the transition rule step will produce all 2-tuples of valid (apple, knife) combinations:
+
+            {"apple": apple_i, "knife": knife_j}
+
+        based on the current instances of each object type in the scene and pass them to @self.condition as the
+        @individual_objects entry.
+        If empty, then no filter will be applied
+
+        Returns:
+            dict: Maps filter name to filter for inferring valid individual object candidates for this transition rule
+        """
+        # Default is empty dictionary
+        return dict()
+
+    @classproperty
+    def group_filters(cls):
+        """
+        Group object filters that this filter cares about. For each name, filter
+        key-value pair, the global transition rule step will produce a single dictionary of valid filtered
+        objects.
+        For example, if the group filters are:
+
+            {"apple": CategoryFilter("apple"), "knife": CategoryFilter("knife")},
+
+        the transition rule step will produce the following dictionary:
+
+            {"apple": [apple0, apple1, ...], "knife": [knife0, knife1, ...]}
+
+        based on the current instances of each object type in the scene and pass them to @self.condition
+        as the @group_objects entry.
+        If empty, then no filter will be applied
+
+        Returns:
+            dict: Maps filter name to filter for inferring valid group object candidates for this transition rule
+        """
+        # Default is empty dictionary
+        return dict()
+
+    @classproperty
+    def requires_individual_filters(cls):
+        """
+        Returns:
+            bool: Whether this transition rule requires any specific filters
+        """
+        return len(cls.individual_filters) > 0
+
+    @classproperty
+    def requires_group_filters(cls):
+        """
+        Returns:
+            bool: Whether this transition rule requires any group filters
+        """
+        return len(cls.group_filters) > 0
+
+    @classmethod
+    def get_object_candidates(cls, objects):
+        """
+        Given the set of objects @objects, compute the valid object candidate combinations that may be valid for
+        this TransitionRule
+
+        Args:
+            objects (list of BaseObject): Objects to filter for valid transition rule candidates
+
+        Returns:
+            2-tuple:
+                - defaultdict: Maps individual filter to valid object(s) that satisfy that filter
+                - defaultdict: Maps group filter to valid object(s) that satisfy that group filter
+        """
+        # Iterate over all objects and add to dictionary if valid
+        individual_obj_dict = defaultdict(list)
+        group_obj_dict = defaultdict(list)
+        individual_filters, group_filters = cls.individual_filters, cls.group_filters
+        for obj in objects:
+            for fname, f in individual_filters.items():
+                if f(obj):
+                    individual_obj_dict[fname].append(obj)
+            for fname, f in group_filters.items():
+                if f(obj):
+                    group_obj_dict[fname].append(obj)
+
+        return individual_obj_dict, group_obj_dict
+
+    @classmethod
+    def process(cls, individual_objects, group_objects):
         """
         Processes this transition rule at the current simulator step. If @condition evaluates to True, then
         @transition will be executed.
@@ -154,33 +344,15 @@ class BaseTransitionRule(metaclass=ABCMeta):
                 satisfy the filter, then this will be an empty dictionary
 
         Returns:
-            2-tuple:
-                - bool: Whether @self.condition is met
-                - None or TransitionResults: Output from @self.transition (None if it was never executed)
+            - None or TransitionResults: Output from @self.transition (None if it was never executed --i.e.:
+                condition was never met)
         """
-        should_transition = self.condition(individual_objects=individual_objects, group_objects=group_objects)
-        return should_transition, \
-            self.transition(individual_objects=individual_objects, group_objects=group_objects) \
+        should_transition = cls.condition(individual_objects=individual_objects, group_objects=group_objects)
+        return cls.transition(individual_objects=individual_objects, group_objects=group_objects) \
             if should_transition else None
 
-    @property
-    def requires_individual_filters(self):
-        """
-        Returns:
-            bool: Whether this transition rule requires any specific filters
-        """
-        return len(self.individual_filters) > 0
-
-    @property
-    def requires_group_filters(self):
-        """
-        Returns:
-            bool: Whether this transition rule requires any group filters
-        """
-        return len(self.group_filters) > 0
-
-    @abstractmethod
-    def condition(self, individual_objects, group_objects):
+    @classmethod
+    def condition(cls, individual_objects, group_objects):
         """
         Returns True if the rule applies to the object tuple.
 
@@ -195,10 +367,10 @@ class BaseTransitionRule(metaclass=ABCMeta):
         Returns:
             bool: Whether the condition is met or not
         """
-        pass
+        raise NotImplementedError()
 
-    @abstractmethod
-    def transition(self, individual_objects, group_objects):
+    @classmethod
+    def transition(cls, individual_objects, group_objects):
         """
         Rule to apply for each set of objects satisfying the condition.
 
@@ -213,39 +385,40 @@ class BaseTransitionRule(metaclass=ABCMeta):
         Returns:
             TransitionResults: results from the executed transition
         """
+        raise NotImplementedError()
+
+    @classmethod
+    def clear(cls):
+        """
+        Clears any internal state when the simulator is restarted (e.g.: a new scene is opened)
+        """
         pass
 
+    @classproperty
+    def _do_not_register_classes(cls):
+        # Don't register this class since it's an abstract template
+        classes = super()._do_not_register_classes
+        classes.add("BaseTransitionRule")
+        return classes
 
-class GenericTransitionRule(BaseTransitionRule):
-    """
-    A generic transition rule template used typically for simple rules.
-    """
-
-    def __init__(self, individual_filters, group_filters, condition_fn, transition_fn):
-        super(GenericTransitionRule, self).__init__(individual_filters, group_filters)
-        self.condition_fn = condition_fn
-        self.transition_fn = transition_fn
-
-    def condition(self, individual_objects, group_objects):
-        return self.condition_fn(individual_objects, group_objects)
-
-    def transition(self, individual_objects, group_objects):
-        return self.transition_fn(individual_objects, group_objects)
+    @classproperty
+    def _cls_registry(cls):
+        # Global registry
+        global REGISTERED_RULES
+        return REGISTERED_RULES
 
 
 class SlicingRule(BaseTransitionRule):
     """
     Transition rule to apply to sliced / slicer object pairs.
     """
-
-    def __init__(self):
+    @classproperty
+    def individual_filters(cls):
         # Define an individual filter dictionary so we can track all valid combos of slicer - sliceable
-        individual_filters = {ability: AbilityFilter(ability) for ability in ("sliceable", "slicer")}
+        return {ability: AbilityFilter(ability) for ability in ("sliceable", "slicer")}
 
-        # Run super
-        super().__init__(individual_filters=individual_filters)
-
-    def condition(self, individual_objects, group_objects):
+    @classmethod
+    def condition(cls, individual_objects, group_objects):
         slicer_obj, sliced_obj = individual_objects["slicer"], individual_objects["sliceable"]
 
         contact_list = slicer_obj.states[ContactBodies].get_value()
@@ -256,7 +429,8 @@ class SlicingRule(BaseTransitionRule):
         # Slicer may contact the same body in multiple points, so cut once since removing the object from the simulator
         return not sliced_obj.states[Sliced].get_value()
 
-    def transition(self, individual_objects, group_objects):
+    @classmethod
+    def transition(cls, individual_objects, group_objects):
         slicer_obj, sliced_obj = individual_objects["slicer"], individual_objects["sliceable"]
         # Object parts offset annotation are w.r.t the base link of the whole object.
         sliced_obj.states[Sliced].set_value(True)
@@ -288,10 +462,6 @@ class SlicingRule(BaseTransitionRule):
             # Calculate global part bounding box pose.
             part_bb_pos = pos + T.quat2mat(orn) @ (part_bb_pos * scale)
             part_bb_orn = T.quat_multiply(orn, part_bb_orn)
-
-            # Avoid circular imports
-            from omnigibson.objects.dataset_object import DatasetObject
-
             part_obj_name = f"{sliced_obj.name}_part_{part_idx}"
             part_obj = DatasetObject(
                 prim_path=f"/World/{part_obj_name}",
@@ -315,19 +485,18 @@ class SlicingRule(BaseTransitionRule):
 
         return t_results
 
+
 class DicingRule(BaseTransitionRule):
     """
     Transition rule to apply to diceable / slicer object pairs.
     """
-
-    def __init__(self):
+    @classproperty
+    def individual_filters(cls):
         # Define an individual filter dictionary so we can track all valid combos of slicer - sliceable
-        individual_filters = {ability: AbilityFilter(ability) for ability in ("diceable", "slicer")}
+        return {ability: AbilityFilter(ability) for ability in ("diceable", "slicer")}
 
-        # Run super
-        super().__init__(individual_filters=individual_filters)
-
-    def condition(self, individual_objects, group_objects):
+    @classmethod
+    def condition(cls, individual_objects, group_objects):
         slicer_obj, diced_obj = individual_objects["slicer"], individual_objects["diceable"]
         slicer_position = slicer_obj.states[Slicer].link.get_position()
         if slicer_position is None:
@@ -341,13 +510,15 @@ class DicingRule(BaseTransitionRule):
         # Return if the diceable object still exists
         return True
 
-    def transition(self, individual_objects, group_objects):
+    @classmethod
+    def transition(cls, individual_objects, group_objects):
         t_results = TransitionResults()
 
         slicer_obj, diced_obj = individual_objects["slicer"], individual_objects["diceable"]
 
         system_name = f"diced_{diced_obj.category}"
         system = get_system(system_name)
+        from IPython import embed; embed()
         system.generate_particles_from_link(diced_obj, diced_obj.root_link, use_visual_meshes=False)
 
         # Delete original object from stage.
@@ -357,39 +528,107 @@ class DicingRule(BaseTransitionRule):
 
 
 class BlenderRule(BaseTransitionRule):
-    def __init__(self, output_system, particle_requirements=None, obj_requirements=None):
+
+    # Keep track of blender volume checker functions
+    # Note that ALL blender rule subclasses will share this dictionary -- this is intentional so that each blender's
+    # volume will only need to be computed exactly once, across all blender rules!!
+    _CHECK_IN_VOLUME = dict()
+
+    @classmethod
+    def create(
+        cls,
+        name,
+        output_system,
+        particle_requirements=None,
+        object_requirements=None,
+        **kwargs,
+    ):
         """
-        Transition rule to apply when objects are blended together
+        Utility function to programmaticlaly generate monolithic blender rule classes
 
         Args:
+            name (str): Name of the rule to generate (should include "Rule" at the end)
             output_system (str): Name of the physical particle to generate once all the input ingredients are blended
             particle_requirements (None or dict): If specified, should map physical particle system name to the minimum
                 number of physical particles required in order to successfully blend
-            obj_requirements (None or dict): If specified, should map object category names to minimum number of that
-                type of object rqeuired in order to successfully blend
+            object_requirements (None or dict): If specified, should map object category names to minimum number of that
+                type of object required in order to successfully blend
+            **kwargs (any): keyword-mapped parameters to override / set in the child class, where the keys represent
+                the class attribute to modify and the values represent the functions / value to set
+                (Note: These values should have either @classproperty or @classmethod decorators!)
+
+        Returns:
+            BlenderRule: Generated blender rule class
         """
+        @classproperty
+        def cp_output_system(cls):
+            return output_system
+        kwargs["output_system"] = cp_output_system
+
+        # Override the particle requirements if specified
+        if particle_requirements is not None:
+            @classproperty
+            def cp_particle_requirements(cls):
+                return particle_requirements
+            kwargs["particle_requirements"] = cp_particle_requirements
+
+        # Override the object requirements and group filters class properties based on the requested object
+        # requirements if requested
+        if object_requirements is not None:
+            @classproperty
+            def cp_object_requirements(cls):
+                return object_requirements
+            kwargs["object_requirements"] = cp_object_requirements
+
+            @classproperty
+            def cp_group_filters(cls):
+                return {category: CategoryFilter(category) for category in object_requirements.keys()}
+            kwargs["group_filters"] = cp_group_filters
+
+        # Create and return the class
+        return subclass_factory(name=name, base_classes=cls, **kwargs)
+
+    @classproperty
+    def output_system(cls):
+        """
+        Returns:
+            str: Corresponding output system for this specific blender rule
+        """
+        raise NotImplementedError()
+
+    @classproperty
+    def particle_requirements(cls):
+        """
+        Returns:
+            dict: Maps physical particle system name to the minimum number of physical particles required in order to
+                successfully blend
+        """
+        # Default is empty dictionary
+        return dict()
+
+    @classproperty
+    def object_requirements(cls):
+        """
+        Returns:
+            dict: Maps object category names to minimum number of that type of object required in order to
+                successfully blend
+        """
+        # Default is empty dictionary
+        return dict()
+
+    @classproperty
+    def individual_filters(cls):
         # We want to filter for any object that is included in @obj_requirements and also separately for blender
-        individual_filters = {"blender": CategoryFilter("blender")}
-        group_filters = {category: CategoryFilter(category) for category in obj_requirements.keys()}
+        return {"blender": CategoryFilter("blender")}
 
-        # Store internal variables
-        self.output_system = output_system
-        self.particle_requirements = particle_requirements
-        self.obj_requirements = obj_requirements
-
-        # Store a cached dictionary to check blender volumes so we don't have to do this later
-        self._check_in_volume = dict()
-
-        # Call super method
-        super().__init__(individual_filters=individual_filters, group_filters=group_filters)
-
-    def condition(self, individual_objects, group_objects):
+    @classmethod
+    def condition(cls, individual_objects, group_objects):
         # TODO: Check blender if both toggled on and lid is closed!
 
         blender = individual_objects["blender"]
         # If this blender doesn't exist in our volume checker, we add it
-        if blender.name not in self._check_in_volume:
-            self._check_in_volume[blender.name] = lambda pos: blender.states[Filled].check_in_volume(pos.reshape(-1, 3))
+        if blender.name not in cls._CHECK_IN_VOLUME:
+            cls._CHECK_IN_VOLUME[blender.name] = lambda pos: blender.states[Filled].check_in_volume(pos.reshape(-1, 3))
 
         # Check to see which objects are inside the blender container
         for obj_category, objs in group_objects.items():
@@ -398,13 +637,13 @@ class BlenderRule(BaseTransitionRule):
                 if obj.states[Inside].get_value(blender):
                     inside_objs.append(obj)
             # Make sure the number of objects inside meets the required threshold, else we trigger a failure
-            if len(inside_objs) < self.obj_requirements[obj_category]:
+            if len(inside_objs) < cls.object_requirements[obj_category]:
                 return False
             # We mutate the group_objects in place so that we only keep the ones inside the blender
             group_objects[obj_category] = inside_objs
 
         # Check whether we have sufficient physical particles as well
-        for system_name, n_min_particles in self.particle_requirements.items():
+        for system_name, n_min_particles in cls.particle_requirements.items():
             if not is_system_active(system_name):
                 return False
 
@@ -413,14 +652,15 @@ class BlenderRule(BaseTransitionRule):
                 return False
 
             particle_positions = np.concatenate([inst.particle_positions for inst in system.particle_instancers.values()], axis=0)
-            n_particles_in_volume = np.sum(self._check_in_volume[blender.name](particle_positions))
+            n_particles_in_volume = np.sum(cls._CHECK_IN_VOLUME[blender.name](particle_positions))
             if n_particles_in_volume < n_min_particles:
                 return False
 
         # Our condition is whether we have sufficient ingredients or not
         return True
 
-    def transition(self, individual_objects, group_objects):
+    @classmethod
+    def transition(cls, individual_objects, group_objects):
         t_results = TransitionResults()
         blender = individual_objects["blender"]
         # For every object in group_objects, we remove them from the simulator
@@ -429,39 +669,35 @@ class BlenderRule(BaseTransitionRule):
                 t_results.remove.append(obj)
 
         # Remove all physical particles that are inside the blender
-        for system_name in self.particle_requirements.keys():
+        for system_name in cls.particle_requirements.keys():
             system = get_system(system_name)
             # No need to check for whether particle instancers exist because they must due to @self.condition passing!
             for inst in system.particle_instancers.values():
-                indices = self._check_in_volume[blender.name](inst.particle_positions).nonzero()[0]
+                indices = cls._CHECK_IN_VOLUME[blender.name](inst.particle_positions).nonzero()[0]
                 inst.remove_particles(idxs=indices)
 
         # Spawn in blended physical particles!
-        blender.states[Filled].set_value(get_system(self.output_system), True)
+        blender.states[Filled].set_value(get_system(cls.output_system), True)
 
         return t_results
 
+    @classmethod
+    def clear(cls):
+        # Clear blender volume checkers
+        cls._CHECK_IN_VOLUME = dict()
 
-"""See the following example for writing simple rules.
+    @classproperty
+    def _do_not_register_classes(cls):
+        # Don't register this class since it's an abstract template
+        classes = super()._do_not_register_classes
+        classes.add("BlenderRule")
+        return classes
 
-  GenericTransitionRule(
-      filters=(
-          AndFilter(CategoryFilter("light"), StateFilter(ToggledOn, True)),
-          CategoryFilter("key"),
-      ),
-      condition_fn=lambda light, key: dist(light, key) < 1,
-      transition_fn=lambda light, key: light.states[ToggledOn].set_value(True),
-  )
-"""
-# TODO: To prevent bugs for now, we make this READ-ONLY (tuple). In the future, rules should be allowed to be added
-# dynamically
-DEFAULT_RULES = (
-    SlicingRule(),
-    DicingRule(),
-    # Strawberry smoothie
-    BlenderRule(
-        output_system="strawberry_smoothie",
-        particle_requirements={"milk": 10},
-        obj_requirements={"strawberry": 5, "ice_cube": 5},
-    ),
+
+# Create strawberry smoothie blender rule
+StrawberrySmoothieRule = BlenderRule.create(
+    name="StrawberrySmoothieRule",
+    output_system="strawberry_smoothie",
+    particle_requirements={"milk": 10},
+    obj_requirements={"strawberry": 5, "ice_cube": 5},
 )
