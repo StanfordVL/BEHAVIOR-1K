@@ -578,19 +578,15 @@ class MeltingRule(BaseTransitionRule):
 
     @classmethod
     def condition(cls, individual_objects, group_objects):
-        # Return True if the melter is touching the meltable object and the melter is one of:
-        # (a) heatsource: either toggled on or non-toggleable
-        # (b) flammable: onFire == True
+        # Return True if the melter is touching the meltable object and the melter is on
         meltable_obj, melter_obj = individual_objects["meltable"], individual_objects["heatSource"]
 
         # Check if fire or heat source is not on
-        if OnFire in melter_obj.states:
-            if not melter_obj.states[OnFire].get_value():
-                return False
-        elif ToggledOn in melter_obj.states and not melter_obj.states[ToggledOn].get_value():
+        melter_state = OnFire if OnFire in melter_obj.states else HeatSourceOrSink
+        if not melter_obj.states[melter_state].get_value():
             return False
 
-        # Always check whether melter is touching
+        # Check whether melter is touching
         if not melter_obj.states[Touching].get_value(meltable_obj):
             return False
 
