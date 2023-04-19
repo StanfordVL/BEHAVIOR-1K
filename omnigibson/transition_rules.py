@@ -436,8 +436,9 @@ class SlicingRule(BaseTransitionRule):
         t_results = TransitionResults()
 
         # Load object parts.
-        sliced_obj_id = int(sliced_obj.bddl_obj_scope.split("_")[-1])
-        sliced_obj_scope_prefix = "_".join(sliced_obj.bddl_obj_scope.split("_")[:-1])
+        if sliced_obj.bddl_object_scope is not None:
+            sliced_obj_id = int(sliced_obj.bddl_object_scope.split("_")[-1])
+            sliced_obj_scope_prefix = "_".join(sliced_obj.bddl_object_scope.split("_")[:-1])
         for i, part in enumerate(sliced_obj.metadata["object_parts"].values()):
             # List of dicts gets replaced by {'0':dict, '1':dict, ...}
 
@@ -468,7 +469,7 @@ class SlicingRule(BaseTransitionRule):
                 category=part["category"],
                 model=part["model"],
                 bounding_box=part["bb_size"] * scale,   # equiv. to scale=(part["bb_size"] / self.native_bbox) * (scale)
-                bddl_object_scope=f"half_{sliced_obj_scope_prefix}_{2 * sliced_obj_id - i}",
+                bddl_object_scope=None if sliced_obj.bddl_object_scope is None else f"half_{sliced_obj_scope_prefix}_{2 * sliced_obj_id - i}",
             )
 
             # Add the new object to the results.
