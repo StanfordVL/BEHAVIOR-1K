@@ -5,6 +5,7 @@ from omnigibson.object_states.attached_to import AttachedTo
 from omnigibson.object_states.burnt import Burnt
 from omnigibson.object_states.contact_bodies import ContactBodies
 from omnigibson.object_states.contact_particles import ContactParticles
+from omnigibson.object_states.contains import Contains, ContainsAny
 from omnigibson.object_states.cooked import Cooked
 from omnigibson.object_states.covered import Covered
 from omnigibson.object_states.frozen import Frozen
