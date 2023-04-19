@@ -420,10 +420,7 @@ class SlicingRule(BaseTransitionRule):
     @classmethod
     def condition(cls, individual_objects, group_objects):
         slicer_obj, sliced_obj = individual_objects["slicer"], individual_objects["sliceable"]
-
-        contact_list = slicer_obj.states[ContactBodies].get_value()
-        sliced_links = set(sliced_obj.links.values())
-        if contact_list.isdisjoint(sliced_links):
+        if not slicer_obj.states[Touching].get_value(sliced_obj):
             return False
 
         # Slicer may contact the same body in multiple points, so cut once since removing the object from the simulator
@@ -501,26 +498,16 @@ class DicingRule(BaseTransitionRule):
     @classmethod
     def condition(cls, individual_objects, group_objects):
         slicer_obj, diced_obj = individual_objects["slicer"], individual_objects["diceable"]
-        slicer_position = slicer_obj.states[Slicer].link.get_position()
-        if slicer_position is None:
-            return False
 
-        contact_list = slicer_obj.states[ContactBodies].get_value()
-        sliced_links = set(diced_obj.links.values())
-        if contact_list.isdisjoint(sliced_links):
-            return False
-
-        # Return if the diceable object still exists
-        return True
+        # Return True if the slicer object is touching the diced object
+        return slicer_obj.states[Touching].get_value(diced_obj)
 
     @classmethod
     def transition(cls, individual_objects, group_objects):
         t_results = TransitionResults()
 
         slicer_obj, diced_obj = individual_objects["slicer"], individual_objects["diceable"]
-
-        system_name = f"diced_{diced_obj.category}"
-        system = get_system(system_name)
+        system = get_system(f"diced_{diced_obj.category}")
         system.generate_particles_from_link(diced_obj, diced_obj.root_link, use_visual_meshes=False)
 
         # Delete original object from stage.
@@ -574,7 +561,46 @@ class CookingPhysicalParticleRule(BaseTransitionRule):
         return t_results
 
 
-class BlenderRule(BaseTransitionRule):
+class MeltingRule(BaseTransitionRule):
+    """
+    Transition rule to apply to meltable objects to simulate melting
+    """
+    @classproperty
+    def individual_filters(cls):
+        # We want to find all meltable object / heatsource combos
+        # TODO: This does not handle flammable objects currently
+        return {ability: AbilityFilter(ability) for ability in ("meltable", "heatSource")}
+
+    @classmethod
+    def condition(cls, individual_objects, group_objects):
+        # Return True if the heat source is touching the meltable object and the heat source is either toggled on or
+        # non-toggleable
+        meltable_obj, heatsource_obj = individual_objects["meltable"], individual_objects["heatSource"]
+        if ToggledOn in heatsource_obj.states and not heatsource_obj.states[ToggledOn].get_value():
+            return False
+
+        if not heatsource_obj.states[Touching].get_value(meltable_obj):
+            return False
+
+        # Otherwise, all conditions met, return True
+        return True
+
+    @classmethod
+    def transition(cls, individual_objects, group_objects):
+        t_results = TransitionResults()
+
+        # Convert the meltable object into its melted substance
+        meltable_obj = individual_objects["meltable"]
+        system = get_system(f"melted_{meltable_obj.category}")
+        system.generate_particles_from_link(meltable_obj, meltable_obj.root_link, use_visual_meshes=False)
+
+        # Delete original object from stage.
+        t_results.remove.append(meltable_obj)
+
+        return t_results
+
+
+class BlenderRuleTemplate(BaseTransitionRule):
 
     # Keep track of blender volume checker functions
     # Note that ALL blender rule subclasses will share this dictionary -- this is intentional so that each blender's
@@ -737,12 +763,12 @@ class BlenderRule(BaseTransitionRule):
     def _do_not_register_classes(cls):
         # Don't register this class since it's an abstract template
         classes = super()._do_not_register_classes
-        classes.add("BlenderRule")
+        classes.add("BlenderRuleTemplate")
         return classes
 
 
 # Create strawberry smoothie blender rule
-StrawberrySmoothieRule = BlenderRule.create(
+StrawberrySmoothieRule = BlenderRuleTemplate.create(
     name="StrawberrySmoothieRule",
     output_system="strawberry_smoothie",
     particle_requirements={"milk": 10},
