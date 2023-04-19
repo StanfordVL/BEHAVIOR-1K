@@ -410,13 +410,12 @@ class Simulator(SimulationContext, Serializable):
 
             # Propagate states if the feature is enabled
             if gm.ENABLE_OBJECT_STATES:
-                # Step the object states in global topological order (if the scene exists).
-                if self.scene is not None:
-                    for state_type in self.object_state_types_requiring_update:
-                        for obj in self.scene.get_objects_with_state(state_type):
-                            # Only update objects that have been initialized so far
-                            if obj.initialized:
-                                obj.states[state_type].update()
+                # Step the object states in global topological order (if the scene exists)
+                for state_type in self.object_state_types_requiring_update:
+                    for obj in self.scene.get_objects_with_state(state_type):
+                        # Only update objects that have been initialized so far
+                        if obj.initialized:
+                            obj.states[state_type].update()
 
                 for obj in self.scene.objects:
                     # Only update visuals for objects that have been initialized so far
