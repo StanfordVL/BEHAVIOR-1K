@@ -639,7 +639,7 @@ class BlenderRuleTemplate(BaseTransitionRule):
                 (Note: These values should have either @classproperty or @classmethod decorators!)
 
         Returns:
-            BlenderRule: Generated blender rule class
+            BlenderRuleTemplate: Generated blender rule class
         """
         @classproperty
         def cp_output_system(cls):
@@ -704,9 +704,12 @@ class BlenderRuleTemplate(BaseTransitionRule):
 
     @classmethod
     def condition(cls, individual_objects, group_objects):
-        # TODO: Check blender if both toggled on and lid is closed!
-
         blender = individual_objects["blender"]
+
+        # Immediately terminate if the blender isn't toggled on
+        if not blender.states[ToggledOn].get_value():
+            return False
+
         # If this blender doesn't exist in our volume checker, we add it
         if blender.name not in cls._CHECK_IN_VOLUME:
             cls._CHECK_IN_VOLUME[blender.name] = lambda pos: blender.states[Filled].check_in_volume(pos.reshape(-1, 3))
