@@ -128,6 +128,8 @@ class TransitionRuleAPI:
                     (added_obj_attr.bb_pos is not None or added_obj_attr.bb_orn is not None):
                 new_obj.set_bbox_center_position_orientation(position=added_obj_attr.bb_pos,
                                                              orientation=added_obj_attr.bb_orn)
+            else:
+                raise ValueError("Expected at least one of pos, orn, bb_pos, or bb_orn to be specified in ObjectAttrs!")
             # Additionally record any requested states if specified to be updated during the next transition step
             if added_obj_attr.states is not None:
                 cls._INIT_STATES[new_obj] = added_obj_attr.states
