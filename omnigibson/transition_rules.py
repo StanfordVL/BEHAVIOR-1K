@@ -4,7 +4,7 @@ import numpy as np
 import itertools
 import omnigibson as og
 from omnigibson.macros import gm, create_module_macros
-from omnigibson.systems import get_system, is_system_active
+from omnigibson.systems import get_system, is_system_active, PhysicalParticleSystem
 from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.object_states import *
 from omnigibson.utils.python_utils import Registerable, classproperty, subclass_factory
@@ -521,11 +521,55 @@ class DicingRule(BaseTransitionRule):
 
         system_name = f"diced_{diced_obj.category}"
         system = get_system(system_name)
-        from IPython import embed; embed()
         system.generate_particles_from_link(diced_obj, diced_obj.root_link, use_visual_meshes=False)
 
         # Delete original object from stage.
         t_results.remove.append(diced_obj)
+
+        return t_results
+
+
+class CookingPhysicalParticleRule(BaseTransitionRule):
+    """
+    Transition rule to apply to "cook" physicl particles
+    """
+    @classproperty
+    def individual_filters(cls):
+        # We want to track all possible fillable heatable objects
+        return {"fillable": AndFilter(filters=(AbilityFilter("fillable"), AbilityFilter("heatable")))}
+
+    @classmethod
+    def condition(cls, individual_objects, group_objects):
+        fillable_obj = individual_objects["fillable"]
+        # If not heated, immediately return False
+        if not fillable_obj.states[Heated].get_value():
+            return False
+
+        # Otherwise, return True
+        return True
+
+    @classmethod
+    def transition(cls, individual_objects, group_objects):
+        t_results = TransitionResults()
+        fillable_obj = individual_objects["fillable"]
+        contains_state = fillable_obj.states[Contains]
+
+        # Iterate over all active physical particle systems, and for any non-cooked particles inside,
+        # convert into cooked particles
+        for name, system in PhysicalParticleSystem.get_active_systems().items():
+            # Skip any systems that are already cooked or do not contain any particles from this system
+            if "cooked" in name or not fillable_obj.states[ContainsAny].get_value():
+                continue
+            # TODO: Remove this assert once we have a more standardized method of globally R/W particle positions
+            assert len(system.particle_instancers) == 1, \
+                f"PhysicalParticleSystem {system.name} should only have one instancer!"
+            # Replace all particles inside the container with their cooked versions
+            cooked_system = get_system(f"cooked_{system.name}")
+            positions = contains_state.cache[(system,)]["info"]["positions"]
+            in_volume = contains_state.cache[(system,)]["info"]["in_volume"]
+            in_volume_idx = np.where(in_volume)[0]
+            system.default_particle_instancer.remove_particles(idxs=in_volume_idx)
+            cooked_system.default_particle_instancer.add_particles(positions=positions[in_volume_idx])
 
         return t_results
 
