@@ -548,7 +548,7 @@ class CookingPhysicalParticleRule(BaseTransitionRule):
         # convert into cooked particles
         for name, system in PhysicalParticleSystem.get_active_systems().items():
             # Skip any systems that are already cooked or do not contain any particles from this system
-            if "cooked" in name or not fillable_obj.states[Contains].get_value():
+            if "cooked" in name or not fillable_obj.states[Contains].get_value(system=system):
                 continue
             # TODO: Remove this assert once we have a more standardized method of globally R/W particle positions
             assert len(system.particle_instancers) == 1, \
