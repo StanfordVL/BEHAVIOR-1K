@@ -570,19 +570,28 @@ class MeltingRule(BaseTransitionRule):
     """
     @classproperty
     def individual_filters(cls):
-        # We want to find all meltable object / heatsource combos
-        # TODO: This does not handle flammable objects currently
-        return {ability: AbilityFilter(ability) for ability in ("meltable", "heatSource")}
+        # We want to find all meltable object + heatsource / flammable combos
+        return {
+            "meltable": AbilityFilter("meltable"),
+            "melter": OrFilter(filters=[AbilityFilter("heatSource"), AbilityFilter("flammable")]),
+        }
 
     @classmethod
     def condition(cls, individual_objects, group_objects):
-        # Return True if the heat source is touching the meltable object and the heat source is either toggled on or
-        # non-toggleable
-        meltable_obj, heatsource_obj = individual_objects["meltable"], individual_objects["heatSource"]
-        if ToggledOn in heatsource_obj.states and not heatsource_obj.states[ToggledOn].get_value():
+        # Return True if the melter is touching the meltable object and the melter is one of:
+        # (a) heatsource: either toggled on or non-toggleable
+        # (b) flammable: onFire == True
+        meltable_obj, melter_obj = individual_objects["meltable"], individual_objects["heatSource"]
+
+        # Check if fire or heat source is not on
+        if OnFire in melter_obj.states:
+            if not melter_obj.states[OnFire].get_value():
+                return False
+        elif ToggledOn in melter_obj.states and not melter_obj.states[ToggledOn].get_value():
             return False
 
-        if not heatsource_obj.states[Touching].get_value(meltable_obj):
+        # Always check whether melter is touching
+        if not melter_obj.states[Touching].get_value(meltable_obj):
             return False
 
         # Otherwise, all conditions met, return True
