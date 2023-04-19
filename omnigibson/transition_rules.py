@@ -540,21 +540,21 @@ class CookingPhysicalParticleRule(BaseTransitionRule):
     def transition(cls, individual_objects, group_objects):
         t_results = TransitionResults()
         fillable_obj = individual_objects["fillable"]
-        contains_state = fillable_obj.states[Contains]
+        contained_particles_state = fillable_obj.states[ContainedParticles]
 
         # Iterate over all active physical particle systems, and for any non-cooked particles inside,
         # convert into cooked particles
         for name, system in PhysicalParticleSystem.get_active_systems().items():
             # Skip any systems that are already cooked or do not contain any particles from this system
-            if "cooked" in name or not fillable_obj.states[ContainsAny].get_value():
+            if "cooked" in name or not fillable_obj.states[Contains].get_value():
                 continue
             # TODO: Remove this assert once we have a more standardized method of globally R/W particle positions
             assert len(system.particle_instancers) == 1, \
                 f"PhysicalParticleSystem {system.name} should only have one instancer!"
             # Replace all particles inside the container with their cooked versions
             cooked_system = get_system(f"cooked_{system.name}")
-            positions = contains_state.cache[(system,)]["info"]["positions"]
-            in_volume = contains_state.cache[(system,)]["info"]["in_volume"]
+            positions = contained_particles_state.cache[(system,)]["info"]["positions"]
+            in_volume = contained_particles_state.cache[(system,)]["info"]["in_volume"]
             in_volume_idx = np.where(in_volume)[0]
             system.default_particle_instancer.remove_particles(idxs=in_volume_idx)
             cooked_system.default_particle_instancer.add_particles(positions=positions[in_volume_idx])

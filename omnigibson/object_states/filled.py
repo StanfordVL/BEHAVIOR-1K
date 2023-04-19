@@ -1,6 +1,6 @@
 import numpy as np
 from omnigibson.macros import create_module_macros
-from omnigibson.object_states.contains import Contains
+from omnigibson.object_states.contains import ContainedParticles
 from omnigibson.object_states.object_state_base import RelativeObjectState, BooleanState
 from omnigibson.systems.micro_particle_system import PhysicalParticleSystem
 
@@ -19,8 +19,8 @@ class Filled(RelativeObjectState, BooleanState):
         # Check what volume is filled
         if len(system.particle_instancers) > 0:
             particle_volume = 4 / 3 * np.pi * (system.particle_radius ** 3)
-            n_particles = self.obj.states[Contains].get_value()
-            prop_filled = particle_volume * n_particles / self.obj.states[Contains].volume
+            n_particles = self.obj.states[ContainedParticles].get_value()
+            prop_filled = particle_volume * n_particles / self.obj.states[ContainedParticles].volume
             # If greater than threshold, then the volume is filled
             # Explicit bool cast needed here because the type is bool_ instead of bool which is not JSON-Serializable
             # This has to do with numpy, see https://stackoverflow.com/questions/58408054/typeerror-object-of-type-bool-is-not-json-serializable
@@ -41,24 +41,24 @@ class Filled(RelativeObjectState, BooleanState):
 
         # Only do something if we're changing state
         if current_state != new_value:
-            contains_state = self.obj.states[Contains]
+            contained_particles_state = self.obj.states[ContainedParticles]
             if new_value:
                 # Going from False --> True, sample volume with particles
                 system.generate_particles_from_link(
                     obj=self.obj,
-                    link=contains_state.link,
+                    link=contained_particles_state.link,
                     mesh_name_prefixes="container",
                 )
             else:
                 # Going from True --> False, delete all particles inside the volume
                 for inst in system.particle_instancers.values():
-                    inst.remove_particles(contains_state.check_in_volume(inst.particle_positions).nonzero()[0])
+                    inst.remove_particles(contained_particles_state.check_in_volume(inst.particle_positions).nonzero()[0])
 
         return True
 
     @staticmethod
     def get_dependencies():
-        return [Contains]
+        return [ContainedParticles]
 
     @staticmethod
     def get_optional_dependencies():

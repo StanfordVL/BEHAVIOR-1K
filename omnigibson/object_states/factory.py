@@ -9,8 +9,8 @@ _ALL_STATES = frozenset(
         Burnt,
         ContactBodies,
         ContactParticles,
+        ContainedParticles,
         Contains,
-        ContainsAny,
         Cooked,
         Covered,
         Heated,
@@ -63,7 +63,7 @@ _ABILITY_TO_STATE_MAPPING = {
     "sliceable": [Sliced],
     "slicer": [Slicer],
     "toggleable": [ToggledOn],
-    "fillable": [Filled, ContainsAny],
+    "fillable": [Filled, Contains],
     "foldable": [Folded],
     "unfoldable": [Unfolded],
 }

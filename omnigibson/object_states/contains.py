@@ -12,7 +12,10 @@ m = create_module_macros(module_path=__file__)
 m.CONTAINER_LINK_PREFIX = "container"
 
 
-class Contains(RelativeObjectState, LinkBasedStateMixin):
+class ContainedParticles(RelativeObjectState, LinkBasedStateMixin):
+    """
+    Object state for computing the number of particles of a given system contained in this object's container volume
+    """
     def __init__(self, obj):
         super().__init__(obj)
         self.check_in_volume = None         # Function to check whether particles are in volume for this container
@@ -24,6 +27,14 @@ class Contains(RelativeObjectState, LinkBasedStateMixin):
         return m.CONTAINER_LINK_PREFIX
 
     def _get_value(self, system):
+        """
+        Args:
+            system (PhysicalParticleSystem): System whose number of particles will be checked inside this object's
+                container volume
+
+        Returns:
+            int: Number of @system's particles inside this object's container volume
+        """
         # Sanity check to make sure system is valid
         assert issubclass(system, PhysicalParticleSystem), "Can only get Contains state with a valid PhysicalParticleSystem!"
         # Check how many particles are included
@@ -42,7 +53,7 @@ class Contains(RelativeObjectState, LinkBasedStateMixin):
 
     def _set_value(self, system, new_value):
         # Cannot set this value
-        raise ValueError("set_value not supported for Contains state.")
+        raise ValueError("set_value not supported for ContainedParticles state.")
 
     def _initialize(self):
         super()._initialize()
@@ -75,15 +86,15 @@ class Contains(RelativeObjectState, LinkBasedStateMixin):
         return []
 
 
-class ContainsAny(RelativeObjectState, BooleanState):
+class Contains(RelativeObjectState, BooleanState):
     def _get_value(self, system):
         # Grab value from Contains state; True if value is greater than 0
-        return self.obj.states[Contains].get_value(system=system) > 0
+        return self.obj.states[ContainedParticles].get_value(system=system) > 0
 
     def _set_value(self, system, new_value):
         # Cannot set this value
-        raise ValueError("set_value not supported for ContainsAny state.")
+        raise ValueError("set_value not supported for Contains state.")
 
     @staticmethod
     def get_dependencies():
-        return [Contains]
+        return [ContainedParticles]
