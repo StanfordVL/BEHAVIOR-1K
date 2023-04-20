@@ -502,14 +502,13 @@ class SlicingRule(BaseTransitionRule):
         if not slicer_obj.states[Touching].get_value(sliced_obj):
             return False
 
-        # Slicer may contact the same body in multiple points, so cut once since removing the object from the simulator
-        return not sliced_obj.states[Sliced].get_value()
+        # TODO: How to handle case when multiple slicers are touching the same sliceable object at the same exact time?
+        return True
 
     @classmethod
     def transition(cls, individual_objects, group_objects):
         slicer_obj, sliced_obj = individual_objects["slicer"], individual_objects["sliceable"]
         # Object parts offset annotation are w.r.t the base link of the whole object.
-        sliced_obj.states[Sliced].set_value(True)
         pos, orn = sliced_obj.get_position_orientation()
 
         t_results = TransitionResults()
@@ -556,7 +555,6 @@ class SlicingRule(BaseTransitionRule):
                 obj=part_obj,
                 bb_pos=part_bb_pos,
                 bb_orn=part_bb_orn,
-                states={Sliced: (True,)},
             )
             t_results.add.append(new_obj_attrs)
 
