@@ -174,7 +174,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 light_type="Dome",
                 intensity=1500,
             )
-            og.sim.import_object(self._skybox, register=False)
+            og.sim.import_object(self._skybox)
             light_prim = self._skybox.light_link.prim
             light_prim.GetAttribute("color").Set(Gf.Vec3f(1.07, 0.85, 0.61))
             light_prim.GetAttribute("texture:file").Set(Sdf.AssetPath(m.DEFAULT_SKYBOX_TEXTURE))
