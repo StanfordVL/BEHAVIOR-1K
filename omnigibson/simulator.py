@@ -330,15 +330,13 @@ class Simulator(SimulationContext, Serializable):
         """
         self._objects_to_initialize.append(obj)
 
-    def import_object(self, obj, register=True, auto_initialize=True):
+    def import_object(self, obj, register=True):
         """
         Import an object into the simulator.
 
         Args:
             obj (BaseObject): an object to load
             register (bool): whether to register this object internally in the scene registry
-            auto_initialize (bool): If True, will auto-initialize the requested object on the next simulation step.
-                Otherwise, we assume that the object will call initialize() on its own!
         """
         assert isinstance(obj, BaseObject), "import_object can only be called with BaseObject"
 
@@ -353,9 +351,7 @@ class Simulator(SimulationContext, Serializable):
             self._link_id_to_objects[PhysicsSchemaTools.sdfPathToInt(link.prim_path)] = obj
 
         # Lastly, additionally add this object automatically to be initialized as soon as another simulator step occurs
-        # if requested
-        if auto_initialize:
-            self.initialize_object_on_next_sim_step(obj=obj)
+        self.initialize_object_on_next_sim_step(obj=obj)
     
     def remove_object(self, obj):
         """
@@ -501,18 +497,17 @@ class Simulator(SimulationContext, Serializable):
         assert n_physics_timesteps_per_render.is_integer(), "render_timestep must be a multiple of physics_timestep"
         return int(n_physics_timesteps_per_render)
 
-    def step(self, render=True, force_playing=False):
+    def step(self, render=True):
         """
         Step the simulation at self.render_timestep
 
         Args:
             render (bool): Whether rendering should occur or not
-            force_playing (bool): If True, will force physics to propagate (i.e.: set simulation, if paused / stopped,
-                to "play" mode)
         """
-        # Possibly force playing
-        if force_playing and not self.is_playing():
-            self.play()
+        # If we have imported any objects within the last timestep, we render the app once, since otherwise calling
+        # step() may not step physics
+        if len(self._objects_to_initialize) > 0:
+            self.render()
 
         if render:
             super().step(render=True)
