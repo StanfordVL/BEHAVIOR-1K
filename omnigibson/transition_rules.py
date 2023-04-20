@@ -632,8 +632,7 @@ class CookingPhysicalParticleRule(BaseTransitionRule):
                 f"PhysicalParticleSystem {system.name} should only have one instancer!"
             # Replace all particles inside the container with their cooked versions
             cooked_system = get_system(f"cooked_{system.name}")
-            positions = contained_particles_state.cache[(system,)]["info"]["positions"]
-            in_volume = contained_particles_state.cache[(system,)]["info"]["in_volume"]
+            _, positions, in_volume = contained_particles_state.get_value()
             in_volume_idx = np.where(in_volume)[0]
             system.default_particle_instancer.remove_particles(idxs=in_volume_idx)
             cooked_system.default_particle_instancer.add_particles(positions=positions[in_volume_idx])

@@ -33,23 +33,22 @@ class ContainedParticles(RelativeObjectState, LinkBasedStateMixin):
                 container volume
 
         Returns:
-            int: Number of @system's particles inside this object's container volume
+            3-tuple:
+                - int: Number of @system's particles inside this object's container volume
+                - n-array: (N, 3) Particle positions of all @system's particles
+                - n-array: (N,) boolean array, 1 if the corresponding particle is inside this object's container volume,
+                    else 0
         """
         # Sanity check to make sure system is valid
         assert issubclass(system, PhysicalParticleSystem), "Can only get Contains state with a valid PhysicalParticleSystem!"
         # Check how many particles are included
-        value = 0
-        self._compute_info = dict(positions=np.array([]), in_volume=np.array([]))
+        n_particles_in_volume, particle_positions, particles_in_volume = 0, np.array([]), np.array([])
         if len(system.particle_instancers) > 0:
             particle_positions = np.concatenate([inst.particle_positions for inst in system.particle_instancers.values()], axis=0)
             particles_in_volume = self.check_in_volume(particle_positions)
-            value = particles_in_volume.sum()
+            n_particles_in_volume = particles_in_volume.sum()
 
-            # Also store compute info
-            self._compute_info["positions"] = particle_positions
-            self._compute_info["in_volume"] = particles_in_volume
-
-        return value
+        return n_particles_in_volume, particle_positions, particles_in_volume
 
     def _set_value(self, system, new_value):
         # Cannot set this value
@@ -65,13 +64,6 @@ class ContainedParticles(RelativeObjectState, LinkBasedStateMixin):
 
         # Calculate volume
         self._volume = calculate_volume()
-
-    def cache_info(self, get_value_args):
-        # Call super first
-        info = super().cache_info(get_value_args=get_value_args)
-        info.update(self._compute_info)
-
-        return info
 
     @property
     def volume(self):
@@ -89,7 +81,7 @@ class ContainedParticles(RelativeObjectState, LinkBasedStateMixin):
 class Contains(RelativeObjectState, BooleanState):
     def _get_value(self, system):
         # Grab value from Contains state; True if value is greater than 0
-        return self.obj.states[ContainedParticles].get_value(system=system) > 0
+        return self.obj.states[ContainedParticles].get_value(system=system)[0] > 0
 
     def _set_value(self, system, new_value):
         # Cannot set this value
