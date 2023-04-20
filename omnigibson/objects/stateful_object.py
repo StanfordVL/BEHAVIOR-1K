@@ -9,7 +9,6 @@ import omnigibson as og
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.factory import (
     get_default_states,
-    get_object_state_instance,
     get_state_name,
     get_states_for_ability,
     get_texture_change_states,
@@ -219,7 +218,7 @@ class StatefulObject(BaseObject):
         # Now generate the states in topological order.
         self._states = dict()
         for state_type, params in reversed(state_types_and_params):
-            self._states[state_type] = get_object_state_instance(state_type, self, params)
+            self._states[state_type] = state_type(obj=self, **params)
 
     def _create_emitter_apis(self, emitter_type):
         """
