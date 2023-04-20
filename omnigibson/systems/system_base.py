@@ -108,10 +108,12 @@ SYSTEM_REGISTRY = SerializableRegistry(
     unique_keys=["name", "prim_path", "uuid"],
 )
 
+
 def is_system_active(system_name):
     assert system_name in REGISTERED_SYSTEMS, f"System {system_name} not in REGISTERED_SYSTEMS."
     system = REGISTERED_SYSTEMS[system_name]
     return system.initialized
+
 
 def get_system(system_name):
     assert system_name in REGISTERED_SYSTEMS, f"System {system_name} not in REGISTERED_SYSTEMS."
@@ -119,4 +121,9 @@ def get_system(system_name):
     if not system.initialized:
         system.initialize()
         SYSTEM_REGISTRY.add(obj=system)
+        # Make sure to refresh any transition rules that require this system
+        # Import now to avoid circular imports
+        from omnigibson.transition_rules import TransitionRuleAPI, RULES_REGISTRY
+        system_rules = RULES_REGISTRY("required_systems", system.name)
+        TransitionRuleAPI.refresh_rules(rules=system_rules, objects=og.sim.scene.objects)
     return system

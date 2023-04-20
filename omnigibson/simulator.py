@@ -370,6 +370,9 @@ class Simulator(SimulationContext, Serializable):
         self._scene.remove_object(obj)
         self.app.update()
 
+        # Refresh all current rules
+        TransitionRuleAPI.prune_active_rules(objects=self.scene.objects)
+
     def _reset_variables(self):
         """
         Reset internal variables when a new stage is loaded
@@ -406,7 +409,7 @@ class Simulator(SimulationContext, Serializable):
                 self._objects_to_initialize = self._objects_to_initialize[n_objects_to_initialize:]
 
                 # Also refresh the transition rules that are currently active
-                TransitionRuleAPI.refresh_active_rules(objects=self.scene.objects)
+                TransitionRuleAPI.refresh_all_rules(objects=self.scene.objects)
 
             # Propagate states if the feature is enabled
             if gm.ENABLE_OBJECT_STATES:

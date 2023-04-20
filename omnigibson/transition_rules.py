@@ -8,6 +8,7 @@ from omnigibson.systems import get_system, is_system_active, PhysicalParticleSys
 from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.object_states import *
 from omnigibson.utils.python_utils import Registerable, classproperty, subclass_factory
+from omnigibson.utils.registry_utils import Registry
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.ui_utils import disclaimer
 
@@ -43,39 +44,88 @@ class TransitionRuleAPI:
     _INIT_STATES = dict()
 
     @classmethod
-    def refresh_active_rules(cls, objects):
+    def get_rule_candidates(cls, rule, objects):
         """
-        Refreshes the current set of active rules given the current set of objects @objects
+        Computes valid input object candidates for transition rule @rule, if any exist
+
+        Args:
+            rule (BaseTransitionRule): Transition rule whose candidates should be computed
+            objects (list of BaseObject): List of objects that will be used to compute object candidates
+
+        Returns:
+            None or list of dict: If any valid candidates are found, returns list of unique candidate combinations,
+                where each entry is a dictionary of "individual_objects", "group_objects". Otherwise, returns None if
+                no valid candidates are found
+        """
+        individual_objects, group_objects = rule.get_object_candidates(objects=objects)
+        n_individual_filters_satisfied, n_group_filters_satisfied = len(individual_objects), len(group_objects)
+        # Skip if the rule requirements are not met
+        if (rule.requires_individual_filters and n_individual_filters_satisfied != len(rule.individual_filters)) \
+                or (rule.requires_group_filters and n_group_filters_satisfied != len(rule.group_filters)):
+            return
+
+        # Compile candidates
+        # Note: Even if there are no valid individual combos (i.e.: rule does NOT require individual filters), this
+        # will still trigger a single pass with individual objects being an empty dictionary, which is what we want
+        # since presumably the group objects are used for this rule)
+        candidates = []
+        for obj_tuple in itertools.product(*list(individual_objects.values())):
+            individual_objs = {fname: obj for fname, obj in zip(individual_objects.keys(), obj_tuple)}
+            candidates.append({"individual_objects": individual_objs, "group_objects": group_objects})
+
+        return candidates
+
+    @classmethod
+    def prune_active_rules(cls, objects):
+        """
+        Prunes the active transition rules, removing any whose filter requirements are not satisifed by object set
+        @objects. Useful when the current object set changes, e.g.: an object is removed from the simulator
 
         Args:
             objects (list of BaseObject): List of objects that will be used to infer which transition rules are
                 currently active
         """
-        global REGISTERED_RULES
+        # Need explicit list to iterate over because refresh_rules mutates the ACTIVE_RULES dict in place
+        cls.refresh_rules(rules=list(cls.ACTIVE_RULES.keys()), objects=objects)
+
+    @classmethod
+    def refresh_all_rules(cls, objects):
+        """
+        Refreshes all registered rules given the current set of objects @objects
+
+        Args:
+            objects (list of BaseObject): List of objects that will be used to infer which transition rules are
+                currently active
+        """
+        global RULES_REGISTRY
 
         # Clear all active rules
         cls.ACTIVE_RULES = dict()
 
-        # Iterate over all registered rules, and parse their filtering requirements
-        for rule in REGISTERED_RULES.values():
-            individual_objects, group_objects = rule.get_object_candidates(objects=objects)
-            n_individual_filters_satisfied, n_group_filters_satisfied = len(individual_objects), len(group_objects)
-            # Skip if the rule requirements are not met
-            if (rule.requires_individual_filters and n_individual_filters_satisfied != len(rule.individual_filters)) \
-               or (rule.requires_group_filters and n_group_filters_satisfied != len(rule.group_filters)):
-                continue
+        # Refresh all registered rules
+        cls.refresh_rules(rules=RULES_REGISTRY.objects, objects=objects)
 
-            # Compile candidates
-            # Note: Even if there are no valid individual combos (i.e.: rule does NOT require individual filters), this
-            # will still trigger a single pass with individual objects being an empty dictionary, which is what we want
-            # since presumably the group objects are used for this rule)
-            candidates = []
-            for obj_tuple in itertools.product(*list(individual_objects.values())):
-                individual_objs = {fname: obj for fname, obj in zip(individual_objects.keys(), obj_tuple)}
-                candidates.append({"individual_objects": individual_objs, "group_objects": group_objects})
+    @classmethod
+    def refresh_rules(cls, rules, objects):
+        """
+        Refreshes the specified transition rules @rules based on current set of objects @objects. This will prune
+        any pre-existing rules in cls.ACTIVE_RULES if no valid candidates are found, or add / update the entry if
+        valid candidates are found
 
-            # Store candidates
-            cls.ACTIVE_RULES[rule] = candidates
+        Args:
+            rules (list of BaseTransitionRule): List of transition rules whose candidate lists should be refreshed
+            objects (list of BaseObject): List of objects that will be used to infer which transition rules are
+                currently active
+        """
+        for rule in rules:
+            # Check if rule is still valid, if so, update its entry
+            candidates = cls.get_rule_candidates(rule=rule, objects=objects)
+
+            # Update candidates if valid, otherwise pop the entry if it exists in cls.ACTIVE_RULES
+            if candidates is not None:
+                cls.ACTIVE_RULES[rule] = candidates
+            elif rule in cls.ACTIVE_RULES:
+                cls.ACTIVE_RULES.pop(rule)
 
     @classmethod
     def step(cls):
@@ -139,14 +189,14 @@ class TransitionRuleAPI:
         """
         Clears any internal state when the simulator is restarted (e.g.: when a new stage is opened)
         """
-        global REGISTERED_RULES
+        global RULES_REGISTRY
 
         # Clear internal dictionaries
         cls.ACTIVE_RULES = dict()
         cls._INIT_STATES = dict()
 
         # Iterate over all registered rules and also clear their states
-        for rule in REGISTERED_RULES.values():
+        for rule in RULES_REGISTRY.objects:
             rule.clear()
 
 
@@ -234,15 +284,30 @@ class BaseTransitionRule(Registerable):
         # Call super first
         super().__init_subclass__(**kwargs)
 
-        # Make sure at least one set of filters is specified -- in general, there should never be a rule
+        # Register this system, and
+        # make sure at least one set of filters is specified -- in general, there should never be a rule
         # where no filter is specified
-        assert len(cls.individual_filters) > 0 or len(cls.group_filters) > 0, \
-            "At least one of individual_filters or group_filters must be specified!"
+        # Only run this check for actual rules that are being registered
+        if cls.__name__ not in cls._do_not_register_classes:
+            global RULES_REGISTRY
+            RULES_REGISTRY.add(obj=cls)
+            assert len(cls.individual_filters) > 0 or len(cls.group_filters) > 0, \
+                "At least one of individual_filters or group_filters must be specified!"
+
+    @classproperty
+    def required_systems(cls):
+        """
+        Particle systems that this transition rule cares about. Should be specified by subclass.
+
+        Returns:
+            list of str: Particle system names which must be active in order for the transition rule to occur
+        """
+        return []
 
     @classproperty
     def individual_filters(cls):
         """
-        Individual object filters that this filter cares about.
+        Individual object filters that this transition rule cares about.
         For each name, filter key-value pair, the global transition rule step will produce tuples of valid
         filtered objects such that the cross product over all individual filter outputs occur.
         For example, if the individual filters are:
@@ -320,14 +385,17 @@ class BaseTransitionRule(Registerable):
         # Iterate over all objects and add to dictionary if valid
         individual_obj_dict = defaultdict(list)
         group_obj_dict = defaultdict(list)
-        individual_filters, group_filters = cls.individual_filters, cls.group_filters
-        for obj in objects:
-            for fname, f in individual_filters.items():
-                if f(obj):
-                    individual_obj_dict[fname].append(obj)
-            for fname, f in group_filters.items():
-                if f(obj):
-                    group_obj_dict[fname].append(obj)
+
+        # Only compile candidates if all active system requirements are met
+        if np.all([is_system_active(system_name=name) for name in cls.required_systems]):
+            individual_filters, group_filters = cls.individual_filters, cls.group_filters
+            for obj in objects:
+                for fname, f in individual_filters.items():
+                    if f(obj):
+                        individual_obj_dict[fname].append(obj)
+                for fname, f in group_filters.items():
+                    if f(obj):
+                        group_obj_dict[fname].append(obj)
 
         return individual_obj_dict, group_obj_dict
 
@@ -408,6 +476,15 @@ class BaseTransitionRule(Registerable):
         # Global registry
         global REGISTERED_RULES
         return REGISTERED_RULES
+
+
+# Global dicts that will contain mappings. Must be placed here immediately AFTER BaseTransitionRule!
+RULES_REGISTRY = Registry(
+    name="TransitionRuleRegistry",
+    class_types=BaseTransitionRule,
+    default_key="__name__",
+    group_keys=["required_systems"],
+)
 
 
 class SlicingRule(BaseTransitionRule):
