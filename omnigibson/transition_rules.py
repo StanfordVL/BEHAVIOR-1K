@@ -646,28 +646,14 @@ class MeltingRule(BaseTransitionRule):
     """
     @classproperty
     def individual_filters(cls):
-        # We want to find all meltable object + heatsource / flammable combos
-        return {
-            "meltable": AbilityFilter("meltable"),
-            "melter": OrFilter(filters=[AbilityFilter("heatSource"), AbilityFilter("flammable")]),
-        }
+        # We want to find all meltable objects
+        return {"meltable": AbilityFilter("meltable")}
 
     @classmethod
     def condition(cls, individual_objects, group_objects):
-        # Return True if the melter is touching the meltable object and the melter is on
-        meltable_obj, melter_obj = individual_objects["meltable"], individual_objects["heatSource"]
-
-        # Check if fire or heat source is not on
-        melter_state = OnFire if OnFire in melter_obj.states else HeatSourceOrSink
-        if not melter_obj.states[melter_state].get_value():
-            return False
-
-        # Check whether melter is touching
-        if not melter_obj.states[Touching].get_value(meltable_obj):
-            return False
-
-        # Otherwise, all conditions met, return True
-        return True
+        # Return True if the melter object's temperature is above its melting threshold
+        melter_obj = individual_objects["meltable"]
+        return melter_obj.states[Temperature].get_value() > m.MELTING_TEMPERATURE
 
     @classmethod
     def transition(cls, individual_objects, group_objects):
