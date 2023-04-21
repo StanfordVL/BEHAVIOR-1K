@@ -261,7 +261,7 @@ class MacroParticleSystem(BaseSystem):
         Removes all particles and deletes them from the simulator
         """
         # Use list explicitly to prevent mid-loop mutation of dict
-        for particle_name in list(cls.particles.keys()):
+        for particle_name in tuple(cls.particles.keys()):
             cls.remove_particle(name=particle_name)
 
     @classmethod
@@ -476,7 +476,7 @@ class VisualParticleSystem(MacroParticleSystem):
         # Make sure the group exists
         cls._validate_group(group=group)
         # Remove all particles from the group
-        for particle_name in list(cls._group_particles[group].keys()):
+        for particle_name in tuple(cls._group_particles[group].keys()):
             cls.remove_particle(name=particle_name)
 
     @classmethod

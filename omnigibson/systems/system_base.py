@@ -8,6 +8,7 @@ from omnigibson.utils.ui_utils import create_module_logger
 # Create module logger
 log = create_module_logger(module_name=__name__)
 
+
 class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
     """
     Base class for all systems. These are non-instance objects that should be used globally for a given environment.
@@ -124,6 +125,6 @@ def get_system(system_name):
         # Make sure to refresh any transition rules that require this system
         # Import now to avoid circular imports
         from omnigibson.transition_rules import TransitionRuleAPI, RULES_REGISTRY
-        system_rules = RULES_REGISTRY("required_systems", system.name)
+        system_rules = RULES_REGISTRY("required_systems", system.name, default_val=[])
         TransitionRuleAPI.refresh_rules(rules=system_rules, objects=og.sim.scene.objects)
     return system
