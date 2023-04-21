@@ -8,6 +8,7 @@ import numpy as np
 import json
 import omni
 import carb
+import omni.physics
 from omni.isaac.core.simulation_context import SimulationContext
 from omni.isaac.core.utils.prims import get_prim_at_path
 from omni.isaac.core.utils.stage import open_stage
@@ -22,7 +23,7 @@ from omnigibson.macros import gm, create_module_macros
 from omnigibson.utils.constants import LightingMode
 from omnigibson.utils.config_utils import NumpyEncoder
 from omnigibson.utils.python_utils import clear as clear_pu, create_object_from_init_info, Serializable
-from omnigibson.utils.usd_utils import clear as clear_uu, BoundingBoxAPI, FlatcacheAPI
+from omnigibson.utils.usd_utils import clear as clear_uu, BoundingBoxAPI, FlatcacheAPI, RigidContactAPI
 from omnigibson.utils.ui_utils import CameraMover, disclaimer, create_module_logger, suppress_omni_log
 from omnigibson.scenes import Scene
 from omnigibson.objects.object_base import BaseObject
@@ -128,7 +129,7 @@ class Simulator(SimulationContext, Serializable):
         self.play()
         self.stop()
 
-        # Finally, update the physics settings
+        # Update the physics settings
         # This needs to be done now, after an initial step + stop for some reason if we want to use GPU
         # dynamics, otherwise we get very strange behavior, e.g., PhysX complains about invalid transforms
         # and crashes
@@ -366,6 +367,9 @@ class Simulator(SimulationContext, Serializable):
         self._scene.remove_object(obj)
         self.app.update()
 
+        # Re-initialize the physics view because the number of objects has changed
+        RigidContactAPI.initialize_view()
+
         # Refresh all current rules
         TransitionRuleAPI.prune_active_rules(objects=self.scene.objects)
 
@@ -404,6 +408,9 @@ class Simulator(SimulationContext, Serializable):
 
                 self._objects_to_initialize = self._objects_to_initialize[n_objects_to_initialize:]
 
+                # Re-initialize the physics view because the number of objects has changed
+                RigidContactAPI.initialize_view()
+
                 # Also refresh the transition rules that are currently active
                 TransitionRuleAPI.refresh_all_rules(objects=self.scene.objects)
 
@@ -429,8 +436,9 @@ class Simulator(SimulationContext, Serializable):
         """
         Step any omni-related things
         """
-        # Clear the bounding box cache so that it gets updated during the next time it's called
+        # Clear the bounding box and contact caches so that they get updated during the next time they're called
         BoundingBoxAPI.clear()
+        RigidContactAPI.clear()
 
     def play(self):
         if not self.is_playing():
