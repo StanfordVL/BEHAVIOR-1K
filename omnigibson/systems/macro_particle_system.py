@@ -59,7 +59,7 @@ class MacroParticleSystem(BaseSystem):
 
         # Load the particle template, and make it kinematic only because it's not interacting with anything
         particle_template = cls._create_particle_template()
-        og.sim.import_object(obj=particle_template, register=False, auto_initialize=True)
+        og.sim.import_object(obj=particle_template, register=False)
         particle_template.kinematic_only = True
 
         # Make sure there is no ambiguity about which mesh to use as the particle from this template

@@ -1400,7 +1400,7 @@ class GranularSystem(PhysicalParticleSystem):
     def _create_particle_prototypes(cls):
         # Load the particle template
         particle_template = cls._create_particle_template()
-        og.sim.import_object(obj=particle_template, register=False, auto_initialize=True)
+        og.sim.import_object(obj=particle_template, register=False)
 
         # Make sure there is no ambiguity about which mesh to use as the particle from this template
         assert len(particle_template.links) == 1, "GranularSystem particle template has more than one link"

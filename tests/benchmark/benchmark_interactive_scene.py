@@ -55,7 +55,7 @@ def benchmark_scene(scene_name, optimized=False, import_robot=True):
 
     if import_robot:
         turtlebot = Turtlebot(prim_path="/World/robot", name="agent")
-        og.sim.import_object(turtlebot, auto_initialize=True)
+        og.sim.import_object(turtlebot)
         og.sim.step()
         if scene_name == "restaurant_hotel":
             turtlebot.set_position_orientation([-12.2627573, -10.60511875, -3.4790891], [0, 0, 0, 1.0])
