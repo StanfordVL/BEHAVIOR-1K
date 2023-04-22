@@ -2,6 +2,7 @@ import operator
 from abc import ABCMeta, abstractmethod
 from collections import namedtuple, defaultdict
 import numpy as np
+from copy import copy
 import itertools
 import omnigibson as og
 from omnigibson.macros import gm, create_module_macros
@@ -11,8 +12,11 @@ from omnigibson.object_states import *
 from omnigibson.utils.python_utils import Registerable, classproperty, subclass_factory
 from omnigibson.utils.registry_utils import Registry
 import omnigibson.utils.transform_utils as T
-from omnigibson.utils.ui_utils import disclaimer
+from omnigibson.utils.ui_utils import disclaimer, create_module_logger
 from omnigibson.utils.usd_utils import RigidContactAPI
+
+# Create module logger
+log = create_module_logger(module_name=__name__)
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -22,6 +26,9 @@ m.MELTING_TEMPERATURE = 100.0
 
 # Where to place objects far out of the scene
 m.OBJECT_GRAVEYARD_POS = (100.0, 100.0, 100.0)
+
+# Default "trash" system if an invalid mixing rule transition occurs
+m.DEFAULT_GARBAGE_SYSTEM = "sludge"
 
 # Tuple of attributes of objects created in transitions.
 # `states` field is dict mapping object state class to arguments to pass to setter for that class
@@ -120,6 +127,7 @@ class TransitionRuleAPI:
             # Update candidates if valid, otherwise pop the entry if it exists in cls.ACTIVE_RULES
             if candidates is not None:
                 # We have a valid rule which should be active, so grab and initialize all of its conditions
+                rule.initialize()
                 conditions = []
                 combined_candidates = dict(**candidates["individual"], **candidates["group"])
                 for condition in rule.conditions:
@@ -404,6 +412,72 @@ class StateCondition(RuleCondition):
         return len(object_candidates[self._filter_name]) > 0
 
 
+class ChangeCondition(RuleCondition):
+    """
+    Rule condition that checks all objects from @filter_name whether the sum of the prior conditions has changed
+    from the previous timestep
+    """
+    def __init__(
+            self,
+            filter_name,
+    ):
+        """
+        Args:
+            filter_name (str): Name of the filter whose object candidates will be pruned based on whether or not any
+                prior conditions have changed or not
+        """
+        self._filter_name = filter_name
+        self._last_valid_candidates = None
+
+    def initialize(self, object_candidates):
+        # Initialize last valid candidates
+        self._last_valid_candidates = set(object_candidates[self._filter_name])
+
+    def __call__(self, object_candidates):
+        # Iterate over all current candidates -- if there's a mismatch in last valid candidates and current, then
+        # we store it, otherwise, we don't
+        objs = [obj for obj in object_candidates[self._filter_name] if obj not in self._last_valid_candidates]
+        object_candidates[self._filter_name] = objs
+        self._last_valid_candidates = set(objs)
+
+        # Valid if any object conditions have changed
+        return len(objs) > 0
+
+
+class OrCondition(RuleCondition):
+    """
+    Logical OR between multiple RuleConditions
+    """
+    def __init__(self, conditions):
+        """
+        Args:
+            conditions (list of RuleConditions): Conditions to take logical OR over. This will generate
+                the UNION of all pruning between the two sets
+        """
+        self._conditions = conditions
+
+    def __call__(self, object_candidates):
+        # Iterate over all conditions and aggregate their results
+        pruned_candidates = dict()
+        for condition in self._conditions:
+            # Copy the candidates because they get modified in place
+            pruned_candidates[condition] = copy(object_candidates)
+            condition(object_candidates=pruned_candidates[condition])
+
+        # Now, take the union over all keys in the candidates --
+        # if the result is empty, then we immediately return False
+        for filter_name, old_candidates in object_candidates.keys():
+            # If an entry was already empty, we skip it
+            if len(old_candidates) == 0:
+                continue
+            object_candidates[filter_name] = \
+                list(set(np.concatenate([candidates[filter_name] for candidates in pruned_candidates.values()])))
+            if len(object_candidates[filter_name]) == 0:
+                return False
+
+        return True
+
+
 class BaseTransitionRule(Registerable):
     """
     Defines a set of categories of objects and how to transition their states.
@@ -490,8 +564,7 @@ class BaseTransitionRule(Registerable):
         Returns:
             list of RuleCondition: Condition(s) to enforce to determine whether a transition rule should occur
         """
-        # Default to empty list
-        return []
+        raise NotImplementedError
 
     @classproperty
     def requires_individual_filters(cls):
@@ -539,6 +612,14 @@ class BaseTransitionRule(Registerable):
                         group_obj_dict[fname].append(obj)
 
         return individual_obj_dict, group_obj_dict
+
+    @classmethod
+    def initialize(self):
+        """
+        Initializes any internal state for this rule
+        """
+        # No-op by default
+        pass
 
     @classmethod
     def transition(cls, individual_objects, group_objects):
@@ -765,174 +846,298 @@ class MeltingRule(BaseTransitionRule):
         return t_results
 
 
-class BlenderRuleTemplate(BaseTransitionRule):
+class MixingRule(BaseTransitionRule):
+    """
+    Transition rule to apply to mixing objects together
+    """
+    # Maps recipe name to recipe information
+    # NOTE: By defining this class variable directly here, all subclasses SHARE this same dictionary!
+    # This is intentional because there may be multiple valid mixing methods,
+    # and all of them should share the same global recipe pool
+    _RECIPES = dict()
 
-    # Keep track of blender volume checker functions
-    # Note that ALL blender rule subclasses will share this dictionary -- this is intentional so that each blender's
-    # volume will only need to be computed exactly once, across all blender rules!!
-    _CHECK_IN_VOLUME = dict()
+    # Maps active recipe name to recipe information
+    _ACTIVE_RECIPES = None
+
+    # Maps object category name to indices in the flattened object array for efficient computation
+    _CATEGORY_IDXS = None
+
+    # Flattened array of all simulator objects, sorted by category
+    _OBJECTS = None
 
     @classmethod
-    def create(
-        cls,
-        name,
-        output_system,
-        particle_requirements=None,
-        object_requirements=None,
-        **kwargs,
-    ):
+    def add_recipe(cls, name, input_objects, input_systems, output_system):
         """
-        Utility function to programmaticlaly generate monolithic blender rule classes
+        Adds a recipe to this mixing rule to check against. This defines a valid mapping of inputs that will transform
+        into the outputs
 
         Args:
-            name (str): Name of the rule to generate (should include "Rule" at the end)
-            output_system (str): Name of the physical particle to generate once all the input ingredients are blended
-            particle_requirements (None or dict): If specified, should map physical particle system name to the minimum
-                number of physical particles required in order to successfully blend
-            object_requirements (None or dict): If specified, should map object category names to minimum number of that
-                type of object required in order to successfully blend
-            **kwargs (any): keyword-mapped parameters to override / set in the child class, where the keys represent
-                the class attribute to modify and the values represent the functions / value to set
-                (Note: These values should have either @classproperty or @classmethod decorators!)
-
-        Returns:
-            BlenderRuleTemplate: Generated blender rule class
+            name (str): Name of the recipe
+            input_objects (dict): Maps object category to number of instances required for the recipe
+            input_systems (list of str): Required system names for the recipe
+            output_system (str): Output system name that will replace all contained objects if the recipe is executed
         """
-        @classproperty
-        def cp_output_system(cls):
-            return output_system
-        kwargs["output_system"] = cp_output_system
-
-        # Override the particle requirements if specified
-        if particle_requirements is not None:
-            @classproperty
-            def cp_particle_requirements(cls):
-                return particle_requirements
-            kwargs["particle_requirements"] = cp_particle_requirements
-
-        # Override the object requirements and group filters class properties based on the requested object
-        # requirements if requested
-        if object_requirements is not None:
-            @classproperty
-            def cp_object_requirements(cls):
-                return object_requirements
-            kwargs["object_requirements"] = cp_object_requirements
-
-            @classproperty
-            def cp_group_filters(cls):
-                return {category: CategoryFilter(category) for category in object_requirements.keys()}
-            kwargs["group_filters"] = cp_group_filters
-
-        # Create and return the class
-        return subclass_factory(name=name, base_classes=cls, **kwargs)
-
-    @classproperty
-    def output_system(cls):
-        """
-        Returns:
-            str: Corresponding output system for this specific blender rule
-        """
-        raise NotImplementedError()
-
-    @classproperty
-    def particle_requirements(cls):
-        """
-        Returns:
-            dict: Maps physical particle system name to the minimum number of physical particles required in order to
-                successfully blend
-        """
-        # Default is empty dictionary
-        return dict()
-
-    @classproperty
-    def object_requirements(cls):
-        """
-        Returns:
-            dict: Maps object category names to minimum number of that type of object required in order to
-                successfully blend
-        """
-        # Default is empty dictionary
-        return dict()
-
-    @classproperty
-    def individual_filters(cls):
-        # We want to filter for any object that is included in @obj_requirements and also separately for blender
-        return {"blender": CategoryFilter("blender")}
+        # Store information for this recipe
+        cls._RECIPES[name] = {
+            "input_objects": input_objects,
+            "input_systems": input_systems,
+            "output_system": output_system,
+        }
 
     @classmethod
-    def condition(cls, individual_objects, group_objects):
-        blender = individual_objects["blender"]
+    def _validate_recipe_systems_are_contained(cls, recipe, container):
+        """
+        Validates whether @recipe's input_systems are all contained in @container or not
 
-        # Immediately terminate if the blender isn't toggled on
-        if not blender.states[ToggledOn].get_value():
-            return False
+        Args:
+            recipe (dict): Recipe whose systems should be checked
+            container (BaseObject): Container object that should contain all of @recipe's input systems
 
-        # If this blender doesn't exist in our volume checker, we add it
-        if blender.name not in cls._CHECK_IN_VOLUME:
-            cls._CHECK_IN_VOLUME[blender.name] = lambda pos: blender.states[Filled].check_in_volume(pos.reshape(-1, 3))
-
-        # Check to see which objects are inside the blender container
-        for obj_category, objs in group_objects.items():
-            inside_objs = []
-            for obj in objs:
-                if obj.states[Inside].get_value(blender):
-                    inside_objs.append(obj)
-            # Make sure the number of objects inside meets the required threshold, else we trigger a failure
-            if len(inside_objs) < cls.object_requirements[obj_category]:
+        Returns:
+            bool: True if all the input systems are contained
+        """
+        for system_name in recipe["input_systems"]:
+            if not container.states[Contains].get_value(system=get_system(system_name=system_name)):
                 return False
-            # We mutate the group_objects in place so that we only keep the ones inside the blender
-            group_objects[obj_category] = inside_objs
-
-        # Check whether we have sufficient physical particles as well
-        for system_name, n_min_particles in cls.particle_requirements.items():
-            if not is_system_active(system_name):
-                return False
-
-            system = get_system(system_name)
-            if system.n_particles == 0:
-                return False
-
-            particle_positions = np.concatenate([inst.particle_positions for inst in system.particle_instancers.values()], axis=0)
-            n_particles_in_volume = np.sum(cls._CHECK_IN_VOLUME[blender.name](particle_positions))
-            if n_particles_in_volume < n_min_particles:
-                return False
-
-        # Our condition is whether we have sufficient ingredients or not
         return True
+
+    @classmethod
+    def _validate_nonrecipe_systems_not_contained(cls, recipe, container):
+        """
+        Validates whether all systems not relevant to @recipe are not contained in @container
+
+        Args:
+            recipe (dict): Recipe whose systems should be checked
+            container (BaseObject): Container object that should contain all of @recipe's input systems
+
+        Returns:
+            bool: True if none of the non-relevant systems are contained
+        """
+        relevant_systems = set(recipe["input_systems"])
+        for system in PhysicalParticleSystem.get_active_systems():
+            if system.name not in relevant_systems and container.states[Contains].get_value(system=system):
+                return False
+        return True
+
+    @classmethod
+    def _validate_recipe_objects_are_contained(cls, recipe, in_volume):
+        """
+        Validates whether @recipe's input_objects are all contained in the container represented by @in_volume
+
+        Args:
+            recipe (dict): Recipe whose objects should be checked
+            in_volume (n-array): (N,) flat boolean array corresponding to whether every object from
+                cls._OBJECTS is inside the corresponding container
+
+        Returns:
+            bool: True if all the input object quantities are contained
+        """
+        for obj_category, obj_quantity in recipe["input_objects"].items():
+            if np.sum(in_volume[cls._CATEGORY_IDXS[obj_category]]) < obj_quantity:
+                return False
+        return True
+
+    @classmethod
+    def _validate_nonrecipe_objects_not_contained(cls, recipe, in_volume):
+        """
+        Validates whether all objects not relevant to @recipe are not contained in the container
+        represented by @in_volume
+
+        Args:
+            recipe (dict): Recipe whose systems should be checked
+            in_volume (n-array): (N,) flat boolean array corresponding to whether every object from
+                cls._OBJECTS is inside the corresponding container
+
+        Returns:
+            bool: True if none of the non-relevant objects are contained
+        """
+        idxs = np.concatenate(cls._CATEGORY_IDXS[obj_category] for obj_category in recipe["input_objects"].keys())
+        return not np.any(np.delete(in_volume, idxs))
+
+    @classmethod
+    def _validate_recipe_systems_exist(cls, recipe):
+        """
+        Validates whether @recipe's input_systems are all active or not
+
+        Args:
+            recipe (dict): Recipe whose systems should be checked
+
+        Returns:
+            bool: True if all the input systems are active
+        """
+        for system_name in recipe["input_systems"]:
+            if not is_system_active(system_name=system_name):
+                return False
+        return True
+
+    @classmethod
+    def _validate_recipe_objects_exist(cls, recipe):
+        """
+        Validates whether @recipe's input_objects exist in the current scene or not
+
+        Args:
+            recipe (dict): Recipe whose objects should be checked
+
+        Returns:
+            bool: True if all the input objects exist in the scene
+        """
+        for obj_category, obj_quantity in recipe["input_objects"].items():
+            if len(og.sim.scene.object_registry("category", obj_category, default_val=set())) < obj_quantity:
+                return False
+        return True
+
+    @classmethod
+    def initialize(cls):
+        # Cache active recipes given the current set of objects
+        cls._ACTIVE_RECIPES = dict()
+        cls._CATEGORY_IDXS = dict()
+        cls._OBJECTS = []
+
+        # Prune any recipes whose objects / system requirements are not met by the current set of objects / systems
+        objects_by_category = og.sim.scene.object_registry.get_dict("category")
+
+        for name, recipe in cls._RECIPES.items():
+            # Check valid active systems
+            if not cls._validate_recipe_systems_exist(recipe=recipe):
+                continue
+
+            # Check valid object quantities
+            if not cls._validate_recipe_objects_exist(recipe=recipe):
+                continue
+
+            # All pre-requisites met, add to active recipes
+            cls._ACTIVE_RECIPES[name] = recipe
+
+        # Finally, compute relevant objects and category mapping based on relevant categories
+        i = 0
+        for category, objects in objects_by_category.items():
+            cls._CATEGORY_IDXS[category] = i + np.arange(len(objects))
+            cls._OBJECTS += list(objects)
+            i += len(objects)
+
+        # Wrap relevant objects as numpy array so we can index into it efficiently
+        cls._OBJECTS = np.array(cls._OBJECTS)
+
+    @classproperty
+    def group_filters(cls):
+        # Fillable object required
+        return {"container": AbilityFilter(ability="fillable")}
 
     @classmethod
     def transition(cls, individual_objects, group_objects):
         t_results = TransitionResults()
-        blender = individual_objects["blender"]
-        # For every object in group_objects, we remove them from the simulator
-        for i, (obj_category, objs) in enumerate(group_objects.items()):
-            for j, obj in enumerate(objs):
-                t_results.remove.append(obj)
 
-        # Remove all physical particles that are inside the blender
-        for system_name in cls.particle_requirements.keys():
-            system = get_system(system_name)
-            # No need to check for whether particle instancers exist because they must due to @self.condition passing!
-            for inst in system.particle_instancers.values():
-                indices = cls._CHECK_IN_VOLUME[blender.name](inst.particle_positions).nonzero()[0]
-                inst.remove_particles(idxs=indices)
+        # Compute all relevant object AABB positions
+        obj_positions = np.array([obj.aabb_center for obj in cls._OBJECTS])
 
-        # Spawn in blended physical particles!
-        blender.states[Filled].set_value(get_system(cls.output_system), True)
+        # Iterate over all fillable objects, to execute recipes for each one
+        for container in individual_objects["container"]:
+            # Compute in volume for all relevant object positions
+            in_volume = container.states[ContainedParticles].check_in_volume(obj_positions)
 
-        return t_results
+            # Check every recipe to find if any is valid
+            for name, recipe in cls._ACTIVE_RECIPES.items():
+                # Verify all required systems are contained in the container
+                if not cls._validate_recipe_systems_are_contained(recipe=recipe, container=container):
+                    continue
 
-    @classmethod
-    def clear(cls):
-        # Clear blender volume checkers
-        cls._CHECK_IN_VOLUME = dict()
+                # Verify all required object quantities are contained in the container
+                if not cls._validate_recipe_objects_are_contained(recipe=recipe, in_volume=in_volume):
+                    continue
+
+                # Verify no non-relevant system is contained
+                if not cls._validate_nonrecipe_systems_not_contained(recipe=recipe, container=container):
+                    continue
+
+                # Verify no non-relevant object is contained
+                if not cls._validate_nonrecipe_objects_not_contained(recipe=recipe, in_volume=in_volume):
+                    continue
+
+                # Otherwise, all conditions met, we found a valid recipe and so we execute and terminate early
+                og.log.info(f"Executing recipe: {name} in container {container.name}!")
+
+                # Remove all recipe system particles contained in the container
+                for system_name in recipe["input_systems"]:
+                    container.states[Filled].set_value(get_system(system_name=system_name), False)
+
+                # Remove all recipe objects
+                objs_to_remove = np.concatenate([
+                    cls._OBJECTS[np.where(in_volume[cls._CATEGORY_IDXS[obj_category]])[0]]
+                    for obj_category in recipe["input_objects"].keys()
+                ]).tolist()
+                t_results.remove += objs_to_remove
+
+                # Spawn in new fluid
+                container.states[Filled].set_value(get_system(recipe["output_system"]), True)
+
+                # Terminate early
+                return t_results
+
+            # Otherwise, if we didn't find a valid recipe, we execute a garbage transition instead
+
+            # Remove all systems inside the container
+            for system in PhysicalParticleSystem.get_active_systems():
+                if container.states[Contains].get_value(system):
+                    container.states[Filled].set_value(system, False)
+
+            # Remove all objects inside the container
+            objs_to_remove = cls._OBJECTS[np.where(in_volume)[0]].tolist()
+            t_results.remove += objs_to_remove
+
+            # Spawn in garbage fluid
+            container.states[Filled].set_value(get_system(system_name=m.DEFAULT_GARBAGE_SYSTEM), True)
+
+            return t_results
 
     @classproperty
     def _do_not_register_classes(cls):
         # Don't register this class since it's an abstract template
         classes = super()._do_not_register_classes
-        classes.add("BlenderRuleTemplate")
+        classes.add("MixingRule")
         return classes
+
+
+class BlenderRule(MixingRule):
+    """
+    Transition mixing rule that leverages "blender" ability objects, which require toggledOn in order to trigger
+    the recipe event
+    """
+    @classproperty
+    def group_filters(cls):
+        # Modify the container filter to include "blender" ability as well
+        group_filters = super().group_filters
+        group_filters["container"] = AndFilter(filters=[group_filters["container"], AbilityFilter(ability="blender")])
+        return group_filters
+
+    @classproperty
+    def conditions(cls):
+        # Container must be toggledOn, and should only be triggered once
+        return [
+            StateCondition(filter_name="container", state=ToggledOn, val=True, op=operator.eq),
+            ChangeCondition(filter_name="container"),
+        ]
+
+
+class MixingWandRule(MixingRule):
+    """
+    Transition mixing rule that leverages "mixing_wand" ability objects, which require touching between a mixing wand
+    and a container in order to trigger the recipe event
+    """
+
+    @classproperty
+    def group_filters(cls):
+        # Add mixing wand group filter as well
+        group_filters = super().group_filters
+        group_filters["mixing_wand"] = AbilityFilter(ability="mixing_wand")
+        return group_filters
+
+    @classproperty
+    def conditions(cls):
+        # Mixing wand must be touching the container, and should only be triggered once
+        return [
+            TouchingAnyCondition(filter_1_name="container", filter_2_name="mixing_wand"),
+            ChangeCondition(filter_name="container"),
+        ]
 
 
 # Create strawberry smoothie blender rule
