@@ -1141,9 +1141,9 @@ class MixingWandRule(MixingRule):
 
 
 # Create strawberry smoothie blender rule
-StrawberrySmoothieRule = BlenderRuleTemplate.create(
-    name="StrawberrySmoothieRule",
-    output_system="strawberry_smoothie",
-    particle_requirements={"milk": 10},
-    obj_requirements={"strawberry": 5, "ice_cube": 5},
+BlenderRule.add_recipe(
+    name="strawberry_smoothie_recipe",
+    input_objects={"strawberry": 5, "ice_cube": 5},
+    input_systems=["milk"],
+    output_system="strawberry_smoothie"
 )

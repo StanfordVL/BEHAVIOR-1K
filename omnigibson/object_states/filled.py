@@ -51,8 +51,9 @@ class Filled(RelativeObjectState, BooleanState):
                 )
             else:
                 # Going from True --> False, delete all particles inside the volume
-                for inst in system.particle_instancers.values():
-                    inst.remove_particles(contained_particles_state.check_in_volume(inst.particle_positions).nonzero()[0])
+                # TODO: Make more robust against multiple particle instancers
+                assert len(system.particle_instancers) == 1, "Cannot handle multiple particle instancers!"
+                system.default_particle_instancer.remove_particles(contained_particles_state.get_value()[2].nonzero()[0])
 
         return True
 

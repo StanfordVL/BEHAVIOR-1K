@@ -57,7 +57,7 @@ class Simulator(SimulationContext, Serializable):
         physics_dt (float): dt between physics steps. Defaults to 1.0 / 60.0.
         rendering_dt (float): dt between rendering steps. Note: rendering means rendering a frame of the current
             application and not only rendering a frame to the viewports/ cameras. So UI elements of Isaac Sim will
-            be refereshed with this dt as well if running non-headless. Defaults to 1.0 / 60.0.
+            be refreshed with this dt as well if running non-headless. Defaults to 1.0 / 60.0.
         stage_units_in_meters (float): The metric units of assets. This will affect gravity value..etc.
             Defaults to 0.01.
         viewer_width (int): width of the camera image, in pixels

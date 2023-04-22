@@ -4,6 +4,7 @@ from omnigibson.object_states import *
 
 _ABILITY_TO_STATE_MAPPING = {
     "attachable": [AttachedTo],
+    "blender": [],
     "burnable": [Burnt],
     "particleApplier": [ParticleApplier],
     "particleRemover": [ParticleRemover],
@@ -16,6 +17,7 @@ _ABILITY_TO_STATE_MAPPING = {
     "heatable": [Heated],
     "heatSource": [HeatSourceOrSink],
     "meltable": [],
+    "mixing_wand": [],
     "openable": [Open],
     "flammable": [OnFire],
     "saturable": [Saturated],
