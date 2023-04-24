@@ -1033,7 +1033,8 @@ class MixingRule(BaseTransitionRule):
         # Iterate over all fillable objects, to execute recipes for each one
         for container in individual_objects["container"]:
             # Compute in volume for all relevant object positions
-            in_volume = container.states[ContainedParticles].check_in_volume(obj_positions)
+            contained_particles_state = container.states[ContainedParticles]
+            in_volume = contained_particles_state.check_in_volume(obj_positions)
 
             # Check every recipe to find if any is valid
             for name, recipe in cls._ACTIVE_RECIPES.items():
@@ -1056,19 +1057,31 @@ class MixingRule(BaseTransitionRule):
                 # Otherwise, all conditions met, we found a valid recipe and so we execute and terminate early
                 og.log.info(f"Executing recipe: {name} in container {container.name}!")
 
+                # Compute total volume of all contained items
+                volume = 0
+
                 # Remove all recipe system particles contained in the container
                 for system_name in recipe["input_systems"]:
-                    container.states[Filled].set_value(get_system(system_name=system_name), False)
+                    system = get_system(system_name=system_name)
+                    volume += contained_particles_state.get_value()[0] * np.pi * (system.particle_radius ** 3) * 4 / 3
+                    container.states[Filled].set_value(system, False)
 
                 # Remove all recipe objects
                 objs_to_remove = np.concatenate([
                     cls._OBJECTS[np.where(in_volume[cls._CATEGORY_IDXS[obj_category]])[0]]
                     for obj_category in recipe["input_objects"].keys()
                 ]).tolist()
+                volume += sum(obj.volume for obj in objs_to_remove)
                 t_results.remove += objs_to_remove
 
                 # Spawn in new fluid
-                container.states[Filled].set_value(get_system(recipe["output_system"]), True)
+                out_system = get_system(recipe["output_system"])
+                out_system.generate_particles_from_link(
+                    obj=container,
+                    link=contained_particles_state.link,
+                    mesh_name_prefixes="container",
+                    max_samples=volume // (np.pi * (out_system.particle_radius ** 3) * 4 / 3),
+                )
 
                 # Terminate early
                 return t_results
