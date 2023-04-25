@@ -127,11 +127,14 @@ class TransitionRuleAPI:
             # Update candidates if valid, otherwise pop the entry if it exists in cls.ACTIVE_RULES
             if candidates is not None:
                 # We have a valid rule which should be active, so grab and initialize all of its conditions
-                rule.initialize()
+                # NOTE: The rule may ALREADY exist in ACTIVE_RULES, but we still need to update its candidates because
+                # the relevant candidate set / information for the rule + its conditions may have changed given the
+                # new set of objects
+                rule.refresh()
                 conditions = []
                 combined_candidates = dict(**candidates["individual"], **candidates["group"])
                 for condition in rule.conditions:
-                    condition.initialize(combined_candidates)
+                    condition.refresh(combined_candidates)
                     conditions.append(condition)
                 cls.ACTIVE_RULES[rule] = {
                     "conditions": conditions,
@@ -304,9 +307,10 @@ class RuleCondition:
     NOTE: These filters should describe DYNAMIC properties about object candidates -- i.e.: properties that MAY change
     at runtime, once imported
     """
-    def initialize(self, object_candidates):
+    def refresh(self, object_candidates):
         """
-        Initializes any internal state for this rule condition, given set of input object candidates @individual_candidates and @group_candidates
+        Refreshes any internal state for this rule condition, given set of input object candidates
+        @individual_candidates and @group_candidates
 
         Args:
             object_candidates (dict): Maps filter name to valid object(s) that satisfy that filter
@@ -352,7 +356,7 @@ class TouchingAnyCondition(RuleCondition):
         # List of rigid body idxs in the global contact matrix corresponding to filter 2
         self._filter_2_idxs = None
 
-    def initialize(self, object_candidates):
+    def refresh(self, object_candidates):
         # Register idx mappings
         self._filter_1_idxs = {obj: [RigidContactAPI.get_body_idx(link.prim_path) for link in obj.links.values()]
                             for obj in object_candidates[self._filter_1_name]}
@@ -429,7 +433,7 @@ class ChangeCondition(RuleCondition):
         self._filter_name = filter_name
         self._last_valid_candidates = None
 
-    def initialize(self, object_candidates):
+    def refresh(self, object_candidates):
         # Initialize last valid candidates
         self._last_valid_candidates = set(object_candidates[self._filter_name])
 
@@ -614,9 +618,9 @@ class BaseTransitionRule(Registerable):
         return individual_obj_dict, group_obj_dict
 
     @classmethod
-    def initialize(self):
+    def refresh(self):
         """
-        Initializes any internal state for this rule
+        Refresh any internal state for this rule
         """
         # No-op by default
         pass
@@ -987,7 +991,7 @@ class MixingRule(BaseTransitionRule):
         return True
 
     @classmethod
-    def initialize(cls):
+    def refresh(cls):
         # Cache active recipes given the current set of objects
         cls._ACTIVE_RECIPES = dict()
         cls._CATEGORY_IDXS = dict()
