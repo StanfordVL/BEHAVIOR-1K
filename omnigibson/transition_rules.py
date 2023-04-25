@@ -48,8 +48,8 @@ class TransitionRuleAPI:
     """
     Monolithic class containing methods to check and execute arbitrary discrete state transitions within the simulator
     """
-    # Maps BaseTransitionRule instances to list of valid object candidates combinations to check for transitions
-    ACTIVE_RULES = dict()
+    # Set of active rules
+    ACTIVE_RULES = set()
 
     # Maps BaseObject instances to dictionary mapping object states to arguments to set for that state when the
     # object is initialized
@@ -65,40 +65,27 @@ class TransitionRuleAPI:
             objects (list of BaseObject): List of objects that will be used to compute object candidates
 
         Returns:
-            None or dict: None if no valid candidates are found, otherwise mapping, with keys "individual", and "group",
-                where each respective key maps to a nested dictionary mapping filter name to list of object(s)
-                satisfying that filter
+            None or dict: None if no valid candidates are found, otherwise mapping from filter key to list of object
+                instances that satisfy that filter
         """
-        individual_candidates, group_candidates = rule.get_object_candidates(objects=objects)
-        n_individual_filters_satisfied, n_group_filters_satisfied = len(individual_candidates), len(group_candidates)
-        # Skip if the rule requirements are not met
-        if (rule.requires_individual_filters and n_individual_filters_satisfied != len(rule.individual_filters)) \
-                or (rule.requires_group_filters and n_group_filters_satisfied != len(rule.group_filters)):
-            return
-
-        return dict(individual=individual_candidates, group=group_candidates)
+        obj_candidates = rule.get_object_candidates(objects=objects)
+        n_filters_satisfied = sum(len(candidates) > 0 for candidates in obj_candidates.values())
+        # Return object candidates if all filters are met, otherwise return None
+        return obj_candidates if n_filters_satisfied == len(rule.candidate_filters) else None
 
     @classmethod
-    def prune_active_rules(cls, objects):
+    def prune_active_rules(cls):
         """
-        Prunes the active transition rules, removing any whose filter requirements are not satisfied by object set
-        @objects. Useful when the current object set changes, e.g.: an object is removed from the simulator
-
-        Args:
-            objects (list of BaseObject): List of objects that will be used to infer which transition rules are
-                currently active
+        Prunes the active transition rules, removing any whose filter requirements are not satisfied by all current
+        objects on the scene. Useful when the current object set changes, e.g.: an object is removed from the simulator
         """
-        # Need explicit list to iterate over because refresh_rules mutates the ACTIVE_RULES dict in place
-        cls.refresh_rules(rules=list(cls.ACTIVE_RULES.keys()), objects=objects)
+        # Need explicit tuple to iterate over because refresh_rules mutates the ACTIVE_RULES set in place
+        cls.refresh_rules(rules=tuple(cls.ACTIVE_RULES))
 
     @classmethod
-    def refresh_all_rules(cls, objects):
+    def refresh_all_rules(cls):
         """
-        Refreshes all registered rules given the current set of objects @objects
-
-        Args:
-            objects (list of BaseObject): List of objects that will be used to infer which transition rules are
-                currently active
+        Refreshes all registered rules given the current set of objects in the scene
         """
         global RULES_REGISTRY
 
@@ -106,47 +93,38 @@ class TransitionRuleAPI:
         cls.ACTIVE_RULES = dict()
 
         # Refresh all registered rules
-        cls.refresh_rules(rules=RULES_REGISTRY.objects, objects=objects)
+        cls.refresh_rules(rules=RULES_REGISTRY.objects)
 
     @classmethod
-    def refresh_rules(cls, rules, objects):
+    def refresh_rules(cls, rules):
         """
-        Refreshes the specified transition rules @rules based on current set of objects @objects. This will prune
-        any pre-existing rules in cls.ACTIVE_RULES if no valid candidates are found, or add / update the entry if
-        valid candidates are found
+        Refreshes the specified transition rules @rules based on current set of objects in the simulator.
+        This will prune any pre-existing rules in cls.ACTIVE_RULES if no valid candidates are found, or add / update
+        the entry if valid candidates are found
 
         Args:
             rules (list of BaseTransitionRule): List of transition rules whose candidate lists should be refreshed
-            objects (list of BaseObject): List of objects that will be used to infer which transition rules are
-                currently active
         """
+        objects = og.sim.scene.objects
         for rule in rules:
             # Check if rule is still valid, if so, update its entry
-            candidates = cls.get_rule_candidates(rule=rule, objects=objects)
+            object_candidates = cls.get_rule_candidates(rule=rule, objects=objects)
 
             # Update candidates if valid, otherwise pop the entry if it exists in cls.ACTIVE_RULES
             if candidates is not None:
                 # We have a valid rule which should be active, so grab and initialize all of its conditions
-                # NOTE: The rule may ALREADY exist in ACTIVE_RULES, but we still need to update its candidates because
+                # NOTE: The rule may ALREADY exist in ACTIVE_RULES, but we still need to refresh its candidates because
                 # the relevant candidate set / information for the rule + its conditions may have changed given the
                 # new set of objects
-                rule.refresh()
-                conditions = []
-                combined_candidates = dict(**candidates["individual"], **candidates["group"])
-                for condition in rule.conditions:
-                    condition.refresh(combined_candidates)
-                    conditions.append(condition)
-                cls.ACTIVE_RULES[rule] = {
-                    "conditions": conditions,
-                    "candidates": candidates,
-                }
+                rule.refresh(object_candidates=object_candidates)
+                cls.ACTIVE_RULES.add(rule)
             elif rule in cls.ACTIVE_RULES:
-                cls.ACTIVE_RULES.pop(rule)
+                cls.ACTIVE_RULES.remove(rule)
 
     @classmethod
     def step(cls):
         """
-        Steps all active transition rules, checking if any are satisfied, and if so, executing their transitions
+        Steps all active transition rules, checking if any are satisfied, and if so, executing their transition
         """
         # First apply any transition object init states from before, and then clear the dictionary
         for obj, states_info in cls._INIT_STATES.items():
@@ -158,27 +136,12 @@ class TransitionRuleAPI:
         # Cast to list before iterating since ACTIVE_RULES may get updated mid-iteration
         added_obj_attrs = []
         removed_objs = []
-        for rule in tuple(cls.ACTIVE_RULES.keys()):
-            # Compile candidates (shallow) copy that will be mutated in place by conditions
-            conditions, candidates = cls.ACTIVE_RULES[rule]["conditions"], cls.ACTIVE_RULES[rule]["candidates"]
-            combined_candidates = dict(**candidates["individual"], **candidates["group"])
-            should_transition = True
-            for condition in conditions:
-                if not condition(object_candidates=combined_candidates):
-                    # Condition was not met, so break early
-                    should_transition = False
-                    break
-            if should_transition:
-                # Compile all valid transitions, and take the transition
-                pruned_individual_candidates = {k: combined_candidates[k] for k in candidates["individual"].keys()}
-                group_objects = {k: combined_candidates[k] for k in candidates["group"].keys()}
-                for obj_tuple in itertools.product(*list(pruned_individual_candidates.values())):
-                    individual_objects = {fname: obj for fname, obj in zip(pruned_individual_candidates.keys(), obj_tuple)}
-                    # Take the transition
-                    output = rule.transition(individual_objects=individual_objects, group_objects=group_objects)
-                    # Store objects to be added / removed
-                    added_obj_attrs += output.add
-                    removed_objs += output.remove
+        for rule in tuple(cls.ACTIVE_RULES):
+            output = rule.step()
+            # Store objects to be added / removed if we have a valid output
+            if output is not None:
+                added_obj_attrs += output.add
+                removed_objs += output.remove
 
         # Process all transition results
         if len(removed_objs) > 0:
@@ -309,8 +272,7 @@ class RuleCondition:
     """
     def refresh(self, object_candidates):
         """
-        Refreshes any internal state for this rule condition, given set of input object candidates
-        @individual_candidates and @group_candidates
+        Refreshes any internal state for this rule condition, given set of input object candidates @object_candidates
 
         Args:
             object_candidates (dict): Maps filter name to valid object(s) that satisfy that filter
@@ -473,11 +435,11 @@ class ChangeConditionWrapper(RuleCondition):
 
     @classproperty
     def modifies_filter_names(self):
-        # Return super method
+        # Return wrapped names
         return self._condition.modifies_filter_names
 
 
-class OrCondition(RuleCondition):
+class OrConditionWrapper(RuleCondition):
     """
     Logical OR between multiple RuleConditions
     """
@@ -488,6 +450,11 @@ class OrCondition(RuleCondition):
                 the UNION of all pruning between the two sets
         """
         self._conditions = conditions
+
+    def refresh(self, object_candidates):
+        # Refresh nested conditions
+        for condition in self._conditions:
+            condition.refresh(object_candidates=object_candidates)
 
     def __call__(self, object_candidates):
         # Iterate over all conditions and aggregate their results
@@ -510,25 +477,35 @@ class OrCondition(RuleCondition):
 
         return True
 
+    @classproperty
+    def modifies_filter_names(self):
+        # Return all wrapped names
+        return set.union(*(condition.modifies_filter_names for condition in self._conditions))
+
 
 class BaseTransitionRule(Registerable):
     """
     Defines a set of categories of objects and how to transition their states.
     """
+    conditions = None
+    candidates = None
 
     def __init_subclass__(cls, **kwargs):
         # Call super first
         super().__init_subclass__(**kwargs)
 
         # Register this system, and
-        # make sure at least one set of filters is specified -- in general, there should never be a rule
+        # make sure at least one filter is specified -- in general, there should never be a rule
         # where no filter is specified
         # Only run this check for actual rules that are being registered
         if cls.__name__ not in cls._do_not_register_classes:
             global RULES_REGISTRY
             RULES_REGISTRY.add(obj=cls)
-            assert len(cls.individual_filters) > 0 or len(cls.group_filters) > 0, \
+            assert len(cls.candidate_filters) > 0, \
                 "At least one of individual_filters or group_filters must be specified!"
+
+            # Store conditions
+            cls.conditions = cls._generate_conditions()
 
     @classproperty
     def required_systems(cls):
@@ -541,35 +518,11 @@ class BaseTransitionRule(Registerable):
         return []
 
     @classproperty
-    def individual_filters(cls):
+    def candidate_filters(cls):
         """
-        Individual object filters that this transition rule cares about.
-        For each name, filter key-value pair, the global transition rule step will produce tuples of valid
-        filtered objects such that the cross product over all individual filter outputs occur.
-        For example, if the individual filters are:
-
-            {"apple": CategoryFilter("apple"), "knife": CategoryFilter("knife")},
-
-        the transition rule step will produce all 2-tuples of valid (apple, knife) combinations:
-
-            {"apple": apple_i, "knife": knife_j}
-
-        based on the current instances of each object type in the scene and pass them to @self.condition as the
-        @individual_objects entry.
-        If empty, then no filter will be applied
-
-        Returns:
-            dict: Maps filter name to filter for inferring valid individual object candidates for this transition rule
-        """
-        # Default is empty dictionary
-        return dict()
-
-    @classproperty
-    def group_filters(cls):
-        """
-        Group object filters that this filter cares about. For each name, filter
-        key-value pair, the global transition rule step will produce a single dictionary of valid filtered
-        objects.
+        Object candidate filters that this transition rule cares about.
+        For each name, filter key-value pair, the global transition rule step will produce a
+        single dictionary of valid filtered objects.
         For example, if the group filters are:
 
             {"apple": CategoryFilter("apple"), "knife": CategoryFilter("knife")},
@@ -578,42 +531,25 @@ class BaseTransitionRule(Registerable):
 
             {"apple": [apple0, apple1, ...], "knife": [knife0, knife1, ...]}
 
-        based on the current instances of each object type in the scene and pass them to @self.condition
-        as the @group_objects entry.
-        If empty, then no filter will be applied
+        based on the current instances of each object type in the scene and pass them to conditions in @self.conditions
+
+        NOTE: There should always be at least one filter applied for every rule!
 
         Returns:
-            dict: Maps filter name to filter for inferring valid group object candidates for this transition rule
+            dict: Maps filter name to filter for inferring valid object candidates for this transition rule
         """
-        # Default is empty dictionary
-        return dict()
+        raise NotImplementedError
 
-    @classproperty
-    def conditions(cls):
+    @classmethod
+    def _generate_conditions(cls):
         """
-        Rule conditions for this transition rule. These conditions are used to prune object candidates at runtime,
-        to determine whether a transition rule should occur at the given timestep
+        Generates rule condition(s)s for this transition rule. These conditions are used to prune object
+        candidates at runtime, to determine whether a transition rule should occur at the given timestep
 
         Returns:
             list of RuleCondition: Condition(s) to enforce to determine whether a transition rule should occur
         """
         raise NotImplementedError
-
-    @classproperty
-    def requires_individual_filters(cls):
-        """
-        Returns:
-            bool: Whether this transition rule requires any specific filters
-        """
-        return len(cls.individual_filters) > 0
-
-    @classproperty
-    def requires_group_filters(cls):
-        """
-        Returns:
-            bool: Whether this transition rule requires any group filters
-        """
-        return len(cls.group_filters) > 0
 
     @classmethod
     def get_object_candidates(cls, objects):
@@ -625,52 +561,69 @@ class BaseTransitionRule(Registerable):
             objects (list of BaseObject): Objects to filter for valid transition rule candidates
 
         Returns:
-            2-tuple:
-                - defaultdict: Maps individual filter to valid object(s) that satisfy that filter
-                - defaultdict: Maps group filter to valid object(s) that satisfy that group filter
+            dict: Maps filter name to valid object(s) that satisfy that filter
         """
         # Iterate over all objects and add to dictionary if valid
-        individual_obj_dict = defaultdict(list)
-        group_obj_dict = defaultdict(list)
+        filters = cls.candidate_filters
+        obj_dict = {filter_name: [] for filter_name in filters.keys()}
 
         # Only compile candidates if all active system requirements are met
         if np.all([is_system_active(system_name=name) for name in cls.required_systems]):
-            individual_filters, group_filters = cls.individual_filters, cls.group_filters
             for obj in objects:
-                for fname, f in individual_filters.items():
+                for fname, f in filters.items():
                     if f(obj):
-                        individual_obj_dict[fname].append(obj)
-                for fname, f in group_filters.items():
-                    if f(obj):
-                        group_obj_dict[fname].append(obj)
+                        obj_dict[fname].append(obj)
 
-        return individual_obj_dict, group_obj_dict
+        return obj_dict
 
     @classmethod
-    def refresh(self):
+    def refresh(cls, object_candidates):
         """
-        Refresh any internal state for this rule
+        Refresh any internal state for this rule, given set of input object candidates @object_candidates
+
+        Args:
+            object_candidates (dict): Maps filter name to valid object(s) that satisfy that filter
         """
-        # No-op by default
-        pass
+        # Store candidates
+        cls.candidates = object_candidates
+
+        # Refresh all conditions
+        for condition in cls.conditions:
+            condition.refresh(object_candidates=object_candidates)
+
 
     @classmethod
-    def transition(cls, individual_objects, group_objects):
+    def transition(cls, object_candidates):
         """
         Rule to apply for each set of objects satisfying the condition.
 
         Args:
-            individual_objects (dict): Dictionary mapping corresponding keys from @individual_filters to individual
-                object instances where the filter is satisfied. Note: if @self.individual_filters is None or no values
-                satisfy the filter, then this will be an empty dictionary
-            group_objects (dict): Dictionary mapping corresponding keys from @group_filters to a list of individual
-                object instances where the filter is satisfied. Note: if @self.group_filters is None or no values
-                satisfy the filter, then this will be an empty dictionary
+            object_candidates (dict): Dictionary mapping corresponding keys from @cls.filters to list of individual
+                object instances where the filter is satisfied
 
         Returns:
             TransitionResults: results from the executed transition
         """
         raise NotImplementedError()
+
+    @classmethod
+    def step(cls):
+        """
+        Takes a step for this transition rule, checking if all of @cls.conditions are satisified, and if so, taking
+        a transition via @cls.transition()
+
+        Returns:
+            None or TransitionResults: If a transition occurs, returns its results, otherwise, returns None
+        """
+        # Copy the candidates dictionary since it may be mutated in place by @conditions
+        object_candidates = {filter_name: candidates.copy() for filter_name, candidates in cls.candidates.items()}
+        for condition in conditions:
+            if not condition(object_candidates=object_candidates):
+                # Condition was not met, so immediately terminate
+                return
+
+        # All conditions are met, take the transition
+        return cls.transition(object_candidates=object_candidates)
 
     @classproperty
     def _do_not_register_classes(cls):
@@ -700,74 +653,73 @@ class SlicingRule(BaseTransitionRule):
     Transition rule to apply to sliced / slicer object pairs.
     """
     @classproperty
-    def individual_filters(cls):
+    def candidate_filters(cls):
         # TODO: Remove hacky filter once half category is updated properly
-        return {"sliceable": AndFilter(filters=[AbilityFilter("sliceable"), NotFilter(NameFilter(name="half"))])}
+        return {
+            "sliceable": AndFilter(filters=[AbilityFilter("sliceable"), NotFilter(NameFilter(name="half"))]),
+            "slicer": AbilityFilter("slicer"),
+        }
 
-    @classproperty
-    def group_filters(cls):
-        return {"slicer": AbilityFilter("slicer")}
-
-    @classproperty
-    def conditions(cls):
+    @classmethod
+    def _generate_conditions(cls):
         # sliceables should be touching any slicer
         return [TouchingAnyCondition(filter_1_name="sliceable", filter_2_name="slicer")]
 
     @classmethod
-    def transition(cls, individual_objects, group_objects):
-        sliceable_obj = individual_objects["sliceable"]
-        # Object parts offset annotation are w.r.t the base link of the whole object.
-        pos, orn = sliceable_obj.get_position_orientation()
-
+    def transition(cls, object_candidates):
         t_results = TransitionResults()
+        for sliceable_obj in object_candidates["sliceable"]:
+            # Object parts offset annotation are w.r.t the base link of the whole object.
+            pos, orn = sliceable_obj.get_position_orientation()
 
-        # Load object parts.
-        if sliceable_obj.bddl_object_scope is not None:
-            sliced_obj_id = int(sliceable_obj.bddl_object_scope.split("_")[-1])
-            sliced_obj_scope_prefix = "_".join(sliceable_obj.bddl_object_scope.split("_")[:-1])
-        for i, part in enumerate(sliceable_obj.metadata["object_parts"].values()):
-            # List of dicts gets replaced by {'0':dict, '1':dict, ...}
+            # Load object parts.
+            if sliceable_obj.bddl_object_scope is not None:
+                sliced_obj_id = int(sliceable_obj.bddl_object_scope.split("_")[-1])
+                sliced_obj_scope_prefix = "_".join(sliceable_obj.bddl_object_scope.split("_")[:-1])
+            for i, part in enumerate(sliceable_obj.metadata["object_parts"].values()):
+                # List of dicts gets replaced by {'0':dict, '1':dict, ...}
 
-            # Get bounding box info
-            part_bb_pos = np.array(part["bb_pos"])
-            part_bb_orn = np.array(part["bb_orn"])
+                # Get bounding box info
+                part_bb_pos = np.array(part["bb_pos"])
+                part_bb_orn = np.array(part["bb_orn"])
 
-            # Determine the relative scale to apply to the object part from the original object
-            # Note that proper (rotated) scaling can only be applied when the relative orientation of
-            # the object part is a multiple of 90 degrees wrt the parent object, so we assert that here
-            # Check by making sure the quaternion is some permutation of +/- (1, 0, 0, 0),
-            # +/- (0.707, 0.707, 0, 0), or +/- (0.5, 0.5, 0.5, 0.5)
-            # Because orientations are all normalized (same L2-norm), every orientation should have a unique L1-norm
-            # So we check the L1-norm of the absolute value of the orientation as a proxy for verifying these values
-            assert np.any(np.isclose(np.abs(part_bb_orn).sum(), np.array([1.0, 1.414, 2.0]), atol=1e-3)), \
-                "Sliceable objects should only have relative object part orientations that are factors of 90 degrees!"
+                # Determine the relative scale to apply to the object part from the original object
+                # Note that proper (rotated) scaling can only be applied when the relative orientation of
+                # the object part is a multiple of 90 degrees wrt the parent object, so we assert that here
+                # Check by making sure the quaternion is some permutation of +/- (1, 0, 0, 0),
+                # +/- (0.707, 0.707, 0, 0), or +/- (0.5, 0.5, 0.5, 0.5)
+                # Because orientations are all normalized (same L2-norm), every orientation should have a unique L1-norm
+                # So we check the L1-norm of the absolute value of the orientation as a proxy for verifying these values
+                assert np.any(np.isclose(np.abs(part_bb_orn).sum(), np.array([1.0, 1.414, 2.0]), atol=1e-3)), \
+                    "Sliceable objects should only have relative object part orientations that are factors of 90 degrees!"
 
-            # Scale the offset accordingly.
-            scale = np.abs(T.quat2mat(part_bb_orn) @ sliceable_obj.scale)
+                # Scale the offset accordingly.
+                scale = np.abs(T.quat2mat(part_bb_orn) @ sliceable_obj.scale)
 
-            # Calculate global part bounding box pose.
-            part_bb_pos = pos + T.quat2mat(orn) @ (part_bb_pos * scale)
-            part_bb_orn = T.quat_multiply(orn, part_bb_orn)
-            part_obj_name = f"half_{sliceable_obj.name}_{i}"
-            part_obj = DatasetObject(
-                prim_path=f"/World/{part_obj_name}",
-                name=part_obj_name,
-                category=part["category"],
-                model=part["model"],
-                bounding_box=part["bb_size"] * scale,   # equiv. to scale=(part["bb_size"] / self.native_bbox) * (scale)
-                bddl_object_scope=None if sliceable_obj.bddl_object_scope is None else f"half_{sliced_obj_scope_prefix}_{2 * sliced_obj_id - i}",
-            )
+                # Calculate global part bounding box pose.
+                part_bb_pos = pos + T.quat2mat(orn) @ (part_bb_pos * scale)
+                part_bb_orn = T.quat_multiply(orn, part_bb_orn)
+                part_obj_name = f"half_{sliceable_obj.name}_{i}"
+                part_obj = DatasetObject(
+                    prim_path=f"/World/{part_obj_name}",
+                    name=part_obj_name,
+                    category=part["category"],
+                    model=part["model"],
+                    bounding_box=part["bb_size"] * scale,   # equiv. to scale=(part["bb_size"] / self.native_bbox) * (scale)
+                    bddl_object_scope=None if sliceable_obj.bddl_object_scope is None
+                        else f"half_{sliced_obj_scope_prefix}_{2 * sliced_obj_id - i}",
+                )
 
-            # Add the new object to the results.
-            new_obj_attrs = ObjectAttrs(
-                obj=part_obj,
-                bb_pos=part_bb_pos,
-                bb_orn=part_bb_orn,
-            )
-            t_results.add.append(new_obj_attrs)
+                # Add the new object to the results.
+                new_obj_attrs = ObjectAttrs(
+                    obj=part_obj,
+                    bb_pos=part_bb_pos,
+                    bb_orn=part_bb_orn,
+                )
+                t_results.add.append(new_obj_attrs)
 
-        # Delete original object from stage.
-        t_results.remove.append(sliceable_obj)
+            # Delete original object from stage.
+            t_results.remove.append(sliceable_obj)
 
         return t_results
 
@@ -777,28 +729,27 @@ class DicingRule(BaseTransitionRule):
     Transition rule to apply to diceable / slicer object pairs.
     """
     @classproperty
-    def individual_filters(cls):
-        return {"diceable": AbilityFilter("diceable")}
+    def candidate_filters(cls):
+        return {
+            "diceable": AbilityFilter("diceable"),
+            "slicer": AbilityFilter("slicer"),
+        }
 
-    @classproperty
-    def group_filters(cls):
-        return {"slicer": AbilityFilter("slicer")}
-
-    @classproperty
-    def conditions(cls):
+    @classmethod
+    def _generate_conditions(cls):
         # sliceables should be touching any slicer
         return [TouchingAnyCondition(filter_1_name="diceable", filter_2_name="slicer")]
 
     @classmethod
-    def transition(cls, individual_objects, group_objects):
+    def transition(cls, object_candidates):
         t_results = TransitionResults()
 
-        diceable_obj = individual_objects["diceable"]
-        system = get_system(f"diced_{diceable_obj.category}")
-        system.generate_particles_from_link(diceable_obj, diceable_obj.root_link, use_visual_meshes=False)
+        for diceable_obj in object_candidates["diceable"]:
+            system = get_system(f"diced_{diceable_obj.category}")
+            system.generate_particles_from_link(diceable_obj, diceable_obj.root_link, use_visual_meshes=False)
 
-        # Delete original object from stage.
-        t_results.remove.append(diceable_obj)
+            # Delete original object from stage.
+            t_results.remove.append(diceable_obj)
 
         return t_results
 
@@ -808,19 +759,19 @@ class CookingPhysicalParticleRule(BaseTransitionRule):
     Transition rule to apply to "cook" physicl particles
     """
     @classproperty
-    def group_filters(cls):
+    def candidate_filters(cls):
         # We want to track all possible fillable heatable objects
         return {"fillable": AndFilter(filters=(AbilityFilter("fillable"), AbilityFilter("heatable")))}
 
-    @classproperty
-    def conditions(cls):
+    @classmethod
+    def _generate_conditions(cls):
         # Only heated objects are valid
         return [StateCondition(filter_name="fillable", state=Heated, val=True, op=operator.eq)]
 
     @classmethod
-    def transition(cls, individual_objects, group_objects):
+    def transition(cls, object_candidates):
         t_results = TransitionResults()
-        fillable_objs = group_objects["fillable"]
+        fillable_objs = object_candidates["fillable"]
 
         # Iterate over all active physical particle systems, and for any non-cooked particles inside,
         # convert into cooked particles
@@ -855,26 +806,26 @@ class MeltingRule(BaseTransitionRule):
     Transition rule to apply to meltable objects to simulate melting
     """
     @classproperty
-    def individual_filters(cls):
+    def candidate_filters(cls):
         # We want to find all meltable objects
         return {"meltable": AbilityFilter("meltable")}
 
-    @classproperty
-    def conditions(cls):
+    @classmethod
+    def _generate_conditions(cls):
         # Only heated objects are valid
         return [StateCondition(filter_name="meltable", state=Temperature, val=m.MELTING_TEMPERATURE, op=operator.ge)]
 
     @classmethod
-    def transition(cls, individual_objects, group_objects):
+    def transition(cls, object_candidates):
         t_results = TransitionResults()
 
         # Convert the meltable object into its melted substance
-        meltable_obj = individual_objects["meltable"]
-        system = get_system(f"melted_{meltable_obj.category}")
-        system.generate_particles_from_link(meltable_obj, meltable_obj.root_link, use_visual_meshes=False)
+        for meltable_obj in object_candidates["meltable"]:
+            system = get_system(f"melted_{meltable_obj.category}")
+            system.generate_particles_from_link(meltable_obj, meltable_obj.root_link, use_visual_meshes=False)
 
-        # Delete original object from stage.
-        t_results.remove.append(meltable_obj)
+            # Delete original object from stage.
+            t_results.remove.append(meltable_obj)
 
         return t_results
 
@@ -887,7 +838,7 @@ class MixingRule(BaseTransitionRule):
     # NOTE: By defining this class variable directly here, all subclasses SHARE this same dictionary!
     # This is intentional because there may be multiple valid mixing methods,
     # and all of them should share the same global recipe pool
-    _RECIPES = dict()
+    _RECIPES = None
 
     # Maps active recipe name to recipe information
     _ACTIVE_RECIPES = None
@@ -897,6 +848,13 @@ class MixingRule(BaseTransitionRule):
 
     # Flattened array of all simulator objects, sorted by category
     _OBJECTS = None
+
+    def __init_subclass__(cls, **kwargs):
+        # Run super first
+        super().__init_subclass__(**kwargs)
+
+        # Initialize recipes
+        cls._RECIPES = dict()
 
     @classmethod
     def add_recipe(cls, name, input_objects, input_systems, output_system):
@@ -1052,19 +1010,19 @@ class MixingRule(BaseTransitionRule):
         cls._OBJECTS = np.array(cls._OBJECTS)
 
     @classproperty
-    def group_filters(cls):
+    def candidate_filters(cls):
         # Fillable object required
         return {"container": AbilityFilter(ability="fillable")}
 
     @classmethod
-    def transition(cls, individual_objects, group_objects):
+    def transition(cls, object_candidates):
         t_results = TransitionResults()
 
         # Compute all relevant object AABB positions
         obj_positions = np.array([obj.aabb_center for obj in cls._OBJECTS])
 
         # Iterate over all fillable objects, to execute recipes for each one
-        for container in individual_objects["container"]:
+        for container in object_candidates["container"]:
             # Compute in volume for all relevant object positions
             contained_particles_state = container.states[ContainedParticles]
             in_volume = contained_particles_state.check_in_volume(obj_positions)
@@ -1149,38 +1107,37 @@ class BlenderRule(MixingRule):
     the recipe event
     """
     @classproperty
-    def group_filters(cls):
+    def candidate_filters(cls):
         # Modify the container filter to include "blender" ability as well
-        group_filters = super().group_filters
-        group_filters["container"] = AndFilter(filters=[group_filters["container"], AbilityFilter(ability="blender")])
+        candidate_filters = super().candidate_filters
+        candidate_filters["container"] = AndFilter(filters=[candidate_filters["container"], AbilityFilter(ability="blender")])
         return group_filters
 
-    @classproperty
-    def conditions(cls):
+    @classmethod
+    def _generate_conditions(cls):
         # Container must be toggledOn, and should only be triggered once
         return [ChangeConditionWrapper(
             condition=StateCondition(filter_name="container", state=ToggledOn, val=True, op=operator.eq)
         )]
 
 
-class MixingWandRule(MixingRule):
+class MixingToolRule(MixingRule):
     """
-    Transition mixing rule that leverages "mixing_wand" ability objects, which require touching between a mixing wand
+    Transition mixing rule that leverages "mixing_tool" ability objects, which require touching between a mixing tool
     and a container in order to trigger the recipe event
     """
-
     @classproperty
-    def group_filters(cls):
-        # Add mixing wand group filter as well
-        group_filters = super().group_filters
-        group_filters["mixing_wand"] = AbilityFilter(ability="mixing_wand")
+    def candidate_filters(cls):
+        # Add mixing tool filter as well
+        candidate_filters = super().candidate_filters
+        candidate_filters["mixing_tool"] = AbilityFilter(ability="mixing_tool")
         return group_filters
 
-    @classproperty
-    def conditions(cls):
-        # Mixing wand must be touching the container, and should only be triggered once
+    @classmethod
+    def _generate_conditions(cls):
+        # Mixing tool must be touching the container, and should only be triggered once
         return [ChangeConditionWrapper(
-            condition=TouchingAnyCondition(filter_1_name="container", filter_2_name="mixing_wand")
+            condition=TouchingAnyCondition(filter_1_name="container", filter_2_name="mixing_tool")
         )]
 
 
