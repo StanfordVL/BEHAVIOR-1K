@@ -101,6 +101,8 @@ PRIMITIVE_MESH_TYPES = {
 # Valid geom types
 GEOM_TYPES = {"Sphere", "Cube", "Capsule", "Cone", "Cylinder", "Mesh"}
 
+# Valid joint axis
+JointAxis = ["X", "Y", "Z"]
 
 # TODO: Clean up this class to be better enum with sanity checks
 # Joint types

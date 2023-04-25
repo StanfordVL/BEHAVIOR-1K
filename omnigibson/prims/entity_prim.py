@@ -12,11 +12,13 @@ from omni.isaac.core.utils.prims import get_prim_property, set_prim_property, \
     get_prim_parent, get_prim_at_path
 
 import omnigibson as og
+import omnigibson.utils.transform_utils as T
+
 from omnigibson.prims.cloth_prim import ClothPrim
 from omnigibson.prims.joint_prim import JointPrim
 from omnigibson.prims.rigid_prim import RigidPrim
 from omnigibson.prims.xform_prim import XFormPrim
-from omnigibson.utils.constants import PrimType, GEOM_TYPES
+from omnigibson.utils.constants import PrimType, GEOM_TYPES, JointType, JointAxis
 from omnigibson.utils.ui_utils import suppress_omni_log
 from omnigibson.macros import gm
 
@@ -242,6 +244,55 @@ class EntityPrim(XFormPrim):
 
         # Store values internally
         self._n_dof = n_dof
+        self._update_joint_limits()
+
+    def _update_joint_limits(self):
+        """
+        Helper function to update internal joint limits for prismatic joints based on the object's scale
+        """
+        # If the scale is [1, 1, 1], we can skip this step
+        if np.allclose(self.scale, np.ones(3)):
+            return
+
+        prismatic_joints = {j_name: j for j_name, j in self._joints.items() if j.joint_type == JointType.JOINT_PRISMATIC}
+
+        # If there are no prismatic joints, we can skip this step
+        if len(prismatic_joints) == 0:
+            return
+
+        uniform_scale = np.allclose(self.scale, self.scale[0])
+
+        for joint_name, joint in prismatic_joints.items():
+            if uniform_scale:
+                scale_along_axis = self.scale[0]
+            else:
+                assert not self.initialized, \
+                    "Cannot update joint limits for a non-uniformly scaled object when already initialized."
+                for link_name, link in self.links.items():
+                    if joint.parent_name == link_name:
+                        # Find the parent link frame orientation in the object frame
+                        _, link_local_orn = link.get_local_pose()
+
+                        # Find the joint frame orientation in the parent link frame
+                        joint_local_orn = gf_quat_to_np_array(joint.get_attribute("physics:localRot0"))[[1, 2, 3, 0]]
+
+                        # Compute the joint frame orientation in the object frame
+                        joint_orn = T.quat_multiply(quaternion1=joint_local_orn, quaternion0=link_local_orn)
+
+                        assert T.check_quat_right_angle(joint_orn), "Objects that are NOT uniformly scaled requires all joints to have orientations that are factors of 90 degrees!"
+
+                        # Find the joint axis unit vector (e.g. [1, 0, 0] for "X", [0, 1, 0] for "Y", etc.)
+                        axis_in_joint_frame = np.zeros(3)
+                        axis_in_joint_frame[JointAxis.index(joint.axis)] = 1.0
+
+                        # Compute the joint axis unit vector in the object frame
+                        axis_in_obj_frame = T.quat2mat(joint_orn) @ axis_in_joint_frame
+
+                        # Find the correct scale along the joint axis direction
+                        scale_along_axis = self.scale[np.argmax(np.abs(axis_in_obj_frame))]
+
+            joint.lower_limit = joint.lower_limit * scale_along_axis
+            joint.upper_limit = joint.upper_limit * scale_along_axis
 
     @property
     def prim_type(self):
