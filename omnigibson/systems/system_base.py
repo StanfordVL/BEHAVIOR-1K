@@ -126,5 +126,5 @@ def get_system(system_name):
         # Import now to avoid circular imports
         from omnigibson.transition_rules import TransitionRuleAPI, RULES_REGISTRY
         system_rules = RULES_REGISTRY("required_systems", system.name, default_val=[])
-        TransitionRuleAPI.refresh_rules(rules=system_rules, objects=og.sim.scene.objects)
+        TransitionRuleAPI.refresh_rules(rules=system_rules)
     return system

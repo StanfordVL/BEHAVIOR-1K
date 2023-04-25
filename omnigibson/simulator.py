@@ -371,7 +371,7 @@ class Simulator(SimulationContext, Serializable):
         RigidContactAPI.initialize_view()
 
         # Refresh all current rules
-        TransitionRuleAPI.prune_active_rules(objects=self.scene.objects)
+        TransitionRuleAPI.prune_active_rules()
 
     def _reset_variables(self):
         """
@@ -412,7 +412,7 @@ class Simulator(SimulationContext, Serializable):
                 RigidContactAPI.initialize_view()
 
                 # Also refresh the transition rules that are currently active
-                TransitionRuleAPI.refresh_all_rules(objects=self.scene.objects)
+                TransitionRuleAPI.refresh_all_rules()
 
             # Propagate states if the feature is enabled
             if gm.ENABLE_OBJECT_STATES:
