@@ -654,6 +654,23 @@ class PhysicalParticleSystem(MicroParticleSystem):
         pass
 
     @classmethod
+    def check_in_contact(cls, positions):
+        """
+        Checks whether each particle specified by @particle_positions are in contact with any rigid body.
+
+        Args:
+            positions (np.array): (n_particles, 3) shaped array specifying per-particle (x,y,z) positions
+
+        Returns:
+            n-array: (n_particles,) boolean array, True if in contact, otherwise False
+        """
+        in_contact = np.zeros(len(positions), dtype=bool)
+        for idx, pos in enumerate(positions):
+            in_contact[idx] = og.sim.psqi.overlap_sphere_any(system.particle_contact_offset, pos)
+        return in_contact
+
+
+    @classmethod
     def generate_particles(
             cls,
             positions,
@@ -672,8 +689,7 @@ class PhysicalParticleSystem(MicroParticleSystem):
         NOTE:
 
         Args:
-            positions (np.array): (n_particles, 3) shaped array specifying per-particle (x,y,z) positions.
-                If not specified, will be set to the origin by default
+            positions (np.array): (n_particles, 3) shaped array specifying per-particle (x,y,z) positions
             instancer_idn (None or int): Unique identification number of the particle instancer to assign the generated
                 particles to. This is used to deterministically reproduce individual particle instancer states
                 dynamically, even if we delete / add additional ones at runtime during simulation. If there is no
@@ -822,7 +838,8 @@ class PhysicalParticleSystem(MicroParticleSystem):
     ):
         """
         Generates a new particle instancer with unique identification number @idn, with particles sampled from the mesh
-        located at @mesh_prim_path, and registers it internally
+        located at @mesh_prim_path, and registers it internally. This will also check for collision with other rigid
+        objects before spawning in individual particles
 
         Args:
             obj (EntityPrim): Object whose @link's visual meshes will be converted into sampled particles
@@ -886,6 +903,10 @@ class PhysicalParticleSystem(MicroParticleSystem):
         particle_positions = np.stack([arr.flatten() for arr in np.meshgrid(*arrs)]).T
         # Check which points are inside the volume and only keep those
         particle_positions = particle_positions[np.where(check_in_volume(particle_positions))[0]]
+
+        # Also prune any that in contact with anything
+        particle_positions = particle_positions[np.where(cls.check_in_contact(particle_positions))[0]]
+
         # Also potentially sub-sample if we're past our limit
         if len(particle_positions) > max_samples:
             particle_positions = particle_positions[
