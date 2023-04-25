@@ -81,7 +81,7 @@ class TransitionRuleAPI:
     @classmethod
     def prune_active_rules(cls, objects):
         """
-        Prunes the active transition rules, removing any whose filter requirements are not satisifed by object set
+        Prunes the active transition rules, removing any whose filter requirements are not satisfied by object set
         @objects. Useful when the current object set changes, e.g.: an object is removed from the simulator
 
         Args:
@@ -333,6 +333,14 @@ class RuleCondition:
         # Default is False
         return False
 
+    @classproperty
+    def modifies_filter_names(self):
+        """
+        Returns:
+            set: Filter name(s) whose values may be modified in-place by this condition
+        """
+        raise NotImplementedError
+
 
 class TouchingAnyCondition(RuleCondition):
     """
@@ -379,6 +387,11 @@ class TouchingAnyCondition(RuleCondition):
         # If objs is empty, return False, otherwise, True
         return len(objs) > 0
 
+    @classproperty
+    def modifies_filter_names(self):
+        # Only modifies values from filter 1
+        return set((self._filter_1_name,))
+
 
 class StateCondition(RuleCondition):
     """
@@ -415,37 +428,53 @@ class StateCondition(RuleCondition):
         # Condition met if any object meets the condition
         return len(object_candidates[self._filter_name]) > 0
 
+    @classproperty
+    def modifies_filter_names(self):
+        return set((self._filter_name,))
 
-class ChangeCondition(RuleCondition):
+
+class ChangeConditionWrapper(RuleCondition):
     """
-    Rule condition that checks all objects from @filter_name whether the sum of the prior conditions has changed
-    from the previous timestep
+    Rule condition wrapper that checks whether the output from @condition
     """
     def __init__(
             self,
-            filter_name,
+            condition,
     ):
         """
         Args:
-            filter_name (str): Name of the filter whose object candidates will be pruned based on whether or not any
-                prior conditions have changed or not
+            condition (RuleCondition): Condition whose output will be additionally filtered whether or not its relevant
+                values have changed since the previous time this condition was called
         """
-        self._filter_name = filter_name
+        self._condition = condition
         self._last_valid_candidates = None
 
     def refresh(self, object_candidates):
-        # Initialize last valid candidates
-        self._last_valid_candidates = set(object_candidates[self._filter_name])
+        # Refresh nested condition
+        self._condition.refresh(object_candidates=object_candidates)
+
+        # Clear last valid candidates
+        self._last_valid_candidates = {filter_name: set() for filter_name in self.modifies_filter_names}
 
     def __call__(self, object_candidates):
-        # Iterate over all current candidates -- if there's a mismatch in last valid candidates and current, then
-        # we store it, otherwise, we don't
-        objs = [obj for obj in object_candidates[self._filter_name] if obj not in self._last_valid_candidates]
-        object_candidates[self._filter_name] = objs
-        self._last_valid_candidates = set(objs)
+        # Call wrapped method first
+        valid = self._condition(object_candidates=object_candidates)
 
-        # Valid if any object conditions have changed
-        return len(objs) > 0
+        # Iterate over all current candidates -- if there's a mismatch in last valid candidates and current,
+        # then we store it, otherwise, we don't
+        for filter_name in self.modifies_filter_names:
+            objs = [obj for obj in object_candidates[filter_name] if obj not in self._last_valid_candidates]
+            object_candidates[self._filter_name] = objs
+            self._last_valid_candidates[filter_name] = set(objs)
+            valid = valid and len(objs) > 0
+
+        # Valid if any object conditions have changed and we still have valid objects
+        return valid
+
+    @classproperty
+    def modifies_filter_names(self):
+        # Return super method
+        return self._condition.modifies_filter_names
 
 
 class OrCondition(RuleCondition):
@@ -1129,10 +1158,9 @@ class BlenderRule(MixingRule):
     @classproperty
     def conditions(cls):
         # Container must be toggledOn, and should only be triggered once
-        return [
-            StateCondition(filter_name="container", state=ToggledOn, val=True, op=operator.eq),
-            ChangeCondition(filter_name="container"),
-        ]
+        return [ChangeConditionWrapper(
+            condition=StateCondition(filter_name="container", state=ToggledOn, val=True, op=operator.eq)
+        )]
 
 
 class MixingWandRule(MixingRule):
@@ -1151,10 +1179,9 @@ class MixingWandRule(MixingRule):
     @classproperty
     def conditions(cls):
         # Mixing wand must be touching the container, and should only be triggered once
-        return [
-            TouchingAnyCondition(filter_1_name="container", filter_2_name="mixing_wand"),
-            ChangeCondition(filter_name="container"),
-        ]
+        return [ChangeConditionWrapper(
+            condition=TouchingAnyCondition(filter_1_name="container", filter_2_name="mixing_wand")
+        )]
 
 
 # Create strawberry smoothie blender rule
