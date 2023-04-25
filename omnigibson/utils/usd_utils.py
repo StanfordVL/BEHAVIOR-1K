@@ -300,7 +300,6 @@ class RigidContactAPI:
         # Generate the contact matrix if it doesn't already exist
         if cls._CONTACT_MATRIX is None:
             cls._CONTACT_MATRIX = cls._CONTACT_VIEW.get_contact_force_matrix(dt=1.0)
-            cls._CONTACT_CACHE = dict()
 
         return cls._CONTACT_MATRIX
 
@@ -341,16 +340,10 @@ class RigidContactAPI:
         """
         # Check if the contact tuple already exists in the cache; if so, return the value
         key = (tuple(prim_paths_a), tuple(prim_paths_b))
-        in_contact = None if cls._CONTACT_CACHE is None else cls._CONTACT_CACHE.get(key, None)
-        if in_contact is not None:
-            return in_contact
-
-        # In contact if any of the matrix values representing the interaction between the two groups is non-zero
-        in_contact = np.any(cls.get_impulses(prim_paths_a=prim_paths_a, prim_paths_b=prim_paths_b))
-
-        cls._CONTACT_CACHE[key] = in_contact
-
-        return in_contact
+        if key not in cls._CONTACT_CACHE:
+            # In contact if any of the matrix values representing the interaction between the two groups is non-zero
+            cls._CONTACT_CACHE[key] = np.any(cls.get_impulses(prim_paths_a=prim_paths_a, prim_paths_b=prim_paths_b))
+        return cls._CONTACT_CACHE[key]
 
     @classmethod
     def clear(cls):
@@ -358,7 +351,7 @@ class RigidContactAPI:
         Clears the internal contact matrix and cache
         """
         cls._CONTACT_MATRIX = None
-        cls._CONTACT_CACHE = None
+        cls._CONTACT_CACHE = dict()
 
 
 class CollisionAPI:
