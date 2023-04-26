@@ -352,7 +352,7 @@ class TouchingAnyCondition(RuleCondition):
     @classproperty
     def modifies_filter_names(self):
         # Only modifies values from filter 1
-        return set((self._filter_1_name,))
+        return {self._filter_1_name}
 
 
 class StateCondition(RuleCondition):
@@ -392,7 +392,7 @@ class StateCondition(RuleCondition):
 
     @classproperty
     def modifies_filter_names(self):
-        return set((self._filter_name,))
+        return {self._filter_name}
 
 
 class ChangeConditionWrapper(RuleCondition):
