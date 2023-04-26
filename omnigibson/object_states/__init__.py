@@ -28,5 +28,5 @@ from omnigibson.object_states.toggle import ToggledOn
 from omnigibson.object_states.touching import Touching
 from omnigibson.object_states.under import Under
 from omnigibson.object_states.filled import Filled
-from omnigibson.object_states.folded import Folded
-from omnigibson.object_states.unfolded import Unfolded
+from omnigibson.object_states.folded import Folded, Unfolded, FoldedLevel
+from omnigibson.object_states.draped import Draped

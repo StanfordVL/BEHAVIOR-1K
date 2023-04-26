@@ -867,6 +867,34 @@ def test_open():
     assert not microwave.states[Open].get_value()
     assert not bottom_cabinet.states[Open].get_value()
 
+@og_test
+def test_draped():
+    from IPython import embed
+    print("test")
+    embed()
+    breakfast_table = og.sim.scene.object_registry("name", "breakfast_table")
+    carpet = og.sim.scene.object_registry("name", "carpet")
+
+    breakfast_table.set_position([0., 0., 0.53])
+    carpet.set_position([0.0, 0., 0.67])
+
+    for _ in range(5):
+        og.sim.step()
+
+    assert carpet.states[Draped].get_value(breakfast_table)
+
+    carpet.set_position([20., 20., 1.])
+
+    for _ in range(5):
+        og.sim.step()
+
+    assert not carpet.states[Draped].get_value(breakfast_table)
+
+    assert carpet.states[Draped].set_value(breakfast_table, True)
+
+    with pytest.raises(NotImplementedError):
+        carpet.states[Draped].set_value(breakfast_table, False)
+
 
 def test_clear_sim():
     og.sim.clear()

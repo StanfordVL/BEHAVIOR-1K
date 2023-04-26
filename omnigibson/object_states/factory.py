@@ -39,6 +39,8 @@ _ALL_STATES = frozenset(
         Filled,
         Folded,
         Unfolded,
+        FoldedLevel,
+        Draped,
     ]
 )
 
@@ -62,8 +64,7 @@ _ABILITY_TO_STATE_MAPPING = {
     "slicer": [Slicer],
     "toggleable": [ToggledOn],
     "fillable": [Filled],
-    "foldable": [Folded],
-    "unfoldable": [Unfolded],
+    "cloth": [Folded, Unfolded, Overlaid, Draped],
 }
 
 _DEFAULT_STATE_SET = frozenset(
@@ -71,7 +72,6 @@ _DEFAULT_STATE_SET = frozenset(
         Inside,
         NextTo,
         OnTop,
-        Overlaid,
         Touching,
         Under,
         Covered,

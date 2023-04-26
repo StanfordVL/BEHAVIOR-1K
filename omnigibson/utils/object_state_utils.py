@@ -252,97 +252,79 @@ def sample_kinematics(
     return success
 
 
-# Folded / Unfolded related utils
-m.DEBUG_CLOTH_PROJ_VIS = False
-# Angle threshold for checking smoothness of the cloth; surface normals need to be close enough to the z-axis
-m.NORMAL_Z_ANGLE_DIFF = np.deg2rad(45.0)
-
-
-def calculate_projection_area_and_diagonal_maximum(obj):
+def sample_cloth_on_rigid(obj, other, max_trials=10, z_offset=0.05, randomize_xy=True):
     """
-    Calculate the maximum projection area and the diagonal length along different axes
+    Samples the cloth object @obj on the rigid object @other
 
     Args:
-        obj (DatasetObject): Must be PrimType.CLOTH
+        obj (StatefulObject): Object whose state should be sampled. e.g.: for sampling a bed sheet on a rack,
+            @obj is the bed sheet
+        other (StatefulObject): Object who is the reference point for @obj's state. e.g.: for sampling a bed sheet
+            on a rack, @other is the rack
+        max_trials (int): Number of attempts for sampling
+        z_offset (float): Z-offset to apply to the sampled pose
 
     Returns:
-        area_max (float): area of the convex hull of the projected points
-        diagonal_max (float): diagonal of the convex hull of the projected points
+        bool: True if successfully sampled, else False
     """
-    # use the largest projection area as the unfolded area
-    area_max = 0.0
-    diagonal_max = 0.0
-    dims_list = [[0, 1], [0, 2], [1, 2]]  # x-y plane, x-z plane, y-z plane
+    assert z_offset > 0.5 * 9.81 * (og.sim.get_physics_dt() ** 2) + 0.02,\
+        f"z_offset {z_offset} is too small for the current physics_dt {og.sim.get_physics_dt()}"
 
-    for dims in dims_list:
-        area, diagonal = calculate_projection_area_and_diagonal(obj, dims)
-        if area > area_max:
-            area_max = area
-            diagonal_max = diagonal
+    if not (obj.prim_type == PrimType.CLOTH and other.prim_type == PrimType.RIGID):
+        raise ValueError("sample_cloth_on_rigid requires obj1 is cloth and obj2 is rigid.")
 
-    return area_max, diagonal_max
+    state = og.sim.dump_state(serialized=False)
 
+    # Reset the cloth
+    obj.root_link.reset()
 
-def calculate_projection_area_and_diagonal(obj, dims):
-    """
-    Calculate the projection area and the diagonal length when projecting to the plane defined by the input dims
-    E.g. if dims is [0, 1], the points will be projected onto the x-y plane.
+    obj_aabb_low, obj_aabb_high = obj.states[AABB].get_value()
+    other_aabb_low, other_aabb_high = other.states[AABB].get_value()
 
-    Args:
-        obj (DatasetObject): Must be PrimType.CLOTH
-        dims (2-array): Global axes to project area onto. Options are {0, 1, 2}.
-            E.g. if dims is [0, 1], project onto the x-y plane.
+    # z value is always the same: the top-z of the other object + half the height of the object to be placed + offset
+    z_value = other_aabb_high[2] + (obj_aabb_high[2] - obj_aabb_low[2]) / 2.0 + z_offset
 
-    Returns:
-        area (float): area of the convex hull of the projected points
-        diagonal (float): diagonal of the convex hull of the projected points
-    """
-    cloth = obj.links["base_link"]
-    points = cloth.keypoint_particle_positions[:, dims]
-    hull = ConvexHull(points)
+    if randomize_xy:
+        low = np.array([other_aabb_low[0], other_aabb_low[1], z_value])
+        high = np.array([other_aabb_high[0], other_aabb_high[1], z_value])
+    else:
+        low = np.array([(other_aabb_low[0] + other_aabb_high[0]) / 2.0,
+                        (other_aabb_low[1] + other_aabb_high[1]) / 2.0,
+                        z_value])
+        high = low
 
-    # When input points are 2-dimensional, this is the area of the convex hull.
-    # Ref: https://docs.scipy.org/doc/scipy/reference/generated/scipy.spatial.ConvexHull.html
-    area = hull.volume
-    diagonal = distance_matrix(points[hull.vertices], points[hull.vertices]).max()
+    for _ in range(max_trials):
+        # Sample a random position
+        pos = np.random.uniform(low, high)
+        # Sample a random orientation in the z-axis
+        orn = T.euler2quat(np.array([0., 0., np.random.uniform(0, np.pi * 2)]))
 
-    if m.DEBUG_CLOTH_PROJ_VIS:
-        import matplotlib.pyplot as plt
-        ax = plt.gca()
-        ax.set_aspect('equal')
+        obj.set_position_orientation(pos, orn)
+        obj.root_link.reset()
+        obj.keep_still()
 
-        plt.plot(points[:, dims[0]], points[:, dims[1]], 'o')
-        for simplex in hull.simplices:
-            plt.plot(points[simplex, dims[0]], points[simplex, dims[1]], 'k-')
-        plt.plot(points[hull.vertices, dims[0]], points[hull.vertices, dims[1]], 'r--', lw=2)
-        plt.plot(points[hull.vertices[0], dims[0]], points[hull.vertices[0], dims[1]], 'ro')
-        plt.show()
+        og.sim.step_physics()
+        success = len(obj.states[ContactBodies].get_value()) == 0
 
-    return area, diagonal
+        if success:
+            break
+        else:
+            og.sim.load_state(state)
 
+    if success:
+        obj.set_position_orientation(pos, orn)
+        obj.root_link.reset()
+        obj.keep_still()
 
-def calculate_smoothness(obj):
-    """
-    Calculate the percantage of surface normals that are sufficiently close to the z-axis.
-    """
-    cloth = obj.links["base_link"]
-    face_vertex_counts = np.array(cloth.get_attribute("faceVertexCounts"))
-    assert (face_vertex_counts == 3).all(), "cloth prim is expected to only contain triangle faces"
-    face_vertex_indices = np.array(cloth.get_attribute("faceVertexIndices"))
-    points = cloth.particle_positions[face_vertex_indices]
-    # Shape [F, 3, 3] where F is the number of faces
-    points = points.reshape((face_vertex_indices.shape[0] // 3, 3, 3))
+        # Let it fall for 0.2 second
+        for _ in range(int(0.2 / og.sim.get_physics_dt())):
+            og.sim.step_physics()
+            if len(obj.states[ContactBodies].get_value()) > 0:
+                break
 
-    # Shape [F, 3]
-    v1 = points[:, 2, :] - points[:, 0, :]
-    v2 = points[:, 1, :] - points[:, 0, :]
-    normals = np.cross(v1, v2)
-    normals_norm = np.linalg.norm(normals, axis=1)
+        obj.keep_still()
 
-    valid_normals = normals[normals_norm.nonzero()] / np.expand_dims(normals_norm[normals_norm.nonzero()], axis=1)
-    assert valid_normals.shape[0] > 0
+        # Render at the end
+        og.sim.render()
 
-    # projection onto the z-axis
-    proj = np.abs(np.dot(valid_normals, np.array([0.0, 0.0, 1.0])))
-    percentage = np.mean(proj > np.cos(m.NORMAL_Z_ANGLE_DIFF))
-    return percentage
+    return success
