@@ -7,8 +7,8 @@ RUN apt-get update && apt-get install -y \
   wget \
   && rm -rf /var/lib/apt/lists/*
 
-RUN rm -rf /isaac-sim/exts/omni.isaac.ml_archive/pip_prebundle/gym
-RUN rm -rf /isaac-sim/kit/extscore/omni.kit.pip_archive/pip_prebundle/numpy
+RUN rm -rf /isaac-sim/exts/omni.isaac.ml_archive/pip_prebundle/gym*
+RUN rm -rf /isaac-sim/kit/extscore/omni.kit.pip_archive/pip_prebundle/numpy*
 
 # Mount the data directory
 VOLUME ["/data"]
@@ -22,8 +22,16 @@ RUN curl -Ls https://micro.mamba.pm/api/micromamba/linux-64/latest | tar -xvj -C
 ENV MAMBA_ROOT_PREFIX /micromamba
 RUN micromamba create -n omnigibson -c conda-forge python=3.7
 RUN micromamba shell init --shell=bash --prefix=/micromamba
+
+# Make sure isaac gets properly sourced every time omnigibson gets called
+ARG CONDA_ACT_FILE="/micromamba/envs/omnigibson/etc/conda/activate.d/env_vars.sh"
+RUN mkdir -p "/micromamba/envs/omnigibson/etc/conda/activate.d"
+RUN touch $CONDA_ACT_FILE
+
+RUN echo '#!/bin/sh' > $CONDA_ACT_FILE
+RUN echo "source /isaac-sim/setup_conda_env.sh" >> $CONDA_ACT_FILE
+
 RUN echo "micromamba activate omnigibson" >> /root/.bashrc
-RUN echo "source /isaac-sim/setup_conda_env.sh" >> /root/.bashrc
 
 # Install some additional niceties for working with notebooks
 SHELL ["micromamba", "run", "-n", "omnigibson", "/bin/bash", "--login", "-c"]
