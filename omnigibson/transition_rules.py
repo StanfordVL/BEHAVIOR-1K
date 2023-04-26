@@ -1061,9 +1061,9 @@ class MixingRule(BaseTransitionRule):
                 og.log.info(f"Executing recipe: {name} in container {container.name}!")
 
                 # Take the transform
-                t_results.remove += cls._transform_to_output_system(
+                t_results.remove += cls._execute_recipe(
                     container=container,
-                    output_system=recipe["output_system"],
+                    recipe=recipe,
                     in_volume=in_volume,
                 )
 
@@ -1074,16 +1074,16 @@ class MixingRule(BaseTransitionRule):
             og.log.info(f"Did not find a valid recipe; generating {m.DEFAULT_GARBAGE_SYSTEM} in {container.name}!")
 
             # Generate garbage fluid
-            t_results.remove += cls._transform_to_output_system(
+            t_results.remove += cls._execute_recipe(
                 container=container,
-                output_system=m.DEFAULT_GARBAGE_SYSTEM,
+                recipe=dict(input_objects=[], input_systems=[], output_system=m.DEFAULT_GARBAGE_SYSTEM),
                 in_volume=in_volume,
             )
 
             return t_results
 
     @classmethod
-    def _transform_to_output_system(cls, container, output_system, in_volume):
+    def _execute_recipe(cls, container, recipe, in_volume):
         """
         Transforms all items contained in @container into @output_system, generating volume of @output_system
         proportional to the number of items transformed.
@@ -1091,7 +1091,7 @@ class MixingRule(BaseTransitionRule):
         Args:
             container (BaseObject): Container object which will have its contained elements transformed into
                 @output_system
-            output_system (str): Name of the output system to generate. Should be a PhysicalParticleSystem
+            recipe (str): Recipe to execute. Should include "input_objects", "input_systems", and "output_system" keys
             in_volume (n-array): (n_objects,) boolean array specifying whether every object from og.sim.scene.objects
                 is contained in @container or not. Only necess
 
@@ -1100,7 +1100,6 @@ class MixingRule(BaseTransitionRule):
         """
         # Compute total volume of all contained items
         volume = 0
-        objects_to_remove = []
 
         # Remove all recipe system particles contained in the container
         for system in PhysicalParticleSystem.get_active_systems():
@@ -1112,11 +1111,12 @@ class MixingRule(BaseTransitionRule):
             if group_name in system.groups and system.num_group_particles(group_name) > 0:
                 system.remove_all_group_particles(group=group_name)
 
-        # Remove all contained objects if requested
-        if not cls.ignore_nonrecipe_objects:
-            # Remove all objects inside the container
-            objs_to_remove = cls._OBJECTS[np.where(in_volume)[0]].tolist()
-            volume += sum(obj.volume for obj in objs_to_remove)
+        # Remove either all objects or only the recipe-relevant objects inside the container
+        objs_to_remove = np.concatenate([
+                cls._OBJECTS[np.where(in_volume[cls._CATEGORY_IDXS[obj_category]])[0]]
+                for obj_category in recipe["input_objects"].keys()
+            ]).tolist() if cls.ignore_nonrecipe_objects else cls._OBJECTS[np.where(in_volume)[0]].tolist()
+        volume += sum(obj.volume for obj in objs_to_remove)
 
         # Spawn in new fluid
         out_system = get_system(output_system)
