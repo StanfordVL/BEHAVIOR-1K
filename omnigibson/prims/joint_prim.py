@@ -17,7 +17,7 @@ from omni.isaac.core.utils.stage import get_current_stage
 from omnigibson.macros import create_module_macros
 from omnigibson.prims.prim_base import BasePrim
 from omnigibson.utils.usd_utils import create_joint
-from omnigibson.utils.constants import JointType
+from omnigibson.utils.constants import JointType, JointAxis
 from omnigibson.utils.python_utils import assert_valid_key
 import omnigibson.utils.transform_utils as T
 from omnigibson.controllers.controller_base import ControlType
@@ -507,7 +507,12 @@ class JointPrim(BasePrim):
         Args:
             lower_limit (float): lower_limit to set
         """
-        # Can't use DC because it's read only property
+        # Only support revolute and prismatic joints for now
+        assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
+        # Set dc properties
+        self._dof_properties[0].lower = lower_limit
+        self._dc.set_dof_properties(self._dof_handles[0], self._dof_properties[0])
+        # Set USD properties
         lower_limit = T.rad2deg(lower_limit) if self.is_revolute else lower_limit
         self.set_attribute("physics:lowerLimit", lower_limit)
 
@@ -535,7 +540,12 @@ class JointPrim(BasePrim):
         Args:
             upper_limit (float): upper_limit to set
         """
-        # Can't use DC because it's read only property
+        # Only support revolute and prismatic joints for now
+        assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
+        # Set dc properties
+        self._dof_properties[0].upper = upper_limit
+        self._dc.set_dof_properties(self._dof_handles[0], self._dof_properties[0])
+        # Set USD properties
         upper_limit = T.rad2deg(upper_limit) if self.is_revolute else upper_limit
         self.set_attribute("physics:upperLimit", upper_limit)
 
@@ -547,8 +557,32 @@ class JointPrim(BasePrim):
         """
         # Only support revolute and prismatic joints for now
         assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
-        # We either return the raw value or a default value if there is no max specified
         return self._dof_properties[0].has_limits
+
+    @property
+    def axis(self):
+        """
+        Gets this joint's axis
+
+        Returns:
+            str: axis for this joint, one of "X", "Y, "Z"
+        """
+        # Only support revolute and prismatic joints for now
+        assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
+        return self.get_attribute("physics:axis")
+
+    @axis.setter
+    def axis(self, axis):
+        """
+        Sets this joint's axis
+
+        Args:
+            str: axis for this joint, one of "X", "Y, "Z"
+        """
+        # Only support revolute and prismatic joints for now
+        assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
+        assert axis in JointAxis, f"Invalid joint axis specified: {axis}!"
+        self.set_attribute("physics:axis", axis)
 
     @property
     def n_dof(self):

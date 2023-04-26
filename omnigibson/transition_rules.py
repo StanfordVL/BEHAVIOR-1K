@@ -686,12 +686,7 @@ class SlicingRule(BaseTransitionRule):
                 # Determine the relative scale to apply to the object part from the original object
                 # Note that proper (rotated) scaling can only be applied when the relative orientation of
                 # the object part is a multiple of 90 degrees wrt the parent object, so we assert that here
-                # Check by making sure the quaternion is some permutation of +/- (1, 0, 0, 0),
-                # +/- (0.707, 0.707, 0, 0), or +/- (0.5, 0.5, 0.5, 0.5)
-                # Because orientations are all normalized (same L2-norm), every orientation should have a unique L1-norm
-                # So we check the L1-norm of the absolute value of the orientation as a proxy for verifying these values
-                assert np.any(np.isclose(np.abs(part_bb_orn).sum(), np.array([1.0, 1.414, 2.0]), atol=1e-3)), \
-                    "Sliceable objects should only have relative object part orientations that are factors of 90 degrees!"
+                assert T.check_quat_right_angle(part_bb_orn), "Sliceable objects should only have relative object part orientations that are factors of 90 degrees!"
 
                 # Scale the offset accordingly.
                 scale = np.abs(T.quat2mat(part_bb_orn) @ sliceable_obj.scale)
