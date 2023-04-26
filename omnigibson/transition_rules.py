@@ -6,7 +6,7 @@ from copy import copy
 import itertools
 import omnigibson as og
 from omnigibson.macros import gm, create_module_macros
-from omnigibson.systems import get_system, is_system_active, PhysicalParticleSystem, REGISTERED_SYSTEMS
+from omnigibson.systems import get_system, is_system_active, PhysicalParticleSystem, VisualParticleSystem, REGISTERED_SYSTEMS
 from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.object_states import *
 from omnigibson.utils.python_utils import Registerable, classproperty, subclass_factory
@@ -888,8 +888,16 @@ class MixingRule(BaseTransitionRule):
             bool: True if all the input systems are contained
         """
         for system_name in recipe["input_systems"]:
-            if not container.states[Contains].get_value(system=get_system(system_name=system_name)):
-                return False
+            system = get_system(system_name=system_name)
+            # Physical particle systems
+            if issubclass(system, PhysicalParticleSystem):
+                if container.states[Contains].get_value(system=get_system(system_name=system_name)):
+                    return False
+            # Visual particle systems
+            else:
+                group_name = system.get_group_name(obj=container)
+                if group_name not in system.groups or system.num_group_particles(group=group_name) == 0:
+                    return False
         return True
 
     @classmethod
@@ -907,6 +915,10 @@ class MixingRule(BaseTransitionRule):
         relevant_systems = set(recipe["input_systems"])
         for system in PhysicalParticleSystem.get_active_systems():
             if system.name not in relevant_systems and container.states[Contains].get_value(system=system):
+                return False
+        for system in VisualParticleSystem.get_active_systems():
+            group_name = system.get_group_name(obj=container)
+            if group_name in system.groups and system.num_group_particles(group=group_name) > 0:
                 return False
         return True
 
@@ -1041,57 +1053,92 @@ class MixingRule(BaseTransitionRule):
                 if not cls._validate_nonrecipe_systems_not_contained(recipe=recipe, container=container):
                     continue
 
-                # Verify no non-relevant object is contained
-                if not cls._validate_nonrecipe_objects_not_contained(recipe=recipe, in_volume=in_volume):
+                # Verify no non-relevant object is contained if we're not ignoring them
+                if not cls.ignore_nonrecipe_objects and not cls._validate_nonrecipe_objects_not_contained(recipe=recipe, in_volume=in_volume):
                     continue
 
                 # Otherwise, all conditions met, we found a valid recipe and so we execute and terminate early
                 og.log.info(f"Executing recipe: {name} in container {container.name}!")
 
-                # Compute total volume of all contained items
-                volume = 0
-
-                # Remove all recipe system particles contained in the container
-                for system_name in recipe["input_systems"]:
-                    system = get_system(system_name=system_name)
-                    volume += contained_particles_state.get_value()[0] * np.pi * (system.particle_radius ** 3) * 4 / 3
-                    container.states[Filled].set_value(system, False)
-
-                # Remove all recipe objects
-                objs_to_remove = np.concatenate([
-                    cls._OBJECTS[np.where(in_volume[cls._CATEGORY_IDXS[obj_category]])[0]]
-                    for obj_category in recipe["input_objects"].keys()
-                ]).tolist()
-                volume += sum(obj.volume for obj in objs_to_remove)
-                t_results.remove += objs_to_remove
-
-                # Spawn in new fluid
-                out_system = get_system(recipe["output_system"])
-                out_system.generate_particles_from_link(
-                    obj=container,
-                    link=contained_particles_state.link,
-                    mesh_name_prefixes="container",
-                    max_samples=volume // (np.pi * (out_system.particle_radius ** 3) * 4 / 3),
+                # Take the transform
+                t_results.remove += cls._transform_to_output_system(
+                    container=container,
+                    output_system=recipe["output_system"],
+                    in_volume=in_volume,
                 )
 
                 # Terminate early
                 return t_results
 
             # Otherwise, if we didn't find a valid recipe, we execute a garbage transition instead
+            og.log.info(f"Did not find a valid recipe; generating {m.DEFAULT_GARBAGE_SYSTEM} in {container.name}!")
 
-            # Remove all systems inside the container
-            for system in PhysicalParticleSystem.get_active_systems():
-                if container.states[Contains].get_value(system):
-                    container.states[Filled].set_value(system, False)
-
-            # Remove all objects inside the container
-            objs_to_remove = cls._OBJECTS[np.where(in_volume)[0]].tolist()
-            t_results.remove += objs_to_remove
-
-            # Spawn in garbage fluid
-            container.states[Filled].set_value(get_system(system_name=m.DEFAULT_GARBAGE_SYSTEM), True)
+            # Generate garbage fluid
+            t_results.remove += cls._transform_to_output_system(
+                container=container,
+                output_system=m.DEFAULT_GARBAGE_SYSTEM,
+                in_volume=in_volume,
+            )
 
             return t_results
+
+    @classmethod
+    def _transform_to_output_system(cls, container, output_system, in_volume):
+        """
+        Transforms all items contained in @container into @output_system, generating volume of @output_system
+        proportional to the number of items transformed.
+
+        Args:
+            container (BaseObject): Container object which will have its contained elements transformed into
+                @output_system
+            output_system (str): Name of the output system to generate. Should be a PhysicalParticleSystem
+            in_volume (n-array): (n_objects,) boolean array specifying whether every object from og.sim.scene.objects
+                is contained in @container or not. Only necess
+
+        Returns:
+            list of BaseObject: List of object(s) to remove from the simulator due to this transformation
+        """
+        # Compute total volume of all contained items
+        volume = 0
+        objects_to_remove = []
+
+        # Remove all recipe system particles contained in the container
+        for system in PhysicalParticleSystem.get_active_systems():
+            if container.states[Contains].get_value(system):
+                volume += contained_particles_state.get_value()[0] * np.pi * (system.particle_radius ** 3) * 4 / 3
+                container.states[Filled].set_value(system, False)
+        for system in VisualParticleSystem.get_active_systems():
+            group_name = system.get_group_name(container)
+            if group_name in system.groups and system.num_group_particles(group_name) > 0:
+                system.remove_all_group_particles(group=group_name)
+
+        # Remove all contained objects if requested
+        if not cls.ignore_nonrecipe_objects:
+            # Remove all objects inside the container
+            objs_to_remove = cls._OBJECTS[np.where(in_volume)[0]].tolist()
+            volume += sum(obj.volume for obj in objs_to_remove)
+
+        # Spawn in new fluid
+        out_system = get_system(output_system)
+        out_system.generate_particles_from_link(
+            obj=container,
+            link=contained_particles_state.link,
+            mesh_name_prefixes="container",
+            check_contact=cls.ignore_nonrecipe_objects,
+            max_samples=volume // (np.pi * (out_system.particle_radius ** 3) * 4 / 3),
+        )
+
+        # Return removed objects
+        return objects_to_remove
+
+    @classproperty
+    def ignore_nonrecipe_objects(cls):
+        """
+        Returns:
+            bool: Whether contained rigid objects not relevant to the recipe should be ignored or not
+        """
+        # False by default
+        return False
 
     @classproperty
     def _do_not_register_classes(cls):
@@ -1111,7 +1158,7 @@ class BlenderRule(MixingRule):
         # Modify the container filter to include "blender" ability as well
         candidate_filters = super().candidate_filters
         candidate_filters["container"] = AndFilter(filters=[candidate_filters["container"], AbilityFilter(ability="blender")])
-        return group_filters
+        return candidate_filters
 
     @classmethod
     def _generate_conditions(cls):
@@ -1126,12 +1173,25 @@ class MixingToolRule(MixingRule):
     Transition mixing rule that leverages "mixing_tool" ability objects, which require touching between a mixing tool
     and a container in order to trigger the recipe event
     """
+    @classmethod
+    def add_recipe(cls, name, input_objects, input_systems, output_system):
+        # We do not allow any input objects to be specified! Assert empty list
+        assert len(input_objects) == 0, f"No input_objects should be specified for {cls.__name__}!"
+
+        # Call super
+        super().add_recipe(
+            name=name,
+            input_objects=input_objects,
+            input_systems=input_systems,
+            output_system=output_system,
+        )
+
     @classproperty
     def candidate_filters(cls):
         # Add mixing tool filter as well
         candidate_filters = super().candidate_filters
         candidate_filters["mixing_tool"] = AbilityFilter(ability="mixing_tool")
-        return group_filters
+        return candidate_filters
 
     @classmethod
     def _generate_conditions(cls):
@@ -1139,6 +1199,10 @@ class MixingToolRule(MixingRule):
         return [ChangeConditionWrapper(
             condition=TouchingAnyCondition(filter_1_name="container", filter_2_name="mixing_tool")
         )]
+
+    @classproperty
+    def ignore_nonrecipe_objects(cls):
+        return True
 
 
 # Create strawberry smoothie blender rule
