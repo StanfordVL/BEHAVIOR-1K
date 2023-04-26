@@ -19,7 +19,7 @@ class Filled(RelativeObjectState, BooleanState):
         # Check what volume is filled
         if len(system.particle_instancers) > 0:
             particle_volume = 4 / 3 * np.pi * (system.particle_radius ** 3)
-            n_particles = self.obj.states[ContainedParticles].get_value()[0]
+            n_particles = self.obj.states[ContainedParticles].get_value().n_in_volume
             prop_filled = particle_volume * n_particles / self.obj.states[ContainedParticles].volume
             # If greater than threshold, then the volume is filled
             # Explicit bool cast needed here because the type is bool_ instead of bool which is not JSON-Serializable
@@ -53,7 +53,7 @@ class Filled(RelativeObjectState, BooleanState):
                 # Going from True --> False, delete all particles inside the volume
                 # TODO: Make more robust against multiple particle instancers
                 assert len(system.particle_instancers) == 1, "Cannot handle multiple particle instancers!"
-                system.default_particle_instancer.remove_particles(contained_particles_state.get_value()[2].nonzero()[0])
+                system.default_particle_instancer.remove_particles(contained_particles_state.get_value().in_volume.nonzero()[0])
 
         return True
 

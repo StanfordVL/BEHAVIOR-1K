@@ -788,13 +788,13 @@ class CookingPhysicalParticleRule(BaseTransitionRule):
             # fillable objects
             in_volume = np.zeros(system.n_particles).astype(bool)
             for fillable_obj in fillable_objs:
-                in_volume |= fillable_obj.states[ContainedParticles][2]
+                in_volume |= fillable_obj.states[ContainedParticles].get_value().in_volume
 
             # If any are in volume, convert particles
             in_volume_idx = np.where(in_volume)[0]
             if len(in_volume_idx) > 0:
                 cooked_system = get_system(f"cooked_{system.name}")
-                particle_positions = fillable_obj.states[ContainedParticles][1]
+                particle_positions = fillable_obj.states[ContainedParticles].get_value().positions
                 system.default_particle_instancer.remove_particles(idxs=in_volume_idx)
                 cooked_system.default_particle_instancer.add_particles(positions=particle_positions[in_volume_idx])
 
@@ -1036,8 +1036,7 @@ class MixingRule(BaseTransitionRule):
         # Iterate over all fillable objects, to execute recipes for each one
         for container in object_candidates["container"]:
             # Compute in volume for all relevant object positions
-            contained_particles_state = container.states[ContainedParticles]
-            in_volume = contained_particles_state.check_in_volume(obj_positions)
+            in_volume = container.states[ContainedParticles].check_in_volume(obj_positions)
 
             # Check every recipe to find if any is valid
             for name, recipe in cls._ACTIVE_RECIPES.items():
