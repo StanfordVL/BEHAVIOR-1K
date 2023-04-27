@@ -20,6 +20,8 @@ from omnigibson.utils.usd_utils import create_joint
 from omnigibson.utils.constants import JointType, JointAxis
 from omnigibson.utils.python_utils import assert_valid_key
 import omnigibson.utils.transform_utils as T
+from omnigibson.utils.usd_utils import BoundingBoxAPI
+
 from omnigibson.controllers.controller_base import ControlType
 
 
@@ -794,6 +796,8 @@ class JointPrim(BasePrim):
         for dof_handle, p in zip(self._dof_handles, pos):
             if not drive:
                 self._dc.set_dof_position(dof_handle, p)
+                BoundingBoxAPI.clear()
+
             # We set the position target in either case
             self._dc.set_dof_position_target(dof_handle, p)
 

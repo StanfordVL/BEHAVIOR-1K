@@ -28,7 +28,7 @@ def main(random_selection=False, headless=False, short_exec=False):
                 "category": "carpet",
                 "model": "ctclvd",
                 "prim_type": PrimType.CLOTH,
-                "abilities": {"foldable": {}, "unfoldable": {}},
+                "abilities": {"cloth": {}},
                 "position": [0, 0, 0.5],
             },
             {
@@ -38,7 +38,7 @@ def main(random_selection=False, headless=False, short_exec=False):
                 "model": "dtfspn",
                 "prim_type": PrimType.CLOTH,
                 "scale": 5.0,
-                "abilities": {"foldable": {}, "unfoldable": {}},
+                "abilities": {"cloth": {}},
                 "position": [1, 1, 0.5],
             },
             {
@@ -48,7 +48,7 @@ def main(random_selection=False, headless=False, short_exec=False):
                 "model": "kvidcx",
                 "prim_type": PrimType.CLOTH,
                 "scale": 0.05,
-                "abilities": {"foldable": {}, "unfoldable": {}},
+                "abilities": {"cloth": {}},
                 "position": [-1, 1, 0.5],
                 "orientation": [0.7071, 0., 0.7071, 0.],
             },

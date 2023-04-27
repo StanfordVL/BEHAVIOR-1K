@@ -508,7 +508,6 @@ class StatefulObject(BaseObject):
             return
         for _, obj_state in self._states.items():
             obj_state.clear_cache()
-        BoundingBoxAPI.clear()
 
     def set_position_orientation(self, position=None, orientation=None):
         super().set_position_orientation(position=position, orientation=orientation)

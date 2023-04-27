@@ -24,9 +24,8 @@ _ABILITY_TO_STATE_MAPPING = {
     "sliceable": [],
     "slicer": [],
     "toggleable": [ToggledOn],
+    "cloth": [Folded, Unfolded, Overlaid, Draped],
     "fillable": [Filled, Contains],
-    "foldable": [Folded],
-    "unfoldable": [Unfolded],
 }
 
 _DEFAULT_STATE_SET = frozenset(
@@ -34,7 +33,6 @@ _DEFAULT_STATE_SET = frozenset(
         Inside,
         NextTo,
         OnTop,
-        Overlaid,
         Touching,
         Under,
         Covered,

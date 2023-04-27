@@ -22,9 +22,10 @@ import trimesh
 
 import omnigibson as og
 from omnigibson.macros import gm
-from omnigibson.utils.constants import JointType, PRIMITIVE_MESH_TYPES, PrimType
+from omnigibson.utils.constants import JointType, PRIMITIVE_MESH_TYPES, PrimType, GEOM_TYPES
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.ui_utils import suppress_omni_log
+
 import omnigibson.utils.transform_utils as T
 
 GF_TO_VT_MAPPING = {
@@ -489,6 +490,7 @@ class BoundingBoxAPI:
         """
         # Create cache if it doesn't already exist
         if cls.CACHE_NON_FLATCACHE is None:
+            og.sim.psi.fetch_results()
             cls.CACHE_NON_FLATCACHE = create_bbox_cache(use_extents_hint=False)
 
         # Grab aabb
@@ -721,6 +723,43 @@ def mesh_prim_to_trimesh_mesh(mesh_prim):
         i += count
 
     return trimesh.Trimesh(vertices=vertices, faces=faces)
+
+
+def get_mesh_volume_and_com(mesh_prim):
+    """
+    Computes the volume and center of mass for @mesh_prim
+
+    Args:
+        mesh_prim (Usd.Prim): Mesh prim to compute volume and center of mass for
+
+    Returns:
+        Tuple[float, np.array]: Tuple containing the volume and center of mass in the mesh frame of @mesh_prim
+    """
+    mesh_type = mesh_prim.GetPrimTypeInfo().GetTypeName()
+    assert mesh_type in GEOM_TYPES, f"Invalid mesh type: {mesh_type}"
+    # Default volume and com
+    volume = 0.0
+    com = np.zeros(3)
+    if mesh_type == "Mesh":
+        # We construct a trimesh object from this mesh in order to infer its volume
+        trimesh_mesh = mesh_prim_to_trimesh_mesh(mesh_prim)
+        if not trimesh.triangles.all_coplanar(trimesh_mesh.triangles):
+            trimesh_mesh = trimesh_mesh if trimesh_mesh.is_volume else trimesh_mesh.convex_hull
+            volume = trimesh_mesh.volume
+            com = trimesh_mesh.center_mass
+    elif mesh_type == "Sphere":
+        volume = 4 / 3 * np.pi * (mesh_prim.GetAttribute("radius").Get() ** 3)
+    elif mesh_type == "Cube":
+        volume = mesh_prim.GetAttribute("size").Get() ** 3
+    elif mesh_type == "Cone":
+        volume = np.pi * (mesh_prim.GetAttribute("radius").Get() ** 2) * mesh_prim.GetAttribute("height").Get() / 3
+        com = np.array([0, 0, mesh.GetAttribute("height").Get() / 4])
+    elif mesh_type == "Cylinder":
+        volume = np.pi * (mesh_prim.GetAttribute("radius").Get() ** 2) * mesh_prim.GetAttribute("height").Get()
+    else:
+        raise ValueError(f"Cannot compute volume for mesh of type: {mesh_type}")
+
+    return volume, com
 
 
 def create_primitive_mesh(prim_path, primitive_type, extents=1.0, u_patches=None, v_patches=None):

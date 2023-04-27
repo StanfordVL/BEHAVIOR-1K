@@ -274,11 +274,6 @@ def place_base_pose(obj, pos, quat=None, z_offset=None):
     # avoid circular dependency
     from omnigibson.object_states import AABB
 
-    # Make sure AABB is up-to-date before grabbing value
-    get_physx_simulation_interface().fetch_results()
-    BoundingBoxAPI.clear()
-    obj.states[AABB].clear_cache()
-
     lower, _ = obj.states[AABB].get_value()
     cur_pos = obj.get_position()
     z_diff = cur_pos[2] - lower[2]
