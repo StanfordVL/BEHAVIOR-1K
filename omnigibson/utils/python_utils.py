@@ -288,6 +288,7 @@ def get_uuid(name, n_digits=8):
     """
     return abs(hash(name)) % (10 ** n_digits)
 
+
 def camel_case_to_snake_case(camel_case_text):
     """
     Helper function to convert a camel case text to snake case, e.g. "StrawberrySmoothie" -> "strawberry_smoothie"
@@ -300,6 +301,7 @@ def camel_case_to_snake_case(camel_case_text):
     """
     return re.sub(r'(?<!^)(?=[A-Z])', '_', camel_case_text).lower()
 
+
 def snake_case_to_camel_case(snake_case_text):
     """
     Helper function to convert a snake case text to camel case, e.g. "strawberry_smoothie" -> "StrawberrySmoothie"
@@ -311,6 +313,7 @@ def snake_case_to_camel_case(snake_case_text):
         str: camel case text
     """
     return ''.join(item.title() for item in snake_case_text.split('_'))
+
 
 class UniquelyNamed:
     """

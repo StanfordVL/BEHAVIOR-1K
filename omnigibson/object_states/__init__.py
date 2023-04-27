@@ -5,6 +5,7 @@ from omnigibson.object_states.attached_to import AttachedTo
 from omnigibson.object_states.burnt import Burnt
 from omnigibson.object_states.contact_bodies import ContactBodies
 from omnigibson.object_states.contact_particles import ContactParticles
+from omnigibson.object_states.contains import ContainedParticles, Contains
 from omnigibson.object_states.cooked import Cooked
 from omnigibson.object_states.covered import Covered
 from omnigibson.object_states.frozen import Frozen
@@ -21,8 +22,6 @@ from omnigibson.object_states.particle_modifier import ParticleRemover, Particle
 from omnigibson.object_states.particle_source_or_sink import ParticleSource, ParticleSink
 from omnigibson.object_states.pose import Pose
 from omnigibson.object_states.saturated import Saturated
-from omnigibson.object_states.sliced import Sliced
-from omnigibson.object_states.slicer import Slicer
 from omnigibson.object_states.temperature import Temperature
 from omnigibson.object_states.toggle import ToggledOn
 from omnigibson.object_states.touching import Touching

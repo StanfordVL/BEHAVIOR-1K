@@ -13,8 +13,6 @@ from bddl.activity import (
     get_natural_goal_conditions,
     get_object_scope,
 )
-from bddl.condition_evaluation import Negation
-from bddl.logic_base import AtomicFormula
 from bddl.object_taxonomy import ObjectTaxonomy
 
 import omnigibson as og
@@ -24,7 +22,7 @@ from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.reward_functions.potential_reward import PotentialReward
 from omnigibson.robots.robot_base import BaseRobot
 from omnigibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
-from omnigibson.tasks.bddl_backend import OmniGibsonBDDLBackend
+from omnigibson.utils.bddl_utils import OmniGibsonBDDLBackend, process_single_condition
 from omnigibson.tasks.task_base import BaseTask
 from omnigibson.termination_conditions.predicate_goal import PredicateGoal
 from omnigibson.termination_conditions.timeout import Timeout
@@ -565,31 +563,6 @@ class BehaviorTask(BaseTask):
             assert matched_sim_obj is not None, obj_inst
             self.object_scope[obj_inst] = matched_sim_obj
 
-    def process_single_condition(self, condition):
-        """
-        Processes a single BDDL condition
-
-        Args:
-            condition (Condition): Condition to process
-
-        Returns:
-            2-tuple:
-                - Expression: Condition's expression
-                - bool: Whether this evaluated condition is positive or negative
-        """
-        if not isinstance(condition.children[0], Negation) and not isinstance(condition.children[0], AtomicFormula):
-            log.debug(("Skipping over sampling of predicate that is not a negation or an atomic formula"))
-            return None, None
-
-        if isinstance(condition.children[0], Negation):
-            condition = condition.children[0].children[0]
-            positive = False
-        else:
-            condition = condition.children[0]
-            positive = True
-
-        return condition, positive
-
     def group_initial_conditions(self):
         """
         We group initial conditions by first splitting the desired task-relevant objects into non-sampleable objects
@@ -611,7 +584,7 @@ class BehaviorTask(BaseTask):
         # This child is either a ObjectStateUnaryPredicate/ObjectStateBinaryPredicate or
         # a Negation of a ObjectStateUnaryPredicate/ObjectStateBinaryPredicate
         for condition in self.activity_initial_conditions:
-            condition, positive = self.process_single_condition(condition)
+            condition, positive = process_single_condition(condition)
             if condition is None:
                 continue
 
@@ -834,7 +807,7 @@ class BehaviorTask(BaseTask):
         for goal_condition_set in self.ground_goal_state_options[:num_goal_condition_set_to_test]:
             goal_condition_processed = []
             for condition in goal_condition_set:
-                condition, positive = self.process_single_condition(condition)
+                condition, positive = process_single_condition(condition)
                 if condition is None:
                     continue
                 goal_condition_processed.append((condition, positive))

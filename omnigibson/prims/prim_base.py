@@ -308,7 +308,7 @@ class BasePrim(Serializable, UniquelyNamed, Recreatable, ABC):
             name=f"{self.name}_copy{self._n_duplicates}",
             load_config=self._load_config,
         )
-        og.sim.import_object(new_prim, register=False, auto_initialize=True)
+        og.sim.import_object(new_prim, register=False)
 
         # Increment duplicate count
         self._n_duplicates += 1

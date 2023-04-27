@@ -22,7 +22,7 @@ import trimesh
 
 import omnigibson as og
 from omnigibson.macros import gm
-from omnigibson.utils.constants import JointType, PRIMITIVE_MESH_TYPES, GEOM_TYPES
+from omnigibson.utils.constants import JointType, PRIMITIVE_MESH_TYPES, PrimType, GEOM_TYPES
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.ui_utils import suppress_omni_log
 
@@ -227,6 +227,132 @@ def create_joint(prim_path, joint_type, body0=None, body1=None, enabled=True,
 
     # Return this joint
     return joint_prim
+
+
+class RigidContactAPI:
+    """
+    Class containing class methods to aggregate rigid body contacts across all rigid bodies in the simulator
+    """
+    # Dictionary mapping rigid body prim path to corresponding index in the contact view matrix
+    _PATH_TO_IDX = None
+
+    # Contact view for generating contact matrices at each timestep
+    _CONTACT_VIEW = None
+
+    # Current aggregated contacts over all rigid bodies at the current timestep. Shape: (N, N, 3)
+    _CONTACT_MATRIX = None
+
+    # Current cache, mapping 2-tuple (prim_paths_a, prim_paths_b) to contact values
+    _CONTACT_CACHE = None
+
+    @classmethod
+    def initialize_view(cls):
+        """
+        Initializes the rigid contact view. Note: Can only be done when sim is playing!
+        """
+        assert og.sim.is_playing(), "Cannot create rigid contact view while sim is not playing!"
+
+        # Compile deterministic mapping from rigid body path to idx
+        # Note that omni's ordering is based on the top-down object ordering path on the USD stage, which coincidentally
+        # matches the same ordering we store objects in our registry. So the mapping we generate from our registry
+        # mapping aligns with omni's ordering!
+        i = 0
+        cls._PATH_TO_IDX = dict()
+        for obj in og.sim.scene.objects:
+            if obj.prim_type == PrimType.RIGID:
+                for link in obj.links.values():
+                    cls._PATH_TO_IDX[link.prim_path] = i
+                    i += 1
+
+        # Generate rigid body view, making sure to update the simulation first (without physics) so that the physx
+        # backend is synchronized with any newly added objects
+        # We also suppress the omni tensor plugin from giving warnings we expect
+        og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
+        with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
+            cls._CONTACT_VIEW = og.sim.physics_sim_view.create_rigid_contact_view(
+                pattern="/World/*/*",
+                filter_patterns=list(cls._PATH_TO_IDX.keys()),
+            )
+
+        # Sanity check generated view -- this should generate square matrices of shape (N, N, 3)
+        n_bodies = len(cls._PATH_TO_IDX)
+        # from IPython import embed; embed()
+        assert cls._CONTACT_VIEW.sensor_count == n_bodies and cls._CONTACT_VIEW.filter_count == n_bodies, \
+            f"Got unexpected contact view shape. Expected: ({n_bodies}, {n_bodies}); " \
+            f"got: ({cls._CONTACT_VIEW.sensor_count}, {cls._CONTACT_VIEW.filter_count})"
+
+    @classmethod
+    def get_body_idx(cls, prim_path):
+        """
+        Returns:
+            int: idx assigned to the rigid body defined by @prim_path
+        """
+        return cls._PATH_TO_IDX[prim_path]
+
+    @classmethod
+    def get_all_impulses(cls):
+        """
+        Grab all impulses at the current timestep
+
+        Returns:
+            n-array: (N, N, 3) impulse array defining current impulses between all N contact-sensor enabled rigid bodies
+                in the simulator
+        """
+        # Generate the contact matrix if it doesn't already exist
+        if cls._CONTACT_MATRIX is None:
+            cls._CONTACT_MATRIX = cls._CONTACT_VIEW.get_contact_force_matrix(dt=1.0)
+
+        return cls._CONTACT_MATRIX
+
+    @classmethod
+    def get_impulses(cls, prim_paths_a, prim_paths_b):
+        """
+        Grabs the matrix representing all impulse forces between rigid prims from @prim_paths_a and
+        rigid prims from @prim_paths_b
+
+        Args:
+            prim_paths_a (list of str): Rigid body prim path(s) with which to grab contact impulses against
+                any of the rigid body prim path(s) defined by @prim_paths_b
+            prim_paths_b (list of str): Rigid body prim path(s) with which to grab contact impulses against
+                any of the rigid body prim path(s) defined by @prim_paths_a
+
+        Returns:
+            n-array: (N, M, 3) impulse array defining current impulses between N bodies from @prim_paths_a and M bodies
+                from @prim_paths_b
+        """
+        # Compute subset of matrix and return
+        idxs_a = [cls._PATH_TO_IDX[path] for path in prim_paths_a]
+        idxs_b = [cls._PATH_TO_IDX[path] for path in prim_paths_b]
+        return cls.get_all_impulses()[idxs_a][:, idxs_b]
+
+    @classmethod
+    def in_contact(cls, prim_paths_a, prim_paths_b):
+        """
+        Check if any rigid prim from @prim_paths_a is in contact with any rigid prim from @prim_paths_b
+
+        Args:
+            prim_paths_a (list of str): Rigid body prim path(s) with which to check contact against any of the rigid
+                body prim path(s) defined by @prim_paths_b
+            prim_paths_b (list of str): Rigid body prim path(s) with which to check contact against any of the rigid
+                body prim path(s) defined by @prim_paths_a
+
+        Returns:
+            bool: Whether any body from @prim_paths_a is in contact with any body from @prim_paths_b
+        """
+        # Check if the contact tuple already exists in the cache; if so, return the value
+        key = (tuple(prim_paths_a), tuple(prim_paths_b))
+        if key not in cls._CONTACT_CACHE:
+            # In contact if any of the matrix values representing the interaction between the two groups is non-zero
+            cls._CONTACT_CACHE[key] = np.any(cls.get_impulses(prim_paths_a=prim_paths_a, prim_paths_b=prim_paths_b))
+        return cls._CONTACT_CACHE[key]
+
+    @classmethod
+    def clear(cls):
+        """
+        Clears the internal contact matrix and cache
+        """
+        cls._CONTACT_MATRIX = None
+        cls._CONTACT_CACHE = dict()
 
 
 class CollisionAPI:

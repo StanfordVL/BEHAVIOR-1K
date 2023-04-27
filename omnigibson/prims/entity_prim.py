@@ -346,7 +346,7 @@ class EntityPrim(XFormPrim):
     def root_link(self):
         """
         Returns:
-            RigidPrim: Root link of this object prim
+            RigidPrim or ClothPrim: Root link of this object prim
         """
         return self._links[self.root_link_name]
 
@@ -1230,6 +1230,19 @@ class EntityPrim(XFormPrim):
                 for more information
         """
         self.root_link.kinematic_only = val
+
+    @property
+    def aabb(self):
+        # If we're a cloth prim type, we compute the bounding box from the limits of the particles. Otherwise, use the
+        # normal method for computing bounding box
+        if self._prim_type == PrimType.CLOTH:
+            particle_positions = self.root_link.particle_positions
+            aabb_lo, aabb_hi = np.min(particle_positions, axis=0), np.max(particle_positions, axis=0)
+        else:
+            aabb_lo, aabb_hi = super().aabb
+            aabb_lo, aabb_hi = np.array(aabb_lo), np.array(aabb_hi)
+
+        return aabb_lo, aabb_hi
 
     def wake(self):
         """

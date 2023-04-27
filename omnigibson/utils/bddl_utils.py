@@ -1,7 +1,12 @@
 from bddl.backend_abc import BDDLBackend
-from bddl.logic_base import BinaryAtomicFormula, UnaryAtomicFormula
+from bddl.condition_evaluation import Negation
+from bddl.logic_base import BinaryAtomicFormula, UnaryAtomicFormula, AtomicFormula
+from omnigibson.utils.ui_utils import create_module_logger
 
 from omnigibson import object_states
+
+# Create module logger
+log = create_module_logger(module_name=__name__)
 
 
 class ObjectStateUnaryPredicate(UnaryAtomicFormula):
@@ -42,6 +47,32 @@ def get_binary_predicate_for_state(state_class, state_name):
     )
 
 
+def process_single_condition(condition):
+    """
+    Processes a single BDDL condition
+
+    Args:
+        condition (Condition): Condition to process
+
+    Returns:
+        2-tuple:
+            - Expression: Condition's expression
+            - bool: Whether this evaluated condition is positive or negative
+    """
+    if not isinstance(condition.children[0], Negation) and not isinstance(condition.children[0], AtomicFormula):
+        log.debug(("Skipping over sampling of predicate that is not a negation or an atomic formula"))
+        return None, None
+
+    if isinstance(condition.children[0], Negation):
+        condition = condition.children[0].children[0]
+        positive = False
+    else:
+        condition = condition.children[0]
+        positive = True
+
+    return condition, positive
+
+
 # TODO: Add remaining predicates.
 SUPPORTED_PREDICATES = {
     "inside": get_binary_predicate_for_state(object_states.Inside, "inside"),
@@ -50,12 +81,12 @@ SUPPORTED_PREDICATES = {
     "under": get_binary_predicate_for_state(object_states.Under, "under"),
     "touching": get_binary_predicate_for_state(object_states.Touching, "touching"),
     "covered": get_binary_predicate_for_state(object_states.Covered, "covered"),
+    "contains": get_binary_predicate_for_state(object_states.Contains, "contains"),
     "saturated": get_binary_predicate_for_state(object_states.Saturated, "saturated"),
     "filled": get_binary_predicate_for_state(object_states.Filled, "filled"),
     "cooked": get_unary_predicate_for_state(object_states.Cooked, "cooked"),
     "burnt": get_unary_predicate_for_state(object_states.Burnt, "burnt"),
     "open": get_unary_predicate_for_state(object_states.Open, "open"),
-    "sliced": get_unary_predicate_for_state(object_states.Sliced, "sliced"),
     "toggled_on": get_unary_predicate_for_state(object_states.ToggledOn, "toggled_on"),
     "frozen": get_unary_predicate_for_state(object_states.Frozen, "frozen"),
 }

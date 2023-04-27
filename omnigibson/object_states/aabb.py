@@ -1,8 +1,4 @@
-import numpy as np
-
-from omnigibson.utils.usd_utils import BoundingBoxAPI
 from omnigibson.object_states.object_state_base import AbsoluteObjectState
-from omnigibson.utils.constants import PrimType
 
 
 class AABB(AbsoluteObjectState):
