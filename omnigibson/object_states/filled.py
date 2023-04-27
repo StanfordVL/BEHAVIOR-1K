@@ -48,6 +48,7 @@ class Filled(RelativeObjectState, BooleanState):
                     obj=self.obj,
                     link=contained_particles_state.link,
                     mesh_name_prefixes="container",
+                    check_contact=True,
                 )
             else:
                 # Going from True --> False, delete all particles inside the volume

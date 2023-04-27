@@ -769,7 +769,7 @@ class DicingRule(BaseTransitionRule):
 
         for diceable_obj in object_candidates["diceable"]:
             system = get_system(f"diced_{diceable_obj.category}")
-            system.generate_particles_from_link(diceable_obj, diceable_obj.root_link, use_visual_meshes=False)
+            system.generate_particles_from_link(diceable_obj, diceable_obj.root_link, check_contact=False, use_visual_meshes=False)
 
             # Delete original object from stage.
             t_results.remove.append(diceable_obj)
@@ -845,7 +845,7 @@ class MeltingRule(BaseTransitionRule):
         # Convert the meltable object into its melted substance
         for meltable_obj in object_candidates["meltable"]:
             system = get_system(f"melted_{meltable_obj.category}")
-            system.generate_particles_from_link(meltable_obj, meltable_obj.root_link, use_visual_meshes=False)
+            system.generate_particles_from_link(meltable_obj, meltable_obj.root_link, check_contact=False, use_visual_meshes=False)
 
             # Delete original object from stage.
             t_results.remove.append(meltable_obj)

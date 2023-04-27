@@ -666,7 +666,7 @@ class PhysicalParticleSystem(MicroParticleSystem):
         """
         in_contact = np.zeros(len(positions), dtype=bool)
         for idx, pos in enumerate(positions):
-            in_contact[idx] = og.sim.psqi.overlap_sphere_any(system.particle_contact_offset, pos)
+            in_contact[idx] = og.sim.psqi.overlap_sphere_any(cls.particle_contact_offset, pos)
         return in_contact
 
 
