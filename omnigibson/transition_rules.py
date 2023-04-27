@@ -90,7 +90,7 @@ class TransitionRuleAPI:
         global RULES_REGISTRY
 
         # Clear all active rules
-        cls.ACTIVE_RULES = dict()
+        cls.ACTIVE_RULES = set()
 
         # Refresh all registered rules
         cls.refresh_rules(rules=RULES_REGISTRY.objects)
@@ -186,7 +186,7 @@ class TransitionRuleAPI:
         global RULES_REGISTRY
 
         # Clear internal dictionaries
-        cls.ACTIVE_RULES = dict()
+        cls.ACTIVE_RULES = set()
         cls._INIT_STATES = dict()
 
 
@@ -354,7 +354,7 @@ class TouchingAnyCondition(RuleCondition):
         if self._optimized:
             # Get all impulses
             impulses = RigidContactAPI.get_all_impulses()
-            idxs_to_check = np.concatenate((self._filter_2_idxs[obj] for obj in object_candidates[self._filter_2_name]))
+            idxs_to_check = np.concatenate([self._filter_2_idxs[obj] for obj in object_candidates[self._filter_2_name]])
             # Batch check for each object
             for obj in object_candidates[self._filter_1_name]:
                 if np.any(impulses[self._filter_1_idxs[obj]][:, idxs_to_check]):
@@ -640,7 +640,7 @@ class BaseTransitionRule(Registerable):
         """
         # Copy the candidates dictionary since it may be mutated in place by @conditions
         object_candidates = {filter_name: candidates.copy() for filter_name, candidates in cls.candidates.items()}
-        for condition in conditions:
+        for condition in cls.conditions:
             if not condition(object_candidates=object_candidates):
                 # Condition was not met, so immediately terminate
                 return
