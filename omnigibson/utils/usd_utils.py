@@ -258,7 +258,7 @@ class RigidContactAPI:
         i = 0
         cls._PATH_TO_IDX = dict()
         for obj in og.sim.scene.objects:
-            if obj.prim_type == PrimType.RIGID:
+            if obj.prim_type == PrimType.RIGID and not obj.kinematic_only:
                 for link in obj.links.values():
                     cls._PATH_TO_IDX[link.prim_path] = i
                     i += 1
