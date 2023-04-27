@@ -642,7 +642,7 @@ class FlatcacheAPI:
         # For any prim transforms that were manually updated, we need to restore their original transforms
         for prim in cls.MODIFIED_PRIMS:
             cls.reset_raw_object_transforms_in_usd(prim)
-        cls.FLATCACHE_MODIFIED_PRIMS = set()
+        cls.MODIFIED_PRIMS = set()
 
 
 def clear():

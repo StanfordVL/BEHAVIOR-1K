@@ -111,7 +111,7 @@ class TransitionRuleAPI:
             object_candidates = cls.get_rule_candidates(rule=rule, objects=objects)
 
             # Update candidates if valid, otherwise pop the entry if it exists in cls.ACTIVE_RULES
-            if candidates is not None:
+            if object_candidates is not None:
                 # We have a valid rule which should be active, so grab and initialize all of its conditions
                 # NOTE: The rule may ALREADY exist in ACTIVE_RULES, but we still need to refresh its candidates because
                 # the relevant candidate set / information for the rule + its conditions may have changed given the
