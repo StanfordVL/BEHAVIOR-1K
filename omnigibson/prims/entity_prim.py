@@ -20,6 +20,8 @@ from omnigibson.prims.rigid_prim import RigidPrim
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.constants import PrimType, GEOM_TYPES, JointType, JointAxis
 from omnigibson.utils.ui_utils import suppress_omni_log
+from omnigibson.utils.usd_utils import BoundingBoxAPI
+
 from omnigibson.macros import gm
 
 
@@ -61,6 +63,7 @@ class EntityPrim(XFormPrim):
 
         # This needs to be initialized to be used for _load() of PrimitiveObject
         self._prim_type = load_config["prim_type"] if "prim_type" in load_config else PrimType.RIGID
+        assert self._prim_type in iter(PrimType), f"Unknown prim type {self._prim_type}!"
 
         # Run super init
         super().__init__(
@@ -132,6 +135,17 @@ class EntityPrim(XFormPrim):
                         material_paths.add(mat_path)
 
         self._materials = materials
+
+    @property
+    def aabb(self):
+        if self.prim_type == PrimType.CLOTH:
+            particle_positions = self.root_link.particle_positions
+            aabb_low, aabb_hi = np.min(particle_positions, axis=0), np.max(particle_positions, axis=0)
+        else:  # Rigid
+            aabb_low, aabb_hi = super().aabb
+            aabb_low, aabb_hi = np.array(aabb_low), np.array(aabb_hi)
+
+        return aabb_low, aabb_hi
 
     def update_links(self):
         """
@@ -540,6 +554,7 @@ class EntityPrim(XFormPrim):
         dof_states["pos"] = new_positions
         if not drive:
             self._dc.set_articulation_dof_states(self._handle, dof_states, _dynamic_control.STATE_POS)
+            BoundingBoxAPI.clear()
 
         # Also set the target
         self._dc.set_articulation_dof_position_targets(self._handle, new_positions.astype(np.float32))
@@ -868,6 +883,8 @@ class EntityPrim(XFormPrim):
             else:
                 super().set_position_orientation(position=position, orientation=orientation)
 
+        BoundingBoxAPI.clear()
+
     def get_position_orientation(self):
         if self._prim_type == PrimType.CLOTH:
             if self._dc is not None and self._dc.is_simulating():
@@ -923,6 +940,7 @@ class EntityPrim(XFormPrim):
                 self._set_local_pose_when_simulating(translation=translation, orientation=orientation)
             else:
                 super().set_local_pose(translation=translation, orientation=orientation)
+        BoundingBoxAPI.clear()
 
     def _get_local_pose_when_simulating(self):
         """

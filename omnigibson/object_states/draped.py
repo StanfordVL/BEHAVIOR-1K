@@ -1,6 +1,6 @@
 from omnigibson.object_states.kinematics import KinematicsMixin
 from omnigibson.object_states.object_state_base import BooleanState, RelativeObjectState
-from omnigibson.object_states.touching import Touching
+from omnigibson.object_states.contact_bodies import ContactBodies
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.object_state_utils import sample_cloth_on_rigid
 import omnigibson.utils.transform_utils as T
@@ -23,7 +23,7 @@ m.DRAPED_MAX_VELOCITY = 0.05
 class Draped(KinematicsMixin, RelativeObjectState, BooleanState):
     @staticmethod
     def get_dependencies():
-        return KinematicsMixin.get_dependencies() + RelativeObjectState.get_dependencies() + [Touching]
+        return KinematicsMixin.get_dependencies() + RelativeObjectState.get_dependencies() + [ContactBodies]
 
     def _set_value(self, other, new_value):
         if not new_value:
@@ -45,12 +45,24 @@ class Draped(KinematicsMixin, RelativeObjectState, BooleanState):
     def _get_value(self, other):
         """
         Check whether the (cloth) object is draped on the other (rigid) object.
-        The cloth object needs to touch the rigid object and its velocity needs to be small.
+        The cloth object should touch the rigid object and its CoM should be below the average position of the contact points.
         """
         if not (self.obj.prim_type == PrimType.CLOTH and other.prim_type == PrimType.RIGID):
             raise ValueError("Draped state requires obj1 is cloth and obj2 is rigid.")
 
-        return self.obj.states[Touching].get_value(other)
+        # Find the links of @other that are in contact with @self.obj
+        contact_links = self.obj.states[ContactBodies].get_value() & set(other.links.values())
+        if len(contact_links) == 0:
+            return False
+        contact_link_prim_paths = {contact_link.prim_path for contact_link in contact_links}
 
-        # return self.obj.states[Touching].get_value(other) and \
-        #     np.linalg.norm(self.obj.get_linear_velocity()) < m.DRAPED_MAX_VELOCITY
+        # Filter the contact points to only include the ones that are on the contact links
+        contact_positions = []
+        for contact in self.obj.contact_list():
+            if len({contact.body0, contact.body1} & contact_link_prim_paths) > 0:
+                contact_positions.append(contact.position)
+
+        # The center of mass of the cloth needs to be below the average position of the contact points
+        mean_contact_position = np.mean(contact_positions, axis=0)
+        center_of_mass = np.mean(self.obj.root_link.particle_positions, axis=0)
+        return center_of_mass[2] < mean_contact_position[2]

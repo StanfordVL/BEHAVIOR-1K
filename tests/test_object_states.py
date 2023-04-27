@@ -869,9 +869,6 @@ def test_open():
 
 @og_test
 def test_draped():
-    from IPython import embed
-    print("test")
-    embed()
     breakfast_table = og.sim.scene.object_registry("name", "breakfast_table")
     carpet = og.sim.scene.object_registry("name", "carpet")
 

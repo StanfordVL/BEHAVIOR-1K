@@ -364,6 +364,7 @@ class BoundingBoxAPI:
         """
         # Create cache if it doesn't already exist
         if cls.CACHE_NON_FLATCACHE is None:
+            og.sim.psi.fetch_results()
             cls.CACHE_NON_FLATCACHE = create_bbox_cache(use_extents_hint=False)
 
         # Grab aabb

@@ -263,6 +263,8 @@ def sample_cloth_on_rigid(obj, other, max_trials=10, z_offset=0.05, randomize_xy
             on a rack, @other is the rack
         max_trials (int): Number of attempts for sampling
         z_offset (float): Z-offset to apply to the sampled pose
+        randomize_xy (bool): Whether to randomize the XY position of the sampled pose. If False, the center of @other
+            will always be used.
 
     Returns:
         bool: True if successfully sampled, else False
@@ -285,9 +287,11 @@ def sample_cloth_on_rigid(obj, other, max_trials=10, z_offset=0.05, randomize_xy
     z_value = other_aabb_high[2] + (obj_aabb_high[2] - obj_aabb_low[2]) / 2.0 + z_offset
 
     if randomize_xy:
+        # Sample a random position in the x-y plane within the other object's AABB
         low = np.array([other_aabb_low[0], other_aabb_low[1], z_value])
         high = np.array([other_aabb_high[0], other_aabb_high[1], z_value])
     else:
+        # Always sample the center of the other object's AABB
         low = np.array([(other_aabb_low[0] + other_aabb_high[0]) / 2.0,
                         (other_aabb_low[1] + other_aabb_high[1]) / 2.0,
                         z_value])
@@ -312,15 +316,9 @@ def sample_cloth_on_rigid(obj, other, max_trials=10, z_offset=0.05, randomize_xy
             og.sim.load_state(state)
 
     if success:
-        obj.set_position_orientation(pos, orn)
-        obj.root_link.reset()
-        obj.keep_still()
-
-        # Let it fall for 0.2 second
+        # Let it fall for 0.2 second always to let the cloth settle
         for _ in range(int(0.2 / og.sim.get_physics_dt())):
             og.sim.step_physics()
-            if len(obj.states[ContactBodies].get_value()) > 0:
-                break
 
         obj.keep_still()
 

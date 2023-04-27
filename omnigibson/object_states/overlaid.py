@@ -1,6 +1,6 @@
 from omnigibson.object_states.kinematics import KinematicsMixin
 from omnigibson.object_states.object_state_base import BooleanState, RelativeObjectState
-from omnigibson.object_states.draped import Draped
+from omnigibson.object_states.touching import Touching
 from omnigibson.utils.constants import PrimType
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.object_state_utils import sample_cloth_on_rigid
@@ -27,7 +27,7 @@ m.SAMPLING_Z_OFFSET = 0.01
 class Overlaid(KinematicsMixin, RelativeObjectState, BooleanState):
     @staticmethod
     def get_dependencies():
-        return KinematicsMixin.get_dependencies() + RelativeObjectState.get_dependencies() + [Draped]
+        return KinematicsMixin.get_dependencies() + RelativeObjectState.get_dependencies() + [Touching]
 
     def _set_value(self, other, new_value):
         if not new_value:
@@ -52,7 +52,7 @@ class Overlaid(KinematicsMixin, RelativeObjectState, BooleanState):
         if not (self.obj.prim_type == PrimType.CLOTH and other.prim_type == PrimType.RIGID):
             raise ValueError("Overlaid state requires obj1 is cloth and obj2 is rigid.")
 
-        if not self.obj.states[Draped].get_value(other):
+        if not self.obj.states[Touching].get_value(other):
             return False
 
         # Compute the convex hull of the particles of the cloth object.
