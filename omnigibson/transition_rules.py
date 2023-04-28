@@ -323,6 +323,8 @@ class TouchingAnyCondition(RuleCondition):
         # Will be filled in during self.initialize
         # Maps object to the list of rigid body idxs in the global contact matrix corresponding to filter 1
         self._filter_1_idxs = None
+
+        # If optimized, filter_2_idxs will be used, otherwise filter_2_bodies will be used!
         # Maps object to the list of rigid body idxs in the global contact matrix corresponding to filter 2
         self._filter_2_idxs = None
         # Maps object to set of rigid bodies corresponding to filter 2
