@@ -191,6 +191,20 @@ def get_object_models_of_category(category_name, filter_method=None):
     return sorted(models)
 
 
+def get_all_system_categories():
+    """
+    Get OmniGibson all system categories
+
+    Returns:
+        list: all system categories
+    """
+    og_dataset_path = gm.DATASET_PATH
+    og_categories_path = os.path.join(og_dataset_path, "systems")
+
+    categories =[f for f in os.listdir(og_categories_path) if not is_dot_file(f)]
+    return sorted(categories)
+
+
 def get_all_object_categories():
     """
     Get OmniGibson all object categories

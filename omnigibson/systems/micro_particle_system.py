@@ -1233,8 +1233,8 @@ class PhysicalParticleSystem(MicroParticleSystem):
         kwargs["particle_contact_offset"] = cp_particle_contact_offset
         kwargs["particle_density"] = cp_particle_density
 
-        # Create and return the class
-        return subclass_factory(name=snake_case_to_camel_case(name), base_classes=cls, **kwargs)
+        # Run super
+        return super().create(name=name, **kwargs)
 
 
 class FluidSystem(PhysicalParticleSystem):

@@ -956,8 +956,8 @@ class VisualParticleSystem(MacroParticleSystem):
         kwargs["initialize"] = cm_initialize
         kwargs["_create_particle_template"] = cm_create_particle_template
 
-        # Create and return the class
-        return subclass_factory(name=snake_case_to_camel_case(name), base_classes=cls, **kwargs)
+        # Run super
+        return super().create(name=name, **kwargs)
 
     @classmethod
     def _dump_state(cls):
@@ -1127,6 +1127,7 @@ VisualParticleSystem.create(
     _BOUNDING_BOX_UPPER_LIMIT_MAX=0.1,
     # Also need to override the how we process particle scaling, since they get scaled according to the parent object's
     # native size
+    # TODO: Should this always be the case? Maybe make this a flag in the create() method?
     update_particle_scaling=stain_update_particle_scaling,
 )
 

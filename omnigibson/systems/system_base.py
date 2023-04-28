@@ -1,7 +1,8 @@
 import omnigibson as og
 from omnigibson.macros import gm
+from omnigibson.utils.asset_utils import get_all_system_categories
 from omnigibson.utils.python_utils import classproperty, assert_valid_key, get_uuid, camel_case_to_snake_case, \
-    SerializableNonInstance, UniquelyNamedNonInstance
+    snake_case_to_camel_case, subclass_factory, SerializableNonInstance, UniquelyNamedNonInstance
 from omnigibson.utils.registry_utils import SerializableRegistry
 from omnigibson.utils.ui_utils import create_module_logger
 
@@ -88,6 +89,25 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
         pass
 
     @classmethod
+    def create(cls, name, **kwargs):
+        """
+        Helper function to programmatically generate systems
+
+        Args:
+            name (str): Name of the visual particles, in snake case.
+            **kwargs (any): keyword-mapped parameters to override / set in the child class, where the keys represent
+                the class attribute to modify and the values represent the functions / value to set
+                (Note: These values should have either @classproperty or @classmethod decorators!)
+
+
+        Returns:
+            BaseSystem: Generated system class given input arguments
+        """
+        # Create and return the class
+        return subclass_factory(name=snake_case_to_camel_case(name), base_classes=cls, **kwargs)
+
+
+    @classmethod
     def get_active_systems(cls):
         """
         Returns:
@@ -110,6 +130,79 @@ SYSTEM_REGISTRY = SerializableRegistry(
 )
 
 
+def _create_system_from_metadata(system_name):
+    """
+    Internal helper function to programmatically create a system from dataset metadata
+
+    NOTE: This only creates the system, and does NOT initialize the system
+
+    Args:
+        system_name (str): Name of the system to create, e.g.: "water", "stain", etc.
+
+    Returns:
+        BaseSystem: Created system class
+    """
+    # Search for the appropriate system, if not found, fallback
+    # TODO: Once dataset is fully constructed, DON'T fallback, and assert False instead
+    all_systems = set(get_all_system_categories())
+    if system_name not in all_systems:
+        # Avoid circular imports
+        from omnigibson import systems
+        # Use default config -- assume @system_name is a fluid that uses the same params as water
+        return systems.__dict__["FluidSystem"].create(
+            name=system_name,
+            particle_contact_offset=0.012,
+            particle_density=500.0,
+            material_mtl_name="DeepWater",
+        )
+    else:
+        """
+        This is not defined yet, but one proposal:
+        
+        Metadata = .json dict, with format:
+        {
+            "type": one of {"visual", "fluid", "granular"},
+        }
+        
+        if visual or granular, also includes:
+            "KWARG_0" : ... (e.g.: stain kwargs)
+            
+            --> note: create_particle_template should be deterministic, configured via:
+                lambda prim_path, name: og.objects.DatasetObject(
+                    prim_path=prim_path,
+                    name=name,
+                    usd_path=os.path.join(gm.DATASET_PATH, "systems", system_name, f"{system_name}.usd"),
+                    category=system_name,
+                    visible=False,
+                    fixed_base=False,
+                    visual_only=True,
+                    include_default_states=False,
+                    abilities={},
+                )
+        
+        if fluid / granular, also include:
+            "particle_contact_offset": ...,
+            "particle_density": ...,
+        
+        if fluid, also include:
+            "material_mtl_name": ...,       # Base material config to use
+            "customize_particle_kwargs": {  # Maps property/ies from @MaterialPrim to value to set
+                "opacity_constant": ...,
+                "albedo_add": ...,
+                "diffuse_color_constant": ...,
+                ...,
+            }
+            
+            --> This will be programmatically constructed into a function:
+                def _customize_particle_material(mat: MaterialPrim): --> None
+                    for attr, val in metadata["customize_particle_kwargs"].items():
+                        mat.__setattr__(attr, val)
+                        
+        Then, compile the necessary kwargs and generate the requested system
+        """
+        raise ValueError("Metadata format for loading system not defined yet!")
+
+
 def is_system_active(system_name):
     assert system_name in REGISTERED_SYSTEMS, f"System {system_name} not in REGISTERED_SYSTEMS."
     system = REGISTERED_SYSTEMS[system_name]
@@ -117,8 +210,11 @@ def is_system_active(system_name):
 
 
 def get_system(system_name):
-    assert system_name in REGISTERED_SYSTEMS, f"System {system_name} not in REGISTERED_SYSTEMS."
-    system = REGISTERED_SYSTEMS[system_name]
+    # Make sure scene exists
+    assert og.sim.scene is not None, "Cannot get systems until scene is imported!"
+    # If system_name is not in REGISTERED_SYSTEMS, create from metadata
+    system = REGISTERED_SYSTEMS[system_name] if system_name in REGISTERED_SYSTEMS \
+        else _create_system_from_metadata(system_name=system_name)
     if not system.initialized:
         system.initialize()
         SYSTEM_REGISTRY.add(obj=system)
