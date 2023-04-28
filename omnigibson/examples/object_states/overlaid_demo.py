@@ -32,7 +32,7 @@ def main(random_selection=False, headless=False, short_exec=False):
                 "category": "carpet",
                 "model": "ctclvd",
                 "prim_type": PrimType.CLOTH,
-                "abilities": {"foldable": {}},
+                "abilities": {"cloth": {}},
                 "position": [0, 0, 1.0],
                 "scale": [1.5] * 3,
             },

@@ -174,7 +174,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 light_type="Dome",
                 intensity=1500,
             )
-            og.sim.import_object(self._skybox, register=False)
+            og.sim.import_object(self._skybox)
             light_prim = self._skybox.light_link.prim
             light_prim.GetAttribute("color").Set(Gf.Vec3f(1.07, 0.85, 0.61))
             light_prim.GetAttribute("texture:file").Set(Sdf.AssetPath(m.DEFAULT_SKYBOX_TEXTURE))
@@ -205,24 +205,6 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 position=init_state[obj_name]["root_link"]["pos"],
                 orientation=init_state[obj_name]["root_link"]["ori"],
             )
-
-        # disable collision between the fixed links of the fixed objects
-        fixed_objs = self.object_registry("fixed_base", True, default_val=[])
-        if len(fixed_objs) > 1:
-            # We iterate over all pairwise combinations of fixed objects
-            building_categories = {"walls", "floors", "ceilings"}
-            for obj_a, obj_b in combinations(fixed_objs, 2):
-                # TODO: Remove this hotfix once asset collision meshes are fixed!
-                # Filter out collisions between walls / ceilings / floors and ALL links of the other object
-                if obj_a.category in building_categories:
-                    for link in obj_b.links.values():
-                        obj_a.root_link.add_filtered_collision_pair(link)
-                elif obj_b.category in building_categories:
-                    for link in obj_a.links.values():
-                        obj_b.root_link.add_filtered_collision_pair(link)
-                else:
-                    # Only filter out root links
-                    obj_a.root_link.add_filtered_collision_pair(obj_b.root_link)
 
     def _should_load_object(self, obj_info):
         """
@@ -416,6 +398,22 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # let scene._load() load the object when called later on.
         prim = obj.load()
 
+        # If this object is fixed, disable collisions between the fixed links of the fixed objects
+        if obj.fixed_base:
+            # TODO: Remove building hotfix once asset collision meshes are fixed!!
+            building_categories = {"walls", "floors", "ceilings"}
+            for fixed_obj in self.fixed_objects.values():
+                # Filter out collisions between walls / ceilings / floors and ALL links of the other object
+                if obj.category in building_categories:
+                    for link in fixed_obj.links.values():
+                        obj.root_link.add_filtered_collision_pair(link)
+                elif fixed_obj.category in building_categories:
+                    for link in obj.links.values():
+                        fixed_obj.root_link.add_filtered_collision_pair(link)
+                else:
+                    # Only filter out root links
+                    obj.root_link.add_filtered_collision_pair(fixed_obj.root_link)
+
         # Add this object to our registry based on its type, if we want to register it
         if register:
             self.object_registry.add(obj)
@@ -474,7 +472,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             dict: Keyword-mapped objects that are fixed in the scene. Maps object name to their object class instances
                 (DatasetObject)
         """
-        return {obj.name: obj for obj in self.object_registry("fixed_base", True)}
+        return {obj.name: obj for obj in self.object_registry("fixed_base", True, default_val=[])}
 
     def get_random_floor(self):
         """

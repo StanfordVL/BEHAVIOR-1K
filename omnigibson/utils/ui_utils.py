@@ -392,6 +392,10 @@ class CameraMover:
         """
         # Create splines and their derivatives
         n_waypoints = len(waypoints)
+        if n_waypoints < 3:
+            og.log.error("Cannot generate trajectory from waypoints with less than 3 waypoints!")
+            return
+
         splines = [CubicSpline(range(n_waypoints), waypoints[:, i], bc_type='clamped') for i in range(3)]
         dsplines = [spline.derivative() for spline in splines]
 

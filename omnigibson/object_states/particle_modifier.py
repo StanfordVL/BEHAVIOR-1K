@@ -512,6 +512,13 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
 
         return state_dict, len(self.modified_particle_count) + 1
 
+    @classproperty
+    def _do_not_register_classes(cls):
+        # Don't register this class since it's an abstract template
+        classes = super()._do_not_register_classes
+        classes.add("ParticleModifier")
+        return classes
+
 
 class ParticleRemover(ParticleModifier):
     """

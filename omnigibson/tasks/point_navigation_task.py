@@ -1,6 +1,7 @@
 import numpy as np
 
 import omnigibson as og
+from omnigibson.object_states import Pose
 from omnigibson.objects.primitive_object import PrimitiveObject
 from omnigibson.reward_functions.collision_reward import CollisionReward
 from omnigibson.reward_functions.point_goal_reward import PointGoalReward
@@ -276,7 +277,7 @@ class PointNavigationTask(BaseTask):
         Returns:
             float: L2 distance to the target position
         """
-        return T.l2_distance(env.robots[self._robot_idn].get_position()[:2], self._goal_pos[:2])
+        return T.l2_distance(env.robots[self._robot_idn].states[Pose].get_value()[0][:2], self._goal_pos[:2])
 
     def get_potential(self, env):
         """
@@ -318,7 +319,7 @@ class PointNavigationTask(BaseTask):
 
         # Notify user if we failed to reset a collision-free sampled pose
         if not success:
-            log.warning("WARNING: Failed to reset robot without collision")
+            log.warning("Failed to reset robot without collision")
 
         # Land the robot
         land_object(env.robots[self._robot_idn], initial_pos, initial_quat, env.initial_pos_z_offset)
@@ -363,8 +364,8 @@ class PointNavigationTask(BaseTask):
         Returns:
             3-array: (x,y,z) position in self._robot_idn agent's local frame
         """
-        delta_pos_global = np.array(pos) - env.robots[self._robot_idn].get_position()
-        return T.quat2mat(env.robots[self._robot_idn].get_orientation()).T @ delta_pos_global
+        delta_pos_global = np.array(pos) - env.robots[self._robot_idn].states[Pose].get_value()[0]
+        return T.quat2mat(env.robots[self._robot_idn].states[Pose].get_value()[1]).T @ delta_pos_global
 
     def _get_obs(self, env):
         # Get relative position of goal with respect to the current agent position
@@ -373,9 +374,9 @@ class PointNavigationTask(BaseTask):
             xy_pos_to_goal = np.array(T.cartesian_to_polar(*xy_pos_to_goal))
 
         # linear velocity and angular velocity
-        quat = env.robots[self._robot_idn].get_orientation()
-        lin_vel = T.quat2mat(quat).T @ env.robots[self._robot_idn].get_linear_velocity()
-        ang_vel = T.quat2mat(quat).T @ env.robots[self._robot_idn].get_angular_velocity()
+        ori_t = T.quat2mat(env.robots[self._robot_idn].states[Pose].get_value()[1]).T
+        lin_vel = ori_t @ env.robots[self._robot_idn].get_linear_velocity()
+        ang_vel = ori_t @ env.robots[self._robot_idn].get_angular_velocity()
 
         # Compose observation dict
         low_dim_obs = dict(
@@ -403,7 +404,7 @@ class PointNavigationTask(BaseTask):
         Returns:
             3-array: (x,y,z) global current position representing the robot
         """
-        return env.robots[self._robot_idn].get_position()
+        return env.robots[self._robot_idn].states[Pose].get_value()[0]
 
     def get_shortest_path_to_goal(self, env, start_xy_pos=None, entire_path=False):
         """
@@ -421,7 +422,7 @@ class PointNavigationTask(BaseTask):
                 - list of 2-array: List of (x,y) waypoints representing the path # TODO: is this true?
                 - float: geodesic distance of the path to the goal position
         """
-        start_xy_pos = env.robots[self._robot_idn].get_position()[:2] if start_xy_pos is None else start_xy_pos
+        start_xy_pos = env.robots[self._robot_idn].states[Pose].get_value()[0][:2] if start_xy_pos is None else start_xy_pos
         return env.scene.get_shortest_path(self._floor, start_xy_pos, self._goal_pos[:2], entire_path=entire_path)
 
     def _step_visualization(self, env):
@@ -450,7 +451,7 @@ class PointNavigationTask(BaseTask):
         self._step_visualization(env=env)
 
         # Update other internal variables
-        new_robot_pos = env.robots[self._robot_idn].get_position()
+        new_robot_pos = env.robots[self._robot_idn].states[Pose].get_value()[0]
         self._path_length += T.l2_distance(self._current_robot_pos[:2], new_robot_pos[:2])
         self._current_robot_pos = new_robot_pos
 

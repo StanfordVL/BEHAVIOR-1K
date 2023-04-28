@@ -12,12 +12,16 @@ from omni.isaac.core.utils.prims import get_prim_property, set_prim_property, \
     get_prim_parent, get_prim_at_path
 
 import omnigibson as og
+import omnigibson.utils.transform_utils as T
+
 from omnigibson.prims.cloth_prim import ClothPrim
 from omnigibson.prims.joint_prim import JointPrim
 from omnigibson.prims.rigid_prim import RigidPrim
 from omnigibson.prims.xform_prim import XFormPrim
-from omnigibson.utils.constants import PrimType, GEOM_TYPES
+from omnigibson.utils.constants import PrimType, GEOM_TYPES, JointType, JointAxis
 from omnigibson.utils.ui_utils import suppress_omni_log
+from omnigibson.utils.usd_utils import BoundingBoxAPI
+
 from omnigibson.macros import gm
 
 
@@ -59,6 +63,7 @@ class EntityPrim(XFormPrim):
 
         # This needs to be initialized to be used for _load() of PrimitiveObject
         self._prim_type = load_config["prim_type"] if "prim_type" in load_config else PrimType.RIGID
+        assert self._prim_type in iter(PrimType), f"Unknown prim type {self._prim_type}!"
 
         # Run super init
         super().__init__(
@@ -130,6 +135,17 @@ class EntityPrim(XFormPrim):
                         material_paths.add(mat_path)
 
         self._materials = materials
+
+    @property
+    def aabb(self):
+        if self.prim_type == PrimType.CLOTH:
+            particle_positions = self.root_link.particle_positions
+            aabb_low, aabb_hi = np.min(particle_positions, axis=0), np.max(particle_positions, axis=0)
+        else:  # Rigid
+            aabb_low, aabb_hi = super().aabb
+            aabb_low, aabb_hi = np.array(aabb_low), np.array(aabb_hi)
+
+        return aabb_low, aabb_hi
 
     def update_links(self):
         """
@@ -242,6 +258,55 @@ class EntityPrim(XFormPrim):
 
         # Store values internally
         self._n_dof = n_dof
+        self._update_joint_limits()
+
+    def _update_joint_limits(self):
+        """
+        Helper function to update internal joint limits for prismatic joints based on the object's scale
+        """
+        # If the scale is [1, 1, 1], we can skip this step
+        if np.allclose(self.scale, np.ones(3)):
+            return
+
+        prismatic_joints = {j_name: j for j_name, j in self._joints.items() if j.joint_type == JointType.JOINT_PRISMATIC}
+
+        # If there are no prismatic joints, we can skip this step
+        if len(prismatic_joints) == 0:
+            return
+
+        uniform_scale = np.allclose(self.scale, self.scale[0])
+
+        for joint_name, joint in prismatic_joints.items():
+            if uniform_scale:
+                scale_along_axis = self.scale[0]
+            else:
+                assert not self.initialized, \
+                    "Cannot update joint limits for a non-uniformly scaled object when already initialized."
+                for link_name, link in self.links.items():
+                    if joint.parent_name == link_name:
+                        # Find the parent link frame orientation in the object frame
+                        _, link_local_orn = link.get_local_pose()
+
+                        # Find the joint frame orientation in the parent link frame
+                        joint_local_orn = gf_quat_to_np_array(joint.get_attribute("physics:localRot0"))[[1, 2, 3, 0]]
+
+                        # Compute the joint frame orientation in the object frame
+                        joint_orn = T.quat_multiply(quaternion1=joint_local_orn, quaternion0=link_local_orn)
+
+                        assert T.check_quat_right_angle(joint_orn), "Objects that are NOT uniformly scaled requires all joints to have orientations that are factors of 90 degrees!"
+
+                        # Find the joint axis unit vector (e.g. [1, 0, 0] for "X", [0, 1, 0] for "Y", etc.)
+                        axis_in_joint_frame = np.zeros(3)
+                        axis_in_joint_frame[JointAxis.index(joint.axis)] = 1.0
+
+                        # Compute the joint axis unit vector in the object frame
+                        axis_in_obj_frame = T.quat2mat(joint_orn) @ axis_in_joint_frame
+
+                        # Find the correct scale along the joint axis direction
+                        scale_along_axis = self.scale[np.argmax(np.abs(axis_in_obj_frame))]
+
+            joint.lower_limit = joint.lower_limit * scale_along_axis
+            joint.upper_limit = joint.upper_limit * scale_along_axis
 
     @property
     def prim_type(self):
@@ -281,7 +346,7 @@ class EntityPrim(XFormPrim):
     def root_link(self):
         """
         Returns:
-            RigidPrim: Root link of this object prim
+            RigidPrim or ClothPrim: Root link of this object prim
         """
         return self._links[self.root_link_name]
 
@@ -489,6 +554,7 @@ class EntityPrim(XFormPrim):
         dof_states["pos"] = new_positions
         if not drive:
             self._dc.set_articulation_dof_states(self._handle, dof_states, _dynamic_control.STATE_POS)
+            BoundingBoxAPI.clear()
 
         # Also set the target
         self._dc.set_articulation_dof_position_targets(self._handle, new_positions.astype(np.float32))
@@ -817,6 +883,8 @@ class EntityPrim(XFormPrim):
             else:
                 super().set_position_orientation(position=position, orientation=orientation)
 
+        BoundingBoxAPI.clear()
+
     def get_position_orientation(self):
         if self._prim_type == PrimType.CLOTH:
             if self._dc is not None and self._dc.is_simulating():
@@ -872,6 +940,7 @@ class EntityPrim(XFormPrim):
                 self._set_local_pose_when_simulating(translation=translation, orientation=orientation)
             else:
                 super().set_local_pose(translation=translation, orientation=orientation)
+        BoundingBoxAPI.clear()
 
     def _get_local_pose_when_simulating(self):
         """
@@ -1161,6 +1230,19 @@ class EntityPrim(XFormPrim):
                 for more information
         """
         self.root_link.kinematic_only = val
+
+    @property
+    def aabb(self):
+        # If we're a cloth prim type, we compute the bounding box from the limits of the particles. Otherwise, use the
+        # normal method for computing bounding box
+        if self._prim_type == PrimType.CLOTH:
+            particle_positions = self.root_link.particle_positions
+            aabb_lo, aabb_hi = np.min(particle_positions, axis=0), np.max(particle_positions, axis=0)
+        else:
+            aabb_lo, aabb_hi = super().aabb
+            aabb_lo, aabb_hi = np.array(aabb_lo), np.array(aabb_hi)
+
+        return aabb_lo, aabb_hi
 
     def wake(self):
         """

@@ -12,7 +12,7 @@ import omnigibson as og
 from omni.isaac.core.utils.stage import get_current_stage
 from omnigibson.prims.prim_base import BasePrim
 from omnigibson.prims.material_prim import MaterialPrim
-from omnigibson.utils.transform_utils import quat2mat, mat2euler
+from omnigibson.utils.transform_utils import quat2euler
 from omnigibson.utils.usd_utils import BoundingBoxAPI
 from scipy.spatial.transform import Rotation as R
 
@@ -235,7 +235,7 @@ class XFormPrim(BasePrim):
         Returns:
             3-array: (roll, pitch, yaw) global euler orientation of this prim
         """
-        return mat2euler(quat2mat(self.get_orientation()))
+        return quat2euler(self.get_orientation())
 
     def get_local_pose(self):
         """

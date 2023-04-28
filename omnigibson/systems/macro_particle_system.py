@@ -59,7 +59,7 @@ class MacroParticleSystem(BaseSystem):
 
         # Load the particle template, and make it kinematic only because it's not interacting with anything
         particle_template = cls._create_particle_template()
-        og.sim.import_object(obj=particle_template, register=False, auto_initialize=True)
+        og.sim.import_object(obj=particle_template, register=False)
         particle_template.kinematic_only = True
 
         # Make sure there is no ambiguity about which mesh to use as the particle from this template
@@ -261,7 +261,7 @@ class MacroParticleSystem(BaseSystem):
         Removes all particles and deletes them from the simulator
         """
         # Use list explicitly to prevent mid-loop mutation of dict
-        for particle_name in list(cls.particles.keys()):
+        for particle_name in tuple(cls.particles.keys()):
             cls.remove_particle(name=particle_name)
 
     @classmethod
@@ -476,7 +476,7 @@ class VisualParticleSystem(MacroParticleSystem):
         # Make sure the group exists
         cls._validate_group(group=group)
         # Remove all particles from the group
-        for particle_name in list(cls._group_particles[group].keys()):
+        for particle_name in tuple(cls._group_particles[group].keys()):
             cls.remove_particle(name=particle_name)
 
     @classmethod
