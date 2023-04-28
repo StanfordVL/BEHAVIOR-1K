@@ -908,7 +908,7 @@ class PhysicalParticleSystem(MicroParticleSystem):
 
         # Also prune any that in contact with anything if requested
         if check_contact:
-            particle_positions = particle_positions[np.where(cls.check_in_contact(particle_positions))[0]]
+            particle_positions = particle_positions[np.where(cls.check_in_contact(particle_positions) == 0)[0]]
 
         # Also potentially sub-sample if we're past our limit
         if len(particle_positions) > max_samples:
