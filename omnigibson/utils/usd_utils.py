@@ -259,7 +259,7 @@ class RigidContactAPI:
         i = 0
         cls._PATH_TO_IDX = dict()
         for obj in og.sim.scene.objects:
-            if obj.prim_type == PrimType.RIGID:
+            if obj.prim_type == PrimType.RIGID and not obj.kinematic_only:
                 for link in obj.links.values():
                     cls._PATH_TO_IDX[link.prim_path] = i
                     i += 1
@@ -644,7 +644,7 @@ class FlatcacheAPI:
         # For any prim transforms that were manually updated, we need to restore their original transforms
         for prim in cls.MODIFIED_PRIMS:
             cls.reset_raw_object_transforms_in_usd(prim)
-        cls.FLATCACHE_MODIFIED_PRIMS = set()
+        cls.MODIFIED_PRIMS = set()
 
 
 def clear():

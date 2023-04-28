@@ -539,6 +539,7 @@ class Simulator(SimulationContext, Serializable):
         Step the physics a single step.
         """
         self._physics_context._step(current_time=self.current_time)
+        self._omni_update_step()
 
     def _on_contact(self, contact_headers, contact_data):
         """

@@ -19,7 +19,7 @@ class Filled(RelativeObjectState, BooleanState):
         # Check what volume is filled
         if len(system.particle_instancers) > 0:
             particle_volume = 4 / 3 * np.pi * (system.particle_radius ** 3)
-            n_particles = self.obj.states[ContainedParticles].get_value().n_in_volume
+            n_particles = self.obj.states[ContainedParticles].get_value(system).n_in_volume
             prop_filled = particle_volume * n_particles / self.obj.states[ContainedParticles].volume
             # If greater than threshold, then the volume is filled
             # Explicit bool cast needed here because the type is bool_ instead of bool which is not JSON-Serializable
@@ -48,6 +48,7 @@ class Filled(RelativeObjectState, BooleanState):
                     obj=self.obj,
                     link=contained_particles_state.link,
                     mesh_name_prefixes="container",
+                    check_contact=True,
                 )
             else:
                 # Going from True --> False, delete all particles inside the volume

@@ -90,7 +90,7 @@ class TransitionRuleAPI:
         global RULES_REGISTRY
 
         # Clear all active rules
-        cls.ACTIVE_RULES = dict()
+        cls.ACTIVE_RULES = set()
 
         # Refresh all registered rules
         cls.refresh_rules(rules=RULES_REGISTRY.objects)
@@ -111,7 +111,7 @@ class TransitionRuleAPI:
             object_candidates = cls.get_rule_candidates(rule=rule, objects=objects)
 
             # Update candidates if valid, otherwise pop the entry if it exists in cls.ACTIVE_RULES
-            if candidates is not None:
+            if object_candidates is not None:
                 # We have a valid rule which should be active, so grab and initialize all of its conditions
                 # NOTE: The rule may ALREADY exist in ACTIVE_RULES, but we still need to refresh its candidates because
                 # the relevant candidate set / information for the rule + its conditions may have changed given the
@@ -186,7 +186,7 @@ class TransitionRuleAPI:
         global RULES_REGISTRY
 
         # Clear internal dictionaries
-        cls.ACTIVE_RULES = dict()
+        cls.ACTIVE_RULES = set()
         cls._INIT_STATES = dict()
 
 
@@ -323,25 +323,50 @@ class TouchingAnyCondition(RuleCondition):
         # Will be filled in during self.initialize
         # Maps object to the list of rigid body idxs in the global contact matrix corresponding to filter 1
         self._filter_1_idxs = None
-        # List of rigid body idxs in the global contact matrix corresponding to filter 2
+
+        # If optimized, filter_2_idxs will be used, otherwise filter_2_bodies will be used!
+        # Maps object to the list of rigid body idxs in the global contact matrix corresponding to filter 2
         self._filter_2_idxs = None
+        # Maps object to set of rigid bodies corresponding to filter 2
+        self._filter_2_bodies = None
+
+        # Flag whether optimized call can be used
+        self._optimized = None
 
     def refresh(self, object_candidates):
-        # Register idx mappings
-        self._filter_1_idxs = {obj: [RigidContactAPI.get_body_idx(link.prim_path) for link in obj.links.values()]
-                            for obj in object_candidates[self._filter_1_name]}
-        self._filter_2_idxs = [RigidContactAPI.get_body_idx(link.prim_path)
-                               for obj in object_candidates[self._filter_2_name] for link in obj.links.values()]
+        # Check whether we can use optimized computation or not -- this is determined by whether or not any objects
+        # in our collision set are kinematic only
+        self._optimized = not np.any([obj.kinematic_only
+                                  for f in (self._filter_1_name, self._filter_2_name) for obj in object_candidates[f]])
+
+        if self._optimized:
+            # Register idx mappings
+            self._filter_1_idxs = {obj: [RigidContactAPI.get_body_idx(link.prim_path) for link in obj.links.values()]
+                                for obj in object_candidates[self._filter_1_name]}
+            self._filter_2_idxs = {obj: [RigidContactAPI.get_body_idx(link.prim_path) for link in obj.links.values()]
+                                for obj in object_candidates[self._filter_2_name]}
+        else:
+            # Register body mappings
+            self._filter_2_bodies = {obj: set(obj.links.values()) for obj in object_candidates[self._filter_2_name]}
 
     def __call__(self, object_candidates):
-        # Get all impulses
-        impulses = RigidContactAPI.get_all_impulses()
-
         # Keep any object that has non-zero impulses between itself and any of the @filter_2_name's objects
         objs = []
-        for obj in object_candidates[self._filter_1_name]:
-            if np.any(impulses[self._filter_1_idxs[obj]][:, self._filter_2_idxs]):
-                objs.append(obj)
+
+        if self._optimized:
+            # Get all impulses
+            impulses = RigidContactAPI.get_all_impulses()
+            idxs_to_check = np.concatenate([self._filter_2_idxs[obj] for obj in object_candidates[self._filter_2_name]])
+            # Batch check for each object
+            for obj in object_candidates[self._filter_1_name]:
+                if np.any(impulses[self._filter_1_idxs[obj]][:, idxs_to_check]):
+                    objs.append(obj)
+        else:
+            # Manually check contact
+            filter_2_bodies = set.union(*(self._filter_2_bodies[obj] for obj in object_candidates[self._filter_2_name]))
+            for obj in object_candidates[self._filter_1_name]:
+                if len(obj.states[ContactBodies].get_value().intersection(filter_2_bodies)) > 0:
+                    objs.append(obj)
 
         # Update candidates
         object_candidates[self._filter_1_name] = objs
@@ -617,7 +642,7 @@ class BaseTransitionRule(Registerable):
         """
         # Copy the candidates dictionary since it may be mutated in place by @conditions
         object_candidates = {filter_name: candidates.copy() for filter_name, candidates in cls.candidates.items()}
-        for condition in conditions:
+        for condition in cls.conditions:
             if not condition(object_candidates=object_candidates):
                 # Condition was not met, so immediately terminate
                 return
@@ -741,7 +766,7 @@ class DicingRule(BaseTransitionRule):
 
         for diceable_obj in object_candidates["diceable"]:
             system = get_system(f"diced_{diceable_obj.category}")
-            system.generate_particles_from_link(diceable_obj, diceable_obj.root_link, use_visual_meshes=False)
+            system.generate_particles_from_link(diceable_obj, diceable_obj.root_link, check_contact=False, use_visual_meshes=False)
 
             # Delete original object from stage.
             t_results.remove.append(diceable_obj)
@@ -783,13 +808,13 @@ class CookingPhysicalParticleRule(BaseTransitionRule):
             # fillable objects
             in_volume = np.zeros(system.n_particles).astype(bool)
             for fillable_obj in fillable_objs:
-                in_volume |= fillable_obj.states[ContainedParticles].get_value().in_volume
+                in_volume |= fillable_obj.states[ContainedParticles].get_value(system).in_volume
 
             # If any are in volume, convert particles
             in_volume_idx = np.where(in_volume)[0]
             if len(in_volume_idx) > 0:
                 cooked_system = get_system(f"cooked_{system.name}")
-                particle_positions = fillable_obj.states[ContainedParticles].get_value().positions
+                particle_positions = fillable_obj.states[ContainedParticles].get_value(system).positions
                 system.default_particle_instancer.remove_particles(idxs=in_volume_idx)
                 cooked_system.default_particle_instancer.add_particles(positions=particle_positions[in_volume_idx])
 
@@ -817,7 +842,7 @@ class MeltingRule(BaseTransitionRule):
         # Convert the meltable object into its melted substance
         for meltable_obj in object_candidates["meltable"]:
             system = get_system(f"melted_{meltable_obj.category}")
-            system.generate_particles_from_link(meltable_obj, meltable_obj.root_link, use_visual_meshes=False)
+            system.generate_particles_from_link(meltable_obj, meltable_obj.root_link, check_contact=False, use_visual_meshes=False)
 
             # Delete original object from stage.
             t_results.remove.append(meltable_obj)

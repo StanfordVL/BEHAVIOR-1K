@@ -666,7 +666,7 @@ class PhysicalParticleSystem(MicroParticleSystem):
         """
         in_contact = np.zeros(len(positions), dtype=bool)
         for idx, pos in enumerate(positions):
-            in_contact[idx] = og.sim.psqi.overlap_sphere_any(system.particle_contact_offset, pos)
+            in_contact[idx] = og.sim.psqi.overlap_sphere_any(cls.particle_contact_offset, pos)
         return in_contact
 
 
@@ -828,6 +828,7 @@ class PhysicalParticleSystem(MicroParticleSystem):
             link,
             use_visual_meshes=True,
             mesh_name_prefixes=None,
+            check_contact=True,
             instancer_idn=None,
             particle_group=0,
             sampling_distance=None,
@@ -848,6 +849,7 @@ class PhysicalParticleSystem(MicroParticleSystem):
             mesh_name_prefixes (None or str): If specified, specifies the substring that must exist in @link's
                 mesh names in order for that mesh to be included in the particle generator function.
                 If None, no filtering will be used.
+            check_contact (bool): If True, will only spawn in particles that do not collide with other rigid bodies
             instancer_idn (None or int): Unique identification number of the particle instancer to assign the generated
                 particles to. This is used to deterministically reproduce individual particle instancer states
                 dynamically, even if we delete / add additional ones at runtime during simulation. If there is no
@@ -904,8 +906,9 @@ class PhysicalParticleSystem(MicroParticleSystem):
         # Check which points are inside the volume and only keep those
         particle_positions = particle_positions[np.where(check_in_volume(particle_positions))[0]]
 
-        # Also prune any that in contact with anything
-        particle_positions = particle_positions[np.where(cls.check_in_contact(particle_positions))[0]]
+        # Also prune any that in contact with anything if requested
+        if check_contact:
+            particle_positions = particle_positions[np.where(cls.check_in_contact(particle_positions) == 0)[0]]
 
         # Also potentially sub-sample if we're past our limit
         if len(particle_positions) > max_samples:
