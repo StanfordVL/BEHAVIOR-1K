@@ -83,6 +83,12 @@ def create_app():
     enable_extension("omni.particle.system.bundle")
     enable_extension("omni.kit.window.viewport")    # This is needed for windows
 
+    # If we're headless, suppress all warnings about GLFW
+    if gm.HEADLESS:
+        import omni.log
+        log = omni.log.get_log()
+        log.set_channel_enabled("carb.windowing-glfw.plugin", False, omni.log.SettingBehavior.OVERRIDE)
+        
     # Globally suppress certain logging modules (unless we're in debug mode) since they produce spurious warnings
     if not gm.DEBUG:
         import omni.log
