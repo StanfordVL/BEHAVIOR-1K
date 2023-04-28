@@ -14,11 +14,6 @@ import numpy as np
 import trimesh
 import itertools
 
-# Create settings for this module
-m = create_module_macros(module_path=__file__)
-
-# Maximum velocity allowed for the draped object
-m.DRAPED_MAX_VELOCITY = 0.05
 
 class Draped(KinematicsMixin, RelativeObjectState, BooleanState):
     @staticmethod

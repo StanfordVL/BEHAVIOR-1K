@@ -45,7 +45,7 @@ class Overlaid(KinematicsMixin, RelativeObjectState, BooleanState):
     def _get_value(self, other):
         """
         Check whether the (cloth) object is overlaid on the other (rigid) object.
-        First, the cloth object needs to be draped on the rigid object.
+        First, the cloth object needs to be touching the rigid object.
         Then, the convex hull of the particles of the cloth object needs to cover a decent percentage of the
         base aligned bounding box of the other rigid object.
         """

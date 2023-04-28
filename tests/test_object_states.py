@@ -780,7 +780,7 @@ def test_attached_to():
 @og_test
 def test_fluid_source():
     sink = og.sim.scene.object_registry("name", "sink")
-    sink.set_position_orientation([0, 0, 0.182], [0, 0, 0, 1])
+    sink.set_position_orientation([0, 0, 0.7], [0, 0, 0, 1])
     for _ in range(3):
         og.sim.step()
 
