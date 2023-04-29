@@ -873,6 +873,11 @@ class BehaviorTask(BaseTask):
                         if not success:
                             return "Sampleable object conditions failed: {}".format(condition.body)
 
+        # Update all the objects' bddl object scopes
+        for obj_scope, obj in self.object_scope.items():
+            if isinstance(obj, DatasetObject):
+                obj.bddl_object_scope = obj_scope
+
         # One more sim step to make sure the object states are propagated correctly
         # E.g. after sampling Filled.set_value(True), Filled.get_value() will become True only after one step
         og.sim.step()
@@ -891,32 +896,31 @@ class BehaviorTask(BaseTask):
                 - None or str: None if successful, otherwise the associated error message
         """
         # Auto-initialize all sampleable objects
-        og.sim.play()
-        env.scene.reset()
+        with og.sim.playing():
+            env.scene.reset()
 
-        error_msg = self.group_initial_conditions()
-        if error_msg:
-            log.error(error_msg)
-            return False, error_msg
-
-        error_msg = self.sample_initial_conditions()
-        if error_msg:
-            log.error(error_msg)
-            return False, error_msg
-
-        if validate_goal:
-            error_msg = self.sample_goal_conditions()
+            error_msg = self.group_initial_conditions()
             if error_msg:
                 log.error(error_msg)
                 return False, error_msg
 
-        error_msg = self.sample_initial_conditions_final()
-        if error_msg:
-            log.error(error_msg)
-            return False, error_msg
+            error_msg = self.sample_initial_conditions()
+            if error_msg:
+                log.error(error_msg)
+                return False, error_msg
 
-        env.scene.update_initial_state()
-        og.sim.stop()
+            if validate_goal:
+                error_msg = self.sample_goal_conditions()
+                if error_msg:
+                    log.error(error_msg)
+                    return False, error_msg
+
+            error_msg = self.sample_initial_conditions_final()
+            if error_msg:
+                log.error(error_msg)
+                return False, error_msg
+
+            env.scene.update_initial_state()
 
         return True, None
 
