@@ -113,6 +113,18 @@ class MacroParticleSystem(BaseSystem):
         # Reset all internal variables
         cls.remove_all_particles()
 
+    @classmethod
+    def clear(cls):
+        # Call super first
+        super().clear()
+
+        # Clear all internal state
+        cls.particle_object = None
+        cls.particles = None
+        cls.min_scale = None
+        cls.max_scale = None
+        cls._color = None
+
     @classproperty
     def n_particles(cls):
         """
