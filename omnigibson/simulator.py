@@ -374,8 +374,9 @@ class Simulator(SimulationContext, Serializable):
         self._scene.remove_object(obj)
         self.app.update()
 
-        # Re-initialize the physics view because the number of objects has changed
-        RigidContactAPI.initialize_view()
+        # Re-initialize the physics view if we're playing because the number of objects has changed
+        if og.sim.is_playing():
+            RigidContactAPI.initialize_view()
 
         # Refresh all current rules
         TransitionRuleAPI.prune_active_rules()
