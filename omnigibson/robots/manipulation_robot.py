@@ -937,7 +937,9 @@ class ManipulationRobot(BaseRobot):
             dic[arm] = {
                 "name": "NullJointController",
                 "control_freq": self._control_freq,
+                "motor_type": "velocity",
                 "control_limits": self.control_limits,
+                "dof_idx": self.gripper_control_idx[arm],
             }
         return dic
 
