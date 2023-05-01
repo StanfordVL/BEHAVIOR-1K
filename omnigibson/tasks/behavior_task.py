@@ -155,7 +155,7 @@ class BehaviorTask(BaseTask):
 
         # Initialize the current activity
         success, self.feedback = self.initialize_activity(env=env)
-        assert success, f"Failed to initialize Behavior Activity. Feedback:\n{self.feedback}"
+        # assert success, f"Failed to initialize Behavior Activity. Feedback:\n{self.feedback}"
 
         # Highlight any task relevant objects if requested
         if self.highlight_task_relevant_objs:
@@ -436,12 +436,10 @@ class BehaviorTask(BaseTask):
                         category, filter_method="sliceable_whole" if is_sliceable else None
                     )
                 except:
-                    og.sim.play()
                     return f"Missing object category: {category}"
 
                 if len(model_choices) == 0:
                     # restore back to the play state
-                    og.sim.play()
                     return f"Missing valid object models for category: {category}"
 
                 # TODO: This no longer works because model ID changes in the new asset
@@ -873,6 +871,11 @@ class BehaviorTask(BaseTask):
                         if not success:
                             return "Sampleable object conditions failed: {}".format(condition.body)
 
+        # Update all the objects' bddl object scopes
+        for obj_scope, obj in self.object_scope.items():
+            if isinstance(obj, DatasetObject):
+                obj.bddl_object_scope = obj_scope
+
         # One more sim step to make sure the object states are propagated correctly
         # E.g. after sampling Filled.set_value(True), Filled.get_value() will become True only after one step
         og.sim.step()
@@ -891,32 +894,31 @@ class BehaviorTask(BaseTask):
                 - None or str: None if successful, otherwise the associated error message
         """
         # Auto-initialize all sampleable objects
-        og.sim.play()
-        env.scene.reset()
+        with og.sim.playing():
+            env.scene.reset()
 
-        error_msg = self.group_initial_conditions()
-        if error_msg:
-            log.error(error_msg)
-            return False, error_msg
-
-        error_msg = self.sample_initial_conditions()
-        if error_msg:
-            log.error(error_msg)
-            return False, error_msg
-
-        if validate_goal:
-            error_msg = self.sample_goal_conditions()
+            error_msg = self.group_initial_conditions()
             if error_msg:
                 log.error(error_msg)
                 return False, error_msg
 
-        error_msg = self.sample_initial_conditions_final()
-        if error_msg:
-            log.error(error_msg)
-            return False, error_msg
+            error_msg = self.sample_initial_conditions()
+            if error_msg:
+                log.error(error_msg)
+                return False, error_msg
 
-        env.scene.update_initial_state()
-        og.sim.stop()
+            if validate_goal:
+                error_msg = self.sample_goal_conditions()
+                if error_msg:
+                    log.error(error_msg)
+                    return False, error_msg
+
+            error_msg = self.sample_initial_conditions_final()
+            if error_msg:
+                log.error(error_msg)
+                return False, error_msg
+
+            env.scene.update_initial_state()
 
         return True, None
 

@@ -364,11 +364,19 @@ class Simulator(SimulationContext, Serializable):
         # pop all link ids
         for link in obj.links.values():
             self._link_id_to_objects.pop(PhysicsSchemaTools.sdfPathToInt(link.prim_path))
+
+        # If it was queued up to be initialized, remove it from the queue as well
+        for i, initialize_obj in enumerate(self._objects_to_initialize):
+            if obj.name == initialize_obj.name:
+                self._objects_to_initialize.pop(i)
+                break
+
         self._scene.remove_object(obj)
         self.app.update()
 
-        # Re-initialize the physics view because the number of objects has changed
-        RigidContactAPI.initialize_view()
+        # Re-initialize the physics view if we're playing because the number of objects has changed
+        if og.sim.is_playing():
+            RigidContactAPI.initialize_view()
 
         # Refresh all current rules
         TransitionRuleAPI.prune_active_rules()
@@ -478,7 +486,7 @@ class Simulator(SimulationContext, Serializable):
 
                 self.step_physics()
 
-                # Initialize physics view
+                # Initialize physics view and RigidContactAPI
                 self._physics_sim_view = omni.physics.tensors.create_simulation_view(self.backend)
                 self._physics_sim_view.set_subspace_roots("/")
 

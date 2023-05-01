@@ -398,8 +398,9 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # let scene._load() load the object when called later on.
         prim = obj.load()
 
-        # If this object is fixed, disable collisions between the fixed links of the fixed objects
-        if obj.fixed_base:
+        # If this object is fixed and is NOT an agent, disable collisions between the fixed links of the fixed objects
+        # This is to account for cases such as Tiago, which has a fixed base which is needed for its global base joints
+        if obj.fixed_base and obj.category != robot_macros.ROBOT_CATEGORY:
             # TODO: Remove building hotfix once asset collision meshes are fixed!!
             building_categories = {"walls", "floors", "ceilings"}
             for fixed_obj in self.fixed_objects.values():
@@ -469,10 +470,10 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
     def fixed_objects(self):
         """
         Returns:
-            dict: Keyword-mapped objects that are fixed in the scene. Maps object name to their object class instances
-                (DatasetObject)
+            dict: Keyword-mapped objects that are fixed in the scene, IGNORING any robots.
+                Maps object name to their object class instances (DatasetObject)
         """
-        return {obj.name: obj for obj in self.object_registry("fixed_base", True, default_val=[])}
+        return {obj.name: obj for obj in self.object_registry("fixed_base", True, default_val=[]) if obj.category != robot_macros.ROBOT_CATEGORY}
 
     def get_random_floor(self):
         """
