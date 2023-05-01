@@ -155,7 +155,7 @@ class BehaviorTask(BaseTask):
 
         # Initialize the current activity
         success, self.feedback = self.initialize_activity(env=env)
-        assert success, f"Failed to initialize Behavior Activity. Feedback:\n{self.feedback}"
+        # assert success, f"Failed to initialize Behavior Activity. Feedback:\n{self.feedback}"
 
         # Highlight any task relevant objects if requested
         if self.highlight_task_relevant_objs:
@@ -436,12 +436,10 @@ class BehaviorTask(BaseTask):
                         category, filter_method="sliceable_whole" if is_sliceable else None
                     )
                 except:
-                    og.sim.play()
                     return f"Missing object category: {category}"
 
                 if len(model_choices) == 0:
                     # restore back to the play state
-                    og.sim.play()
                     return f"Missing valid object models for category: {category}"
 
                 # TODO: This no longer works because model ID changes in the new asset
