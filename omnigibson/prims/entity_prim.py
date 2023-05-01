@@ -1229,8 +1229,7 @@ class EntityPrim(XFormPrim):
                 body's pose / velocities. See https://docs.omniverse.nvidia.com/app_create/prod_extensions/ext_physics/rigid-bodies.html?highlight=rigid%20body%20enabled#kinematic-rigid-bodies
                 for more information
         """
-        for link in self.links.values():
-            link.kinematic_only = val
+        self.root_link.kinematic_only = val
 
     @property
     def aabb(self):

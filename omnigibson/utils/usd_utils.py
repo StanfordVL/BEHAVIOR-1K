@@ -259,10 +259,11 @@ class RigidContactAPI:
         i = 0
         cls._PATH_TO_IDX = dict()
         for obj in og.sim.scene.objects:
-            if obj.prim_type == PrimType.RIGID and not obj.kinematic_only:
+            if obj.prim_type == PrimType.RIGID:
                 for link in obj.links.values():
-                    cls._PATH_TO_IDX[link.prim_path] = i
-                    i += 1
+                    if not link.kinematic_only:
+                        cls._PATH_TO_IDX[link.prim_path] = i
+                        i += 1
 
         # Generate rigid body view, making sure to update the simulation first (without physics) so that the physx
         # backend is synchronized with any newly added objects
