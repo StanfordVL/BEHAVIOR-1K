@@ -172,13 +172,13 @@ class ControllableObject(BaseObject):
             # If we're using normalized action space, override the inputs for all controllers
             if self._action_normalize:
                 cfg["command_input_limits"] = "default"  # default is normalized (-1, 1)
+
             # Create the controller
-            self._controllers[name] = create_controller(**cfg)
             controller = create_controller(**cfg)
             # Verify the controller's DOFs can all be driven
             for idx in controller.dof_idx:
                 assert self._joints[self.dof_names_ordered[idx]].driven, "Controllers should only control driveable joints!"
-
+            self._controllers[name] = controller
         self.update_controller_mode()
 
     def update_controller_mode(self):
