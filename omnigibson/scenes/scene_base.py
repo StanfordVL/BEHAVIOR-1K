@@ -399,6 +399,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         prim = obj.load()
 
         # If this object is fixed and is NOT an agent, disable collisions between the fixed links of the fixed objects
+        # This is to account for cases such as Tiago, which has a fixed base which is needed for its global base joints
         if obj.fixed_base and obj.category != robot_macros.ROBOT_CATEGORY:
             # TODO: Remove building hotfix once asset collision meshes are fixed!!
             building_categories = {"walls", "floors", "ceilings"}
