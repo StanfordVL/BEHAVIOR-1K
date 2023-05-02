@@ -1,3 +1,7 @@
+import os
+import json
+import numpy as np
+
 import omnigibson as og
 from omnigibson.macros import gm
 from omnigibson.utils.asset_utils import get_all_system_categories
@@ -142,17 +146,19 @@ def _create_system_from_metadata(system_name):
     Returns:
         BaseSystem: Created system class
     """
+    # Avoid circular imports
+    from omnigibson import systems
+
     # Search for the appropriate system, if not found, fallback
     # TODO: Once dataset is fully constructed, DON'T fallback, and assert False instead
     all_systems = set(get_all_system_categories())
     if system_name not in all_systems:
-        # Avoid circular imports
-        from omnigibson import systems
         # Use default config -- assume @system_name is a fluid that uses the same params as water
         return systems.__dict__["FluidSystem"].create(
             name=system_name,
             particle_contact_offset=0.012,
             particle_density=500.0,
+            is_viscous=False,
             material_mtl_name="DeepWater",
         )
     else:
@@ -163,9 +169,10 @@ def _create_system_from_metadata(system_name):
         {
             "type": one of {"visual", "fluid", "granular"},
         }
+        if visual, include:
+            "relative_particle_scaling" : ...,
         
         if visual or granular, also includes:
-            "KWARG_0" : ... (e.g.: stain kwargs)
             
             --> note: create_particle_template should be deterministic, configured via:
                 lambda prim_path, name: og.objects.DatasetObject(
@@ -185,6 +192,7 @@ def _create_system_from_metadata(system_name):
             "particle_density": ...,
         
         if fluid, also include:
+            "is_viscous": bool
             "material_mtl_name": ...,       # Base material config to use
             "customize_particle_kwargs": {  # Maps property/ies from @MaterialPrim to value to set
                 "opacity_constant": ...,
@@ -200,7 +208,53 @@ def _create_system_from_metadata(system_name):
                         
         Then, compile the necessary kwargs and generate the requested system
         """
-        raise ValueError("Metadata format for loading system not defined yet!")
+        # Parse information
+        system_dir = os.path.join(gm.DATASET_PATH, "systems", system_name)
+        with open(os.path.join(system_dir, "metadata.json"), "r") as f:
+            metadata = json.load(f)
+        system_type = metadata["type"]
+        system_kwargs = dict(name=system_name)
+
+        def generate_particle_template_fcn():
+            return lambda prim_path, name: \
+                og.objects.DatasetObject(
+                    prim_path=prim_path,
+                    name=name,
+                    usd_path=os.path.join(system_dir, f"{system_name}.usd"),
+                    category=system_name,
+                    visible=False,
+                    fixed_base=False,
+                    visual_only=True,
+                    include_default_states=False,
+                    abilities={},
+                )
+
+        def generate_customize_particle_material_fcn(mat_kwargs):
+            def customize_mat(mat):
+                for attr, val in mat_kwargs.items():
+                    setattr(mat, attr, np.array(val) if isinstance(val, list) else val)
+            return customize_mat
+
+        if system_type == "visual":
+            system_kwargs["create_particle_template"] = generate_particle_template_fcn()
+            system_kwargs["relative_particle_scaling"] = metadata["relative_particle_scaling"]
+        elif system_type == "granular":
+            system_kwargs["create_particle_template"] = generate_particle_template_fcn()
+            system_kwargs["particle_contact_offset"] = metadata["particle_contact_offset"]
+            system_kwargs["particle_density"] = metadata["particle_density"]
+        elif system_type == "fluid":
+            system_kwargs["particle_contact_offset"] = metadata["particle_contact_offset"]
+            system_kwargs["particle_density"] = metadata["particle_density"]
+            system_kwargs["is_viscous"] = metadata["is_viscous"]
+            system_kwargs["material_mtl_name"] = metadata["material_mtl_name"]
+            system_kwargs["customize_particle_material"] = \
+                generate_customize_particle_material_fcn(mat_kwargs=metadata["customize_material_kwargs"])
+        else:
+            raise ValueError(f"{system_name} system's type {system_type} is invalid! "
+                             f"Must be one of {{ 'visual', 'granular', or 'fluid' }}")
+
+        # Generate the requested system
+        return systems.__dict__[f"{system_type.capitalize()}System"].create(**system_kwargs)
 
 
 def is_system_active(system_name):
