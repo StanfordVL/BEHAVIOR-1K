@@ -4,7 +4,7 @@ import omni
 from omni.isaac.core.utils.prims import get_prim_at_path
 
 import omnigibson as og
-from omnigibson.macros import gm
+from omnigibson.macros import gm, create_module_macros
 from omnigibson.systems.system_base import BaseSystem, REGISTERED_SYSTEMS
 from omnigibson.utils.constants import SemanticClass
 from omnigibson.utils.python_utils import classproperty, subclass_factory, snake_case_to_camel_case
@@ -17,6 +17,17 @@ from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
+
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
+
+# Parameters used if scaling particles relative to its parent object's scale
+m.BBOX_LOWER_LIMIT_FRACTION_OF_AABB = 0.06
+m.BBOX_LOWER_LIMIT_MIN = 0.01
+m.BBOX_LOWER_LIMIT_MAX = 0.02
+m.BBOX_UPPER_LIMIT_FRACTION_OF_AABB = 0.1
+m.BBOX_UPPER_LIMIT_MIN = 0.02
+m.BBOX_UPPER_LIMIT_MAX = 0.1
 
 
 def is_visual_particle_system(system_name):
@@ -420,6 +431,14 @@ class VisualParticleSystem(MacroParticleSystem):
         return set(cls._group_particles.keys())
 
     @classproperty
+    def scale_relative_to_parent(cls):
+        """
+        Returns:
+            bool: Whether or not particles should be scaled relative to the group's parent object
+        """
+        return False
+
+    @classproperty
     def state_size(cls):
         # Get super size first
         state_size = super().state_size
@@ -585,7 +604,34 @@ class VisualParticleSystem(MacroParticleSystem):
                 - 3-array: min scaling factor to set
                 - 3-array: max scaling factor to set
         """
-        return cls.min_scale, cls.max_scale
+        if cls.scale_relative_to_parent:
+            # First set the bbox ranges -- depends on the object's bounding box
+            obj = cls._group_objects[group]
+            median_aabb_dim = np.median(obj.aabb_extent)
+
+            # Compute lower and upper limits to bbox
+            bbox_lower_limit_from_aabb = m.BBOX_LOWER_LIMIT_FRACTION_OF_AABB * median_aabb_dim
+            bbox_lower_limit = np.clip(
+                bbox_lower_limit_from_aabb,
+                m.BBOX_LOWER_LIMIT_MIN,
+                m.BBOX_LOWER_LIMIT_MAX,
+            )
+
+            bbox_upper_limit_from_aabb = m.BBOX_UPPER_LIMIT_FRACTION_OF_AABB * median_aabb_dim
+            bbox_upper_limit = np.clip(
+                bbox_upper_limit_from_aabb,
+                m.BBOX_UPPER_LIMIT_MIN,
+                m.BBOX_UPPER_LIMIT_MAX,
+            )
+
+            # Convert these into scaling factors for the x and y axes for our particle object
+            particle_bbox = cls.particle_object.aabb_extent
+            minimum = np.array([bbox_lower_limit / particle_bbox[0], bbox_lower_limit / particle_bbox[1], 1.0])
+            maximum = np.array([bbox_upper_limit / particle_bbox[0], bbox_upper_limit / particle_bbox[1], 1.0])
+        else:
+            minimum, maximum = cls.min_scale, cls.max_scale
+
+        return minimum, maximum
 
     @classmethod
     def sample_scales(cls, group, n):
@@ -909,7 +955,7 @@ class VisualParticleSystem(MacroParticleSystem):
                 cls._particles_info[particle.name] = dict(obj=obj, link=obj.links[link_name])
 
     @classmethod
-    def create(cls, name, create_particle_template, min_scale=None, max_scale=None, **kwargs):
+    def create(cls, name, create_particle_template, min_scale=None, max_scale=None, scale_relative_to_parent=False, **kwargs):
         """
         Utility function to programmatically generate monolithic visual particle system classes.
 
@@ -924,6 +970,8 @@ class VisualParticleSystem(MacroParticleSystem):
                 Else, defaults to 1
             max_scale (None or 3-array): If specified, sets the maximum bound for the visual particles' relative scale.
                 Else, defaults to 1
+            scale_relative_to_parent (bool): If True, will scale generated particles relative to the corresponding
+                group's object
             create_particle_template (function): Method for generating the visual particle template that will be duplicated
                 when generating groups of particles.
                 Expected signature:
@@ -947,6 +995,10 @@ class VisualParticleSystem(MacroParticleSystem):
             # We should register this system since it's an "actual" system (not an intermediate class)
             return True
 
+        @classproperty
+        def cp_scale_relative_to_parent(cls):
+            return scale_relative_to_parent
+
         @classmethod
         def cm_initialize(cls):
             # Run super first (we have to use a bit esoteric syntax in order to accommodate this procedural method for
@@ -965,6 +1017,7 @@ class VisualParticleSystem(MacroParticleSystem):
 
         # Add to any other params specified
         kwargs["_register_system"] = cp_register_system
+        kwargs["scale_relative_to_parent"] = cp_scale_relative_to_parent
         kwargs["initialize"] = cm_initialize
         kwargs["_create_particle_template"] = cm_create_particle_template
 
@@ -1071,38 +1124,9 @@ class VisualParticleSystem(MacroParticleSystem):
         return state_dict, idx + idx_super
 
 
-# We need to define an overriding method for stain so that the stain scaling values are modified based on
-# the parent's native object size
-@classmethod
-def stain_update_particle_scaling(cls, group):
-    # First set the bbox ranges -- depends on the object's bounding box
-    obj = cls._group_objects[group]
-    median_aabb_dim = np.median(obj.aabb_extent)
-
-    # Compute lower and upper limits to bbox
-    bbox_lower_limit_from_aabb = cls._BOUNDING_BOX_LOWER_LIMIT_FRACTION_OF_AABB * median_aabb_dim
-    bbox_lower_limit = np.clip(
-        bbox_lower_limit_from_aabb,
-        cls._BOUNDING_BOX_LOWER_LIMIT_MIN,
-        cls._BOUNDING_BOX_LOWER_LIMIT_MAX,
-    )
-
-    bbox_upper_limit_from_aabb = cls._BOUNDING_BOX_UPPER_LIMIT_FRACTION_OF_AABB * median_aabb_dim
-    bbox_upper_limit = np.clip(
-        bbox_upper_limit_from_aabb,
-        cls._BOUNDING_BOX_UPPER_LIMIT_MIN,
-        cls._BOUNDING_BOX_UPPER_LIMIT_MAX,
-    )
-
-    # Convert these into scaling factors for the x and y axes for our particle object
-    particle_bbox = cls.particle_object.aabb_extent
-    minimum = np.array([bbox_lower_limit / particle_bbox[0], bbox_lower_limit / particle_bbox[1], 1.0])
-    maximum = np.array([bbox_upper_limit / particle_bbox[0], bbox_upper_limit / particle_bbox[1], 1.0])
-    return minimum, maximum
-
-
 VisualParticleSystem.create(
     name="dust",
+    scale_relative_to_parent=False,
     create_particle_template=lambda prim_path, name: og.objects.PrimitiveObject(
         prim_path=prim_path,
         primitive_type="Cube",
@@ -1120,6 +1144,7 @@ VisualParticleSystem.create(
 
 VisualParticleSystem.create(
     name="stain",
+    scale_relative_to_parent=True,
     create_particle_template=lambda prim_path, name: og.objects.USDObject(
         prim_path=prim_path,
         usd_path=os.path.join(gm.ASSET_PATH, "models", "stain", "stain.usd"),
@@ -1130,17 +1155,6 @@ VisualParticleSystem.create(
         visual_only=True,
         include_default_states=False,
     ),
-    # Default parameters for sampling particle sizes based on attachment group object size
-    _BOUNDING_BOX_LOWER_LIMIT_FRACTION_OF_AABB=0.06,
-    _BOUNDING_BOX_LOWER_LIMIT_MIN=0.01,
-    _BOUNDING_BOX_LOWER_LIMIT_MAX=0.02,
-    _BOUNDING_BOX_UPPER_LIMIT_FRACTION_OF_AABB=0.1,
-    _BOUNDING_BOX_UPPER_LIMIT_MIN=0.02,
-    _BOUNDING_BOX_UPPER_LIMIT_MAX=0.1,
-    # Also need to override the how we process particle scaling, since they get scaled according to the parent object's
-    # native size
-    # TODO: Should this always be the case? Maybe make this a flag in the create() method?
-    update_particle_scaling=stain_update_particle_scaling,
 )
 
 

@@ -1269,6 +1269,9 @@ class FluidSystem(PhysicalParticleSystem):
         cls._material.shader_force_populate()
         # Potentially modify the material
         cls._customize_particle_material()
+        # Apply the physical material preset based on whether or not this fluid is viscous
+        apply_mat_physics = particleUtils.AddPBDMaterialViscous if cls.is_viscous else particleUtils.AddPBDMaterialWater
+        apply_mat_physics(p=cls._material.prim)
 
         # Compute the overall color of the fluid system
         base_color_weight = cls._material.diffuse_reflection_weight
@@ -1299,6 +1302,14 @@ class FluidSystem(PhysicalParticleSystem):
     @classproperty
     def use_isosurface(cls):
         return True
+
+    @classproperty
+    def is_viscous(cls):
+        """
+        Returns:
+            bool: True if this material is viscous or not. Default is False
+        """
+        raise NotImplementedError
 
     @classproperty
     def material(cls):
@@ -1355,6 +1366,7 @@ class FluidSystem(PhysicalParticleSystem):
         name,
         particle_contact_offset,
         particle_density,
+        is_viscous=False,
         material_mtl_name=None,
         customize_particle_material=None,
         **kwargs,
@@ -1366,6 +1378,7 @@ class FluidSystem(PhysicalParticleSystem):
             name (str): Name of the system
             particle_contact_offset (float): Contact offset for the generated system
             particle_density (float): Particle density for the generated system
+            is_viscous (bool): Whether or not the generated fluid system should be viscous
             material_mtl_name (None or str): Material mdl preset name to use for generating this fluid material.
                 NOTE: Should be an entry from OmniSurfacePresets.mdl, minus the "OmniSurface_" string.
                 If None if specified, will default to the generic OmniSurface material
@@ -1388,12 +1401,17 @@ class FluidSystem(PhysicalParticleSystem):
         def cp_material_mtl_name(cls):
             return material_mtl_name
 
+        @classproperty
+        def cp_is_viscous(cls):
+            return is_viscous
+
         @classmethod
         def cm_customize_particle_material(cls):
             if customize_particle_material is not None:
                 customize_particle_material(mat=cls._material)
 
         # Add to any other params specified
+        kwargs["is_viscous"] = cp_is_viscous
         kwargs["_material_mtl_name"] = cp_material_mtl_name
         kwargs["_customize_particle_material"] = cm_customize_particle_material
 
@@ -1511,6 +1529,7 @@ FluidSystem.create(
     name="water",
     particle_contact_offset=0.012,
     particle_density=500.0,
+    is_viscous=False,
     material_mtl_name="DeepWater",
 )
 
@@ -1518,6 +1537,7 @@ FluidSystem.create(
     name="milk",
     particle_contact_offset=0.008,
     particle_density=500.0,
+    is_viscous=False,
     material_mtl_name="WholeMilk",
 )
 
@@ -1525,6 +1545,7 @@ FluidSystem.create(
     name="strawberry_smoothie",
     particle_contact_offset=0.008,
     particle_density=500.0,
+    is_viscous=True,
     material_mtl_name="SkimMilk",
     customize_particle_material=customize_particle_material_factory("specular_reflection_color", [1.0, 0.64, 0.64]),
 )

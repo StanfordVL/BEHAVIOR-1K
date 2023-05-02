@@ -761,7 +761,7 @@ def get_mesh_volume_and_com(mesh_prim):
         volume = mesh_prim.GetAttribute("size").Get() ** 3
     elif mesh_type == "Cone":
         volume = np.pi * (mesh_prim.GetAttribute("radius").Get() ** 2) * mesh_prim.GetAttribute("height").Get() / 3
-        com = np.array([0, 0, mesh.GetAttribute("height").Get() / 4])
+        com = np.array([0, 0, mesh_prim.GetAttribute("height").Get() / 4])
     elif mesh_type == "Cylinder":
         volume = np.pi * (mesh_prim.GetAttribute("radius").Get() ** 2) * mesh_prim.GetAttribute("height").Get()
     else:
