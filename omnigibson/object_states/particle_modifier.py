@@ -81,8 +81,10 @@ def create_projection_visualization(
         prim_path (str): Stage location for where to generate the projection visualization
         shape (str): Shape of the projection to generate. Valid options are: {Sphere, Cone}
         projection_name (str): Name associated with this projection visualization. Should be unique!
-        projection_radius (float): Radius of the generated projection visualization overall volume (
+        projection_radius (float): Radius of the generated projection visualization overall volume
+            (specified in local frame)
         projection_height (float): Height of the generated projection visualization overall volume
+            (specified in local frame)
         particle_radius (float): Radius of the particles composing the projection visualization
         parent_scale (3-array): If specified, specifies the (x,y,z) scale of the parent Xform prim of the
             generated source sphere prim at @prim_path. This will be used to scale the visualization accordingly
