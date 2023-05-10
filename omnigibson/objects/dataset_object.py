@@ -126,11 +126,6 @@ class DatasetObject(USDObject):
                                       f"DatasetObject!"
             usd_path = f"{gm.DATASET_PATH}/objects/{category}/{model}/usd/{model}.usd"
 
-        # Post-process the usd path if we're generating a cloth object
-        if prim_type == PrimType.CLOTH:
-            assert usd_path.endswith(".usd"), f"usd_path [{usd_path}] is invalid."
-            usd_path = usd_path[:-4] + "_cloth.usd"
-
         # Run super init
         super().__init__(
             prim_path=prim_path,
@@ -300,7 +295,7 @@ class DatasetObject(USDObject):
             elif self._prim_type == PrimType.CLOTH:
                 # Cloth cannot set density. Internally omni evenly distributes the mass to each particle
                 mass = self.avg_obj_dims["mass"] * v_ratio
-                self._links["base_link"].mass = mass
+                self.root_link.mass = mass
 
     def _update_texture_change(self, object_state):
         """

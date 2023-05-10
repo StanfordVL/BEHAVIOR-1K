@@ -122,27 +122,15 @@ class PrimitiveObject(StatefulObject):
         # Define an Xform at the specified path
         prim = og.sim.stage.DefinePrim(self._prim_path, "Xform")
 
-        if self._prim_type == PrimType.RIGID:
-            # Define a nested mesh corresponding to the root link for this prim
-            base_link = og.sim.stage.DefinePrim(f"{self._prim_path}/base_link", "Xform")
-            self._vis_geom = create_primitive_mesh(prim_path=f"{self._prim_path}/base_link/visuals", primitive_type=self._primitive_type)
-            self._col_geom = create_primitive_mesh(prim_path=f"{self._prim_path}/base_link/collisions", primitive_type=self._primitive_type)
+        # Define a nested mesh corresponding to the root link for this prim
+        base_link = og.sim.stage.DefinePrim(f"{self._prim_path}/base_link", "Xform")
+        self._vis_geom = create_primitive_mesh(prim_path=f"{self._prim_path}/base_link/visuals", primitive_type=self._primitive_type)
+        self._col_geom = create_primitive_mesh(prim_path=f"{self._prim_path}/base_link/collisions", primitive_type=self._primitive_type)
 
-            # Add collision API to collision geom
-            UsdPhysics.CollisionAPI.Apply(self._col_geom.GetPrim())
-            UsdPhysics.MeshCollisionAPI.Apply(self._col_geom.GetPrim())
-            PhysxSchema.PhysxCollisionAPI.Apply(self._col_geom.GetPrim())
-
-        elif self._prim_type == PrimType.CLOTH:
-            # For Cloth, the base link itself is a cloth mesh
-            # TODO (eric): configure u_patches and v_patches
-            self._vis_geom = create_primitive_mesh(
-                prim_path=f"{self._prim_path}/base_link",
-                primitive_type=self._primitive_type,
-                u_patches=None,
-                v_patches=None,
-            )
-            self._col_geom = None
+        # Add collision API to collision geom
+        UsdPhysics.CollisionAPI.Apply(self._col_geom.GetPrim())
+        UsdPhysics.MeshCollisionAPI.Apply(self._col_geom.GetPrim())
+        PhysxSchema.PhysxCollisionAPI.Apply(self._col_geom.GetPrim())
 
         # Create a material for this object for the base link
         og.sim.stage.DefinePrim(f"{self._prim_path}/Looks", "Scope")
@@ -182,9 +170,9 @@ class PrimitiveObject(StatefulObject):
 
         # Set color and opacity
         if self._prim_type == PrimType.RIGID:
-            visual_geom_prim = list(self.links["base_link"].visual_meshes.values())[0]
+            visual_geom_prim = list(self.root_link.visual_meshes.values())[0]
         elif self._prim_type == PrimType.CLOTH:
-            visual_geom_prim = self.links["base_link"]
+            visual_geom_prim = self.root_link
         else:
             raise ValueError("Prim type must either be PrimType.RIGID or PrimType.CLOTH for loading a primitive object")
 

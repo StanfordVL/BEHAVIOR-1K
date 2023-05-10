@@ -8,8 +8,7 @@ from omni.isaac.core.utils.stage import get_current_stage
 from pxr import Gf, Usd, UsdGeom, UsdPhysics, PhysxSchema
 import omni
 
-from omni.isaac.core.utils.prims import get_prim_property, set_prim_property, \
-    get_prim_parent, get_prim_at_path
+from omni.isaac.core.utils.prims import get_prim_property, set_prim_property, get_prim_parent, get_prim_at_path
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
@@ -100,8 +99,33 @@ class EntityPrim(XFormPrim):
         raise NotImplementedError("By default, an entity prim cannot be created from scratch.")
 
     def _post_load(self):
+        # If this is a cloth, delete the root link and replace it with the single nested mesh
+        if self._prim_type == PrimType.CLOTH:
+            # Verify only a single link and a single mesh exists
+            old_link_prim = None
+            cloth_mesh_prim = None
+            for prim in self._prim.GetChildren():
+                if prim.GetPrimTypeInfo().GetTypeName() == "Xform":
+                    assert old_link_prim is None, "Found multiple XForm links for a Cloth entity prim! Expected: 1"
+                    old_link_prim = prim
+                    for child in prim.GetChildren():
+                        if child.GetPrimTypeInfo().GetTypeName() == "Mesh" and not child.HasAPI(UsdPhysics.CollisionAPI):
+                            assert cloth_mesh_prim is None, "Found multiple meshes for a Cloth entity prim! Expected: 1"
+                            cloth_mesh_prim = child
+
+            # Move mesh prim one level up via copy, then delete the original link
+            # NOTE: We copy because we cannot directly move the prim because it is ancestral
+            # NOTE: We use this specific delete method because alternative methods (eg: "delete_prim") fail beacuse
+            # the prim is ancestral. Note that because it is non-destructive, the original link prim path is still
+            # tracked by omni, so we have to have to utilize a new unique prim path for the copied cloth mesh
+            # See omni.kit.context_menu module for reference
+            new_path = f"{self._prim_path}/{old_link_prim.GetName()}_cloth"
+            omni.kit.commands.execute("CopyPrim", path_from=cloth_mesh_prim.GetPath(), path_to=new_path)
+            omni.kit.commands.execute("DeletePrims", paths=[old_link_prim.GetPath()], destructive=False)
+
         # Setup links info FIRST before running any other post loading behavior
-        self.update_links()
+        # We pass in scale explicitly so that the generated links can leverage the desired entity scale
+        self.update_links(load_config=dict(scale=self._load_config.get("scale", None)))
 
         # Set visual only flag
         # This automatically handles setting collisions / gravity appropriately per-link
@@ -138,7 +162,7 @@ class EntityPrim(XFormPrim):
 
     @property
     def aabb(self):
-        if self.prim_type == PrimType.CLOTH:
+        if self._prim_type == PrimType.CLOTH:
             particle_positions = self.root_link.particle_positions
             aabb_low, aabb_hi = np.min(particle_positions, axis=0), np.max(particle_positions, axis=0)
         else:  # Rigid
@@ -147,10 +171,14 @@ class EntityPrim(XFormPrim):
 
         return aabb_low, aabb_hi
 
-    def update_links(self):
+    def update_links(self, load_config=None):
         """
         Helper function to refresh owned joints. Useful for synchronizing internal data if
         additional bodies are added manually
+
+        Args:
+            load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
+            loading each of the link's rigid prims
         """
         # Make sure to clean up all pre-existing names for all links
         if self._links is not None:
@@ -162,14 +190,11 @@ class EntityPrim(XFormPrim):
         self._links = dict()
         joint_children = set()
         for prim in self._prim.GetChildren():
-            link = None
+            link_cls = None
             link_name = prim.GetName()
             if self._prim_type == PrimType.RIGID and prim.GetPrimTypeInfo().GetTypeName() == "Xform":
                 # For rigid body object, process prims that are Xforms (e.g. rigid links)
-                link = RigidPrim(
-                    prim_path=prim.GetPrimPath().__str__(),
-                    name=f"{self._name}:{link_name}",
-                )
+                link_cls = RigidPrim
                 # Also iterate through all children to infer joints and determine the children of those joints
                 # We will use this info to infer which link is the base link!
                 for child_prim in prim.GetChildren():
@@ -180,15 +205,16 @@ class EntityPrim(XFormPrim):
                         if len(relationships["physics:body0"].GetTargets()) > 0:
                             joint_children.add(relationships["physics:body1"].GetTargets()[0].pathString.split("/")[-1])
 
-            if self._prim_type == PrimType.CLOTH and prim.GetPrimTypeInfo().GetTypeName() in GEOM_TYPES:
-                # For cloth object, process prims that belong to any of the GEOM_TYPES (e.g. Cube, Mesh, etc)
-                link = ClothPrim(
+            elif self._prim_type == PrimType.CLOTH and prim.GetPrimTypeInfo().GetTypeName() == "Mesh":
+                # For cloth object, process prims that are Meshes
+                link_cls = ClothPrim
+
+            if link_cls is not None:
+                self._links[link_name] = link_cls(
                     prim_path=prim.GetPrimPath().__str__(),
                     name=f"{self._name}:{link_name}",
+                    load_config=load_config,
                 )
-
-            if link is not None:
-                self._links[link_name] = link
 
         # Infer the correct root link name -- this corresponds to whatever link does not have any joint existing
         # in the children joints
