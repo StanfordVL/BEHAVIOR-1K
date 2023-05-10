@@ -16,7 +16,7 @@ from omnigibson.prims.geom_prim import GeomPrim
 from omnigibson.systems import get_system
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.sim_utils import CsRawData
-from omnigibson.utils.usd_utils import array_to_vtarray, mesh_prim_to_trimesh_mesh
+from omnigibson.utils.usd_utils import array_to_vtarray, mesh_prim_to_trimesh_mesh, sample_mesh_keypoints
 from omnigibson.utils.constants import GEOM_TYPES
 from omnigibson.utils.python_utils import classproperty
 import omnigibson as og
@@ -30,6 +30,8 @@ m = create_module_macros(module_path=__file__)
 # Subsample cloth particle points to boost performance
 m.N_CLOTH_KEYPOINTS = 1000
 m.KEYPOINT_COVERAGE_THRESHOLD = 0.80
+m.N_CLOTH_KEYFACES = 500
+
 
 
 class ClothPrim(GeomPrim):
@@ -62,6 +64,7 @@ class ClothPrim(GeomPrim):
     ):
         # Internal vars stored
         self._keypoint_idx = None
+        self._keyface_idx = None
 
         # Run super init
         super().__init__(
@@ -86,16 +89,20 @@ class ClothPrim(GeomPrim):
             self.mass = self._load_config["mass"]
 
         # Clothify this prim, which is assumed to be a mesh
-        ClothPrim.cloth_system.clothify_mesh_prim(mesh_prim=self.prim)
+        ClothPrim.cloth_system.clothify_mesh_prim(mesh_prim=self._prim)
 
         # Track generated particle count
         positions = self.particle_positions
         self._n_particles = len(positions)
 
-        # Deterministically sample keypoints and sanity check the AABB of these subsampled points vs. the actual points
-        np.random.seed(0)
-        self._keypoint_idx = np.random.randint(0, self._n_particles, m.N_CLOTH_KEYPOINTS) if \
-            self._n_particles > m.N_CLOTH_KEYPOINTS else np.arange(self._n_particles)
+        # Sample mesh keypoints / keyvalues and sanity check the AABB of these subsampled points vs. the actual points
+        self._keypoint_idx, self._keyface_idx = sample_mesh_keypoints(
+            mesh_prim=self._prim,
+            n_keypoints=m.N_CLOTH_KEYPOINTS,
+            n_keyfaces=m.N_CLOTH_KEYFACES,
+            deterministic=True,
+        )
+
         keypoint_positions = positions[self._keypoint_idx]
         keypoint_aabb = keypoint_positions.min(axis=0), keypoint_positions.max(axis=0)
         true_aabb = positions.min(axis=0), positions.max(axis=0)
@@ -155,6 +162,18 @@ class ClothPrim(GeomPrim):
         p_world = (r @ (p_local * s).T).T + t
 
         return p_world
+
+    @property
+    def keyfaces(self):
+        """
+        Grabs particle indexes defining each of the keyfaces for this cloth prim.
+        Total number of keyfaces is m.N_CLOTH_KEYFACES
+
+        Returns:
+             np.array: (N, 3) numpy array, where each of the N keyfaces are defined by the 3 particle indices
+                corresponding to that face's vertices
+        """
+        return np.array(self.get_attribute("faceVertexIndices")).reshape(-1, 3)[self._keyface_idx]
 
     @property
     def keypoint_particle_positions(self):

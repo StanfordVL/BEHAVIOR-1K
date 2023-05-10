@@ -737,6 +737,52 @@ def mesh_prim_to_trimesh_mesh(mesh_prim, include_normals=True, include_texcoord=
     return trimesh.Trimesh(**kwargs)
 
 
+def sample_mesh_keypoints(mesh_prim, n_keypoints, n_keyfaces, deterministic=True):
+    """
+    Samples keypoints and keyfaces for mesh @mesh_prim
+
+    Args:
+        mesh_prim (Usd.Prim): Mesh prim to be sampled from
+        n_keypoints (int): number of (unique) keypoints to randomly sample from @mesh_prim
+        n_keyfaces (int): number of (unique) keyfaces to randomly sample from @mesh_prim
+        deterministic (bool): Whether to deterministically sample or not (ie: whether to set random seed or not)
+
+    Returns:
+        2-tuple:
+            - n-array: (n,) 1D int array representing the randomly sampled point idxs from @mesh_prim.
+                Note that since this is without replacement, the total length of the array may be less than
+                @n_keypoints
+            - None or n-array: 1D int array representing the randomly sampled face idxs from @mesh_prim.
+                Note that since this is without replacement, the total length of the array may be less than
+                @n_keyfaces
+    """
+    # Set seed if deterministic
+    if deterministic:
+        np.random.seed(0)
+
+    # Generate trimesh mesh from which to aggregate points
+    tm = mesh_prim_to_trimesh_mesh(mesh_prim=mesh_prim, include_normals=False, include_texcoord=False)
+    n_unique_vertices, n_unique_faces = len(tm.vertices), len(tm.faces)
+    faces_flat = tm.faces.flatten()
+    n_vertices = len(faces_flat)
+
+    # Sample vertices
+    # Note: We oversample (x3, arbitrarily chosen number) and then only keep up to the first unique @n_keypoints idxs
+    sampled_idxs = np.random.choice(n_vertices, size=3 * n_keypoints, replace=False) if \
+        n_vertices > 3 * n_keypoints else np.arange(n_vertices)
+    # Create dictionary mapping unique vertex ID to non-unique vertex ID so that we automatically filter out any
+    # duplicates of unique vertex IDs
+    unique_vertex_mapping = {faces_flat[idx]: idx for idx in sampled_idxs}
+    # Keep the first @n_keypoints values, or less if there are less points
+    keypoint_idx = np.array(list(unique_vertex_mapping.values())[:min(n_keypoints, n_unique_vertices)])
+
+    # Sample faces
+    keyface_idx = np.random.choice(n_unique_faces, size=n_keyfaces, replace=False) if \
+        n_unique_faces > n_keyfaces else np.arange(n_unique_faces)
+
+    return keypoint_idx, keyface_idx
+
+
 def get_mesh_volume_and_com(mesh_prim):
     """
     Computes the volume and center of mass for @mesh_prim
