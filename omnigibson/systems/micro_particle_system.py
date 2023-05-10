@@ -7,10 +7,15 @@ from omnigibson.systems.system_base import BaseSystem, REGISTERED_SYSTEMS
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
 from omnigibson.utils.python_utils import classproperty, assert_valid_key, subclass_factory, snake_case_to_camel_case
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object_full_grid_topdown
-from omnigibson.utils.usd_utils import array_to_vtarray
+from omnigibson.utils.usd_utils import mesh_prim_to_trimesh_mesh
 from omnigibson.utils.physx_utils import create_physx_particle_system, create_physx_particleset_pointinstancer
 from omnigibson.utils.ui_utils import disclaimer, create_module_logger
 
+from pathlib import Path
+import os
+import tempfile
+import datetime
+import pymeshlab
 import omni
 from omni.isaac.core.utils.prims import get_prim_at_path, is_prim_path_valid
 from omni.physx.scripts import particleUtils
@@ -30,6 +35,16 @@ import carb
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
+
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
+
+
+# TODO: Tune these default values!
+m.CLOTH_STRETCH_STIFFNESS = 10000.0
+m.CLOTH_BEND_STIFFNESS = 200.0
+m.CLOTH_SHEAR_STIFFNESS = 100.0
+m.CLOTH_DAMPING = 0.2
 
 
 def is_physical_particle_system(system_name):
@@ -1589,6 +1604,74 @@ class Cloth(MicroParticleSystem):
     """
     Particle system class to simulate cloth.
     """
+    @classmethod
+    def clothify_mesh_prim(cls, mesh_prim, remesh=True, particle_distance=None):
+        """
+        Clothifies @mesh_prim by applying the appropriate Cloth API, optionally re-meshing the mesh so that the
+        resulting generated particles are roughly @particle_distance apart from each other.
+
+        Args:
+            mesh_prim (Usd.Prim): Mesh prim to clothify
+            remesh (bool): If True, will remesh the input mesh before converting it into a cloth
+            particle_distance (None or float): If set, specifies the absolute target distance between generated cloth
+                particles. If None, a value is automatically chosen such that the generated cloth particles are roughly
+                touching each other, given cls.particle_contact_offset and @mesh_prim's scale
+        """
+        # Possibly remesh if requested
+        if remesh:
+            # We will remesh in pymeshlab, but it doesn't allow programmatic construction of a mesh with texcoords so
+            # we convert our mesh into a trimesh mesh, then export it to a temp file, then load it into pymeshlab
+            tm = mesh_prim_to_trimesh_mesh(mesh_prim=mesh_prim, include_normals=True, include_texcoord=True)
+            # Tmp file written to: {tmp_dir}/{tmp_fname}/{tmp_fname}.obj
+            tmp_name = f"{mesh_prim.GetName()}_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
+            tmp_dir = os.path.join(tempfile.gettempdir(), tmp_name)
+            tmp_fpath = os.path.join(tmp_dir, f"{tmp_name}.obj")
+            Path(tmp_dir).mkdir(parents=True, exist_ok=True)
+            tm.export(tmp_fpath)
+            ms = pymeshlab.MeshSet()
+            ms.load_new_mesh(tmp_fpath)
+
+            # Re-mesh based on @particle_distance
+            particle_distance = cls.particle_contact_offset * 2 / (1.5 * np.mean(mesh_prim.GetAttribute("xformOp:scale").Get())) \
+                if particle_distance is None else particle_distance
+            ms.meshing_isotropic_explicit_remeshing(iterations=20, targetlen=pymeshlab.AbsoluteValue(particle_distance))
+
+            # Re-write data to @mesh_prim
+            cm = ms.current_mesh()
+            new_face_vertex_ids = cm.face_matrix().flatten()
+            new_texcoord = cm.wedge_tex_coord_matrix()
+            new_vertices = cm.vertex_matrix()[new_face_vertex_ids]
+            new_normals = cm.vertex_normal_matrix()[new_face_vertex_ids]
+            n_vertices = len(new_vertices)
+            n_faces = len(cm.face_matrix())
+
+            mesh_prim.GetAttribute("faceVertexCounts").Set(np.ones(n_faces, dtype=int) * 3)
+            mesh_prim.GetAttribute("points").Set(Vt.Vec3fArray.FromNumpy(new_vertices))
+            mesh_prim.GetAttribute("faceVertexIndices").Set(np.arange(n_vertices))
+            mesh_prim.GetAttribute("normals").Set(Vt.Vec3fArray.FromNumpy(new_normals))
+            mesh_prim.GetAttribute("primvars:st").Set(Vt.Vec2fArray.FromNumpy(new_texcoord))
+
+        # Convert into particle cloth
+        particleUtils.add_physx_particle_cloth(
+            stage=og.sim.stage,
+            path=mesh_prim.GetPath(),
+            dynamic_mesh_path=None,
+            particle_system_path=cls.system_prim_path,
+            spring_stretch_stiffness=m.CLOTH_STRETCH_STIFFNESS,
+            spring_bend_stiffness=m.CLOTH_BEND_STIFFNESS,
+            spring_shear_stiffness=m.CLOTH_SHEAR_STIFFNESS,
+            spring_damping=m.CLOTH_DAMPING,
+            self_collision=True,
+            self_collision_filter=True,
+        )
+
+    @classproperty
+    def _pbd_material_kwargs(cls):
+        return dict(
+            friction=0.4,
+            drag=0.001,
+            lift=0.003,
+        )
 
     @classproperty
     def _register_system(cls):

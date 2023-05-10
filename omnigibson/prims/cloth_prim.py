@@ -31,12 +31,6 @@ m = create_module_macros(module_path=__file__)
 m.N_CLOTH_KEYPOINTS = 1000
 m.KEYPOINT_COVERAGE_THRESHOLD = 0.80
 
-# TODO: Tune these default values!
-m.CLOTH_STRETCH_STIFFNESS = 10000.0
-m.CLOTH_BEND_STIFFNESS = 200.0
-m.CLOTH_SHEAR_STIFFNESS = 100.0
-m.CLOTH_DAMPING = 0.2
-
 
 class ClothPrim(GeomPrim):
     """
@@ -91,18 +85,10 @@ class ClothPrim(GeomPrim):
         if "mass" in self._load_config and self._load_config["mass"] is not None:
             self.mass = self._load_config["mass"]
 
-        particleUtils.add_physx_particle_cloth(
-            stage=og.sim.stage,
-            path=self.prim_path,
-            dynamic_mesh_path=None,
-            particle_system_path=ClothPrim.cloth_system.system_prim_path,
-            spring_stretch_stiffness=m.CLOTH_STRETCH_STIFFNESS,
-            spring_bend_stiffness=m.CLOTH_BEND_STIFFNESS,
-            spring_shear_stiffness=m.CLOTH_SHEAR_STIFFNESS,
-            spring_damping=m.CLOTH_DAMPING,
-            self_collision=True,
-            self_collision_filter=True,
-        )
+        # Clothify this prim, which is assumed to be a mesh
+        ClothPrim.cloth_system.clothify_mesh_prim(mesh_prim=self.prim)
+
+        # Track generated particle count
         positions = self.particle_positions
         self._n_particles = len(positions)
 
