@@ -238,7 +238,7 @@ def _generate_convex_hull_volume_checker_functions(convex_hull_mesh):
                 USD mesh
     """
     # For efficiency, we pre-compute the mesh using trimesh and find its corresponding faces and normals
-    trimesh_mesh = mesh_prim_to_trimesh_mesh(convex_hull_mesh).convex_hull
+    trimesh_mesh = mesh_prim_to_trimesh_mesh(convex_hull_mesh, include_normals=False, include_texcoord=False).convex_hull
     assert trimesh_mesh.is_convex, \
         f"Trying to generate a volume checker function for a non-convex mesh {convex_hull_mesh.GetPath().pathString}"
     face_centroids = trimesh_mesh.vertices[trimesh_mesh.faces].mean(axis=1)
