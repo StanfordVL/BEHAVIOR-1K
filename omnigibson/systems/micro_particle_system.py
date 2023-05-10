@@ -1681,7 +1681,7 @@ class Cloth(MicroParticleSystem):
     @classproperty
     def particle_contact_offset(cls):
         # TODO (eric): figure out whether one offset can fit all
-        return 0.005
+        return 0.0075
 
     @classproperty
     def state_size(cls):
