@@ -408,6 +408,13 @@ class MicroParticleSystem(BaseSystem):
     # Particle system prim in the scene, should be generated at runtime
     system_prim = None
 
+    # Material -- MaterialPrim associated with this particle system
+    _material = None
+
+    # Color of the generated material. Default is white [1.0, 1.0, 1.0]
+    # (NOTE: external queries should call cls.color)
+    _color = np.array([1.0, 1.0, 1.0])
+
     @classmethod
     def initialize(cls):
         # Run super first
@@ -415,6 +422,91 @@ class MicroParticleSystem(BaseSystem):
         if not gm.USE_GPU_DYNAMICS:
             raise ValueError(f"Failed to initialize {cls.name} system. Please set gm.USE_GPU_DYNAMICS to be True.")
         cls.system_prim = cls._create_particle_system()
+
+        # Create material
+        cls._material = cls._create_particle_material_template()
+        # Load the material
+        cls._material.load()
+        # Bind the material to the particle system (for isosurface) and the prototypes (for non-isosurface)
+        cls._material.bind(cls.system_prim_path)
+        # Also apply physics to this material
+        particleUtils.add_pbd_particle_material(og.sim.stage, cls.mat_path, **cls._pbd_material_kwargs)
+        # Force populate inputs and outputs of the shader
+        cls._material.shader_force_populate()
+        # Potentially modify the material
+        cls._customize_particle_material()
+
+    @classproperty
+    def color(cls):
+        """
+        Returns:
+            None or 3-array: If @cls._material exists, this will be its corresponding RGB color. Otherwise,
+                will return None
+        """
+        return cls._color
+
+    @classproperty
+    def material(cls):
+        """
+        Returns:
+            None or MaterialPrim: The bound material to this prim, if there is one
+        """
+        return cls._material
+
+    @classproperty
+    def mat_path(cls):
+        """
+        Returns:
+            str: Path to this system's material in the scene stage
+        """
+        return f"{cls.prim_path}/material"
+
+    @classproperty
+    def mat_name(cls):
+        """
+        Returns:
+            str: Name of this system's material
+        """
+        return f"{cls.name}:material"
+
+    @classproperty
+    def _pbd_material_kwargs(cls):
+        """
+        Returns:
+            dict: Any PBD material kwargs to pass to the PBD material method particleUtils.add_pbd_particle_material
+                used to define physical properties associated with this particle system
+        """
+        # Default is empty dictionary
+        return dict()
+
+    @classmethod
+    def _create_particle_material_template(cls):
+        """
+        Creates the particle material template to be used for this particle system. Prim path does not matter,
+        as it will be overridden internally such that it is a child prim of this particle system's prim.
+
+        NOTE: This material is a template because it is loading an Omni material preset. It can then be customized (in
+        addition to modifying its physical material properties) via @_customize_particle_material
+
+        Returns:
+            MaterialPrim: The material to apply to all particles
+        """
+        # Default is PBR material
+        return MaterialPrim(
+            prim_path=cls.mat_path,
+            name=cls.mat_name,
+            load_config={
+                "mdl_name": f"OmniPBR.mdl",
+                "mtl_name": f"OmniPBR",
+            }
+        )
+
+    @classmethod
+    def _customize_particle_material(cls):
+        """
+        Modifies this particle system's particle material once it is loaded. Default is a no-op
+        """
+        pass
 
     @classproperty
     def system_prim_path(cls):
@@ -540,22 +632,6 @@ class PhysicalParticleSystem(MicroParticleSystem):
         """
         return [inst.idn for inst in cls.particle_instancers.values()]
 
-    @classproperty
-    def mat_path(cls):
-        """
-        Returns:
-            str: Path to this system's material in the scene stage
-        """
-        return f"{cls.prim_path}/material"
-
-    @classproperty
-    def mat_name(cls):
-        """
-        Returns:
-            str: Name of this system's material
-        """
-        return f"{cls.name}:material"
-
     @classmethod
     def initialize(cls):
         # Run super first
@@ -617,10 +693,6 @@ class PhysicalParticleSystem(MicroParticleSystem):
             else cls.generate_particle_instancer(n_particles=0, idn=cls.default_instancer_idn)
 
     @classproperty
-    def color(cls):
-        return cls._color
-
-    @classproperty
     def is_fluid(cls):
         """
         Returns:
@@ -645,28 +717,6 @@ class PhysicalParticleSystem(MicroParticleSystem):
             list of VisualGeomPrim: Visual mesh prim(s) to use as this system's particle prototype(s)
         """
         raise NotImplementedError()
-
-    @classmethod
-    def _create_particle_material_template(cls):
-        """
-        Creates the particle material template to be used for this particle system. Prim path does not matter,
-        as it will be overridden internally such that it is a child prim of this particle system's prim.
-
-        NOTE: This material is a template because it is loading an Omni material preset. It can then be customized (in
-        addition to modifying its physical material properties) via @_customize_particle_material
-
-        Returns:
-            None or MaterialPrim: If specified, is the material to apply to all particles. If None, no material
-                will be used. Default is None
-        """
-        return None
-
-    @classmethod
-    def _customize_particle_material(cls):
-        """
-        Modifies this particle system's particle material once it is loaded. Default is a no-op
-        """
-        pass
 
     @classmethod
     def check_in_contact(cls, positions):
@@ -1258,32 +1308,15 @@ class FluidSystem(PhysicalParticleSystem):
     texture. Individual particles are composed of spheres.
     """
 
-    # Material -- either a MaterialPrim or None if no material is used for this particle system
-    _material = None
-
-    # Color associated with this system (NOTE: external queries should call cls.color)
-    # The default color is blue.
-    _color = np.array([0.0, 0.0, 1.0])
-
     @classmethod
     def initialize(cls):
         # Run super first
         super().initialize()
 
-        # Create the particle material
-        cls._material = cls._create_particle_material_template()
-        # Load the material
-        cls._material.load()
         # Bind the material to the particle system (for isosurface) and the prototypes (for non-isosurface)
         cls._material.bind(cls.system_prim_path)
         for prototype in cls.particle_prototypes:
             cls._material.bind(prototype.prim_path)
-        # Also apply physics to this material
-        particleUtils.add_pbd_particle_material(og.sim.stage, cls.mat_path)
-        # Force populate inputs and outputs of the shader
-        cls._material.shader_force_populate()
-        # Potentially modify the material
-        cls._customize_particle_material()
         # Apply the physical material preset based on whether or not this fluid is viscous
         apply_mat_physics = particleUtils.AddPBDMaterialViscous if cls.is_viscous else particleUtils.AddPBDMaterialWater
         apply_mat_physics(p=cls._material.prim)
@@ -1325,14 +1358,6 @@ class FluidSystem(PhysicalParticleSystem):
             bool: True if this material is viscous or not. Default is False
         """
         raise NotImplementedError
-
-    @classproperty
-    def material(cls):
-        """
-        Returns:
-            None or MaterialPrim: The bound material to this prim, if there is one
-        """
-        return cls._material
 
     @classproperty
     def particle_radius(cls):
