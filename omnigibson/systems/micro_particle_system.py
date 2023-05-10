@@ -1656,7 +1656,8 @@ class Cloth(MicroParticleSystem):
             ms = pymeshlab.MeshSet()
             ms.load_new_mesh(tmp_fpath)
 
-            # Re-mesh based on @particle_distance
+            # Re-mesh based on @particle_distance - distance chosen such that at rest particles should be just touching
+            # each other. The 1.5 magic number comes from the particle cloth demo from omni
             particle_distance = cls.particle_contact_offset * 2 / (1.5 * np.mean(mesh_prim.GetAttribute("xformOp:scale").Get())) \
                 if particle_distance is None else particle_distance
             ms.meshing_isotropic_explicit_remeshing(iterations=20, targetlen=pymeshlab.AbsoluteValue(particle_distance))
