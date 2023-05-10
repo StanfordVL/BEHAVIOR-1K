@@ -1638,9 +1638,10 @@ class Cloth(MicroParticleSystem):
         Args:
             mesh_prim (Usd.Prim): Mesh prim to clothify
             remesh (bool): If True, will remesh the input mesh before converting it into a cloth
-            particle_distance (None or float): If set, specifies the absolute target distance between generated cloth
-                particles. If None, a value is automatically chosen such that the generated cloth particles are roughly
-                touching each other, given cls.particle_contact_offset and @mesh_prim's scale
+            particle_distance (None or float): If set and @remesh is True, specifies the absolute target distance
+                between generated cloth particles. If None, a value is automatically chosen such that the generated
+                cloth particles are roughly touching each other, given cls.particle_contact_offset and
+                @mesh_prim's scale
         """
         # Possibly remesh if requested
         if remesh:
