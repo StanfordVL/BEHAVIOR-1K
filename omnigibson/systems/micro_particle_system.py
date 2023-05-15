@@ -45,6 +45,9 @@ m.CLOTH_STRETCH_STIFFNESS = 10000.0
 m.CLOTH_BEND_STIFFNESS = 200.0
 m.CLOTH_SHEAR_STIFFNESS = 100.0
 m.CLOTH_DAMPING = 0.2
+m.CLOTH_FRICTION = 0.4
+m.CLOTH_DRAG = 0.001
+m.CLOTH_LIFT = 0.003
 
 
 def is_physical_particle_system(system_name):
@@ -1697,9 +1700,9 @@ class Cloth(MicroParticleSystem):
     @classproperty
     def _pbd_material_kwargs(cls):
         return dict(
-            friction=0.4,
-            drag=0.001,
-            lift=0.003,
+            friction=m.CLOTH_FRICTION,
+            drag=m.CLOTH_DRAG,
+            lift=m.CLOTH_LIFT,
         )
 
     @classproperty
