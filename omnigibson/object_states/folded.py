@@ -55,13 +55,8 @@ class FoldedLevel(AbsoluteObjectState):
         """
         Calculate the percantage of surface normals that are sufficiently close to the z-axis.
         """
-        cloth = self.obj.links["base_link"]
-        face_vertex_counts = np.array(cloth.get_attribute("faceVertexCounts"))
-        assert (face_vertex_counts == 3).all(), "cloth prim is expected to only contain triangle faces"
-        face_vertex_indices = np.array(cloth.get_attribute("faceVertexIndices"))
-        points = cloth.particle_positions[face_vertex_indices]
-        # Shape [F, 3, 3] where F is the number of faces
-        points = points.reshape((face_vertex_indices.shape[0] // 3, 3, 3))
+        cloth = self.obj.root_link
+        points = cloth.particle_positions[cloth.keyfaces]
 
         # Shape [F, 3]
         v1 = points[:, 2, :] - points[:, 0, :]
@@ -111,7 +106,7 @@ class FoldedLevel(AbsoluteObjectState):
             area (float): area of the convex hull of the projected points
             diagonal (float): diagonal of the convex hull of the projected points
         """
-        cloth = self.obj.links["base_link"]
+        cloth = self.obj.root_link
         points = cloth.keypoint_particle_positions[:, dims]
         hull = ConvexHull(points)
 

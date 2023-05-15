@@ -702,12 +702,15 @@ def create_mesh_prim_with_default_xform(primitive_type, prim_path, u_patches=Non
     carb.settings.get_settings().set(evaluator.SETTING_OBJECT_HALF_SCALE, hs_backup)
 
 
-def mesh_prim_to_trimesh_mesh(mesh_prim):
+def mesh_prim_to_trimesh_mesh(mesh_prim, include_normals=True, include_texcoord=True):
     """
     Generates trimesh mesh from @mesh_prim
 
     Args:
         mesh_prim (Usd.Prim): Mesh prim to convert into trimesh mesh
+        include_normals (bool): Whether to include the normals in the resulting trimesh or not
+        include_texcoord (bool): Whether to include the corresponding 2D-texture coordinates in the resulting
+            trimesh or not
 
     Returns:
         trimesh.Trimesh: Generated trimesh mesh
@@ -723,7 +726,57 @@ def mesh_prim_to_trimesh_mesh(mesh_prim):
             faces.append([face_indices[i], face_indices[i + j + 1], face_indices[i + j + 2]])
         i += count
 
-    return trimesh.Trimesh(vertices=vertices, faces=faces)
+    kwargs = dict(vertices=vertices, faces=faces)
+
+    if include_normals:
+        kwargs["vertex_normals"] = np.array(mesh_prim.GetAttribute("normals").Get())
+
+    if include_texcoord:
+        kwargs["visual"] = trimesh.visual.TextureVisuals(uv=np.array(mesh_prim.GetAttribute("primvars:st").Get()))
+
+    return trimesh.Trimesh(**kwargs)
+
+
+def sample_mesh_keypoints(mesh_prim, n_keypoints, n_keyfaces, deterministic=True):
+    """
+    Samples keypoints and keyfaces for mesh @mesh_prim
+
+    Args:
+        mesh_prim (Usd.Prim): Mesh prim to be sampled from
+        n_keypoints (int): number of (unique) keypoints to randomly sample from @mesh_prim
+        n_keyfaces (int): number of (unique) keyfaces to randomly sample from @mesh_prim
+        deterministic (bool): Whether to deterministically sample or not (ie: whether to set random seed or not)
+
+    Returns:
+        2-tuple:
+            - n-array: (n,) 1D int array representing the randomly sampled point idxs from @mesh_prim.
+                Note that since this is without replacement, the total length of the array may be less than
+                @n_keypoints
+            - None or n-array: 1D int array representing the randomly sampled face idxs from @mesh_prim.
+                Note that since this is without replacement, the total length of the array may be less than
+                @n_keyfaces
+    """
+    # Set seed if deterministic
+    if deterministic:
+        np.random.seed(0)
+
+    # Generate trimesh mesh from which to aggregate points
+    tm = mesh_prim_to_trimesh_mesh(mesh_prim=mesh_prim, include_normals=False, include_texcoord=False)
+    n_unique_vertices, n_unique_faces = len(tm.vertices), len(tm.faces)
+    faces_flat = tm.faces.flatten()
+    n_vertices = len(faces_flat)
+
+    # Sample vertices
+    unique_vertices = np.unique(faces_flat, return_index=True)[1]
+    assert len(unique_vertices) == n_unique_vertices
+    keypoint_idx = np.random.choice(unique_vertices, size=n_keypoints, replace=False) if \
+        n_unique_vertices > n_keypoints else unique_vertices
+
+    # Sample faces
+    keyface_idx = np.random.choice(n_unique_faces, size=n_keyfaces, replace=False) if \
+        n_unique_faces > n_keyfaces else np.arange(n_unique_faces)
+
+    return keypoint_idx, keyface_idx
 
 
 def get_mesh_volume_and_com(mesh_prim):
@@ -743,7 +796,7 @@ def get_mesh_volume_and_com(mesh_prim):
     com = np.zeros(3)
     if mesh_type == "Mesh":
         # We construct a trimesh object from this mesh in order to infer its volume
-        trimesh_mesh = mesh_prim_to_trimesh_mesh(mesh_prim)
+        trimesh_mesh = mesh_prim_to_trimesh_mesh(mesh_prim, include_normals=False, include_texcoord=False)
         if trimesh_mesh.is_volume:
             volume = trimesh_mesh.volume
             com = trimesh_mesh.center_mass

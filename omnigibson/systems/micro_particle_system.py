@@ -7,10 +7,15 @@ from omnigibson.systems.system_base import BaseSystem, REGISTERED_SYSTEMS
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
 from omnigibson.utils.python_utils import classproperty, assert_valid_key, subclass_factory, snake_case_to_camel_case
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object_full_grid_topdown
-from omnigibson.utils.usd_utils import array_to_vtarray
+from omnigibson.utils.usd_utils import mesh_prim_to_trimesh_mesh
 from omnigibson.utils.physx_utils import create_physx_particle_system, create_physx_particleset_pointinstancer
 from omnigibson.utils.ui_utils import disclaimer, create_module_logger
 
+from pathlib import Path
+import os
+import tempfile
+import datetime
+import pymeshlab
 import omni
 from omni.isaac.core.utils.prims import get_prim_at_path, is_prim_path_valid
 from omni.physx.scripts import particleUtils
@@ -30,6 +35,22 @@ import carb
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
+
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
+
+
+# TODO: Tune these default values!
+# TODO (eric): figure out whether one offset can fit all
+m.CLOTH_PARTICLE_CONTACT_OFFSET = 0.0075
+m.CLOTH_REMESHING_ERROR_THRESHOLD = 0.05
+m.CLOTH_STRETCH_STIFFNESS = 10000.0
+m.CLOTH_BEND_STIFFNESS = 200.0
+m.CLOTH_SHEAR_STIFFNESS = 100.0
+m.CLOTH_DAMPING = 0.2
+m.CLOTH_FRICTION = 0.4
+m.CLOTH_DRAG = 0.001
+m.CLOTH_LIFT = 0.003
 
 
 def is_physical_particle_system(system_name):
@@ -393,6 +414,13 @@ class MicroParticleSystem(BaseSystem):
     # Particle system prim in the scene, should be generated at runtime
     system_prim = None
 
+    # Material -- MaterialPrim associated with this particle system
+    _material = None
+
+    # Color of the generated material. Default is white [1.0, 1.0, 1.0]
+    # (NOTE: external queries should call cls.color)
+    _color = np.array([1.0, 1.0, 1.0])
+
     @classmethod
     def initialize(cls):
         # Run super first
@@ -400,6 +428,91 @@ class MicroParticleSystem(BaseSystem):
         if not gm.USE_GPU_DYNAMICS:
             raise ValueError(f"Failed to initialize {cls.name} system. Please set gm.USE_GPU_DYNAMICS to be True.")
         cls.system_prim = cls._create_particle_system()
+
+        # Create material
+        cls._material = cls._create_particle_material_template()
+        # Load the material
+        cls._material.load()
+        # Bind the material to the particle system (for isosurface) and the prototypes (for non-isosurface)
+        cls._material.bind(cls.system_prim_path)
+        # Also apply physics to this material
+        particleUtils.add_pbd_particle_material(og.sim.stage, cls.mat_path, **cls._pbd_material_kwargs)
+        # Force populate inputs and outputs of the shader
+        cls._material.shader_force_populate()
+        # Potentially modify the material
+        cls._customize_particle_material()
+
+    @classproperty
+    def color(cls):
+        """
+        Returns:
+            None or 3-array: If @cls._material exists, this will be its corresponding RGB color. Otherwise,
+                will return None
+        """
+        return cls._color
+
+    @classproperty
+    def material(cls):
+        """
+        Returns:
+            None or MaterialPrim: The bound material to this prim, if there is one
+        """
+        return cls._material
+
+    @classproperty
+    def mat_path(cls):
+        """
+        Returns:
+            str: Path to this system's material in the scene stage
+        """
+        return f"{cls.prim_path}/material"
+
+    @classproperty
+    def mat_name(cls):
+        """
+        Returns:
+            str: Name of this system's material
+        """
+        return f"{cls.name}:material"
+
+    @classproperty
+    def _pbd_material_kwargs(cls):
+        """
+        Returns:
+            dict: Any PBD material kwargs to pass to the PBD material method particleUtils.add_pbd_particle_material
+                used to define physical properties associated with this particle system
+        """
+        # Default is empty dictionary
+        return dict()
+
+    @classmethod
+    def _create_particle_material_template(cls):
+        """
+        Creates the particle material template to be used for this particle system. Prim path does not matter,
+        as it will be overridden internally such that it is a child prim of this particle system's prim.
+
+        NOTE: This material is a template because it is loading an Omni material preset. It can then be customized (in
+        addition to modifying its physical material properties) via @_customize_particle_material
+
+        Returns:
+            MaterialPrim: The material to apply to all particles
+        """
+        # Default is PBR material
+        return MaterialPrim(
+            prim_path=cls.mat_path,
+            name=cls.mat_name,
+            load_config={
+                "mdl_name": f"OmniPBR.mdl",
+                "mtl_name": f"OmniPBR",
+            }
+        )
+
+    @classmethod
+    def _customize_particle_material(cls):
+        """
+        Modifies this particle system's particle material once it is loaded. Default is a no-op
+        """
+        pass
 
     @classproperty
     def system_prim_path(cls):
@@ -525,22 +638,6 @@ class PhysicalParticleSystem(MicroParticleSystem):
         """
         return [inst.idn for inst in cls.particle_instancers.values()]
 
-    @classproperty
-    def mat_path(cls):
-        """
-        Returns:
-            str: Path to this system's material in the scene stage
-        """
-        return f"{cls.prim_path}/material"
-
-    @classproperty
-    def mat_name(cls):
-        """
-        Returns:
-            str: Name of this system's material
-        """
-        return f"{cls.name}:material"
-
     @classmethod
     def initialize(cls):
         # Run super first
@@ -602,10 +699,6 @@ class PhysicalParticleSystem(MicroParticleSystem):
             else cls.generate_particle_instancer(n_particles=0, idn=cls.default_instancer_idn)
 
     @classproperty
-    def color(cls):
-        return cls._color
-
-    @classproperty
     def is_fluid(cls):
         """
         Returns:
@@ -630,28 +723,6 @@ class PhysicalParticleSystem(MicroParticleSystem):
             list of VisualGeomPrim: Visual mesh prim(s) to use as this system's particle prototype(s)
         """
         raise NotImplementedError()
-
-    @classmethod
-    def _create_particle_material_template(cls):
-        """
-        Creates the particle material template to be used for this particle system. Prim path does not matter,
-        as it will be overridden internally such that it is a child prim of this particle system's prim.
-
-        NOTE: This material is a template because it is loading an Omni material preset. It can then be customized (in
-        addition to modifying its physical material properties) via @_customize_particle_material
-
-        Returns:
-            None or MaterialPrim: If specified, is the material to apply to all particles. If None, no material
-                will be used. Default is None
-        """
-        return None
-
-    @classmethod
-    def _customize_particle_material(cls):
-        """
-        Modifies this particle system's particle material once it is loaded. Default is a no-op
-        """
-        pass
 
     @classmethod
     def check_in_contact(cls, positions):
@@ -1243,32 +1314,15 @@ class FluidSystem(PhysicalParticleSystem):
     texture. Individual particles are composed of spheres.
     """
 
-    # Material -- either a MaterialPrim or None if no material is used for this particle system
-    _material = None
-
-    # Color associated with this system (NOTE: external queries should call cls.color)
-    # The default color is blue.
-    _color = np.array([0.0, 0.0, 1.0])
-
     @classmethod
     def initialize(cls):
         # Run super first
         super().initialize()
 
-        # Create the particle material
-        cls._material = cls._create_particle_material_template()
-        # Load the material
-        cls._material.load()
         # Bind the material to the particle system (for isosurface) and the prototypes (for non-isosurface)
         cls._material.bind(cls.system_prim_path)
         for prototype in cls.particle_prototypes:
             cls._material.bind(prototype.prim_path)
-        # Also apply physics to this material
-        particleUtils.add_pbd_particle_material(og.sim.stage, cls.mat_path)
-        # Force populate inputs and outputs of the shader
-        cls._material.shader_force_populate()
-        # Potentially modify the material
-        cls._customize_particle_material()
         # Apply the physical material preset based on whether or not this fluid is viscous
         apply_mat_physics = particleUtils.AddPBDMaterialViscous if cls.is_viscous else particleUtils.AddPBDMaterialWater
         apply_mat_physics(p=cls._material.prim)
@@ -1310,14 +1364,6 @@ class FluidSystem(PhysicalParticleSystem):
             bool: True if this material is viscous or not. Default is False
         """
         raise NotImplementedError
-
-    @classproperty
-    def material(cls):
-        """
-        Returns:
-            None or MaterialPrim: The bound material to this prim, if there is one
-        """
-        return cls._material
 
     @classproperty
     def particle_radius(cls):
@@ -1589,6 +1635,88 @@ class Cloth(MicroParticleSystem):
     """
     Particle system class to simulate cloth.
     """
+    @classmethod
+    def clothify_mesh_prim(cls, mesh_prim, remesh=True, particle_distance=None):
+        """
+        Clothifies @mesh_prim by applying the appropriate Cloth API, optionally re-meshing the mesh so that the
+        resulting generated particles are roughly @particle_distance apart from each other.
+
+        Args:
+            mesh_prim (Usd.Prim): Mesh prim to clothify
+            remesh (bool): If True, will remesh the input mesh before converting it into a cloth
+            particle_distance (None or float): If set and @remesh is True, specifies the absolute target distance
+                between generated cloth particles. If None, a value is automatically chosen such that the generated
+                cloth particles are roughly touching each other, given cls.particle_contact_offset and
+                @mesh_prim's scale
+        """
+        # Possibly remesh if requested
+        if remesh:
+            # We will remesh in pymeshlab, but it doesn't allow programmatic construction of a mesh with texcoords so
+            # we convert our mesh into a trimesh mesh, then export it to a temp file, then load it into pymeshlab
+            tm = mesh_prim_to_trimesh_mesh(mesh_prim=mesh_prim, include_normals=True, include_texcoord=True)
+            # Tmp file written to: {tmp_dir}/{tmp_fname}/{tmp_fname}.obj
+            tmp_name = f"{mesh_prim.GetName()}_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
+            tmp_dir = os.path.join(tempfile.gettempdir(), tmp_name)
+            tmp_fpath = os.path.join(tmp_dir, f"{tmp_name}.obj")
+            Path(tmp_dir).mkdir(parents=True, exist_ok=True)
+            tm.export(tmp_fpath)
+            ms = pymeshlab.MeshSet()
+            ms.load_new_mesh(tmp_fpath)
+
+            # Re-mesh based on @particle_distance - distance chosen such that at rest particles should be just touching
+            # each other. The 1.5 magic number comes from the particle cloth demo from omni
+            # Note that this means that the particles will overlap with each other, since at dist = 2 * contact_offset
+            # the particles are just touching each other at rest
+            particle_distance = cls.particle_contact_offset * 2 / (1.5 * np.mean(mesh_prim.GetAttribute("xformOp:scale").Get())) \
+                if particle_distance is None else particle_distance
+            avg_edge_percentage_mismatch = 1.0
+            iters = 0
+            # Loop re-meshing until average edge percentage is within error threshold or we reach the max number of tries
+            while avg_edge_percentage_mismatch > m.CLOTH_REMESHING_ERROR_THRESHOLD:
+                ms.meshing_isotropic_explicit_remeshing(iterations=5, targetlen=pymeshlab.AbsoluteValue(particle_distance))
+                avg_edge_percentage_mismatch = abs(1.0 - particle_distance / ms.get_geometric_measures()["avg_edge_length"])
+                iters += 1
+                if iters > 10:
+                    # Terminate anyways, but don't fail
+                    log.warn("Failed to sufficiently remesh cloth. "
+                             "The generated cloth may not have evenly distributed particles.")
+
+            # Re-write data to @mesh_prim
+            cm = ms.current_mesh()
+            new_face_vertex_ids = cm.face_matrix().flatten()
+            new_texcoord = cm.wedge_tex_coord_matrix()
+            new_vertices = cm.vertex_matrix()[new_face_vertex_ids]
+            new_normals = cm.vertex_normal_matrix()[new_face_vertex_ids]
+            n_vertices = len(new_vertices)
+            n_faces = len(cm.face_matrix())
+
+            mesh_prim.GetAttribute("faceVertexCounts").Set(np.ones(n_faces, dtype=int) * 3)
+            mesh_prim.GetAttribute("points").Set(Vt.Vec3fArray.FromNumpy(new_vertices))
+            mesh_prim.GetAttribute("faceVertexIndices").Set(np.arange(n_vertices))
+            mesh_prim.GetAttribute("normals").Set(Vt.Vec3fArray.FromNumpy(new_normals))
+            mesh_prim.GetAttribute("primvars:st").Set(Vt.Vec2fArray.FromNumpy(new_texcoord))
+
+        # Convert into particle cloth
+        particleUtils.add_physx_particle_cloth(
+            stage=og.sim.stage,
+            path=mesh_prim.GetPath(),
+            dynamic_mesh_path=None,
+            particle_system_path=cls.system_prim_path,
+            spring_stretch_stiffness=m.CLOTH_STRETCH_STIFFNESS,
+            spring_bend_stiffness=m.CLOTH_BEND_STIFFNESS,
+            spring_shear_stiffness=m.CLOTH_SHEAR_STIFFNESS,
+            spring_damping=m.CLOTH_DAMPING,
+            self_collision=True,
+            self_collision_filter=True,
+        )
+
+    @classproperty
+    def _pbd_material_kwargs(cls):
+        return dict(
+            friction=m.CLOTH_FRICTION,
+            drag=m.CLOTH_DRAG,
+            lift=m.CLOTH_LIFT,
+        )
 
     @classproperty
     def _register_system(cls):
@@ -1597,8 +1725,7 @@ class Cloth(MicroParticleSystem):
 
     @classproperty
     def particle_contact_offset(cls):
-        # TODO (eric): figure out whether one offset can fit all
-        return 0.005
+        return m.CLOTH_PARTICLE_CONTACT_OFFSET
 
     @classproperty
     def state_size(cls):

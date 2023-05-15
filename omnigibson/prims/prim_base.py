@@ -45,7 +45,7 @@ class BasePrim(Serializable, UniquelyNamed, Recreatable, ABC):
     ):
         self._prim_path = prim_path
         self._name = name
-        self._load_config = {} if load_config is None else load_config
+        self._load_config = dict() if load_config is None else load_config
 
         # Other values that will be filled in at runtime
         self._applied_visual_material = None

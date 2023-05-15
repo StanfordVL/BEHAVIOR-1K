@@ -70,6 +70,7 @@ def create_projection_visualization(
         projection_radius,
         projection_height,
         particle_radius,
+        parent_scale,
         material=None,
 ):
     """
@@ -81,8 +82,12 @@ def create_projection_visualization(
         shape (str): Shape of the projection to generate. Valid options are: {Sphere, Cone}
         projection_name (str): Name associated with this projection visualization. Should be unique!
         projection_radius (float): Radius of the generated projection visualization overall volume
+            (specified in local frame)
         projection_height (float): Height of the generated projection visualization overall volume
+            (specified in local frame)
         particle_radius (float): Radius of the particles composing the projection visualization
+        parent_scale (3-array): If specified, specifies the (x,y,z) scale of the parent Xform prim of the
+            generated source sphere prim at @prim_path. This will be used to scale the visualization accordingly
         material (None or MaterialPrim): If specified, specifies the material to associate with the generated
             particles within the projection visualization
 
@@ -93,6 +98,7 @@ def create_projection_visualization(
     """
     # Create the desired shape which will be used as the source input prim into the generated projection visualization
     source = UsdGeom.Sphere.Define(og.sim.stage, Sdf.Path(prim_path))
+
     # Modify the radius according to the desired @shape (and also infer the desired spread values)
     if shape == "Cylinder":
         source_radius = projection_radius
@@ -110,6 +116,13 @@ def create_projection_visualization(
     UsdGeom.Imageable(source.GetPrim()).MakeInvisible()
     # Generate the ComputeGraph nodes to render the projection
     core = Core(lambda val: None, particle_system_name=projection_name)
+
+    # Scale radius and height by the parent scale -- projection always points in the negative-z direction of the
+    # parent frame
+    # We do this AFTER we create the source sphere because the actual projection is scaled in the world frame, whereas
+    # the source sphere is already scaled by its own parent frame
+    projection_radius *= np.mean(parent_scale[:2])
+    projection_height *= parent_scale[2]
 
     # Suppress omni warnings here -- we don't have control over this API, but omni likes to complain about this
     with suppress_omni_log(channels=["omni.graph.core.plugin", "omni.usd", "rtx.neuraylib.plugin"]):
@@ -680,6 +693,7 @@ class ParticleApplier(ParticleModifier):
                     projection_radius=radius,
                     projection_height=height,
                     particle_radius=particle_radius,
+                    parent_scale=self.link.scale,
                     material=particle_material,
                 )
 
