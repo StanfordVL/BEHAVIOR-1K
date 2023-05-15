@@ -41,6 +41,8 @@ m = create_module_macros(module_path=__file__)
 
 
 # TODO: Tune these default values!
+# TODO (eric): figure out whether one offset can fit all
+m.CLOTH_PARTICLE_CONTACT_OFFSET = 0.0075
 m.CLOTH_REMESHING_ERROR_THRESHOLD = 0.05
 m.CLOTH_STRETCH_STIFFNESS = 10000.0
 m.CLOTH_BEND_STIFFNESS = 200.0
@@ -1723,8 +1725,7 @@ class Cloth(MicroParticleSystem):
 
     @classproperty
     def particle_contact_offset(cls):
-        # TODO (eric): figure out whether one offset can fit all
-        return 0.0075
+        return m.CLOTH_PARTICLE_CONTACT_OFFSET
 
     @classproperty
     def state_size(cls):
