@@ -767,14 +767,10 @@ def sample_mesh_keypoints(mesh_prim, n_keypoints, n_keyfaces, deterministic=True
     n_vertices = len(faces_flat)
 
     # Sample vertices
-    # Note: We oversample (x3, arbitrarily chosen number) and then only keep up to the first unique @n_keypoints idxs
-    sampled_idxs = np.random.choice(n_vertices, size=3 * n_keypoints, replace=False) if \
-        n_vertices > 3 * n_keypoints else np.arange(n_vertices)
-    # Create dictionary mapping unique vertex ID to non-unique vertex ID so that we automatically filter out any
-    # duplicates of unique vertex IDs
-    unique_vertex_mapping = {faces_flat[idx]: idx for idx in sampled_idxs}
-    # Keep the first @n_keypoints values, or less if there are less points
-    keypoint_idx = np.array(list(unique_vertex_mapping.values())[:min(n_keypoints, n_unique_vertices)])
+    unique_vertices = np.unique(faces_flat, return_index=True)[1]
+    assert len(unique_vertices) == n_unique_vertices
+    keypoint_idx = np.random.choice(unique_vertices, size=n_keypoints, replace=False) if \
+        n_unique_vertices > n_keypoints else unique_vertices
 
     # Sample faces
     keyface_idx = np.random.choice(n_unique_faces, size=n_keyfaces, replace=False) if \
