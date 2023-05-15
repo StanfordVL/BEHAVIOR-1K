@@ -41,6 +41,7 @@ m = create_module_macros(module_path=__file__)
 
 
 # TODO: Tune these default values!
+m.CLOTH_REMESHING_ERROR_THRESHOLD = 0.05
 m.CLOTH_STRETCH_STIFFNESS = 10000.0
 m.CLOTH_BEND_STIFFNESS = 200.0
 m.CLOTH_SHEAR_STIFFNESS = 100.0
@@ -1666,7 +1667,17 @@ class Cloth(MicroParticleSystem):
             # the particles are just touching each other at rest
             particle_distance = cls.particle_contact_offset * 2 / (1.5 * np.mean(mesh_prim.GetAttribute("xformOp:scale").Get())) \
                 if particle_distance is None else particle_distance
-            ms.meshing_isotropic_explicit_remeshing(iterations=20, targetlen=pymeshlab.AbsoluteValue(particle_distance))
+            avg_edge_percentage_mismatch = 1.0
+            iters = 0
+            # Loop re-meshing until average edge percentage is within error threshold or we reach the max number of tries
+            while avg_edge_percentage_mismatch > m.CLOTH_REMESHING_ERROR_THRESHOLD:
+                ms.meshing_isotropic_explicit_remeshing(iterations=5, targetlen=pymeshlab.AbsoluteValue(particle_distance))
+                avg_edge_percentage_mismatch = abs(1.0 - particle_distance / ms.get_geometric_measures()["avg_edge_length"])
+                iters += 1
+                if iters > 10:
+                    # Terminate anyways, but don't fail
+                    log.warn("Failed to sufficiently remesh cloth. "
+                             "The generated cloth may not have evenly distributed particles.")
 
             # Re-write data to @mesh_prim
             cm = ms.current_mesh()
