@@ -117,7 +117,7 @@ class EntityPrim(XFormPrim):
             # NOTE: We copy because we cannot directly move the prim because it is ancestral
             # NOTE: We use this specific delete method because alternative methods (eg: "delete_prim") fail beacuse
             # the prim is ancestral. Note that because it is non-destructive, the original link prim path is still
-            # tracked by omni, so we have to have to utilize a new unique prim path for the copied cloth mesh
+            # tracked by omni, so we have to utilize a new unique prim path for the copied cloth mesh
             # See omni.kit.context_menu module for reference
             new_path = f"{self._prim_path}/{old_link_prim.GetName()}_cloth"
             omni.kit.commands.execute("CopyPrim", path_from=cloth_mesh_prim.GetPath(), path_to=new_path)
