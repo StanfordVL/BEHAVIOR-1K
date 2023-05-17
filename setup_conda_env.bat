@@ -49,5 +49,5 @@ call conda activate omnigibson
 echo OmniGibson successfully installed!
 
 :error
-An error occurred during installation. Please check the error message above.
+echo An error occurred during installation. Please check the error message above.
 exit /b
