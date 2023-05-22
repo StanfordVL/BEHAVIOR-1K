@@ -451,10 +451,10 @@ class Environment(gym.Env, GymObservable, Recreatable):
         if self.observation_space is not None and not self.observation_space.contains(obs):
             # Flatten obs, and print out all keys and values
             log.error("OBSERVATION SPACE:")
-            for key, value in recursively_generate_flat_dict(dic=self.observation_space):
+            for key, value in recursively_generate_flat_dict(dic=self.observation_space).items():
                 log.error(("obs_space", key, value.dtype, value.shape))
             log.error("ACTUAL OBSERVATIONS:")
-            for key, value in recursively_generate_flat_dict(dic=obs):
+            for key, value in recursively_generate_flat_dict(dic=obs).items():
                 log.error(("obs", key, value.dtype, value.shape))
             raise ValueError("Observation space does not match returned observations!")
 
