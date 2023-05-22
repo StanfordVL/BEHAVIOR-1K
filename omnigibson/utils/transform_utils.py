@@ -1082,11 +1082,18 @@ def rad2deg(rad):
     return rad * 180. / np.pi
 
 
-def check_quat_right_angle(quat):
+def check_quat_right_angle(quat, atol=5e-3):
     """
     Check by making sure the quaternion is some permutation of +/- (1, 0, 0, 0),
     +/- (0.707, 0.707, 0, 0), or +/- (0.5, 0.5, 0.5, 0.5)
     Because orientations are all normalized (same L2-norm), every orientation should have a unique L1-norm
     So we check the L1-norm of the absolute value of the orientation as a proxy for verifying these values
+
+    Args:
+        quat (4-array): (x,y,z,w) quaternion orientation to check
+        atol (float): Absolute tolerance permitted
+
+    Returns:
+        bool: Whether the quaternion is a right angle or not
     """
-    return np.any(np.isclose(np.abs(quat).sum(), np.array([1.0, 1.414, 2.0]), atol=1e-3))
+    return np.any(np.isclose(np.abs(quat).sum(), np.array([1.0, 1.414, 2.0]), atol=atol))
