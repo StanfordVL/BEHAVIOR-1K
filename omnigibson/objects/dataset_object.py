@@ -585,7 +585,7 @@ class DatasetObject(USDObject):
                 points.extend(trimesh.transformations.transform_points(vertices_in_base_frame, bbox_center_in_base_frame))
             elif fallback_to_aabb:
                 # If no BB annotation is available, get the AABB for this link.
-                aabb_center, aabb_extent = BoundingBoxAPI.compute_center_extent(prim_path=link.prim_path)
+                aabb_center, aabb_extent = BoundingBoxAPI.compute_center_extent(prim=link)
                 aabb_vertices_in_world = aabb_center + np.array(list(itertools.product((1, -1), repeat=3))) * (
                         aabb_extent / 2
                 )
