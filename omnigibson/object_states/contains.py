@@ -3,14 +3,17 @@ from collections import namedtuple
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from omnigibson.object_states.object_state_base import RelativeObjectState, BooleanState
+from omnigibson.systems.macro_particle_system import VisualParticleSystem
 from omnigibson.systems.micro_particle_system import PhysicalParticleSystem
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
 from omnigibson.utils.python_utils import classproperty
+import omnigibson.utils.transform_utils as T
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
 m.CONTAINER_LINK_PREFIX = "container"
+m.VISUAL_PARTICLE_OFFSET = 0.01    # Offset to visual particles' poses when checking overlaps with container volume
 
 
 """
@@ -31,6 +34,7 @@ class ContainedParticles(RelativeObjectState, LinkBasedStateMixin):
         self.check_in_volume = None         # Function to check whether particles are in volume for this container
         self._volume = None                 # Volume of this container
         self._compute_info = None           # Intermediate computation information to store
+        self._visual_particle_group = None  # Name corresponding to this object's set of visual particles
 
     @classproperty
     def metalink_prefix(cls):
@@ -49,16 +53,33 @@ class ContainedParticles(RelativeObjectState, LinkBasedStateMixin):
                 - in_volume (np.array): (N,) boolean array, True if the corresponding particle is inside this
                     object's container volume, else False
         """
-        # Sanity check to make sure system is valid
-        assert issubclass(system, PhysicalParticleSystem), "Can only get Contains state with a valid PhysicalParticleSystem!"
-        # Check how many particles are included
-        n_particles_in_volume, particle_positions, particles_in_volume = 0, np.array([]), np.array([])
-        if len(system.particle_instancers) > 0:
-            particle_positions = np.concatenate([inst.particle_positions for inst in system.particle_instancers.values()], axis=0)
-            particles_in_volume = self.check_in_volume(particle_positions)
+        # Value is false by default
+        n_particles_in_volume, raw_positions, checked_positions, particles_in_volume = 0, np.array([]), np.array([]), np.array([])
+
+        # First, we check what type of system
+        # Currently, we support VisualParticleSystems and PhysicalParticleSystems
+        if issubclass(system, VisualParticleSystem):
+            if self._visual_particle_group in system.groups:
+                # Grab global particle poses and offset them in the direction of their orientation
+                raw_positions, quats = system.get_particles_position_orientation(group=self._visual_particle_group)
+                unit_z = np.zeros((len(raw_positions), 3, 1))
+                unit_z[:, -1, :] = m.VISUAL_PARTICLE_OFFSET
+                checked_positions = (T.quat2mat(quats) @ unit_z).reshape(-1, 3) + raw_positions
+        elif issubclass(system, PhysicalParticleSystem):
+            # We only check if we have particle instancers currently
+            if len(system.particle_instancers) > 0:
+                raw_positions = np.concatenate([inst.particle_positions for inst in system.particle_instancers.values()], axis=0)
+                checked_positions = raw_positions
+        else:
+            raise ValueError(f"Invalid system {system} received for getting Covered state!"
+                             f"Currently, only VisualParticleSystems and PhysicalParticleSystems are supported.")
+
+        # Only calculate if we have valid positions
+        if len(checked_positions) > 0:
+            particles_in_volume = self.check_in_volume(checked_positions)
             n_particles_in_volume = particles_in_volume.sum()
 
-        return ContainedParticlesData(n_particles_in_volume, particle_positions, particles_in_volume)
+        return ContainedParticlesData(n_particles_in_volume, raw_positions, particles_in_volume)
 
     def _set_value(self, system, new_value):
         # Cannot set this value
@@ -74,6 +95,9 @@ class ContainedParticles(RelativeObjectState, LinkBasedStateMixin):
 
         # Calculate volume
         self._volume = calculate_volume()
+
+        # Grab group name
+        self._visual_particle_group = VisualParticleSystem.get_group_name(obj=self.obj)
 
     @property
     def volume(self):

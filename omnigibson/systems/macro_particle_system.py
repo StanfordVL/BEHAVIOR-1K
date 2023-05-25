@@ -812,11 +812,15 @@ class VisualParticleSystem(MacroParticleSystem):
         return success
 
     @classmethod
-    def get_particles_position_orientation(cls):
+    def get_particles_position_orientation(cls, group=None):
         """
         Computes all particles' global positions and orientations that belong to this system
 
         Note: This is more optimized than doing a for loop with self.get_particle_position_orientation()
+
+        Args:
+            group (None or str): If specified, will only return subset of particle positions and orientations belonging
+                to @group. None results in all particles being returned
 
         Returns:
             2-tuple:
@@ -827,7 +831,8 @@ class VisualParticleSystem(MacroParticleSystem):
         link_tfs = dict()
         link_tfs_batch = np.zeros((cls.n_particles, 4, 4))
         particle_local_poses_batch = np.zeros_like(link_tfs_batch)
-        for i, name in enumerate(cls.particles):
+        particles = cls.particles if group is None else cls._group_particles[group]
+        for i, name in enumerate(particles):
             link = cls._particles_info[name]["link"]
             if link in link_tfs:
                 link_tf = link_tfs[link]

@@ -468,10 +468,10 @@ def quat2mat(quaternion):
     Converts given quaternion to matrix.
 
     Args:
-        quaternion (np.array): (x,y,z,w) vec4 float angles
+        quaternion (np.array): (..., 4) (x,y,z,w) float quaternion angles
 
     Returns:
-        np.array: 3x3 rotation matrix
+        np.array: (..., 3, 3) rotation matrix
     """
     return R.from_quat(quaternion).as_matrix()
 
