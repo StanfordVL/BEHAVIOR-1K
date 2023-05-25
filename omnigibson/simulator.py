@@ -104,6 +104,10 @@ class Simulator(SimulationContext, Serializable):
         self._objects_require_contact_callback = False
         self._objects_require_joint_break_callback = False
 
+        # Maps callback name to callback
+        self._callbacks_on_play = None
+        self._callbacks_on_stop = None
+
         # Mapping from link IDs assigned from omni to the object that they reference
         self._link_id_to_objects = dict()
 
@@ -668,6 +672,48 @@ class Simulator(SimulationContext, Serializable):
         yield
         self.set_simulation_dt(physics_dt=physics_dt, rendering_dt=rendering_dt)
 
+    def add_callback_on_play(self, name, callback):
+        """
+        Adds a function @callback, referenced by @name, to be executed every time sim.play() is called
+
+        Args:
+            name (str): Name of the callback
+            callback (function): Callback function. Function signature is expected to be:
+
+                def callback() --> None
+        """
+        self._callbacks_on_play[name] = callback
+
+    def add_callback_on_stop(self, name, callback):
+        """
+        Adds a function @callback, referenced by @name, to be executed every time sim.stop() is called
+
+        Args:
+            name (str): Name of the callback
+            callback (function): Callback function. Function signature is expected to be:
+
+                def callback() --> None
+        """
+        self._callbacks_on_stop[name] = callback
+
+    def remove_callback_on_play(self, name):
+        """
+        Remove play callback whose reference is @name
+
+        Args:
+            name (str): Name of the callback
+        """
+        self._callbacks_on_play.pop(name)
+
+    def remove_callback_on_stop(self, name):
+        """
+        Remove stop callback whose reference is @name
+
+        Args:
+            name (str): Name of the callback
+        """
+        self._callbacks_on_stop.pop(name)
+
     @classmethod
     def clear_instance(cls):
         SimulationContext.clear_instance()
@@ -771,6 +817,9 @@ class Simulator(SimulationContext, Serializable):
         self._objects_require_contact_callback = False
         self._objects_require_joint_break_callback = False
         self._link_id_to_objects = dict()
+
+        self._callbacks_on_play = dict()
+        self._callbacks_on_stop = dict()
 
         # Load dummy stage, but don't clear sim to prevent circular loops
         self._load_stage(usd_path=f"{gm.ASSET_PATH}/models/misc/clear_stage.usd")
