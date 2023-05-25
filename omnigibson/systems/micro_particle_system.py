@@ -56,7 +56,7 @@ m.CLOTH_LIFT = 0.003
 def is_physical_particle_system(system_name):
     assert system_name in REGISTERED_SYSTEMS, f"System {system_name} not in REGISTERED_SYSTEMS."
     system = REGISTERED_SYSTEMS[system_name]
-    return issubclass(system, PhysicalParticleSystem)
+    return issubclass(system, MicroPhysicalParticleSystem)
 
 
 def set_carb_settings_for_fluid_isosurface():
@@ -596,7 +596,7 @@ class MicroParticleSystem(BaseSystem):
         ).GetPrim()
 
 
-class PhysicalParticleSystem(MicroParticleSystem):
+class MicroPhysicalParticleSystem(MicroParticleSystem):
     """
     Global system for modeling physical "micro" level particles, e.g.: water, seeds, rice, etc. This system leverages
     Omniverse's native physx particle systems
@@ -1282,7 +1282,7 @@ class PhysicalParticleSystem(MicroParticleSystem):
                 (Note: These values should have either @classproperty or @classmethod decorators!)
 
         Returns:
-            PhysicalParticleSystem: Generated system class
+            MicroPhysicalParticleSystem: Generated system class
         """
 
         # Override the necessary parameters
@@ -1308,7 +1308,7 @@ class PhysicalParticleSystem(MicroParticleSystem):
         return super().create(name=name, **kwargs)
 
 
-class FluidSystem(PhysicalParticleSystem):
+class FluidSystem(MicroPhysicalParticleSystem):
     """
     Particle system class simulating fluids, leveraging isosurface feature in omniverse to render nice PBR fluid
     texture. Individual particles are composed of spheres.
@@ -1475,7 +1475,7 @@ def customize_particle_material_factory(attr, value):
     return func
 
 
-class GranularSystem(PhysicalParticleSystem):
+class GranularSystem(MicroPhysicalParticleSystem):
     """
     Particle system class simulating granular materials. Individual particles are composed of custom USD objects.
     """

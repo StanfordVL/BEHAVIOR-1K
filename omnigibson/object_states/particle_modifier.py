@@ -13,7 +13,7 @@ from omnigibson.object_states.object_state_base import AbsoluteObjectState
 from omnigibson.object_states.toggle import ToggledOn
 from omnigibson.object_states.update_state_mixin import UpdateStateMixin
 from omnigibson.systems.macro_particle_system import VisualParticleSystem
-from omnigibson.systems.micro_particle_system import PhysicalParticleSystem
+from omnigibson.systems.micro_particle_system import MicroPhysicalParticleSystem
 from omnigibson.systems import get_system, is_visual_particle_system, is_physical_particle_system, is_system_active
 from omnigibson.utils.constants import ParticleModifyMethod, PrimType
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function, get_particle_positions_from_frame
@@ -434,7 +434,7 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
         assert system.name in self.conditions, f"System {system.name} is not defined in the conditions."
         if issubclass(system, VisualParticleSystem):
             limit = self.visual_particle_modification_limit
-        elif issubclass(system, PhysicalParticleSystem):
+        elif issubclass(system, MicroPhysicalParticleSystem):
             limit = self.physical_particle_modification_limit
 
         # If requested, run sanity check to make sure we're not over the limit with this system's particles
@@ -458,7 +458,7 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
         if value:
             if issubclass(system, VisualParticleSystem):
                 n_particles = self.visual_particle_modification_limit
-            elif issubclass(system, PhysicalParticleSystem):
+            elif issubclass(system, MicroPhysicalParticleSystem):
                 n_particles = self.physical_particle_modification_limit
         self.modified_particle_count[system.name] = n_particles
 
@@ -468,7 +468,7 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
         Returns:
             list: All systems used in this state that are active, dynamic across time
         """
-        return list(VisualParticleSystem.get_active_systems().values()) + list(PhysicalParticleSystem.get_active_systems().values())
+        return list(VisualParticleSystem.get_active_systems().values()) + list(MicroPhysicalParticleSystem.get_active_systems().values())
 
     @property
     def n_steps_per_modification(self):
@@ -558,7 +558,7 @@ class ParticleRemover(ParticleModifier):
                 system.remove_particle(particle_names[idx])
             self.modified_particle_count[system.name] += min(len(inbound_idxs), max_particle_absorbed)
 
-        elif issubclass(system, PhysicalParticleSystem):
+        elif issubclass(system, MicroPhysicalParticleSystem):
             instancer_to_particle_idxs = {}
             # If the object is a cloth, we have to use check_in_mesh with the relaxed AABB since we can't detect
             # collisions via scene query interface. Alternatively, if we're using the projection method,
@@ -639,7 +639,7 @@ class ParticleApplier(ParticleModifier):
             If None, information found from @obj.metadata will be used instead.
         sample_with_raycast (bool): If True, will only sample particles at raycast hits. Otherwise, will bypass sampling
             and immediately sample particles at the sampled particle locations. Note that this will only work
-            for PhysicalParticleSystem-based ParticleAppliers that use the Projection method!
+            for MicroPhysicalParticleSystem-based ParticleAppliers that use the Projection method!
         initial_speed (float): For physical particles, the initial speed for generated particles. Note that the
             direction of the velocity is inferred from the particle sampling process.
         """
@@ -714,8 +714,8 @@ class ParticleApplier(ParticleModifier):
                 raise ValueError(f"Unsupported ParticleModifyMethod: {self.method}!")
         else:
             # Make sure we're only using a physical particle system and the projection method
-            assert issubclass(system, PhysicalParticleSystem), \
-                "If not sampling with raycast, ParticleApplier only supports PhysicalParticleSystems!"
+            assert issubclass(system, MicroPhysicalParticleSystem), \
+                "If not sampling with raycast, ParticleApplier only supports MicroPhysicalParticleSystems!"
             assert self.method == ParticleModifyMethod.PROJECTION, \
                 "If not sampling with raycast, ParticleApplier only supports ParticleModifyMethod.PROJECTION method!"
             # Override the check overlap function -- this now always returns True because we don't require contact with
@@ -803,7 +803,7 @@ class ParticleApplier(ParticleModifier):
                 cuboid_dimensions=cuboid_dimensions,
                 ignore_objs=[self.obj],
                 hit_proportion=0.0,             # We want all hits
-                cuboid_bottom_padding=system.particle_radius if issubclass(system, PhysicalParticleSystem) else
+                cuboid_bottom_padding=system.particle_radius if issubclass(system, MicroPhysicalParticleSystem) else
                 macros.utils.sampling_utils.DEFAULT_CUBOID_BOTTOM_PADDING,
                 undo_cuboid_bottom_padding=issubclass(system, VisualParticleSystem),      # micro particles have zero cuboid dimensions so we need to maintain padding
                 verify_cuboid_empty=False,
@@ -865,7 +865,7 @@ class ParticleApplier(ParticleModifier):
                 # Update our particle count
                 self.modified_particle_count[system.name] += len(particle_info["link_prim_paths"])
 
-        elif issubclass(system, PhysicalParticleSystem):
+        elif issubclass(system, MicroPhysicalParticleSystem):
             # Compile the particle poses to generate and sample the particles
             n_particles = min(len(hits), m.PHYSICAL_PARTICLES_APPLICATION_LIMIT - self.modified_particle_count[system.name])
             # Generate particles
@@ -883,7 +883,7 @@ class ParticleApplier(ParticleModifier):
         Helper function to apply particles form system @system within the projection volume owned by this
         ParticleApplier.
 
-        NOTE: This function only supports PhysicalParticleSystems and ParticleModifyMethod.PROJECTION method, which
+        NOTE: This function only supports MicroPhysicalParticleSystems and ParticleModifyMethod.PROJECTION method, which
         should have been asserted during this ParticleApplier's initialize() call
 
         Args:
@@ -891,8 +891,8 @@ class ParticleApplier(ParticleModifier):
         """
         assert self.method == ParticleModifyMethod.PROJECTION, \
             "Can only apply particles within projection volume if ParticleModifyMethod.PROJECTION method is used!"
-        assert issubclass(system, PhysicalParticleSystem), \
-            "Can only apply particles within projection volume if system is PhysicalParticleSystem!"
+        assert issubclass(system, MicroPhysicalParticleSystem), \
+            "Can only apply particles within projection volume if system is MicroPhysicalParticleSystem!"
 
         # Transform pre-cached particle positions into the world frame
         pos, quat = self.link.get_position_orientation()
@@ -1007,7 +1007,7 @@ class ParticleApplier(ParticleModifier):
         # Check the system
         if issubclass(system, VisualParticleSystem):
             val = m.MAX_VISUAL_PARTICLES_APPLIED_PER_STEP
-        elif issubclass(system, PhysicalParticleSystem):
+        elif issubclass(system, MicroPhysicalParticleSystem):
             val = m.MAX_PHYSICAL_PARTICLES_APPLIED_PER_STEP
         return val
 

@@ -4,7 +4,7 @@ from omnigibson.object_states import AABB
 from omnigibson.object_states.object_state_base import RelativeObjectState, BooleanState
 from omnigibson.object_states.contact_particles import ContactParticles
 from omnigibson.systems.macro_particle_system import VisualParticleSystem
-from omnigibson.systems.micro_particle_system import PhysicalParticleSystem
+from omnigibson.systems.micro_particle_system import MicroPhysicalParticleSystem
 from omnigibson.systems import get_system
 from omnigibson.utils.python_utils import classproperty
 import numpy as np
@@ -60,12 +60,12 @@ class Covered(RelativeObjectState, BooleanState):
         # Value is false by default
         value = False
         # First, we check what type of system
-        # Currently, we support VisualParticleSystems and PhysicalParticleSystems
+        # Currently, we support VisualParticleSystems and MicroPhysicalParticleSystems
         if issubclass(system, VisualParticleSystem):
             if self._visual_particle_group in system.groups:
                 # We check whether the current number of particles assigned to the group is greater than the threshold
                 value = system.num_group_particles(group=self._visual_particle_group) >= m.VISUAL_PARTICLE_THRESHOLD
-        elif issubclass(system, PhysicalParticleSystem):
+        elif issubclass(system, MicroPhysicalParticleSystem):
             # We only check if we have particle instancers currently
             if len(system.particle_instancers) > 0:
                 # We've already cached particle contacts, so we merely search through them to see if any particles are
@@ -75,7 +75,7 @@ class Covered(RelativeObjectState, BooleanState):
                 value = n_near_particles >= m.PHYSICAL_PARTICLE_THRESHOLD
         else:
             raise ValueError(f"Invalid system {system} received for getting Covered state!"
-                             f"Currently, only VisualParticleSystems and PhysicalParticleSystems are supported.")
+                             f"Currently, only VisualParticleSystems and MicroPhysicalParticleSystems are supported.")
 
         return value
 
@@ -83,7 +83,7 @@ class Covered(RelativeObjectState, BooleanState):
         # Default success value is True
         success = True
         # First, we check what type of system
-        # Currently, we support VisualParticleSystems and PhysicalParticleSystems
+        # Currently, we support VisualParticleSystems and MicroPhysicalParticleSystems
         if issubclass(system, VisualParticleSystem):
             # Create the group if it doesn't exist already
             if self._visual_particle_group not in system.groups:
@@ -102,7 +102,7 @@ class Covered(RelativeObjectState, BooleanState):
                     # We remove all of this group's particles
                     system.remove_all_group_particles(group=self._visual_particle_group)
 
-        elif issubclass(system, PhysicalParticleSystem):
+        elif issubclass(system, MicroPhysicalParticleSystem):
             # Check current state and only do something if we're changing state
             if self.get_value(system) != new_value:
                 if new_value:
@@ -119,6 +119,6 @@ class Covered(RelativeObjectState, BooleanState):
 
         else:
             raise ValueError(f"Invalid system {system} received for setting Covered state!"
-                             f"Currently, only VisualParticleSystems and PhysicalParticleSystems are supported.")
+                             f"Currently, only VisualParticleSystems and MicroPhysicalParticleSystems are supported.")
 
         return success

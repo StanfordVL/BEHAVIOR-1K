@@ -6,7 +6,7 @@ from omnigibson.macros import create_module_macros
 from omnigibson.object_states.object_state_base import RelativeObjectState
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.kinematics import KinematicsMixin
-from omnigibson.systems import PhysicalParticleSystem
+from omnigibson.systems import MicroPhysicalParticleSystem
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -24,7 +24,7 @@ class ContactParticles(RelativeObjectState, KinematicsMixin):
 
     def _get_value(self, system, link=None):
         # Make sure system is valid
-        assert issubclass(system, PhysicalParticleSystem), "Can only get ContactParticles for a PhysicalParticleSystem!"
+        assert issubclass(system, MicroPhysicalParticleSystem), "Can only get ContactParticles for a MicroPhysicalParticleSystem!"
 
         # Create contacts dictionary, mapping instancer to set of particle IDs in contact
         contacts = defaultdict(set)
@@ -76,7 +76,7 @@ class ContactParticles(RelativeObjectState, KinematicsMixin):
     #
     #     # Store the system's particle positions for each instancer
     #     for arg in get_value_args:
-    #         if inspect.isclass(arg) and issubclass(arg, PhysicalParticleSystem):
+    #         if inspect.isclass(arg) and issubclass(arg, MicroPhysicalParticleSystem):
     #             info[arg] = {instancer: instancer.particle_positions for instancer in arg.particle_instancers.values()}
     #
     #     return info
@@ -89,7 +89,7 @@ class ContactParticles(RelativeObjectState, KinematicsMixin):
     #         return False
     #
     #     for arg, info in self._cache[get_value_args]["info"].items():
-    #         if inspect.isclass(arg) and issubclass(arg, PhysicalParticleSystem):
+    #         if inspect.isclass(arg) and issubclass(arg, MicroPhysicalParticleSystem):
     #             # TODO: adopt the has_changed mechanism in object_state_base
     #             # Check if the particle positions have changed
     #

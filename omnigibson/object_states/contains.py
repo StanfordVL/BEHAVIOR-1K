@@ -4,7 +4,7 @@ from omnigibson.macros import create_module_macros
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from omnigibson.object_states.object_state_base import RelativeObjectState, BooleanState
 from omnigibson.systems.macro_particle_system import VisualParticleSystem
-from omnigibson.systems.micro_particle_system import PhysicalParticleSystem
+from omnigibson.systems.micro_particle_system import MicroPhysicalParticleSystem
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
 from omnigibson.utils.python_utils import classproperty
 import omnigibson.utils.transform_utils as T
@@ -43,7 +43,7 @@ class ContainedParticles(RelativeObjectState, LinkBasedStateMixin):
     def _get_value(self, system):
         """
         Args:
-            system (PhysicalParticleSystem): System whose number of particles will be checked inside this object's
+            system (MicroPhysicalParticleSystem): System whose number of particles will be checked inside this object's
                 container volume
 
         Returns:
@@ -57,7 +57,7 @@ class ContainedParticles(RelativeObjectState, LinkBasedStateMixin):
         n_particles_in_volume, raw_positions, checked_positions, particles_in_volume = 0, np.array([]), np.array([]), np.array([])
 
         # First, we check what type of system
-        # Currently, we support VisualParticleSystems and PhysicalParticleSystems
+        # Currently, we support VisualParticleSystems and MicroPhysicalParticleSystems
         if issubclass(system, VisualParticleSystem):
             if self._visual_particle_group in system.groups:
                 # Grab global particle poses and offset them in the direction of their orientation
@@ -65,14 +65,14 @@ class ContainedParticles(RelativeObjectState, LinkBasedStateMixin):
                 unit_z = np.zeros((len(raw_positions), 3, 1))
                 unit_z[:, -1, :] = m.VISUAL_PARTICLE_OFFSET
                 checked_positions = (T.quat2mat(quats) @ unit_z).reshape(-1, 3) + raw_positions
-        elif issubclass(system, PhysicalParticleSystem):
+        elif issubclass(system, MicroPhysicalParticleSystem):
             # We only check if we have particle instancers currently
             if len(system.particle_instancers) > 0:
                 raw_positions = np.concatenate([inst.particle_positions for inst in system.particle_instancers.values()], axis=0)
                 checked_positions = raw_positions
         else:
             raise ValueError(f"Invalid system {system} received for getting Covered state!"
-                             f"Currently, only VisualParticleSystems and PhysicalParticleSystems are supported.")
+                             f"Currently, only VisualParticleSystems and MicroPhysicalParticleSystems are supported.")
 
         # Only calculate if we have valid positions
         if len(checked_positions) > 0:

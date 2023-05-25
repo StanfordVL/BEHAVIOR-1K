@@ -2,7 +2,7 @@ import numpy as np
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.contains import ContainedParticles
 from omnigibson.object_states.object_state_base import RelativeObjectState, BooleanState
-from omnigibson.systems.micro_particle_system import PhysicalParticleSystem
+from omnigibson.systems.micro_particle_system import MicroPhysicalParticleSystem
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -15,7 +15,7 @@ class Filled(RelativeObjectState, BooleanState):
 
     def _get_value(self, system):
         # Sanity check to make sure system is valid
-        assert issubclass(system, PhysicalParticleSystem), "Can only get Filled state with a valid PhysicalParticleSystem!"
+        assert issubclass(system, MicroPhysicalParticleSystem), "Can only get Filled state with a valid MicroPhysicalParticleSystem!"
         # Check what volume is filled
         if len(system.particle_instancers) > 0:
             particle_volume = 4 / 3 * np.pi * (system.particle_radius ** 3)
@@ -33,8 +33,8 @@ class Filled(RelativeObjectState, BooleanState):
 
     def _set_value(self, system, new_value):
         # Sanity check to manke sure system is valid
-        assert issubclass(system, PhysicalParticleSystem), \
-            "Can only set Filled state with a valid PhysicalParticleSystem!"
+        assert issubclass(system, MicroPhysicalParticleSystem), \
+            "Can only set Filled state with a valid MicroPhysicalParticleSystem!"
 
         # First, check our current state
         current_state = self.get_value(system)

@@ -6,7 +6,7 @@ from copy import copy
 import itertools
 import omnigibson as og
 from omnigibson.macros import gm, create_module_macros
-from omnigibson.systems import get_system, is_system_active, PhysicalParticleSystem, VisualParticleSystem, REGISTERED_SYSTEMS
+from omnigibson.systems import get_system, is_system_active, MicroPhysicalParticleSystem, VisualParticleSystem, REGISTERED_SYSTEMS
 from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.object_states import *
 from omnigibson.utils.python_utils import Registerable, classproperty, subclass_factory
@@ -795,14 +795,14 @@ class CookingPhysicalParticleRule(BaseTransitionRule):
 
         # Iterate over all active physical particle systems, and for any non-cooked particles inside,
         # convert into cooked particles
-        for name, system in PhysicalParticleSystem.get_active_systems().items():
+        for name, system in MicroPhysicalParticleSystem.get_active_systems().items():
             # Skip any systems that are already cooked
             if "cooked" in name:
                 continue
 
             # TODO: Remove this assert once we have a more standardized method of globally R/W particle positions
             assert len(system.particle_instancers) == 1, \
-                f"PhysicalParticleSystem {system.name} should only have one instancer!"
+                f"MicroPhysicalParticleSystem {system.name} should only have one instancer!"
 
             # Iterate over all fillables -- a given particle should become hot if it is contained in any of the
             # fillable objects
@@ -910,7 +910,7 @@ class MixingRule(BaseTransitionRule):
         for system_name in recipe["input_systems"]:
             system = get_system(system_name=system_name)
             # Physical particle systems
-            if issubclass(system, PhysicalParticleSystem):
+            if issubclass(system, MicroPhysicalParticleSystem):
                 if container.states[Contains].get_value(system=get_system(system_name=system_name)):
                     return False
             # Visual particle systems
@@ -933,7 +933,7 @@ class MixingRule(BaseTransitionRule):
             bool: True if none of the non-relevant systems are contained
         """
         relevant_systems = set(recipe["input_systems"])
-        for system in PhysicalParticleSystem.get_active_systems():
+        for system in MicroPhysicalParticleSystem.get_active_systems():
             if system.name not in relevant_systems and container.states[Contains].get_value(system=system):
                 return False
         for system in VisualParticleSystem.get_active_systems():
@@ -1121,7 +1121,7 @@ class MixingRule(BaseTransitionRule):
         volume = 0
 
         # Remove all recipe system particles contained in the container
-        for system in PhysicalParticleSystem.get_active_systems():
+        for system in MicroPhysicalParticleSystem.get_active_systems():
             if container.states[Contains].get_value(system):
                 volume += contained_particles_state.get_value()[0] * np.pi * (system.particle_radius ** 3) * 4 / 3
                 container.states[Filled].set_value(system, False)

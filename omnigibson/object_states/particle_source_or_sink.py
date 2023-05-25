@@ -3,7 +3,7 @@ import numpy as np
 import omnigibson as og
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.particle_modifier import ParticleApplier, ParticleRemover
-from omnigibson.systems.micro_particle_system import PhysicalParticleSystem
+from omnigibson.systems.micro_particle_system import MicroPhysicalParticleSystem
 from omnigibson.utils.constants import ParticleModifyMethod
 from omnigibson.utils.python_utils import classproperty
 
@@ -80,7 +80,7 @@ class ParticleSource(ParticleApplier):
 
     def _get_max_particles_limit_per_step(self, system):
         # Check the system
-        assert issubclass(system, PhysicalParticleSystem), "ParticleSource only supports PhysicalParticleSystem"
+        assert issubclass(system, MicroPhysicalParticleSystem), "ParticleSource only supports MicroPhysicalParticleSystem"
         return m.MAX_SOURCE_PARTICLES_PER_STEP
 
     @classproperty
@@ -143,7 +143,7 @@ class ParticleSink(ParticleRemover):
 
     def _get_max_particles_limit_per_step(self, system):
         # Check the system
-        assert issubclass(system, PhysicalParticleSystem), "ParticleSink only supports PhysicalParticleSystem"
+        assert issubclass(system, MicroPhysicalParticleSystem), "ParticleSink only supports MicroPhysicalParticleSystem"
         return m.MAX_PHYSICAL_PARTICLES_SOURCED_PER_STEP
 
     @classproperty
