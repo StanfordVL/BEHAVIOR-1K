@@ -800,14 +800,15 @@ def get_mesh_volume_and_com(mesh_prim):
         if trimesh_mesh.is_volume:
             volume = trimesh_mesh.volume
             com = trimesh_mesh.center_mass
-        elif trimesh_mesh.vertices.shape[0] >= 4:  # At least 4 vertices are needed for computing the convex hull
-            # If the mesh is not a volume, we compute its convex hull and use that instead
-            trimesh_mesh_convex = trimesh_mesh.convex_hull
-            volume = trimesh_mesh_convex.volume
-            com = trimesh_mesh_convex.center_mass
         else:
-            # Use the default volume and com
-            pass
+            # If the mesh is not a volume, we compute its convex hull and use that instead
+            try:
+                trimesh_mesh_convex = trimesh_mesh.convex_hull
+                volume = trimesh_mesh_convex.volume
+                com = trimesh_mesh_convex.center_mass
+            except:
+                # if convex hull computation fails, it usually means the mesh is degenerated. We just skip it.
+                pass
     elif mesh_type == "Sphere":
         volume = 4 / 3 * np.pi * (mesh_prim.GetAttribute("radius").Get() ** 3)
     elif mesh_type == "Cube":
