@@ -45,9 +45,12 @@ call pip install -e . || goto :error
 :: Cycle conda environment so that all dependencies are propagated
 call conda deactivate
 call conda activate omnigibson
-
-echo OmniGibson successfully installed!
+goto :end
 
 :error
 echo An error occurred during installation. Please check the error message above.
 exit /b
+
+:end
+echo:
+echo OmniGibson successfully installed! 
