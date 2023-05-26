@@ -807,6 +807,7 @@ def get_mesh_volume_and_com(mesh_prim):
                 volume = trimesh_mesh_convex.volume
                 com = trimesh_mesh_convex.center_mass
             except:
+                # if convex hull computation fails, it usually means the mesh is degenerated. We just skip it.
                 pass
     elif mesh_type == "Sphere":
         volume = 4 / 3 * np.pi * (mesh_prim.GetAttribute("radius").Get() ** 3)
