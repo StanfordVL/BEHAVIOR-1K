@@ -22,6 +22,7 @@ from omnigibson.utils.ui_utils import suppress_omni_log
 from omnigibson.utils.usd_utils import create_primitive_mesh, FlatcacheAPI
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object
+from omni.isaac.version import get_version
 from omni.isaac.core.utils.prims import get_prim_at_path, delete_prim, move_prim, is_prim_path_valid
 from pxr import PhysicsSchemaTools, UsdGeom, Gf, Sdf
 
@@ -283,8 +284,10 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
             # Make sure the mesh is translated so that its tip lies at the metalink origin, and rotated so the vector
             # from tip to tail faces the positive x axis
             # Both Cone and Cylinder have their frames located at the center of their shapes as of IsaacSim 2022.2.1,
-            # so we offset by half their height
-            z_offset = self._projection_mesh_params["extents"][2] / 2
+            # so we offset by half their height, otherwise set the Cone to be a different value
+            z_offset = self._projection_mesh_params["extents"][2] if \
+                (get_version()[0] == "2022.2.0" and self._projection_mesh_params["type"] == "Cone") else \
+                self._projection_mesh_params["extents"][2] / 2
 
             self.projection_mesh.set_local_pose(
                 translation=np.array([0, 0, -z_offset]),
