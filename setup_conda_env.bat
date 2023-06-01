@@ -2,7 +2,7 @@
 :: Make sure that the ISAAC_SIM_PATH variable is set correctly
 dir /b /o:-n %userprofile%\AppData\Local\ov\pkg\isaac_sim* > NUL
 if errorlevel 0 (
-    for /f "tokens=* usebackq" %%f in (`dir /b /o:-n %userprofile%\AppData\Local\ov\pkg\isaac_sim*`) do set ISAAC_SIM_PATH=%userprofile%\AppData\Local\ov\pkg\%%f
+    for /f "tokens=* usebackq" %%f in (`dir /b /o:n %userprofile%\AppData\Local\ov\pkg\isaac_sim*`) do set ISAAC_SIM_PATH=%userprofile%\AppData\Local\ov\pkg\%%f
     setlocal enabledelayedexpansion
     echo We found Isaac Sim installed at [4m!ISAAC_SIM_PATH![0m. OmniGibson will use it by default.
     endlocal

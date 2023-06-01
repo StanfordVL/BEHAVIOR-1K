@@ -15,16 +15,16 @@ else
 fi
 
 while [[ ! -f "${ISAAC_SIM_PATH}/isaac-sim.sh" ]]; do
-  read -p "isaac-sim.sh not found in ${ISAAC_SIM_PATH}! Make sure you have entered the correct path >>> " ISAAC_SIM_PATH
+  read -p "isaac-sim.sh not found in [4m$ISAAC_SIM_PATH[0m! Make sure you have entered the correct path >>> " ISAAC_SIM_PATH
 done
-echo -e "\nUsing Isaac Sim at $ISAAC_SIM_PATH\n"
+echo -e "\nUsing Isaac Sim at [4m$ISAAC_SIM_PATH[0m\n"
 
 
 # Choose venv name 
 echo "The new conda environment will be named [4momnigibson[0m by default."
 read -p "If you want to use a different name, please type in here (press enter to skip) >>> " conda_name
 conda_name=${name:-omnigibson}
-echo -e "\nUsing $conda_name as the conda environment name\n"
+echo -e "\nUsing [4m$conda_name[0m as the conda environment name\n"
 
 # Create a conda environment with python 3.7
 source $(conda info --base)/etc/profile.d/conda.sh
