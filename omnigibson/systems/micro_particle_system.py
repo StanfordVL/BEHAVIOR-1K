@@ -437,6 +437,13 @@ class MicroParticleSystem(BaseSystem):
         cls._customize_particle_material()
 
     @classproperty
+    def particle_radius(cls):
+        # Magic number from omni tutorials
+        # See https://docs.omniverse.nvidia.com/prod_extensions/prod_extensions/ext_physics.html#offset-autocomputation
+        # Also https://nvidia-omniverse.github.io/PhysX/physx/5.1.3/docs/ParticleSystem.html#particle-system-configuration
+        return 0.99 * cls.particle_contact_offset
+
+    @classproperty
     def color(cls):
         """
         Returns:
@@ -576,7 +583,7 @@ class MicroParticleSystem(BaseSystem):
         ).GetPrim()
 
 
-class MicroPhysicalParticleSystem(PhysicalParticleSystem, MicroParticleSystem):
+class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
     """
     Global system for modeling physical "micro" level particles, e.g.: water, seeds, rice, etc. This system leverages
     Omniverse's native physx particle systems
@@ -657,13 +664,6 @@ class MicroPhysicalParticleSystem(PhysicalParticleSystem, MicroParticleSystem):
         # NOTE: Cannot use dict.get() call for some reason; it messes up IDE introspection
         return cls.particle_instancers[name] if name in cls.particle_instancers \
             else cls.generate_particle_instancer(n_particles=0, idn=cls.default_instancer_idn)
-
-    @classproperty
-    def particle_radius(cls):
-        # Magic number from omni tutorials
-        # See https://docs.omniverse.nvidia.com/prod_extensions/prod_extensions/ext_physics.html#offset-autocomputation
-        # Also https://nvidia-omniverse.github.io/PhysX/physx/5.1.3/docs/ParticleSystem.html#particle-system-configuration
-        return 0.99 * cls.particle_contact_offset
 
     @classproperty
     def particle_contact_radius(cls):
@@ -1288,10 +1288,6 @@ class FluidSystem(MicroPhysicalParticleSystem):
 
     @classproperty
     def particle_radius(cls):
-        """
-        Returns:
-            float: Radius for the particles to be generated, since all fluids are composed of spheres
-        """
         # Magic number from omni tutorials
         # See https://docs.omniverse.nvidia.com/prod_extensions/prod_extensions/ext_physics.html#offset-autocomputation
         return 0.99 * 0.6 * cls.particle_contact_offset
@@ -1556,13 +1552,6 @@ class Cloth(MicroParticleSystem):
     """
     Particle system class to simulate cloth.
     """
-    @classproperty
-    def particle_radius(cls):
-        # Magic number from omni tutorials
-        # See https://docs.omniverse.nvidia.com/prod_extensions/prod_extensions/ext_physics.html#offset-autocomputation
-        # Also https://nvidia-omniverse.github.io/PhysX/physx/5.1.3/docs/ParticleSystem.html#particle-system-configuration
-        return 0.99 * cls.particle_contact_offset
-
     @classmethod
     def delete_all_particles(cls):
         # Override base method since there are no particles to be deleted
