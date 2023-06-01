@@ -409,8 +409,7 @@ class MacroVisualParticleSystem(VisualParticleSystem, MacroParticleSystem):
 
     @classmethod
     def remove_particle(cls, name):
-        # Run MacroParticleSystem's call first (note: NOT super, since that calls VisualParticleSystem,
-        # which is not implemented)
+        # Run super first
         super().remove_particle(name=name)
 
         # Remove this particle from its respective group as well
