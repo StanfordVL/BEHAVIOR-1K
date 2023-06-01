@@ -2,7 +2,7 @@ import numpy as np
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.contains import ContainedParticles
 from omnigibson.object_states.object_state_base import RelativeObjectState, BooleanState
-from omnigibson.systems.micro_particle_system import MicroPhysicalParticleSystem
+from omnigibson.systems.system_base import PhysicalParticleSystem, is_physical_particle_system
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -15,7 +15,9 @@ class Filled(RelativeObjectState, BooleanState):
 
     def _get_value(self, system):
         # Sanity check to make sure system is valid
-        assert issubclass(system, MicroPhysicalParticleSystem), "Can only get Filled state with a valid MicroPhysicalParticleSystem!"
+        assert is_physical_particle_system(system_name=system.name), \
+            "Can only get Filled state with a valid PhysicalParticleSystem!"
+
         # Check what volume is filled
         if len(system.particle_instancers) > 0:
             particle_volume = 4 / 3 * np.pi * (system.particle_radius ** 3)
@@ -33,8 +35,8 @@ class Filled(RelativeObjectState, BooleanState):
 
     def _set_value(self, system, new_value):
         # Sanity check to manke sure system is valid
-        assert issubclass(system, MicroPhysicalParticleSystem), \
-            "Can only set Filled state with a valid MicroPhysicalParticleSystem!"
+        assert is_physical_particle_system(system_name=system.name), \
+            "Can only set Filled state with a valid PhysicalParticleSystem!"
 
         # First, check our current state
         current_state = self.get_value(system)
@@ -52,9 +54,7 @@ class Filled(RelativeObjectState, BooleanState):
                 )
             else:
                 # Going from True --> False, delete all particles inside the volume
-                # TODO: Make more robust against multiple particle instancers
-                assert len(system.particle_instancers) == 1, "Cannot handle multiple particle instancers!"
-                system.default_particle_instancer.remove_particles(contained_particles_state.get_value().in_volume.nonzero()[0])
+                system.delete_particles(idxs=contained_particles_state.get_value().in_volume.nonzero()[0])
 
         return True
 
