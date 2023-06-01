@@ -618,7 +618,7 @@ class ParticleApplier(ParticleModifier):
             If None, information found from @obj.metadata will be used instead.
         sample_with_raycast (bool): If True, will only sample particles at raycast hits. Otherwise, will bypass sampling
             and immediately sample particles at the sampled particle locations. Note that this will only work
-            for MicroPhysicalParticleSystem-based ParticleAppliers that use the Projection method!
+            for PhysicalParticleSystem-based ParticleAppliers that use the Projection method!
         initial_speed (float): For physical particles, the initial speed for generated particles. Note that the
             direction of the velocity is inferred from the particle sampling process.
         """
@@ -864,7 +864,7 @@ class ParticleApplier(ParticleModifier):
         Helper function to apply particles form system @system within the projection volume owned by this
         ParticleApplier.
 
-        NOTE: This function only supports MicroPhysicalParticleSystems and ParticleModifyMethod.PROJECTION method, which
+        NOTE: This function only supports PhysicalParticleSystems and ParticleModifyMethod.PROJECTION method, which
         should have been asserted during this ParticleApplier's initialize() call
 
         Args:

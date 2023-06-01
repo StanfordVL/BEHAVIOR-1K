@@ -60,7 +60,7 @@ class Covered(RelativeObjectState, BooleanState):
         # Value is false by default
         value = False
         # First, we check what type of system
-        # Currently, we support VisualParticleSystems and MicroPhysicalParticleSystems
+        # Currently, we support VisualParticleSystems and PhysicalParticleSystems
         if system.n_particles > 0:
             if is_visual_particle_system(system_name=system.name):
                 if self._visual_particle_group in system.groups:
@@ -82,7 +82,7 @@ class Covered(RelativeObjectState, BooleanState):
         # Default success value is True
         success = True
         # First, we check what type of system
-        # Currently, we support VisualParticleSystems and MicroPhysicalParticleSystems
+        # Currently, we support VisualParticleSystems and PhysicalParticleSystems
         if is_visual_particle_system(system_name=system.name):
             # Create the group if it doesn't exist already
             if self._visual_particle_group not in system.groups:

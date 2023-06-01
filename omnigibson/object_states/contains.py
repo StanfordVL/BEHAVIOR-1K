@@ -59,7 +59,7 @@ class ContainedParticles(RelativeObjectState, LinkBasedStateMixin):
         # Only run additional computations if there are any particles
         if system.n_particles > 0:
             # First, we check what type of system
-            # Currently, we support VisualParticleSystems and MicroPhysicalParticleSystems
+            # Currently, we support VisualParticleSystems and PhysicalParticleSystems
             if is_visual_particle_system(system_name=system.name):
                 if self._visual_particle_group in system.groups:
                     # Grab global particle poses and offset them in the direction of their orientation
@@ -72,7 +72,7 @@ class ContainedParticles(RelativeObjectState, LinkBasedStateMixin):
                 checked_positions = raw_positions
             else:
                 raise ValueError(f"Invalid system {system} received for getting Covered state!"
-                                 f"Currently, only VisualParticleSystems and MicroPhysicalParticleSystems are supported.")
+                                 f"Currently, only VisualParticleSystems and PhysicalParticleSystems are supported.")
 
         # Only calculate if we have valid positions
         if len(checked_positions) > 0:
