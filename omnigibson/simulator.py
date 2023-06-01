@@ -11,7 +11,7 @@ import carb
 import omni.physics
 from omni.isaac.core.simulation_context import SimulationContext
 from omni.isaac.core.utils.prims import get_prim_at_path
-from omni.isaac.core.utils.stage import open_stage
+from omni.isaac.core.utils.stage import open_stage, create_new_stage
 from omni.isaac.dynamic_control import _dynamic_control
 from omni.physx.bindings._physx import ContactEventType, SimulationEvent
 import omni.kit.loop._loop as omni_loop
@@ -76,6 +76,12 @@ class Simulator(SimulationContext, Serializable):
             viewer_height=gm.DEFAULT_VIEWER_HEIGHT,
             device=None,
     ):
+        # Store vars needed for initialization
+        self.gravity = gravity
+        self._viewer_camera = None
+        self._camera_mover = None
+
+        # Run super init
         super().__init__(
             physics_dt=physics_dt,
             rendering_dt=rendering_dt,
@@ -87,12 +93,7 @@ class Simulator(SimulationContext, Serializable):
             return
         Simulator._world_initialized = True
 
-        # Store other internal vars
-        self.gravity = gravity
-
         # Store other references to variables that will be initialized later
-        self._viewer_camera = None
-        self._camera_mover = None
         self._scene = None
         self._physx_interface = None
         self._physx_simulation_interface = None
@@ -105,8 +106,8 @@ class Simulator(SimulationContext, Serializable):
         self._objects_require_joint_break_callback = False
 
         # Maps callback name to callback
-        self._callbacks_on_play = None
-        self._callbacks_on_stop = None
+        self._callbacks_on_play = dict()
+        self._callbacks_on_stop = dict()
 
         # Mapping from link IDs assigned from omni to the object that they reference
         self._link_id_to_objects = dict()
@@ -357,7 +358,7 @@ class Simulator(SimulationContext, Serializable):
 
         # Lastly, additionally add this object automatically to be initialized as soon as another simulator step occurs
         self.initialize_object_on_next_sim_step(obj=obj)
-    
+
     def remove_object(self, obj):
         """
         Remove a non-robot object from the simulator.
@@ -497,6 +498,10 @@ class Simulator(SimulationContext, Serializable):
             # Additionally run non physics things
             self._non_physics_step()
 
+        # Run all callbacks
+        for callback in self._callbacks_on_play.values():
+            callback()
+
     def pause(self):
         if not self.is_paused():
             super().pause()
@@ -508,6 +513,10 @@ class Simulator(SimulationContext, Serializable):
         # If we're using flatcache, we also need to reset its API
         if gm.ENABLE_FLATCACHE:
             FlatcacheAPI.reset()
+
+        # Run all callbacks
+        for callback in self._callbacks_on_stop.values():
+            callback()
 
     @property
     def n_physics_timesteps_per_render(self):
@@ -822,7 +831,7 @@ class Simulator(SimulationContext, Serializable):
         self._callbacks_on_stop = dict()
 
         # Load dummy stage, but don't clear sim to prevent circular loops
-        self._load_stage(usd_path=f"{gm.ASSET_PATH}/models/misc/clear_stage.usd")
+        self._open_new_stage()
 
     def restore(self, json_path):
         """
@@ -901,6 +910,34 @@ class Simulator(SimulationContext, Serializable):
 
         log.info("The current simulation environment saved.")
 
+    def _open_new_stage(self):
+        """
+        Opens a new stage
+        """
+        # Stop the physics if we're playing
+        if not self.is_stopped():
+            log.warning("Stopping simulation in order to open new stage.")
+            self.stop()
+
+        # Store physics dt and rendering dt to reuse later
+        # Note that the stage may have been deleted previously; if so, we use the default values
+        # of 1/60, 1/60
+        try:
+            physics_dt = self.get_physics_dt()
+        except:
+            print("WARNING: Invalid or non-existent physics scene found. Setting physics dt to 1/60.")
+            physics_dt = 1 / 60.
+        rendering_dt = self.get_rendering_dt()
+
+        # Open new stage -- suppressing warning that we're opening a new stage
+        with suppress_omni_log(None):
+            create_new_stage()
+
+        # Create world prim
+        self.stage.DefinePrim("/World", "Xform")
+
+        self._init_stage(physics_dt=physics_dt, rendering_dt=rendering_dt)
+
     def _load_stage(self, usd_path):
         """
         Open the stage specified by USD file at @usd_path
@@ -927,25 +964,32 @@ class Simulator(SimulationContext, Serializable):
         with suppress_omni_log(None):
             open_stage(usd_path=usd_path)
 
-        # Re-initialize necessary internal vars
-        self._app = omni.kit.app.get_app_interface()
-        self._framework = carb.get_framework()
-        self._timeline = omni.timeline.get_timeline_interface()
-        self._timeline.set_auto_update(True)
-        self._cached_rate_limit_enabled = self._settings.get_as_bool("/app/runLoops/main/rateLimitEnabled")
-        self._cached_rate_limit_frequency = self._settings.get_as_int("/app/runLoops/main/rateLimitFrequency")
-        self._cached_min_frame_rate = self._settings.get_as_int("persistent/simulation/minFrameRate")
-        self._loop_runner = omni_loop.acquire_loop_interface()
+        self._init_stage(physics_dt=physics_dt, rendering_dt=rendering_dt)
 
-        # Initialize stage
-        self._init_stage(
+    def _init_stage(
+        self,
+        physics_dt=None,
+        rendering_dt=None,
+        stage_units_in_meters=None,
+        physics_prim_path="/physicsScene",
+        sim_params=None,
+        set_defaults=True,
+        backend="numpy",
+        device=None,
+    ):
+        # Run super first
+        super()._init_stage(
             physics_dt=physics_dt,
             rendering_dt=rendering_dt,
-            stage_units_in_meters=self._initial_stage_units_in_meters,
+            stage_units_in_meters=stage_units_in_meters,
+            physics_prim_path=physics_prim_path,
+            sim_params=sim_params,
+            set_defaults=set_defaults,
+            backend=backend,
+            device=device,
         )
 
-        # Update internal references
-        self._dynamic_control = _dynamic_control.acquire_dynamic_control_interface()
+        # Update internal vars
         self._physx_interface = get_physx_interface()
         self._physx_simulation_interface = get_physx_simulation_interface()
         self._physx_scene_query_interface = get_physx_scene_query_interface()
