@@ -3,15 +3,28 @@ import json
 import numpy as np
 
 import omnigibson as og
-from omnigibson.macros import gm
+from omnigibson.macros import gm, create_module_macros
 from omnigibson.utils.asset_utils import get_all_system_categories
+from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
 from omnigibson.utils.python_utils import classproperty, assert_valid_key, get_uuid, camel_case_to_snake_case, \
     snake_case_to_camel_case, subclass_factory, SerializableNonInstance, UniquelyNamedNonInstance
 from omnigibson.utils.registry_utils import SerializableRegistry
+from omnigibson.utils.sampling_utils import sample_cuboid_on_object_full_grid_topdown
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
+
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
+
+# Parameters used if scaling particles relative to its parent object's scale
+m.BBOX_LOWER_LIMIT_FRACTION_OF_AABB = 0.06
+m.BBOX_LOWER_LIMIT_MIN = 0.01
+m.BBOX_LOWER_LIMIT_MAX = 0.02
+m.BBOX_UPPER_LIMIT_FRACTION_OF_AABB = 0.1
+m.BBOX_UPPER_LIMIT_MIN = 0.02
+m.BBOX_UPPER_LIMIT_MAX = 0.1
 
 
 class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
@@ -22,6 +35,17 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
     (e.g. StrawberrySmoothie), we adopt the snake case for the system registry to unify with the category of BaseObject.
     For example, get_system("strawberry_smoothie") will return the StrawberrySmoothie class.
     """
+    # Scaling factor to sample from when generating a new particle
+    min_scale = None              # (x,y,z) scaling
+    max_scale = None              # (x,y,z) scaling
+
+    # Whether this system has been initialized or not
+    initialized = False
+
+    # Internal variables used for bookkeeping
+    _uuid = None
+    _snake_case_name = None
+
     def __init_subclass__(cls, **kwargs):
         # While class names are camel case, we convert them to snake case to be consistent with object categories.
         cls._snake_case_name = camel_case_to_snake_case(cls.__name__)
@@ -34,10 +58,6 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
             global REGISTERED_SYSTEMS
             REGISTERED_SYSTEMS[cls._snake_case_name] = cls
             cls._uuid = get_uuid(cls._snake_case_name)
-
-    initialized = False
-    _uuid = None
-    _snake_case_name = None
 
     @classproperty
     def name(cls):
@@ -57,6 +77,22 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
         return f"/World/{cls.name}"
 
     @classproperty
+    def n_particles(cls):
+        """
+        Returns:
+            int: Number of particles belonging to this system
+        """
+        raise NotImplementedError()
+
+    @classproperty
+    def material(cls):
+        """
+        Returns:
+            None or MaterialPrim: Material belonging to this system, if there is any
+        """
+        return None
+
+    @classproperty
     def _register_system(cls):
         """
         Returns:
@@ -66,6 +102,14 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
         # We assume we aren't registering by default
         return False
 
+    @classproperty
+    def _store_local_poses(cls):
+        """
+        Returns:
+            bool: Whether to store local particle poses or not when state is saved. Default is False
+        """
+        return False
+
     @classmethod
     def initialize(cls):
         """
@@ -73,7 +117,58 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
         """
         assert not cls.initialized, f"Already initialized system {cls.name}!"
         og.sim.stage.DefinePrim(cls.prim_path, "Scope")
+
+        # Set the default scales if not already set
+        cls.min_scale = np.ones(3) if cls.min_scale is None else cls.min_scale
+        cls.max_scale = np.ones(3) if cls.max_scale is None else cls.max_scale
+
         cls.initialized = True
+
+    @classmethod
+    def delete_all_particles(cls):
+        """
+        Removes all particles and deletes them from the simulator
+        """
+        raise NotImplementedError()
+
+    @classmethod
+    def delete_particles(
+            cls,
+            idxs,
+            **kwargs,
+    ):
+        """
+        Deletes pre-existing particles
+
+        Args:
+            idxs (np.array): (n_particles,) shaped array specifying IDs of particles to delete
+            **kwargs (dict): Any additional keyword-specific arguments required by subclass implementation
+        """
+        raise NotImplementedError()
+
+    @classmethod
+    def generate_particles(
+            cls,
+            positions,
+            velocities=None,
+            orientations=None,
+            scales=None,
+            **kwargs,
+    ):
+        """
+        Generates new particles
+
+        Args:
+            positions (np.array): (n_particles, 3) shaped array specifying per-particle (x,y,z) positions
+            velocities (None or np.array): (n_particles, 3) shaped array specifying per-particle (x,y,z) velocities.
+                If not specified, all will be set to 0
+            orientations (None or np.array): (n_particles, 4) shaped array specifying per-particle (x,y,z,w) quaternion
+                orientations. If not specified, all will be set to canonical orientation (0, 0, 0, 1)
+            scales (None or np.array): (n_particles, 3) shaped array specifying per-particle (x,y,z) scales.
+                If not specified, will be uniformly randomly sampled from (cls.min_scale, cls.max_scale)
+            **kwargs (dict): Any additional keyword-specific arguments required by subclass implementation
+        """
+        raise NotImplementedError()
 
     @classmethod
     def clear(cls):
@@ -81,16 +176,26 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
         Clears this system, so that it may possibly be re-initialized. Useful for, e.g., when loading from a new
         scene during the same sim instance
         """
+        global SYSTEM_REGISTRY
+
         if cls.initialized:
             cls.reset()
             cls.initialized = False
+
+            # Remove from active registry
+            SYSTEM_REGISTRY.remove(obj=cls)
+            # Make sure to refresh any transition rules that require this system
+            # Import now to avoid circular imports
+            from omnigibson.transition_rules import TransitionRuleAPI, RULES_REGISTRY
+            system_rules = RULES_REGISTRY("required_systems", cls.name, default_val=[])
+            TransitionRuleAPI.refresh_rules(rules=system_rules)
 
     @classmethod
     def reset(cls):
         """
         Reset this system
         """
-        pass
+        cls.delete_all_particles()
 
     @classmethod
     def create(cls, name, **kwargs):
@@ -110,7 +215,6 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
         # Create and return the class
         return subclass_factory(name=snake_case_to_camel_case(name), base_classes=cls, **kwargs)
 
-
     @classmethod
     def get_active_systems(cls):
         """
@@ -119,8 +223,143 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
         """
         return {system.name: system for system in SYSTEM_REGISTRY.objects if issubclass(system, cls)}
 
+    @classmethod
+    def set_scale_limits(cls, minimum=None, maximum=None):
+        """
+        Set the min and / or max scaling limits that will be uniformly sampled from when generating new particles
+
+        Args:
+            minimum (None or 3-array): If specified, should be (x,y,z) minimum scaling factor to apply to generated
+                particles
+            maximum (None or 3-array): If specified, should be (x,y,z) maximum scaling factor to apply to generated
+                particles
+        """
+        if minimum is not None:
+            cls.min_scale = np.array(minimum)
+        if maximum is not None:
+            cls.max_scale = np.array(maximum)
+
+    @classmethod
+    def get_particles_position_orientation(cls, local=False):
+        """
+        Computes all particles' positions and orientations that belong to this system
+
+        Note: This is more optimized than doing a for loop with self.get_particle_position_orientation()
+
+        Args:
+            local (bool): Whether to get pose in the particle's local frame or not
+
+        Returns:
+            2-tuple:
+                - (n, 3)-array: per-particle (x,y,z) position
+                - (n, 4)-array: per-particle (x,y,z,w) quaternion orientation
+        """
+        raise NotImplementedError()
+
+    @classmethod
+    def get_particle_position_orientation(cls, idx, local=False):
+        """
+        Compute particle's position and orientation. This automatically takes into account the relative
+        pose w.r.t. its parent link and the global pose of that parent link.
+
+        Args:
+            idx (int): Index of the particle to compute position and orientation for. Note: this is
+                equivalent to grabbing the corresponding idx'th entry from @get_particles_position_orientation()
+            local (bool): Whether to get pose in the particle's local frame or not
+
+        Returns:
+            2-tuple:
+                - 3-array: (x,y,z) position
+                - 4-array: (x,y,z,w) quaternion orientation
+        """
+        raise NotImplementedError()
+
+    @classmethod
+    def set_particles_position_orientation(cls, positions=None, orientations=None, local=False):
+        """
+        Sets all particles' positions and orientations that belong to this system
+
+        Note: This is more optimized than doing a for loop with self.set_particle_position_orientation()
+
+        Args:
+            positions (n-array): (n, 3) per-particle (x,y,z) position
+            orientations (n-array): (n, 4) per-particle (x,y,z,w) quaternion orientation
+            local (bool): Whether to set pose in the particle's local frame or not
+        """
+        raise NotImplementedError()
+
+    @classmethod
+    def set_particle_position_orientation(cls, idx, position=None, orientation=None, local=False):
+        """
+        Sets particle's position and orientation. If not @local, this automatically takes into account the relative
+        pose w.r.t. its parent link and the global pose of that parent link.
+
+        Args:
+            idx (int): Index of the particle to set position and orientation for. Note: this is
+                equivalent to setting the corresponding idx'th entry from @set_particles_position_orientation()
+            position (3-array): particle (x,y,z) position
+            orientation (4-array): particle (x,y,z,w) quaternion orientation
+            local (bool): Whether to set pose in the particle's local frame or not
+        """
+        raise NotImplementedError()
+
     def __init__(self):
         raise ValueError("System classes should not be created!")
+
+    @classproperty
+    def state_size(cls):
+        # We have n_particles (1), min / max scale (3*2), each particle pose (7*n)
+        return 7 + 7 * cls.n_particles
+
+    @classmethod
+    def _dump_state(cls):
+        positions, orientations = cls.get_particles_position_orientation(local=cls._store_local_poses)
+        return dict(
+            n_particles=cls.n_particles,
+            min_scale=cls.min_scale,
+            max_scale=cls.max_scale,
+            positions=positions,
+            orientations=orientations,
+        )
+
+    @classmethod
+    def _load_state(cls, state):
+        # Sanity check loading particles
+        assert cls.n_particles == state["n_particles"], f"Inconsistent number of particles found when loading " \
+                                                        f"particles state! Current number: {cls.n_particles}, " \
+                                                        f"loaded number: {state['n_particles']}"
+        # Load scale
+        cls.set_scale_limits(minimum=state["min_scale"], maximum=state["max_scale"])
+
+        # Load the poses
+        cls.set_particles_position_orientation(positions=state["positions"], orientations=state["orientations"], local=cls._store_local_poses)
+
+    @classmethod
+    def _serialize(cls, state):
+        # Array is n_particles, then min_scale and max_scale, then poses for all particles
+        return np.concatenate([
+            [state["n_particles"]],
+            state["min_scale"],
+            state["max_scale"],
+            state["positions"].flatten(),
+            state["orientations"].flatten(),
+        ], dtype=float)
+
+    @classmethod
+    def _deserialize(cls, state):
+        # First index is number of particles, then min_scale and max_scale, then the individual particle poses
+        state_dict = dict()
+        n_particles = int(state[0])
+        len_positions = n_particles * 3
+        len_orientations = n_particles * 4
+        state_dict["n_particles"] = n_particles
+        state_dict["min_scale"] = state[1:4]
+        state_dict["max_scale"] = state[4:7]
+        state_dict["positions"] = state[7:7+len_positions].reshape(-1, 3)
+        state_dict["orientations"] = state[7+len_positions:7+len_positions+len_orientations].reshape(-1, 4)
+
+        return state_dict, 7 + len_positions + len_orientations
+
 
 # Global dict that contains mappings of all the systems
 REGISTERED_SYSTEMS = dict()
@@ -132,6 +371,536 @@ SYSTEM_REGISTRY = SerializableRegistry(
     default_key="name",
     unique_keys=["name", "prim_path", "uuid"],
 )
+
+
+class VisualParticleSystem(BaseSystem):
+    """
+    Particle system class for generating particles not subject to physics, and are attached to individual objects
+    """
+    # Maps group name to the particles associated with it
+    # This is an ordered dict of ordered dict (nested ordered dict maps particle names to particle instance)
+    _group_particles = None
+
+    # Maps group name to the parent object (the object with particles attached to it) of the group
+    _group_objects = None
+
+    @classmethod
+    def initialize(cls):
+        # Run super method first
+        super().initialize()
+
+        # Initialize mutable class variables so they don't automatically get overridden by children classes
+        cls._group_particles = dict()
+        cls._group_objects = dict()
+
+    @classproperty
+    def particle_object(cls):
+        """
+        Returns:
+            XFormPrim: Particle object to be used as a template for duplication
+        """
+        raise NotImplementedError()
+
+    @classproperty
+    def groups(cls):
+        """
+        Returns:
+            set of str: Current attachment particle group names
+        """
+        return set(cls._group_particles.keys())
+
+    @classproperty
+    def _store_local_poses(cls):
+        # Store local poses since particles are attached to moving bodies
+        return True
+
+    @classproperty
+    def scale_relative_to_parent(cls):
+        """
+        Returns:
+            bool: Whether or not particles should be scaled relative to the group's parent object
+        """
+        return False
+
+    @classproperty
+    def state_size(cls):
+        # Get super size first
+        state_size = super().state_size
+
+        # Additionally, we have n_groups (1), with m_particles for each group (n), attached_obj_uuids (n), and
+        # particle ids and corresponding link info for each particle (m * 2)
+        return state_size + 1 + 2 * len(cls._group_particles) + \
+               sum(2 * cls.num_group_particles(group) for group in cls.groups)
+
+    @classmethod
+    def clear(cls):
+        # Run super method first
+        super().clear()
+
+        # Clear all groups as well
+        cls._group_particles = dict()
+        cls._group_objects = dict()
+
+    @classmethod
+    def remove_particle_by_name(cls, name):
+        """
+        Remove particle with name @name from both the simulator and internal state
+
+        Args:
+            name (str): Name of the particle to remove
+        """
+        raise NotImplementedError()
+
+    @classmethod
+    def remove_all_group_particles(cls, group):
+        """
+        Remove particle with name @name from both the simulator as well as internally
+
+        Args:
+            group (str): Name of the attachment group to remove all particles from
+        """
+        # Make sure the group exists
+        cls._validate_group(group=group)
+        # Remove all particles from the group
+        for particle_name in tuple(cls._group_particles[group].keys()):
+            cls.remove_particle_by_name(name=particle_name)
+
+    @classmethod
+    def num_group_particles(cls, group):
+        """
+        Gets the number of particles for the given group in the simulator
+
+        Args:
+            group (str): Name of the attachment group to remove all particles from.
+
+        Returns:
+            int: Number of particles allocated to this group in the scene. Note that if @group does not
+                exist, this will return 0
+        """
+        # Make sure the group exists
+        cls._validate_group(group=group)
+        return len(cls._group_particles[group])
+
+    @classmethod
+    def get_group_name(cls, obj):
+        """
+        Grabs the corresponding group name for object @obj
+
+        Args:
+            obj (BaseObject): Object for which its procedurally generated particle attachment name should be grabbed
+
+        Returns:
+            str: Name of the attachment group to use when executing commands from this class on
+                that specific attachment group
+        """
+        return obj.name
+
+    @classmethod
+    def create_attachment_group(cls, obj):
+        """
+        Creates an attachment group internally for object @obj. Note that this does NOT automatically generate particles
+        for this object (should call generate_group_particles(...) ).
+
+        Args:
+            obj (BaseObject): Object for which a new particle attachment group will be created for
+
+        Returns:
+            str: Name of the attachment group to use when executing commands from this class on
+                that specific attachment group
+        """
+        group = cls.get_group_name(obj=obj)
+        # This should only happen once for a single attachment group, so we explicitly check to make sure the object
+        # doesn't already exist
+        assert group not in cls.groups, \
+            f"Cannot create new attachment group because group with name {group} already exists!"
+
+        # Create the group
+        cls._group_particles[group] = dict()
+        cls._group_objects[group] = obj
+
+        return group
+
+    @classmethod
+    def remove_attachment_group(cls, group):
+        """
+        Removes an attachment group internally for object @obj. Note that this will automatically remove any particles
+        currently assigned to that group
+
+        Args:
+            group (str): Name of the attachment group to remove
+
+        Returns:
+            str: Name of the attachment group to use when executing commands from this class on
+                that specific attachment group
+        """
+        # Make sure the group exists
+        cls._validate_group(group=group)
+
+        # Remove all particles from the group
+        cls.remove_all_group_particles(group=group)
+
+        # Remove the actual groups
+        cls._group_particles.pop(group)
+        cls._group_objects.pop(group)
+
+        return group
+
+    @classmethod
+    def update_particle_scaling(cls, group):
+        """
+        Update particle scaling for group @group before generating group particles. Default is a no-op
+        (i.e.: returns the current cls.min_scale, cls.max_scale)
+
+        Args:
+            group (str): Specific group for which to modify the particle scaling
+
+        Returns:
+            2-tuple:
+                - 3-array: min scaling factor to set
+                - 3-array: max scaling factor to set
+        """
+        if cls.scale_relative_to_parent:
+            # First set the bbox ranges -- depends on the object's bounding box
+            obj = cls._group_objects[group]
+            median_aabb_dim = np.median(obj.aabb_extent)
+
+            # Compute lower and upper limits to bbox
+            bbox_lower_limit_from_aabb = m.BBOX_LOWER_LIMIT_FRACTION_OF_AABB * median_aabb_dim
+            bbox_lower_limit = np.clip(
+                bbox_lower_limit_from_aabb,
+                m.BBOX_LOWER_LIMIT_MIN,
+                m.BBOX_LOWER_LIMIT_MAX,
+            )
+
+            bbox_upper_limit_from_aabb = m.BBOX_UPPER_LIMIT_FRACTION_OF_AABB * median_aabb_dim
+            bbox_upper_limit = np.clip(
+                bbox_upper_limit_from_aabb,
+                m.BBOX_UPPER_LIMIT_MIN,
+                m.BBOX_UPPER_LIMIT_MAX,
+            )
+
+            # Convert these into scaling factors for the x and y axes for our particle object
+            particle_bbox = cls.particle_object.aabb_extent
+            minimum = np.array([bbox_lower_limit / particle_bbox[0], bbox_lower_limit / particle_bbox[1], 1.0])
+            maximum = np.array([bbox_upper_limit / particle_bbox[0], bbox_upper_limit / particle_bbox[1], 1.0])
+        else:
+            minimum, maximum = cls.min_scale, cls.max_scale
+
+        return minimum, maximum
+
+    @classmethod
+    def sample_scales(cls, group, n):
+        """
+        Samples @n particle scales for group @group.
+
+        Args:
+            group (str): Specific group for which to sample scales
+            n (int): Number of scales to sample
+
+        Returns:
+            (n, 3) array: Array of sampled scales
+        """
+        # Make sure the group exists
+        cls._validate_group(group=group)
+
+        # Update scaling and grab object
+        cls.set_scale_limits(*cls.update_particle_scaling(group=group))
+        obj = cls._group_objects[group]
+
+        # Sample scales of the particles to generate
+        # Since the particles will be placed under the object, it will be affected/stretched by obj.scale. In order to
+        # preserve the absolute size of the particles, we need to scale the particle by obj.scale in some way. However,
+        # since the particles have a relative rotation w.r.t the object, the scale between the two don't align. As a
+        # heuristics, we divide it by the avg_scale, which is the cubic root of the product of the scales along 3 axes.
+        avg_scale = np.cbrt(np.product(obj.scale))
+        return np.random.uniform(cls.min_scale, cls.max_scale, (n, 3)) / avg_scale
+
+    @classmethod
+    def generate_particles(
+            cls,
+            positions,
+            velocities=None,
+            orientations=None,
+            scales=None,
+            **kwargs,
+    ):
+        # Should not be called, since particles must be tied to a group!
+        raise ValueError("Cannot call generate_particles for a VisualParticleSystem! "
+                         "Call generate_group_particles() instead.")
+
+    @classmethod
+    def generate_group_particles(
+            cls,
+            group,
+            positions,
+            orientations=None,
+            scales=None,
+            link_prim_paths=None,
+    ):
+        """
+        Generates new particle objects within group @group at the specified pose (@positions, @orientations) with
+        corresponding scales @scales.
+
+        NOTE: Assumes positions are the exact contact point on @group object's surface. If cls._CLIP_INTO_OBJECTS
+            is not True, then the positions will be offset away from the object by half of its bbox
+
+        Args:
+            group (str): Object on which to sample particle locations
+            positions (np.array): (n_particles, 3) shaped array specifying per-particle (x,y,z) positions
+            orientations (None or np.array): (n_particles, 4) shaped array specifying per-particle (x,y,z,w) quaternion
+                orientations. If not specified, all will be set to canonical orientation (0, 0, 0, 1)
+            scales (None or np.array): (n_particles, 3) shaped array specifying per-particle (x,y,z) scaling in its
+                local frame. If not specified, all we randomly sampled based on @cls.min_scale and @cls.max_scale
+            link_prim_paths (None or list of str): Determines which link each generated particle will
+                be attached to. If not specified, all will be attached to the group object's root link
+        """
+        raise NotImplementedError
+
+    @classmethod
+    def generate_group_particles_on_object(cls, group, max_samples, min_samples_for_success=1):
+        """
+        Generates @max_samples new particle objects and samples their locations on the surface of object @obj. Note
+        that if any particles are in the group already, they will be removed
+
+        Args:
+            group (str): Object on which to sample particle locations
+            max_samples (int): Maximum number of particles to sample
+            min_samples_for_success (int): Minimum number of particles required to be sampled successfully in order
+                for this generation process to be considered successful
+
+        Returns:
+            bool: True if enough particles were generated successfully (number of successfully sampled points >=
+                min_samples_for_success), otherwise False
+        """
+        raise NotImplementedError
+
+    @classmethod
+    def get_group_particles_position_orientation(cls, group, local=False):
+        """
+        Computes all particles' positions and orientations that belong to @group
+
+        Note: This is more optimized than doing a for loop with self.get_particle_position_orientation()
+
+        Args:
+            group (str): Group name whose particle positions and orientations should be computed
+            local (bool): Whether to get poses in the particles' local frames or not
+
+        Returns:
+            2-tuple:
+                - (n, 3)-array: per-particle (x,y,z) position
+                - (n, 4)-array: per-particle (x,y,z,w) quaternion orientation
+        """
+        raise NotImplementedError
+
+    @classmethod
+    def set_group_particles_position_orientation(cls, group, positions=None, orientations=None, local=False):
+        """
+        Sets all particles' positions and orientations that belong to @group
+
+        Note: This is more optimized than doing a for loop with self.set_particle_position_orientation()
+
+        Args:
+            group (str): Group name whose particle positions and orientations should be computed
+            positions (n-array): (n, 3) per-particle (x,y,z) position
+            orientations (n-array): (n, 4) per-particle (x,y,z,w) quaternion orientation
+            local (bool): Whether to set pose in the particle's local frame or not
+        """
+        raise NotImplementedError
+
+    @classmethod
+    def _validate_group(cls, group):
+        """
+        Checks if particle attachment group @group exists. (If not, can create the group via create_attachment_group).
+        This will raise a ValueError if it doesn't exist.
+
+        Args:
+            group (str): Name of the group to check for
+        """
+        if group not in cls.groups:
+            raise ValueError(f"Particle attachment group {group} does not exist!")
+
+
+class PhysicalParticleSystem(BaseSystem):
+    """
+    System whose generated particles are subject to physics
+    """
+    @classproperty
+    def particle_density(cls):
+        """
+        Returns:
+            float: The per-particle density, in kg / m^3
+        """
+        raise NotImplementedError()
+
+    @classproperty
+    def particle_radius(cls):
+        """
+        Returns:
+            float: Radius for the particles to be generated, for the purpose of sampling
+        """
+        raise NotImplementedError()
+
+    @classproperty
+    def particle_contact_radius(cls):
+        """
+        Returns:
+            float: Contact radius for the particles to be generated, for the purpose of estimating contacts
+        """
+        raise NotImplementedError()
+
+    @classmethod
+    def check_in_contact(cls, positions):
+        """
+        Checks whether each particle specified by @particle_positions are in contact with any rigid body.
+
+        NOTE: This is a rough proxy for contact, given @positions. Should not be taken as ground truth.
+
+        Args:
+            positions (np.array): (n_particles, 3) shaped array specifying per-particle (x,y,z) positions
+
+        Returns:
+            n-array: (n_particles,) boolean array, True if in contact, otherwise False
+        """
+        in_contact = np.zeros(len(positions), dtype=bool)
+        for idx, pos in enumerate(positions):
+            in_contact[idx] = og.sim.psqi.overlap_sphere_any(cls.particle_contact_radius, pos)
+        return in_contact
+
+    @classmethod
+    def generate_particles_from_link(
+            cls,
+            obj,
+            link,
+            use_visual_meshes=True,
+            mesh_name_prefixes=None,
+            check_contact=True,
+            sampling_distance=None,
+            max_samples=5e5,
+            **kwargs,
+    ):
+        """
+        Generates a new particle instancer with unique identification number @idn, with particles sampled from the mesh
+        located at @mesh_prim_path, and registers it internally. This will also check for collision with other rigid
+        objects before spawning in individual particles
+
+        Args:
+            obj (EntityPrim): Object whose @link's visual meshes will be converted into sampled particles
+            link (RigidPrim): @obj's link whose visual meshes will be converted into sampled particles
+            use_visual_meshes (bool): Whether to use visual meshes of the link to generate particles
+            mesh_name_prefixes (None or str): If specified, specifies the substring that must exist in @link's
+                mesh names in order for that mesh to be included in the particle generator function.
+                If None, no filtering will be used.
+            check_contact (bool): If True, will only spawn in particles that do not collide with other rigid bodies
+            sampling_distance (None or float): If specified, sets the distance between sampled particles. If None,
+                a simulator autocomputed value will be used
+            max_samples (int): Maximum number of particles to sample
+            **kwargs (dict): Any additional keyword-mapped arguments required by subclass implementation
+        """
+        # Run sanity checks
+        assert cls.initialized, "Must initialize system before generating particle instancers!"
+
+        # Generate a checker function to see if particles are within the link's volumes
+        check_in_volume, _ = generate_points_in_volume_checker_function(
+            obj=obj,
+            volume_link=link,
+            use_visual_meshes=use_visual_meshes,
+            mesh_name_prefixes=mesh_name_prefixes,
+        )
+
+        # Grab the link's AABB (or fallback to obj AABB if link does not have a valid AABB),
+        # and generate a grid of points based on the sampling distance
+        try:
+            low, high = link.aabb
+            extent = link.aabb_extent
+        except ValueError:
+            low, high = obj.aabb
+            extent = obj.aabb_extent
+        # We sample the range of each extent minus
+        sampling_distance = 2 * cls.particle_radius if sampling_distance is None else sampling_distance
+        n_particles_per_axis = (extent / sampling_distance).astype(int)
+        assert np.all(n_particles_per_axis), f"link {link.name} is too small to sample any particle of radius {cls.particle_radius}."
+
+        # 1e-10 is added because the extent might be an exact multiple of particle radius
+        arrs = [np.arange(lo + cls.particle_radius, hi - cls.particle_radius + 1e-10, cls.particle_radius * 2)
+                for lo, hi, n in zip(low, high, n_particles_per_axis)]
+        # Generate 3D-rectangular grid of points
+        particle_positions = np.stack([arr.flatten() for arr in np.meshgrid(*arrs)]).T
+        # Check which points are inside the volume and only keep those
+        particle_positions = particle_positions[np.where(check_in_volume(particle_positions))[0]]
+
+        # Also prune any that in contact with anything if requested
+        if check_contact:
+            particle_positions = particle_positions[np.where(cls.check_in_contact(particle_positions) == 0)[0]]
+
+        # Also potentially sub-sample if we're past our limit
+        if len(particle_positions) > max_samples:
+            particle_positions = particle_positions[
+                np.random.choice(len(particle_positions), size=(max_samples,), replace=False)]
+
+        return cls.generate_particles(
+            positions=particle_positions,
+            **kwargs,
+        )
+
+    @classmethod
+    def generate_particles_on_object(
+            cls,
+            obj,
+            sampling_distance=None,
+            max_samples=5e5,
+            min_samples_for_success=1,
+            **kwargs,
+    ):
+        """
+        Generates @n_particles new particle objects and samples their locations on the top surface of object @obj
+
+        Args:
+            obj (BaseObject): Object on which to generate a particle instancer with sampled particles on the object's
+                top surface
+            sampling_distance (None or float): If specified, sets the distance between sampled particles. If None,
+                a simulator autocomputed value will be used
+            max_samples (int): Maximum number of particles to sample
+            min_samples_for_success (int): Minimum number of particles required to be sampled successfully in order
+                for this generation process to be considered successful
+            **kwargs (dict): Any additional keyword-mapped arguments required by subclass implementation
+
+        Returns:
+            bool: True if enough particles were generated successfully (number of successfully sampled points >=
+                min_samples_for_success), otherwise False
+        """
+        assert max_samples >= min_samples_for_success, "number of particles to sample should exceed the min for success"
+
+        # We densely sample a grid of points by ray-casting from top to bottom to find the valid positions
+        radius = cls.particle_radius
+        results = sample_cuboid_on_object_full_grid_topdown(
+            obj,
+            # the grid is fully dense - particles are sitting next to each other
+            ray_spacing=radius * 2 if sampling_distance is None else sampling_distance,
+            # assume the particles are extremely small - sample cuboids of size 0 for better performance
+            cuboid_dimensions=np.zeros(3),
+            # raycast start inside the aabb in x-y plane and outside the aabb in the z-axis
+            aabb_offset=np.array([-radius, -radius, radius]),
+            # bottom padding should be the same as the particle radius
+            cuboid_bottom_padding=radius,
+            # undo_cuboid_bottom_padding should be False - the sampled positions are above the surface by its radius
+            undo_cuboid_bottom_padding=False,
+        )
+        particle_positions = np.array([result[0] for result in results if result[0] is not None])
+        # Also potentially sub-sample if we're past our limit
+        if len(particle_positions) > max_samples:
+            particle_positions = particle_positions[
+                np.random.choice(len(particle_positions), size=(max_samples,), replace=False)]
+
+        n_particles = len(particle_positions)
+        success = n_particles >= min_samples_for_success
+        # If we generated a sufficient number of points, generate them in the simulator
+        if success:
+            cls.generate_particles(
+                positions=particle_positions,
+                **kwargs,
+            )
+
+        return success
 
 
 def _create_system_from_metadata(system_name):
@@ -261,6 +1030,18 @@ def is_system_active(system_name):
     assert system_name in REGISTERED_SYSTEMS, f"System {system_name} not in REGISTERED_SYSTEMS."
     system = REGISTERED_SYSTEMS[system_name]
     return system.initialized
+
+
+def is_visual_particle_system(system_name):
+    assert system_name in REGISTERED_SYSTEMS, f"System {system_name} not in REGISTERED_SYSTEMS."
+    system = REGISTERED_SYSTEMS[system_name]
+    return issubclass(system, VisualParticleSystem)
+
+
+def is_physical_particle_system(system_name):
+    assert system_name in REGISTERED_SYSTEMS, f"System {system_name} not in REGISTERED_SYSTEMS."
+    system = REGISTERED_SYSTEMS[system_name]
+    return issubclass(system, PhysicalParticleSystem)
 
 
 def get_system(system_name):
