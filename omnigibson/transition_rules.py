@@ -811,7 +811,7 @@ class CookingPhysicalParticleRule(BaseTransitionRule):
             if len(in_volume_idx) > 0:
                 cooked_system = get_system(f"cooked_{system.name}")
                 particle_positions = fillable_obj.states[ContainedParticles].get_value(system).positions
-                system.delete_particles(idxs=in_volume_idx)
+                system.remove_particles(idxs=in_volume_idx)
                 cooked_system.generate_particles(positions=particle_positions[in_volume_idx])
 
         return t_results

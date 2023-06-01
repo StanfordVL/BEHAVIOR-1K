@@ -132,13 +132,13 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
         raise NotImplementedError()
 
     @classmethod
-    def delete_particles(
+    def remove_particles(
             cls,
             idxs,
             **kwargs,
     ):
         """
-        Deletes pre-existing particles
+        Removes pre-existing particles
 
         Args:
             idxs (np.array): (n_particles,) shaped array specifying IDs of particles to delete

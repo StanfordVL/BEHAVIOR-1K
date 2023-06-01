@@ -563,7 +563,7 @@ class ParticleRemover(ParticleModifier):
             modification_limit = self.physical_particle_modification_limit
 
         n_particles_absorbed = min(len(inbound_idxs), modification_limit - self.modified_particle_count[system.name])
-        system.delete_particles(inbound_idxs[:n_particles_absorbed])
+        system.remove_particles(inbound_idxs[:n_particles_absorbed])
         self.modified_particle_count[system.name] += n_particles_absorbed
 
     @classproperty

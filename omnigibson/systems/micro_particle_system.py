@@ -689,13 +689,13 @@ class MicroPhysicalParticleSystem(PhysicalParticleSystem, MicroParticleSystem):
         raise NotImplementedError()
 
     @classmethod
-    def delete_particles(
+    def remove_particles(
             cls,
             idxs,
             instancer_idn=None,
     ):
         """
-        Deletes pre-existing particles from instancer @instancer_idn
+        Removes pre-existing particles from instancer @instancer_idn
 
         Args:
             idxs (np.array): (n_particles,) shaped array specifying IDs of particles to delete

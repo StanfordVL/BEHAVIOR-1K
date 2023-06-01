@@ -252,7 +252,7 @@ class MacroParticleSystem(BaseSystem):
         particle.remove()
 
     @classmethod
-    def delete_particles(
+    def remove_particles(
             cls,
             idxs,
             **kwargs,

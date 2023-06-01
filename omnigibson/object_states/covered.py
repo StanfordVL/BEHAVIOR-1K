@@ -112,8 +112,8 @@ class Covered(RelativeObjectState, BooleanState):
                         min_samples_for_success=m.PHYSICAL_PARTICLE_THRESHOLD,
                     )
                 else:
-                    # We delete all particles touching this object
-                    system.delete_particles(idxs=list(self.obj.states[ContactParticles].get_value(system)))
+                    # We remove all particles touching this object
+                    system.remove_particles(idxs=list(self.obj.states[ContactParticles].get_value(system)))
 
         else:
             raise ValueError(f"Invalid system {system} received for setting Covered state!"
