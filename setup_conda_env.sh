@@ -1,40 +1,37 @@
 #!/usr/bin/env bash
+set -eo &> /dev/null
 
-set -eo
-
-# Helper function to check whether the script is soruced
-is_sourced() {
-  if [ -n "$ZSH_VERSION" ]; then 
-    case $ZSH_EVAL_CONTEXT in *:file:*) return 0;; esac
-  else
-    case ${0##*/} in dash|-dash|bash|-bash|ksh|-ksh|sh|-sh) return 0;; esac
-  fi
-  return 1
-}
-is_sourced && sourced=1 || sourced=0
-
-if [[ $sourced == 0 ]]; then
-  echo "Please source the script to make sure conda env is created successfully!"
-  exit
+# Make sure that the ISAAC_SIM_PATH variable is set correctly
+if [[ -d ~/.local/share/ov/pkg ]] && [[ $(ls ~/.local/share/ov/pkg | grep isaac_sim) ]]; 
+then
+  FOUND_ISAAC_SIM_PATH=$(ls -d ~/.local/share/ov/pkg/* | grep isaac_sim | tail -n 1) 
+  echo "We found Isaac Sim installed at [4m$FOUND_ISAAC_SIM_PATH[0m. OmniGibson will use it by default."
+  read -p "If you want to use a different one, please type in the path containing isaac-sim.bat here (press enter to skip) >>> " ISAAC_SIM_PATH
+  ISAAC_SIM_PATH=${ISAAC_SIM_PATH:-$FOUND_ISAAC_SIM_PATH}
+else
+  echo "We did not find Isaac Sim under ~/.local/share/ov/pkg."
+  echo "If you haven't installed Isaac Sim yet, please do so before running this setup script."
+  read -p "If you have already installed it in a custom location, please type in the path containing isaac-sim.bat here >>> " ISAAC_SIM_PATH
 fi
 
-# Make sure that the ISAAC_SIM_PATH variable is set
-if [[ x"${ISAAC_SIM_PATH}" == "x" ]]; then
-  echo "Please set ISAAC_SIM_PATH!"
-  return
-fi
+while [[ ! -f "${ISAAC_SIM_PATH}/isaac-sim.sh" ]]; do
+  read -p "isaac-sim.sh not found in ${ISAAC_SIM_PATH}! Make sure you have entered the correct path >>> " ISAAC_SIM_PATH
+done
+echo -e "\nUsing Isaac Sim at $ISAAC_SIM_PATH\n"
 
-# Sanity check whether env variable is set correctly
-if [[ ! -f "${ISAAC_SIM_PATH}/setup_conda_env.sh" ]]; then
-  echo "setup_conda_env.sh not found in ${ISAAC_SIM_PATH}! Make sure you have set the correct ISAAC_SIM_PATH"
-  return
-fi
+
+# Choose venv name 
+echo "The new conda environment will be named [4momnigibson[0m by default."
+read -p "If you want to use a different name, please type in here (press enter to skip) >>> " conda_name
+conda_name=${name:-omnigibson}
+echo -e "\nUsing $conda_name as the conda environment name\n"
 
 # Create a conda environment with python 3.7
-conda create -y -n omnigibson python=3.7
+source $(conda info --base)/etc/profile.d/conda.sh
+conda create -y -n $conda_name python=3.7
 
 # Now activate the omnigibson environment
-conda activate omnigibson
+conda activate $conda_name
 
 mkdir -p ${CONDA_PREFIX}/etc/conda/activate.d
 mkdir -p ${CONDA_PREFIX}/etc/conda/deactivate.d
@@ -62,6 +59,5 @@ pip install -e .
 
 # Cycle conda environment so that all dependencies are propagated
 conda deactivate
-conda activate omnigibson
 
-echo "OmniGibson successfully installed!"
+echo -e "\nOmniGibson successfully installed! Please run [4mconda activate $conda_name[0m to activate the environment.\n"
