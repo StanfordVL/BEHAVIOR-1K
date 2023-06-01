@@ -71,7 +71,7 @@ class ContainedParticles(RelativeObjectState, LinkBasedStateMixin):
                 raw_positions = system.get_particles_position_orientation(local=False)[0]
                 checked_positions = raw_positions
             else:
-                raise ValueError(f"Invalid system {system} received for getting Covered state!"
+                raise ValueError(f"Invalid system {system} received for getting ContainedParticles state!"
                                  f"Currently, only VisualParticleSystems and PhysicalParticleSystems are supported.")
 
         # Only calculate if we have valid positions
