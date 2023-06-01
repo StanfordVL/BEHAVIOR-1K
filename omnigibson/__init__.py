@@ -81,7 +81,10 @@ def create_app():
     from omni.isaac.core.utils.extensions import enable_extension
     enable_extension("omni.flowusd")
     enable_extension("omni.particle.system.bundle")
-    enable_extension("omni.kit.window.viewport")    # This is needed for windows
+
+    # Additional import for windows
+    if os.name == "nt":
+        enable_extension("omni.kit.window.viewport")
 
     # If we're headless, suppress all warnings about GLFW
     if gm.HEADLESS:
