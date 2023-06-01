@@ -99,7 +99,7 @@ class MacroParticleSystem(BaseSystem):
     def delete_all_particles(cls):
         # Use list explicitly to prevent mid-loop mutation of dict
         for particle_name in tuple(cls.particles.keys()):
-            cls.remove_particle(name=particle_name)
+            cls.remove_particle_by_name(name=particle_name)
 
     @classmethod
     def reset(cls):
@@ -246,15 +246,8 @@ class MacroParticleSystem(BaseSystem):
         return new_particle
 
     @classmethod
-    def remove_particle(cls, name):
-        """
-        Remove particle with name @name from both the simulator as well as internally
-
-        Args:
-            name (str): Name of the particle to remove
-        """
+    def remove_particle_by_name(cls, name):
         assert name in cls.particles, f"Got invalid name for particle to remove {name}"
-
         particle = cls.particles.pop(name)
         particle.remove()
 
@@ -266,7 +259,7 @@ class MacroParticleSystem(BaseSystem):
     ):
         particle_names = tuple(cls.particles.keys())
         for idx in idxs:
-            cls.remove_particle(particle_names[idx])
+            cls.remove_particle_by_name(particle_names[idx])
 
     @classmethod
     def generate_particles(
@@ -341,7 +334,7 @@ class MacroParticleSystem(BaseSystem):
         return np.array(cls._color)
 
 
-class MacroVisualParticleSystem(VisualParticleSystem, MacroParticleSystem):
+class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
     """
     Particle system class that procedurally generates individual particles that are not subject to physics
     """
@@ -408,18 +401,14 @@ class MacroVisualParticleSystem(VisualParticleSystem, MacroParticleSystem):
         cls._particles_local_mat = dict()
 
     @classmethod
-    def remove_particle(cls, name):
+    def remove_particle_by_name(cls, name):
         # Run super first
-        super().remove_particle(name=name)
+        super().remove_particle_by_name(name=name)
 
         # Remove this particle from its respective group as well
         cls._group_particles[cls._particles_info[name]["obj"].name].pop(name)
         cls._particles_info.pop(name)
         cls._particles_local_mat.pop(name)
-
-    @classmethod
-    def remove_particle_by_name(cls, name):
-        cls.remove_particle(name=name)
 
     @classmethod
     def generate_group_particles(
@@ -1007,9 +996,9 @@ class MacroPhysicalParticleSystem(PhysicalParticleSystem, MacroParticleSystem):
         cls.particles_view = None
 
     @classmethod
-    def remove_particle(cls, name):
+    def remove_particle_by_name(cls, name):
         # Run super first
-        super().remove_particle(name=name)
+        super().remove_particle_by_name(name=name)
 
         # Refresh particles view
         cls._refresh_particles_view()
