@@ -6,7 +6,7 @@ from copy import copy
 import itertools
 import omnigibson as og
 from omnigibson.macros import gm, create_module_macros
-from omnigibson.systems import get_system, is_system_active, MicroPhysicalParticleSystem, VisualParticleSystem, REGISTERED_SYSTEMS
+from omnigibson.systems import get_system, is_system_active, PhysicalParticleSystem, VisualParticleSystem, REGISTERED_SYSTEMS
 from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.object_states import *
 from omnigibson.utils.python_utils import Registerable, classproperty, subclass_factory
@@ -795,14 +795,10 @@ class CookingPhysicalParticleRule(BaseTransitionRule):
 
         # Iterate over all active physical particle systems, and for any non-cooked particles inside,
         # convert into cooked particles
-        for name, system in MicroPhysicalParticleSystem.get_active_systems().items():
+        for name, system in PhysicalParticleSystem.get_active_systems().items():
             # Skip any systems that are already cooked
             if "cooked" in name:
                 continue
-
-            # TODO: Remove this assert once we have a more standardized method of globally R/W particle positions
-            assert len(system.particle_instancers) == 1, \
-                f"MicroPhysicalParticleSystem {system.name} should only have one instancer!"
 
             # Iterate over all fillables -- a given particle should become hot if it is contained in any of the
             # fillable objects
@@ -815,8 +811,8 @@ class CookingPhysicalParticleRule(BaseTransitionRule):
             if len(in_volume_idx) > 0:
                 cooked_system = get_system(f"cooked_{system.name}")
                 particle_positions = fillable_obj.states[ContainedParticles].get_value(system).positions
-                system.default_particle_instancer.remove_particles(idxs=in_volume_idx)
-                cooked_system.default_particle_instancer.add_particles(positions=particle_positions[in_volume_idx])
+                system.delete_particles(idxs=in_volume_idx)
+                cooked_system.generate_particles(positions=particle_positions[in_volume_idx])
 
         return t_results
 
@@ -909,15 +905,8 @@ class MixingRule(BaseTransitionRule):
         """
         for system_name in recipe["input_systems"]:
             system = get_system(system_name=system_name)
-            # Physical particle systems
-            if issubclass(system, MicroPhysicalParticleSystem):
-                if container.states[Contains].get_value(system=get_system(system_name=system_name)):
-                    return False
-            # Visual particle systems
-            else:
-                group_name = system.get_group_name(obj=container)
-                if group_name not in system.groups or system.num_group_particles(group=group_name) == 0:
-                    return False
+            if container.states[Contains].get_value(system=get_system(system_name=system_name)):
+                return False
         return True
 
     @classmethod
@@ -933,14 +922,7 @@ class MixingRule(BaseTransitionRule):
             bool: True if none of the non-relevant systems are contained
         """
         relevant_systems = set(recipe["input_systems"])
-        for system in MicroPhysicalParticleSystem.get_active_systems():
-            if system.name not in relevant_systems and container.states[Contains].get_value(system=system):
-                return False
-        for system in VisualParticleSystem.get_active_systems():
-            group_name = system.get_group_name(obj=container)
-            if group_name in system.groups and system.num_group_particles(group=group_name) > 0:
-                return False
-        return True
+        return system.name in relevant_systems or not container.states[Contains].get_value(system=system)
 
     @classmethod
     def _validate_recipe_objects_are_contained(cls, recipe, in_volume):
@@ -1121,7 +1103,7 @@ class MixingRule(BaseTransitionRule):
         volume = 0
 
         # Remove all recipe system particles contained in the container
-        for system in MicroPhysicalParticleSystem.get_active_systems():
+        for system in PhysicalParticleSystem.get_active_systems():
             if container.states[Contains].get_value(system):
                 volume += contained_particles_state.get_value()[0] * np.pi * (system.particle_radius ** 3) * 4 / 3
                 container.states[Filled].set_value(system, False)
