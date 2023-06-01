@@ -1613,6 +1613,7 @@ class Cloth(MicroParticleSystem):
                     # Terminate anyways, but don't fail
                     log.warn("Failed to sufficiently remesh cloth. "
                              "The generated cloth may not have evenly distributed particles.")
+                    break
 
             # Re-write data to @mesh_prim
             cm = ms.current_mesh()
