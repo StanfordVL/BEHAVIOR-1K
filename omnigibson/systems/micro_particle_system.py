@@ -1427,7 +1427,7 @@ class GranularSystem(MicroPhysicalParticleSystem):
         prototype.visible = False
 
         # Store the contact offset based on a minimum sphere
-        vertices = np.array(prototype.get_attribute("points"))
+        vertices = np.array(prototype.get_attribute("points")) * cls.max_scale
         _, cls._particle_contact_offset = trimesh.nsphere.minimum_nsphere(trimesh.Trimesh(vertices=vertices))
 
         return [prototype]
