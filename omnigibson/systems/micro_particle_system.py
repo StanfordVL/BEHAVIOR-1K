@@ -15,6 +15,7 @@ from pathlib import Path
 import os
 import tempfile
 import datetime
+import trimesh
 import pymeshlab
 import omni
 from omni.isaac.core.utils.prims import get_prim_at_path, is_prim_path_valid
@@ -616,7 +617,10 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
 
     @classmethod
     def initialize(cls):
-        # Run super first
+        # Create prototype before running super!
+        cls.particle_prototypes = cls._create_particle_prototypes()
+
+        # Run super
         super().initialize()
 
         # Initialize class variables that are mutable so they don't get overridden by children classes
@@ -625,7 +629,6 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         # Initialize max instancer idn
         cls.max_instancer_idn = -1
 
-        cls.particle_prototypes = cls._create_particle_prototypes()
 
     @classproperty
     def next_available_instancer_idn(cls):
@@ -1176,7 +1179,6 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
     def create(
         cls,
         name,
-        particle_contact_offset,
         particle_density,
         **kwargs,
     ):
@@ -1202,16 +1204,11 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
             return True
 
         @classproperty
-        def cp_particle_contact_offset(cls):
-            return particle_contact_offset
-
-        @classproperty
         def cp_particle_density(cls):
             return particle_density
 
         # Add to any other params specified
         kwargs["_register_system"] = cp_register_system
-        kwargs["particle_contact_offset"] = cp_particle_contact_offset
         kwargs["particle_density"] = cp_particle_density
 
         # Run super
@@ -1350,6 +1347,10 @@ class FluidSystem(MicroPhysicalParticleSystem):
             FluidSystem: Generated system class
         """
         @classproperty
+        def cp_particle_contact_offset(cls):
+            return particle_contact_offset
+
+        @classproperty
         def cp_material_mtl_name(cls):
             return material_mtl_name
 
@@ -1363,8 +1364,9 @@ class FluidSystem(MicroPhysicalParticleSystem):
                 customize_particle_material(mat=cls._material)
 
         # Add to any other params specified
-        kwargs["is_viscous"] = cp_is_viscous
+        kwargs["particle_contact_offset"] = cp_particle_contact_offset
         kwargs["_material_mtl_name"] = cp_material_mtl_name
+        kwargs["is_viscous"] = cp_is_viscous
         kwargs["_customize_particle_material"] = cm_customize_particle_material
 
         # Create and return the class
@@ -1385,6 +1387,12 @@ class GranularSystem(MicroPhysicalParticleSystem):
     """
     Particle system class simulating granular materials. Individual particles are composed of custom USD objects.
     """
+    # Cached particle contact offset determined from loaded prototype
+    _particle_contact_offset = None
+
+    @classproperty
+    def particle_contact_offset(cls):
+        return cls._particle_contact_offset
 
     @classproperty
     def is_fluid(cls):
@@ -1409,8 +1417,12 @@ class GranularSystem(MicroPhysicalParticleSystem):
 
         # Wrap it with VisualGeomPrim with the correct scale
         prototype = VisualGeomPrim(prim_path=prototype_path, name=prototype_path)
-        prototype.scale = (cls.particle_radius * 2) / prototype.aabb_extent
         prototype.visible = False
+
+        # Store the contact offset based on a minimum sphere
+        vertices = np.array(prototype.get_attribute("points"))
+        _, cls._particle_contact_offset = trimesh.nsphere.minimum_nsphere(trimesh.Trimesh(vertices=vertices))
+
         return [prototype]
 
     @classmethod
@@ -1430,7 +1442,6 @@ class GranularSystem(MicroPhysicalParticleSystem):
     def create(
         cls,
         name,
-        particle_contact_offset,
         particle_density,
         create_particle_template,
         **kwargs,
