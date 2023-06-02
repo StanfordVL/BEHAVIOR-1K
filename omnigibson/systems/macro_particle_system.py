@@ -141,16 +141,14 @@ class MacroParticleSystem(BaseSystem):
     @classproperty
     def state_size(cls):
         # In additon to super, we have:
-        # scale (3*n), and template pose (7), template scale (3), and particle counter (1)
-        return super().state_size + 3 * cls.n_particles + 11
+        # scale (3*n), and particle counter (1)
+        return super().state_size + 3 * cls.n_particles + 1
 
     @classmethod
     def _dump_state(cls):
         state = super()._dump_state()
 
         state["scales"] = np.array([particle.scale for particle in cls.particles.values()])
-        state["template_pose"] = np.concatenate(cls._particle_object.get_local_pose())
-        state["template_scale"] = cls._particle_object.scale
         state["particle_counter"] = cls._particle_counter
 
         return state
@@ -164,9 +162,7 @@ class MacroParticleSystem(BaseSystem):
         for particle, scale in zip(cls.particles.values(), state["scales"]):
             particle.scale = scale
 
-        # Load template pose and scale
-        cls._particle_object.set_local_pose(state["template_pose"][:3], state["template_pose"][3:])
-        cls._particle_object.scale = state["template_scale"]
+        # Set particle counter
         cls._particle_counter = state["particle_counter"]
 
     @classmethod
@@ -178,8 +174,6 @@ class MacroParticleSystem(BaseSystem):
         return np.concatenate([
             states_flat,
             state["scales"].flatten(),
-            state["template_pose"],
-            state["template_scale"],
             [state["particle_counter"]],
         ], dtype=float)
 
@@ -192,12 +186,9 @@ class MacroParticleSystem(BaseSystem):
         n_particles = state_dict["n_particles"]
         len_scales = n_particles * 3
         state_dict["scales"] = state[idx:idx+len_scales].reshape(-1, 3)
-        template_info = state[idx+len_scales:idx+len_scales+10]
-        state_dict["template_pose"] = template_info[:7]
-        state_dict["template_scale"] = template_info[7:]
-        state_dict["particle_counter"] = int(state[idx+len_scales+10])
+        state_dict["particle_counter"] = int(state[idx+len_scales])
 
-        return state_dict, idx + len_scales + 11
+        return state_dict, idx + len_scales + 1
 
     @classmethod
     def set_particle_template_object(cls, obj):
