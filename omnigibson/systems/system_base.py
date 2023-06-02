@@ -240,14 +240,11 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
             cls.max_scale = np.array(maximum)
 
     @classmethod
-    def get_particles_position_orientation(cls, local=False):
+    def get_particles_position_orientation(cls):
         """
-        Computes all particles' positions and orientations that belong to this system
+        Computes all particles' positions and orientations that belong to this system in the world frame
 
         Note: This is more optimized than doing a for loop with self.get_particle_position_orientation()
-
-        Args:
-            local (bool): Whether to get pose in the particle's local frame or not
 
         Returns:
             2-tuple:
@@ -257,7 +254,7 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
         raise NotImplementedError()
 
     @classmethod
-    def get_particle_position_orientation(cls, idx, local=False):
+    def get_particle_position_orientation(cls, idx):
         """
         Compute particle's position and orientation. This automatically takes into account the relative
         pose w.r.t. its parent link and the global pose of that parent link.
@@ -265,7 +262,6 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
         Args:
             idx (int): Index of the particle to compute position and orientation for. Note: this is
                 equivalent to grabbing the corresponding idx'th entry from @get_particles_position_orientation()
-            local (bool): Whether to get pose in the particle's local frame or not
 
         Returns:
             2-tuple:
@@ -275,23 +271,22 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
         raise NotImplementedError()
 
     @classmethod
-    def set_particles_position_orientation(cls, positions=None, orientations=None, local=False):
+    def set_particles_position_orientation(cls, positions=None, orientations=None):
         """
-        Sets all particles' positions and orientations that belong to this system
+        Sets all particles' positions and orientations that belong to this system in the world frame
 
         Note: This is more optimized than doing a for loop with self.set_particle_position_orientation()
 
         Args:
             positions (n-array): (n, 3) per-particle (x,y,z) position
             orientations (n-array): (n, 4) per-particle (x,y,z,w) quaternion orientation
-            local (bool): Whether to set pose in the particle's local frame or not
         """
         raise NotImplementedError()
 
     @classmethod
-    def set_particle_position_orientation(cls, idx, position=None, orientation=None, local=False):
+    def set_particle_position_orientation(cls, idx, position=None, orientation=None):
         """
-        Sets particle's position and orientation. If not @local, this automatically takes into account the relative
+        Sets particle's position and orientation. This automatically takes into account the relative
         pose w.r.t. its parent link and the global pose of that parent link.
 
         Args:
@@ -299,7 +294,58 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
                 equivalent to setting the corresponding idx'th entry from @set_particles_position_orientation()
             position (3-array): particle (x,y,z) position
             orientation (4-array): particle (x,y,z,w) quaternion orientation
-            local (bool): Whether to set pose in the particle's local frame or not
+        """
+        raise NotImplementedError()
+
+    @classmethod
+    def get_particles_local_pose(cls):
+        """
+        Computes all particles' positions and orientations that belong to this system in the particles' parent frames
+
+        Returns:
+            2-tuple:
+                - (n, 3)-array: per-particle (x,y,z) position
+                - (n, 4)-array: per-particle (x,y,z,w) quaternion orientation
+        """
+        raise NotImplementedError()
+
+    @classmethod
+    def get_particle_local_pose(cls, idx):
+        """
+        Compute particle's position and orientation in the particle's parent frame
+
+        Args:
+            idx (int): Index of the particle to compute position and orientation for. Note: this is
+                equivalent to grabbing the corresponding idx'th entry from @get_particles_local_pose()
+
+        Returns:
+            2-tuple:
+                - 3-array: (x,y,z) position
+                - 4-array: (x,y,z,w) quaternion orientation
+        """
+        raise NotImplementedError()
+
+    @classmethod
+    def set_particles_local_pose(cls, positions=None, orientations=None):
+        """
+        Sets all particles' positions and orientations that belong to this system in the particles' parent frames
+
+        Args:
+            positions (n-array): (n, 3) per-particle (x,y,z) position
+            orientations (n-array): (n, 4) per-particle (x,y,z,w) quaternion orientation
+        """
+        raise NotImplementedError()
+
+    @classmethod
+    def set_particle_local_pose(cls, idx, position=None, orientation=None):
+        """
+        Sets particle's position and orientation in the particle's parent frame
+
+        Args:
+            idx (int): Index of the particle to set position and orientation for. Note: this is
+                equivalent to setting the corresponding idx'th entry from @set_particles_local_pose()
+            position (3-array): particle (x,y,z) position
+            orientation (4-array): particle (x,y,z,w) quaternion orientation
         """
         raise NotImplementedError()
 
@@ -313,7 +359,8 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
 
     @classmethod
     def _dump_state(cls):
-        positions, orientations = cls.get_particles_position_orientation(local=cls._store_local_poses)
+        positions, orientations = cls.get_particles_local_pose() if \
+            cls._store_local_poses else cls.get_particles_position_orientation()
         return dict(
             n_particles=cls.n_particles,
             min_scale=cls.min_scale,
@@ -332,7 +379,8 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
         cls.set_scale_limits(minimum=state["min_scale"], maximum=state["max_scale"])
 
         # Load the poses
-        cls.set_particles_position_orientation(positions=state["positions"], orientations=state["orientations"], local=cls._store_local_poses)
+        setter = cls.set_particles_local_pose if cls._store_local_poses else cls.set_particles_position_orientation
+        setter(positions=state["positions"], orientations=state["orientations"])
 
     @classmethod
     def _serialize(cls, state):
@@ -675,7 +723,7 @@ class VisualParticleSystem(BaseSystem):
         raise NotImplementedError
 
     @classmethod
-    def get_group_particles_position_orientation(cls, group, local=False):
+    def get_group_particles_position_orientation(cls, group):
         """
         Computes all particles' positions and orientations that belong to @group
 
@@ -683,7 +731,6 @@ class VisualParticleSystem(BaseSystem):
 
         Args:
             group (str): Group name whose particle positions and orientations should be computed
-            local (bool): Whether to get poses in the particles' local frames or not
 
         Returns:
             2-tuple:
@@ -693,7 +740,7 @@ class VisualParticleSystem(BaseSystem):
         raise NotImplementedError
 
     @classmethod
-    def set_group_particles_position_orientation(cls, group, positions=None, orientations=None, local=False):
+    def set_group_particles_position_orientation(cls, group, positions=None, orientations=None):
         """
         Sets all particles' positions and orientations that belong to @group
 
@@ -703,7 +750,33 @@ class VisualParticleSystem(BaseSystem):
             group (str): Group name whose particle positions and orientations should be computed
             positions (n-array): (n, 3) per-particle (x,y,z) position
             orientations (n-array): (n, 4) per-particle (x,y,z,w) quaternion orientation
-            local (bool): Whether to set pose in the particle's local frame or not
+        """
+        raise NotImplementedError
+
+    @classmethod
+    def get_group_particles_local_pose(cls, group):
+        """
+        Computes all particles' positions and orientations that belong to @group in the particles' parent frame
+
+        Args:
+            group (str): Group name whose particle positions and orientations should be computed
+
+        Returns:
+            2-tuple:
+                - (n, 3)-array: per-particle (x,y,z) position
+                - (n, 4)-array: per-particle (x,y,z,w) quaternion orientation
+        """
+        raise NotImplementedError
+
+    @classmethod
+    def set_group_particles_local_pose(cls, group, positions=None, orientations=None):
+        """
+        Sets all particles' positions and orientations that belong to @group in the particles' parent frame
+
+        Args:
+            group (str): Group name whose particle positions and orientations should be computed
+            positions (n-array): (n, 3) per-particle (x,y,z) position
+            orientations (n-array): (n, 4) per-particle (x,y,z,w) quaternion orientation
         """
         raise NotImplementedError
 

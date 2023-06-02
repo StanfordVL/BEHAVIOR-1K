@@ -568,27 +568,36 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         return global_poses[:, :3, 3], T.mat2quat(global_poses[:, :3, :3])
 
     @classmethod
-    def get_particles_position_orientation(cls, local=False):
-        return cls._compute_batch_particles_position_orientation(particles=cls.particles, local=local)
+    def get_particles_position_orientation(cls):
+        return cls._compute_batch_particles_position_orientation(particles=cls.particles, local=False)
 
     @classmethod
-    def get_group_particles_position_orientation(cls, group, local=False):
-        return cls._compute_batch_particles_position_orientation(particles=cls._group_particles[group], local=local)
+    def get_particles_local_pose(cls):
+        return cls._compute_batch_particles_position_orientation(particles=cls.particles, local=True)
 
     @classmethod
-    def get_particle_position_orientation(cls, idx, local=False):
+    def get_group_particles_position_orientation(cls, group):
+        return cls._compute_batch_particles_position_orientation(particles=cls._group_particles[group], local=False)
+
+    @classmethod
+    def get_group_particles_local_pose(cls, group):
+        return cls._compute_batch_particles_position_orientation(particles=cls._group_particles[group], local=True)
+
+    @classmethod
+    def get_particle_position_orientation(cls, idx):
         name = list(cls.particles.keys())[idx]
-        if local:
-            val = cls.particles[name].get_local_pose()
-        else:
-            # First, get local pose, scale it by the parent link's scale, and then convert into a matrix
-            parent_link = cls._particles_info[name]["link"]
-            local_mat = cls._particles_local_mat[name]
-            link_tf = T.pose2mat(parent_link.get_position_orientation())
+        # First, get local pose, scale it by the parent link's scale, and then convert into a matrix
+        parent_link = cls._particles_info[name]["link"]
+        local_mat = cls._particles_local_mat[name]
+        link_tf = T.pose2mat(parent_link.get_position_orientation())
 
-            # Multiply the local pose by the link's global transform, then return as pos, quat tuple
-            val = T.mat2pose(link_tf @ local_mat)
-        return val
+        # Multiply the local pose by the link's global transform, then return as pos, quat tuple
+        return T.mat2pose(link_tf @ local_mat)
+
+    @classmethod
+    def get_particle_local_pose(cls, idx):
+        name = list(cls.particles.keys())[idx]
+        return cls.particles[name].get_local_pose()
 
     @classmethod
     def _modify_batch_particles_position_orientation(cls, particles, positions=None, orientations=None, local=False):
@@ -635,17 +644,44 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
             cls._modify_particle_local_mat(name=name, mat=particle_local_poses_batch[i], ignore_scale=local)
 
     @classmethod
-    def set_particles_position_orientation(cls, positions=None, orientations=None, local=False):
-        return cls._modify_batch_particles_position_orientation(particles=cls.particles, positions=positions, orientations=orientations, local=local)
+    def set_particles_position_orientation(cls, positions=None, orientations=None):
+        return cls._modify_batch_particles_position_orientation(particles=cls.particles, positions=positions, orientations=orientations, local=False)
 
     @classmethod
-    def set_group_particles_position_orientation(cls, group, positions=None, orientations=None, local=False):
-        return cls._modify_batch_particles_position_orientation(particles=cls._group_particles[group], positions=positions, orientations=orientations, local=local)
+    def set_particles_local_pose(cls, positions=None, orientations=None):
+        return cls._modify_batch_particles_position_orientation(particles=cls.particles, positions=positions, orientations=orientations, local=True)
 
     @classmethod
-    def set_particle_position_orientation(cls, idx, position=None, orientation=None, local=False):
+    def set_group_particles_position_orientation(cls, group, positions=None, orientations=None):
+        return cls._modify_batch_particles_position_orientation(particles=cls._group_particles[group], positions=positions, orientations=orientations, local=False)
+
+    @classmethod
+    def set_group_particles_local_pose(cls, group, positions=None, orientations=None):
+        return cls._modify_batch_particles_position_orientation(particles=cls._group_particles[group], positions=positions, orientations=orientations, local=True)
+
+    @classmethod
+    def set_particle_position_orientation(cls, idx, position=None, orientation=None):
         if position is None or orientation is None:
-            pos, ori = cls.get_particle_position_orientation(idx=idx, local=local)
+            pos, ori = cls.get_particle_position_orientation(idx=idx)
+            position = pos if position is None else position
+            orientation = ori if orientation is None else orientation
+
+        name = list(cls.particles.keys())[idx]
+        global_mat = np.zeros((4, 4))
+        global_mat[-1, -1] = 1.0
+        global_mat[:3, 3] = position
+        global_mat[:3, :3] = T.quat2mat(orientation)
+        # First, get global pose, scale it by the parent link's scale, and then convert into a matrix
+        parent_link = cls._particles_info[name]["link"]
+        link_tf = T.pose2mat(parent_link.get_position_orientation())
+        local_mat = np.linalg.inv(link_tf) @ global_mat
+
+        cls._modify_particle_local_mat(name=name, mat=local_mat, ignore_scale=False)
+
+    @classmethod
+    def set_particle_local_pose(cls, idx, position=None, orientation=None):
+        if position is None or orientation is None:
+            pos, ori = cls.get_particle_local_pose(idx=idx)
             position = pos if position is None else position
             orientation = ori if orientation is None else orientation
 
@@ -654,14 +690,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         local_mat[-1, -1] = 1.0
         local_mat[:3, 3] = position
         local_mat[:3, :3] = T.quat2mat(orientation)
-
-        if not local:
-            # First, get local pose, scale it by the parent link's scale, and then convert into a matrix
-            parent_link = cls._particles_info[name]["link"]
-            link_tf = T.pose2mat(parent_link.get_position_orientation())
-            local_mat = np.linalg.inv(link_tf) @ local_mat
-
-        cls._modify_particle_local_mat(name=name, mat=local_mat, ignore_scale=local)
+        cls._modify_particle_local_mat(name=name, mat=local_mat, ignore_scale=True)
 
     @classmethod
     def _compute_particle_local_mat(cls, name, ignore_scale=False):
@@ -1012,7 +1041,7 @@ class MacroPhysicalParticleSystem(PhysicalParticleSystem, MacroParticleSystem):
         cls._refresh_particles_view()
 
     @classmethod
-    def get_particles_position_orientation(cls, local=False):
+    def get_particles_position_orientation(cls):
         if cls.n_particles > 0:
             tfs = cls.particles_view.get_transforms()
             pos, ori = tfs[:, :3], tfs[:, 3:]
@@ -1022,12 +1051,20 @@ class MacroPhysicalParticleSystem(PhysicalParticleSystem, MacroParticleSystem):
         return pos, ori
 
     @classmethod
-    def get_particle_position_orientation(cls, idx, local=False):
+    def get_particles_local_pose(cls):
+        return cls.get_particles_position_orientation()
+
+    @classmethod
+    def get_particle_position_orientation(cls, idx):
         positions, orientations = cls.get_particles_position_orientation()
         return (positions[idx], orientations[idx]) if cls.n_particles > 0 else (positions, orientations)
 
     @classmethod
-    def set_particles_position_orientation(cls, positions=None, orientations=None, local=False):
+    def get_particle_local_pose(cls, idx):
+        return cls.get_particle_position_orientation(idx=idx)
+
+    @classmethod
+    def set_particles_position_orientation(cls, positions=None, orientations=None):
         if positions is None or orientations is None:
             pos, ori = cls.get_particles_position_orientation()
             orientations = ori if orientations is None else orientations
@@ -1035,12 +1072,20 @@ class MacroPhysicalParticleSystem(PhysicalParticleSystem, MacroParticleSystem):
         cls.particles_view.set_transforms(np.concatenate([positions, orientations], axis=1), indices=np.arange(len(positions)))
 
     @classmethod
-    def set_particle_position_orientation(cls, idx, position=None, orientation=None, local=False):
+    def set_particles_local_pose(cls, positions=None, orientations=None):
+        cls.set_particles_position_orientation(positions=positions, orientations=orientations)
+
+    @classmethod
+    def set_particle_position_orientation(cls, idx, position=None, orientation=None):
         if position is None or orientation is None:
             pos, ori = cls.get_particle_position_orientation(idx=idx)
             orientation = ori if orientation is None else orientation
             position = pos if position is None else (position - T.quat2mat(orientation) @ cls._particle_offset)
         cls.particles_view.set_transforms(np.concatenate([position, orientation]).reshape(1, -1), indices=np.array([idx]))
+
+    @classmethod
+    def set_particle_local_pose(cls, idx, position=None, orientation=None):
+        cls.set_particle_position_orientation(idx=idx, position=position, orientation=orientation)
 
     @classmethod
     def get_particles_velocities(cls):
