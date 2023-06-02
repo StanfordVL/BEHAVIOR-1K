@@ -1023,6 +1023,7 @@ class MacroPhysicalParticleSystem(PhysicalParticleSystem, MacroParticleSystem):
 
     @classmethod
     def get_particles_position_orientation(cls):
+        # Note: This gets the center of the sphere approximation of the particles, NOT the actual particle frames!
         if cls.n_particles > 0:
             tfs = cls.particles_view.get_transforms()
             pos, ori = tfs[:, :3], tfs[:, 3:]
@@ -1046,6 +1047,7 @@ class MacroPhysicalParticleSystem(PhysicalParticleSystem, MacroParticleSystem):
 
     @classmethod
     def set_particles_position_orientation(cls, positions=None, orientations=None):
+        # Note: This sets the center of the sphere approximation of the particles, NOT the actual particle frames!
         if positions is None or orientations is None:
             pos, ori = cls.get_particles_position_orientation()
             orientations = ori if orientations is None else orientations
