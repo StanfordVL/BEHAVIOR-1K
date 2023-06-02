@@ -257,7 +257,6 @@ class MacroParticleSystem(BaseSystem):
     def generate_particles(
             cls,
             positions,
-            velocities=None,
             orientations=None,
             scales=None,
             **kwargs,
@@ -1137,9 +1136,9 @@ class MacroPhysicalParticleSystem(PhysicalParticleSystem, MacroParticleSystem):
     def generate_particles(
             cls,
             positions,
+            orientations=None,
             velocities=None,
             angular_velocities=None,
-            orientations=None,
             scales=None,
             **kwargs,
     ):
@@ -1148,12 +1147,12 @@ class MacroPhysicalParticleSystem(PhysicalParticleSystem, MacroParticleSystem):
 
         Args:
             positions (np.array): (n_particles, 3) shaped array specifying per-particle (x,y,z) positions
+            orientations (None or np.array): (n_particles, 4) shaped array specifying per-particle (x,y,z,w) quaternion
+                orientations. If not specified, all will be sampled randomly
             velocities (None or np.array): (n_particles, 3) shaped array specifying per-particle (x,y,z) velocities.
                 If not specified, all will be set to 0
             angular_velocities (None or np.array): (n_particles, 3) shaped array specifying per-particle (ax,ay,az)
                 angular velocities. If not specified, all will be set to 0
-            orientations (None or np.array): (n_particles, 4) shaped array specifying per-particle (x,y,z,w) quaternion
-                orientations. If not specified, all will be sampled randomly
             scales (None or np.array): (n_particles, 3) shaped array specifying per-particle (x,y,z) scales.
                 If not specified, will be uniformly randomly sampled from (cls.min_scale, cls.max_scale)
             **kwargs (dict): Any additional keyword-specific arguments required by subclass implementation
@@ -1161,7 +1160,6 @@ class MacroPhysicalParticleSystem(PhysicalParticleSystem, MacroParticleSystem):
         # Call super first
         super().generate_particles(
             positions=positions,
-            velocities=velocities,
             orientations=orientations,
             scales=scales,
             **kwargs,

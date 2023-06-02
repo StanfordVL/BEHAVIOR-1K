@@ -150,7 +150,6 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
     def generate_particles(
             cls,
             positions,
-            velocities=None,
             orientations=None,
             scales=None,
             **kwargs,
@@ -160,8 +159,6 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
 
         Args:
             positions (np.array): (n_particles, 3) shaped array specifying per-particle (x,y,z) positions
-            velocities (None or np.array): (n_particles, 3) shaped array specifying per-particle (x,y,z) velocities.
-                If not specified, all will be set to 0
             orientations (None or np.array): (n_particles, 4) shaped array specifying per-particle (x,y,z,w) quaternion
                 orientations. If not specified, all will be set to canonical orientation (0, 0, 0, 1)
             scales (None or np.array): (n_particles, 3) shaped array specifying per-particle (x,y,z) scales.
@@ -685,7 +682,6 @@ class VisualParticleSystem(BaseSystem):
     def generate_particles(
             cls,
             positions,
-            velocities=None,
             orientations=None,
             scales=None,
             **kwargs,
