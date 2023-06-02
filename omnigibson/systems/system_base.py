@@ -845,6 +845,11 @@ class PhysicalParticleSystem(BaseSystem):
         Checks whether each particle specified by @particle_positions are in contact with any rigid body.
 
         NOTE: This is a rough proxy for contact, given @positions. Should not be taken as ground truth.
+        This is because for efficiency and underlying physics reasons, it's easier to treat particles as spheres
+        for fast checking. For particles directly spawned from Omniverse's underlying ParticleSystem API, it is a
+        rough proxy semantically, though it is accurate in sim-physics since all spawned particles interact as spheres.
+        For particles spawned manually as rigid bodies, it is a rough proxy both semantically and physically, as the
+        object physically interacts with its non-uniform geometry.
 
         Args:
             positions (np.array): (n_particles, 3) shaped array specifying per-particle (x,y,z) positions
