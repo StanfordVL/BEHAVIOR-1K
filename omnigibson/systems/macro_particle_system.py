@@ -1190,8 +1190,6 @@ class MacroPhysicalParticleSystem(PhysicalParticleSystem, MacroParticleSystem):
         cf. https://stackoverflow.com/questions/22403897/what-does-it-mean-by-the-super-object-returned-is-unbound-in-python
             Use: super(cls).__get__(cls).<METHOD_NAME>(<KWARGS>)
 
-        Note: Scale is automatically inferred from the particle object that is loaded!
-
         Args:
             name (str): Name of the macro physical particles, in snake case.
             particle_density (float): Particle density for the generated system
