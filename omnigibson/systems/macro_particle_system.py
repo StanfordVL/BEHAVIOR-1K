@@ -540,12 +540,9 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
             particle_local_poses_batch = np.zeros_like(link_tfs_batch)
             for i, name in enumerate(particles):
                 link = cls._particles_info[name]["link"]
-                if link in link_tfs:
-                    link_tf = link_tfs[link]
-                else:
-                    link_tf = T.pose2mat(link.get_position_orientation())
-                    link_tfs[link] = link_tf
-                link_tfs_batch[i] = link_tf
+                if link not in link_tfs:
+                    link_tfs[link] = T.pose2mat(link.get_position_orientation())
+                link_tfs_batch[i] = link_tfs[link]
                 particle_local_poses_batch[i] = cls._particles_local_mat[name]
 
             # Compute once
