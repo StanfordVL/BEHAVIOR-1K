@@ -582,8 +582,9 @@ class VisualParticleSystem(BaseSystem):
         cls._group_particles[group] = dict()
         cls._group_objects[group] = obj
 
-        # Compute the group scale
-        cls._group_scales[group] = cls._compute_relative_group_scales(group=group)
+        # Compute the group scale if we're scaling relative to parent
+        if cls.scale_relative_to_parent:
+            cls._group_scales[group] = cls._compute_relative_group_scales(group=group)
 
         return group
 
