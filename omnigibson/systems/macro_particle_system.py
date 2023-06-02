@@ -1038,6 +1038,8 @@ class MacroPhysicalParticleSystem(PhysicalParticleSystem, MacroParticleSystem):
 
     @classmethod
     def get_particle_position_orientation(cls, idx):
+        assert idx <= cls.n_particles, \
+            f"Got invalid idx for getting particle pose! N particles: {cls.n_particles}, got idx: {idx}"
         positions, orientations = cls.get_particles_position_orientation()
         return (positions[idx], orientations[idx]) if cls.n_particles > 0 else (positions, orientations)
 
@@ -1060,6 +1062,8 @@ class MacroPhysicalParticleSystem(PhysicalParticleSystem, MacroParticleSystem):
 
     @classmethod
     def set_particle_position_orientation(cls, idx, position=None, orientation=None):
+        assert idx <= cls.n_particles, \
+            f"Got invalid idx for setting particle pose! N particles: {cls.n_particles}, got idx: {idx}"
         if position is None or orientation is None:
             pos, ori = cls.get_particle_position_orientation(idx=idx)
             orientation = ori if orientation is None else orientation
