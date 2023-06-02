@@ -125,7 +125,7 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
         cls.initialized = True
 
     @classmethod
-    def delete_all_particles(cls):
+    def remove_all_particles(cls):
         """
         Removes all particles and deletes them from the simulator
         """
@@ -195,7 +195,7 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
         """
         Reset this system
         """
-        cls.delete_all_particles()
+        cls.remove_all_particles()
 
     @classmethod
     def create(cls, name, **kwargs):

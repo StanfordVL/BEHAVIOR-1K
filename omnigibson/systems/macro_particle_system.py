@@ -96,7 +96,7 @@ class MacroParticleSystem(BaseSystem):
         raise NotImplementedError()
 
     @classmethod
-    def delete_all_particles(cls):
+    def remove_all_particles(cls):
         # Use list explicitly to prevent mid-loop mutation of dict
         for particle_name in tuple(cls.particles.keys()):
             cls.remove_particle_by_name(name=particle_name)

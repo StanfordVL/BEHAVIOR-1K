@@ -171,9 +171,6 @@ class PhysxParticleInstancer(BasePrim):
             self.particle_prototype_ids = np.delete(self.particle_prototype_ids, idxs, axis=0)
 
     def remove_all_particles(self):
-        """
-        Removes all particles from this instancer, but does NOT delete this instancer
-        """
         self.remove_particles(idxs=np.arange(self._n_particles))
 
     @property
@@ -1172,10 +1169,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         ), idx
 
     @classmethod
-    def delete_all_particles(cls):
-        """
-        Removes all particle instancers and deletes them from the simulator
-        """
+    def remove_all_particles(cls):
         cls._sync_particle_instancers(idns=[], particle_groups=[], particle_counts=[])
 
     @classmethod
@@ -1548,7 +1542,7 @@ class Cloth(MicroParticleSystem):
     Particle system class to simulate cloth.
     """
     @classmethod
-    def delete_all_particles(cls):
+    def remove_all_particles(cls):
         # Override base method since there are no particles to be deleted
         pass
 
