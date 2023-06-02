@@ -1187,7 +1187,6 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
 
         Args:
             name (str): Name of the system, in snake case.
-            particle_contact_offset (float): Contact offset for the generated system
             particle_density (float): Particle density for the generated system
             **kwargs (any): keyword-mapped parameters to override / set in the child class, where the keys represent
                 the class attribute to modify and the values represent the functions / value to set
@@ -1372,7 +1371,6 @@ class FluidSystem(MicroPhysicalParticleSystem):
         # Create and return the class
         return super().create(
             name=name,
-            particle_contact_offset=particle_contact_offset,
             particle_density=particle_density,
             **kwargs,
         )
@@ -1451,7 +1449,6 @@ class GranularSystem(MicroPhysicalParticleSystem):
 
         Args:
             name (str): Name of the system
-            particle_contact_offset (float): Contact offset for the generated system
             particle_density (float): Particle density for the generated system
             material_mtl_name (None or str): Material mdl preset name to use for generating this fluid material.
                 NOTE: Should be an entry from OmniSurfacePresets.mdl, minus the "OmniSurface_" string.
@@ -1483,7 +1480,6 @@ class GranularSystem(MicroPhysicalParticleSystem):
         # Create and return the class
         return super().create(
             name=name,
-            particle_contact_offset=particle_contact_offset,
             particle_density=particle_density,
             **kwargs,
         )
@@ -1515,7 +1511,6 @@ FluidSystem.create(
 
 GranularSystem.create(
     name="diced_apple",
-    particle_contact_offset=0.015,
     particle_density=500.0,
     create_particle_template=lambda prim_path, name: og.objects.DatasetObject(
         prim_path=prim_path,
@@ -1527,12 +1522,12 @@ GranularSystem.create(
         visual_only=True,
         include_default_states=False,
         abilities={},
+        scale=0.05,
     ),
 )
 
 GranularSystem.create(
     name="dango",
-    particle_contact_offset=0.015,
     particle_density=500.0,
     create_particle_template=lambda prim_path, name: og.objects.PrimitiveObject(
         prim_path=prim_path,

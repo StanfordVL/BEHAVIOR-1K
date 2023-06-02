@@ -57,6 +57,9 @@ class MacroParticleSystem(BaseSystem):
         og.sim.import_object(obj=particle_template, register=False)
         particle_template.kinematic_only = True
 
+        # Make sure the scale of the object is exactly 1.0
+        assert np.all(particle_template.scale == 1.0)
+
         # Make sure there is no ambiguity about which mesh to use as the particle from this template
         assert len(particle_template.links) == 1, "MacroParticleSystem particle template has more than one link"
         assert len(particle_template.root_link.visual_meshes) == 1, "MacroParticleSystem particle template has more than one visual mesh"
@@ -208,12 +211,13 @@ class MacroParticleSystem(BaseSystem):
         cls._particle_object = obj
 
     @classmethod
-    def add_particle(cls, prim_path, idn=None):
+    def add_particle(cls, prim_path, scale, idn=None):
         """
         Adds a particle to this system.
 
         Args:
             prim_path (str): Absolute path to the newly created particle, minus the name for this particle
+            scale (3-array): (x,y,z) scale to set for the added particle
             idn (None or int): If specified, should be unique identifier to assign to this particle. If not, will
                 automatically generate a new unique one
 
@@ -226,7 +230,8 @@ class MacroParticleSystem(BaseSystem):
         assert name not in cls.particles.keys(), f"Cannot create particle with name {name} because it already exists!"
         new_particle = cls._load_new_particle(prim_path=f"{prim_path}/{name}", name=name)
 
-        # Make sure the particle is visible
+        # Set the scale and make sure the particle is visible
+        new_particle.scale = scale
         new_particle.visible = True
 
         # Track this particle as well
@@ -274,8 +279,7 @@ class MacroParticleSystem(BaseSystem):
 
         # Add particles
         for scale in scales:
-            particle = cls.add_particle(prim_path=f"{cls.prim_path}/particles")
-            particle.scale = scale
+            cls.add_particle(prim_path=f"{cls.prim_path}/particles", scale=scale)
 
         # Set the tfs
         cls.set_particles_position_orientation(positions=positions, orientations=orientations)
@@ -444,15 +448,14 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                 position -= normal * base_to_center
 
             # Create particle
-            particle = cls.add_particle(prim_path=link_prim_path)
+            particle = cls.add_particle(prim_path=link_prim_path, scale=scale)
 
             # Add to group
             cls._group_particles[group][particle.name] = particle
             cls._particles_info[particle.name] = dict(obj=cls._group_objects[group], link=link)
 
-            # Set the pose and scale
+            # Set the pose
             cls.set_particle_position_orientation(idx=-1, position=position, orientation=orientation)
-            particle.scale = scale
 
     @classmethod
     def generate_group_particles_on_object(cls, group, max_samples, min_samples_for_success=1):
@@ -528,6 +531,9 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                 - (n, 4)-array: per-particle (x,y,z,w) quaternion orientation
         """
         n_particles = len(particles)
+        if n_particles == 0:
+            return (np.array([]).reshape(0, 3), np.array([]).reshape(0, 4))
+
         if local:
             global_poses = np.zeros((n_particles, 4, 4))
             for i, name in enumerate(particles):
@@ -597,6 +603,10 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                 - (n, 3)-array: per-particle (x,y,z) position
                 - (n, 4)-array: per-particle (x,y,z,w) quaternion orientation
         """
+        n_particles = len(particles)
+        if n_particles == 0:
+            return
+
         if positions is None or orientations is None:
             pos, ori = cls._compute_batch_particles_position_orientation(particles=particles, local=local)
             positions = pos if positions is None else positions
@@ -766,7 +776,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
 
             for particle_idn, link_name in zip(info["particle_idns"], info["link_names"]):
                 # Create the necessary particles
-                particle = cls.add_particle(prim_path=f"{obj.prim_path}/{link_name}", idn=int(particle_idn))
+                particle = cls.add_particle(prim_path=f"{obj.prim_path}/{link_name}", scale=np.ones(3), idn=int(particle_idn))
                 cls._group_particles[name][particle.name] = particle
                 cls._particles_info[particle.name] = dict(obj=obj, link=obj.links[link_name])
 
@@ -1013,12 +1023,14 @@ class MacroPhysicalParticleSystem(PhysicalParticleSystem, MacroParticleSystem):
         cls._refresh_particles_view()
 
     @classmethod
-    def add_particle(cls, prim_path, idn=None):
+    def add_particle(cls, prim_path, scale, idn=None):
         # Run super first
-        super().add_particle(prim_path=prim_path, idn=idn)
+        particle = super().add_particle(prim_path=prim_path, scale=scale, idn=idn)
 
         # Refresh particles view
         cls._refresh_particles_view()
+
+        return particle
 
     @classmethod
     def get_particles_position_orientation(cls):
@@ -1048,6 +1060,9 @@ class MacroPhysicalParticleSystem(PhysicalParticleSystem, MacroParticleSystem):
 
     @classmethod
     def set_particles_position_orientation(cls, positions=None, orientations=None):
+        if cls.n_particles == 0:
+            return
+
         # Note: This sets the center of the sphere approximation of the particles, NOT the actual particle frames!
         if positions is None or orientations is None:
             pos, ori = cls.get_particles_position_orientation()
@@ -1107,6 +1122,9 @@ class MacroPhysicalParticleSystem(PhysicalParticleSystem, MacroParticleSystem):
 
     @classmethod
     def set_particles_velocities(cls, lin_vels=None, ang_vels=None):
+        if cls.n_particles == 0:
+            return
+
         if lin_vels is None or ang_vels is None:
             l_vels, a_vels = cls.get_particles_velocities()
             lin_vels = l_vels if lin_vels is None else lin_vels
@@ -1246,6 +1264,26 @@ class MacroPhysicalParticleSystem(PhysicalParticleSystem, MacroParticleSystem):
         # Run super
         return super().create(name=name, **kwargs)
 
+    @classmethod
+    def _sync_particles(cls, n_particles):
+        """
+        Synchronizes the number of particles seen in the scene with @n_particles
+
+        Args:
+            n_particles (int): Desired number of particles to force simulator to have
+        """
+        # Get the difference between current and desired particles
+        n_particles_to_generate = n_particles - cls.n_particles
+
+        # If positive, add particles
+        if n_particles_to_generate > 0:
+            for i in range(n_particles_to_generate):
+                # Min scale == max scale, so no need for sampling
+                cls.add_particle(prim_path=f"{cls.prim_path}/particles", scale=cls.max_scale)
+        else:
+            # Remove excess particles
+            cls.remove_particles(idxs=np.arange(-n_particles_to_generate))
+
     @classproperty
     def state_size(cls):
         # In additon to super, we have:
@@ -1263,7 +1301,13 @@ class MacroPhysicalParticleSystem(PhysicalParticleSystem, MacroParticleSystem):
 
     @classmethod
     def _load_state(cls, state):
+        # Sync the number of particles first
+        cls._sync_particles(n_particles=state["n_particles"])
+
         super()._load_state(state=state)
+
+        # Make sure view is refreshed
+        cls._refresh_particles_view()
 
         # Make sure we update all the velocities
         cls.set_particles_velocities(state["lin_velocities"], state["ang_velocities"])
@@ -1278,6 +1322,9 @@ class MacroPhysicalParticleSystem(PhysicalParticleSystem, MacroParticleSystem):
 
     @classmethod
     def _deserialize(cls, state):
+        # Sync the number of particles first
+        cls._sync_particles(n_particles=int(state[0]))
+
         # Run super first
         state_dict, idx = super()._deserialize(state=state)
 
