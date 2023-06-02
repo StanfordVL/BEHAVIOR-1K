@@ -1101,6 +1101,8 @@ class MacroPhysicalParticleSystem(PhysicalParticleSystem, MacroParticleSystem):
                 - 3-array: particle (x, y, z) linear velocity in the world frame
                 - 3-array: particle (ax, ay, az) angular velocity in the world frame
         """
+        assert idx <= cls.n_particles, \
+            f"Got invalid idx for getting particle velocity! N particles: {cls.n_particles}, got idx: {idx}"
         lin_vel, ang_vel = cls.get_particles_velocities()
         return (lin_vel[idx], ang_vel[idx]) if cls.n_particles > 0 else lin_vel, ang_vel
 
@@ -1114,6 +1116,8 @@ class MacroPhysicalParticleSystem(PhysicalParticleSystem, MacroParticleSystem):
 
     @classmethod
     def set_particle_velocities(cls, idx, lin_vel=None, ang_vel=None):
+        assert idx <= cls.n_particles, \
+            f"Got invalid idx for setting particle velocity! N particles: {cls.n_particles}, got idx: {idx}"
         if lin_vel is None or ang_vel is None:
             l_vel, a_vel = cls.get_particles_velocities()
             lin_vel = l_vel if lin_vel is None else lin_vel
