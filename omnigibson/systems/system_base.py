@@ -49,6 +49,8 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
     def __init_subclass__(cls, **kwargs):
         # While class names are camel case, we convert them to snake case to be consistent with object categories.
         cls._snake_case_name = camel_case_to_snake_case(cls.__name__)
+        cls.min_scale = np.ones(3)
+        cls.max_scale = np.ones(3)
 
         # Run super init
         super().__init_subclass__(**kwargs)
@@ -117,10 +119,6 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
         """
         assert not cls.initialized, f"Already initialized system {cls.name}!"
         og.sim.stage.DefinePrim(cls.prim_path, "Scope")
-
-        # Set the default scales if not already set
-        cls.min_scale = np.ones(3) if cls.min_scale is None else cls.min_scale
-        cls.max_scale = np.ones(3) if cls.max_scale is None else cls.max_scale
 
         cls.initialized = True
 
@@ -195,20 +193,37 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
         cls.remove_all_particles()
 
     @classmethod
-    def create(cls, name, **kwargs):
+    def create(cls, name, min_scale=None, max_scale=None, **kwargs):
         """
         Helper function to programmatically generate systems
 
         Args:
             name (str): Name of the visual particles, in snake case.
+            min_scale (None or 3-array): If specified, sets the minumum bound for particles' relative scale.
+                Else, defaults to 1
+            max_scale (None or 3-array): If specified, sets the maximum bound for particles' relative scale.
+                Else, defaults to 1
             **kwargs (any): keyword-mapped parameters to override / set in the child class, where the keys represent
                 the class attribute to modify and the values represent the functions / value to set
                 (Note: These values should have either @classproperty or @classmethod decorators!)
 
-
         Returns:
             BaseSystem: Generated system class given input arguments
         """
+        @classmethod
+        def cm_initialize(cls):
+            # Potentially override the min / max scales
+            if min_scale is not None:
+                cls.min_scale = np.array(min_scale)
+            if max_scale is not None:
+                cls.max_scale = np.array(max_scale)
+
+            # Run super (we have to use a bit esoteric syntax in order to accommodate this procedural method for
+            # using super calls -- cf. https://stackoverflow.com/questions/22403897/what-does-it-mean-by-the-super-object-returned-is-unbound-in-python
+            super(cls).__get__(cls).initialize()
+
+        kwargs["initialize"] = cm_initialize
+
         # Create and return the class
         return subclass_factory(name=snake_case_to_camel_case(name), base_classes=cls, **kwargs)
 

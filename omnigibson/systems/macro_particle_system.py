@@ -827,29 +827,16 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
             return scale_relative_to_parent
 
         @classmethod
-        def cm_initialize(cls):
-            # Potentially override the min / max scales
-            if min_scale is not None:
-                cls.min_scale = np.array(min_scale)
-            if max_scale is not None:
-                cls.max_scale = np.array(max_scale)
-
-            # Run super (we have to use a bit esoteric syntax in order to accommodate this procedural method for
-            # using super calls -- cf. https://stackoverflow.com/questions/22403897/what-does-it-mean-by-the-super-object-returned-is-unbound-in-python
-            super(cls).__get__(cls).initialize()
-
-        @classmethod
         def cm_create_particle_template(cls):
             return create_particle_template(prim_path=f"{cls.prim_path}/template", name=f"{cls.name}_template")
 
         # Add to any other params specified
         kwargs["_register_system"] = cp_register_system
         kwargs["scale_relative_to_parent"] = cp_scale_relative_to_parent
-        kwargs["initialize"] = cm_initialize
         kwargs["_create_particle_template"] = cm_create_particle_template
 
         # Run super
-        return super().create(name=name, **kwargs)
+        return super().create(name=name, min_scale=min_scale, max_scale=max_scale, **kwargs)
 
     @classmethod
     def _dump_state(cls):
@@ -1200,7 +1187,7 @@ class MacroPhysicalParticleSystem(PhysicalParticleSystem, MacroParticleSystem):
         cls.set_particles_velocities(lin_vels=velocities, ang_vels=angular_velocities)
 
     @classmethod
-    def create(cls, name, create_particle_template, particle_density, scale, **kwargs):
+    def create(cls, name, create_particle_template, particle_density, scale=None, **kwargs):
         """
         Utility function to programmatically generate monolithic visual particle system classes.
 
@@ -1242,28 +1229,16 @@ class MacroPhysicalParticleSystem(PhysicalParticleSystem, MacroParticleSystem):
             return particle_density
 
         @classmethod
-        def cm_initialize(cls):
-            # Potentially override the min / max scales
-            if scale is not None:
-                cls.min_scale = np.array(scale)
-                cls.max_scale = np.array(scale)
-
-            # Run super (we have to use a bit esoteric syntax in order to accommodate this procedural method for
-            # using super calls -- cf. https://stackoverflow.com/questions/22403897/what-does-it-mean-by-the-super-object-returned-is-unbound-in-python
-            super(cls).__get__(cls).initialize()
-
-        @classmethod
         def cm_create_particle_template(cls):
             return create_particle_template(prim_path=f"{cls.prim_path}/template", name=f"{cls.name}_template")
 
         # Add to any other params specified
         kwargs["_register_system"] = cp_register_system
         kwargs["particle_density"] = cp_particle_density
-        kwargs["initialize"] = cm_initialize
         kwargs["_create_particle_template"] = cm_create_particle_template
 
         # Run super
-        return super().create(name=name, **kwargs)
+        return super().create(name=name, min_scale=scale, max_scale=scale, **kwargs)
 
     @classmethod
     def _sync_particles(cls, n_particles):

@@ -1180,6 +1180,8 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         cls,
         name,
         particle_density,
+        min_scale=None,
+        max_scale=None,
         **kwargs,
     ):
         """
@@ -1188,6 +1190,10 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         Args:
             name (str): Name of the system, in snake case.
             particle_density (float): Particle density for the generated system
+            min_scale (None or 3-array): If specified, sets the minumum bound for particles' relative scale.
+                Else, defaults to 1
+            max_scale (None or 3-array): If specified, sets the maximum bound for particles' relative scale.
+                Else, defaults to 1
             **kwargs (any): keyword-mapped parameters to override / set in the child class, where the keys represent
                 the class attribute to modify and the values represent the functions / value to set
                 (Note: These values should have either @classproperty or @classmethod decorators!)
@@ -1211,7 +1217,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         kwargs["particle_density"] = cp_particle_density
 
         # Run super
-        return super().create(name=name, **kwargs)
+        return super().create(name=name, min_scale=min_scale, max_scale=max_scale, **kwargs)
 
 
 class FluidSystem(MicroPhysicalParticleSystem):
@@ -1442,6 +1448,7 @@ class GranularSystem(MicroPhysicalParticleSystem):
         name,
         particle_density,
         create_particle_template,
+        scale=None,
         **kwargs,
     ):
         """
@@ -1462,6 +1469,9 @@ class GranularSystem(MicroPhysicalParticleSystem):
                 where @prim_path and @name are the parameters to assign to the generated EntityPrim.
                 NOTE: The loaded particle template is expected to be a non-articulated, single-link object with a single
                     visual mesh attached to its root link, since this will be the actual visual mesh used
+            scale (None or 3-array): If specified, sets the scaling factor for the particles' relative scale.
+                Else, defaults to 1
+
             **kwargs (any): keyword-mapped parameters to override / set in the child class, where the keys represent
                 the class attribute to modify and the values represent the functions / value to set
                 (Note: These values should have either @classproperty or @classmethod decorators!)
@@ -1481,6 +1491,8 @@ class GranularSystem(MicroPhysicalParticleSystem):
         return super().create(
             name=name,
             particle_density=particle_density,
+            min_scale=scale,
+            max_scale=scale,
             **kwargs,
         )
 
