@@ -776,6 +776,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
 
             for particle_idn, link_name in zip(info["particle_idns"], info["link_names"]):
                 # Create the necessary particles
+                # Use scale (1,1,1) since it will get overridden anyways when loading state
                 particle = cls.add_particle(prim_path=f"{obj.prim_path}/{link_name}", scale=np.ones(3), idn=int(particle_idn))
                 cls._group_particles[name][particle.name] = particle
                 cls._particles_info[particle.name] = dict(obj=obj, link=obj.links[link_name])
