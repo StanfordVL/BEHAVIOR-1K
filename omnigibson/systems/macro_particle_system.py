@@ -571,6 +571,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
     def get_particle_position_orientation(cls, idx):
         name = list(cls.particles.keys())[idx]
         # First, get local pose, scale it by the parent link's scale, and then convert into a matrix
+        # Note that particles_local_mat already takes the parent scale into account when computing the transform!
         parent_link = cls._particles_info[name]["link"]
         local_mat = cls._particles_local_mat[name]
         link_tf = T.pose2mat(parent_link.get_position_orientation())
