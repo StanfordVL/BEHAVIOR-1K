@@ -141,8 +141,8 @@ class MacroParticleSystem(BaseSystem):
     @classproperty
     def state_size(cls):
         # In additon to super, we have:
-        # scale (3*n), and template pose (7), and template scale (3)
-        return super().state_size + 3 * cls.n_particles + 10
+        # scale (3*n), and template pose (7), template scale (3), and particle counter (1)
+        return super().state_size + 3 * cls.n_particles + 11
 
     @classmethod
     def _dump_state(cls):
@@ -151,6 +151,7 @@ class MacroParticleSystem(BaseSystem):
         state["scales"] = np.array([particle.scale for particle in cls.particles.values()])
         state["template_pose"] = np.concatenate(cls._particle_object.get_local_pose())
         state["template_scale"] = cls._particle_object.scale
+        state["particle_counter"] = cls._particle_counter
 
         return state
 
@@ -166,6 +167,7 @@ class MacroParticleSystem(BaseSystem):
         # Load template pose and scale
         cls._particle_object.set_local_pose(state["template_pose"][:3], state["template_pose"][3:])
         cls._particle_object.scale = state["template_scale"]
+        cls._particle_counter = state["particle_counter"]
 
     @classmethod
     def _serialize(cls, state):
@@ -178,6 +180,7 @@ class MacroParticleSystem(BaseSystem):
             state["scales"].flatten(),
             state["template_pose"],
             state["template_scale"],
+            [state["particle_counter"]],
         ], dtype=float)
 
     @classmethod
@@ -192,8 +195,9 @@ class MacroParticleSystem(BaseSystem):
         template_info = state[idx+len_scales:idx+len_scales+10]
         state_dict["template_pose"] = template_info[:7]
         state_dict["template_scale"] = template_info[7:]
+        state_dict["particle_counter"] = int(state[idx+len_scales+10])
 
-        return state_dict, idx + len_scales + 10
+        return state_dict, idx + len_scales + 11
 
     @classmethod
     def set_particle_template_object(cls, obj):
