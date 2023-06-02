@@ -480,7 +480,8 @@ class VisualParticleSystem(BaseSystem):
     def scale_relative_to_parent(cls):
         """
         Returns:
-            bool: Whether or not particles should be scaled relative to the group's parent object
+            bool: Whether or not particles should be scaled relative to the group's parent object. NOTE: If True,
+                this will OVERRIDE cls.min_scale and cls.max_scale when sampling particles!
         """
         return False
 
