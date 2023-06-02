@@ -1014,44 +1014,35 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
         return f"{cls.name}Instancer{idn}"
 
     @classmethod
-    def get_particles_position_orientation(cls, local=False):
+    def get_particles_position_orientation(cls):
         return cls.default_particle_instancer.particle_positions, cls.default_particle_instancer.particle_orientations
 
     @classmethod
-    def get_particle_position_orientation(cls, idx, local=False):
-        pos, ori = cls.get_particles_position_orientation(local=local)
+    def get_particles_local_pose(cls):
+        return cls.get_particles_position_orientation()
+
+    @classmethod
+    def get_particle_position_orientation(cls, idx):
+        pos, ori = cls.get_particles_position_orientation()
         return pos[idx], ori[idx]
 
     @classmethod
-    def set_particles_position_orientation(cls, positions=None, orientations=None, local=False):
-        """
-        Sets all particles' positions and orientations that belong to this system
+    def get_particle_local_pose(cls, idx):
+        return cls.get_particle_position_orientation(idx=idx)
 
-        Note: This is more optimized than doing a for loop with self.set_particle_position_orientation()
-
-        Args:
-            positions (n-array): (n, 3) per-particle (x,y,z) position
-            orientations (n-array): (n, 4) per-particle (x,y,z,w) quaternion orientation
-            local (bool): Whether to set pose in the particle's local frame or not
-        """
+    @classmethod
+    def set_particles_position_orientation(cls, positions=None, orientations=None):
         if positions is not None:
             cls.default_particle_instancer.particle_positions = positions
         if orientations is not None:
             cls.default_particle_instancer.particle_orientations = orientations
 
     @classmethod
-    def set_particle_position_orientation(cls, idx, position=None, orientation=None, local=False):
-        """
-        Sets particle's position and orientation. If not @local, this automatically takes into account the relative
-        pose w.r.t. its parent link and the global pose of that parent link.
+    def set_particles_local_pose(cls, positions=None, orientations=None):
+        cls.set_particles_position_orientation(positions=positions, orientations=orientations)
 
-        Args:
-            idx (int): Index of the particle to set position and orientation for. Note: this is
-                equivalent to setting the corresponding idx'th entry from @set_particles_position_orientation()
-            position (3-array): particle (x,y,z) position
-            orientation (4-array): particle (x,y,z,w) quaternion orientation
-            local (bool): Whether to set pose in the particle's local frame or not
-        """
+    @classmethod
+    def set_particle_position_orientation(cls, idx, position=None, orientation=None):
         if position is not None:
             positions = cls.default_particle_instancer.particle_positions
             positions[idx] = position
@@ -1060,6 +1051,10 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
             orientations = cls.default_particle_instancer.particle_orientations
             orientations[idx] = orientation
             cls.default_particle_instancer.particle_orientations = orientations
+
+    @classmethod
+    def set_particle_local_pose(cls, idx, position=None, orientation=None):
+        cls.set_particle_position_orientation(idx=idx, position=position, orientation=orientation)
 
     @classmethod
     def _sync_particle_instancers(cls, idns, particle_groups, particle_counts):

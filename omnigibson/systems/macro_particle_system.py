@@ -466,7 +466,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
             cls._particles_info[particle.name] = dict(obj=cls._group_objects[group], link=link)
 
             # Set the pose
-            cls.set_particle_position_orientation(idx=-1, position=position, orientation=orientation, local=False)
+            cls.set_particle_position_orientation(idx=-1, position=position, orientation=orientation)
 
     @classmethod
     def generate_group_particles_on_object(cls, group, max_samples, min_samples_for_success=1):

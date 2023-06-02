@@ -62,7 +62,7 @@ class ContactParticles(RelativeObjectState, KinematicsMixin):
         upper = upper + (system.particle_radius + 0.01)
 
         # Iterate over all particles and aggregate contacts
-        positions = system.get_particles_position_orientation(local=False)[0]
+        positions = system.get_particles_position_orientation()[0]
         # Only check positions that are within the relaxed AABB of this object
         inbound_idxs = ((lower < positions) & (positions < upper)).all(axis=-1).nonzero()[0]
         dist = system.particle_contact_radius + m.CONTACT_TOLERANCE
