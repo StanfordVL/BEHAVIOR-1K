@@ -240,6 +240,19 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
             cls.max_scale = np.array(maximum)
 
     @classmethod
+    def sample_scales(cls, n):
+        """
+        Samples scales uniformly based on @cls.min_scale and @cls.max_scale
+
+        Args:
+            n (int): Number of scales to sample
+
+        Returns:
+            (n, 3) array: Array of sampled scales
+        """
+        return np.random.uniform(cls.min_scale, cls.max_scale, (n, 3))
+
+    @classmethod
     def get_particles_position_orientation(cls):
         """
         Computes all particles' positions and orientations that belong to this system in the world frame
@@ -432,6 +445,9 @@ class VisualParticleSystem(BaseSystem):
     # Maps group name to the parent object (the object with particles attached to it) of the group
     _group_objects = None
 
+    # Maps group name to tuple (min_scale, max_scale) to apply to sampled particles for that group
+    _group_scales = None
+
     @classmethod
     def initialize(cls):
         # Run super method first
@@ -440,6 +456,7 @@ class VisualParticleSystem(BaseSystem):
         # Initialize mutable class variables so they don't automatically get overridden by children classes
         cls._group_particles = dict()
         cls._group_objects = dict()
+        cls._group_scales = dict()
 
     @classproperty
     def particle_object(cls):
@@ -488,6 +505,7 @@ class VisualParticleSystem(BaseSystem):
         # Clear all groups as well
         cls._group_particles = dict()
         cls._group_objects = dict()
+        cls._group_scales = dict()
 
     @classmethod
     def remove_particle_by_name(cls, name):
@@ -566,6 +584,9 @@ class VisualParticleSystem(BaseSystem):
         cls._group_particles[group] = dict()
         cls._group_objects[group] = obj
 
+        # Compute the group scale
+        cls._group_scales[group] = cls._compute_relative_group_scales(group=group)
+
         return group
 
     @classmethod
@@ -590,54 +611,51 @@ class VisualParticleSystem(BaseSystem):
         # Remove the actual groups
         cls._group_particles.pop(group)
         cls._group_objects.pop(group)
+        cls._group_scales.pop(group)
 
         return group
 
     @classmethod
-    def update_particle_scaling(cls, group):
+    def _compute_relative_group_scales(cls, group):
         """
-        Update particle scaling for group @group before generating group particles. Default is a no-op
-        (i.e.: returns the current cls.min_scale, cls.max_scale)
+        Computes relative particle scaling for group @group required when @cls.scale_relative_to_parent is True
 
         Args:
-            group (str): Specific group for which to modify the particle scaling
+            group (str): Specific group for which to compute the relative particle scaling
 
         Returns:
             2-tuple:
-                - 3-array: min scaling factor to set
-                - 3-array: max scaling factor to set
+                - 3-array: min scaling factor
+                - 3-array: max scaling factor
         """
-        if cls.scale_relative_to_parent:
-            # First set the bbox ranges -- depends on the object's bounding box
-            obj = cls._group_objects[group]
-            median_aabb_dim = np.median(obj.aabb_extent)
+        # First set the bbox ranges -- depends on the object's bounding box
+        obj = cls._group_objects[group]
+        median_aabb_dim = np.median(obj.aabb_extent)
 
-            # Compute lower and upper limits to bbox
-            bbox_lower_limit_from_aabb = m.BBOX_LOWER_LIMIT_FRACTION_OF_AABB * median_aabb_dim
-            bbox_lower_limit = np.clip(
-                bbox_lower_limit_from_aabb,
-                m.BBOX_LOWER_LIMIT_MIN,
-                m.BBOX_LOWER_LIMIT_MAX,
-            )
+        # Compute lower and upper limits to bbox
+        bbox_lower_limit_from_aabb = m.BBOX_LOWER_LIMIT_FRACTION_OF_AABB * median_aabb_dim
+        bbox_lower_limit = np.clip(
+            bbox_lower_limit_from_aabb,
+            m.BBOX_LOWER_LIMIT_MIN,
+            m.BBOX_LOWER_LIMIT_MAX,
+        )
 
-            bbox_upper_limit_from_aabb = m.BBOX_UPPER_LIMIT_FRACTION_OF_AABB * median_aabb_dim
-            bbox_upper_limit = np.clip(
-                bbox_upper_limit_from_aabb,
-                m.BBOX_UPPER_LIMIT_MIN,
-                m.BBOX_UPPER_LIMIT_MAX,
-            )
+        bbox_upper_limit_from_aabb = m.BBOX_UPPER_LIMIT_FRACTION_OF_AABB * median_aabb_dim
+        bbox_upper_limit = np.clip(
+            bbox_upper_limit_from_aabb,
+            m.BBOX_UPPER_LIMIT_MIN,
+            m.BBOX_UPPER_LIMIT_MAX,
+        )
 
-            # Convert these into scaling factors for the x and y axes for our particle object
-            particle_bbox = cls.particle_object.aabb_extent
-            minimum = np.array([bbox_lower_limit / particle_bbox[0], bbox_lower_limit / particle_bbox[1], 1.0])
-            maximum = np.array([bbox_upper_limit / particle_bbox[0], bbox_upper_limit / particle_bbox[1], 1.0])
-        else:
-            minimum, maximum = cls.min_scale, cls.max_scale
+        # Convert these into scaling factors for the x and y axes for our particle object
+        particle_bbox = cls.particle_object.aabb_extent
+        minimum = np.array([bbox_lower_limit / particle_bbox[0], bbox_lower_limit / particle_bbox[1], 1.0])
+        maximum = np.array([bbox_upper_limit / particle_bbox[0], bbox_upper_limit / particle_bbox[1], 1.0])
 
         return minimum, maximum
 
     @classmethod
-    def sample_scales(cls, group, n):
+    def sample_scales_by_group(cls, group, n):
         """
         Samples @n particle scales for group @group.
 
@@ -651,17 +669,16 @@ class VisualParticleSystem(BaseSystem):
         # Make sure the group exists
         cls._validate_group(group=group)
 
-        # Update scaling and grab object
-        cls.set_scale_limits(*cls.update_particle_scaling(group=group))
-        obj = cls._group_objects[group]
+        # Sample based on whether we're scaling relative to parent or not
+        scales = np.random.uniform(*cls._group_scales[group], (n, 3)) if cls.scale_relative_to_parent else cls.sample_scales(n=n)
 
-        # Sample scales of the particles to generate
         # Since the particles will be placed under the object, it will be affected/stretched by obj.scale. In order to
         # preserve the absolute size of the particles, we need to scale the particle by obj.scale in some way. However,
         # since the particles have a relative rotation w.r.t the object, the scale between the two don't align. As a
         # heuristics, we divide it by the avg_scale, which is the cubic root of the product of the scales along 3 axes.
+        obj = cls._group_objects[group]
         avg_scale = np.cbrt(np.product(obj.scale))
-        return np.random.uniform(cls.min_scale, cls.max_scale, (n, 3)) / avg_scale
+        return scales / avg_scale
 
     @classmethod
     def generate_particles(

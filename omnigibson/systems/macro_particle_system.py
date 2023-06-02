@@ -213,7 +213,7 @@ class MacroParticleSystem(BaseSystem):
         cls._particle_object = obj
 
     @classmethod
-    def add_particle(cls, prim_path, idn=None, scale=None):
+    def add_particle(cls, prim_path, idn=None):
         """
         Adds a particle to this system.
 
@@ -221,8 +221,6 @@ class MacroParticleSystem(BaseSystem):
             prim_path (str): Absolute path to the newly created particle, minus the name for this particle
             idn (None or int): If specified, should be unique identifier to assign to this particle. If not, will
                 automatically generate a new unique one
-            scale (None or 3-array): Relative (x,y,z) scale of the particle, if any. If not specified, will
-                automatically be sampled based on cls.min_scale and cls.max_scale
 
         Returns:
             XFormPrim: Newly created particle instance, which is added internally as well
@@ -233,8 +231,7 @@ class MacroParticleSystem(BaseSystem):
         assert name not in cls.particles.keys(), f"Cannot create particle with name {name} because it already exists!"
         new_particle = cls._load_new_particle(prim_path=f"{prim_path}/{name}", name=name)
 
-        # Sample the scale and also make sure the particle is visible
-        new_particle.scale *= np.random.uniform(cls.min_scale, cls.max_scale) if scale is None else scale
+        # Make sure the particle is visible
         new_particle.visible = True
 
         # Track this particle as well
@@ -276,14 +273,15 @@ class MacroParticleSystem(BaseSystem):
         # Update the tensors
         n_particles = len(positions)
         orientations = R.random(num=n_particles).as_quat() if orientations is None else orientations
-        scales = [None] * n_particles if scales is None else scales
+        scales = cls.sample_scales(n=n_particles) if scales is None else scales
 
         positions = np.concatenate([current_positions, positions], axis=0)
         orientations = np.concatenate([current_orientations, orientations], axis=0)
 
         # Add particles
         for scale in scales:
-            cls.add_particle(prim_path=f"{cls.prim_path}/particles", scale=scale)
+            particle = cls.add_particle(prim_path=f"{cls.prim_path}/particles")
+            particle.scale = scale
 
         # Set the tfs
         cls.set_particles_position_orientation(positions=positions, orientations=orientations)
@@ -422,9 +420,6 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         # Make sure the group exists
         cls._validate_group(group=group)
 
-        # Update scaling
-        cls.set_scale_limits(*cls.update_particle_scaling(group=group))
-
         # Standardize orientations and links
         obj = cls._group_objects[group]
         n_particles = positions.shape[0]
@@ -433,8 +428,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
             orientations[:, -1] = 1.0
         link_prim_paths = [obj.root_link.prim_path] * n_particles if link_prim_paths is None else link_prim_paths
 
-        if scales is None:
-            scales = cls.sample_scales(group=group, n=n_particles)
+        scales = cls.sample_scales_by_group(group=group, n=n_particles) if scales is None else scales
         bbox_extents_local = [(cls._particle_object.aabb_extent * scale).tolist() for scale in scales]
 
         # If we're using flatcache, we need to update the object's pose on the USD manually
@@ -456,17 +450,15 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                 position -= normal * base_to_center
 
             # Create particle
-            particle = cls.add_particle(
-                prim_path=link_prim_path,
-                scale=scale,
-            )
+            particle = cls.add_particle(prim_path=link_prim_path)
 
             # Add to group
             cls._group_particles[group][particle.name] = particle
             cls._particles_info[particle.name] = dict(obj=cls._group_objects[group], link=link)
 
-            # Set the pose
+            # Set the pose and scale
             cls.set_particle_position_orientation(idx=-1, position=position, orientation=orientation)
+            particle.scale = scale
 
     @classmethod
     def generate_group_particles_on_object(cls, group, max_samples, min_samples_for_success=1):
@@ -482,7 +474,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         obj = cls._group_objects[group]
 
         # Sample scales and corresponding bbox extents
-        scales = cls.sample_scales(group=group, n=max_samples)
+        scales = cls.sample_scales_by_group(group=group, n=max_samples)
         # For sampling particle positions, we need the global bbox extents, NOT the local extents
         # which is what we would get naively if we directly use @scales
         avg_scale = np.cbrt(np.product(obj.scale))
@@ -782,10 +774,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
 
             for particle_idn, link_name in zip(info["particle_idns"], info["link_names"]):
                 # Create the necessary particles
-                particle = cls.add_particle(
-                    prim_path=f"{obj.prim_path}/{link_name}",
-                    idn=int(particle_idn),
-                )
+                particle = cls.add_particle(prim_path=f"{obj.prim_path}/{link_name}", idn=int(particle_idn))
                 cls._group_particles[name][particle.name] = particle
                 cls._particles_info[particle.name] = dict(obj=obj, link=obj.links[link_name])
 
@@ -1033,9 +1022,9 @@ class MacroPhysicalParticleSystem(PhysicalParticleSystem, MacroParticleSystem):
         cls._refresh_particles_view()
 
     @classmethod
-    def add_particle(cls, prim_path, idn=None, scale=None):
+    def add_particle(cls, prim_path, idn=None):
         # Run super first
-        super().add_particle(prim_path=prim_path, idn=idn, scale=scale)
+        super().add_particle(prim_path=prim_path, idn=idn)
 
         # Refresh particles view
         cls._refresh_particles_view()
