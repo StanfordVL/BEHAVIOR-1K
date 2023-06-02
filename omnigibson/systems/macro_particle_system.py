@@ -2,7 +2,7 @@ import os
 import matplotlib.pyplot as plt
 import omni
 from omni.isaac.core.utils.prims import get_prim_at_path
-from pxr import UsdPhysics, PhysxSchema
+from pxr import UsdPhysics
 import trimesh
 
 import omnigibson as og
@@ -971,7 +971,6 @@ class MacroPhysicalParticleSystem(PhysicalParticleSystem, MacroParticleSystem):
             # Apply RigidBodyAPI to it so it is subject to physics
             prim = get_prim_at_path(prim_path)
             UsdPhysics.RigidBodyAPI.Apply(prim)
-            # PhysxSchema.PhysxRigidBodyAPI.Apply(prim)
         return CollisionVisualGeomPrim(prim_path=prim_path, name=name)
 
     @classmethod
