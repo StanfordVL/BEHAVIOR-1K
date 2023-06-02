@@ -1331,7 +1331,6 @@ MacroPhysicalParticleSystem.create(
     particle_density=800.0,
     create_particle_template=lambda prim_path, name: og.objects.DatasetObject(
         prim_path=prim_path,
-        # usd_path=os.path.join(gm.ASSET_PATH, "models", "stain", "stain.usd"),
         name=name,
         # class_id=SemanticClass.DIRT,
         visible=False,
@@ -1343,22 +1342,3 @@ MacroPhysicalParticleSystem.create(
     ),
     scale=np.ones(3) * 5.0,
 )
-
-
-# GrassSystem = VisualParticleSystem.create(
-#     name="Grass",
-#     create_particle_template=lambda prim_path, name: og.objects.DatasetObject(
-#         prim_path=prim_path,
-#         name=name,
-#         category="grass_patch",
-#         model="kqhokv",
-#         class_id=SemanticClass.GRASS,
-#         visible=False,
-#         fixed_base=False,
-#         visual_only=True,
-#         include_default_states=False,
-#     ),
-#     # Also need to override how we sample particles, since grass should only point upwards and placed on "top"
-#     # parts of surfaces!
-#     _SAMPLING_AXIS_PROBABILITIES=(0, 0, 1.0),
-# )
