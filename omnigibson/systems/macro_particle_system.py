@@ -535,9 +535,9 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
             return (np.array([]).reshape(0, 3), np.array([]).reshape(0, 4))
 
         if local:
-            global_poses = np.zeros((n_particles, 4, 4))
+            poses = np.zeros((n_particles, 4, 4))
             for i, name in enumerate(particles):
-                global_poses[i] = T.pose2mat(cls.particles[name].get_local_pose())
+                poses[i] = T.pose2mat(cls.particles[name].get_local_pose())
         else:
             # Iterate over all particles and compute link tfs programmatically, then batch the matrix transform
             link_tfs = dict()
@@ -551,10 +551,10 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                 particle_local_poses_batch[i] = cls._particles_local_mat[name]
 
             # Compute once
-            global_poses = np.matmul(link_tfs_batch, particle_local_poses_batch)
+            poses = np.matmul(link_tfs_batch, particle_local_poses_batch)
 
         # Decompose back into positions and orientations
-        return global_poses[:, :3, 3], T.mat2quat(global_poses[:, :3, :3])
+        return poses[:, :3, 3], T.mat2quat(poses[:, :3, :3])
 
     @classmethod
     def get_particles_position_orientation(cls):
