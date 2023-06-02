@@ -57,7 +57,7 @@ class MacroParticleSystem(BaseSystem):
         og.sim.import_object(obj=particle_template, register=False)
         particle_template.kinematic_only = True
 
-        # Make sure the scale of the object is exactly 1.0
+        # Make sure template scaling is [1, 1, 1] -- any particle scaling should be done via cls.min/max_scale
         assert np.all(particle_template.scale == 1.0)
 
         # Make sure there is no ambiguity about which mesh to use as the particle from this template
