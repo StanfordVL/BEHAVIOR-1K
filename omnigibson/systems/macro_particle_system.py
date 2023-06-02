@@ -975,10 +975,6 @@ class MacroPhysicalParticleSystem(PhysicalParticleSystem, MacroParticleSystem):
         # Run super method
         super().set_particle_template_object(obj=obj)
 
-        # Make sure min and max scale are identical
-        assert np.all(cls.min_scale == cls.max_scale), \
-            "Min and max scale should be identical for MacroPhysicalParticleSystem!"
-
         # Compute particle radius
         vertices = np.array(cls._particle_object.get_attribute("points")) * cls.max_scale.reshape(1, 3)
         cls._particle_offset, cls._particle_radius = trimesh.nsphere.minimum_nsphere(trimesh.Trimesh(vertices=vertices))

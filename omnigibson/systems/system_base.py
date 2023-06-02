@@ -812,6 +812,15 @@ class PhysicalParticleSystem(BaseSystem):
     """
     System whose generated particles are subject to physics
     """
+    @classmethod
+    def initialize(cls):
+        # Run super first
+        super().initialize()
+
+        # Make sure min and max scale are identical
+        assert np.all(cls.min_scale == cls.max_scale), \
+            "Min and max scale should be identical for PhysicalParticleSystem!"
+
     @classproperty
     def particle_density(cls):
         """
