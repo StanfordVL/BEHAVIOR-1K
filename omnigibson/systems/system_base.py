@@ -226,7 +226,8 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
     @classmethod
     def set_scale_limits(cls, minimum=None, maximum=None):
         """
-        Set the min and / or max scaling limits that will be uniformly sampled from when generating new particles
+        Set the min and / or max scaling limits that will be uniformly sampled from when generating new particles.
+        Note: These scales dictate the scale set for particles in their parents' frame, NOT the global frame!
 
         Args:
             minimum (None or 3-array): If specified, should be (x,y,z) minimum scaling factor to apply to generated
