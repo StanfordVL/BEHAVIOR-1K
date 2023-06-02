@@ -221,23 +221,6 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
         return {system.name: system for system in SYSTEM_REGISTRY.objects if issubclass(system, cls)}
 
     @classmethod
-    def set_scale_limits(cls, minimum=None, maximum=None):
-        """
-        Set the min and / or max scaling limits that will be uniformly sampled from when generating new particles.
-        Note: These scales dictate the scale set for particles in their parents' frame, NOT the global frame!
-
-        Args:
-            minimum (None or 3-array): If specified, should be (x,y,z) minimum scaling factor to apply to generated
-                particles
-            maximum (None or 3-array): If specified, should be (x,y,z) maximum scaling factor to apply to generated
-                particles
-        """
-        if minimum is not None:
-            cls.min_scale = np.array(minimum)
-        if maximum is not None:
-            cls.max_scale = np.array(maximum)
-
-    @classmethod
     def sample_scales(cls, n):
         """
         Samples scales uniformly based on @cls.min_scale and @cls.max_scale
@@ -387,7 +370,8 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
                                                         f"particles state! Current number: {cls.n_particles}, " \
                                                         f"loaded number: {state['n_particles']}"
         # Load scale
-        cls.set_scale_limits(minimum=state["min_scale"], maximum=state["max_scale"])
+        cls.min_scale = state["min_scale"]
+        cls.max_scale = state["max_scale"]
 
         # Load the poses
         setter = cls.set_particles_local_pose if cls._store_local_poses else cls.set_particles_position_orientation
