@@ -853,7 +853,7 @@ class MicroPhysicalParticleSystem(MicroParticleSystem, PhysicalParticleSystem):
             orientations=orientations,
             velocities=velocities,
             angular_velocities=None,
-            scales=np.random.uniform(cls.min_scale, cls.max_scale, size=(n_particles, 3)) if scales is None else scales,
+            scales=cls.sample_scales(n=n_particles) if scales is None else scales,
             prototype_prim_paths=[pp.prim_path for pp in cls.particle_prototypes],
             prototype_indices=prototype_indices,
             enabled=not cls.visual_only,
