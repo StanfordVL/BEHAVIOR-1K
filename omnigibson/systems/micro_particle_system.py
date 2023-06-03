@@ -1424,10 +1424,11 @@ class GranularSystem(MicroPhysicalParticleSystem):
 
         # Wrap it with VisualGeomPrim with the correct scale
         prototype = VisualGeomPrim(prim_path=prototype_path, name=prototype_path)
+        prototype.scale = cls.max_scale
         prototype.visible = False
 
         # Store the contact offset based on a minimum sphere
-        vertices = np.array(prototype.get_attribute("points")) * cls.max_scale
+        vertices = np.array(prototype.get_attribute("points")) * prototype.scale
         _, cls._particle_contact_offset = trimesh.nsphere.minimum_nsphere(trimesh.Trimesh(vertices=vertices))
 
         return [prototype]
@@ -1537,8 +1538,8 @@ GranularSystem.create(
         visual_only=True,
         include_default_states=False,
         abilities={},
-        scale=0.05,
     ),
+    scale=np.ones(3) * 0.3,
 )
 
 GranularSystem.create(
