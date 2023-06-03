@@ -417,10 +417,17 @@ class MicroParticleSystem(BaseSystem):
     def initialize(cls):
         # Run super first
         super().initialize()
+
+        # Run sanity checks
         if not gm.USE_GPU_DYNAMICS:
             raise ValueError(f"Failed to initialize {cls.name} system. Please set gm.USE_GPU_DYNAMICS to be True.")
-        cls.system_prim = cls._create_particle_system()
 
+        # Make sure flatcache is not being used OR isosurface is enabled -- otherwise, raise an error, since
+        # non-isosurface particles don't get rendered properly when flatcache is enabled
+        assert cls.use_isosurface or not gm.ENABLE_FLATCACHE, \
+            f"Cannot use flatcache with MicroParticleSystem {cls.name} when no isosurface is used!"
+
+        cls.system_prim = cls._create_particle_system()
         # Create material
         cls._material = cls._create_particle_material_template()
         # Load the material
