@@ -1171,7 +1171,7 @@ class BlenderRule(MixingRule):
 
 class MixingToolRule(MixingRule):
     """
-    Transition mixing rule that leverages "mixing_tool" ability objects, which require touching between a mixing tool
+    Transition mixing rule that leverages "mixingTool" ability objects, which require touching between a mixing tool
     and a container in order to trigger the recipe event
     """
     @classmethod
@@ -1191,14 +1191,14 @@ class MixingToolRule(MixingRule):
     def candidate_filters(cls):
         # Add mixing tool filter as well
         candidate_filters = super().candidate_filters
-        candidate_filters["mixing_tool"] = AbilityFilter(ability="mixing_tool")
+        candidate_filters["mixingTool"] = AbilityFilter(ability="mixingTool")
         return candidate_filters
 
     @classmethod
     def _generate_conditions(cls):
         # Mixing tool must be touching the container, and should only be triggered once
         return [ChangeConditionWrapper(
-            condition=TouchingAnyCondition(filter_1_name="container", filter_2_name="mixing_tool")
+            condition=TouchingAnyCondition(filter_1_name="container", filter_2_name="mixingTool")
         )]
 
     @classproperty
