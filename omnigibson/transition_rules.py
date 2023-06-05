@@ -1356,6 +1356,248 @@ class MixingToolRule(RecipeRule):
     def ignore_nonrecipe_objects(cls):
         return True
 
+    @classproperty
+    def use_garbage_fallback_recipe(cls):
+        return True
+
+
+class CookingRule(RecipeRule):
+    """
+    Transition mixing rule that approximates cooking recipes via a container and heatsource
+    """
+    # Counter that increments monotonically
+    cls.COUNTER = 0
+
+    # Maps recipe name to current number of consecutive heating steps
+    cls._HEAT_STEPS = None
+
+    # Maps recipe name to the last timestep that it was active
+    cls._LAST_HEAT_TIMESTEP = None
+
+    @classmethod
+    def refresh(cls):
+        # Run super first
+        super().refresh()
+
+        # Iterate through all (updated) active recipes and store in internal variables if not already recorded
+        cls._HEAT_STEPS = dict() if cls._HEAT_STEPS is None else cls._HEAT_STEPS
+        cls._LAST_HEAT_TIMESTEP = dict() if cls._LAST_HEAT_TIMESTEP is None else cls._LAST_HEAT_TIMESTEP
+
+        for name in cls._RECIPES.keys():
+            if name not in cls._HEAT_STEPS:
+                cls._HEAT_STEPS[name] = 0
+                cls._LAST_HEAT_TIMESTEP[name] = -1
+
+    @classmethod
+    def _validate_recipe_fillables_exist(cls, recipe):
+        """
+        Validates that recipe @recipe's necessary fillable categorie(s) exist in the current scene
+
+        Args:
+            recipe (dict): Recipe whose fillable categories should be checked
+
+        Returns:
+            bool: True if there is at least a single valid fillable category in the current scene, else False
+        """
+        fillable_categories = recipe["fillable_categories"]
+        if fillable_categories is None:
+            # Any is valid
+            return True
+        # Otherwise, at least one valid type must exist
+        for category in fillable_categories:
+            if len(og.sim.scene.object_registry("category", category, default_val=set())) > 0:
+                return True
+
+        # None found, return False
+        return False
+
+    @classmethod
+    def _validate_recipe_heatsources_exist(cls, recipe):
+        """
+        Validates that recipe @recipe's necessary heatsource categorie(s) exist in the current scene
+
+        Args:
+            recipe (dict): Recipe whose heatsource categories should be checked
+
+        Returns:
+            bool: True if there is at least a single valid heatsource category in the current scene, else False
+        """
+        heatsource_categories = recipe["heatsource_categories"]
+        if heatsource_categories is None:
+            # Any is valid
+            return True
+        # Otherwise, at least one valid type must exist
+        for category in heatsource_categories:
+            if len(og.sim.scene.object_registry("category", category, default_val=set())) > 0:
+                return True
+
+        # None found, return False
+        return False
+
+    @classmethod
+    def _validate_recipe_container_is_valid(cls, recipe, container):
+        """
+        Validates that @container's category satisfies @recipe's fillable_categories
+
+        Args:
+            recipe (dict): Recipe whose fillable_categories should be checked against @container
+            container (StatefulObject): Container whose category should match one of @recipe's fillable_categories,
+                if specified
+
+        Returns:
+            bool: True if @container is valid, else False
+        """
+        fillable_categories = recipe["fillable_categories"]
+        return fillable_categories is None or container.category in fillable_categories
+
+    @classmethod
+    def _validate_recipe_heatsource_is_valid(cls, recipe, heatsource_categories):
+        """
+        Validates that there is a valid heatsource category in @heatsource_categories compatible with @recipe
+
+        Args:
+            recipe (dict): Recipe whose heatsource_categories should be checked against @heatsource_categories
+            heatsource_categories (set of str): Set of potential heatsource categories
+
+        Returns:
+            bool: True if there is a compatible category in @heatsource_categories, else False
+        """
+        required_heatsource_categories = recipe["heatsource_categories"]
+        # Either no specific required and there is at least 1 heatsource or there is at least 1 matching heatsource
+        # between the required and available
+        return (required_heatsource_categories is None and len(heatsource_categories) > 0) or \
+               len(required_heatsource_categories.intersection(heatsource_categories)) > 0
+
+    @classmethod
+    def _compute_container_info(cls, object_candidates, container, global_info):
+        # Run super first
+        info = super()._compute_container_info(object_candidates=object_candidates, container=container, global_info=global_info)
+
+        # Compute whether each heatsource is affecting the container
+        info["heatsource_categories"] = set(obj.category for obj in object_candidates["heatSource"] if
+                                                        obj.states[HeatSourceOrSink].affects_obj(container))
+
+        return info
+
+    @classmethod
+    def _is_recipe_active(cls, recipe):
+        # Check for fillable and heatsource categories first
+        if not cls._validate_recipe_fillables_exist(recipe=recipe):
+            return False
+
+        if not cls._validate_recipe_heatsources_exist(recipe=recipe):
+            return False
+
+        # Otherwise, run super normally
+        return super()._is_recipe_active(recipe=recipe)
+
+    @classmethod
+    def _is_recipe_executable(cls, recipe, container, global_info, container_info):
+        # Check for container and heatsource compatibility first
+        if not cls._validate_recipe_container_is_valid(recipe=recipe, container=container):
+            return False
+
+        if not cls._validate_recipe_heatsource_is_valid(recipe=recipe, heatsource_categories=container_info["heatsource_categories"]):
+            return False
+
+        # Run super
+        executable = super()._is_recipe_executable(
+            recipe=recipe,
+            container=container,
+            global_info=global_info,
+            container_info=container_info,
+        )
+
+        # If executable, increment heat counter by 1, if we were also active last timestep, else, reset to 1
+        if executable:
+            name = recipe["name"]
+            cls._HEAT_STEPS[name] = cls._HEAT_STEPS[name] + 1 if \
+                cls._LAST_HEAT_TIMESTEP[name] == cls.COUNTER - 1 else 1
+            cls._LAST_HEAT_TIMESTEP[name] = cls.COUNTER
+
+            # If valid number of timesteps met, recipe is indeed executable
+            executable = cls._HEAT_STEPS[name] >= recipe["n_heat_steps"]
+
+        return executable
+
+    @classmethod
+    def add_recipe(
+            cls,
+            name,
+            input_objects=None,
+            input_systems=None,
+            output_objects=None,
+            output_systems=None,
+            fillable_categories=None,
+            heatsource_categories=None,
+            n_heat_steps=1,
+            **kwargs,
+    ):
+        """
+        Adds a recipe to this cooking recipe rule to check against. This defines a valid mapping of inputs that
+        will transform into the outputs
+
+        Args:
+            name (str): Name of the recipe
+            input_objects (None or dict): Maps object category to number of instances required for the recipe, or None
+                if no objects required
+            input_systems (None or list of str): Required system names for the recipe, or None if no systems required
+            output_objects (None or dict): Maps object category to number of instances to be spawned in the container
+                when the recipe executes, or None if no objects are to be spawned
+            output_systems (None or list of str): Output system name(s) that will replace all contained objects
+                if the recipe is executed, or None if no system is to be spawned
+            fillable_categories (None or list of str): If specified, list of fillable categories which are allowed
+                for this recipe. If None, any fillable is allowed
+            heatsource_categories (None or list of str): If specified, list of heatsource categories which are allowed
+                for this recipe. If None, any heatsource is allowed
+            n_heat_steps (int): Number of subsequent heating steps required for the recipe to execute. Default is 1
+                step, i.e.: instantaneous execution
+
+            kwargs (dict): Any additional keyword-arguments to be stored as part of this recipe
+        """
+        # Call super first
+        super().add_recipe(
+            name=name,
+            input_objects=input_objects,
+            input_systems=input_systems,
+            output_objects=output_objects,
+            output_systems=output_systems,
+            **kwargs,
+        )
+
+        # Add additional kwargs
+        cls._RECIPES[name]["fillable_categories"] = None if fillable_categories is None else set(fillable_categories)
+        cls._RECIPES[name]["heatsource_categories"] = None if heatsource_categories is None else set(heatsource_categories)
+        cls._RECIPES[name]["n_heat_steps"] = n_heat_steps
+
+    @classproperty
+    def candidate_filters(cls):
+        # Add mixing tool filter as well
+        candidate_filters = super().candidate_filters
+        candidate_filters["heatSource"] = AbilityFilter(ability="heatSource")
+        return candidate_filters
+
+    @classmethod
+    def _generate_conditions(cls):
+        # Define a class to increment this class's internal time counter every time it is triggered
+        class TimeIncrementCondition(RuleCondition):
+            def __init__(self, cls):
+                self.cls = cls
+
+            def __call__(self, object_candidates):
+                # This is just a pass-through, but also increment the time
+                self.cls.COUNTER += 1
+                return True
+
+            def modifies_filter_names(self):
+                return set()
+
+        # Any heatsource must be active
+        return [
+            TimeIncrementCondition(cls=cls),
+            StateCondition(filter_name="heatSource", state=HeatSourceOrSink, val=True, op=operator.eq),
+        ]
+
 
 # Create strawberry smoothie blender rule
 BlenderRule.add_recipe(
