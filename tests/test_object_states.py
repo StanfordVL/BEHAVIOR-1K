@@ -892,6 +892,33 @@ def test_draped():
     with pytest.raises(NotImplementedError):
         carpet.states[Draped].set_value(breakfast_table, False)
 
+@og_test
+def test_covered():
+    breakfast_table = og.sim.scene.object_registry("name", "breakfast_table")
+
+    breakfast_table.set_position([0., 0., 0.53])
+
+    for _ in range(5):
+        og.sim.step()
+
+    systems = (
+        get_system("water"),
+        get_system("stain"),
+        get_system("raspberry"),
+    )
+    for system in systems:
+        assert breakfast_table.states[Covered].set_value(system, True)
+
+        for _ in range(5):
+            og.sim.step()
+
+        assert breakfast_table.states[Covered].get_value(system)
+        breakfast_table.states[Covered].set_value(system, False)
+
+        for _ in range(5):
+            og.sim.step()
+        assert not breakfast_table.states[Covered].get_value(system)
+
 
 def test_clear_sim():
     og.sim.clear()
