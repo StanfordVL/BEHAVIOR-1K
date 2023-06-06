@@ -1235,7 +1235,8 @@ class RecipeRule(BaseTransitionRule):
             container_aabb = container.states[ContainedParticles].link.aabb_extent
             obj_aabb = obj.aabb_extent
             state = Inside if np.all(container_aabb > obj_aabb) else OnTop
-            obj.states[state].set_value(container, True)
+            # TODO: What to do if setter fails?
+            assert obj.states[state].set_value(container, True)
 
         # Spawn in new objects
         for category, n_instances in recipe["output_objects"].items():
