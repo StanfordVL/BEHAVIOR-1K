@@ -1372,13 +1372,13 @@ class CookingRule(RecipeRule):
     Transition mixing rule that approximates cooking recipes via a container and heatsource
     """
     # Counter that increments monotonically
-    cls.COUNTER = 0
+    COUNTER = 0
 
     # Maps recipe name to current number of consecutive heating steps
-    cls._HEAT_STEPS = None
+    _HEAT_STEPS = None
 
     # Maps recipe name to the last timestep that it was active
-    cls._LAST_HEAT_TIMESTEP = None
+    _LAST_HEAT_TIMESTEP = None
 
     @classmethod
     def refresh(cls):
