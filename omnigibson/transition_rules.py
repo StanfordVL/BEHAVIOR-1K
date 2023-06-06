@@ -9,6 +9,7 @@ from omnigibson.macros import gm, create_module_macros
 from omnigibson.systems import get_system, is_system_active, PhysicalParticleSystem, VisualParticleSystem, REGISTERED_SYSTEMS
 from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.object_states import *
+from omnigibson.utils.asset_utils import get_all_object_category_models
 from omnigibson.utils.python_utils import Registerable, classproperty, subclass_factory
 from omnigibson.utils.registry_utils import Registry
 import omnigibson.utils.transform_utils as T
@@ -32,7 +33,9 @@ m.DEFAULT_GARBAGE_SYSTEM = "sludge"
 
 # Tuple of attributes of objects created in transitions.
 # `states` field is dict mapping object state class to arguments to pass to setter for that class
-_attrs_fields = ["category", "model", "name", "scale", "obj", "pos", "orn", "bb_pos", "bb_orn", "states"]
+_attrs_fields = ["category", "model", "name", "scale", "obj", "pos", "orn", "bb_pos", "bb_orn", "states", "callback"]
+# States: dict: mapping state nameargs to pass to the state setter for @obj in order to set the object state
+# callback: function: signature callback(obj) -> None to execute after states are set, if any
 ObjectAttrs = namedtuple(
     "ObjectAttrs", _attrs_fields, defaults=(None,) * len(_attrs_fields))
 
@@ -51,9 +54,10 @@ class TransitionRuleAPI:
     # Set of active rules
     ACTIVE_RULES = set()
 
-    # Maps BaseObject instances to dictionary mapping object states to arguments to set for that state when the
-    # object is initialized
-    _INIT_STATES = dict()
+    # Maps BaseObject instances to dictionary with the following keys:
+    # "states": None or dict mapping object states to arguments to set for that state when the object is initialized
+    # "callback": None or function to execute when the object is initialized
+    _INIT_INFO = dict()
 
     @classmethod
     def get_rule_candidates(cls, rule, objects):
@@ -127,10 +131,13 @@ class TransitionRuleAPI:
         Steps all active transition rules, checking if any are satisfied, and if so, executing their transition
         """
         # First apply any transition object init states from before, and then clear the dictionary
-        for obj, states_info in cls._INIT_STATES.items():
-            for state, args in states_info.items():
-                obj.states[state].set_value(*args)
-        cls._INIT_STATES = dict()
+        for obj, info in cls._INIT_INFO.items():
+            if info["states"] is not None:
+                for state, args in info["states"].items():
+                    obj.states[state].set_value(*args)
+            if info["callback"] is not None:
+                info["callback"](obj)
+        cls._INIT_INFO = dict()
 
         # Iterate over all active rules and process the rule for every valid object candidate combination
         # Cast to list before iterating since ACTIVE_RULES may get updated mid-iteration
@@ -175,8 +182,9 @@ class TransitionRuleAPI:
             else:
                 raise ValueError("Expected at least one of pos, orn, bb_pos, or bb_orn to be specified in ObjectAttrs!")
             # Additionally record any requested states if specified to be updated during the next transition step
-            if added_obj_attr.states is not None:
-                cls._INIT_STATES[new_obj] = added_obj_attr.states
+            if added_obj_attr.states is not None or added_obj_attr.callback is not None:
+                cls._INIT_INFO[new_obj]["states"] = added_obj_attr.states
+                cls._INIT_INFO[new_obj]["callback"] = added_obj_attr.callback
 
     @classmethod
     def clear(cls):
@@ -187,7 +195,7 @@ class TransitionRuleAPI:
 
         # Clear internal dictionaries
         cls.ACTIVE_RULES = set()
-        cls._INIT_STATES = dict()
+        cls._INIT_INFO = dict()
 
 
 class ObjectCandidateFilter(metaclass=ABCMeta):
@@ -846,14 +854,11 @@ class MeltingRule(BaseTransitionRule):
         return t_results
 
 
-class MixingRule(BaseTransitionRule):
+class RecipeRule(BaseTransitionRule):
     """
-    Transition rule to apply to mixing objects together
+    Transition rule to approximate recipe-based transitions
     """
     # Maps recipe name to recipe information
-    # NOTE: By defining this class variable directly here, all subclasses SHARE this same dictionary!
-    # This is intentional because there may be multiple valid mixing methods,
-    # and all of them should share the same global recipe pool
     _RECIPES = None
 
     # Maps active recipe name to recipe information
@@ -873,22 +878,36 @@ class MixingRule(BaseTransitionRule):
         cls._RECIPES = dict()
 
     @classmethod
-    def add_recipe(cls, name, input_objects, input_systems, output_system):
+    def add_recipe(cls, name, input_objects=None, input_systems=None, output_objects=None, output_systems=None, **kwargs):
         """
-        Adds a recipe to this mixing rule to check against. This defines a valid mapping of inputs that will transform
+        Adds a recipe to this recipe rule to check against. This defines a valid mapping of inputs that will transform
         into the outputs
 
         Args:
             name (str): Name of the recipe
-            input_objects (dict): Maps object category to number of instances required for the recipe
-            input_systems (list of str): Required system names for the recipe
-            output_system (str): Output system name that will replace all contained objects if the recipe is executed
+            input_objects (None or dict): Maps object category to number of instances required for the recipe, or None
+                if no objects required
+            input_systems (None or list of str): Required system names for the recipe, or None if no systems required
+            output_objects (None or dict): Maps object category to number of instances to be spawned in the container
+                when the recipe executes, or None if no objects are to be spawned
+            output_systems (None or list of str): Output system name(s) that will replace all contained objects
+                if the recipe is executed, or None if no system is to be spawned
+
+            kwargs (dict): Any additional keyword-arguments to be stored as part of this recipe
         """
+        # For now, assert only one of output_objects or output_systems is not None
+        # TODO: How to handle both?
+        assert output_objects is None or output_systems is None, \
+            "Recipe can only generate output objects or output systems, but not both!"
+
         # Store information for this recipe
         cls._RECIPES[name] = {
-            "input_objects": input_objects,
-            "input_systems": input_systems,
-            "output_system": output_system,
+            "name": name,
+            "input_objects": dict() if input_objects is None else input_objects,
+            "input_systems": [] if input_systems is None else input_systems,
+            "output_objects": dict() if output_objects is None else output_objects,
+            "output_systems": [] if output_systems is None else output_systems,
+            **kwargs,
         }
 
     @classmethod
@@ -992,6 +1011,106 @@ class MixingRule(BaseTransitionRule):
         return True
 
     @classmethod
+    def _is_recipe_active(cls, recipe):
+        """
+        Helper function to determine whether a given recipe @recipe should be actively checked for or not.
+
+        Args:
+            recipe (dict): Maps relevant keyword to corresponding recipe info
+
+        Returns:
+            bool: True if the recipe is active, else False
+        """
+        # Check valid active systems
+        if not cls._validate_recipe_systems_exist(recipe=recipe):
+            return False
+
+        # Check valid object quantities
+        if not cls._validate_recipe_objects_exist(recipe=recipe):
+            return False
+
+        return True
+
+    @classmethod
+    def _is_recipe_executable(cls, recipe, container, global_info, container_info):
+        """
+        Helper function to determine whether a given recipe @recipe should be immediately executed or not.
+
+        Args:
+            recipe (dict): Maps relevant keyword to corresponding recipe info
+            container (StatefulObject): Container in which @recipe may be executed
+            global_info (dict): Output of @cls._compute_global_rule_info(); global information which may be
+                relevant for computing whether recipe is executable
+            container_info (dict): Output of @cls._compute_container_info(); container-specific information
+                which may be relevant for computing whether recipe is executable
+
+        Returns:
+            bool: True if the recipe is active, else False
+        """
+        in_volume = container_info["in_volume"]
+
+        # Verify all required systems are contained in the container
+        if not cls._validate_recipe_systems_are_contained(recipe=recipe, container=container):
+            return False
+
+        # Verify all required object quantities are contained in the container
+        if not cls._validate_recipe_objects_are_contained(recipe=recipe, in_volume=in_volume):
+            return False
+
+        # Verify no non-relevant system is contained
+        if not cls._validate_nonrecipe_systems_not_contained(recipe=recipe, container=container):
+            return False
+
+        # Verify no non-relevant object is contained if we're not ignoring them
+        if not cls.ignore_nonrecipe_objects and not cls._validate_nonrecipe_objects_not_contained(recipe=recipe, in_volume=in_volume):
+            return False
+
+        return True
+
+    @classmethod
+    def _compute_global_rule_info(cls, object_candidates):
+        """
+        Helper function to compute global information necessary for checking rules. This is executed exactly
+        once per cls.transition() step
+
+        Args:
+            object_candidates (dict): Dictionary mapping corresponding keys from @cls.filters to list of individual
+                object instances where the filter is satisfied
+
+        Returns:
+            dict: Keyword-mapped global rule information
+        """
+        # Compute all relevant object AABB positions
+        obj_positions = np.array([obj.aabb_center for obj in cls._OBJECTS])
+
+        return dict(obj_positions=obj_positions)
+
+    @classmethod
+    def _compute_container_info(cls, object_candidates, container, global_info):
+        """
+        Helper function to compute container-specific information necessary for checking rules. This is executed once
+        per container per cls.transition() step
+
+        Args:
+            object_candidates (dict): Dictionary mapping corresponding keys from @cls.filters to list of individual
+                object instances where the filter is satisfied
+            container (StatefulObject): Relevant container object for computing information
+            global_info (dict): Output of @cls._compute_global_rule_info(); global information which may be
+                relevant for computing container information
+
+        Returns:
+            dict: Keyword-mapped container information
+        """
+        obj_positions = global_info["obj_positions"]
+        # Compute in volume for all relevant object positions
+        # We check for either the object AABB being contained OR the object being on top of the container, in the
+        # case that the container is too flat for the volume to contain the object
+        in_volume = container.states[ContainedParticles].check_in_volume(obj_positions) | \
+                    np.array([obj.states[OnTop].get_value(container) for obj in cls._OBJECTS])
+
+        return dict(in_volume=in_volume)
+
+    @classmethod
     def refresh(cls):
         # Cache active recipes given the current set of objects
         cls._ACTIVE_RECIPES = dict()
@@ -1002,16 +1121,9 @@ class MixingRule(BaseTransitionRule):
         objects_by_category = og.sim.scene.object_registry.get_dict("category")
 
         for name, recipe in cls._RECIPES.items():
-            # Check valid active systems
-            if not cls._validate_recipe_systems_exist(recipe=recipe):
-                continue
-
-            # Check valid object quantities
-            if not cls._validate_recipe_objects_exist(recipe=recipe):
-                continue
-
-            # All pre-requisites met, add to active recipes
-            cls._ACTIVE_RECIPES[name] = recipe
+            # If all pre-requisites met, add to active recipes
+            if cls._is_recipe_active(recipe=recipe):
+                cls._ACTIVE_RECIPES[name] = recipe
 
         # Finally, compute relevant objects and category mapping based on relevant categories
         i = 0
@@ -1032,56 +1144,55 @@ class MixingRule(BaseTransitionRule):
     def transition(cls, object_candidates):
         t_results = TransitionResults()
 
-        # Compute all relevant object AABB positions
-        obj_positions = np.array([obj.aabb_center for obj in cls._OBJECTS])
+        # Compute global info
+        global_info = cls._compute_global_rule_info(object_candidates=object_candidates)
 
         # Iterate over all fillable objects, to execute recipes for each one
         for container in object_candidates["container"]:
-            # Compute in volume for all relevant object positions
-            in_volume = container.states[ContainedParticles].check_in_volume(obj_positions)
+            recipe_results = None
+            # Compute container info
+            container_info = cls._compute_container_info(
+                object_candidates=object_candidates,
+                container=container,
+                global_info=global_info,
+            )
 
             # Check every recipe to find if any is valid
             for name, recipe in cls._ACTIVE_RECIPES.items():
-                # Verify all required systems are contained in the container
-                if not cls._validate_recipe_systems_are_contained(recipe=recipe, container=container):
-                    continue
+                if cls._is_recipe_executable(recipe=recipe, container=container, global_info=global_info, container_info=container_info):
+                    # Otherwise, all conditions met, we found a valid recipe and so we execute and terminate early
+                    og.log.info(f"Executing recipe: {name} in container {container.name}!")
 
-                # Verify all required object quantities are contained in the container
-                if not cls._validate_recipe_objects_are_contained(recipe=recipe, in_volume=in_volume):
-                    continue
+                    # Take the transform and terminate early
+                    recipe_results = cls._execute_recipe(
+                        container=container,
+                        recipe=recipe,
+                        in_volume=in_volume,
+                    )
+                    t_results.add += recipe_results.add
+                    t_results.remove += recipe_results.remove
+                    break
 
-                # Verify no non-relevant system is contained
-                if not cls._validate_nonrecipe_systems_not_contained(recipe=recipe, container=container):
-                    continue
+            # Otherwise, if we didn't find a valid recipe, we execute a garbage transition instead if requested
+            if recipe_results is None and cls.use_garbage_fallback_recipe:
+                og.log.info(f"Did not find a valid recipe; generating {m.DEFAULT_GARBAGE_SYSTEM} in {container.name}!")
 
-                # Verify no non-relevant object is contained if we're not ignoring them
-                if not cls.ignore_nonrecipe_objects and not cls._validate_nonrecipe_objects_not_contained(recipe=recipe, in_volume=in_volume):
-                    continue
-
-                # Otherwise, all conditions met, we found a valid recipe and so we execute and terminate early
-                og.log.info(f"Executing recipe: {name} in container {container.name}!")
-
-                # Take the transform
-                t_results.remove += cls._execute_recipe(
+                # Generate garbage fluid
+                garbage_results = cls._execute_recipe(
                     container=container,
-                    recipe=recipe,
+                    recipe=dict(
+                        name="garbage",
+                        input_objects=dict(),
+                        input_systems=[],
+                        output_objects=dict(),
+                        output_systems=[m.DEFAULT_GARBAGE_SYSTEM],
+                    ),
                     in_volume=in_volume,
                 )
+                t_results.add += garbage_results.add
+                t_results.remove += garbage_results.remove
 
-                # Terminate early
-                return t_results
-
-            # Otherwise, if we didn't find a valid recipe, we execute a garbage transition instead
-            og.log.info(f"Did not find a valid recipe; generating {m.DEFAULT_GARBAGE_SYSTEM} in {container.name}!")
-
-            # Generate garbage fluid
-            t_results.remove += cls._execute_recipe(
-                container=container,
-                recipe=dict(input_objects=[], input_systems=[], output_system=m.DEFAULT_GARBAGE_SYSTEM),
-                in_volume=in_volume,
-            )
-
-            return t_results
+        return t_results
 
     @classmethod
     def _execute_recipe(cls, container, recipe, in_volume):
@@ -1092,13 +1203,16 @@ class MixingRule(BaseTransitionRule):
         Args:
             container (BaseObject): Container object which will have its contained elements transformed into
                 @output_system
-            recipe (str): Recipe to execute. Should include "input_objects", "input_systems", and "output_system" keys
+            recipe (dict): Recipe to execute. Should include, at the minimum, "input_objects", "input_systems",
+                "output_objects", and "output_systems" keys
             in_volume (n-array): (n_objects,) boolean array specifying whether every object from og.sim.scene.objects
-                is contained in @container or not. Only necess
+                is contained in @container or not
 
         Returns:
-            list of BaseObject: List of object(s) to remove from the simulator due to this transformation
+            TransitionResults: Results of the executed recipe transition
         """
+        t_results = TransitionResults()
+
         # Compute total volume of all contained items
         volume = 0
 
@@ -1113,11 +1227,37 @@ class MixingRule(BaseTransitionRule):
                 system.remove_all_group_particles(group=group_name)
 
         # Remove either all objects or only the recipe-relevant objects inside the container
-        objs_to_remove = np.concatenate([
+        t_results.remove = np.concatenate([
                 cls._OBJECTS[np.where(in_volume[cls._CATEGORY_IDXS[obj_category]])[0]]
                 for obj_category in recipe["input_objects"].keys()
             ]).tolist() if cls.ignore_nonrecipe_objects else cls._OBJECTS[np.where(in_volume)[0]].tolist()
         volume += sum(obj.volume for obj in objs_to_remove)
+
+        # Define callback for spawning new objects inside container
+        def _spawn_object_in_container(obj):
+            # We will either sample Inside or OnTop, based on the relative AABB extents of the container link
+            # vs. the object link
+            container_aabb = container.states[ContainedParticles].link.aabb_extent
+            obj_aabb = obj.aabb_extent
+            state = Inside if np.all(container_aabb > obj_aabb) else OnTop
+            # TODO: What to do if setter fails?
+            assert obj.states[state].set_value(container, True)
+
+        # Spawn in new objects
+        for category, n_instances in recipe["output_objects"].items():
+            n_category_objs = len(og.sim.scene.object_registry("category", category, []))
+            models = get_all_object_category_models(category=category)
+            for i in range(n_instances):
+                obj = DatasetObject(
+                    name=f"{category}_{n_category_objs + i}",
+                    category=category,
+                    model=np.random.sample(models),
+                )
+                new_obj_attrs = ObjectAttrs(
+                    obj=obj,
+                    callback=_spawn_object_in_container,
+                )
+                t_results.add.append(new_obj_attrs)
 
         # Spawn in new fluid
         out_system = get_system(output_system)
@@ -1129,8 +1269,8 @@ class MixingRule(BaseTransitionRule):
             max_samples=volume // (np.pi * (out_system.particle_radius ** 3) * 4 / 3),
         )
 
-        # Return removed objects
-        return objects_to_remove
+        # Return transition results
+        return t_results
 
     @classproperty
     def ignore_nonrecipe_objects(cls):
@@ -1142,14 +1282,24 @@ class MixingRule(BaseTransitionRule):
         return False
 
     @classproperty
+    def use_garbage_fallback_recipe(cls):
+        """
+        Returns:
+            bool: Whether this recipe rule should use a garbage fallback recipe if all conditions are met but no
+                valid recipe is found for a given container
+        """
+        # False by default
+        return False
+
+    @classproperty
     def _do_not_register_classes(cls):
         # Don't register this class since it's an abstract template
         classes = super()._do_not_register_classes
-        classes.add("MixingRule")
+        classes.add("RecipeRule")
         return classes
 
 
-class BlenderRule(MixingRule):
+class BlenderRule(RecipeRule):
     """
     Transition mixing rule that leverages "blender" ability objects, which require toggledOn in order to trigger
     the recipe event
@@ -1168,42 +1318,291 @@ class BlenderRule(MixingRule):
             condition=StateCondition(filter_name="container", state=ToggledOn, val=True, op=operator.eq)
         )]
 
+    @classproperty
+    def use_garbage_fallback_recipe(cls):
+        return True
 
-class MixingToolRule(MixingRule):
+
+class MixingToolRule(RecipeRule):
     """
-    Transition mixing rule that leverages "mixing_tool" ability objects, which require touching between a mixing tool
+    Transition mixing rule that leverages "mixingTool" ability objects, which require touching between a mixing tool
     and a container in order to trigger the recipe event
     """
     @classmethod
-    def add_recipe(cls, name, input_objects, input_systems, output_system):
+    def add_recipe(cls, name, input_objects=None, input_systems=None, output_objects=None, output_systems=None, **kwargs):
         # We do not allow any input objects to be specified! Assert empty list
-        assert len(input_objects) == 0, f"No input_objects should be specified for {cls.__name__}!"
+        assert input_objects is None or len(input_objects) == 0, \
+            f"No input_objects should be specified for {cls.__name__}!"
 
         # Call super
         super().add_recipe(
             name=name,
             input_objects=input_objects,
             input_systems=input_systems,
-            output_system=output_system,
+            output_objects=output_objects,
+            output_systems=output_systems,
+            **kwargs,
         )
 
     @classproperty
     def candidate_filters(cls):
         # Add mixing tool filter as well
         candidate_filters = super().candidate_filters
-        candidate_filters["mixing_tool"] = AbilityFilter(ability="mixing_tool")
+        candidate_filters["mixingTool"] = AbilityFilter(ability="mixingTool")
         return candidate_filters
 
     @classmethod
     def _generate_conditions(cls):
         # Mixing tool must be touching the container, and should only be triggered once
         return [ChangeConditionWrapper(
-            condition=TouchingAnyCondition(filter_1_name="container", filter_2_name="mixing_tool")
+            condition=TouchingAnyCondition(filter_1_name="container", filter_2_name="mixingTool")
         )]
 
     @classproperty
     def ignore_nonrecipe_objects(cls):
         return True
+
+    @classproperty
+    def use_garbage_fallback_recipe(cls):
+        return True
+
+
+class CookingRule(RecipeRule):
+    """
+    Transition mixing rule that approximates cooking recipes via a container and heatsource
+    """
+    # Counter that increments monotonically
+    COUNTER = 0
+
+    # Maps recipe name to current number of consecutive heating steps
+    _HEAT_STEPS = None
+
+    # Maps recipe name to the last timestep that it was active
+    _LAST_HEAT_TIMESTEP = None
+
+    @classmethod
+    def refresh(cls):
+        # Run super first
+        super().refresh()
+
+        # Iterate through all (updated) active recipes and store in internal variables if not already recorded
+        cls._HEAT_STEPS = dict() if cls._HEAT_STEPS is None else cls._HEAT_STEPS
+        cls._LAST_HEAT_TIMESTEP = dict() if cls._LAST_HEAT_TIMESTEP is None else cls._LAST_HEAT_TIMESTEP
+
+        for name in cls._RECIPES.keys():
+            if name not in cls._HEAT_STEPS:
+                cls._HEAT_STEPS[name] = 0
+                cls._LAST_HEAT_TIMESTEP[name] = -1
+
+    @classmethod
+    def _validate_recipe_fillables_exist(cls, recipe):
+        """
+        Validates that recipe @recipe's necessary fillable categorie(s) exist in the current scene
+
+        Args:
+            recipe (dict): Recipe whose fillable categories should be checked
+
+        Returns:
+            bool: True if there is at least a single valid fillable category in the current scene, else False
+        """
+        fillable_categories = recipe["fillable_categories"]
+        if fillable_categories is None:
+            # Any is valid
+            return True
+        # Otherwise, at least one valid type must exist
+        for category in fillable_categories:
+            if len(og.sim.scene.object_registry("category", category, default_val=set())) > 0:
+                return True
+
+        # None found, return False
+        return False
+
+    @classmethod
+    def _validate_recipe_heatsources_exist(cls, recipe):
+        """
+        Validates that recipe @recipe's necessary heatsource categorie(s) exist in the current scene
+
+        Args:
+            recipe (dict): Recipe whose heatsource categories should be checked
+
+        Returns:
+            bool: True if there is at least a single valid heatsource category in the current scene, else False
+        """
+        heatsource_categories = recipe["heatsource_categories"]
+        if heatsource_categories is None:
+            # Any is valid
+            return True
+        # Otherwise, at least one valid type must exist
+        for category in heatsource_categories:
+            if len(og.sim.scene.object_registry("category", category, default_val=set())) > 0:
+                return True
+
+        # None found, return False
+        return False
+
+    @classmethod
+    def _validate_recipe_container_is_valid(cls, recipe, container):
+        """
+        Validates that @container's category satisfies @recipe's fillable_categories
+
+        Args:
+            recipe (dict): Recipe whose fillable_categories should be checked against @container
+            container (StatefulObject): Container whose category should match one of @recipe's fillable_categories,
+                if specified
+
+        Returns:
+            bool: True if @container is valid, else False
+        """
+        fillable_categories = recipe["fillable_categories"]
+        return fillable_categories is None or container.category in fillable_categories
+
+    @classmethod
+    def _validate_recipe_heatsource_is_valid(cls, recipe, heatsource_categories):
+        """
+        Validates that there is a valid heatsource category in @heatsource_categories compatible with @recipe
+
+        Args:
+            recipe (dict): Recipe whose heatsource_categories should be checked against @heatsource_categories
+            heatsource_categories (set of str): Set of potential heatsource categories
+
+        Returns:
+            bool: True if there is a compatible category in @heatsource_categories, else False
+        """
+        required_heatsource_categories = recipe["heatsource_categories"]
+        # Either no specific required and there is at least 1 heatsource or there is at least 1 matching heatsource
+        # between the required and available
+        return (required_heatsource_categories is None and len(heatsource_categories) > 0) or \
+               len(required_heatsource_categories.intersection(heatsource_categories)) > 0
+
+    @classmethod
+    def _compute_container_info(cls, object_candidates, container, global_info):
+        # Run super first
+        info = super()._compute_container_info(object_candidates=object_candidates, container=container, global_info=global_info)
+
+        # Compute whether each heatsource is affecting the container
+        info["heatsource_categories"] = set(obj.category for obj in object_candidates["heatSource"] if
+                                                        obj.states[HeatSourceOrSink].affects_obj(container))
+
+        return info
+
+    @classmethod
+    def _is_recipe_active(cls, recipe):
+        # Check for fillable and heatsource categories first
+        if not cls._validate_recipe_fillables_exist(recipe=recipe):
+            return False
+
+        if not cls._validate_recipe_heatsources_exist(recipe=recipe):
+            return False
+
+        # Otherwise, run super normally
+        return super()._is_recipe_active(recipe=recipe)
+
+    @classmethod
+    def _is_recipe_executable(cls, recipe, container, global_info, container_info):
+        # Check for container and heatsource compatibility first
+        if not cls._validate_recipe_container_is_valid(recipe=recipe, container=container):
+            return False
+
+        if not cls._validate_recipe_heatsource_is_valid(recipe=recipe, heatsource_categories=container_info["heatsource_categories"]):
+            return False
+
+        # Run super
+        executable = super()._is_recipe_executable(
+            recipe=recipe,
+            container=container,
+            global_info=global_info,
+            container_info=container_info,
+        )
+
+        # If executable, increment heat counter by 1, if we were also active last timestep, else, reset to 1
+        if executable:
+            name = recipe["name"]
+            cls._HEAT_STEPS[name] = cls._HEAT_STEPS[name] + 1 if \
+                cls._LAST_HEAT_TIMESTEP[name] == cls.COUNTER - 1 else 1
+            cls._LAST_HEAT_TIMESTEP[name] = cls.COUNTER
+
+            # If valid number of timesteps met, recipe is indeed executable
+            executable = cls._HEAT_STEPS[name] >= recipe["n_heat_steps"]
+
+        return executable
+
+    @classmethod
+    def add_recipe(
+            cls,
+            name,
+            input_objects=None,
+            input_systems=None,
+            output_objects=None,
+            output_systems=None,
+            fillable_categories=None,
+            heatsource_categories=None,
+            n_heat_steps=1,
+            **kwargs,
+    ):
+        """
+        Adds a recipe to this cooking recipe rule to check against. This defines a valid mapping of inputs that
+        will transform into the outputs
+
+        Args:
+            name (str): Name of the recipe
+            input_objects (None or dict): Maps object category to number of instances required for the recipe, or None
+                if no objects required
+            input_systems (None or list of str): Required system names for the recipe, or None if no systems required
+            output_objects (None or dict): Maps object category to number of instances to be spawned in the container
+                when the recipe executes, or None if no objects are to be spawned
+            output_systems (None or list of str): Output system name(s) that will replace all contained objects
+                if the recipe is executed, or None if no system is to be spawned
+            fillable_categories (None or list of str): If specified, list of fillable categories which are allowed
+                for this recipe. If None, any fillable is allowed
+            heatsource_categories (None or list of str): If specified, list of heatsource categories which are allowed
+                for this recipe. If None, any heatsource is allowed
+            n_heat_steps (int): Number of subsequent heating steps required for the recipe to execute. Default is 1
+                step, i.e.: instantaneous execution
+
+            kwargs (dict): Any additional keyword-arguments to be stored as part of this recipe
+        """
+        # Call super first
+        super().add_recipe(
+            name=name,
+            input_objects=input_objects,
+            input_systems=input_systems,
+            output_objects=output_objects,
+            output_systems=output_systems,
+            **kwargs,
+        )
+
+        # Add additional kwargs
+        cls._RECIPES[name]["fillable_categories"] = None if fillable_categories is None else set(fillable_categories)
+        cls._RECIPES[name]["heatsource_categories"] = None if heatsource_categories is None else set(heatsource_categories)
+        cls._RECIPES[name]["n_heat_steps"] = n_heat_steps
+
+    @classproperty
+    def candidate_filters(cls):
+        # Add mixing tool filter as well
+        candidate_filters = super().candidate_filters
+        candidate_filters["heatSource"] = AbilityFilter(ability="heatSource")
+        return candidate_filters
+
+    @classmethod
+    def _generate_conditions(cls):
+        # Define a class to increment this class's internal time counter every time it is triggered
+        class TimeIncrementCondition(RuleCondition):
+            def __init__(self, cls):
+                self.cls = cls
+
+            def __call__(self, object_candidates):
+                # This is just a pass-through, but also increment the time
+                self.cls.COUNTER += 1
+                return True
+
+            def modifies_filter_names(self):
+                return set()
+
+        # Any heatsource must be active
+        return [
+            TimeIncrementCondition(cls=cls),
+            StateCondition(filter_name="heatSource", state=HeatSourceOrSink, val=True, op=operator.eq),
+        ]
 
 
 # Create strawberry smoothie blender rule

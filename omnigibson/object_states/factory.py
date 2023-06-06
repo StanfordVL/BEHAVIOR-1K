@@ -17,7 +17,7 @@ _ABILITY_TO_STATE_MAPPING = {
     "heatable": [Heated],
     "heatSource": [HeatSourceOrSink],
     "meltable": [],
-    "mixing_tool": [],
+    "mixingTool": [],
     "openable": [Open],
     "flammable": [OnFire],
     "saturable": [Saturated],

@@ -241,6 +241,19 @@ def get_all_object_models():
     return sorted(models)
 
 
+def get_all_object_category_models(category):
+    """
+    Get all object models from @category
+
+    Returns:
+        list of str: all object models belonging to @category
+    """
+    og_dataset_path = gm.DATASET_PATH
+    og_categories_path = os.path.join(og_dataset_path, "objects")
+
+    return os.listdir(os.path.join(og_categories_path, category))
+
+
 def get_og_assets_version():
     """
     Returns:
