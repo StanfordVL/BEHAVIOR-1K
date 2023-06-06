@@ -895,6 +895,11 @@ class RecipeRule(BaseTransitionRule):
 
             kwargs (dict): Any additional keyword-arguments to be stored as part of this recipe
         """
+        # For now, assert only one of output_objects or output_systems is not None
+        # TODO: How to handle both?
+        assert output_objects is None or output_systems is None, \
+            "Recipe can only generate output objects or output systems, but not both!"
+
         # Store information for this recipe
         cls._RECIPES[name] = {
             "name": name,
