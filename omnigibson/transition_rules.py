@@ -1245,7 +1245,7 @@ class RecipeRule(BaseTransitionRule):
                 obj = DatasetObject(
                     name=f"{category}_{n_category_objs + i}",
                     category=category,
-                    model=model,
+                    model=np.random.sample(models),
                 )
                 new_obj_attrs = ObjectAttrs(
                     obj=obj,
