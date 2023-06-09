@@ -43,22 +43,22 @@ class ObjectStateUnaryPredicate(UnaryAtomicFormula):
     STATE_CLASS = None
     STATE_NAME = None
 
-    def _evaluate(self, obj, **kwargs):
-        return obj.states[self.STATE_CLASS].get_value(**kwargs)
+    def _evaluate(self, entity, **kwargs):
+        return entity.get_state(self.STATE_CLASS, **kwargs)
 
-    def _sample(self, obj, binary_state, **kwargs):
-        return obj.states[self.STATE_CLASS].set_value(binary_state, **kwargs)
+    def _sample(self, entity, binary_state, **kwargs):
+        return entity.set_state(self.STATE_CLASS, binary_state, **kwargs)
 
 
 class ObjectStateBinaryPredicate(BinaryAtomicFormula):
     STATE_CLASS = None
     STATE_NAME = None
 
-    def _evaluate(self, obj1, obj2, **kwargs):
-        return obj1.states[self.STATE_CLASS].get_value(obj2, **kwargs)
+    def _evaluate(self, entity1, entity2, **kwargs):
+        return entity1.get_state(self.STATE_CLASS, entity2.wrapped_obj, **kwargs) if entity2.exists() else None
 
-    def _sample(self, obj1, obj2, binary_state, **kwargs):
-        return obj1.states[self.STATE_CLASS].set_value(obj2, binary_state, **kwargs)
+    def _sample(self, entity1, entity2, binary_state, **kwargs):
+        return entity1.set_state(self.STATE_CLASS, entity2.wrapped_obj, binary_state, **kwargs) if entity2.exists() else None
 
 
 def get_unary_predicate_for_state(state_class, state_name):
@@ -143,3 +143,115 @@ if os.path.isfile(non_sampleable_category_txt):
 class OmniGibsonBDDLBackend(BDDLBackend):
     def get_predicate_class(self, predicate_name):
         return SUPPORTED_PREDICATES[predicate_name]
+
+
+class BDDLEntity(Wrapper):
+    """
+    Thin wrapper class that wraps an object or system if it exists, or nothing if it does not exist. Will
+    dynamically reference an object / system as they become real in the sim
+    """
+    def __init__(
+        self,
+        object_scope,
+        entity=None,
+    ):
+        """
+        Args:
+            object_scope (str): BDDL synset instance of the entity, e.g.: "almond.n.01_1"
+            entity (None or DatasetObject or BaseSystem): If specified, the BDDL entity to wrap. If not
+                specified, will initially wrap nothing, but may dynamically reference an actual object or system
+                if it exists in the future
+        """
+        # Store synset and other info, and pass entity internally
+        self.object_scope = object_scope
+        self.synset = "_".join(self.object_scope.split("_")[:-1])
+        self.is_system = self.synset in SUBSTANCE_SYNSET_MAPPING
+
+        # Infer the correct category to assign, special casing agents
+        if entity is not None and isinstance(entity, BaseRobot):
+            self.og_categories = ["agent"]
+        else:
+            self.og_categories = [SUBSTANCE_SYNSET_MAPPING[self.synset]] if self.is_system else \
+                OBJECT_TAXONOMY.get_subtree_igibson_categories(self.synset)
+
+        super().__init__(obj=entity)
+
+    def _find_valid_object(self):
+        """
+        Internal helper function to find the first valid simulator object whose category is one of @self.og_categories,
+        and has not been mapped to a BDDLEntity yet
+
+        Returns:
+            None or DatasetObject: If found, the valid object matching a category from @self.og_categories and not
+                mapped
+        """
+        for category in self.og_categories:
+            for obj in og.sim.scene.object_registry("category", category, default_val=[]):
+                if isinstance(obj, DatasetObject) and obj.bddl_object_scope is None:
+                    # Found valid one, return it
+                    return obj
+
+    def exists(self):
+        """
+        Checks whether the entity referenced by @synset exists. Note: this dynamically mutates self.wrapped_obj, and
+        potentially removes it or adds a reference if the entity no longer / now exists.
+
+        Returns:
+            bool: Whether the entity referenced by @synset exists
+        """
+        if self.wrapped_obj is None:
+            # If system, check to see if active or not and grab it if so
+            if self.is_system and is_system_active(self.og_categories[0]):
+                self.wrapped_obj = get_system(self.og_categories[0])
+            # Otherwise, is object, check to see if any valid one exists and grab it if so
+            else:
+                found_obj = self._find_valid_object()
+                if found_obj is not None:
+                    found_obj.bddl_object_scope = self.object_scope
+                    self.wrapped_obj = found_obj
+        else:
+            # Check to see if entity no longer exists
+            if self.is_system and not is_system_active(self.og_category):
+                self.wrapped_obj = None
+            elif og.sim.scene.object_registry("name", self.wrapped_obj.name) is None:
+                self.wrapped_obj = None
+
+        return self.wrapped_obj is not None
+
+    def get_state(self, state, *args, **kwargs):
+        """
+        Helper function to grab wrapped entity's state @state
+
+        Args:
+            state (BaseObjectState): State whose get_value() should be called
+            *args (tuple): Any arguments to pass to getter, in order
+            **kwargs (dict): Any keyword arguments to pass to getter, in order
+
+        Returns:
+            None or any: Returned value(s) from @state if self.wrapped_obj exists (i.e.: not None), else None
+        """
+        return self.wrapped_obj.states[state].get_value(*args, **kwargs) if self.exists() else None
+
+    def set_state(self, state, *args, **kwargs):
+        """
+        Helper function to set wrapped entity's state @state. Note: Should only be called if the entity exists!
+
+        Args:
+            state (BaseObjectState): State whose set_value() should be called
+            *args (tuple): Any arguments to pass to getter, in order
+            **kwargs (dict): Any keyword arguments to pass to getter, in order
+
+        Returns:
+            any: Returned value(s) from @state if self.wrapped_obj exists (i.e.: not None)
+        """
+        assert self.exists(), \
+            f"Cannot call set_state() for BDDLEntity {self.synset} when the entity does not exist!"
+        return self.wrapped_obj.states[state].set_value(*args, **kwargs)
+
+    def __getattr__(self, attr):
+        # Sanity check to make sure wrapped obj is not None -- if so, raise error
+        assert self.wrapped_obj is not None, f"Cannot access attribute {attr}, since no valid entity currently " \
+                                             f"wrapped for BDDLEntity synset {self.synset}!"
+
+        # Call super
+        return super().__getattr__(attr=attr)
