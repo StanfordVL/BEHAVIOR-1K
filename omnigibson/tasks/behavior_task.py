@@ -13,7 +13,6 @@ from bddl.activity import (
     get_natural_goal_conditions,
     get_object_scope,
 )
-from bddl.object_taxonomy import ObjectTaxonomy
 
 import omnigibson as og
 from omnigibson.macros import gm
@@ -22,18 +21,12 @@ from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.reward_functions.potential_reward import PotentialReward
 from omnigibson.robots.robot_base import BaseRobot
 from omnigibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
-from omnigibson.utils.bddl_utils import OmniGibsonBDDLBackend, process_single_condition
+from omnigibson.utils.bddl_utils import OmniGibsonBDDLBackend, process_single_condition, KINEMATIC_STATES_BDDL, \
+    SUBSTANCE_SYNSET_MAPPING, NON_SAMPLEABLE_SYNSETS, BDDLEntity, OBJECT_TAXONOMY
 from omnigibson.tasks.task_base import BaseTask
 from omnigibson.termination_conditions.predicate_goal import PredicateGoal
 from omnigibson.termination_conditions.timeout import Timeout
 from omnigibson.utils.asset_utils import get_og_avg_category_specs, get_og_model_path, get_object_models_of_category
-from omnigibson.utils.constants import (
-    NON_SAMPLEABLE_OBJECTS,
-    KINEMATICS_STATES,
-    MACRO_PARTICLE_SYNSETS,
-    WATER_SYNSETS,
-    SYSTEM_SYNSETS_TO_SYSTEM_NAMES,
-)
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.python_utils import classproperty, assert_valid_key
 from omnigibson.systems import get_system
@@ -104,7 +97,6 @@ class BehaviorTask(BaseTask):
         self.scene_model = None
 
         # Object info
-        self.object_taxonomy = ObjectTaxonomy()
         self.debug_object_sampling = debug_object_sampling
         self.online_object_sampling = online_object_sampling
         self.highlight_task_relevant_objs = highlight_task_relevant_objects
@@ -118,6 +110,7 @@ class BehaviorTask(BaseTask):
         self.object_sampling_orders = None
         self.sampled_objects = None
         self.sampleable_object_conditions = None
+        self.future_obj_instances = None
 
         # Logic-tracking info
         self.currently_viewed_index = None
@@ -159,10 +152,11 @@ class BehaviorTask(BaseTask):
 
         # Highlight any task relevant objects if requested
         if self.highlight_task_relevant_objs:
-            for obj_name, obj in self.object_scope.items():
-                if isinstance(obj, BaseRobot):
+            for entity in self.object_scope.values():
+                if entity.synset == "agent":
                     continue
-                obj.highlighted = True
+                if not entity.is_system and entity.exists():
+                    entity.highlighted = True
 
     def _load_non_low_dim_observation_space(self):
         # No non-low dim observations so we return an empty dict
@@ -246,6 +240,10 @@ class BehaviorTask(BaseTask):
         accept_scene = True
         feedback = None
 
+        # Compose future objects
+        self.future_obj_instances = \
+            {init_cond.body[1] for init_cond in self.activity_initial_conditions if init_cond.body[0] == "future"}
+
         if self.online_object_sampling:
             # Reject scenes with missing non-sampleable objects
             # Populate object_scope with sampleable objects and the robot
@@ -280,7 +278,7 @@ class BehaviorTask(BaseTask):
             if cond[0] == "inroom":
                 obj_inst, room_type = cond[1], cond[2]
                 obj_cat = self.object_instance_to_category[obj_inst]
-                if obj_cat not in NON_SAMPLEABLE_OBJECTS:
+                if obj_cat not in NON_SAMPLEABLE_SYNSETS:
                     # Invalid room assignment
                     return "You have assigned room type for [{}], but [{}] is sampleable. Only non-sampleable objects can have room assignment.".format(
                         obj_cat, obj_cat
@@ -299,7 +297,7 @@ class BehaviorTask(BaseTask):
                 self.non_sampleable_object_instances.add(obj_inst)
 
         for obj_cat in self.activity_conditions.parsed_objects:
-            if obj_cat not in NON_SAMPLEABLE_OBJECTS:
+            if obj_cat not in NON_SAMPLEABLE_SYNSETS:
                 continue
             for obj_inst in self.activity_conditions.parsed_objects[obj_cat]:
                 if obj_inst not in self.non_sampleable_object_instances:
@@ -334,7 +332,7 @@ class BehaviorTask(BaseTask):
 
         # Macro particles and water don't need initial conditions
         remaining_objs = {obj_inst for obj_inst in remaining_objs
-                          if self.object_instance_to_category[obj_inst] not in MACRO_PARTICLE_SYNSETS.union(WATER_SYNSETS)}
+                          if (self.object_instance_to_category[obj_inst] not in SUBSTANCE_SYNSET_MAPPING and obj_inst not in self.future_obj_instances)}
         if len(remaining_objs) != 0:
             return "Some objects do not have any kinematic condition defined for them in the initial conditions: {}".format(
                 ", ".join(remaining_objs)
@@ -371,9 +369,9 @@ class BehaviorTask(BaseTask):
                 obj_cat = self.object_instance_to_category[obj_inst]
 
                 # We allow burners to be used as if they are stoves
-                categories = self.object_taxonomy.get_subtree_igibson_categories(obj_cat)
+                categories = OBJECT_TAXONOMY.get_subtree_igibson_categories(obj_cat)
                 if obj_cat == "stove.n.01":
-                    categories += self.object_taxonomy.get_subtree_igibson_categories("burner.n.02")
+                    categories += OBJECT_TAXONOMY.get_subtree_igibson_categories("burner.n.02")
 
                 for room_inst in og.sim.scene.seg_map.room_sem_name_to_ins_name[room_type]:
                     # A list of scene objects that satisfy the requested categories
@@ -403,88 +401,90 @@ class BehaviorTask(BaseTask):
         self.sampled_objects = set()
         num_new_obj = 0
         # Only populate self.object_scope for sampleable objects
-        avg_category_spec = get_og_avg_category_specs()
         for obj_cat in self.activity_conditions.parsed_objects:
+            # Don't populate agent
             if obj_cat == "agent.n.01":
                 continue
-            if obj_cat in NON_SAMPLEABLE_OBJECTS:
+            # Don't populate synsets that can't be sampled
+            if obj_cat in NON_SAMPLEABLE_SYNSETS:
                 continue
-            if obj_cat in SYSTEM_SYNSETS_TO_SYSTEM_NAMES:
+
+            # Populate based on whether it's a substance or not
+            if obj_cat in SUBSTANCE_SYNSET_MAPPING:
                 assert len(self.activity_conditions.parsed_objects[obj_cat]) == 1, "Systems are singletons"
                 obj_inst = self.activity_conditions.parsed_objects[obj_cat][0]
-                self.object_scope[obj_inst] = get_system(SYSTEM_SYNSETS_TO_SYSTEM_NAMES[obj_cat])
-                continue
+                self.object_scope[obj_inst] = BDDLEntity(object_scope=obj_inst)
+            else:
+                is_sliceable = OBJECT_TAXONOMY.has_ability(obj_cat, "sliceable")
+                categories = OBJECT_TAXONOMY.get_subtree_igibson_categories(obj_cat)
 
-            is_sliceable = self.object_taxonomy.has_ability(obj_cat, "sliceable")
-            categories = self.object_taxonomy.get_subtree_igibson_categories(obj_cat)
+                # TODO: temporary hack
+                remove_categories = [
+                    "pop_case",  # too large
+                    "jewel",  # too small
+                    "ring",  # too small
+                ]
+                for remove_category in remove_categories:
+                    if remove_category in categories:
+                        categories.remove(remove_category)
 
-            # TODO: temporary hack
-            remove_categories = [
-                "pop_case",  # too large
-                "jewel",  # too small
-                "ring",  # too small
-            ]
-            for remove_category in remove_categories:
-                if remove_category in categories:
-                    categories.remove(remove_category)
+                for obj_inst in self.activity_conditions.parsed_objects[obj_cat]:
+                    # Don't explicitly sample if future
+                    if obj_inst in self.future_obj_instances:
+                        self.object_scope[obj_inst] = BDDLEntity(object_scope=obj_inst)
+                        continue
 
-            for obj_inst in self.activity_conditions.parsed_objects[obj_cat]:
-                category = np.random.choice(categories)
-                # for sliceable objects, only get the whole objects
-                try:
-                    model_choices = get_object_models_of_category(
-                        category, filter_method="sliceable_whole" if is_sliceable else None
+                    category = np.random.choice(categories)
+                    # for sliceable objects, only get the whole objects
+                    try:
+                        model_choices = get_object_models_of_category(
+                            category, filter_method="sliceable_whole" if is_sliceable else None
+                        )
+                    except:
+                        return f"Missing object category: {category}"
+
+                    if len(model_choices) == 0:
+                        # restore back to the play state
+                        return f"Missing valid object models for category: {category}"
+
+                    # TODO: This no longer works because model ID changes in the new asset
+                    # Filter object models if the object category is openable
+                    # synset = OBJECT_TAXONOMY.get_class_name_from_igibson_category(category)
+                    # if OBJECT_TAXONOMY.has_ability(synset, "openable"):
+                    #     # Always use the articulated version of a certain object if its category is openable
+                    #     # E.g. backpack, jar, etc
+                    #     model_choices = [m for m in model_choices if "articulated_" in m]
+                    #     if len(model_choices) == 0:
+                    #         return "{} is Openable, but does not have articulated models.".format(category)
+
+                    # Randomly select an object model
+                    model = np.random.choice(model_choices)
+
+                    # TODO: temporary hack no longer works because model ID changes in the new asset
+                    # for "collecting aluminum cans", we need pop cans (not bottles)
+                    # if category == "pop" and self.activity_name in ["collecting_aluminum_cans"]:
+                    #     model = np.random.choice([str(i) for i in range(40, 46)])
+                    # if category == "spoon" and self.activity_name in ["polishing_silver"]:
+                    #     model = np.random.choice([str(i) for i in [2, 5, 6]])
+
+                    # create the object
+                    simulator_obj = DatasetObject(
+                        name=f"{category}_{len(og.sim.scene.objects)}",
+                        category=category,
+                        model=model,
+                        fit_avg_dim_volume=True,
                     )
-                except:
-                    return f"Missing object category: {category}"
+                    num_new_obj += 1
 
-                if len(model_choices) == 0:
-                    # restore back to the play state
-                    return f"Missing valid object models for category: {category}"
+                    # Load the object into the simulator
+                    assert og.sim.scene.loaded, "Scene is not loaded"
+                    og.sim.import_object(simulator_obj)
 
-                # TODO: This no longer works because model ID changes in the new asset
-                # Filter object models if the object category is openable
-                # synset = self.object_taxonomy.get_class_name_from_igibson_category(category)
-                # if self.object_taxonomy.has_ability(synset, "openable"):
-                #     # Always use the articulated version of a certain object if its category is openable
-                #     # E.g. backpack, jar, etc
-                #     model_choices = [m for m in model_choices if "articulated_" in m]
-                #     if len(model_choices) == 0:
-                #         return "{} is Openable, but does not have articulated models.".format(category)
+                    # Set these objects to be far-away locations
+                    simulator_obj.set_position(np.array([100.0 + num_new_obj - 1, 100.0, -100.0]))
 
-                # Randomly select an object model
-                model = np.random.choice(model_choices)
-
-                # TODO: temporary hack no longer works because model ID changes in the new asset
-                # for "collecting aluminum cans", we need pop cans (not bottles)
-                # if category == "pop" and self.activity_name in ["collecting_aluminum_cans"]:
-                #     model = np.random.choice([str(i) for i in range(40, 46)])
-                # if category == "spoon" and self.activity_name in ["polishing_silver"]:
-                #     model = np.random.choice([str(i) for i in [2, 5, 6]])
-
-                model_path = get_og_model_path(category, model)
-                usd_path = os.path.join(model_path, "usd", f"{model}.usd")
-                obj_name = "{}_{}".format(category, len(og.sim.scene.objects))
-
-                # create the object
-                simulator_obj = DatasetObject(
-                    prim_path=f"/World/{obj_name}",
-                    usd_path=usd_path,
-                    name=obj_name,
-                    category=category,
-                    fit_avg_dim_volume=True,
-                )
-                num_new_obj += 1
-
-                # Load the object into the simulator
-                assert og.sim.scene.loaded, "Scene is not loaded"
-                og.sim.import_object(simulator_obj)
-
-                # Set these objects to be far-away locations
-                simulator_obj.set_position(np.array([100.0 + num_new_obj - 1, 100.0, -100.0]))
-
-                self.sampled_objects.add(simulator_obj)
-                self.object_scope[obj_inst] = simulator_obj
+                    self.sampled_objects.add(simulator_obj)
+                    self.object_scope[obj_inst] = BDDLEntity(object_scope=obj_inst, entity=simulator_obj)
 
     def check_scene(self, env):
         """
@@ -518,7 +518,7 @@ class BehaviorTask(BaseTask):
             log.error(error_msg)
             return False, error_msg
 
-        self.object_scope["agent.n.01_1"] = self.get_agent(env)
+        self.object_scope["agent.n.01_1"] = BDDLEntity(object_scope="agent.n.01_1", entity=self.get_agent(env))
 
         return True, None
 
@@ -544,22 +544,25 @@ class BehaviorTask(BaseTask):
         """
         # Assign object_scope based on a cached scene
         for obj_inst in self.object_scope:
-            matched_sim_obj = None
+            entity = None
             # If the object scope points to the agent
             if obj_inst == "agent.n.01_1":
-                matched_sim_obj = self.get_agent(env)
+                entity = BDDLEntity(object_scope=obj_inst, entity=self.get_agent(env))
+            # If object is a future
+            elif obj_inst in self.future_obj_instances:
+                entity = BDDLEntity(object_scope=obj_inst)
             # If the object scope points to a system
-            elif self.object_instance_to_category[obj_inst] in SYSTEM_SYNSETS_TO_SYSTEM_NAMES:
-                matched_sim_obj = get_system(SYSTEM_SYNSETS_TO_SYSTEM_NAMES[self.object_instance_to_category[obj_inst]])
+            elif self.object_instance_to_category[obj_inst] in SUBSTANCE_SYNSET_MAPPING:
+                entity = BDDLEntity(object_scope=obj_inst)
             else:
                 log.debug(f"checking objects...")
                 for sim_obj in og.sim.scene.objects:
                     log.debug(f"checking bddl obj scope for obj: {sim_obj.name}")
                     if hasattr(sim_obj, "bddl_object_scope") and sim_obj.bddl_object_scope == obj_inst:
-                        matched_sim_obj = sim_obj
+                        entity = BDDLEntity(object_scope=obj_inst, entity=sim_obj)
                         break
-            assert matched_sim_obj is not None, obj_inst
-            self.object_scope[obj_inst] = matched_sim_obj
+            assert entity is not None, f"Could not assign valid BDDLEntity for {obj_inst}!"
+            self.object_scope[obj_inst] = entity
 
     def group_initial_conditions(self):
         """
@@ -588,7 +591,7 @@ class BehaviorTask(BaseTask):
 
             # Sampled conditions must always be positive
             # Non-positive (e.g.: NOT onTop) is not restrictive enough for sampling
-            if condition.STATE_NAME in KINEMATICS_STATES and not positive:
+            if condition.STATE_NAME in KINEMATIC_STATES_BDDL and not positive:
                 return "Initial condition has negative kinematic conditions: {}".format(condition.body)
 
             condition_body = set(condition.body)
@@ -626,14 +629,14 @@ class BehaviorTask(BaseTask):
                     # These are a list of candidate simulator objects that need sampling test
                     for obj in input_object_scope[room_type][scene_obj][room_inst]:
                         # Temporarily set object_scope to point to this candidate object
-                        self.object_scope[scene_obj] = obj
+                        self.object_scope[scene_obj] = BDDLEntity(object_scope=scene_obj, entity=obj)
 
                         success = True
                         # If this candidate object is not involved in any conditions,
                         # success will be True by default and this object will qualify
                         for condition, positive in conditions:
                             # Sample positive kinematic conditions that involve this candidate object
-                            if condition.STATE_NAME in KINEMATICS_STATES and positive and scene_obj in condition.body:
+                            if condition.STATE_NAME in KINEMATIC_STATES_BDDL and positive and scene_obj in condition.body:
                                 # Use pybullet GUI for debugging
                                 if self.debug_object_sampling is not None and self.debug_object_sampling == condition.body[0]:
                                     gm.DEBUG = True
@@ -748,7 +751,7 @@ class BehaviorTask(BaseTask):
                     log.debug(("Object scope finalized:"))
                     for obj_inst, obj in matches.items():
                         if obj_inst in obj_inst_to_obj_per_room_inst:
-                            self.object_scope[obj_inst] = obj
+                            self.object_scope[obj_inst] = BDDLEntity(object_scope=obj_inst, entity=obj)
                             log.debug((obj_inst, obj.name))
                     success = True
                     break
@@ -872,9 +875,9 @@ class BehaviorTask(BaseTask):
                             return "Sampleable object conditions failed: {}".format(condition.body)
 
         # Update all the objects' bddl object scopes
-        for obj_scope, obj in self.object_scope.items():
-            if isinstance(obj, DatasetObject):
-                obj.bddl_object_scope = obj_scope
+        for obj_scope, entity in self.object_scope.items():
+            if entity.exists() and isinstance(entity.wrapped_obj, DatasetObject):
+                entity.bddl_object_scope = obj_scope
 
         # One more sim step to make sure the object states are propagated correctly
         # E.g. after sampling Filled.set_value(True), Filled.get_value() will become True only after one step
@@ -929,19 +932,30 @@ class BehaviorTask(BaseTask):
         low_dim_obs["robot_ori_sin"] = np.sin(env.robots[0].get_rpy())
 
         # Batch rpy calculations for much better efficiency
-        objs_rpy = T.quat2euler(np.array([v.states[Pose].get_value()[1] for v in self.object_scope.values()]))
+        objs_rpy = T.quat2euler(np.array([v.states[Pose].get_value()[1] if v.exists() else np.array([0, 0, 0, 1.0])
+                                          for v in self.object_scope.values()]))
 
         i = 0
         for idx, v in enumerate(self.object_scope.values()):
             # TODO: May need to update checking here to USDObject? Or even baseobject?
-            if isinstance(v, DatasetObject):
-                low_dim_obs[f"obj_{i}_valid"] = np.array([1.0])
-                low_dim_obs[f"obj_{i}_pos"] = v.states[Pose].get_value()[0]
-                low_dim_obs[f"obj_{i}_ori_cos"] = np.cos(objs_rpy[idx])
-                low_dim_obs[f"obj_{i}_ori_sin"] = np.sin(objs_rpy[idx])
-                for arm in env.robots[0].arm_names:
-                    grasping_object = env.robots[0].is_grasping(arm=arm, candidate_obj=v)
-                    low_dim_obs[f"obj_{i}_pos_in_gripper_{arm}"] = np.array([float(grasping_object)])
+            if not v.is_system:
+                if v.exists():
+                    if v.wrapped_obj == env.robots[0]:
+                        continue
+                    low_dim_obs[f"obj_{i}_real"] = np.array([1.0])
+                    low_dim_obs[f"obj_{i}_pos"] = v.states[Pose].get_value()[0]
+                    low_dim_obs[f"obj_{i}_ori_cos"] = np.cos(objs_rpy[idx])
+                    low_dim_obs[f"obj_{i}_ori_sin"] = np.sin(objs_rpy[idx])
+                    for arm in env.robots[0].arm_names:
+                        grasping_object = env.robots[0].is_grasping(arm=arm, candidate_obj=v)
+                        low_dim_obs[f"obj_{i}_in_gripper_{arm}"] = np.array([float(grasping_object)])
+                else:
+                    low_dim_obs[f"obj_{i}_real"] = np.zeros(1)
+                    low_dim_obs[f"obj_{i}_pos"] = np.zeros(3)
+                    low_dim_obs[f"obj_{i}_ori_cos"] = np.zeros(3)
+                    low_dim_obs[f"obj_{i}_ori_sin"] = np.zeros(3)
+                    for arm in env.robots[0].arm_names:
+                        low_dim_obs[f"obj_{i}_in_gripper_{arm}"] = np.zeros(1)
                 i += 1
 
         return low_dim_obs, dict()
