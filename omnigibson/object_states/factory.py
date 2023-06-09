@@ -1,5 +1,6 @@
 import networkx as nx
 
+from omnigibson.object_states.kinematics import KinematicsMixin
 from omnigibson.object_states import *
 
 _ABILITY_TO_STATE_MAPPING = {
@@ -37,6 +38,10 @@ _DEFAULT_STATE_SET = frozenset(
         Under,
         Covered,
     ]
+)
+
+_KINEMATIC_STATE_SET = frozenset(
+    [state for state in REGISTERED_OBJECT_STATES.values() if issubclass(state, KinematicsMixin)]
 )
 
 _FIRE_STATE_SET = frozenset(
