@@ -201,8 +201,9 @@ class BDDLEntity(Wrapper):
         """
         if self.wrapped_obj is None:
             # If system, check to see if active or not and grab it if so
-            if self.is_system and is_system_active(self.og_categories[0]):
-                self.wrapped_obj = get_system(self.og_categories[0])
+            if self.is_system:
+                if is_system_active(self.og_categories[0]):
+                    self.wrapped_obj = get_system(self.og_categories[0])
             # Otherwise, is object, check to see if any valid one exists and grab it if so
             else:
                 found_obj = self._find_valid_object()
@@ -211,10 +212,13 @@ class BDDLEntity(Wrapper):
                     self.wrapped_obj = found_obj
         else:
             # Check to see if entity no longer exists
-            if self.is_system and not is_system_active(self.og_category):
-                self.wrapped_obj = None
-            elif og.sim.scene.object_registry("name", self.wrapped_obj.name) is None:
-                self.wrapped_obj = None
+            if self.is_system:
+                if not is_system_active(self.og_categories[0]):
+                    self.wrapped_obj = None
+            # Otherwise, is object, check to see if there are no valid ones
+            else:
+                if og.sim.scene.object_registry("name", self.wrapped_obj.name) is None:
+                    self.wrapped_obj = None
 
         return self.wrapped_obj is not None
 
