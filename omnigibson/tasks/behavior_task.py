@@ -29,7 +29,6 @@ from omnigibson.termination_conditions.timeout import Timeout
 from omnigibson.utils.asset_utils import get_og_avg_category_specs, get_og_model_path, get_object_models_of_category
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.python_utils import classproperty, assert_valid_key
-from omnigibson.systems import get_system
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
@@ -111,6 +110,7 @@ class BehaviorTask(BaseTask):
         self.sampled_objects = None
         self.sampleable_object_conditions = None
         self.future_obj_instances = None
+        self.agent_obj_idx = None
 
         # Logic-tracking info
         self.currently_viewed_index = None
@@ -257,6 +257,18 @@ class BehaviorTask(BaseTask):
         else:
             # Load existing scene cache and assign object scope accordingly
             self.assign_object_scope_with_cache(env)
+
+        # Store index of agent within object scope
+        agent = self.get_agent(env=env)
+        idx = 0
+        for entity in self.object_scope.values():
+            if not entity.is_system:
+                if entity.wrapped_obj == agent:
+                    self.agent_obj_idx = idx
+                    break
+                else:
+                    idx += 1
+        assert self.agent_obj_idx is not None, "Could not find valid index for agent within object scope!"
 
         # Generate goal condition with the fully populated self.object_scope
         self.activity_goal_conditions = get_goal_conditions(self.activity_conditions, self.backend, self.object_scope)
@@ -927,36 +939,40 @@ class BehaviorTask(BaseTask):
 
     def _get_obs(self, env):
         low_dim_obs = dict()
-        low_dim_obs["robot_pos"] = np.array(env.robots[0].get_position())
-        low_dim_obs["robot_ori_cos"] = np.cos(env.robots[0].get_rpy())
-        low_dim_obs["robot_ori_sin"] = np.sin(env.robots[0].get_rpy())
 
         # Batch rpy calculations for much better efficiency
-        objs_rpy = T.quat2euler(np.array([v.states[Pose].get_value()[1] if v.exists() else np.array([0, 0, 0, 1.0])
-                                          for v in self.object_scope.values()]))
+        objs_exist = {obj: obj.exists() for obj in self.object_scope.values() if not obj.is_system}
+        objs_rpy = T.quat2euler(np.array([obj.states[Pose].get_value()[1] if obj_exist else np.array([0, 0, 0, 1.0])
+                                          for obj, obj_exist in objs_exist.items()]))
 
-        i = 0
-        for idx, v in enumerate(self.object_scope.values()):
+        # Always add agent info first
+        agent = self.get_agent(env=env)
+        low_dim_obs["robot_pos"] = agent.states[Pose].get_value()[1]
+        low_dim_obs["robot_ori_cos"] = np.cos(objs_rpy[self.agent_obj_idx])
+        low_dim_obs["robot_ori_sin"] = np.sin(objs_rpy[self.agent_obj_idx])
+
+        for idx, ((obj, obj_exist), obj_rpy) in enumerate(zip(objs_exist.items(), objs_rpy)):
+            # Skip if agent idx -- note: doesn't increment object!
+            if idx == self.agent_obj_idx:
+                continue
+
             # TODO: May need to update checking here to USDObject? Or even baseobject?
-            if not v.is_system:
-                if v.exists():
-                    if v.wrapped_obj == env.robots[0]:
-                        continue
-                    low_dim_obs[f"obj_{i}_real"] = np.array([1.0])
-                    low_dim_obs[f"obj_{i}_pos"] = v.states[Pose].get_value()[0]
-                    low_dim_obs[f"obj_{i}_ori_cos"] = np.cos(objs_rpy[idx])
-                    low_dim_obs[f"obj_{i}_ori_sin"] = np.sin(objs_rpy[idx])
-                    for arm in env.robots[0].arm_names:
-                        grasping_object = env.robots[0].is_grasping(arm=arm, candidate_obj=v)
-                        low_dim_obs[f"obj_{i}_in_gripper_{arm}"] = np.array([float(grasping_object)])
-                else:
-                    low_dim_obs[f"obj_{i}_real"] = np.zeros(1)
-                    low_dim_obs[f"obj_{i}_pos"] = np.zeros(3)
-                    low_dim_obs[f"obj_{i}_ori_cos"] = np.zeros(3)
-                    low_dim_obs[f"obj_{i}_ori_sin"] = np.zeros(3)
-                    for arm in env.robots[0].arm_names:
-                        low_dim_obs[f"obj_{i}_in_gripper_{arm}"] = np.zeros(1)
-                i += 1
+            # TODO: How to handle systems as part of obs?
+            if obj_exist:
+                low_dim_obs[f"{obj.object_scope}_real"] = np.array([1.0])
+                low_dim_obs[f"{obj.object_scope}_pos"] = obj.states[Pose].get_value()[0]
+                low_dim_obs[f"{obj.object_scope}_ori_cos"] = np.cos(obj_rpy)
+                low_dim_obs[f"{obj.object_scope}_ori_sin"] = np.sin(obj_rpy)
+                for arm in agent.arm_names:
+                    grasping_object = agent.is_grasping(arm=arm, candidate_obj=obj.wrapped_obj)
+                    low_dim_obs[f"{obj.object_scope}_in_gripper_{arm}"] = np.array([float(grasping_object)])
+            else:
+                low_dim_obs[f"{obj.object_scope}_real"] = np.zeros(1)
+                low_dim_obs[f"{obj.object_scope}_pos"] = np.zeros(3)
+                low_dim_obs[f"{obj.object_scope}_ori_cos"] = np.zeros(3)
+                low_dim_obs[f"{obj.object_scope}_ori_sin"] = np.zeros(3)
+                for arm in agent.arm_names:
+                    low_dim_obs[f"{obj.object_scope}_in_gripper_{arm}"] = np.zeros(1)
 
         return low_dim_obs, dict()
 
