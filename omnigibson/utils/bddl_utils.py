@@ -9,6 +9,26 @@ from omnigibson import object_states
 log = create_module_logger(module_name=__name__)
 
 
+class ObjectStateFuturePredicate(UnaryAtomicFormula):
+    STATE_NAME = "future"
+
+    def _evaluate(self, entity, **kwargs):
+        return not entity.exists()
+
+    def _sample(self, entity, **kwargs):
+        raise NotImplementedError()
+
+
+class ObjectStateRealPredicate(UnaryAtomicFormula):
+    STATE_NAME = "real"
+
+    def _evaluate(self, entity, **kwargs):
+        return entity.exists()
+
+    def _sample(self, entity, **kwargs):
+        raise NotImplementedError()
+
+
 class ObjectStateUnaryPredicate(UnaryAtomicFormula):
     STATE_CLASS = None
     STATE_NAME = None
@@ -89,6 +109,8 @@ SUPPORTED_PREDICATES = {
     "open": get_unary_predicate_for_state(object_states.Open, "open"),
     "toggled_on": get_unary_predicate_for_state(object_states.ToggledOn, "toggled_on"),
     "frozen": get_unary_predicate_for_state(object_states.Frozen, "frozen"),
+    "future": ObjectStateFuturePredicate,
+    "real": ObjectStateRealPredicate,
 }
 
 
