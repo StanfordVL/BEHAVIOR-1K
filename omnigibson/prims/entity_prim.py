@@ -319,7 +319,9 @@ class EntityPrim(XFormPrim):
                         # Compute the joint frame orientation in the object frame
                         joint_orn = T.quat_multiply(quaternion1=joint_local_orn, quaternion0=link_local_orn)
 
-                        assert T.check_quat_right_angle(joint_orn), "Objects that are NOT uniformly scaled requires all joints to have orientations that are factors of 90 degrees!"
+                        assert T.check_quat_right_angle(joint_orn), \
+                            f"Objects that are NOT uniformly scaled requires all joints to have orientations that " \
+                            f"are factors of 90 degrees! Got orn: {joint_orn} for object {self.name}"
 
                         # Find the joint axis unit vector (e.g. [1, 0, 0] for "X", [0, 1, 0] for "Y", etc.)
                         axis_in_joint_frame = np.zeros(3)
