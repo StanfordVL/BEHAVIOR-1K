@@ -13,6 +13,7 @@ import omnigibson as og
 from omnigibson.object_states import Pose
 from omnigibson.reward_functions.potential_reward import PotentialReward
 from omnigibson.robots.robot_base import BaseRobot
+from omnigibson.systems.system_base import get_system
 from omnigibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
 from omnigibson.utils.bddl_utils import OmniGibsonBDDLBackend, SUBSTANCE_SYNSET_MAPPING, BDDLEntity, \
     BEHAVIOR_ACTIVITIES, BDDLSampler
@@ -292,9 +293,10 @@ class BehaviorTask(BaseTask):
             # If object is a future
             elif obj_inst in self.future_obj_instances:
                 entity = BDDLEntity(object_scope=obj_inst)
-            # If the object scope points to a system
+            # If the object scope points to an (active) system
             elif self.object_instance_to_category[obj_inst] in SUBSTANCE_SYNSET_MAPPING:
-                entity = BDDLEntity(object_scope=obj_inst)
+                system_name = SUBSTANCE_SYNSET_MAPPING[self.object_instance_to_category[obj_inst]]
+                entity = BDDLEntity(object_scope=obj_inst, entity=get_system(system_name))
             else:
                 log.debug(f"checking objects...")
                 for sim_obj in og.sim.scene.objects:

@@ -294,6 +294,8 @@ class BDDLSampler:
             for obj_cat in self._activity_conditions.parsed_objects
             for obj_inst in self._activity_conditions.parsed_objects[obj_cat]
         }
+        self._substance_instances = {obj_inst for obj_inst in self._object_scope.keys() if
+                                     self._object_instance_to_category[obj_inst] in SUBSTANCE_SYNSET_MAPPING}
 
         # Initialize other variables that will be filled in later
         self._room_type_to_object_instance = None           # dict
@@ -302,7 +304,6 @@ class BDDLSampler:
         self._sampled_objects = None                        # set of BaseObject
         self._future_obj_instances = None                   # set of str
         self._non_sampleable_object_conditions = None       # list of (condition, positive) tuple
-        self._sampleable_object_conditions = None           # list of (condition, positive) tuple
         self._non_sampleable_object_scope_filtered_initial = None   # dict mapping str to BDDLEntity
 
     def sample(self, validate_goal=False):
@@ -344,11 +345,6 @@ class BDDLSampler:
         # Auto-initialize all sampleable objects
         with og.sim.playing():
             self._env.scene.reset()
-
-            error_msg = self._group_initial_conditions()
-            if error_msg:
-                log.error(error_msg)
-                return False, error_msg
 
             error_msg = self._sample_initial_conditions()
             if error_msg:
@@ -447,23 +443,47 @@ class BDDLSampler:
         Sampling should happen for batch 1 first, then batch 2, so on and so forth
         Example: OnTop(plate, table) should belong to batch 1, and OnTop(apple, plate) should belong to batch 2
         """
-        # First, sort initial conditions into:
-        # (a) Kinematic (binary) conditions, where (ent0, ent1) are both objects
-        # (b) Particle (binary) conditions, where (ent0, ent1) are (object, substance)
-        # (c) Future conditions, where (ent0,) can be either an objects or substance
-        # (d) Unary conditions, where (ent0,) is an object
-        self._object_sampling_orders = {group: [] for group in ("kinematic", "particle", "unary")}
         sampling_groups = {group: [] for group in ("kinematic", "particle", "future", "unary")}
-        for cond in self._activity_conditions.parsed_initial_conditions:
-            # Binary conditions have length 3: (pred, ent0, ent1)
-            if len(cond) == 3:
-                group = "particle" if \
-                    self._object_instance_to_category.get(cond[2], None) in SUBSTANCE_SYNSET_MAPPING else "kinematic"
+        self._object_sampling_conditions = {group: [] for group in ("kinematic", "particle", "future", "unary")}
+        self._object_sampling_orders = {group: [] for group in ("kinematic", "particle", "unary")}
+        self._non_sampleable_object_conditions = []
+
+        # First, sort initial conditions into kinematic, particle and unary groups
+        # bddl.condition_evaluation.HEAD, each with one child.
+        # This child is either a ObjectStateUnaryPredicate/ObjectStateBinaryPredicate or
+        # a Negation of a ObjectStateUnaryPredicate/ObjectStateBinaryPredicate
+        for condition in get_initial_conditions(self._activity_conditions, self._backend, self._object_scope):
+            condition, positive = process_single_condition(condition)
+            if condition is None:
+                continue
+
+            # Sampled conditions must always be positive
+            # Non-positive (e.g.: NOT onTop) is not restrictive enough for sampling
+            if condition.STATE_NAME in KINEMATIC_STATES_BDDL and not positive:
+                return "Initial condition has negative kinematic conditions: {}".format(condition.body)
+
+            # Infer the group the condition and its object instances belong to
+            # (a) Kinematic (binary) conditions, where (ent0, ent1) are both objects
+            # (b) Particle (binary) conditions, where (ent0, ent1) are (object, substance)
+            # (c) Future conditions, where (ent0,) can be either an objects or substance
+            # (d) Unary conditions, where (ent0,) is an object
+            # Binary conditions have length 2: (ent0, ent1)
+            if len(condition.body) == 2:
+                group = "particle" if condition.body[1] in self._substance_instances else "kinematic"
             else:
-                assert len(cond) == 2, \
-                    f"Got invalid parsed initial condition; length should either be 3 or 2. Got: {cond}"
-                group = "future" if cond[0] == "future" else "unary"
-            sampling_groups[group].append(cond)
+                assert len(condition.body) == 1, \
+                    f"Got invalid parsed initial condition; body length should either be 2 or 1. " \
+                    f"Got body: {condition.body} for condition: {condition}"
+                group = "future" if isinstance(condition, ObjectStateFuturePredicate) else "unary"
+            sampling_groups[group].append(condition.body)
+            self._object_sampling_conditions[group].append((condition, positive))
+
+            # If the condition involves any non-sampleable object (e.g.: furniture), it's a non-sampleable condition
+            # This means that there's no ordering constraint in terms of sampling, because we know the, e.g., furniture
+            # object already exists in the scene and is placed, so these specific conditions can be sampled without
+            # any dependencies
+            if len(self._non_sampleable_object_instances.intersection(set(condition.body))) > 0:
+                self._non_sampleable_object_conditions.append((condition, positive))
 
         # Now, sort each group, ignoring the futures (since they don't get sampled)
         # First handle kinematics, then particles, then unary
@@ -471,18 +491,19 @@ class BDDLSampler:
         # Start with the non-sampleable objects as the first sampled set, then infer recursively
         cur_batch = self._non_sampleable_object_instances
         while len(cur_batch) > 0:
-            self._object_sampling_orders["kinematic"].append(cur_batch)
             next_batch = set()
-            for cond in self._activity_conditions.parsed_initial_conditions:
-                print(cond)
-                if len(cond) == 3 and cond[2] in cur_batch:
-                    next_batch.add(cond[1])
+            for condition, _ in self._object_sampling_conditions["kinematic"]:
+                if condition.body[1] in cur_batch:
+                    next_batch.add(condition.body[0])
             cur_batch = next_batch
+            self._object_sampling_orders["kinematic"].append(cur_batch)
+        # pop final value since it's an empty set
+        self._object_sampling_orders["kinematic"].pop(-1)
 
         # Now parse particles -- this time, in reverse order, starting from the final kinematic group
-        obj_insts_to_system = {cond[1]: cond[2] for cond in sampling_groups["particle"]}
+        obj_insts_to_system = {cond[0]: cond[1] for cond in sampling_groups["particle"]}
         sampled_particle_entities = set()
-        for batch in reversed(self._object_sampling_orders["kinematic"]):
+        for batch in reversed(self._object_sampling_orders["kinematic"] + [self._non_sampleable_object_instances]):
             cur_batch = set()
             for obj_inst in batch:
                 if obj_inst in obj_insts_to_system:
@@ -494,21 +515,21 @@ class BDDLSampler:
 
         # Finally, parse unaries -- this is simply unordered, since it is assumed that unary predicates do not
         # affect each other
-        self._object_sampling_orders["unary"] = {cond[1] for cond in sampling_groups["unary"]}
+        self._object_sampling_orders["unary"] = {cond[0] for cond in sampling_groups["unary"]}
 
         # Aggregate future objects
-        self._future_obj_instances = {cond[1] for cond in sampling_groups["future"]}
+        self._future_obj_instances = {cond[0] for cond in sampling_groups["future"]}
+        nonparticle_entities = set(self._object_scope.keys()) - self._substance_instances
 
         # Sanity check kinematic objects -- any non-system must be kinematically sampled
-        all_nonfuture_entities = set(self._object_scope.keys()) - self._future_obj_instances
-        remaining_kinematic_entities = all_nonfuture_entities - set.union(*(self._object_sampling_orders["kinematic"] + [set()]))
+        remaining_kinematic_entities = nonparticle_entities - self._future_obj_instances - \
+            self._non_sampleable_object_instances - set.union(*(self._object_sampling_orders["kinematic"] + [set()]))
         if len(remaining_kinematic_entities) != 0:
             return f"Some objects do not have any kinematic condition defined for them in the initial conditions: " \
                    f"{', '.join(remaining_kinematic_entities)}"
 
         # Sanity check particle systems -- any non-future system must be sample as part of particle groups
-        particle_entities = {cond[2] for cond in sampling_groups["particle"]}
-        remaining_particle_entities = particle_entities - self._future_obj_instances - sampled_particle_entities
+        remaining_particle_entities = self._substance_instances - self._future_obj_instances - sampled_particle_entities
         if len(remaining_particle_entities) != 0:
             return f"Some systems do not have any particle condition defined for them in the initial conditions: " \
                    f"{', '.join(remaining_particle_entities)}"
@@ -593,7 +614,7 @@ class BDDLSampler:
                                 success = condition.sample(binary_state=positive)
                                 log_msg = " ".join(
                                     [
-                                        "{} condition sampling".format(condition_type),
+                                        "{} kinematic condition sampling".format(condition_type),
                                         room_type,
                                         scene_obj,
                                         room_inst,
@@ -682,7 +703,10 @@ class BDDLSampler:
             if obj_cat in SUBSTANCE_SYNSET_MAPPING:
                 assert len(self._activity_conditions.parsed_objects[obj_cat]) == 1, "Systems are singletons"
                 obj_inst = self._activity_conditions.parsed_objects[obj_cat][0]
-                self._object_scope[obj_inst] = BDDLEntity(object_scope=obj_inst)
+                self._object_scope[obj_inst] = BDDLEntity(
+                    object_scope=obj_inst,
+                    entity=None if obj_inst in self._future_obj_instances else get_system(SUBSTANCE_SYNSET_MAPPING[obj_cat]),
+                )
             else:
                 is_sliceable = OBJECT_TAXONOMY.has_ability(obj_cat, "sliceable")
                 categories = OBJECT_TAXONOMY.get_subtree_igibson_categories(obj_cat)
@@ -755,48 +779,6 @@ class BDDLSampler:
                     self._sampled_objects.add(simulator_obj)
                     self._object_scope[obj_inst] = BDDLEntity(object_scope=obj_inst, entity=simulator_obj)
 
-    def _group_initial_conditions(self):
-        """
-        We group initial conditions by first splitting the desired task-relevant objects into non-sampleable objects
-        and sampleable objects.
-
-        Non-sampleable objects are objects that should ALREADY be in the scene, and should NOT be generated / sampled
-        on the fly
-
-        Sampleable objects are objects that need to be additionally imported into the scene.
-
-        Returns:
-            None or str: None if successful, otherwise failure string
-        """
-        self._non_sampleable_object_conditions = []
-        self._sampleable_object_conditions = []
-
-        # TODO: currently we assume self.initial_conditions is a list of
-        # bddl.condition_evaluation.HEAD, each with one child.
-        # This child is either a ObjectStateUnaryPredicate/ObjectStateBinaryPredicate or
-        # a Negation of a ObjectStateUnaryPredicate/ObjectStateBinaryPredicate
-        for condition in get_initial_conditions(self._activity_conditions, self._backend, self._object_scope):
-            condition, positive = process_single_condition(condition)
-            if condition is None:
-                continue
-
-            # Sampled conditions must always be positive
-            # Non-positive (e.g.: NOT onTop) is not restrictive enough for sampling
-            if condition.STATE_NAME in KINEMATIC_STATES_BDDL and not positive:
-                return "Initial condition has negative kinematic conditions: {}".format(condition.body)
-
-            condition_body = set(condition.body)
-
-            # If the condition involves any non-sampleable object (e.g.: furniture), it's a non-sampleable condition
-            # This means that there's no ordering constraint in terms of sampling, because we know the, e.g., furniture
-            # object already exists in the scene and is placed, so these specific conditions can be sampled without
-            # any dependencies
-            if len(self._non_sampleable_object_instances.intersection(condition_body)) > 0:
-                self._non_sampleable_object_conditions.append((condition, positive))
-            else:
-                # There are dependencies that must be taken into account
-                self._sampleable_object_conditions.append((condition, positive))
-
     def _sample_initial_conditions(self):
         """
         Sample initial conditions
@@ -850,51 +832,25 @@ class BDDLSampler:
         Returns:
             None or str: If successful, returns None. Otherwise, returns an error message
         """
-        # Do the final round of sampling with object scope fixed
-        for condition, positive in self._non_sampleable_object_conditions:
-            num_trials = 10
-            for _ in range(num_trials):
-                success = condition.sample(binary_state=positive)
-                if success:
-                    break
-            if not success:
-                error_msg = "Non-sampleable object conditions failed even after successful matching: {}".format(
-                    condition.body
-                )
-                return error_msg
-
-        # Sample kinematics first
-        if len(self._object_sampling_orders["kinematic"]) > 1:
-            # Pop non-sampleable objects
-            self._object_sampling_orders["kinematic"].pop(0)
-            for cur_batch in self._object_sampling_orders["kinematic"]:
-                # First sample non-sliced conditions
-                for condition, positive in self._sampleable_object_conditions:
-                    if condition.STATE_NAME == "sliced":
-                        continue
-                    # Sample conditions that involve the current batch of objects
-                    if condition.body[0] in cur_batch:
-                        num_trials = 10
-                        for _ in range(num_trials):
-                            success = condition.sample(binary_state=positive)
-                            if success:
-                                break
-                        if not success:
-                            return "Sampleable object conditions failed: {} {}".format(
-                                condition.STATE_NAME, condition.body
-                            )
-
-                # Then sample sliced conditions
-                for condition, positive in self._sampleable_object_conditions:
-                    if condition.STATE_NAME != "sliced":
-                        continue
-                    # Sample conditions that involve the current batch of objects
-                    if condition.body[0] in cur_batch:
-                        success = condition.sample(binary_state=positive)
-                        if not success:
-                            return "Sampleable object conditions failed: {}".format(condition.body)
-
-        # TODO (Josiah): Handle particle and unary sampling!!
+        # Sample kinematics first, then particle states, then unary states
+        for group in ("kinematic", "particle", "unary"):
+            log.debug(f"Sampling {group} states...")
+            if len(self._object_sampling_orders[group]) > 0:
+                # # Pop non-sampleable objects
+                # self._object_sampling_orders["kinematic"].pop(0)
+                for cur_batch in self._object_sampling_orders[group]:
+                    for condition, positive in self._object_sampling_conditions[group]:
+                        # Sample conditions that involve the current batch of objects
+                        if condition.body[0] in cur_batch:
+                            num_trials = 10
+                            for _ in range(num_trials):
+                                success = condition.sample(binary_state=positive)
+                                if success:
+                                    break
+                            if not success:
+                                return "Sampleable object conditions failed: {} {}".format(
+                                    condition.STATE_NAME, condition.body
+                                )
 
         # Update all the objects' bddl object scopes
         for obj_scope, entity in self._object_scope.items():
