@@ -75,6 +75,18 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
         """
         raise NotImplementedError()
 
+    @classmethod
+    def verify_scene_and_task_config(cls, scene_cfg, task_cfg):
+        """
+        Runs any necessary sanity checks on the scene and task configs passed; and possibly modifies them in-place
+
+        Args:
+            scene_cfg (dict): Scene configuration
+            task_cfg (dict): Task configuration
+        """
+        # Default is no-op
+        pass
+
     def _load_observation_space(self):
         # Create the non low dim obs space
         obs_space = self._load_non_low_dim_observation_space()

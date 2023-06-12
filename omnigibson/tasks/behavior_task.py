@@ -108,6 +108,39 @@ class BehaviorTask(BaseTask):
         # Run super init
         super().__init__(termination_config=termination_config, reward_config=reward_config)
 
+    @classmethod
+    def get_cached_activity_scene_filename(cls, scene_model, activity_name, activity_definition_id, activity_instance_id):
+        """
+        Helper method to programmatically construct the scene filename for a given pre-cached task configuration
+
+        Args:
+            scene_model (str): Name of the scene (e.g.: Rs_int)
+            activity_name (str): Name of the task activity (e.g.: putting_away_halloween_decorations)
+            activity_definition_id (int): ID of the task definition
+            activity_instance_id (int): ID of the task instance
+
+        Returns:
+            str: Filename which, if exists, should include the cached activity scene
+        """
+        return f"{scene_model}_task_{activity_name}_{activity_definition_id}_{activity_instance_id}_template"
+
+    @classmethod
+    def verify_scene_and_task_config(cls, scene_cfg, task_cfg):
+        # Run super first
+        super().verify_scene_and_task_config(scene_cfg=scene_cfg, task_cfg=task_cfg)
+
+        # Possibly modify the scene to load if we're using online_object_sampling
+        scene_instance, scene_file = scene_cfg["scene_instance"], scene_cfg["scene_file"]
+        if scene_file is None and scene_instance is None and not task_cfg["online_object_sampling"]:
+            scene_instance = cls.get_cached_activity_scene_filename(
+                scene_model=scene_cfg["scene_model"],
+                activity_name=task_cfg["activity_name"],
+                activity_definition_id=task_cfg.get("activity_definition_id", 0),
+                activity_instance_id=task_cfg.get("activity_instance_id", 0),
+            )
+            # Update the value in the scene config
+            scene_cfg["scene_instance"] = scene_instance
+
     def _create_termination_conditions(self):
         # Initialize termination conditions dict and fill in with Timeout and PredicateGoal
         terminations = dict()

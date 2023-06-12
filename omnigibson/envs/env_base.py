@@ -140,18 +140,11 @@ class Environment(gym.Env, GymObservable, Recreatable):
         scene_type = self.scene_config["type"]
         assert_valid_key(key=scene_type, valid_keys=REGISTERED_SCENES, name="scene type")
 
-        # If we're using a BehaviorTask, we may load a pre-cached scene configuration
-        if self.task_config["type"] == "BehaviorTask":
-            scene_instance, scene_file = self.scene_config["scene_instance"], self.scene_config["scene_file"]
-            if scene_file is None and scene_instance is None and not self.task_config["online_object_sampling"]:
-                scene_instance = "{}_task_{}_{}_{}_fixed_furniture_template".format(
-                    self.scene_config["scene_model"],
-                    self.task_config["activity_name"],
-                    self.task_config["activity_definition_id"],
-                    self.task_config["activity_instance_id"],
-                )
-            # Update the value in the scene config
-            self.scene_config["scene_instance"] = scene_instance
+        # Verify scene and task configs are valid for the given task type
+        REGISTERED_TASKS[self.task_config["type"]].verify_scene_and_task_config(
+            scene_cfg=self.scene_config,
+            task_cfg=self.task_config,
+        )
 
         # - Additionally run some sanity checks on these values -
 
@@ -589,9 +582,5 @@ class Environment(gym.Env, GymObservable, Recreatable):
             # Task kwargs
             "task": {
                 "type": "DummyTask",
-
-                # If we're using a BehaviorTask
-                "activity_definition_id": 0,
-                "activity_instance_id": 0,
             }
         }
