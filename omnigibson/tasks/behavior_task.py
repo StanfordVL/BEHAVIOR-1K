@@ -322,20 +322,20 @@ class BehaviorTask(BaseTask):
             entity = None
             # If the object scope points to the agent
             if obj_inst == "agent.n.01_1":
-                entity = BDDLEntity(object_scope=obj_inst, entity=self.get_agent(env))
+                entity = BDDLEntity(bddl_inst=obj_inst, entity=self.get_agent(env))
             # If object is a future
             elif obj_inst in self.future_obj_instances:
-                entity = BDDLEntity(object_scope=obj_inst)
+                entity = BDDLEntity(bddl_inst=obj_inst)
             # If the object scope points to an (active) system
             elif self.object_instance_to_category[obj_inst] in SUBSTANCE_SYNSET_MAPPING:
                 system_name = SUBSTANCE_SYNSET_MAPPING[self.object_instance_to_category[obj_inst]]
-                entity = BDDLEntity(object_scope=obj_inst, entity=get_system(system_name))
+                entity = BDDLEntity(bddl_inst=obj_inst, entity=get_system(system_name))
             else:
                 log.debug(f"checking objects...")
                 for sim_obj in og.sim.scene.objects:
                     log.debug(f"checking bddl obj scope for obj: {sim_obj.name}")
                     if hasattr(sim_obj, "bddl_object_scope") and sim_obj.bddl_object_scope == obj_inst:
-                        entity = BDDLEntity(object_scope=obj_inst, entity=sim_obj)
+                        entity = BDDLEntity(bddl_inst=obj_inst, entity=sim_obj)
                         break
             assert entity is not None, f"Could not assign valid BDDLEntity for {obj_inst}!"
             self.object_scope[obj_inst] = entity

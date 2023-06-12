@@ -162,19 +162,19 @@ class BDDLEntity(Wrapper):
     """
     def __init__(
         self,
-        object_scope,
+        bddl_inst,
         entity=None,
     ):
         """
         Args:
-            object_scope (str): BDDL synset instance of the entity, e.g.: "almond.n.01_1"
+            bddl_inst (str): BDDL synset instance of the entity, e.g.: "almond.n.01_1"
             entity (None or DatasetObject or BaseSystem): If specified, the BDDL entity to wrap. If not
                 specified, will initially wrap nothing, but may dynamically reference an actual object or system
                 if it exists in the future
         """
         # Store synset and other info, and pass entity internally
-        self.object_scope = object_scope
-        self.synset = "_".join(self.object_scope.split("_")[:-1])
+        self.bddl_inst = bddl_inst
+        self.synset = "_".join(self.bddl_inst.split("_")[:-1])
         self.is_system = self.synset in SUBSTANCE_SYNSET_MAPPING
 
         # Infer the correct category to assign, special casing agents
@@ -218,7 +218,7 @@ class BDDLEntity(Wrapper):
             else:
                 found_obj = self._find_valid_object()
                 if found_obj is not None:
-                    found_obj.bddl_object_scope = self.object_scope
+                    found_obj.bddl_object_scope = self.bddl_inst
                     self.wrapped_obj = found_obj
         else:
             # Check to see if entity no longer exists
