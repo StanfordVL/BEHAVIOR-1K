@@ -887,6 +887,25 @@ class Simulator(SimulationContext, Serializable):
         # Load dummy stage, but don't clear sim to prevent circular loops
         self._open_new_stage()
 
+    def write_metadata(self, key, data):
+        """
+        Writes metadata @data to the current global metadata dict using key @key
+
+        Args:
+            key (str): Keyword entry in the global metadata dictionary to use
+            data (dict): Data to write to @key in the global metadata dictionary
+        """
+        self.world_prim.SetCustomDataByKey(key, data)
+
+    def get_metadata(self, key):
+        """
+        Grabs metadata from the current global metadata dict using key @key
+
+        Args:
+            key (str): Keyword entry in the global metadata dictionary to use
+        """
+        return self.world_prim.GetCustomDataByKey(key)
+
     def restore(self, json_path):
         """
         Restore a simulation environment from @json_path.
@@ -952,6 +971,7 @@ class Simulator(SimulationContext, Serializable):
 
         # Dump saved current state and also scene init info
         scene_info = {
+            "metadata": self.world_prim.GetCustomData(),
             "state": self.scene.dump_state(serialized=False),
             "init_info": self.scene.get_init_info(),
             "objects_info": self.scene.get_objects_info(),
