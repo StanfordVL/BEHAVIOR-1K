@@ -180,6 +180,7 @@ class BDDLEntity(Wrapper):
         self.is_system = self.synset in SUBSTANCE_SYNSET_MAPPING
 
         # Infer the correct category to assign, special casing agents
+        # TODO (Josiah): Verify no special casing needed once new hierarchy released
         if entity is not None and isinstance(entity, BaseRobot):
             self.og_categories = ["agent"]
         else:
