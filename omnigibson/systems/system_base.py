@@ -27,6 +27,10 @@ m.BBOX_UPPER_LIMIT_MIN = 0.02
 m.BBOX_UPPER_LIMIT_MAX = 0.1
 
 
+_CALLBACKS_ON_SYSTEM_INIT = dict()
+_CALLBACKS_ON_SYSTEM_CLEAR = dict()
+
+
 class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
     """
     Base class for all systems. These are non-instance objects that should be used globally for a given environment.
@@ -117,10 +121,24 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
         """
         Initializes this system
         """
+        global _CALLBACKS_ON_SYSTEM_INIT
+
         assert not cls.initialized, f"Already initialized system {cls.name}!"
         og.sim.stage.DefinePrim(cls.prim_path, "Scope")
 
         cls.initialized = True
+
+        # Add to registry
+        SYSTEM_REGISTRY.add(obj=cls)
+        # Make sure to refresh any transition rules that require this system
+        # Import now to avoid circular imports
+        from omnigibson.transition_rules import TransitionRuleAPI, RULES_REGISTRY
+        system_rules = RULES_REGISTRY("required_systems", cls.name, default_val=[])
+        TransitionRuleAPI.refresh_rules(rules=system_rules)
+
+        # Run any callbacks
+        for callback in _CALLBACKS_ON_SYSTEM_INIT.values():
+            callback(cls)
 
     @classmethod
     def remove_all_particles(cls):
@@ -171,9 +189,13 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
         Clears this system, so that it may possibly be re-initialized. Useful for, e.g., when loading from a new
         scene during the same sim instance
         """
-        global SYSTEM_REGISTRY
+        global SYSTEM_REGISTRY, _CALLBACKS_ON_SYSTEM_CLEAR
 
         if cls.initialized:
+            # Run any callbacks
+            for callback in _CALLBACKS_ON_SYSTEM_CLEAR.values():
+                callback(cls)
+
             cls.reset()
             cls.initialized = False
 
@@ -865,6 +887,7 @@ class PhysicalParticleSystem(BaseSystem):
         """
         in_contact = np.zeros(len(positions), dtype=bool)
         for idx, pos in enumerate(positions):
+            # TODO: Maybe multiply particle contact radius * 2?
             in_contact[idx] = og.sim.psqi.overlap_sphere_any(cls.particle_contact_radius, pos)
         return in_contact
 
@@ -1154,10 +1177,29 @@ def get_system(system_name):
         else _create_system_from_metadata(system_name=system_name)
     if not system.initialized:
         system.initialize()
-        SYSTEM_REGISTRY.add(obj=system)
-        # Make sure to refresh any transition rules that require this system
-        # Import now to avoid circular imports
-        from omnigibson.transition_rules import TransitionRuleAPI, RULES_REGISTRY
-        system_rules = RULES_REGISTRY("required_systems", system.name, default_val=[])
-        TransitionRuleAPI.refresh_rules(rules=system_rules)
     return system
+
+
+def clear_all_systems():
+    for system in SYSTEM_REGISTRY.objects:
+        system.clear()
+
+
+def add_callback_on_system_init(name, callback):
+    global _CALLBACKS_ON_SYSTEM_INIT
+    _CALLBACKS_ON_SYSTEM_INIT[name] = callback
+
+
+def add_callback_on_system_clear(name, callback):
+    global _CALLBACKS_ON_SYSTEM_CLEAR
+    _CALLBACKS_ON_SYSTEM_CLEAR[name] = callback
+
+
+def remove_callback_on_system_init(name):
+    global _CALLBACKS_ON_SYSTEM_INIT
+    _CALLBACKS_ON_SYSTEM_INIT.pop(name)
+
+
+def remove_callback_on_system_clear(name):
+    global _CALLBACKS_ON_SYSTEM_CLEAR
+    _CALLBACKS_ON_SYSTEM_CLEAR.pop(name)

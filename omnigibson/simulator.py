@@ -108,6 +108,8 @@ class Simulator(SimulationContext, Serializable):
         # Maps callback name to callback
         self._callbacks_on_play = dict()
         self._callbacks_on_stop = dict()
+        self._callbacks_on_import_obj = dict()
+        self._callbacks_on_remove_obj = dict()
 
         # Mapping from link IDs assigned from omni to the object that they reference
         self._link_id_to_objects = dict()
@@ -352,6 +354,10 @@ class Simulator(SimulationContext, Serializable):
         # Load the object in omniverse by adding it to the scene
         self.scene.add_object(obj, register=register, _is_call_from_simulator=True)
 
+        # Run any callbacks
+        for callback in self._callbacks_on_import_obj.values():
+            callback(obj)
+
         # Cache the mapping from link IDs to object
         for link in obj.links.values():
             self._link_id_to_objects[PhysicsSchemaTools.sdfPathToInt(link.prim_path)] = obj
@@ -366,6 +372,10 @@ class Simulator(SimulationContext, Serializable):
         Args:
             obj (BaseObject): a non-robot object to load
         """
+        # Run any callbacks
+        for callback in self._callbacks_on_remove_obj.values():
+            callback(obj)
+
         # pop all link ids
         for link in obj.links.values():
             self._link_id_to_objects.pop(PhysicsSchemaTools.sdfPathToInt(link.prim_path))
@@ -705,6 +715,30 @@ class Simulator(SimulationContext, Serializable):
         """
         self._callbacks_on_stop[name] = callback
 
+    def add_callback_on_import_obj(self, name, callback):
+        """
+        Adds a function @callback, referenced by @name, to be executed every time sim.import_object() is called
+
+        Args:
+            name (str): Name of the callback
+            callback (function): Callback function. Function signature is expected to be:
+
+                def callback(obj: BaseObject) --> None
+        """
+        self._callbacks_on_import_obj[name] = callback
+
+    def add_callback_on_remove_obj(self, name, callback):
+        """
+        Adds a function @callback, referenced by @name, to be executed every time sim.remove_object() is called
+
+        Args:
+            name (str): Name of the callback
+            callback (function): Callback function. Function signature is expected to be:
+
+                def callback(obj: BaseObject) --> None
+        """
+        self._callbacks_on_remove_obj[name] = callback
+
     def remove_callback_on_play(self, name):
         """
         Remove play callback whose reference is @name
@@ -722,6 +756,24 @@ class Simulator(SimulationContext, Serializable):
             name (str): Name of the callback
         """
         self._callbacks_on_stop.pop(name)
+
+    def remove_callback_on_import_obj(self, name):
+        """
+        Remove stop callback whose reference is @name
+
+        Args:
+            name (str): Name of the callback
+        """
+        self._callbacks_on_import_obj.pop(name)
+
+    def remove_callback_on_remove_obj(self, name):
+        """
+        Remove stop callback whose reference is @name
+
+        Args:
+            name (str): Name of the callback
+        """
+        self._callbacks_on_remove_obj.pop(name)
 
     @classmethod
     def clear_instance(cls):
@@ -829,6 +881,8 @@ class Simulator(SimulationContext, Serializable):
 
         self._callbacks_on_play = dict()
         self._callbacks_on_stop = dict()
+        self._callbacks_on_import_obj = dict()
+        self._callbacks_on_remove_obj = dict()
 
         # Load dummy stage, but don't clear sim to prevent circular loops
         self._open_new_stage()
