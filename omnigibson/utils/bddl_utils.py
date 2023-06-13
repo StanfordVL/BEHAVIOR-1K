@@ -31,7 +31,7 @@ class ObjectStateFuturePredicate(UnaryAtomicFormula):
     STATE_NAME = "future"
 
     def _evaluate(self, entity, **kwargs):
-        return not entity.exists()
+        return not entity.exists
 
     def _sample(self, entity, **kwargs):
         raise NotImplementedError()
@@ -41,7 +41,7 @@ class ObjectStateRealPredicate(UnaryAtomicFormula):
     STATE_NAME = "real"
 
     def _evaluate(self, entity, **kwargs):
-        return entity.exists()
+        return entity.exists
 
     def _sample(self, entity, **kwargs):
         raise NotImplementedError()
@@ -63,10 +63,10 @@ class ObjectStateBinaryPredicate(BinaryAtomicFormula):
     STATE_NAME = None
 
     def _evaluate(self, entity1, entity2, **kwargs):
-        return entity1.get_state(self.STATE_CLASS, entity2.wrapped_obj, **kwargs) if entity2.exists() else None
+        return entity1.get_state(self.STATE_CLASS, entity2.wrapped_obj, **kwargs) if entity2.exists else None
 
     def _sample(self, entity1, entity2, binary_state, **kwargs):
-        return entity1.set_state(self.STATE_CLASS, entity2.wrapped_obj, binary_state, **kwargs) if entity2.exists() else None
+        return entity1.set_state(self.STATE_CLASS, entity2.wrapped_obj, binary_state, **kwargs) if entity2.exists else None
 
 
 def get_unary_predicate_for_state(state_class, state_name):
@@ -189,51 +189,41 @@ class BDDLEntity(Wrapper):
 
         super().__init__(obj=entity)
 
-    def _find_valid_object(self):
+    @property
+    def name(self):
         """
-        Internal helper function to find the first valid simulator object whose category is one of @self.og_categories,
-        and has not been mapped to a BDDLEntity yet
-
         Returns:
-            None or DatasetObject: If found, the valid object matching a category from @self.og_categories and not
-                mapped
+            None or str: Name of this entity, if it exists, else None
         """
-        for category in self.og_categories:
-            for obj in og.sim.scene.object_registry("category", category, default_val=[]):
-                if isinstance(obj, DatasetObject) and obj.bddl_object_scope is None:
-                    # Found valid one, return it
-                    return obj
+        if self.exists:
+            return self.og_categories[0] if self.is_system else self.wrapped_obj.name
+        else:
+            return None
 
+    @property
     def exists(self):
         """
-        Checks whether the entity referenced by @synset exists. Note: this dynamically mutates self.wrapped_obj, and
-        potentially removes it or adds a reference if the entity no longer / now exists.
+        Checks whether the entity referenced by @synset exists
 
         Returns:
             bool: Whether the entity referenced by @synset exists
         """
-        if self.wrapped_obj is None:
-            # If system, check to see if active or not and grab it if so
-            if self.is_system:
-                if is_system_active(self.og_categories[0]):
-                    self.wrapped_obj = get_system(self.og_categories[0])
-            # Otherwise, is object, check to see if any valid one exists and grab it if so
-            else:
-                found_obj = self._find_valid_object()
-                if found_obj is not None:
-                    found_obj.bddl_object_scope = self.bddl_inst
-                    self.wrapped_obj = found_obj
-        else:
-            # Check to see if entity no longer exists
-            if self.is_system:
-                if not is_system_active(self.og_categories[0]):
-                    self.wrapped_obj = None
-            # Otherwise, is object, check to see if there are no valid ones
-            else:
-                if og.sim.scene.object_registry("name", self.wrapped_obj.name) is None:
-                    self.wrapped_obj = None
-
         return self.wrapped_obj is not None
+
+    def set_entity(self, entity):
+        """
+        Sets the internal entity, overriding any if it already exists
+
+        Args:
+            entity (BaseSystem or BaseObject): Entity to set internally
+        """
+        self.wrapped_obj = entity
+
+    def clear_entity(self):
+        """
+        Clears the internal entity, if any
+        """
+        self.wrapped_obj = None
 
     def get_state(self, state, *args, **kwargs):
         """
@@ -247,7 +237,7 @@ class BDDLEntity(Wrapper):
         Returns:
             None or any: Returned value(s) from @state if self.wrapped_obj exists (i.e.: not None), else None
         """
-        return self.wrapped_obj.states[state].get_value(*args, **kwargs) if self.exists() else None
+        return self.wrapped_obj.states[state].get_value(*args, **kwargs) if self.exists else None
 
     def set_state(self, state, *args, **kwargs):
         """
@@ -261,7 +251,7 @@ class BDDLEntity(Wrapper):
         Returns:
             any: Returned value(s) from @state if self.wrapped_obj exists (i.e.: not None)
         """
-        assert self.exists(), \
+        assert self.exists, \
             f"Cannot call set_state() for BDDLEntity {self.synset} when the entity does not exist!"
         return self.wrapped_obj.states[state].set_value(*args, **kwargs)
 
@@ -398,7 +388,7 @@ class BDDLSampler:
             log.error(error_msg)
             return False, error_msg
 
-        self._object_scope["agent.n.01_1"] = BDDLEntity(object_scope="agent.n.01_1", entity=self._agent)
+        self._object_scope["agent.n.01_1"] = BDDLEntity(bddl_inst="agent.n.01_1", entity=self._agent)
 
         return True, None
 
@@ -596,7 +586,7 @@ class BDDLSampler:
                     # These are a list of candidate simulator objects that need sampling test
                     for obj in input_object_scope[room_type][scene_obj][room_inst]:
                         # Temporarily set object_scope to point to this candidate object
-                        self._object_scope[scene_obj] = BDDLEntity(object_scope=scene_obj, entity=obj)
+                        self._object_scope[scene_obj] = BDDLEntity(bddl_inst=scene_obj, entity=obj)
 
                         success = True
                         # If this candidate object is not involved in any conditions,
@@ -698,7 +688,7 @@ class BDDLSampler:
                 assert len(self._activity_conditions.parsed_objects[obj_cat]) == 1, "Systems are singletons"
                 obj_inst = self._activity_conditions.parsed_objects[obj_cat][0]
                 self._object_scope[obj_inst] = BDDLEntity(
-                    object_scope=obj_inst,
+                    bddl_inst=obj_inst,
                     entity=None if obj_inst in self._future_obj_instances else get_system(SUBSTANCE_SYNSET_MAPPING[obj_cat]),
                 )
             else:
@@ -718,7 +708,7 @@ class BDDLSampler:
                 for obj_inst in self._activity_conditions.parsed_objects[obj_cat]:
                     # Don't explicitly sample if future
                     if obj_inst in self._future_obj_instances:
-                        self._object_scope[obj_inst] = BDDLEntity(object_scope=obj_inst)
+                        self._object_scope[obj_inst] = BDDLEntity(bddl_inst=obj_inst)
                         continue
 
                     category = np.random.choice(categories)
@@ -771,7 +761,7 @@ class BDDLSampler:
                     simulator_obj.set_position(np.array([100.0 + num_new_obj - 1, 100.0, -100.0]))
 
                     self._sampled_objects.add(simulator_obj)
-                    self._object_scope[obj_inst] = BDDLEntity(object_scope=obj_inst, entity=simulator_obj)
+                    self._object_scope[obj_inst] = BDDLEntity(bddl_inst=obj_inst, entity=simulator_obj)
 
     def _sample_initial_conditions(self):
         """
@@ -846,11 +836,6 @@ class BDDLSampler:
                                     condition.STATE_NAME, condition.body
                                 )
 
-        # Update all the objects' bddl object scopes
-        for obj_scope, entity in self._object_scope.items():
-            if entity.exists() and isinstance(entity.wrapped_obj, DatasetObject):
-                entity.bddl_object_scope = obj_scope
-
         # One more sim step to make sure the object states are propagated correctly
         # E.g. after sampling Filled.set_value(True), Filled.get_value() will become True only after one step
         og.sim.step()
@@ -920,7 +905,7 @@ class BDDLSampler:
                     log.debug(("Object scope finalized:"))
                     for obj_inst, obj in matches.items():
                         if obj_inst in obj_inst_to_obj_per_room_inst:
-                            self._object_scope[obj_inst] = BDDLEntity(object_scope=obj_inst, entity=obj)
+                            self._object_scope[obj_inst] = BDDLEntity(bddl_inst=obj_inst, entity=obj)
                             log.debug((obj_inst, obj.name))
                     success = True
                     break
