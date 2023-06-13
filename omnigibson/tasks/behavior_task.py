@@ -1,4 +1,5 @@
 import numpy as np
+import os
 from bddl.activity import (
     Conditions,
     evaluate_goal_conditions,
@@ -10,10 +11,12 @@ from bddl.activity import (
 )
 
 import omnigibson as og
+from omnigibson.macros import gm
 from omnigibson.object_states import Pose
 from omnigibson.reward_functions.potential_reward import PotentialReward
 from omnigibson.robots.robot_base import BaseRobot
-from omnigibson.systems.system_base import get_system
+from omnigibson.systems.system_base import get_system, add_callback_on_system_init, add_callback_on_system_clear, \
+    REGISTERED_SYSTEMS
 from omnigibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
 from omnigibson.utils.bddl_utils import OmniGibsonBDDLBackend, SUBSTANCE_SYNSET_MAPPING, BDDLEntity, \
     BEHAVIOR_ACTIVITIES, BDDLSampler
@@ -70,6 +73,9 @@ class BehaviorTask(BaseTask):
             assert activity_name is not None, \
                 "Activity name must be specified if no predefined_problem is specified for BehaviorTask!"
             assert_valid_key(key=activity_name, valid_keys=BEHAVIOR_ACTIVITIES, name="Behavior Task")
+        else:
+            # Infer activity name
+            activity_name = predefined_problem.split("problem ")[-1].split("-")[0]
 
         # Initialize relevant variables
 
@@ -130,10 +136,12 @@ class BehaviorTask(BaseTask):
 
         # Possibly modify the scene to load if we're using online_object_sampling
         scene_instance, scene_file = scene_cfg["scene_instance"], scene_cfg["scene_file"]
+        activity_name = task_cfg["predefined_problem"].split("problem ")[-1].split("-")[0] if \
+            "predefined_problem" in task_cfg else task_cfg["activity_name"]
         if scene_file is None and scene_instance is None and not task_cfg["online_object_sampling"]:
             scene_instance = cls.get_cached_activity_scene_filename(
                 scene_model=scene_cfg["scene_model"],
-                activity_name=task_cfg["activity_name"],
+                activity_name=activity_name,
                 activity_definition_id=task_cfg.get("activity_definition_id", 0),
                 activity_instance_id=task_cfg.get("activity_instance_id", 0),
             )
@@ -183,7 +191,7 @@ class BehaviorTask(BaseTask):
             for entity in self.object_scope.values():
                 if entity.synset == "agent":
                     continue
-                if not entity.is_system and entity.exists():
+                if not entity.is_system and entity.exists:
                     entity.highlighted = True
 
         # Add callbacks to handle internal processing when new systems / objects are added / removed to the scene
@@ -222,7 +230,8 @@ class BehaviorTask(BaseTask):
         )
 
         # Get scope, making sure agent is the first entry
-        self.object_scope = {"agent.n.01_1": None}.update(get_object_scope(self.activity_conditions))
+        self.object_scope = {"agent.n.01_1": None}
+        self.object_scope.update(get_object_scope(self.activity_conditions))
 
         # Object info
         self.object_instance_to_category = {
@@ -348,7 +357,7 @@ class BehaviorTask(BaseTask):
         low_dim_obs = dict()
 
         # Batch rpy calculations for much better efficiency
-        objs_exist = {obj: obj.exists() for obj in self.object_scope.values() if not obj.is_system}
+        objs_exist = {obj: obj.exists for obj in self.object_scope.values() if not obj.is_system}
         objs_rpy = T.quat2euler(np.array([obj.states[Pose].get_value()[1] if obj_exist else np.array([0, 0, 0, 1.0])
                                           for obj, obj_exist in objs_exist.items()]))
         objs_rpy_cos = np.cos(objs_rpy)
