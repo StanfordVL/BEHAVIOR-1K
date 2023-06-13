@@ -140,6 +140,19 @@ class BehaviorTask(BaseTask):
             # Update the value in the scene config
             scene_cfg["scene_instance"] = scene_instance
 
+    def write_task_metadata(self):
+        # Store mapping from entity name to its corresponding BDDL instance name
+        metadata = dict(
+            inst_to_name={inst: entity.name for inst, entity in self.object_scope.items() if entity.exists},
+        )
+
+        # Write to sim
+        og.sim.write_metadata(key="task", data=metadata)
+
+    def load_task_metadata(self):
+        # Load from sim
+        return og.sim.get_metadata(key="task")
+
     def _create_termination_conditions(self):
         # Initialize termination conditions dict and fill in with Timeout and PredicateGoal
         terminations = dict()
@@ -172,6 +185,13 @@ class BehaviorTask(BaseTask):
                     continue
                 if not entity.is_system and entity.exists():
                     entity.highlighted = True
+
+        # Add callbacks to handle internal processing when new systems / objects are added / removed to the scene
+        callback_name = f"{self.activity_name}_refresh"
+        og.sim.add_callback_on_import_obj(name=callback_name, callback=self._update_bddl_scope_from_added_obj)
+        og.sim.add_callback_on_remove_obj(name=callback_name, callback=self._update_bddl_scope_from_removed_obj)
+        add_callback_on_system_init(name=callback_name, callback=self._update_bddl_scope_from_system_init)
+        add_callback_on_system_clear(name=callback_name, callback=self._update_bddl_scope_from_system_clear)
 
     def _load_non_low_dim_observation_space(self):
         # No non-low dim observations so we return an empty dict
@@ -306,28 +326,23 @@ class BehaviorTask(BaseTask):
         Args:
             env (Environment): Current active environment instance
         """
+        # Load task metadata
+        inst_to_name = self.load_task_metadata()["inst_to_name"]
+
         # Assign object_scope based on a cached scene
         for obj_inst in self.object_scope:
-            entity = None
-            # If the object scope points to the agent
-            if obj_inst == "agent.n.01_1":
-                entity = BDDLEntity(bddl_inst=obj_inst, entity=self.get_agent(env))
-            # If object is a future
-            elif obj_inst in self.future_obj_instances:
-                entity = BDDLEntity(bddl_inst=obj_inst)
-            # If the object scope points to an (active) system
-            elif self.object_instance_to_category[obj_inst] in SUBSTANCE_SYNSET_MAPPING:
-                system_name = SUBSTANCE_SYNSET_MAPPING[self.object_instance_to_category[obj_inst]]
-                entity = BDDLEntity(bddl_inst=obj_inst, entity=get_system(system_name))
+            if obj_inst in self.future_obj_instances:
+                entity = None
             else:
-                log.debug(f"checking objects...")
-                for sim_obj in og.sim.scene.objects:
-                    log.debug(f"checking bddl obj scope for obj: {sim_obj.name}")
-                    if hasattr(sim_obj, "bddl_object_scope") and sim_obj.bddl_object_scope == obj_inst:
-                        entity = BDDLEntity(bddl_inst=obj_inst, entity=sim_obj)
-                        break
-            assert entity is not None, f"Could not assign valid BDDLEntity for {obj_inst}!"
-            self.object_scope[obj_inst] = entity
+                assert obj_inst in inst_to_name, f"BDDL object instance {obj_inst} should exist in cached metadata " \
+                                                 f"from loaded scene, but could not be found!"
+                name = inst_to_name[obj_inst]
+                is_system = name in REGISTERED_SYSTEMS
+                entity = get_system(name) if is_system else og.sim.scene.object_registry("name", name)
+            self.object_scope[obj_inst] = BDDLEntity(
+                bddl_inst=obj_inst,
+                entity=entity,
+            )
 
     def _get_obs(self, env):
         low_dim_obs = dict()
@@ -374,6 +389,64 @@ class BehaviorTask(BaseTask):
 
         return done, info
 
+    def _update_bddl_scope_from_added_obj(self, obj):
+        """
+        Internal callback function to be called when sim.import_object() is called to potentially update internal
+        bddl object scope
+
+        Args:
+            obj (BaseObject): Newly imported object
+        """
+        # Iterate over all entities, and if they don't exist, check if any category matches @obj's category, and set it
+        # if it does, and immediately return
+        for inst, entity in self.object_scope.items():
+            if not entity.exists and not entity.is_system and obj.category in set(entity.og_categories):
+                entity.set_entity(entity=obj)
+                return
+
+    def _update_bddl_scope_from_removed_obj(self, obj):
+        """
+        Internal callback function to be called when sim.remove_object() is called to potentially update internal
+        bddl object scope
+
+        Args:
+            obj (BaseObject): Newly removed object
+        """
+        # Iterate over all entities, and if they exist, check if any name matches @obj's name, and remove it
+        # if it does, and immediately return
+        for entity in self.object_scope.values():
+            if entity.exists and not entity.is_system and obj.name == entity.name:
+                entity.clear_entity()
+                return
+
+    def _update_bddl_scope_from_system_init(self, system):
+        """
+        Internal callback function to be called when system.initialize() is called to potentially update internal
+        bddl object scope
+
+        Args:
+            system (BaseSystem): Newly initialized system
+        """
+        # Iterate over all entities, and potentially match the system to the scope
+        for inst, entity in self.object_scope.items():
+            if not entity.exists and entity.is_system and entity.og_categories[0] == system.name:
+                entity.set_entity(entity=system)
+                return
+
+    def _update_bddl_scope_from_system_clear(self, system):
+        """
+        Internal callback function to be called when system.clear() is called to potentially update internal
+        bddl object scope
+
+        Args:
+            system (BaseSystem): Newly cleared system
+        """
+        # Iterate over all entities, and potentially remove the matched system from the scope
+        for inst, entity in self.object_scope.items():
+            if entity.exists and entity.is_system and system.name == entity.name:
+                entity.clear_entity()
+                return
+
     def show_instruction(self):
         """
         Get current instruction for user
@@ -399,6 +472,31 @@ class BehaviorTask(BaseTask):
         """
         self.currently_viewed_index = (self.currently_viewed_index + 1) % len(self.activity_conditions.parsed_goal_conditions)
         self.currently_viewed_instruction = self.instruction_order[self.currently_viewed_index]
+
+    def save_task(self, path=None, override=False):
+        """
+        Writes the current scene configuration to a .json file
+
+        Args:
+            path (None or str): If specified, absolute fpath to the desired path to write the .json. Default is
+                <gm.DATASET_PATH/scenes/<SCENE_MODEL>/json/...>
+            override (bool): Whether to override any files already found at the path to write the task .json
+        """
+        if path is None:
+            fname = self.get_cached_activity_scene_filename(
+                scene_model=og.sim.scene.scene_model,
+                activity_name=self.activity_name,
+                activity_definition_id=self.activity_definition_id,
+                activity_instance_id=self.activity_instance_id,
+            )
+            path = os.path.join(gm.DATASET_PATH, "scenes", og.sim.scene.scene_model, "json", f"{fname}.json")
+
+        if os.path.exists(path) and not override:
+            log.warning(f"Scene json already exists at {path}. Use override=True to force writing of new json.")
+            return
+        # Write metadata and then save
+        self.write_task_metadata()
+        og.sim.save(json_path=path)
 
     @property
     def name(self):
