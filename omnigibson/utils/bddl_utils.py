@@ -27,24 +27,29 @@ from omnigibson.systems.system_base import is_system_active, get_system
 log = create_module_logger(module_name=__name__)
 
 
-class ObjectStateFuturePredicate(UnaryAtomicFormula):
+class UnsampleablePredicate:
+    def _sample(self, *args, **kwargs):
+        raise NotImplementedError()
+
+
+class ObjectStateInsourcePredicate(UnsampleablePredicate, BinaryAtomicFormula):
+    def _evaluate(self, entity, **kwargs):
+        # Always returns True
+        return True
+
+
+class ObjectStateFuturePredicate(UnsampleablePredicate, UnaryAtomicFormula):
     STATE_NAME = "future"
 
     def _evaluate(self, entity, **kwargs):
         return not entity.exists
 
-    def _sample(self, entity, **kwargs):
-        raise NotImplementedError()
 
-
-class ObjectStateRealPredicate(UnaryAtomicFormula):
+class ObjectStateRealPredicate(UnsampleablePredicate, UnaryAtomicFormula):
     STATE_NAME = "real"
 
     def _evaluate(self, entity, **kwargs):
         return entity.exists
-
-    def _sample(self, entity, **kwargs):
-        raise NotImplementedError()
 
 
 class ObjectStateUnaryPredicate(UnaryAtomicFormula):
@@ -129,6 +134,7 @@ SUPPORTED_PREDICATES = {
     "frozen": get_unary_predicate_for_state(object_states.Frozen, "frozen"),
     "future": ObjectStateFuturePredicate,
     "real": ObjectStateRealPredicate,
+    "insource": ObjectStateInsourcePredicate,
 }
 
 KINEMATIC_STATES_BDDL = frozenset([state.__name__.lower() for state in _KINEMATIC_STATE_SET])
@@ -436,8 +442,9 @@ class BDDLSampler:
         Sampling should happen for batch 1 first, then batch 2, so on and so forth
         Example: OnTop(plate, table) should belong to batch 1, and OnTop(apple, plate) should belong to batch 2
         """
-        sampling_groups = {group: [] for group in ("kinematic", "particle", "future", "unary")}
-        self._object_sampling_conditions = {group: [] for group in ("kinematic", "particle", "future", "unary")}
+        unsampleable_conditions = []
+        sampling_groups = {group: [] for group in ("kinematic", "particle", "unary")}
+        self._object_sampling_conditions = {group: [] for group in ("kinematic", "particle", "unary")}
         self._object_sampling_orders = {group: [] for group in ("kinematic", "particle", "unary")}
         self._non_sampleable_object_conditions = []
 
@@ -455,10 +462,14 @@ class BDDLSampler:
             if condition.STATE_NAME in KINEMATIC_STATES_BDDL and not positive:
                 return "Initial condition has negative kinematic conditions: {}".format(condition.body)
 
+            # Store any unsampleable conditions separately
+            if isinstance(condition, UnsampleablePredicate):
+                unsampleable_conditions.append(condition)
+                continue
+
             # Infer the group the condition and its object instances belong to
             # (a) Kinematic (binary) conditions, where (ent0, ent1) are both objects
             # (b) Particle (binary) conditions, where (ent0, ent1) are (object, substance)
-            # (c) Future conditions, where (ent0,) can be either an objects or substance
             # (d) Unary conditions, where (ent0,) is an object
             # Binary conditions have length 2: (ent0, ent1)
             if len(condition.body) == 2:
@@ -467,7 +478,7 @@ class BDDLSampler:
                 assert len(condition.body) == 1, \
                     f"Got invalid parsed initial condition; body length should either be 2 or 1. " \
                     f"Got body: {condition.body} for condition: {condition}"
-                group = "future" if isinstance(condition, ObjectStateFuturePredicate) else "unary"
+                group = "unary"
             sampling_groups[group].append(condition.body)
             self._object_sampling_conditions[group].append((condition, positive))
 
@@ -502,7 +513,7 @@ class BDDLSampler:
         self._object_sampling_orders["unary"].append({cond[0] for cond in sampling_groups["unary"]})
 
         # Aggregate future objects
-        self._future_obj_instances = {cond[0] for cond in sampling_groups["future"]}
+        self._future_obj_instances = {cond.body[0] for cond in unsampleable_conditions if isinstance(cond, ObjectStateFuturePredicate)}
         nonparticle_entities = set(self._object_scope.keys()) - self._substance_instances
 
         # Sanity check kinematic objects -- any non-system must be kinematically sampled
