@@ -140,6 +140,7 @@ with open(f"{bddl.__path__[0]}/../substance_synset_mapping.json", "r") as f:
 
 # BEHAVIOR-related
 OBJECT_TAXONOMY = ObjectTaxonomy() #hierarchy_type="b1k")
+# TODO (Josiah): Remove floor synset once we have new bddl release
 FLOOR_SYNSET = "floor.n.01"
 with open(os.path.join(os.path.dirname(bddl.__file__), "activity_manifest.txt")) as f:
     BEHAVIOR_ACTIVITIES = {line.strip() for line in f.readlines()}
