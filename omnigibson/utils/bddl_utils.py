@@ -501,22 +501,13 @@ class BDDLSampler:
         # pop final value since it's an empty set
         self._object_sampling_orders["kinematic"].pop(-1)
 
-        # Now parse particles -- this time, in reverse order, starting from the final kinematic group
-        obj_insts_to_system = {cond[0]: cond[1] for cond in sampling_groups["particle"]}
-        sampled_particle_entities = set()
-        for batch in reversed(self._object_sampling_orders["kinematic"] + [self._non_sampleable_object_instances]):
-            cur_batch = set()
-            for obj_inst in batch:
-                if obj_inst in obj_insts_to_system:
-                    sampled_particle_entities.add(obj_insts_to_system.pop(obj_inst))
-                    cur_batch.add(obj_inst)
-            self._object_sampling_orders["particle"].append(cur_batch)
-        # Finally, make group with all remaining object instances requiring particle sampling
-        self._object_sampling_orders["particle"].append(set(obj_insts_to_system.keys()))
+        # Now parse particles -- simply unordered, since particle systems shouldn't impact each other
+        self._object_sampling_orders["particle"].append({cond[0] for cond in sampling_groups["particle"]})
+        sampled_particle_entities = {cond[1] for cond in sampling_groups["particle"]}
 
         # Finally, parse unaries -- this is simply unordered, since it is assumed that unary predicates do not
         # affect each other
-        self._object_sampling_orders["unary"] = {cond[0] for cond in sampling_groups["unary"]}
+        self._object_sampling_orders["unary"].append({cond[0] for cond in sampling_groups["unary"]})
 
         # Aggregate future objects
         self._future_obj_instances = {cond[0] for cond in sampling_groups["future"]}
