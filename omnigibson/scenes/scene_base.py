@@ -11,7 +11,7 @@ from omnigibson.utils.python_utils import classproperty, Serializable, Registera
 from omnigibson.utils.registry_utils import SerializableRegistry
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.objects.object_base import BaseObject
-from omnigibson.systems import SYSTEM_REGISTRY
+from omnigibson.systems.system_base import SYSTEM_REGISTRY, clear_all_systems
 from omnigibson.objects.light_object import LightObject
 from omnigibson.robots.robot_base import m as robot_macros
 from pxr import Sdf, Gf
@@ -206,6 +206,17 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 orientation=init_state[obj_name]["root_link"]["ori"],
             )
 
+    def _load_metadata_from_scene_file(self):
+        """
+        Loads metadata from self.scene_file and stores it within the world prim's CustomData
+        """
+        with open(self.scene_file, "r") as f:
+            scene_info = json.load(f)
+
+        # Write the metadata
+        for key, data in scene_info.get("metadata", dict()).items():
+            og.sim.write_metadata(key=key, data=data)
+
     def _should_load_object(self, obj_info):
         """
         Helper function to check whether we should load an object given its init_info. Useful for potentially filtering
@@ -241,8 +252,10 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         self._load()
 
         # If we have any scene file specified, use it to load the objects within it and also update the initial state
+        # and metadata
         if self.scene_file is not None:
             self._load_objects_from_scene_file()
+            self._load_metadata_from_scene_file()
 
         # We're now loaded
         self._loaded = True
@@ -251,17 +264,12 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         if not og.sim.is_stopped():
             og.sim.stop()
 
-    def clear_systems(self):
-        # Clears systems so they can be re-initialized
-        for system in self.systems:
-            system.clear()
-
     def clear(self):
         """
         Clears any internal state before the scene is destroyed
         """
-        # Must clear all systems
-        self.clear_systems()
+        # Clears systems so they can be re-initialized
+        clear_all_systems()
 
     def _initialize(self):
         """
