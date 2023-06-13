@@ -139,6 +139,7 @@ with open(f"{bddl.__path__[0]}/../substance_synset_mapping.json", "r") as f:
 
 
 # BEHAVIOR-related
+# TODO (Josiah): SUBSTANCE_SYNSET_MAPPING should be subsumed into OBJECT_TAXONOMY once we have new bddl
 OBJECT_TAXONOMY = ObjectTaxonomy() #hierarchy_type="b1k")
 # TODO (Josiah): Remove floor synset once we have new bddl release
 FLOOR_SYNSET = "floor.n.01"
