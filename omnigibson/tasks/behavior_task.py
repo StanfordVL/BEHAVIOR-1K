@@ -94,7 +94,6 @@ class BehaviorTask(BaseTask):
         self.object_scope = None                                                # Maps str to BDDLEntity
         self.object_instance_to_category = None                                 # Maps str to str
         self.future_obj_instances = None                                        # set of str
-        self.agent_obj_idx = None                                               # int
 
         # Info for demonstration collection
         self.instruction_order = None                                           # np.array of int
@@ -202,8 +201,10 @@ class BehaviorTask(BaseTask):
             predefined_problem=predefined_problem,
         )
 
+        # Get scope, making sure agent is the first entry
+        self.object_scope = {"agent.n.01_1": None}.update(get_object_scope(self.activity_conditions))
+
         # Object info
-        self.object_scope = get_object_scope(self.activity_conditions)
         self.object_instance_to_category = {
             obj_inst: obj_cat
             for obj_cat in self.activity_conditions.parsed_objects
@@ -278,18 +279,6 @@ class BehaviorTask(BaseTask):
             # Load existing scene cache and assign object scope accordingly
             self.assign_object_scope_with_cache(env)
 
-        # Store index of agent within object scope
-        agent = self.get_agent(env=env)
-        idx = 0
-        for entity in self.object_scope.values():
-            if not entity.is_system:
-                if entity.wrapped_obj == agent:
-                    self.agent_obj_idx = idx
-                    break
-                else:
-                    idx += 1
-        assert self.agent_obj_idx is not None, "Could not find valid index for agent within object scope!"
-
         # Generate goal condition with the fully populated self.object_scope
         self.activity_goal_conditions = get_goal_conditions(self.activity_conditions, self.backend, self.object_scope)
         self.ground_goal_state_options = get_ground_goal_state_options(
@@ -347,35 +336,32 @@ class BehaviorTask(BaseTask):
         objs_exist = {obj: obj.exists() for obj in self.object_scope.values() if not obj.is_system}
         objs_rpy = T.quat2euler(np.array([obj.states[Pose].get_value()[1] if obj_exist else np.array([0, 0, 0, 1.0])
                                           for obj, obj_exist in objs_exist.items()]))
+        objs_rpy_cos = np.cos(objs_rpy)
+        objs_rpy_sin = np.sin(objs_rpy)
 
         # Always add agent info first
         agent = self.get_agent(env=env)
-        low_dim_obs["robot_pos"] = agent.states[Pose].get_value()[1]
-        low_dim_obs["robot_ori_cos"] = np.cos(objs_rpy[self.agent_obj_idx])
-        low_dim_obs["robot_ori_sin"] = np.sin(objs_rpy[self.agent_obj_idx])
 
-        for idx, ((obj, obj_exist), obj_rpy) in enumerate(zip(objs_exist.items(), objs_rpy)):
-            # Skip if agent idx -- note: doesn't increment object!
-            if idx == self.agent_obj_idx:
-                continue
+        for (obj, obj_exist), obj_rpy, obj_rpy_cos, obj_rpy_sin in zip(objs_exist.items(), objs_rpy, objs_rpy_cos, objs_rpy_sin):
 
             # TODO: May need to update checking here to USDObject? Or even baseobject?
             # TODO: How to handle systems as part of obs?
             if obj_exist:
-                low_dim_obs[f"{obj.object_scope}_real"] = np.array([1.0])
-                low_dim_obs[f"{obj.object_scope}_pos"] = obj.states[Pose].get_value()[0]
-                low_dim_obs[f"{obj.object_scope}_ori_cos"] = np.cos(obj_rpy)
-                low_dim_obs[f"{obj.object_scope}_ori_sin"] = np.sin(obj_rpy)
-                for arm in agent.arm_names:
-                    grasping_object = agent.is_grasping(arm=arm, candidate_obj=obj.wrapped_obj)
-                    low_dim_obs[f"{obj.object_scope}_in_gripper_{arm}"] = np.array([float(grasping_object)])
+                low_dim_obs[f"{obj.bddl_inst}_real"] = np.array([1.0])
+                low_dim_obs[f"{obj.bddl_inst}_pos"] = obj.states[Pose].get_value()[0]
+                low_dim_obs[f"{obj.bddl_inst}_ori_cos"] = obj_rpy_cos
+                low_dim_obs[f"{obj.bddl_inst}_ori_sin"] = obj_rpy_sin
+                if obj.name != agent.name:
+                    for arm in agent.arm_names:
+                        grasping_object = agent.is_grasping(arm=arm, candidate_obj=obj.wrapped_obj)
+                        low_dim_obs[f"{obj.bddl_inst}_in_gripper_{arm}"] = np.array([float(grasping_object)])
             else:
-                low_dim_obs[f"{obj.object_scope}_real"] = np.zeros(1)
-                low_dim_obs[f"{obj.object_scope}_pos"] = np.zeros(3)
-                low_dim_obs[f"{obj.object_scope}_ori_cos"] = np.zeros(3)
-                low_dim_obs[f"{obj.object_scope}_ori_sin"] = np.zeros(3)
+                low_dim_obs[f"{obj.bddl_inst}_real"] = np.zeros(1)
+                low_dim_obs[f"{obj.bddl_inst}_pos"] = np.zeros(3)
+                low_dim_obs[f"{obj.bddl_inst}_ori_cos"] = np.zeros(3)
+                low_dim_obs[f"{obj.bddl_inst}_ori_sin"] = np.zeros(3)
                 for arm in agent.arm_names:
-                    low_dim_obs[f"{obj.object_scope}_in_gripper_{arm}"] = np.zeros(1)
+                    low_dim_obs[f"{obj.bddl_inst}_in_gripper_{arm}"] = np.zeros(1)
 
         return low_dim_obs, dict()
 
