@@ -225,7 +225,7 @@ class BehaviorTask(BaseTask):
         self.activity_conditions = Conditions(
             activity_name,
             activity_definition_id,
-            simulator_name="igibson",       # TODO: Update!
+            simulator_name="omnigibson",
             predefined_problem=predefined_problem,
         )
 

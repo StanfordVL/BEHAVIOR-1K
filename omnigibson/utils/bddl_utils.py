@@ -186,12 +186,8 @@ class BDDLEntity(Wrapper):
         self.is_system = self.synset in SUBSTANCE_SYNSET_MAPPING
 
         # Infer the correct category to assign, special casing agents
-        # TODO (Josiah): Verify no special casing needed once new hierarchy released
-        if entity is not None and isinstance(entity, BaseRobot):
-            self.og_categories = ["agent"]
-        else:
-            self.og_categories = [SUBSTANCE_SYNSET_MAPPING[self.synset]] if self.is_system else \
-                OBJECT_TAXONOMY.get_subtree_categories(self.synset)
+        self.og_categories = [SUBSTANCE_SYNSET_MAPPING[self.synset]] if self.is_system else \
+            OBJECT_TAXONOMY.get_subtree_categories(self.synset)
 
         super().__init__(obj=entity)
 
@@ -737,7 +733,7 @@ class BDDLSampler:
 
                     # TODO: This no longer works because model ID changes in the new asset
                     # Filter object models if the object category is openable
-                    # synset = OBJECT_TAXONOMY.get_class_name_from_igibson_category(category)
+                    # synset = OBJECT_TAXONOMY.get_synset_from_category(category)
                     # if OBJECT_TAXONOMY.has_ability(synset, "openable"):
                     #     # Always use the articulated version of a certain object if its category is openable
                     #     # E.g. backpack, jar, etc
