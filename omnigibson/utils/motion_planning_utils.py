@@ -1,6 +1,6 @@
 import numpy as np
 from ompl import base as ob
-from ompl import geometric as o_geo
+from ompl import geometric as ompl_geo
 
 import omnigibson as og
 from omnigibson.object_states import ContactBodies
@@ -27,39 +27,48 @@ def plan_base_motion(
     start_conf = (pos[0], pos[1], yaw)
 
 
-    # create an SE2 state space
+       # create an SE2 state space
     space = ob.SE2StateSpace()
+
     # set lower and upper bounds
     bounds = ob.RealVectorBounds(2)
-    bounds.setLow(-1)
-    bounds.setHigh(1)
+    bounds.setLow(-100)
+    bounds.setHigh(100)
     space.setBounds(bounds)
-    # construct an instance of space information from this state space
-    si = ob.SpaceInformation(space)
-    # set state validity checking for this space
-    si.setStateValidityChecker(ob.StateValidityCheckerFn(collision_fn))
-    # create a problem instance
-    pdef = ob.ProblemDefinition(si)
-    # set the start and goal states
-    pdef.setStartAndGoalStates(start_conf, end_conf)
-    # create a planner for the defined space
-    planner = o_geo.RRTConnect(si)
-    # set the problem we are trying to solve for the planner
-    planner.setProblemDefinition(pdef)
-    # perform setup steps for the planner
-    planner.setup()
-    # attempt to solve the problem within one second of planning time
-    solved = planner.solve(planning_time)
+
+    # create a simple setup object
+    ss = ompl_geo.SimpleSetup(space)
+    ss.setStateValidityChecker(ob.StateValidityCheckerFn(collision_fn))
+
+    start = ob.State(space)
+    start().setX(start_conf[0])
+    start().setY(start_conf[1])
+    start().setYaw(start_conf[2])
+
+    goal = ob.State(space)
+    goal().setX(end_conf[0])
+    goal().setY(end_conf[1])
+    goal().setYaw(end_conf[2])
+
+    ss.setStartAndGoalStates(start, goal)
+
+    # this will automatically choose a default planner with
+    # default parameters
+    solved = ss.solve(10.0)
 
     if solved:
-        # get the goal representation from the problem definition (not the same as the goal state)
-        # and inquire about the found path
-        path = pdef.getSolutionPath()
-        print("Found solution:\n%s" % path)
-    else:
-        print("No solution found")
-
-    return path
+        # try to shorten the path
+        ss.simplifySolution()
+        # print the simplified path
+        sol_path = ss.getSolutionPath()
+        return_path = []
+        for i in range(sol_path.getStateCount()):
+            x = sol_path.getState(i).getX()
+            y = sol_path.getState(i).getY()
+            yaw = sol_path.getState(i).getYaw()
+            return_path.append([x, y, yaw])
+        return return_path
+    return None
 
 def detect_robot_collision(robot, obj_in_hand=None):
     # filter_objects = ["floor"]
