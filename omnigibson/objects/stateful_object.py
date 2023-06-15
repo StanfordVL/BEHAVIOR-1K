@@ -111,7 +111,7 @@ class StatefulObject(BaseObject):
             abilities = {}
             if OBJECT_TAXONOMY is not None:
                 # TODO! Update!!
-                taxonomy_class = OBJECT_TAXONOMY.get_class_name_from_igibson_category(category)
+                taxonomy_class = OBJECT_TAXONOMY.get_synset_from_category(category)
                 if taxonomy_class is not None:
                     abilities = OBJECT_TAXONOMY.get_abilities(taxonomy_class)
         assert isinstance(abilities, dict), "Object abilities must be in dictionary form."
@@ -466,7 +466,7 @@ class StatefulObject(BaseObject):
                 if state_name in state["non_kin"]:
                     state_instance.load_state(state=state["non_kin"][state_name], serialized=False)
                 else:
-                    log.warning("Missing object state [{}] in the state dump".format(state_name))
+                    log.warning(f"Missing object state [{state_name}] in the state dump for obj {self.name}")
 
         # Clear cache after loading state
         self.clear_states_cache()
