@@ -140,13 +140,13 @@ SUPPORTED_PREDICATES = {
 KINEMATIC_STATES_BDDL = frozenset([state.__name__.lower() for state in _KINEMATIC_STATE_SET])
 
 # Load substance and object mapping
-with open(f"{bddl.__path__[0]}/../substance_synset_mapping.json", "r") as f:
+with open(os.path.join(bddl.__path__[0], "generated_data", "substance_synset_mapping.json"), "r") as f:
     SUBSTANCE_SYNSET_MAPPING = json.load(f)
 
 
 # BEHAVIOR-related
 # TODO (Josiah): SUBSTANCE_SYNSET_MAPPING should be subsumed into OBJECT_TAXONOMY once we have new bddl
-OBJECT_TAXONOMY = ObjectTaxonomy() #hierarchy_type="b1k")
+OBJECT_TAXONOMY = ObjectTaxonomy()
 # TODO (Josiah): Remove floor synset once we have new bddl release
 FLOOR_SYNSET = "floor.n.01"
 with open(os.path.join(os.path.dirname(bddl.__file__), "activity_manifest.txt")) as f:

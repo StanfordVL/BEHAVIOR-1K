@@ -1111,7 +1111,10 @@ class RecipeRule(BaseTransitionRule):
         return dict(in_volume=in_volume)
 
     @classmethod
-    def refresh(cls):
+    def refresh(cls, object_candidates):
+        # Run super first
+        super().refresh(object_candidates=object_candidates)
+
         # Cache active recipes given the current set of objects
         cls._ACTIVE_RECIPES = dict()
         cls._CATEGORY_IDXS = dict()
@@ -1381,9 +1384,9 @@ class CookingRule(RecipeRule):
     _LAST_HEAT_TIMESTEP = None
 
     @classmethod
-    def refresh(cls):
+    def refresh(cls, object_candidates):
         # Run super first
-        super().refresh()
+        super().refresh(object_candidates=object_candidates)
 
         # Iterate through all (updated) active recipes and store in internal variables if not already recorded
         cls._HEAT_STEPS = dict() if cls._HEAT_STEPS is None else cls._HEAT_STEPS

@@ -466,7 +466,7 @@ class StatefulObject(BaseObject):
                 if state_name in state["non_kin"]:
                     state_instance.load_state(state=state["non_kin"][state_name], serialized=False)
                 else:
-                    log.warning("Missing object state [{}] in the state dump".format(state_name))
+                    log.warning(f"Missing object state [{state_name}] in the state dump for obj {self.name}")
 
         # Clear cache after loading state
         self.clear_states_cache()
