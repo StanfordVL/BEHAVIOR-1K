@@ -60,7 +60,6 @@ class DatasetObject(USDObject):
         bounding_box=None,
         fit_avg_dim_volume=False,
         in_rooms=None,
-        bddl_object_scope=None,
         **kwargs,
     ):
         """
@@ -100,13 +99,11 @@ class DatasetObject(USDObject):
             fit_avg_dim_volume (bool): whether to fit the object to have the same volume as the average dimension
                 while keeping the aspect ratio. Note that if this is set, it will override both @scale and @bounding_box
             in_rooms (None or list): If specified, sets the rooms that this object should belong to
-            bddl_object_scope (None or str): If specified, should set the BDDL object scope name, e.g. chip.n.04_2
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
                 for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
         """
         # Store variables
         self._in_rooms = in_rooms
-        self._bddl_object_scope = bddl_object_scope
 
         # Info that will be filled in at runtime
         self.supporting_surfaces = None             # Dictionary mapping link names to surfaces represented by links
@@ -372,26 +369,6 @@ class DatasetObject(USDObject):
         # Store the value to the internal variable and also update the init kwargs accordingly
         self._init_info["args"]["in_rooms"] = rooms
         self._in_rooms = rooms
-
-    @property
-    def bddl_object_scope(self):
-        """
-        Returns:
-            None or str: If specified, BDDL object scope name (e.g. chip.n.04_2) to assign to this object
-        """
-        return self._bddl_object_scope
-
-    @bddl_object_scope.setter
-    def bddl_object_scope(self, name):
-        """
-        Sets which BDDL object scope name for this object. If no name, then should set to None
-
-        Args:
-            name (None or str): If specified, BDDL object scope name (e.g. chip.n.04_2) to assign to this object
-        """
-        # Store the value to the internal variable and also update the init kwargs accordingly
-        self._init_info["args"]["bddl_object_scope"] = name
-        self._bddl_object_scope = name
 
     @property
     def native_bbox(self):
@@ -665,5 +642,4 @@ class DatasetObject(USDObject):
             load_config=load_config,
             abilities=self._abilities,
             in_rooms=self.in_rooms,
-            bddl_object_scope=self.bddl_object_scope,
         )
