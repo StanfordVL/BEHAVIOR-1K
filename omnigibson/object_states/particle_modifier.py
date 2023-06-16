@@ -573,6 +573,11 @@ class ParticleRemover(ParticleModifier):
     def metalink_prefix(cls):
         return m.REMOVAL_LINK_PREFIX
 
+    @classmethod
+    def requires_metalink(cls, method, *args, **kwargs):
+        # No metalink required for adjacency
+        return method != ParticleModifyMethod.ADJACENCY
+
     @property
     def _default_link(self):
         # Only supported for adjacency, NOT projection
@@ -994,6 +999,11 @@ class ParticleApplier(ParticleModifier):
     @classproperty
     def metalink_prefix(cls):
         return m.APPLICATION_LINK_PREFIX
+
+    @classmethod
+    def requires_metalink(cls, method, *args, **kwargs):
+        # No metalink required for adjacency
+        return method != ParticleModifyMethod.ADJACENCY
 
     @property
     def _default_link(self):

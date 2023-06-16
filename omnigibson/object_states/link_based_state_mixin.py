@@ -10,7 +10,6 @@ class LinkBasedStateMixin:
     def __init__(self):
         super().__init__()
 
-        self._link = None
         self._links = dict()
 
     @classproperty
@@ -21,13 +20,23 @@ class LinkBasedStateMixin:
         """
         NotImplementedError()
 
+    @classmethod
+    def requires_metalink(cls, *args, **kwargs):
+        """
+        Returns:
+            Whether an object state instantiated with constructor arguments *args and **kwargs will require a metalink
+                or not
+        """
+        # True by default
+        return True
+
     @property
     def link(self):
         """
         Returns:
             None or RigidPrim: The link associated with this link-based state, if it exists
         """
-        return self._default_link if self._link is None else self._link
+        return next(iter(self.links.values()))
 
     @property
     def links(self):
@@ -35,6 +44,12 @@ class LinkBasedStateMixin:
         Returns:
             dict: mapping from link names to links that match the metalink_prefix
         """
+        # Raise an error if we did not find a valid link
+        if len(self._links) == 0:
+            raise ValueError(f"Error: failed to query LinkBasedStateMixin {self.__class__.__name__} for object "
+                             f"{self.obj.name}; no metalink with prefix {self.metalink_prefix} found! "
+                             f"Please use get_all_object_category_models_with_abilities(...) from "
+                             f"omnigibson.utils.asset_utils to grab models with properly annotated metalinks.")
         return self._links
 
     @property
@@ -54,17 +69,7 @@ class LinkBasedStateMixin:
 
         # TODO: Extend logic to account for multiple instances of the same metalink? e.g: _0, _1, ... suffixes
         for name, link in self.obj.links.items():
-            if self.metalink_prefix in name:
+            if self.metalink_prefix in name or (self._default_link is not None and link.name == self._default_link.name):
                 self._links[name] = link
                 assert np.allclose(link.scale, self.obj.scale), \
                     f"the meta link {name} has a inconsistent scale with the object {self.obj.name}"
-
-        if len(self._links) > 0:
-            self._link = list(self._links.values())[0]
-
-        # Raise an error if we did not find a valid link
-        # Note that we check the public accessor for self.link because a subclass might implement a fallback
-        # default_link to use
-        if self.link is None:
-            raise ValueError(f"Error: failed to initialize LinkBasedStateMixin {self.__class__.__name__} for object "
-                             f"{self.obj.name}; no metalink with prefix {self.metalink_prefix} found!")
