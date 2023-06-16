@@ -121,7 +121,7 @@ class DatasetObject(USDObject):
         if usd_path is None:
             assert model is not None, f"Either usd_path or model and category must be specified in order to create a" \
                                       f"DatasetObject!"
-            usd_path = f"{gm.DATASET_PATH}/objects/{category}/{model}/usd/{model}.usd"
+            usd_path = self.get_usd_path(category=category, model=model)
 
         # Run super init
         super().__init__(
@@ -142,6 +142,20 @@ class DatasetObject(USDObject):
             abilities=abilities,
             **kwargs,
         )
+
+    @classmethod
+    def get_usd_path(cls, category, model):
+        """
+        Grabs the USD path for a DatasetObject corresponding to @category and @model
+
+        Args:
+            category (str): Category for the object
+            model (str): Specific model ID of the object
+
+        Returns:
+            str: Absolute filepath to the corresponding USD asset file
+        """
+        return os.path.join(gm.DATASET_PATH, "objects", category, model, "usd", f"{model}.usd")
 
     def load_supporting_surfaces(self):
         # Initialize dict of supporting surface info
@@ -265,13 +279,12 @@ class DatasetObject(USDObject):
         # Run super last
         super()._post_load()
 
-        if gm.USE_ENCRYPTED_ASSETS:
-            # The loaded USD is from an already-deleted temporary file, so the asset paths for texture maps are wrong.
-            # We explicitly provide the root_path to update all the asset paths: the asset paths are relative to the
-            # original USD folder, i.e. <category>/<model>/usd.
-            root_path = os.path.dirname(self._usd_path)
-            for material in self.materials:
-                material.shader_update_asset_paths_with_root_path(root_path)
+        # The loaded USD is from an already-deleted temporary file, so the asset paths for texture maps are wrong.
+        # We explicitly provide the root_path to update all the asset paths: the asset paths are relative to the
+        # original USD folder, i.e. <category>/<model>/usd.
+        root_path = os.path.dirname(self._usd_path)
+        for material in self.materials:
+            material.shader_update_asset_paths_with_root_path(root_path)
 
         # Assign realistic density and mass based on average object category spec
         if self.avg_obj_dims is not None and self.avg_obj_dims["size"] is not None and self.avg_obj_dims["mass"] is not None:
