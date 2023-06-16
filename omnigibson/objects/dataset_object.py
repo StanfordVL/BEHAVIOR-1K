@@ -224,22 +224,19 @@ class DatasetObject(USDObject):
                 joint.friction = friction
 
     def _load(self):
-        if gm.USE_ENCRYPTED_ASSETS:
-            # Create a temporary file to store the decrytped asset, load it, and then delete it.
-            original_usd_path = self._usd_path
-            encrypted_filename = original_usd_path.replace(".usd", ".encrypted.usd")
-            decrypted_fd, decrypted_filename = tempfile.mkstemp(os.path.basename(original_usd_path), dir=og.tempdir)
-            decrypt_file(encrypted_filename, decrypted_filename)
-            self._usd_path = decrypted_filename
-            prim = super()._load()
-            os.close(decrypted_fd)
-            # On Windows, Isaac Sim won't let go of the file until the prim is removed, so we can't delete it.
-            if os.name == "posix":
-                os.remove(decrypted_filename)
-            self._usd_path = original_usd_path
-            return prim
-        else:
-            return super()._load()
+        # Create a temporary file to store the decrytped asset, load it, and then delete it.
+        original_usd_path = self._usd_path
+        encrypted_filename = original_usd_path.replace(".usd", ".encrypted.usd")
+        decrypted_fd, decrypted_filename = tempfile.mkstemp(os.path.basename(original_usd_path), dir=og.tempdir)
+        decrypt_file(encrypted_filename, decrypted_filename)
+        self._usd_path = decrypted_filename
+        prim = super()._load()
+        os.close(decrypted_fd)
+        # On Windows, Isaac Sim won't let go of the file until the prim is removed, so we can't delete it.
+        if os.name == "posix":
+            os.remove(decrypted_filename)
+        self._usd_path = original_usd_path
+        return prim
 
     def _post_load(self):
         # We run this post loading first before any others because we're modifying the load config that will be used
