@@ -16,6 +16,9 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.objects import PrimitiveObject
 from omnigibson.object_states import ContactBodies
 
+def pause(time):
+    for _ in range(int(time*1000)):
+        og.sim.render()
 
 def main(random_selection=False, headless=False, short_exec=False):
     """
@@ -72,26 +75,16 @@ def main(random_selection=False, headless=False, short_exec=False):
     # navigate_controller = controller._navigate_to_pose_direct([0.0, -1.0, 0.0], low_precision=True)
     
 
-    navigate_controller = controller._navigate_to_pose([0.5, 2.5, 0.0])
+    # navigate_controller = controller._navigate_to_pose([0.5, 2.5, 0.0])
     # navigate_controller = controller._navigate_to_pose([0.0, -1.0, 0.0])
+    navigate_controller = controller._navigate_to_obj(marker)
 
-    # with UndoableContext():
-    #     print("save")
-    #     robot.set_position([2.0, 0.0, 0.0])
-    #     og.sim.step()
-    #     for i in range(1000):
-    #         for val in robot.states[ContactBodies].get_value():
-    #             print(val.name)
-    #         og.sim.render()
-    #     print("restore")
 
+    # robot.untuck()
     # og.sim.step()
-    # for i in range(1000):
-    #     og.sim.render()
-    # from IPython import embed; embed()
-
 
     while True:
+        # pause(1)
         action = next(navigate_controller)
         state, reward, done, info = env.step(action)
         # collision_objects = list(filter(lambda obj : "floor" not in obj.name, robot.states[ContactBodies].get_value()))
@@ -104,11 +97,6 @@ def main(random_selection=False, headless=False, short_exec=False):
     #     if done:
     #         og.log.info("Episode finished after {} timesteps".format(i + 1))
     #         break
-
-    # Keep simulator open so I can visually inspect
-    # empty_action = np.zeros(robot.action_dim)
-    # for _ in range(10000):
-    #     env.step(empty_action)
 
     # # Always close the environment at the end
     # env.close()
@@ -149,8 +137,6 @@ def main(random_selection=False, headless=False, short_exec=False):
 #         for link in obj.links.values():
 #             PhysxSchema.PhysxRigidBodyAPI(link.prim).GetSolveContactAttr().Set(False)
 #         obj.keep_still()
-
-
 
 #     # 3.
 #     for pos in robot_poses:
