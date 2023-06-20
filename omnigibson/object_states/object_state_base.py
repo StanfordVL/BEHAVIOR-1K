@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import inspect
 import omnigibson as og
 from omnigibson.utils.python_utils import classproperty, Serializable, Registerable, Recreatable
 
@@ -47,6 +48,30 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
         self._changed = None
         self._last_t_updated = -1               # Last timestep when this state was updated
 
+    @classmethod
+    def is_compatible(cls, obj, **kwargs):
+        """
+        Determines whether this object state is compatible with object @obj or not (i.e.: whether the state can be
+        successfully instantiated with @self.obj given other constructor arguments **kwargs.
+
+        NOTE: Can be further extended by subclass
+
+        Args:
+            obj (StatefulObject): Object whose compatibility with this state should be checked
+
+        Returns:
+            2-tuple:
+                - bool: Whether the given object is compatible with this object state or not
+                - None or str: If not compatible, the reason why it is not compatible. Otherwise, None
+        """
+        # Make sure all required kwargs are specified
+        default_kwargs = inspect.signature(cls.__init__).parameters
+        for kwarg, val in default_kwargs.items():
+            if val.default == inspect._empty and kwarg not in kwargs and kwarg not in {"obj", "self"}:
+                return False, f"Missing required kwarg '{kwarg}'"
+        # Default is True if all kwargs are met
+        return True, None
+
     @property
     def stateful(self):
         """
@@ -83,7 +108,13 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
         """
         assert not self._initialized, "State is already initialized."
 
+        # Validate compatibility with the created object
+        init_args = {k: v for k, v in self.get_init_info()["args"].items() if k != "obj"}
+        assert self.is_compatible(obj=self.obj, **init_args), \
+            f"ObjectState {self.__class__.__name__} is not compatible with object {self.obj.name}."
+
         self._initialize()
+
         self._initialized = True
 
     def clear_cache(self):
