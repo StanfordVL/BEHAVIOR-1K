@@ -23,8 +23,12 @@ def pause(time):
 
 def execute_controller(ctrl_gen, env):
     for action in ctrl_gen:
-        # env.step(action)
-        og.sim.step()
+        print(action)
+        if action is None:
+            og.sim.step()
+        else:
+            env.step(action)
+        
 
 def main(random_selection=False, headless=False, short_exec=False):
     """

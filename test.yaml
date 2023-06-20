@@ -39,7 +39,10 @@ robots:
         name: DifferentialDriveController
       arm_0:
         name: JointController
-        motor_type: velocity
+        motor_type: position
+        command_input_limits: null
+        command_output_limits: null
+        use_delta_commands: True
       gripper_0:
         name: MultiFingerGripperController
         mode: binary

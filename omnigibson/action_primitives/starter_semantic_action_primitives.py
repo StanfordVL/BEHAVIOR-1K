@@ -274,8 +274,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
     def _get_obj_in_hand(self):
         obj_in_hand_id = self.robot._ag_obj_in_hand[self.robot.default_arm]  # TODO(MP): Expose this interface.
-        obj_in_hand = self.scene.objects_by_id[obj_in_hand_id] if obj_in_hand_id is not None else None
-        return obj_in_hand
+        # obj_in_hand = self.scene.objects_by_id[obj_in_hand_id] if obj_in_hand_id is not None else None
+        return obj_in_hand_id
 
     def apply(self, action):
         # Decompose the tuple
@@ -441,6 +441,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         indented_print("Moving hand back to neutral position.")
         yield from self._reset_hand()
+        yield from self._execute_release()
 
         if self._get_obj_in_hand() == obj:
             return
@@ -563,7 +564,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             if stop_on_contact and detect_robot_collision(self.robot):
                 self.robot.set_joint_positions(current_joint_pos, control_idx, drive=False)
                 return
-            yield np.zeros(self.robot.action_dim)
+            yield None
 
     def _move_hand_direct_cartesian(self, target_pose, **kwargs):
         joint_pos, control_idx = self._convert_cartesian_to_joint_space(target_pose)
@@ -606,12 +607,16 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             )
 
     def _reset_hand(self):
-        default_pose = p.multiplyTransforms(
-            # TODO(MP): Generalize.
-            *self.robot.get_position_orientation(),
-            *behavior_robot.RIGHT_HAND_LOC_POSE_TRACKED,
-        )
-        yield from self._move_hand(default_pose)
+        # default_pose = p.multiplyTransforms(
+        #     # TODO(MP): Generalize.
+        #     *self.robot.get_position_orientation(),
+        #     *behavior_robot.RIGHT_HAND_LOC_POSE_TRACKED,
+        # )
+        # yield from self._move_hand(default_pose)
+        action = np.zeros(self.robot.action_dim)
+        action[5] = 1.0
+        for i in range(100):
+            yield action
 
     def _navigate_to_pose(self, pose_2d):
 
