@@ -16,7 +16,7 @@ from omnigibson.objects.usd_object import USDObject
 from omnigibson.utils.constants import AVERAGE_CATEGORY_SPECS, DEFAULT_JOINT_FRICTION, SPECIAL_JOINT_FRICTIONS, JointType
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.usd_utils import BoundingBoxAPI
-from omnigibson.utils.asset_utils import decrypt_file
+from omnigibson.utils.asset_utils import decrypt_file, get_all_object_category_models
 from omnigibson.utils.constants import PrimType
 from omnigibson.macros import gm, create_module_macros
 from omnigibson.utils.ui_utils import create_module_logger
@@ -42,7 +42,6 @@ class DatasetObject(USDObject):
     def __init__(
         self,
         name,
-        usd_path=None,
         prim_path=None,
         category="object",
         model=None,
@@ -65,15 +64,15 @@ class DatasetObject(USDObject):
         """
         Args:
             name (str): Name for the object. Names need to be unique per scene
-            usd_path (None or str): If specified, global path to the USD file to load. Note that this will override
-                @category + @model!
             prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
                 created at /World/<name>
             category (str): Category for the object. Defaults to "object".
-            model (None or str): if @usd_path is not specified, then this must be specified in conjunction with
+            model (None or str): If specified, this is used in conjunction with
                 @category to infer the usd filepath to load for this object, which evaluates to the following:
 
                     {og_dataset_path}/objects/{category}/{model}/usd/{model}.usd
+
+                Otherwise, will randomly sample a model given @category
 
             class_id (None or int): What class ID the object should be assigned in semantic segmentation rendering mode.
                 If None, the ID will be inferred from this object's category.
@@ -118,10 +117,12 @@ class DatasetObject(USDObject):
         load_config["fit_avg_dim_volume"] = fit_avg_dim_volume
 
         # Infer the correct usd path to use
-        if usd_path is None:
-            assert model is not None, f"Either usd_path or model and category must be specified in order to create a" \
-                                      f"DatasetObject!"
-            usd_path = self.get_usd_path(category=category, model=model)
+        if model is None:
+            available_models = get_all_object_category_models(category=category)
+            assert len(available_models) > 0, f"No available models found for category {category}!"
+            model = np.random.choice(available_models)
+        self._model = model
+        usd_path = self.get_usd_path(category=category, model=model)
 
         # Run super init
         super().__init__(
@@ -359,6 +360,14 @@ class DatasetObject(USDObject):
                                               self.scaled_bbox_center_in_base_frame, [0, 0, 0, 1])[0]
             position = position + rotated_offset
         self.set_position_orientation(position, orientation)
+
+    @property
+    def model(self):
+        """
+        Returns:
+            str: Unique model ID for this object
+        """
+        return self._model
 
     @property
     def in_rooms(self):
