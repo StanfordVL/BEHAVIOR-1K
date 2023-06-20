@@ -164,38 +164,6 @@ def get_og_model_path(category_name, model_name):
     return os.path.join(og_category_path, model_name)
 
 
-def get_object_models_of_category(category_name, filter_method=None):
-    """
-    Get OmniGibson all object models of a given category
-
-    # TODO: Make this less ugly -- filter_method is a single hard-coded check
-
-    Args:
-        category_name (str): object category
-        filter_method (str): Method to use for filtering object models
-
-    Returns:
-        list: all object models of a given category
-    """
-    models = []
-    og_category_path = get_og_category_path(category_name)
-    for model_name in os.listdir(og_category_path):
-        if filter_method is None:
-            models.append(model_name)
-        elif filter_method in ["sliceable_part", "sliceable_whole"]:
-            model_path = get_og_model_path(category_name, model_name)
-            metadata_json = os.path.join(model_path, "misc", "metadata.json")
-            with open(metadata_json) as f:
-                metadata = json.load(f)
-            if (filter_method == "sliceable_part" and "object_parts" not in metadata) or (
-                filter_method == "sliceable_whole" and "object_parts" in metadata
-            ):
-                models.append(model_name)
-        else:
-            raise Exception("Unknown filter method: {}".format(filter_method))
-    return sorted(models)
-
-
 def get_all_system_categories():
     """
     Get OmniGibson all system categories
@@ -257,12 +225,11 @@ def get_all_object_category_models(category):
         list of str: all object models belonging to @category
     """
     og_dataset_path = gm.DATASET_PATH
-    og_categories_path = os.path.join(og_dataset_path, "objects")
+    og_categories_path = os.path.join(og_dataset_path, "objects", category)
+    return os.listdir(og_categories_path) if os.path.exists(og_categories_path) else []
 
-    return os.listdir(os.path.join(og_categories_path, category))
 
-
-def get_all_object_cateogry_models_with_abilities(category, abilities):
+def get_all_object_category_models_with_abilities(category, abilities):
     """
     Get all object models from @category whose assets are properly annotated with necessary metalinks to support
     abilities @abilities
