@@ -74,3 +74,7 @@ class ContactParticles(RelativeObjectState, KinematicsMixin):
 
     def _set_value(self, system, new_value):
         raise NotImplementedError("ContactParticles state currently does not support setting.")
+
+    def _cache_is_valid(self, get_value_args):
+        # Cache is never valid since particles always change poses
+        return False
