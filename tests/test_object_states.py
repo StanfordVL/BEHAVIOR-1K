@@ -905,6 +905,7 @@ def test_covered():
         get_system("water"),
         get_system("stain"),
         get_system("raspberry"),
+        get_system("diced_apple"),
     )
     for system in systems:
         assert breakfast_table.states[Covered].set_value(system, True)
@@ -922,3 +923,7 @@ def test_covered():
 
 def test_clear_sim():
     og.sim.clear()
+
+# test_covered()
+# from IPython import embed; embed()
+# og.shutdown()

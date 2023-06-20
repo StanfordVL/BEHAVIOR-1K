@@ -1,6 +1,7 @@
 from omnigibson.object_states.kinematics import KinematicsMixin
 from omnigibson.object_states.object_state_base import BooleanState, RelativeObjectState
 from omnigibson.object_states.contact_bodies import ContactBodies
+from omnigibson.object_states.cloth import ClothState
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.object_state_utils import sample_cloth_on_rigid
 import omnigibson.utils.transform_utils as T
@@ -15,7 +16,7 @@ import trimesh
 import itertools
 
 
-class Draped(KinematicsMixin, RelativeObjectState, BooleanState):
+class Draped(KinematicsMixin, RelativeObjectState, BooleanState, ClothState):
     @staticmethod
     def get_dependencies():
         return KinematicsMixin.get_dependencies() + RelativeObjectState.get_dependencies() + [ContactBodies]
