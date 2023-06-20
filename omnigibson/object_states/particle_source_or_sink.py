@@ -15,6 +15,9 @@ m = create_module_macros(module_path=__file__)
 m.SOURCE_LINK_PREFIX = "fluidsource"
 m.SINK_LINK_PREFIX = "fluidsink"
 
+# Default radius and height
+m.DEFAULT_RADIUS_HEIGHT = 0.2
+
 # Maximum number of particles that can be sourced / sunk per step
 m.MAX_SOURCE_PARTICLES_PER_STEP = 1000
 m.MAX_SINK_PARTICLES_PER_STEP = 1000
@@ -29,35 +32,49 @@ m.SINK_PARTICLES_LIMIT = 1e6
 
 class ParticleSource(ParticleApplier):
     """
-        ParticleApplier where physical particles are spawned continuously in a cylindrical fashion from the
-        metalink pose.
+    ParticleApplier where physical particles are spawned continuously in a cylindrical fashion from the
+    metalink pose.
 
-        Args:
-            obj (StatefulObject): Object to which this state will be applied
-            conditions (dict): Dictionary mapping the names of ParticleSystem (str) to None or the corresponding condition /
-                list of conditions (where None represents no conditions) necessary in order for this particle modifier to be
-                able to modify particles belonging to @ParticleSystem. Each condition should be a function, whose signature
-                is as follows:
+    Args:
+        obj (StatefulObject): Object to which this state will be applied
+        conditions (dict): Dictionary mapping the names of ParticleSystem (str) to None or list of 2-tuples, where
+            None represents no conditions, or each 2-tuple is interpreted as a single condition in the form of
+            (ParticleModifyCondition, value) necessary in order for this particle modifier to be
+            able to modify particles belonging to @ParticleSystem. Expected types of val are as follows:
 
-                    def condition(obj) --> bool
+            SATURATED: string name of the desired system that this modifier must be saturated by, e.g., "water"
+            TOGGLEDON: boolean T/F; whether this modifier must be toggled on or not
+            GRAVITY: boolean T/F; whether this modifier must be pointing downwards (T) or upwards (F)
+            FUNCTION: a function, whose signature is as follows:
+
+                def condition(obj) --> bool
 
                 Where @obj is the specific object that this ParticleModifier state belongs to.
-                For a given ParticleSystem, if all of its conditions evaluate to True and particles are detected within
-                this particle modifier area, then we potentially modify those particles
-            source_radius (float): Radius of the cylinder representing particles' spawning volume
-            source_height (float): Height of the cylinder representing particles' spawning volume
-            initial_speed (float): The initial speed for generated particles. Note that the
-                direction of the velocity is inferred from the particle sampling process
-            """
-    def __init__(self, obj, conditions, source_radius, source_height, initial_speed=0.0):
+
+            For a given ParticleSystem, the list of 2-tuples will be converted into a list of function calls of the
+            form above -- if all of its conditions evaluate to True and particles are detected within
+            this particle modifier area, then we potentially modify those particles
+        source_radius (float): Radius of the cylinder representing particles' spawning volume
+        source_height (float): Height of the cylinder representing particles' spawning volume
+        initial_speed (float): The initial speed for generated particles. Note that the
+            direction of the velocity is inferred from the particle sampling process
+    """
+    def __init__(
+        self,
+        obj,
+        conditions,
+        source_radius=m.DEFAULT_RADIUS_HEIGHT,
+        source_height=m.DEFAULT_RADIUS_HEIGHT,
+        initial_speed=0.0,
+    ):
         # Initialize variables that will be filled in at runtime
         self._n_steps_per_modification = None
 
         # Convert inputs into arguments to pass to particle applier class
         super().__init__(
             obj=obj,
-            method=ParticleModifyMethod.PROJECTION,
             conditions=conditions,
+            method=ParticleModifyMethod.PROJECTION,
             projection_mesh_params={
                 "type": "Cylinder",
                 "extents": [source_radius * 2, source_radius * 2, source_height],
@@ -99,39 +116,65 @@ class ParticleSource(ParticleApplier):
 
 class ParticleSink(ParticleRemover):
     """
-        ParticleRemover where physical particles are removed continuously within a cylindrical volume located
-        at the metalink pose.
+    ParticleRemover where physical particles are removed continuously within a cylindrical volume located
+    at the metalink pose.
 
-        Args:
-            obj (StatefulObject): Object to which this state will be applied
-            conditions (dict): Dictionary mapping the names of ParticleSystem (str) to None or the corresponding condition /
-                list of conditions (where None represents no conditions) necessary in order for this particle modifier to be
-                able to modify particles belonging to @ParticleSystem. Each condition should be a function, whose signature
-                is as follows:
+    Args:
+        obj (StatefulObject): Object to which this state will be applied
+        conditions (dict): Dictionary mapping the names of ParticleSystem (str) to None or list of 2-tuples, where
+            None represents no conditions, or each 2-tuple is interpreted as a single condition in the form of
+            (ParticleModifyCondition, value) necessary in order for this particle modifier to be
+            able to modify particles belonging to @ParticleSystem. Expected types of val are as follows:
 
-                    def condition(obj) --> bool
+            SATURATED: string name of the desired system that this modifier must be saturated by, e.g., "water"
+            TOGGLEDON: boolean T/F; whether this modifier must be toggled on or not
+            GRAVITY: boolean T/F; whether this modifier must be pointing downwards (T) or upwards (F)
+            FUNCTION: a function, whose signature is as follows:
+
+                def condition(obj) --> bool
 
                 Where @obj is the specific object that this ParticleModifier state belongs to.
-                For a given ParticleSystem, if all of its conditions evaluate to True and particles are detected within
-                this particle modifier area, then we potentially modify those particles
-            sink_radius (float): Radius of the cylinder representing particles' sinking volume
-            sink_height (float): Height of the cylinder representing particles' sinking volume
-            """
-    def __init__(self, obj, conditions, sink_radius, sink_height):
+
+            For a given ParticleSystem, the list of 2-tuples will be converted into a list of function calls of the
+            form above -- if all of its conditions evaluate to True and particles are detected within
+            this particle modifier area, then we potentially modify those particles
+        sink_radius (float): Radius of the cylinder representing particles' sinking volume
+        sink_height (float): Height of the cylinder representing particles' sinking volume
+
+        default_physical_conditions (None or list): Condition(s) needed to remove any physical particles not explicitly
+            specified in @conditions. If None, then it is assumed that no other physical particles can be removed. If
+            not None, should be in same format as an entry in @conditions, i.e.: list of (ParticleModifyCondition, val)
+            2-tuples
+        default_visual_conditions (None or list): Condition(s) needed to remove any visual particles not explicitly
+            specified in @conditions. If None, then it is assumed that no other visual particles can be removed. If
+            not None, should be in same format as an entry in @conditions, i.e.: list of (ParticleModifyCondition, val)
+            2-tuples
+        """
+    def __init__(
+        self,
+        obj,
+        conditions,
+        sink_radius=m.DEFAULT_RADIUS_HEIGHT,
+        sink_height=m.DEFAULT_RADIUS_HEIGHT,
+        default_physical_conditions=None,
+        default_visual_conditions=None,
+    ):
         # Initialize variables that will be filled in at runtime
         self._n_steps_per_modification = None
 
         # Convert inputs into arguments to pass to particle applier class
         super().__init__(
             obj=obj,
-            method=ParticleModifyMethod.PROJECTION,
             conditions=conditions,
+            method=ParticleModifyMethod.PROJECTION,
             # TODO: Discuss how this will sync with new asset metalinks
             projection_mesh_params={
                 "type": "Cylinder",
                 "extents": [sink_radius * 2, sink_radius * 2, sink_height],
                 "visualize": False,
             },
+            default_physical_conditions=default_physical_conditions,
+            default_visual_conditions=default_visual_conditions,
         )
 
     def _initialize(self):
