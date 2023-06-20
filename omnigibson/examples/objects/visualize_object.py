@@ -4,7 +4,7 @@ import numpy as np
 import omnigibson as og
 from omnigibson.utils.asset_utils import (
     get_all_object_categories,
-    get_object_models_of_category,
+    get_all_object_category_models,
 )
 from omnigibson.utils.ui_utils import choose_from_options
 import omnigibson.utils.transform_utils as T
@@ -57,7 +57,7 @@ def main(random_selection=False, headless=False, short_exec=False):
                                            random_selection=random_selection)
 
         # Select a model to load
-        available_obj_models = get_object_models_of_category(obj_category)
+        available_obj_models = get_all_object_category_models(obj_category)
         obj_model = choose_from_options(options=available_obj_models, name="object model",
                                         random_selection=random_selection)
 
