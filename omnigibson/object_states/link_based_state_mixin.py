@@ -1,4 +1,5 @@
 import numpy as np
+from omnigibson.object_states.object_state_base import BaseObjectState
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.python_utils import classproperty
 
@@ -6,11 +7,29 @@ from omnigibson.utils.python_utils import classproperty
 log = create_module_logger(module_name=__name__)
 
 
-class LinkBasedStateMixin:
-    def __init__(self):
-        super().__init__()
+class LinkBasedStateMixin(BaseObjectState):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
         self._links = dict()
+
+    @classmethod
+    def is_compatible(cls, obj, **kwargs):
+        # Run super first
+        compatible, reason = super().is_compatible(obj, **kwargs)
+        if not compatible:
+            return compatible, reason
+
+        # Check whether this state requires metalink
+        if not cls.requires_metalink(**kwargs):
+            return True, None
+        metalink_prefix = cls.metalink_prefix
+        for link in obj.links.values():
+            if metalink_prefix in link.name:
+                return True, None
+        return False, f"LinkBasedStateMixin {cls.__name__} requires metalink with prefix {cls.metalink_prefix} " \
+                      f"for obj {obj.name} but none was found! To get valid compatible object models, please use " \
+                      f"omnigibson.utils.asset_utils.get_all_object_category_models_with_abilities(...)"
 
     @classproperty
     def metalink_prefix(cls):
@@ -21,10 +40,10 @@ class LinkBasedStateMixin:
         NotImplementedError()
 
     @classmethod
-    def requires_metalink(cls, *args, **kwargs):
+    def requires_metalink(cls, **kwargs):
         """
         Returns:
-            Whether an object state instantiated with constructor arguments *args and **kwargs will require a metalink
+            Whether an object state instantiated with constructor arguments **kwargs will require a metalink
                 or not
         """
         # True by default
@@ -44,12 +63,6 @@ class LinkBasedStateMixin:
         Returns:
             dict: mapping from link names to links that match the metalink_prefix
         """
-        # Raise an error if we did not find a valid link
-        if len(self._links) == 0:
-            raise ValueError(f"Error: failed to query LinkBasedStateMixin {self.__class__.__name__} for object "
-                             f"{self.obj.name}; no metalink with prefix {self.metalink_prefix} found! "
-                             f"Please use get_all_object_category_models_with_abilities(...) from "
-                             f"omnigibson.utils.asset_utils to grab models with properly annotated metalinks.")
         return self._links
 
     @property
@@ -60,9 +73,7 @@ class LinkBasedStateMixin:
                 no valid metalink is found
         """
         # No default link by default
-        # TODO: Make NotImplementedError() and force downstream Object states to implement, once
-        # assets are fully updated
-        return self.obj.root_link
+        return None
 
     def initialize_link_mixin(self):
         assert not self._initialized

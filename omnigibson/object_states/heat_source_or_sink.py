@@ -86,9 +86,9 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin):
         return m.HEATSOURCE_LINK_PREFIX
 
     @classmethod
-    def requires_metalink(cls, requires_inside, *args, **kwargs):
+    def requires_metalink(cls, **kwargs):
         # No metalink required if inside
-        return not requires_inside
+        return not kwargs.get("requires_inside", False)
 
     @property
     def _default_link(self):
