@@ -14,7 +14,7 @@ from bddl.logic_base import BinaryAtomicFormula, UnaryAtomicFormula, AtomicFormu
 from bddl.object_taxonomy import ObjectTaxonomy
 import omnigibson as og
 from omnigibson.macros import gm
-from omnigibson.utils.asset_utils import get_object_models_of_category
+from omnigibson.utils.asset_utils import get_all_object_categories, get_all_object_category_models_with_abilities
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.python_utils import Wrapper
 from omnigibson.objects.dataset_object import DatasetObject
@@ -284,13 +284,13 @@ class BDDLSampler:
         self._backend = backend
         self._activity_conditions = activity_conditions
         self._object_scope = object_scope
-        self._object_instance_to_category = {
+        self._object_instance_to_synset = {
             obj_inst: obj_cat
             for obj_cat in self._activity_conditions.parsed_objects
             for obj_inst in self._activity_conditions.parsed_objects[obj_cat]
         }
         self._substance_instances = {obj_inst for obj_inst in self._object_scope.keys() if
-                                     self._object_instance_to_category[obj_inst] in SUBSTANCE_SYNSET_MAPPING}
+                                     self._object_instance_to_synset[obj_inst] in SUBSTANCE_SYNSET_MAPPING}
 
         # Initialize other variables that will be filled in later
         self._room_type_to_object_instance = None           # dict
@@ -403,7 +403,7 @@ class BDDLSampler:
         for cond in self._activity_conditions.parsed_initial_conditions:
             if cond[0] == "inroom":
                 obj_inst, room_type = cond[1], cond[2]
-                obj_cat = self._object_instance_to_category[obj_inst]
+                obj_cat = self._object_instance_to_synset[obj_inst]
                 if obj_cat not in NON_SAMPLEABLE_SYNSETS:
                     # Invalid room assignment
                     return "You have assigned room type for [{}], but [{}] is sampleable. Only non-sampleable objects can have room assignment.".format(
@@ -550,17 +550,20 @@ class BDDLSampler:
             room_type_to_scene_objs[room_type] = {}
             for obj_inst in self._room_type_to_object_instance[room_type]:
                 room_type_to_scene_objs[room_type][obj_inst] = {}
-                obj_cat = self._object_instance_to_category[obj_inst]
+                obj_synset = self._object_instance_to_synset[obj_inst]
 
                 # We allow burners to be used as if they are stoves
-                categories = OBJECT_TAXONOMY.get_subtree_categories(obj_cat)
-                if obj_cat == "stove.n.01":
-                    categories += OBJECT_TAXONOMY.get_subtree_categories("burner.n.02")
+                categories = OBJECT_TAXONOMY.get_subtree_categories(obj_synset)
+                abilities = OBJECT_TAXONOMY.get_abilities(obj_synset)
+
+                # Grab all models that fully support all abilities for the corresponding category
+                valid_models = {cat: set(get_all_object_category_models_with_abilities(cat, abilities))
+                                for cat in categories}
 
                 for room_inst in og.sim.scene.seg_map.room_sem_name_to_ins_name[room_type]:
                     # A list of scene objects that satisfy the requested categories
                     room_objs = og.sim.scene.object_registry("in_rooms", room_inst, default_val=[])
-                    scene_objs = [obj for obj in room_objs if obj.category in categories]
+                    scene_objs = [obj for obj in room_objs if obj.category in categories and obj.model in valid_models[obj.category]]
 
                     if len(scene_objs) != 0:
                         room_type_to_scene_objs[room_type][obj_inst][room_inst] = scene_objs
@@ -682,53 +685,42 @@ class BDDLSampler:
         self._sampled_objects = set()
         num_new_obj = 0
         # Only populate self.object_scope for sampleable objects
-        for obj_cat in self._activity_conditions.parsed_objects:
+        available_categories = set(get_all_object_categories())
+        for obj_synset in self._activity_conditions.parsed_objects:
             # Don't populate agent
-            if obj_cat == "agent.n.01":
+            if obj_synset == "agent.n.01":
                 continue
             # Don't populate synsets that can't be sampled
-            if obj_cat in NON_SAMPLEABLE_SYNSETS:
+            if obj_synset in NON_SAMPLEABLE_SYNSETS:
                 continue
 
             # Populate based on whether it's a substance or not
-            if obj_cat in SUBSTANCE_SYNSET_MAPPING:
-                assert len(self._activity_conditions.parsed_objects[obj_cat]) == 1, "Systems are singletons"
-                obj_inst = self._activity_conditions.parsed_objects[obj_cat][0]
+            if obj_synset in SUBSTANCE_SYNSET_MAPPING:
+                assert len(self._activity_conditions.parsed_objects[obj_synset]) == 1, "Systems are singletons"
+                obj_inst = self._activity_conditions.parsed_objects[obj_synset][0]
                 self._object_scope[obj_inst] = BDDLEntity(
                     bddl_inst=obj_inst,
-                    entity=None if obj_inst in self._future_obj_instances else get_system(SUBSTANCE_SYNSET_MAPPING[obj_cat]),
+                    entity=None if obj_inst in self._future_obj_instances else get_system(SUBSTANCE_SYNSET_MAPPING[obj_synset]),
                 )
             else:
-                is_sliceable = OBJECT_TAXONOMY.has_ability(obj_cat, "sliceable")
-                categories = OBJECT_TAXONOMY.get_subtree_categories(obj_cat)
+                categories = list(set(OBJECT_TAXONOMY.get_subtree_categories(obj_synset)).intersection(available_categories))
+                if len(categories) == 0:
+                    return f"Missing all object categories for synset {obj_synset}"
 
-                # TODO: temporary hack
-                remove_categories = [
-                    "pop_case",  # too large
-                    "jewel",  # too small
-                    "ring",  # too small
-                ]
-                for remove_category in remove_categories:
-                    if remove_category in categories:
-                        categories.remove(remove_category)
-
-                for obj_inst in self._activity_conditions.parsed_objects[obj_cat]:
+                for obj_inst in self._activity_conditions.parsed_objects[obj_synset]:
                     # Don't explicitly sample if future
                     if obj_inst in self._future_obj_instances:
                         self._object_scope[obj_inst] = BDDLEntity(bddl_inst=obj_inst)
                         continue
 
                     category = np.random.choice(categories)
-                    # for sliceable objects, only get the whole objects
-                    try:
-                        model_choices = get_object_models_of_category(
-                            category, filter_method="sliceable_whole" if is_sliceable else None
-                        )
-                    except:
-                        return f"Missing object category: {category}"
 
+                    # Get all available models that support all of its synset abilities
+                    model_choices = get_all_object_category_models_with_abilities(
+                        category=category,
+                        abilities=OBJECT_TAXONOMY.get_abilities(obj_synset),
+                    )
                     if len(model_choices) == 0:
-                        # restore back to the play state
                         return f"Missing valid object models for category: {category}"
 
                     # TODO: This no longer works because model ID changes in the new asset
