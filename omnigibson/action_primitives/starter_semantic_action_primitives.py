@@ -273,7 +273,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         return primitive_int, self.addressable_objects.index(obj)
 
     def _get_obj_in_hand(self):
-        obj_in_hand_id = self.robot._ag_obj_in_hand[self.arm]  # TODO(MP): Expose this interface.
+        obj_in_hand_id = self.robot._ag_obj_in_hand[self.robot.default_arm]  # TODO(MP): Expose this interface.
         obj_in_hand = self.scene.objects_by_id[obj_in_hand_id] if obj_in_hand_id is not None else None
         return obj_in_hand
 
@@ -390,32 +390,33 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     {"object": obj, "object_in_hand": obj_in_hand},
                 )
 
-        hand_collision_fn = get_pose3d_hand_collision_fn(
-            self.robot, None, self._get_collision_body_ids(include_robot=True)
-        )
+        # hand_collision_fn = get_pose3d_hand_collision_fn(
+        #     self.robot, None, self._get_collision_body_ids(include_robot=True)
+        # )
         if self._get_obj_in_hand() != obj:
             # Open the hand first
             yield from self._execute_release()
 
             # Allow grasping from suboptimal extents if we've tried enough times.
             force_allow_any_extent = np.random.rand() < 0.5
-            grasp_poses = get_grasp_poses_for_object(self.robot, obj, force_allow_any_extent=force_allow_any_extent)
-            grasp_pose, object_direction = random.choice(grasp_poses)
-            with UndoableContext(self.robot):
-                if hand_collision_fn(grasp_pose):
-                    raise ActionPrimitiveError(
-                        ActionPrimitiveError.Reason.SAMPLING_ERROR,
-                        "Rejecting grasp pose candidate due to collision",
-                        {"grasp_pose": grasp_pose},  # TODO: Add more info about collision.
-                    )
-
+            # grasp_poses = get_grasp_poses_for_object(self.robot, obj, force_allow_any_extent=force_allow_any_extent)
+            # grasp_pose, object_direction = random.choice(grasp_poses)
+            # with UndoableContext(self.robot):
+            #     if hand_collision_fn(grasp_pose):
+            #         raise ActionPrimitiveError(
+            #             ActionPrimitiveError.Reason.SAMPLING_ERROR,
+            #             "Rejecting grasp pose candidate due to collision",
+            #             {"grasp_pose": grasp_pose},  # TODO: Add more info about collision.
+            #         )
+            grasp_pose = np.array([[-0.3, -0.8, 0.5], T.euler2quat([0, 90, 0])])
+            object_direction = np.array([0.0, 0.0, -1.0])
             # Prepare data for the approach later.
             approach_pos = grasp_pose[0] + object_direction * GRASP_APPROACH_DISTANCE
             approach_pose = (approach_pos, grasp_pose[1])
 
             # If the grasp pose is too far, navigate.
-            yield from self._navigate_if_needed(obj, pos_on_obj=approach_pos)
-            yield from self._navigate_if_needed(obj, pos_on_obj=grasp_pose[0])
+            # yield from self._navigate_if_needed(obj, pos_on_obj=approach_pos)
+            # yield from self._navigate_if_needed(obj, pos_on_obj=grasp_pose[0])
 
             yield from self._move_hand(grasp_pose)
 
@@ -423,11 +424,11 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             # It's okay if we can't go all the way because we run into the object.
             indented_print("Performing grasp approach.")
             try:
-                yield from self._move_hand_direct(approach_pose, ignore_failure=True, stop_on_contact=True)
+                yield from self._move_hand_direct_cartesian(approach_pose, stop_on_contact=True)
             except ActionPrimitiveError:
                 # An error will be raised when contact fails. If this happens, let's retry.
                 # Retreat back to the grasp pose.
-                yield from self._move_hand_direct(grasp_pose, ignore_failure=True)
+                yield from self._move_hand_direct_cartesian(grasp_pose)
                 raise
 
             indented_print("Grasping.")
@@ -435,7 +436,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 yield from self._execute_grasp()
             except ActionPrimitiveError:
                 # Retreat back to the grasp pose.
-                yield from self._move_hand_direct(grasp_pose, ignore_failure=True)
+                yield from self._move_hand_direct_cartesian(grasp_pose)
                 raise
 
         indented_print("Moving hand back to neutral position.")
@@ -495,24 +496,49 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         if obj_in_hand.states[predicate].get_value(obj):
             return
 
-    def _move_hand(self, target_pose):
-        target_pose_in_correct_format = list(target_pose[0]) + list(p.getEulerFromQuaternion(target_pose[1]))
-
-        # Define the sampling domain.
-        cur_pos = np.array(self.robot.get_position())
-        target_pos = np.array(target_pose[0])
-        both_pos = np.array([cur_pos, target_pos])
-        min_pos = np.min(both_pos, axis=0) - HAND_SAMPLING_DOMAIN_PADDING
-        max_pos = np.max(both_pos, axis=0) + HAND_SAMPLING_DOMAIN_PADDING
-
-        with UndoableContext(self.robot):
-            plan = plan_hand_motion_br(
-                robot=self.robot,
-                obj_in_hand=self._get_obj_in_hand(),
-                end_conf=target_pose_in_correct_format,
-                hand_limits=(min_pos, max_pos),
-                obstacles=self._get_collision_body_ids(include_robot=True),
+    def _convert_cartesian_to_joint_space(self, target_pose):
+        relative_target_pose = self._get_pose_in_robot_frame(target_pose)
+        control_idx = np.concatenate([self.robot.trunk_control_idx, self.robot.arm_control_idx[self.robot.default_arm]])
+        ik_solver = IKSolver(
+            robot_description_path=self.robot.robot_arm_descriptor_yamls[self.robot.default_arm],
+            robot_urdf_path=self.robot.urdf_path,
+            default_joint_pos=self.robot.get_joint_positions()[control_idx],
+            eef_name=self.robot.eef_link_names[self.robot.default_arm],
+        )
+        # Grab the joint positions in order to reach the desired pose target
+        joint_pos = ik_solver.solve(
+            target_pos=relative_target_pose[0],
+            target_quat=relative_target_pose[1],
+            max_iterations=100,
+        )
+        if joint_pos is None:
+            raise ActionPrimitiveError(
+                ActionPrimitiveError.Reason.PLANNING_ERROR,
+                "Could not find joint positions for target pose",
+                {"target_pose": target_pose},
             )
+        
+        return joint_pos, control_idx
+
+    def _move_hand(self, target_pose):
+        joint_pos, control_idx = self._convert_cartesian_to_joint_space(target_pose)
+        # Define the sampling domain.
+        # cur_pos = np.array(self.robot.get_position())
+        # target_pos = np.array(target_pose[0])
+        # both_pos = np.array([cur_pos, target_pos])
+        # min_pos = np.min(both_pos, axis=0) - HAND_SAMPLING_DOMAIN_PADDING
+        # max_pos = np.max(both_pos, axis=0) + HAND_SAMPLING_DOMAIN_PADDING
+
+        # with UndoableContext():
+        #     plan = plan_hand_motion_br(
+        #         robot=self.robot,
+        #         obj_in_hand=self._get_obj_in_hand(),
+        #         end_conf=target_pose_in_correct_format,
+        #         hand_limits=(min_pos, max_pos),
+        #         obstacles=self._get_collision_body_ids(include_robot=True),
+        #     )
+
+        plan = [joint_pos]
 
         if plan is None:
             raise ActionPrimitiveError(
@@ -523,50 +549,30 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         # Follow the plan to navigate.
         indented_print("Plan has %d steps.", len(plan))
-        for i, xyz_rpy in enumerate(plan):
+        for i, joint_pos in enumerate(plan):
             indented_print("Executing grasp plan step %d/%d", i + 1, len(plan))
-            pose = (xyz_rpy[:3], p.getQuaternionFromEuler(xyz_rpy[3:]))
-            yield from self._move_hand_direct(pose)
+            yield from self._move_hand_direct_joint(joint_pos, control_idx)
 
-    def _move_hand_direct(self, target_pose, **kwargs):
-        yield from self._move_hand_direct_relative_to_robot(self._get_pose_in_robot_frame(target_pose), **kwargs)
-
-    def _move_hand_direct_relative_to_robot(
-        self,
-        relative_target_pose,
-        ignore_failure=False,
-        max_steps_for_hand_move=MAX_STEPS_FOR_HAND_MOVE,
-        stop_on_contact=False,
-    ):
-        for _ in range(max_steps_for_hand_move):
-            if stop_on_contact and p.getContactPoints(self.robot.eef_links[self.arm].body_id):  # TODO(MP): Generalize
+    def _move_hand_direct_joint(self, joint_pos, control_idx, stop_on_contact=False):
+        self.robot.set_joint_positions(joint_pos, indices=control_idx, drive=True)
+        while True:
+            current_joint_pos = self.robot.get_joint_positions()[control_idx]
+            diff_joint_pos = np.absolute(np.array(current_joint_pos) - np.array(joint_pos))
+            if max(diff_joint_pos) < 0.005:
                 return
-
-            action = convert_robot_part_pose_to_action(self.robot, hand_target_pose=relative_target_pose)
-            if action is None:
-                if stop_on_contact:
-                    raise ActionPrimitiveError(
-                        ActionPrimitiveError.Reason.EXECUTION_ERROR,
-                        "No contact was made when contact was required as a move post-condition.",
-                    )
+            if stop_on_contact and detect_robot_collision(self.robot):
+                self.robot.set_joint_positions(current_joint_pos, control_idx, drive=False)
                 return
+            yield np.zeros(self.robot.action_dim)
 
-            yield action
-
-        if not ignore_failure:
-            current_pose = self.robot.get_relative_eef_pose()
-            raise ActionPrimitiveError(
-                ActionPrimitiveError.Reason.EXECUTION_ERROR,
-                "Could not move gripper to desired position.",
-                {"relative_target_pose": relative_target_pose, "relative_current_pose": current_pose},
-            )
-
-        if stop_on_contact:
-            raise ActionPrimitiveError(ActionPrimitiveError.Reason.EXECUTION_ERROR, "No contact was made.")
+    def _move_hand_direct_cartesian(self, target_pose, **kwargs):
+        joint_pos, control_idx = self._convert_cartesian_to_joint_space(target_pose)
+        yield from self._move_hand_direct_joint(joint_pos, control_idx, **kwargs)
 
     def _execute_grasp(self):
         action = np.zeros(self.robot.action_dim)
-        action[self.robot.controller_action_idx["gripper_right_hand"]] = -1.0
+        controller_name = "gripper_{}".format(self.robot.default_arm)
+        action[self.robot.controller_action_idx[controller_name]] = -1.0
         for _ in range(MAX_STEPS_FOR_GRASP_OR_RELEASE):
             yield action
 
@@ -582,7 +588,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
     def _execute_release(self):
         action = np.zeros(self.robot.action_dim)
-        action[self.robot.controller_action_idx["gripper_right_hand"]] = 1.0
+        controller_name = "gripper_{}".format(self.robot.default_arm)
+        action[self.robot.controller_action_idx[controller_name]] = 1.0
         for _ in range(MAX_STEPS_FOR_GRASP_OR_RELEASE):
             # Otherwise, keep applying the action!
             yield action

@@ -29,7 +29,7 @@ robots:
     self_collision: false
     action_normalize: true
     action_type: continuous
-    grasping_mode: physical
+    grasping_mode: sticky
     rigid_trunk: false
     default_trunk_offset: 0.365
     default_arm_pose: diagonal30
@@ -38,8 +38,8 @@ robots:
       base:
         name: DifferentialDriveController
       arm_0:
-        name: InverseKinematicsController
-        kv: 2.0
+        name: JointController
+        motor_type: velocity
       gripper_0:
         name: MultiFingerGripperController
         mode: binary

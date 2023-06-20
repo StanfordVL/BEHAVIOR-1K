@@ -1,6 +1,8 @@
 import numpy as np
-from ompl import base as ob
-from ompl import geometric as ompl_geo
+# from ompl import base as ob
+# from ompl import geometric as ompl_geo
+ob = None
+ompl_geo = None
 
 import omnigibson as og
 from omnigibson.object_states import ContactBodies

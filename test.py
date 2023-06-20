@@ -17,8 +17,14 @@ from omnigibson.objects import PrimitiveObject
 from omnigibson.object_states import ContactBodies
 
 def pause(time):
-    for _ in range(int(time*1000)):
-        og.sim.render()
+    for _ in range(int(time*100)):
+        # og.sim.render()
+        og.sim.step()
+
+def execute_controller(ctrl_gen, env):
+    for action in ctrl_gen:
+        # env.step(action)
+        og.sim.step()
 
 def main(random_selection=False, headless=False, short_exec=False):
     """
@@ -33,11 +39,13 @@ def main(random_selection=False, headless=False, short_exec=False):
     config_filename = "test.yaml"
     config = yaml.load(open(config_filename, "r"), Loader=yaml.FullLoader)
 
-    config["scene"]["load_object_categories"] = ["floors", "ceilings", "walls"]
+    config["scene"]["load_object_categories"] = ["floors", "ceilings", "walls", "coffee_table"]
 
     # config["objects"] = [obj_cfg]
     # Load the environment
     env = og.Environment(configs=config)
+    scene = env.scene
+    robot = env.robots[0]
 
     # Allow user to move camera more easily
     og.sim.enable_viewer_camera_teleoperation()
@@ -45,16 +53,15 @@ def main(random_selection=False, headless=False, short_exec=False):
     marker = PrimitiveObject(
         prim_path=f"/World/marker",
         name="marker",
-        primitive_type="Sphere",
-        radius=0.03,
-        visual_only=True,
+        primitive_type="Cube",
+        size=0.07,
+        visual_only=False,
         rgba=[1.0, 0, 0, 1.0],
     )
     og.sim.import_object(marker)
-    marker.set_position([0.5, 2.5, 1.0])
+    marker.set_position([-0.3, -0.8, 0.5])
     og.sim.step()
-    scene = env.scene
-    robot = env.robots[0]
+
     
     # from omnigibson.utils.sim_utils import land_object
     # land_object(robot, np.zeros(3), z_offset=0.05)
@@ -67,7 +74,8 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # from IPython import embed; embed()
 
-    robot.set_position([0.0, 0.0, 0.05])
+    robot.set_position([0.0, -0.5, 0.05])
+    robot.set_orientation(T.euler2quat([0, 0, -np.pi/1.5]))
     og.sim.step()
 
 
@@ -77,16 +85,40 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # navigate_controller = controller._navigate_to_pose([0.5, 2.5, 0.0])
     # navigate_controller = controller._navigate_to_pose([0.0, -1.0, 0.0])
-    navigate_controller = controller._navigate_to_obj(marker)
+    # navigate_controller = controller._navigate_to_obj(marker)
 
 
     # robot.untuck()
-    # og.sim.step()
+    start_joint_pos = np.array(
+        [
+            0.0,
+            0.0,  # wheels
+            0.2,  # trunk
+            0.0,
+            1.1707963267948966,
+            0.0,  # head
+            1.4707963267948965,
+            -0.4,
+            1.6707963267948966,
+            0.0,
+            1.5707963267948966,
+            0.0,  # arm
+            0.05,
+            0.05,  # gripper
+        ]
+    )
+    robot.set_joint_positions(start_joint_pos)
+    og.sim.step()
+    pause(1)
+    target_pose = ([-0.3, -0.8, 0.5], T.euler2quat([0, 90, 0]))
+    hand_controller = controller.grasp(marker)
 
-    while True:
+    execute_controller(hand_controller, env)
+
+    # while True:
         # pause(1)
-        action = next(navigate_controller)
-        state, reward, done, info = env.step(action)
+        # action = next(navigate_controller)
+        # state, reward, done, info = env.step(action)
         # collision_objects = list(filter(lambda obj : "floor" not in obj.name, robot.states[ContactBodies].get_value()))
         # if len(collision_objects) > 0:
         #     print(collision_objects[0].name)
