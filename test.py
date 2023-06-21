@@ -23,7 +23,7 @@ def pause(time):
 
 def execute_controller(ctrl_gen, env):
     for action in ctrl_gen:
-        print(action)
+        # print(action)
         if action is None:
             og.sim.step()
         else:
@@ -78,9 +78,11 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # from IPython import embed; embed()
 
-    robot.set_position([0.0, -0.5, 0.05])
-    robot.set_orientation(T.euler2quat([0, 0, -np.pi/1.5]))
-    og.sim.step()
+    # robot.set_position([-1.01199755, -0.30455528, 0.0])
+    # robot.set_orientation(T.euler2quat([0, 0, 5.64995586]))
+    # robot.set_position([0.0, -0.5, 0.05])
+    # robot.set_orientation(T.euler2quat([0, 0, -np.pi/1.5]))
+    # og.sim.step()
 
 
     controller = StarterSemanticActionPrimitives(None, scene, robot)
@@ -89,7 +91,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # navigate_controller = controller._navigate_to_pose([0.5, 2.5, 0.0])
     # navigate_controller = controller._navigate_to_pose([0.0, -1.0, 0.0])
-    # navigate_controller = controller._navigate_to_obj(marker)
+    navigate_controller = controller._navigate_to_obj(marker)
 
 
     # robot.untuck()
@@ -111,18 +113,21 @@ def main(random_selection=False, headless=False, short_exec=False):
             0.05,  # gripper
         ]
     )
-    robot.set_joint_positions(start_joint_pos)
-    og.sim.step()
-    pause(1)
-    target_pose = ([-0.3, -0.8, 0.5], T.euler2quat([0, 90, 0]))
+    # robot.set_joint_positions(start_joint_pos)
+    # og.sim.step()
+    # pause(10)
+    # target_pose = ([-0.3, -0.8, 0.5], T.euler2quat([0, 90, 0]))
     hand_controller = controller.grasp(marker)
 
+    # execute_controller(hand_controller, env)
+
+    execute_controller(navigate_controller, env)
     execute_controller(hand_controller, env)
 
     # while True:
-        # pause(1)
-        # action = next(navigate_controller)
-        # state, reward, done, info = env.step(action)
+    #     pause(1)
+    #     action = next(navigate_controller)
+    #     state, reward, done, info = env.step(action)
         # collision_objects = list(filter(lambda obj : "floor" not in obj.name, robot.states[ContactBodies].get_value()))
         # if len(collision_objects) > 0:
         #     print(collision_objects[0].name)

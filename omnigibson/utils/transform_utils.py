@@ -542,6 +542,8 @@ def quat2euler(quat):
     """
     return R.from_quat(quat).as_euler("xyz")
 
+def wrap_angle(theta, lower=-np.pi):  # [-np.pi, np.pi)
+    return (theta - lower) % (2 * np.pi) + lower
 
 def pose_in_A_to_pose_in_B(pose_A, pose_A_in_B):
     """

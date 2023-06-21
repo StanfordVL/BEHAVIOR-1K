@@ -22,7 +22,7 @@ import omnigibson as og
 from omnigibson import object_states
 from omnigibson.action_primitives.action_primitive_set_base import ActionPrimitiveError, BaseActionPrimitiveSet
 # from igibson.external.pybullet_tools.utils import set_joint_position
-# from igibson.object_states.on_floor import RoomFloor
+# from omnigibson.object_states.on_floor import RoomFloor
 from omnigibson.object_states.utils import get_center_extent
 # from igibson.objects.articulated_object import URDFObject
 from omnigibson.objects.object_base import BaseObject
@@ -46,7 +46,7 @@ set_joint_position = None
 RoomFloor = None
 sample_kinematics = None
 URDFObject = None
-DEFAULT_BODY_OFFSET_FROM_FLOOR = 0
+DEFAULT_BODY_OFFSET_FROM_FLOOR = 0.05
 behavior_robot = None
 BehaviorRobot = None
 get_grasp_poses_for_object = None
@@ -81,7 +81,7 @@ HAND_DISTANCE_THRESHOLD = 0.9
 ACTIVITY_RELEVANT_OBJECTS_ONLY = False
 
 DEFAULT_DIST_THRESHOLD = 0.01
-DEFAULT_ANGLE_THRESHOLD = 0.05
+DEFAULT_ANGLE_THRESHOLD = 0.07
 
 LOW_PRECISION_DIST_THRESHOLD = 0.1
 LOW_PRECISION_ANGLE_THRESHOLD = 0.2
@@ -102,6 +102,7 @@ def is_close(start_pose, end_pose, angle_threshold, dist_threshold):
 
     diff_rot = end_rot * start_rot.inv()
     diff_pos = np.array(end_pos) - np.array(start_pos)
+    print("Position difference to target: %s, Rotation difference: %s", np.linalg.norm(diff_pos), diff_rot.magnitude())
     indented_print(
         "Position difference to target: %s, Rotation difference: %s", np.linalg.norm(diff_pos), diff_rot.magnitude()
     )
@@ -607,19 +608,11 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             )
 
     def _reset_hand(self):
-        # default_pose = p.multiplyTransforms(
-        #     # TODO(MP): Generalize.
-        #     *self.robot.get_position_orientation(),
-        #     *behavior_robot.RIGHT_HAND_LOC_POSE_TRACKED,
-        # )
-        # yield from self._move_hand(default_pose)
-        action = np.zeros(self.robot.action_dim)
-        action[5] = 1.0
-        for i in range(100):
-            yield action
+        default_pose = self.robot.tucked_default_joint_pos
+        control_idx = list(range(self.robot.n_joints))
+        yield from self._move_hand_direct_joint(default_pose, control_idx)
 
     def _navigate_to_pose(self, pose_2d):
-
         with UndoableContext():
             plan = plan_base_motion(
                 robot=self.robot,
@@ -689,12 +682,14 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         yield from self._navigate_to_obj(obj, pos_on_obj=pos_on_obj, **kwargs)
 
     def _navigate_to_obj(self, obj, pos_on_obj=None, **kwargs):
-        if isinstance(obj, RoomFloor):
-            # TODO(lowprio-MP): Pos-on-obj for the room navigation?
-            pose = self._sample_pose_in_room(obj.room_instance)
-        else:
-            pose = self._sample_pose_near_object(obj, pos_on_obj=pos_on_obj, **kwargs)
+        # if isinstance(obj, RoomFloor):
+        #     # TODO(lowprio-MP): Pos-on-obj for the room navigation?
+        #     pose = self._sample_pose_in_room(obj.room_instance)
+        # else:
+        #     pose = self._sample_pose_near_object(obj, pos_on_obj=pos_on_obj, **kwargs)
 
+        pose = self._sample_pose_near_object(obj, pos_on_obj=pos_on_obj, **kwargs)
+        print(pose)
         yield from self._navigate_to_pose(pose)
 
     def _navigate_to_pose_direct(self, pose_2d, low_precision=False):
@@ -738,7 +733,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             base_action = [lin_vel, ang_vel]
             action[self.robot.controller_action_idx["base"]] = base_action
 
-            # print(is_angle_close)
+            print("angle: " + str(is_angle_close))
+            print("arrived: " + str(arrived_at_pos))
             # Return None if no action is needed.
             if is_angle_close and arrived_at_pos:
                 indented_print("Move is complete.")
@@ -757,7 +753,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             pos_on_obj = self._sample_position_on_aabb_face(obj)
 
         pos_on_obj = np.array(pos_on_obj)
-        obj_rooms = obj.in_rooms if obj.in_rooms else [self.scene.get_room_instance_by_point(pos_on_obj[:2])]
+        # obj_rooms = obj.in_rooms if obj.in_rooms else [self.scene.get_room_instance_by_point(pos_on_obj[:2])]
         for _ in range(MAX_ATTEMPTS_FOR_SAMPLING_POSE_NEAR_OBJECT):
             distance = np.random.uniform(0.2, 1.0)
             yaw = np.random.uniform(-np.pi, np.pi)
@@ -766,9 +762,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             )
 
             # Check room
-            if self.scene.get_room_instance_by_point(pose_2d[:2]) not in obj_rooms:
-                indented_print("Candidate position is in the wrong room.")
-                continue
+            # if self.scene.get_room_instance_by_point(pose_2d[:2]) not in obj_rooms:
+            #     indented_print("Candidate position is in the wrong room.")
+            #     continue
 
             if not self._test_pose(pose_2d, pos_on_obj=pos_on_obj, **kwargs):
                 continue
@@ -831,16 +827,16 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             return pos, orn
 
     def _test_pose(self, pose_2d, pos_on_obj=None, check_joint=None):
-        with UndoableContext(self.robot):
+        with UndoableContext():
             self.robot.set_position_orientation(*self._get_robot_pose_from_2d_pose(pose_2d))
-
+            og.sim.step(render=False)
             # if pos_on_obj is not None:
             #     hand_distance = self._get_dist_from_point_to_shoulder(pos_on_obj)
             #     if hand_distance > HAND_DISTANCE_THRESHOLD:
             #         indented_print("Candidate position failed shoulder distance test.")
             #         return False
 
-            if detect_robot_collision():
+            if detect_robot_collision(self.robot):
                 indented_print("Candidate position failed collision test.")
                 return False
 

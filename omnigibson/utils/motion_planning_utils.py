@@ -1,14 +1,12 @@
 import numpy as np
-# from ompl import base as ob
-# from ompl import geometric as ompl_geo
-ob = None
-ompl_geo = None
+from ompl import base as ob
+from ompl import geometric as ompl_geo
+# ob = None
+# ompl_geo = None
 
 import omnigibson as og
 from omnigibson.object_states import ContactBodies
 import omnigibson.utils.transform_utils as T
-
-import pdb
 
 def plan_base_motion(
     robot,
@@ -38,8 +36,8 @@ def plan_base_motion(
 
     # set lower and upper bounds
     bounds = ob.RealVectorBounds(2)
-    bounds.setLow(-1)
-    bounds.setHigh(3)
+    bounds.setLow(-7.0)
+    bounds.setHigh(7.0)
     space.setBounds(bounds)
 
     # create a simple setup object
@@ -53,12 +51,14 @@ def plan_base_motion(
     start = ob.State(space)
     start().setX(start_conf[0])
     start().setY(start_conf[1])
-    start().setYaw(start_conf[2])
+    start().setYaw(T.wrap_angle(start_conf[2]))
+    print(start)
 
     goal = ob.State(space)
     goal().setX(end_conf[0])
     goal().setY(end_conf[1])
-    goal().setYaw(end_conf[2])
+    goal().setYaw(T.wrap_angle(end_conf[2]))
+    print(goal)
 
     ss.setStartAndGoalStates(start, goal)
 
@@ -87,6 +87,8 @@ def detect_robot_collision(robot, obj_in_hand=None):
     collision_objects = list(filter(lambda obj : "floor" not in obj.name, robot.states[ContactBodies].get_value()))
     # collision_objects = robot.states[ContactBodies].get_value()
     # for col_obj in collision_objects:
+    # return False
+    # print(collision_objects)
     return len(collision_objects) > 0
 
 def remove_unnecessary_rotations(path):
