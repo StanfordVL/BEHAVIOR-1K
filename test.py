@@ -15,6 +15,7 @@ from omnigibson.action_primitives.starter_semantic_action_primitives import Star
 import omnigibson.utils.transform_utils as T
 from omnigibson.objects import PrimitiveObject
 from omnigibson.object_states import ContactBodies
+from omnigibson.objects.dataset_object import DatasetObject
 
 def pause(time):
     for _ in range(int(time*100)):
@@ -43,7 +44,8 @@ def main(random_selection=False, headless=False, short_exec=False):
     config_filename = "test.yaml"
     config = yaml.load(open(config_filename, "r"), Loader=yaml.FullLoader)
 
-    config["scene"]["load_object_categories"] = ["floors", "ceilings", "walls", "coffee_table"]
+    config["scene"]["load_object_categories"] = ["floors", "ceilings", "walls", "coffee_table", "desk"]
+    # config["scene"]["load_object_categories"] = None
 
     # config["objects"] = [obj_cfg]
     # Load the environment
@@ -54,6 +56,25 @@ def main(random_selection=False, headless=False, short_exec=False):
     # Allow user to move camera more easily
     og.sim.enable_viewer_camera_teleoperation()
 
+    # table_cfg = dict(
+    #     type="DatasetObject",
+    #     name="table",
+    #     category="breakfast_table",
+    #     model="rjgmmy",
+    #     scale=0.9,
+    #     position=[0, 0, 0.58],
+    # )
+
+    table = DatasetObject(
+        name="table",
+        category="breakfast_table",
+        model="rjgmmy",
+        scale = 0.3,
+        position=[2.0, 2.0, 0.58]
+    )
+    og.sim.import_object(table)
+    table.set_position([1.0, 1.0, 0.58])
+
     marker = PrimitiveObject(
         prim_path=f"/World/marker",
         name="marker",
@@ -62,6 +83,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         visual_only=False,
         rgba=[1.0, 0, 0, 1.0],
     )
+
     og.sim.import_object(marker)
     marker.set_position([-0.3, -0.8, 0.5])
     og.sim.step()
@@ -80,9 +102,9 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # robot.set_position([-1.01199755, -0.30455528, 0.0])
     # robot.set_orientation(T.euler2quat([0, 0, 5.64995586]))
-    # robot.set_position([0.0, -0.5, 0.05])
-    # robot.set_orientation(T.euler2quat([0, 0, -np.pi/1.5]))
-    # og.sim.step()
+    robot.set_position([0.0, -0.5, 0.05])
+    robot.set_orientation(T.euler2quat([0, 0, -np.pi/1.5]))
+    og.sim.step()
 
 
     controller = StarterSemanticActionPrimitives(None, scene, robot)
@@ -90,8 +112,9 @@ def main(random_selection=False, headless=False, short_exec=False):
     
 
     # navigate_controller = controller._navigate_to_pose([0.5, 2.5, 0.0])
-    # navigate_controller = controller._navigate_to_pose([0.0, -1.0, 0.0])
-    navigate_controller = controller._navigate_to_obj(marker)
+    # navigate_controller = controller._navigate_to_pose([0.0, 0.5, 0.0])
+    navigate_controller_marker = controller._navigate_to_obj(marker)
+    navigate_controller_table = controller._navigate_to_obj(table)
 
 
     # robot.untuck()
@@ -113,16 +136,16 @@ def main(random_selection=False, headless=False, short_exec=False):
             0.05,  # gripper
         ]
     )
-    # robot.set_joint_positions(start_joint_pos)
-    # og.sim.step()
-    # pause(10)
-    # target_pose = ([-0.3, -0.8, 0.5], T.euler2quat([0, 90, 0]))
+    robot.set_joint_positions(start_joint_pos)
+    og.sim.step()
     hand_controller = controller.grasp(marker)
 
     # execute_controller(hand_controller, env)
 
-    execute_controller(navigate_controller, env)
+    # execute_controller(navigate_controller_marker, env)
     execute_controller(hand_controller, env)
+    pause(1)
+    execute_controller(navigate_controller_table, env)
 
     # while True:
     #     pause(1)

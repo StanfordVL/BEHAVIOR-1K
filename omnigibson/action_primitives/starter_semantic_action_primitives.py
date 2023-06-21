@@ -80,8 +80,8 @@ HAND_DISTANCE_THRESHOLD = 0.9
 
 ACTIVITY_RELEVANT_OBJECTS_ONLY = False
 
-DEFAULT_DIST_THRESHOLD = 0.01
-DEFAULT_ANGLE_THRESHOLD = 0.07
+DEFAULT_DIST_THRESHOLD = 0.05
+DEFAULT_ANGLE_THRESHOLD = 0.05
 
 LOW_PRECISION_DIST_THRESHOLD = 0.1
 LOW_PRECISION_ANGLE_THRESHOLD = 0.2
@@ -102,7 +102,6 @@ def is_close(start_pose, end_pose, angle_threshold, dist_threshold):
 
     diff_rot = end_rot * start_rot.inv()
     diff_pos = np.array(end_pos) - np.array(start_pos)
-    print("Position difference to target: %s, Rotation difference: %s", np.linalg.norm(diff_pos), diff_rot.magnitude())
     indented_print(
         "Position difference to target: %s, Rotation difference: %s", np.linalg.norm(diff_pos), diff_rot.magnitude()
     )
@@ -442,7 +441,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         indented_print("Moving hand back to neutral position.")
         yield from self._reset_hand()
-        yield from self._execute_release()
+        # yield from self._execute_release()
 
         if self._get_obj_in_hand() == obj:
             return
@@ -490,7 +489,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         obj_pose = self._sample_pose_with_object_and_predicate(predicate, obj_in_hand, obj)
         hand_pose = self._get_hand_pose_for_object_pose(obj_pose)
-        yield from self._navigate_if_needed(obj, pos_on_obj=hand_pose[0])
+        # yield from self._navigate_if_needed(obj, pos_on_obj=hand_pose[0])
         yield from self._move_hand(hand_pose)
         yield from self._execute_release()
         yield from self._reset_hand()
@@ -608,15 +607,16 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             )
 
     def _reset_hand(self):
-        default_pose = self.robot.tucked_default_joint_pos
-        control_idx = list(range(self.robot.n_joints))
+        control_idx = np.concatenate([self.robot.trunk_control_idx, self.robot.arm_control_idx[self.robot.default_arm]])
+        default_pose = self.robot.tucked_default_joint_pos[control_idx]
         yield from self._move_hand_direct_joint(default_pose, control_idx)
 
     def _navigate_to_pose(self, pose_2d):
         with UndoableContext():
+            obj_in_hand = self._get_obj_in_hand()
             plan = plan_base_motion(
                 robot=self.robot,
-                obj_in_hand=None,
+                obj_in_hand=obj_in_hand,
                 end_conf=pose_2d,
             )
 
@@ -689,7 +689,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         #     pose = self._sample_pose_near_object(obj, pos_on_obj=pos_on_obj, **kwargs)
 
         pose = self._sample_pose_near_object(obj, pos_on_obj=pos_on_obj, **kwargs)
-        print(pose)
         yield from self._navigate_to_pose(pose)
 
     def _navigate_to_pose_direct(self, pose_2d, low_precision=False):
@@ -708,7 +707,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             # Accumulate the actions in the correct order.
             action = np.zeros(self.robot.action_dim)
 
-            is_angle_close, is_dist_close, angle, dist = is_close(([0, 0, 0], [0, 0, 0, 1]), body_target_pose, dist_threshold, angle_threshold)
+            is_angle_close, is_dist_close, angle, dist = is_close(([0, 0, 0], [0, 0, 0, 1]), body_target_pose, angle_threshold, dist_threshold)
             if is_dist_close: arrived_at_pos = True
 
             angle_to_waypoint = T.vecs2axisangle([1, 0, 0], [body_target_pose[0][0], body_target_pose[0][1], 0.0])[2]
@@ -733,8 +732,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             base_action = [lin_vel, ang_vel]
             action[self.robot.controller_action_idx["base"]] = base_action
 
-            print("angle: " + str(is_angle_close))
-            print("arrived: " + str(arrived_at_pos))
             # Return None if no action is needed.
             if is_angle_close and arrived_at_pos:
                 indented_print("Move is complete.")

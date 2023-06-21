@@ -59,7 +59,7 @@ def plan_base_motion(
     goal().setY(end_conf[1])
     goal().setYaw(T.wrap_angle(end_conf[2]))
     print(goal)
-
+    # print(state_valid_fn(goal()))
     ss.setStartAndGoalStates(start, goal)
 
     # this will automatically choose a default planner with
@@ -81,15 +81,17 @@ def plan_base_motion(
     return None
 
 def detect_robot_collision(robot, obj_in_hand=None):
-    # filter_objects = ["floor"]
-    # if obj_in_hand is not None:
-    #     filter_objects.append(obj_in_hand.name)
-    collision_objects = list(filter(lambda obj : "floor" not in obj.name, robot.states[ContactBodies].get_value()))
-    # collision_objects = robot.states[ContactBodies].get_value()
-    # for col_obj in collision_objects:
-    # return False
-    # print(collision_objects)
-    return len(collision_objects) > 0
+    filter_objects = ["floor"]
+    if obj_in_hand is not None:
+        filter_objects.append(obj_in_hand.name)
+    # collision_objects = list(filter(lambda obj : "floor" not in obj.name, robot.states[ContactBodies].get_value()))
+    collision_objects = robot.states[ContactBodies].get_value()
+    filtered_collision_objects = []
+    for col_obj in collision_objects:
+        if not any([f in col_obj.name for f in filter_objects]):
+            filtered_collision_objects.append(col_obj)
+        
+    return len(filtered_collision_objects) > 0
 
 def remove_unnecessary_rotations(path):
     for start_idx in range(len(path) - 1):
