@@ -1049,7 +1049,7 @@ def _create_system_from_metadata(system_name):
     if system_name not in all_systems:
         # Use default config -- assume @system_name is a fluid that uses the same params as water
         return systems.__dict__["FluidSystem"].create(
-            name=system_name,
+            name=system_name.replace("-", "_"),
             particle_contact_offset=0.012,
             particle_density=500.0,
             is_viscous=False,
@@ -1181,6 +1181,9 @@ def get_system(system_name):
 
 
 def clear_all_systems():
+    global _CALLBACKS_ON_SYSTEM_INIT, _CALLBACKS_ON_SYSTEM_CLEAR
+    _CALLBACKS_ON_SYSTEM_INIT = dict()
+    _CALLBACKS_ON_SYSTEM_CLEAR = dict()
     for system in SYSTEM_REGISTRY.objects:
         system.clear()
 
