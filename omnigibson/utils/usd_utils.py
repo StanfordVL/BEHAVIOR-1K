@@ -265,6 +265,11 @@ class RigidContactAPI:
                         cls._PATH_TO_IDX[link.prim_path] = i
                         i += 1
 
+        # If there are no valid objects, clear the view and terminate early
+        if i == 0:
+            cls._CONTACT_VIEW = None
+            return
+
         # Generate rigid body view, making sure to update the simulation first (without physics) so that the physx
         # backend is synchronized with any newly added objects
         # We also suppress the omni tensor plugin from giving warnings we expect
