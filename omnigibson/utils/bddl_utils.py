@@ -712,9 +712,11 @@ class BDDLSampler:
                     entity=None if obj_inst in self._future_obj_instances else get_system(SUBSTANCE_SYNSET_MAPPING[obj_synset]),
                 )
             else:
-                categories = list(set(OBJECT_TAXONOMY.get_subtree_categories(obj_synset)).intersection(available_categories))
+                valid_categories = set(OBJECT_TAXONOMY.get_subtree_categories(obj_synset))
+                categories = list(valid_categories.intersection(available_categories))
                 if len(categories) == 0:
-                    return f"Missing all object categories for synset {obj_synset}"
+                    return f"None of the following categories could be found in the dataset for synset {obj_synset}: " \
+                           f"{valid_categories}"
 
                 for obj_inst in self._activity_conditions.parsed_objects[obj_synset]:
                     # Don't explicitly sample if future
