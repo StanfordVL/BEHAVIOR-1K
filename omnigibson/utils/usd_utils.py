@@ -742,7 +742,7 @@ def mesh_prim_to_trimesh_mesh(mesh_prim, include_normals=True, include_texcoord=
     return trimesh.Trimesh(**kwargs)
 
 
-def sample_mesh_keypoints(mesh_prim, n_keypoints, n_keyfaces, deterministic=True):
+def sample_mesh_keypoints(mesh_prim, n_keypoints, n_keyfaces, seed=None):
     """
     Samples keypoints and keyfaces for mesh @mesh_prim
 
@@ -750,7 +750,7 @@ def sample_mesh_keypoints(mesh_prim, n_keypoints, n_keyfaces, deterministic=True
         mesh_prim (Usd.Prim): Mesh prim to be sampled from
         n_keypoints (int): number of (unique) keypoints to randomly sample from @mesh_prim
         n_keyfaces (int): number of (unique) keyfaces to randomly sample from @mesh_prim
-        deterministic (bool): Whether to deterministically sample or not (ie: whether to set random seed or not)
+        seed (None or int): If set, sets the random seed for deterministic results
 
     Returns:
         2-tuple:
@@ -762,8 +762,8 @@ def sample_mesh_keypoints(mesh_prim, n_keypoints, n_keyfaces, deterministic=True
                 @n_keyfaces
     """
     # Set seed if deterministic
-    if deterministic:
-        np.random.seed(0)
+    if seed is not None:
+        np.random.seed(seed)
 
     # Generate trimesh mesh from which to aggregate points
     tm = mesh_prim_to_trimesh_mesh(mesh_prim=mesh_prim, include_normals=False, include_texcoord=False)
