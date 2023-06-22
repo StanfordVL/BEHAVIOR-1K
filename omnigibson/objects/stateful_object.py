@@ -24,8 +24,7 @@ from omnigibson.object_states.particle_modifier import ParticleRemover
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.renderer_settings.renderer_settings import RendererSettings
 from omnigibson.utils.constants import PrimType, EmitterType
-from omnigibson.utils.usd_utils import BoundingBoxAPI
-from omnigibson.utils.python_utils import classproperty
+from omnigibson.utils.python_utils import classproperty, extract_class_init_kwargs_from_dict
 from omnigibson.object_states import Saturated
 from omnigibson.utils.ui_utils import create_module_logger
 
@@ -219,9 +218,10 @@ class StatefulObject(BaseObject):
         # Now generate the states in topological order.
         self._states = dict()
         for state_type, params in reversed(state_types_and_params):
-            compatible, reason = state_type.is_compatible(obj=self, **params)
+            relevant_params = extract_class_init_kwargs_from_dict(cls=state_type, dic=params, copy=False)
+            compatible, reason = state_type.is_compatible(obj=self, **relevant_params)
             if compatible:
-                self._states[state_type] = state_type(obj=self, **params)
+                self._states[state_type] = state_type(obj=self, **relevant_params)
             else:
                 log.warning(f"State {state_type.__name__} is incompatible with obj {self.name}. Reason: {reason}")
                 # Remove the ability if it exists
