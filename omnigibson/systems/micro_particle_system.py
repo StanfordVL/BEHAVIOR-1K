@@ -430,8 +430,9 @@ class MicroParticleSystem(BaseSystem):
         cls.system_prim = cls._create_particle_system()
         # Create material
         cls._material = cls._create_particle_material_template()
-        # Load the material
-        cls._material.load()
+        # Load the material if not already loaded
+        if not cls._material.loaded:
+            cls._material.load()
         # Bind the material to the particle system (for isosurface) and the prototypes (for non-isosurface)
         cls._material.bind(cls.system_prim_path)
         # Also apply physics to this material
