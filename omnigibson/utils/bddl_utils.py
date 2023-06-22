@@ -514,19 +514,22 @@ class BDDLSampler:
         # affect each other
         self._object_sampling_orders["unary"].append({cond[0] for cond in sampling_groups["unary"]})
 
-        # Aggregate future objects
+        # Aggregate future objects and any unsampleable obj instances
+        # Unsampleable obj instances are strictly a superset of future obj instances
+        unsampleable_obj_instances = {cond.body[-1] for cond in unsampleable_conditions}
         self._future_obj_instances = {cond.body[0] for cond in unsampleable_conditions if isinstance(cond, ObjectStateFuturePredicate)}
+
         nonparticle_entities = set(self._object_scope.keys()) - self._substance_instances
 
         # Sanity check kinematic objects -- any non-system must be kinematically sampled
-        remaining_kinematic_entities = nonparticle_entities - self._future_obj_instances - \
+        remaining_kinematic_entities = nonparticle_entities - unsampleable_obj_instances - \
             self._non_sampleable_object_instances - set.union(*(self._object_sampling_orders["kinematic"] + [set()]))
         if len(remaining_kinematic_entities) != 0:
             return f"Some objects do not have any kinematic condition defined for them in the initial conditions: " \
                    f"{', '.join(remaining_kinematic_entities)}"
 
-        # Sanity check particle systems -- any non-future system must be sample as part of particle groups
-        remaining_particle_entities = self._substance_instances - self._future_obj_instances - sampled_particle_entities
+        # Sanity check particle systems -- any non-future system must be sampled as part of particle groups
+        remaining_particle_entities = self._substance_instances - unsampleable_obj_instances - sampled_particle_entities
         if len(remaining_particle_entities) != 0:
             return f"Some systems do not have any particle condition defined for them in the initial conditions: " \
                    f"{', '.join(remaining_particle_entities)}"
