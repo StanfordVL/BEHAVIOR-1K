@@ -14,6 +14,7 @@ from bddl.logic_base import BinaryAtomicFormula, UnaryAtomicFormula, AtomicFormu
 from bddl.object_taxonomy import ObjectTaxonomy
 import omnigibson as og
 from omnigibson.macros import gm
+from omnigibson.utils.constants import PrimType
 from omnigibson.utils.asset_utils import get_all_object_categories, get_all_object_category_models_with_abilities
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.python_utils import Wrapper
@@ -129,9 +130,15 @@ SUPPORTED_PREDICATES = {
     "filled": get_binary_predicate_for_state(object_states.Filled, "filled"),
     "cooked": get_unary_predicate_for_state(object_states.Cooked, "cooked"),
     "burnt": get_unary_predicate_for_state(object_states.Burnt, "burnt"),
+    "frozen": get_unary_predicate_for_state(object_states.Frozen, "frozen"),
+    "hot": get_unary_predicate_for_state(object_states.Heated, "hot"),
     "open": get_unary_predicate_for_state(object_states.Open, "open"),
     "toggled_on": get_unary_predicate_for_state(object_states.ToggledOn, "toggled_on"),
-    "frozen": get_unary_predicate_for_state(object_states.Frozen, "frozen"),
+    "attached": get_binary_predicate_for_state(object_states.AttachedTo, "attached"),
+    "overlaid": get_binary_predicate_for_state(object_states.Overlaid, "overlaid"),
+    "folded": get_unary_predicate_for_state(object_states.Folded, "folded"),
+    "unfolded": get_unary_predicate_for_state(object_states.Unfolded, "unfolded"),
+    "draped": get_binary_predicate_for_state(object_states.Draped, "draped"),
     "future": ObjectStateFuturePredicate,
     "real": ObjectStateRealPredicate,
     "insource": ObjectStateInsourcePredicate,
