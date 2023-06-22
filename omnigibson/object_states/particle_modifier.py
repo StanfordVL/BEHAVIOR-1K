@@ -578,7 +578,7 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
         systems_dict = dict()
         for system_name, val in self.modified_particle_count.items():
             systems_dict[system_name] = val
-        return dict(current_step=self._current_step, systems=systems_dict)
+        return dict(current_step=int(self._current_step), systems=systems_dict)
 
     def _load_state(self, state):
         for system_name in self.modified_particle_count:
