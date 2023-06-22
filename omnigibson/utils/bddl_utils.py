@@ -760,6 +760,7 @@ class BDDLSampler:
                         category=category,
                         model=model,
                         fit_avg_dim_volume=True,
+                        prim_type=PrimType.CLOTH if "cloth" in OBJECT_TAXONOMY.get_abilities(obj_synset) else PrimType.RIGID,
                     )
                     num_new_obj += 1
 
@@ -768,7 +769,7 @@ class BDDLSampler:
                     og.sim.import_object(simulator_obj)
 
                     # Set these objects to be far-away locations
-                    simulator_obj.set_position(np.array([100.0 + num_new_obj - 1, 100.0, -100.0]))
+                    simulator_obj.set_position(np.array([100.0, 100.0, -100.0]) + np.ones(3) * num_new_obj * 5.0)
 
                     self._sampled_objects.add(simulator_obj)
                     self._object_scope[obj_inst] = BDDLEntity(bddl_inst=obj_inst, entity=simulator_obj)
