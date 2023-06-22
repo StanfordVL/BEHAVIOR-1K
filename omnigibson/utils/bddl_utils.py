@@ -410,34 +410,33 @@ class BDDLSampler:
         for cond in self._activity_conditions.parsed_initial_conditions:
             if cond[0] == "inroom":
                 obj_inst, room_type = cond[1], cond[2]
-                obj_cat = self._object_instance_to_synset[obj_inst]
-                if obj_cat not in NON_SAMPLEABLE_SYNSETS:
+                obj_synset = self._object_instance_to_synset[obj_inst]
+                abilities = OBJECT_TAXONOMY.get_abilities(obj_synset)
+                if "sceneObject" not in abilities:
                     # Invalid room assignment
-                    return "You have assigned room type for [{}], but [{}] is sampleable. Only non-sampleable objects can have room assignment.".format(
-                        obj_cat, obj_cat
-                    )
+                    return f"You have assigned room type for [{obj_synset}], but [{obj_synset}] is sampleable. " \
+                           f"Only non-sampleable (scene) objects can have room assignment."
                 if room_type not in og.sim.scene.seg_map.room_sem_name_to_ins_name:
                     # Missing room type
-                    return "Room type [{}] missing in scene [{}].".format(room_type, og.sim.scene.scene_model)
+                    return f"Room type [{room_type}] missing in scene [{og.sim.scene.scene_model}]."
                 if room_type not in self._room_type_to_object_instance:
                     self._room_type_to_object_instance[room_type] = []
                 self._room_type_to_object_instance[room_type].append(obj_inst)
 
                 if obj_inst in self._non_sampleable_object_instances:
                     # Duplicate room assignment
-                    return "Object [{}] has more than one room assignment".format(obj_inst)
+                    return f"Object [{obj_inst}] has more than one room assignment"
 
                 self._non_sampleable_object_instances.add(obj_inst)
 
-        for obj_cat in self._activity_conditions.parsed_objects:
-            if obj_cat not in NON_SAMPLEABLE_SYNSETS:
+        for obj_synset in self._activity_conditions.parsed_objects:
+            abilities = OBJECT_TAXONOMY.get_abilities(obj_synset)
+            if "sceneObject" not in abilities:
                 continue
-            for obj_inst in self._activity_conditions.parsed_objects[obj_cat]:
+            for obj_inst in self._activity_conditions.parsed_objects[obj_synset]:
                 if obj_inst not in self._non_sampleable_object_instances:
                     # Missing room assignment
-                    return "All non-sampleable objects should have room assignment. [{}] does not have one.".format(
-                        obj_inst
-                    )
+                    return f"All non-sampleable (scene) objects should have room assignment. [{obj_inst}] does not have one."
 
     def _build_sampling_order(self):
         """
