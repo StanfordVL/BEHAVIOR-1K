@@ -1616,10 +1616,9 @@ class Cloth(MicroParticleSystem):
                 ms.meshing_isotropic_explicit_remeshing(iterations=5, targetlen=pymeshlab.AbsoluteValue(particle_distance))
                 avg_edge_percentage_mismatch = abs(1.0 - particle_distance / ms.get_geometric_measures()["avg_edge_length"])
                 iters += 1
-                if iters > 10:
+                if iters > 5:
                     # Terminate anyways, but don't fail
-                    log.warn("Failed to sufficiently remesh cloth. "
-                             "The generated cloth may not have evenly distributed particles.")
+                    log.warn("The generated cloth may not have evenly distributed particles.")
                     break
 
             # Re-write data to @mesh_prim
