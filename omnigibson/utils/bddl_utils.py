@@ -829,7 +829,7 @@ class BDDLSampler:
         """
         # Sample kinematics first, then particle states, then unary states
         for group in ("kinematic", "particle", "unary"):
-            log.debug(f"Sampling {group} states...")
+            log.info(f"Sampling {group} states...")
             if len(self._object_sampling_orders[group]) > 0:
                 # # Pop non-sampleable objects
                 # self._object_sampling_orders["kinematic"].pop(0)
