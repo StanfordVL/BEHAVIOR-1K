@@ -10,7 +10,7 @@ class ClothState(BaseObjectState):
     """
     def _initialize(self):
         # Run super
-        super().initialize()
+        super()._initialize()
 
         # Make sure the owned object is a cloth type
         assert self.obj.prim_type == PrimType.CLOTH, f"Cannot use ClothState {self.__class__.__name__}, " \
