@@ -113,6 +113,9 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
         assert self.is_compatible(obj=self.obj, **init_args), \
             f"ObjectState {self.__class__.__name__} is not compatible with object {self.obj.name}."
 
+        # Clear cache
+        self.clear_cache()
+
         self._initialize()
 
         self._initialized = True
