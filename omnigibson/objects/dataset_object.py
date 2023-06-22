@@ -649,7 +649,6 @@ class DatasetObject(USDObject):
         # Add additional kwargs (fit_avg_dim_volume and bounding_box are already captured in load_config)
         return self.__class__(
             prim_path=prim_path,
-            usd_path=self._usd_path,
             name=name,
             category=self.category,
             class_id=self.class_id,
