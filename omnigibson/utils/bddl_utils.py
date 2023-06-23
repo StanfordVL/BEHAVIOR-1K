@@ -158,11 +158,6 @@ OBJECT_TAXONOMY = ObjectTaxonomy()
 FLOOR_SYNSET = "floor.n.01"
 with open(os.path.join(os.path.dirname(bddl.__file__), "activity_manifest.txt")) as f:
     BEHAVIOR_ACTIVITIES = {line.strip() for line in f.readlines()}
-NON_SAMPLEABLE_SYNSETS = set()
-non_sampleable_category_txt = os.path.join(gm.DATASET_PATH, "metadata/non_sampleable_categories.txt")
-if os.path.isfile(non_sampleable_category_txt):
-    with open(non_sampleable_category_txt) as f:
-        NON_SAMPLEABLE_SYNSETS = set([FLOOR_SYNSET] + [line.strip() for line in f.readlines()])
 
 
 class OmniGibsonBDDLBackend(BDDLBackend):
@@ -616,7 +611,6 @@ class BDDLSampler:
                         for condition, positive in conditions:
                             # Sample positive kinematic conditions that involve this candidate object
                             if condition.STATE_NAME in KINEMATIC_STATES_BDDL and positive and scene_obj in condition.body:
-
                                 success = condition.sample(binary_state=positive)
                                 log_msg = " ".join(
                                     [
@@ -703,7 +697,8 @@ class BDDLSampler:
             if obj_synset == "agent.n.01":
                 continue
             # Don't populate synsets that can't be sampled
-            if obj_synset in NON_SAMPLEABLE_SYNSETS:
+            abilities = OBJECT_TAXONOMY.get_abilities(obj_synset)
+            if "sceneObject" in abilities:
                 continue
 
             # Populate based on whether it's a substance or not
