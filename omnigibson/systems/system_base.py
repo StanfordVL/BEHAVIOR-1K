@@ -632,7 +632,8 @@ class VisualParticleSystem(BaseSystem):
         # Remove the actual groups
         cls._group_particles.pop(group)
         cls._group_objects.pop(group)
-        cls._group_scales.pop(group)
+        if cls.scale_relative_to_parent:
+            cls._group_scales.pop(group)
 
         return group
 
