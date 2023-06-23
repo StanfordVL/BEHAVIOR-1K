@@ -74,7 +74,8 @@ def create_app():
     from omni.isaac.kit import SimulationApp
     # If multi_gpu is used, og.sim.render() will cause a segfault when called during on_contact callbacks,
     # e.g. when an attachment joint is being created due to contacts (create_joint calls og.sim.render() internally).
-    app = SimulationApp({"headless": gm.HEADLESS, "multi_gpu": False})
+    gpu = int(os.getenv("OMNIGIBSON_GPU", "0"))
+    app = SimulationApp({"headless": gm.HEADLESS, "multi_gpu": False, "active_gpu": gpu, "physics_gpu": gpu})
     import omni
 
     # Enable additional extensions we need
