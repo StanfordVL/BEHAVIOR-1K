@@ -19,10 +19,6 @@ class ContactParticles(RelativeObjectState, KinematicsMixin):
     """
     Object state that handles contact checking between rigid bodies and individual particles.
     """
-
-    def __init__(self, obj):
-        super().__init__(obj=obj)
-
     def _get_value(self, system, link=None):
         """
         Args:
