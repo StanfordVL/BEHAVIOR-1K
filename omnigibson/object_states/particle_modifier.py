@@ -222,20 +222,28 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
         # Map of system to number of modified particles (only include systems specified in the conditions)
         self.modified_particle_count = dict([(system_name, 0) for system_name in self.conditions])
 
-        # Standardize the conditions (make sure every system has at least one condition, which to make sure
-        # the particle modifier isn't already limited with the specific number of particles)
-        for system_name, conds in conditions.items():
-            # Make sure the system is supported
-            assert is_visual_particle_system(system_name) or is_physical_particle_system(system_name), \
-                f"Unsupported system for ParticleModifier: {system_name}"
-            # Make sure conds isn't empty and is a list
-            conds = [] if conds is None else list(conds)
-            # Add the condition to avoid limits
-            conds.append(self._generate_limit_condition(system_name))
-            conditions[system_name] = conds
-
         # Run super method
         super().__init__(obj)
+
+    @classmethod
+    def is_compatible(cls, obj, **kwargs):
+        # Run super first
+        compatible, reason = super().is_compatible(obj, **kwargs)
+        if not compatible:
+            return compatible, reason
+
+        # Check whether this state has toggledon if required or saturated if required for any condition
+        conditions = kwargs.get("conditions", dict())
+        cond_types = {cond[0] for _, conds in conditions.items() for cond in conds}
+        from omnigibson.object_states.saturated import Saturated
+        for cond_type, state_type in zip((ParticleModifyCondition.TOGGLEDON, ParticleModifyCondition.SATURATED), (ToggledOn, Saturated)):
+            if cond_type == ParticleModifyCondition.SATURATED:
+                # TODO: Remove once refactored
+                continue
+            if cond_type in cond_types and state_type not in obj.states:
+                return False, f"{cls.__name__} requires {state_type.__name__} state!"
+
+        return True, None
 
     def _initialize(self):
         super()._initialize()
@@ -407,11 +415,20 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
             dict: Dictionary mapping the names of ParticleSystem (str) to list of condition functions
         """
         parsed_conditions = dict()
+        # Standardize the conditions (make sure every system has at least one condition, which to make sure
+        # the particle modifier isn't already limited with the specific number of particles)
         for system_name, conds in conditions.items():
+            # Make sure the system is supported
+            assert is_visual_particle_system(system_name) or is_physical_particle_system(system_name), \
+                f"Unsupported system for ParticleModifier: {system_name}"
+            # Make sure conds isn't empty and is a list
+            conds = [] if conds is None else list(conds)
             system_conditions = []
             for cond_type, cond_val in conds:
                 cond = self._generate_condition(condition_type=cond_type, value=cond_val)
                 system_conditions.append(cond)
+            # Always add limit condition at the end
+            system_conditions.append(self._generate_limit_condition(system_name))
             parsed_conditions[system_name] = system_conditions
 
         return parsed_conditions
