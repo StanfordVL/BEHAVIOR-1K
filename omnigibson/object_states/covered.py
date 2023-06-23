@@ -32,7 +32,6 @@ class Covered(RelativeObjectState, BooleanState):
 
         # Set internal values
         self._visual_particle_group = None
-        self._n_initial_visual_particles = None
 
     @staticmethod
     def get_dependencies():
