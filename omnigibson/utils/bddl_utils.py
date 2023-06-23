@@ -320,6 +320,7 @@ class BDDLSampler:
                 - bool: Whether sampling was successful or not
                 - None or str: None if successful, otherwise the associated error message
         """
+        log.info("Sampling task...")
         # Reject scenes with missing non-sampleable objects
         # Populate object_scope with sampleable objects and the robot
         accept_scene, feedback = self._prepare_scene_for_sampling()
@@ -329,6 +330,8 @@ class BDDLSampler:
         accept_scene, feedback = self._sample_all_conditions(validate_goal=validate_goal)
         if not accept_scene:
             return accept_scene, feedback
+
+        log.info("Sampling succeeded!")
 
         return True, None
 
@@ -843,9 +846,7 @@ class BDDLSampler:
                                 if success:
                                     break
                             if not success:
-                                return "Sampleable object conditions failed: {} {}".format(
-                                    condition.STATE_NAME, condition.body
-                                )
+                                return f"Sampleable object conditions failed: {condition.STATE_NAME} {condition.body}"
 
         # One more sim step to make sure the object states are propagated correctly
         # E.g. after sampling Filled.set_value(True), Filled.get_value() will become True only after one step
