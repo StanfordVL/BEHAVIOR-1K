@@ -23,6 +23,7 @@ from omnigibson import object_states
 from omnigibson.action_primitives.action_primitive_set_base import ActionPrimitiveError, BaseActionPrimitiveSet
 # from igibson.external.pybullet_tools.utils import set_joint_position
 # from omnigibson.object_states.on_floor import RoomFloor
+from omnigibson.utils.object_state_utils import sample_kinematics
 from omnigibson.object_states.utils import get_center_extent
 # from igibson.objects.articulated_object import URDFObject
 from omnigibson.objects.object_base import BaseObject
@@ -32,6 +33,7 @@ from omnigibson.robots import BaseRobot
 from omnigibson.tasks.behavior_task import BehaviorTask
 from omnigibson.utils.motion_planning_utils import (
     plan_base_motion,
+    plan_arm_motion,
     detect_robot_collision
 )
 # from igibson.utils.grasp_planning_utils import get_grasp_poses_for_object, get_grasp_position_for_open
@@ -39,12 +41,13 @@ from omnigibson.utils.motion_planning_utils import (
 
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.control_utils import IKSolver
+from omnigibson.utils.grasping_planning_utils import get_grasp_poses_for_object_sticky
+from omnigibson.objects import DatasetObject
 
 # Fake imports
 p = None
 set_joint_position = None
 RoomFloor = None
-sample_kinematics = None
 URDFObject = None
 DEFAULT_BODY_OFFSET_FROM_FLOOR = 0.05
 behavior_robot = None
@@ -243,7 +246,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             StarterSemanticActionPrimitive.CLOSE: self.close,
             StarterSemanticActionPrimitive.NAVIGATE_TO: self._navigate_to_obj,
         }
-        self.arm = "right_hand"
+        self.arm = self.robot.default_arm
 
     def get_action_space(self):
         if ACTIVITY_RELEVANT_OBJECTS_ONLY:
@@ -273,9 +276,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         return primitive_int, self.addressable_objects.index(obj)
 
     def _get_obj_in_hand(self):
-        obj_in_hand_id = self.robot._ag_obj_in_hand[self.robot.default_arm]  # TODO(MP): Expose this interface.
+        obj_in_hand = self.robot._ag_obj_in_hand[self.robot.default_arm]  # TODO(MP): Expose this interface.
         # obj_in_hand = self.scene.objects_by_id[obj_in_hand_id] if obj_in_hand_id is not None else None
-        return obj_in_hand_id
+        return obj_in_hand
 
     def apply(self, action):
         # Decompose the tuple
@@ -399,8 +402,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
             # Allow grasping from suboptimal extents if we've tried enough times.
             force_allow_any_extent = np.random.rand() < 0.5
-            # grasp_poses = get_grasp_poses_for_object(self.robot, obj, force_allow_any_extent=force_allow_any_extent)
-            # grasp_pose, object_direction = random.choice(grasp_poses)
+            grasp_poses = get_grasp_poses_for_object_sticky(obj, force_allow_any_extent=force_allow_any_extent)
+            grasp_pose, object_direction = random.choice(grasp_poses)
             # with UndoableContext(self.robot):
             #     if hand_collision_fn(grasp_pose):
             #         raise ActionPrimitiveError(
@@ -408,18 +411,16 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             #             "Rejecting grasp pose candidate due to collision",
             #             {"grasp_pose": grasp_pose},  # TODO: Add more info about collision.
             #         )
-            grasp_pose = np.array([[-0.3, -0.8, 0.5], T.euler2quat([0, 90, 0])])
-            object_direction = np.array([0.0, 0.0, -1.0])
+            # grasp_pose = ([-0.3, -0.8, 0.5], T.euler2quat([0, np.pi/2, 0]))
+            # object_direction = np.array([0.0, 0.0, -1.0])
             # Prepare data for the approach later.
             approach_pos = grasp_pose[0] + object_direction * GRASP_APPROACH_DISTANCE
             approach_pose = (approach_pos, grasp_pose[1])
-
+            # print(grasp_pose)
             # If the grasp pose is too far, navigate.
             # yield from self._navigate_if_needed(obj, pos_on_obj=approach_pos)
             # yield from self._navigate_if_needed(obj, pos_on_obj=grasp_pose[0])
-
             yield from self._move_hand(grasp_pose)
-
             # Since the grasp pose is slightly off the object, we want to move towards the object, around 5cm.
             # It's okay if we can't go all the way because we run into the object.
             indented_print("Performing grasp approach.")
@@ -488,16 +489,51 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             )
 
         obj_pose = self._sample_pose_with_object_and_predicate(predicate, obj_in_hand, obj)
+        obj_pose = ([1.0, 1.0, 0.7], [0.0, 0.0, 0.0, 1.0])
         hand_pose = self._get_hand_pose_for_object_pose(obj_pose)
+        # print(hand_pose)
+        # self._mark_position(hand_pose[0])
+        # print(hand_pose)
         # yield from self._navigate_if_needed(obj, pos_on_obj=hand_pose[0])
+        pose = [1.17965, 0.38005, 1.8925]
+        # robot_pose = self._get_robot_pose_from_2d_pose((pose[0], pose[1], pose[2]))
+        # self.robot.set_position_orientation(robot_pose[0], robot_pose[1])
+        # og.sim.step()
+        yield from self._navigate_to_pose(pose)
+
         yield from self._move_hand(hand_pose)
         yield from self._execute_release()
         yield from self._reset_hand()
 
         if obj_in_hand.states[predicate].get_value(obj):
             return
+        
+    def _mark_position(self, loc):
+        marker = DatasetObject(
+            name="ball",
+            category="ball",
+            model="nofzds",
+            visual_only=True,
+            scale = 0.3
+        )
+        og.sim.import_object(marker)
+        marker.set_position([1.0, 1.0, 0.58])
 
     def _convert_cartesian_to_joint_space(self, target_pose):
+        joint_pos, control_idx = self._ik_solver_cartesian_to_joint_space(target_pose)
+        if joint_pos is None:
+            raise ActionPrimitiveError(
+                ActionPrimitiveError.Reason.PLANNING_ERROR,
+                "Could not find joint positions for target pose",
+                {"target_pose": target_pose},
+            )
+        return joint_pos, control_idx
+    
+    def _target_in_reach_of_robot(self, target_pose):
+        joint_pos, _ = self._ik_solver_cartesian_to_joint_space(target_pose)
+        return False if joint_pos is None else True
+
+    def _ik_solver_cartesian_to_joint_space(self, target_pose):
         relative_target_pose = self._get_pose_in_robot_frame(target_pose)
         control_idx = np.concatenate([self.robot.trunk_control_idx, self.robot.arm_control_idx[self.robot.default_arm]])
         ik_solver = IKSolver(
@@ -512,13 +548,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             target_quat=relative_target_pose[1],
             max_iterations=100,
         )
-        if joint_pos is None:
-            raise ActionPrimitiveError(
-                ActionPrimitiveError.Reason.PLANNING_ERROR,
-                "Could not find joint positions for target pose",
-                {"target_pose": target_pose},
-            )
-        
         return joint_pos, control_idx
 
     def _move_hand(self, target_pose):
@@ -530,16 +559,14 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         # min_pos = np.min(both_pos, axis=0) - HAND_SAMPLING_DOMAIN_PADDING
         # max_pos = np.max(both_pos, axis=0) + HAND_SAMPLING_DOMAIN_PADDING
 
-        # with UndoableContext():
-        #     plan = plan_hand_motion_br(
-        #         robot=self.robot,
-        #         obj_in_hand=self._get_obj_in_hand(),
-        #         end_conf=target_pose_in_correct_format,
-        #         hand_limits=(min_pos, max_pos),
-        #         obstacles=self._get_collision_body_ids(include_robot=True),
-        #     )
+        with UndoableContext():
+            plan = plan_arm_motion(
+                robot=self.robot,
+                obj_in_hand=self._get_obj_in_hand(),
+                end_conf=joint_pos
+            )
 
-        plan = [joint_pos]
+        # plan = [joint_pos]
 
         if plan is None:
             raise ActionPrimitiveError(
@@ -555,16 +582,22 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             yield from self._move_hand_direct_joint(joint_pos, control_idx)
 
     def _move_hand_direct_joint(self, joint_pos, control_idx, stop_on_contact=False):
-        self.robot.set_joint_positions(joint_pos, indices=control_idx, drive=True)
+        # self.robot.set_joint_positions(joint_pos, indices=control_idx, drive=True)
+        action = np.zeros(self.robot.action_dim)
+        action[control_idx] = joint_pos
+        # print(action)
+        # controller = self.robot._controllers["arm_0"]
+        # print(controller.command_dim)
+        # print(len(control_idx))
         while True:
             current_joint_pos = self.robot.get_joint_positions()[control_idx]
             diff_joint_pos = np.absolute(np.array(current_joint_pos) - np.array(joint_pos))
             if max(diff_joint_pos) < 0.005:
                 return
             if stop_on_contact and detect_robot_collision(self.robot):
-                self.robot.set_joint_positions(current_joint_pos, control_idx, drive=False)
+                # self.robot.set_joint_positions(current_joint_pos, control_idx, drive=False)
                 return
-            yield None
+            yield action
 
     def _move_hand_direct_cartesian(self, target_pose, **kwargs):
         joint_pos, control_idx = self._convert_cartesian_to_joint_space(target_pose)
@@ -672,12 +705,12 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             yield action
 
     def _navigate_if_needed(self, obj, pos_on_obj=None, **kwargs):
-        if pos_on_obj is not None:
-            if self._get_dist_from_point_to_shoulder(pos_on_obj) < HAND_DISTANCE_THRESHOLD:
-                # No need to navigate.
-                return
-        elif obj.states[object_states.InReachOfRobot].get_value():
-            return
+        # if pos_on_obj is not None:
+        #     if self._get_dist_from_point_to_shoulder(pos_on_obj) < HAND_DISTANCE_THRESHOLD:
+        #         # No need to navigate.
+        #         return
+        # elif obj.states[object_states.InReachOfRobot].get_value():
+        #     return
 
         yield from self._navigate_to_obj(obj, pos_on_obj=pos_on_obj, **kwargs)
 
@@ -735,7 +768,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             # Return None if no action is needed.
             if is_angle_close and arrived_at_pos:
                 indented_print("Move is complete.")
-                return None
+                yield np.zeros(self.robot.action_dim)
+                return
 
             yield action
 
@@ -767,7 +801,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 continue
 
             return pose_2d
-
+ 
         raise ActionPrimitiveError(
             ActionPrimitiveError.Reason.SAMPLING_ERROR, "Could not find valid position near object."
         )
@@ -800,13 +834,12 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         )
 
     def _sample_pose_with_object_and_predicate(self, predicate, held_obj, target_obj):
-        with UndoableContext(self.robot):
+        with UndoableContext():
             pred_map = {object_states.OnTop: "onTop", object_states.Inside: "inside"}
             result = sample_kinematics(
                 pred_map[predicate],
                 held_obj,
                 target_obj,
-                True,
                 use_ray_casting_method=True,
                 max_trials=MAX_ATTEMPTS_FOR_SAMPLING_POSE_WITH_OBJECT_AND_PREDICATE,
                 skip_falling=True,
@@ -827,12 +860,15 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         with UndoableContext():
             self.robot.set_position_orientation(*self._get_robot_pose_from_2d_pose(pose_2d))
             og.sim.step(render=False)
-            # if pos_on_obj is not None:
-            #     hand_distance = self._get_dist_from_point_to_shoulder(pos_on_obj)
-            #     if hand_distance > HAND_DISTANCE_THRESHOLD:
-            #         indented_print("Candidate position failed shoulder distance test.")
-            #         return False
-
+            if pos_on_obj is not None:
+                pose_on_obj = (pos_on_obj, [0.0, 0.0, 0.0, 1.0])
+                if not self._target_in_reach_of_robot(pose_on_obj):
+                    return False
+                # hand_distance = self._get_dist_from_point_to_shoulder(pos_on_obj)
+                # if hand_distance > HAND_DISTANCE_THRESHOLD:
+                #     indented_print("Candidate position failed shoulder distance test.")
+                #     return False
+            
             if detect_robot_collision(self.robot):
                 indented_print("Candidate position failed collision test.")
                 return False
@@ -895,10 +931,10 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         hand_in_world = self.robot.eef_links[self.arm].get_position_orientation()
 
         # Get the hand pose relative to the obj pose
-        world_in_obj = p.invertTransform(*obj_in_world)
-        hand_in_obj = p.multiplyTransforms(*world_in_obj, *hand_in_world)
+        hand_in_obj = T.relative_pose_transform(*hand_in_world, *obj_in_world)
 
         # Now apply desired obj pose.
-        desired_hand_pose = p.multiplyTransforms(*desired_pose, *hand_in_obj)
+        # desired_hand_pose = T.pose_transform(*hand_in_obj, *desired_pose)
+        desired_hand_pose = T.pose_transform(*desired_pose, *hand_in_obj)
 
         return desired_hand_pose

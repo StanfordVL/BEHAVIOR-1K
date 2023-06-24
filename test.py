@@ -2,6 +2,7 @@ import os
 
 import yaml
 import numpy as np
+import random
 
 import omnigibson as og
 from omnigibson.utils.ui_utils import choose_from_options
@@ -16,6 +17,7 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.objects import PrimitiveObject
 from omnigibson.object_states import ContactBodies
 from omnigibson.objects.dataset_object import DatasetObject
+from omnigibson.utils.motion_planning_utils import detect_robot_collision
 
 def pause(time):
     for _ in range(int(time*100)):
@@ -66,27 +68,48 @@ def main(random_selection=False, headless=False, short_exec=False):
     # )
 
     table = DatasetObject(
-        name="table",
+        name="potato",
         category="breakfast_table",
         model="rjgmmy",
-        scale = 0.3,
-        position=[2.0, 2.0, 0.58]
+        scale = 0.3
     )
     og.sim.import_object(table)
     table.set_position([1.0, 1.0, 0.58])
 
-    marker = PrimitiveObject(
-        prim_path=f"/World/marker",
-        name="marker",
-        primitive_type="Cube",
-        size=0.07,
-        visual_only=False,
-        rgba=[1.0, 0, 0, 1.0],
+    grasp_obj = DatasetObject(
+        name="shaker",
+        category="potato",
+        model="lqjear"
     )
+    og.sim.import_object(grasp_obj)
+    grasp_obj.set_position([-0.3, -0.8, 0.5])
 
-    og.sim.import_object(marker)
-    marker.set_position([-0.3, -0.8, 0.5])
-    og.sim.step()
+    # marker = PrimitiveObject(
+    #     prim_path=f"/World/marker",
+    #     name="marker",
+    #     primitive_type="Cube",
+    #     size=0.07,
+    #     visual_only=True,
+    #     rgba=[1.0, 0, 0, 1.0],
+    # )
+    # og.sim.import_object(marker)
+    # marker.set_position([0.9993666, 0.9949612, 0.7048573])
+    # og.sim.step()
+
+    # from IPython import embed; embed()
+
+    # marker2 = PrimitiveObject(
+    #     prim_path=f"/World/marker",
+    #     name="marker2",
+    #     primitive_type="Sphere",
+    #     radius=0.1,
+    #     visual_only=True,
+    #     rgba=[1.0, 0, 0, 1.0],
+    # )
+
+    # og.sim.import_object(marker2)
+    # marker2.set_position([1.0, 1.0, 0.5])
+    # og.sim.step()
 
     
     # from omnigibson.utils.sim_utils import land_object
@@ -106,14 +129,13 @@ def main(random_selection=False, headless=False, short_exec=False):
     robot.set_orientation(T.euler2quat([0, 0, -np.pi/1.5]))
     og.sim.step()
 
-
     controller = StarterSemanticActionPrimitives(None, scene, robot)
     # navigate_controller = controller._navigate_to_pose_direct([0.0, -1.0, 0.0], low_precision=True)
     
 
     # navigate_controller = controller._navigate_to_pose([0.5, 2.5, 0.0])
     # navigate_controller = controller._navigate_to_pose([0.0, 0.5, 0.0])
-    navigate_controller_marker = controller._navigate_to_obj(marker)
+    # navigate_controller_marker = controller._navigate_to_obj(marker)
     navigate_controller_table = controller._navigate_to_obj(table)
 
 
@@ -136,25 +158,50 @@ def main(random_selection=False, headless=False, short_exec=False):
             0.05,  # gripper
         ]
     )
-    robot.set_joint_positions(start_joint_pos)
+    # robot.set_joint_positions(start_joint_pos)
+    robot.tuck()
+    # robot.root_link.mass = 70
     og.sim.step()
-    hand_controller = controller.grasp(marker)
-
+    hand_controller = controller.grasp(grasp_obj)
+    place_controller = controller.place_on_top(table)
+    # print(robot.root_link.mass)
     # execute_controller(hand_controller, env)
-
     # execute_controller(navigate_controller_marker, env)
     execute_controller(hand_controller, env)
     pause(1)
-    execute_controller(navigate_controller_table, env)
+    execute_controller(place_controller, env)
+    # print(robot.root_link.mass)
+    # pause(50)
+    # execute_controller(place_controller, env)
 
+    # def test_collision(joint_pos):
+    #     with UndoableContext():
+    #         set_joint_position(joint_pos)
+    #         og.sim.step()
+    #         print(detect_robot_collision(robot))
+    #         print("-------")
+    #         pause(2)
+
+    # def set_joint_position(joint_pos):
+    #     joint_control_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
+    #     robot.set_joint_positions(joint_pos, joint_control_idx)
+
+    # def set_random_joint_position():
+    #     joint_positions = []
+    #     joint_control_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
+    #     joints = np.array([joint for joint in robot.joints.values()])
+    #     arm_joints = joints[joint_control_idx]
+    #     for i, joint in enumerate(arm_joints):
+    #         val = random.uniform(joint.lower_limit, joint.upper_limit)
+    #         joint_positions.append(val)
+    #     return joint_positions
+    
+    # sample_table_collision = [0.05725323620041453, 0.5163557640853469, 1.510323032160434, -4.410407307232964, -1.1433260958390707, -5.606768602222553, 1.0313821643138894, -4.181284701460742]
+    # sample_self_collision = [0.03053552120088664, 1.0269865478752571, 1.1344740372495958, 6.158997020615134, 1.133466907494042, -4.544473644642829, 0.6930819484783561, 4.676661155308317]
     # while True:
-    #     pause(1)
-    #     action = next(navigate_controller)
-    #     state, reward, done, info = env.step(action)
-        # collision_objects = list(filter(lambda obj : "floor" not in obj.name, robot.states[ContactBodies].get_value()))
-        # if len(collision_objects) > 0:
-        #     print(collision_objects[0].name)
-        # print(collision_objects)
+        # joint_pos = set_random_joint_position()
+        # random_pos = set_random_joint_position()
+        # test_collision(sample_self_collision)
 
     # for action in navigate_controller:
     #     state, reward, done, info = env.step(action)
