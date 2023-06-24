@@ -1170,13 +1170,13 @@ def is_physical_particle_system(system_name):
     return issubclass(system, PhysicalParticleSystem)
 
 
-def get_system(system_name):
+def get_system(system_name, force_active=True):
     # Make sure scene exists
     assert og.sim.scene is not None, "Cannot get systems until scene is imported!"
     # If system_name is not in REGISTERED_SYSTEMS, create from metadata
     system = REGISTERED_SYSTEMS[system_name] if system_name in REGISTERED_SYSTEMS \
         else _create_system_from_metadata(system_name=system_name)
-    if not system.initialized:
+    if not system.initialized and force_active:
         system.initialize()
     return system
 
