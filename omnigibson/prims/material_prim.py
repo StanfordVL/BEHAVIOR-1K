@@ -1028,3 +1028,19 @@ class MaterialPrim(BasePrim):
              preset (int): this material's specular_reflection_ior_preset (int corresponding to enum)
         """
         self.set_input(inp="specular_reflection_ior_preset", val=preset)
+
+    @property
+    def enable_diffuse_transmission(self):
+        """
+        Returns:
+            float: this material's applied enable_diffuse_transmission
+        """
+        return self.get_input(inp="enable_diffuse_transmission")
+
+    @enable_diffuse_transmission.setter
+    def enable_diffuse_transmission(self, val):
+        """
+        Args:
+             val (bool): this material's applied enable_diffuse_transmission
+        """
+        self.set_input(inp="enable_diffuse_transmission", val=val)
