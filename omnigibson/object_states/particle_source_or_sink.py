@@ -55,8 +55,12 @@ class ParticleSource(ParticleApplier):
             For a given ParticleSystem, the list of 2-tuples will be converted into a list of function calls of the
             form above -- if all of its conditions evaluate to True and particles are detected within
             this particle modifier area, then we potentially modify those particles
-        source_radius (float): Radius of the cylinder representing particles' spawning volume
-        source_height (float): Height of the cylinder representing particles' spawning volume
+        source_radius (None or float): Radius of the cylinder representing particles' spawning volume, if specified.
+            If both @source_radius and @source_height are None, values will be inferred directly from the underlying
+            object asset, otherwise, it will be set to a default value
+        source_height (None or float): Height of the cylinder representing particles' spawning volume, if specified.
+            If both @source_radius and @source_height are None, values will be inferred directly from the underlying
+            object asset, otherwise, it will be set to a default value
         initial_speed (float): The initial speed for generated particles. Note that the
             direction of the velocity is inferred from the particle sampling process
     """
@@ -64,23 +68,30 @@ class ParticleSource(ParticleApplier):
         self,
         obj,
         conditions,
-        source_radius=m.DEFAULT_RADIUS,
-        source_height=m.DEFAULT_HEIGHT,
+        source_radius=None,
+        source_height=None,
         initial_speed=0.0,
     ):
         # Initialize variables that will be filled in at runtime
         self._n_steps_per_modification = None
+
+        # Define projection mesh params based on input kwargs
+        if source_radius is not None or source_height is not None:
+            source_radius = m.DEFAULT_RADIUS if source_radius is None else source_radius
+            source_height = m.DEFAULT_HEIGHT if source_height is None else source_height
+            projection_mesh_params = {
+                "type": "Cylinder",
+                "extents": [source_radius * 2, source_radius * 2, source_height],
+            },
+        else:
+            projection_mesh_params = None
 
         # Convert inputs into arguments to pass to particle applier class
         super().__init__(
             obj=obj,
             conditions=conditions,
             method=ParticleModifyMethod.PROJECTION,
-            projection_mesh_params={
-                "type": "Cylinder",
-                "extents": [source_radius * 2, source_radius * 2, source_height],
-                "visualize": False,
-            },
+            projection_mesh_params=projection_mesh_params,
             sample_with_raycast=False,
             initial_speed=initial_speed,
         )
@@ -101,6 +112,11 @@ class ParticleSource(ParticleApplier):
         assert is_physical_particle_system(system_name=system.name), \
             "ParticleSource only supports PhysicalParticleSystem"
         return m.MAX_SOURCE_PARTICLES_PER_STEP
+
+    @classproperty
+    def visualize(cls):
+        # Don't visualize this source
+        return False
 
     @classproperty
     def metalink_prefix(cls):
@@ -139,8 +155,12 @@ class ParticleSink(ParticleRemover):
             For a given ParticleSystem, the list of 2-tuples will be converted into a list of function calls of the
             form above -- if all of its conditions evaluate to True and particles are detected within
             this particle modifier area, then we potentially modify those particles
-        sink_radius (float): Radius of the cylinder representing particles' sinking volume
-        sink_height (float): Height of the cylinder representing particles' sinking volume
+        sink_radius (float): Radius of the cylinder representing particles' sinking volume, if specified.
+            If both @sink_radius and @sink_height are None, values will be inferred directly from the underlying
+            object asset, otherwise, it will be set to a default value
+        sink_height (float): Height of the cylinder representing particles' sinking volume, if specified.
+            If both @sink_radius and @sink_height are None, values will be inferred directly from the underlying
+            object asset, otherwise, it will be set to a default value
 
         default_physical_conditions (None or list): Condition(s) needed to remove any physical particles not explicitly
             specified in @conditions. If None, then it is assumed that no other physical particles can be removed. If
@@ -163,17 +183,23 @@ class ParticleSink(ParticleRemover):
         # Initialize variables that will be filled in at runtime
         self._n_steps_per_modification = None
 
-        # Convert inputs into arguments to pass to particle applier class
+        # Define projection mesh params based on input kwargs
+        if sink_radius is not None or sink_height is not None:
+            sink_radius = m.DEFAULT_RADIUS if sink_radius is None else sink_radius
+            sink_height = m.DEFAULT_HEIGHT if sink_height is None else sink_height
+            projection_mesh_params = {
+                "type": "Cylinder",
+                "extents": [sink_radius * 2, sink_radius * 2, sink_height],
+            },
+        else:
+            projection_mesh_params = None
+
+        # Convert inputs into arguments to pass to particle remover class
         super().__init__(
             obj=obj,
             conditions=conditions,
             method=ParticleModifyMethod.PROJECTION,
-            # TODO: Discuss how this will sync with new asset metalinks
-            projection_mesh_params={
-                "type": "Cylinder",
-                "extents": [sink_radius * 2, sink_radius * 2, sink_height],
-                "visualize": False,
-            },
+            projection_mesh_params=projection_mesh_params,
             default_physical_conditions=default_physical_conditions,
             default_visual_conditions=default_visual_conditions,
         )

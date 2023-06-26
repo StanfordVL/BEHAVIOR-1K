@@ -121,6 +121,8 @@ def create_projection_visualization(
     # parent frame
     # We do this AFTER we create the source sphere because the actual projection is scaled in the world frame, whereas
     # the source sphere is already scaled by its own parent frame
+    # NOTE: The generated projection visualization will NOT match the underlying projection mesh if the parent link is
+    # scaled non-uniformly!!
     projection_radius *= np.mean(parent_scale[:2])
     projection_height *= parent_scale[2]
 
@@ -193,12 +195,11 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
         method (ParticleModifyMethod): Method to modify particles. Current options supported are ADJACENCY (i.e.:
             "touching" particles) or PROJECTION (i.e.: "spraying" particles)
         projection_mesh_params (None or dict): If specified and @method is ParticleModifyMethod.PROJECTION,
-            manually overrides any metadata found from @obj.metadata to infer what projection volume to generate
+            manually overrides any data inferred directly from this object to infer what projection volume to generate
             for this particle modifier. Expected entries are as follows:
 
-                "type": (str), one of {"Cylinder", "Cone", "Cube"}
+                "type": (str), one of {"Cylinder", "Cone", "Cube", "Sphere"}
                 "extents": (3-array), the (x,y,z) extents of the generated volume (specified in local link frame!)
-                "visualize": (bool), whether to visualize this projection or not
 
             If None, information found from @obj.metadata will be used instead.
             NOTE: x-direction should align with the projection mesh's height (i.e.: z) parameter in @extents!
@@ -239,6 +240,13 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
 
         return True, None
 
+    def initialize_link_mixin(self):
+        # Run super first
+        super().initialize_link_mixin()
+
+        # Make sure there's at most only a single metalink
+        assert len(self.links) <= 1, f"Can only have at most a single metalink for {self.__class__.__name__}!"
+
     def _initialize(self):
         super()._initialize()
 
@@ -275,21 +283,52 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
                 f"Projection mesh params must be specified for {self.obj.name}'s {self.__class__.__name__} state " \
                 f"when method=ParticleModifyMethod.PROJECTION!"
 
-            mesh_prim_path = f"{self.link.prim_path}/projection_mesh"
+            shape_defaults = {
+                "radius": 0.5,
+                "height": 1.0,
+                "size": 1.0,
+            }
+            mesh_prim_path = f"{self.link.prim_path}/mesh_0"
             # Create a primitive shape if it doesn't already exist
-            radius, height = self._projection_mesh_params["extents"][0] / 2.0, self._projection_mesh_params["extents"][2]
-            if not get_prim_at_path(mesh_prim_path):
+            pre_existing_mesh = get_prim_at_path(mesh_prim_path)
+            if not pre_existing_mesh:
+                # Projection mesh params must be specified in order to determine scalings
+                assert self._projection_mesh_params is not None, \
+                    f"Must specify projection_mesh_params for {self.__class__.__name__} " \
+                    f"since it has no pre-existing projection mesh!"
                 mesh = UsdGeom.__dict__[self._projection_mesh_params["type"]].Define(og.sim.stage, mesh_prim_path).GetPrim()
-                mesh.GetAttribute("height").Set(height)
-                mesh.GetAttribute("radius").Set(radius)
+                property_names = set(mesh.GetPropertyNames())
+                for shape_attr, default_val in shape_defaults.items():
+                    if shape_attr in property_names:
+                        mesh.GetAttribute(shape_attr).Set(default_val)
+            else:
+                # Potentially populate projection mesh params if the prim exists
+                if self._projection_mesh_params is None:
+                    self._projection_mesh_params = {
+                        "type": pre_existing_mesh.GetTypeName(),
+                        "extents": np.array(pre_existing_mesh.GetAttribute("xformOp:scale").Get()),
+                    }
 
             # Create the visual geom instance referencing the generated mesh prim, and then hide it
             self.projection_mesh = VisualGeomPrim(prim_path=mesh_prim_path, name=f"{name_prefix}_projection_mesh")
             self.projection_mesh.initialize()
             self.projection_mesh.visible = False
 
-            # Make sure the object updates its meshes
+            # Make sure the shape-based attributes are not set, and only the scaling is set
+            property_names = set(self.projection_mesh.prim.GetPropertyNames())
+            for shape_attr, default_val in shape_defaults.items():
+                if shape_attr in property_names:
+                    val = self.projection_mesh.get_attribute(shape_attr)
+                    assert val == default_val, \
+                        f"Projection mesh should have shape-based attribute {shape_attr} == {default_val}! Got: {val}"
+
+            # Set the scale based on projection mesh params
+            self.projection_mesh.scale = np.array(self._projection_mesh_params["extents"])
+
+            # Make sure the object updates its meshes, and assert that there's only a single visual mesh
             self.link.update_meshes()
+            assert len(self.link.visual_meshes) == 1, \
+                f"Expected only a single projection mesh for {self.link}, got: {len(self.link.visual_meshes)}"
 
             # Make sure the mesh is translated so that its tip lies at the metalink origin, and rotated so the vector
             # from tip to tail faces the positive x axis
@@ -301,11 +340,7 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
             )
 
             # Generate the function for checking whether points are within the projection mesh
-            self._check_in_mesh, _ = generate_points_in_volume_checker_function(
-                obj=self.obj,
-                volume_link=self.link,
-                mesh_name_prefixes="projection",
-            )
+            self._check_in_mesh, _ = generate_points_in_volume_checker_function(obj=self.obj, volume_link=self.link)
 
             # Store the projection mesh's IDs
             projection_mesh_ids = PhysicsSchemaTools.encodeSdfPath(self.projection_mesh.prim_path)
@@ -596,12 +631,11 @@ class ParticleRemover(ParticleModifier):
         method (ParticleModifyMethod): Method to modify particles. Current options supported are ADJACENCY (i.e.:
             "touching" particles) or PROJECTION (i.e.: "spraying" particles)
         projection_mesh_params (None or dict): If specified and @method is ParticleModifyMethod.PROJECTION,
-            manually overrides any metadata found from @obj.metadata to infer what projection volume to generate
+            manually overrides any data inferred directly from this object to infer what projection volume to generate
             for this particle modifier. Expected entries are as follows:
 
-                "type": (str), one of {"Cylinder", "Cone", "Cube"}
+                "type": (str), one of {"Cylinder", "Cone", "Cube", "Sphere"}
                 "extents": (3-array), the (x,y,z) extents of the generated volume (specified in local link frame!)
-                "visualize": (bool), whether to visualize this projection or not
 
             If None, information found from @obj.metadata will be used instead.
             NOTE: x-direction should align with the projection mesh's height (i.e.: z) parameter in @extents!
@@ -733,12 +767,11 @@ class ParticleApplier(ParticleModifier):
         method (ParticleModifyMethod): Method to modify particles. Current options supported are ADJACENCY (i.e.:
             "touching" particles) or PROJECTION (i.e.: "spraying" particles)
         projection_mesh_params (None or dict): If specified and @method is ParticleModifyMethod.PROJECTION,
-            manually overrides any metadata found from @obj.metadata to infer what projection volume to generate
+            manually overrides any data inferred directly from this object to infer what projection volume to generate
             for this particle modifier. Expected entries are as follows:
 
-                "type": (str), one of {"Cylinder", "Cone", "Cube"}
+                "type": (str), one of {"Cylinder", "Cone", "Cube", "Sphere"}
                 "extents": (3-array), the (x,y,z) extents of the generated volume (specified in local link frame!)
-                "visualize": (bool), whether to visualize this projection or not
 
             If None, information found from @obj.metadata will be used instead.
         sample_with_raycast (bool): If True, will only sample particles at raycast hits. Otherwise, will bypass sampling
@@ -783,7 +816,7 @@ class ParticleApplier(ParticleModifier):
         # get_system will initialize the system if it's not initialized already.
         system = get_system(system_name)
 
-        if self.method == ParticleModifyMethod.PROJECTION and self._projection_mesh_params["visualize"]:
+        if self.method == ParticleModifyMethod.PROJECTION and self.visualize:
             assert self._projection_mesh_params["type"] in {"Cylinder", "Cone"}, \
                 f"{self.__class__.__name__} visualization only supports Cylinder and Cone types!"
             radius, height = np.mean(self._projection_mesh_params["extents"][:2]) / 2.0, self._projection_mesh_params["extents"][2]
@@ -817,6 +850,15 @@ class ParticleApplier(ParticleModifier):
             self.projection_source_sphere.visible = False
             # Rotate by 90 degrees in y-axis so that the projection visualization aligns with the projection mesh
             self.projection_source_sphere.set_orientation(T.euler2quat([0, np.pi / 2, 0]))
+
+            # Make sure the meta mesh is aligned with the meta link if visualizing
+            # This corresponds to checking (a) position of tip of projection mesh should align with origin of
+            # metalink, and (b) zero relative orientation between the metalink and the projection mesh
+            local_pos, local_quat = self.projection_mesh.get_local_pose()
+            assert np.all(np.isclose(local_pos + np.array([0, 0, height / 2.0]), 0.0)), \
+                "Projection mesh tip should align with metalink position!"
+            assert np.all(np.isclose(T.quat2euler(local_quat), 0.0)), \
+                "Projection mesh orientation should align with metalink orientation!"
 
         # Store which method to use for sampling particle locations
         if self._sample_with_raycast:
@@ -1124,6 +1166,15 @@ class ParticleApplier(ParticleModifier):
         assert system.name in self.conditions, f"System {system.name} is not defined in the conditions."
         return m.MAX_VISUAL_PARTICLES_APPLIED_PER_STEP if is_visual_particle_system(system_name=system.name) else \
             m.MAX_PHYSICAL_PARTICLES_APPLIED_PER_STEP
+
+    @classproperty
+    def visualize(cls):
+        """
+        Returns:
+            bool: Whether this Applier should be visualized or not
+        """
+        # True by default
+        return True
 
     @classproperty
     def metalink_prefix(cls):
