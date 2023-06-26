@@ -923,7 +923,3 @@ def test_covered():
 
 def test_clear_sim():
     og.sim.clear()
-
-# test_covered()
-# from IPython import embed; embed()
-# og.shutdown()
