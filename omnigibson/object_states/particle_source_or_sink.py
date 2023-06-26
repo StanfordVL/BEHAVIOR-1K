@@ -16,7 +16,8 @@ m.SOURCE_LINK_PREFIX = "fluidsource"
 m.SINK_LINK_PREFIX = "fluidsink"
 
 # Default radius and height
-m.DEFAULT_RADIUS_HEIGHT = 0.2
+m.DEFAULT_RADIUS = 0.2
+m.DEFAULT_HEIGHT = 0.2
 
 # Maximum number of particles that can be sourced / sunk per step
 m.MAX_SOURCE_PARTICLES_PER_STEP = 1000
@@ -63,8 +64,8 @@ class ParticleSource(ParticleApplier):
         self,
         obj,
         conditions,
-        source_radius=m.DEFAULT_RADIUS_HEIGHT,
-        source_height=m.DEFAULT_RADIUS_HEIGHT,
+        source_radius=m.DEFAULT_RADIUS,
+        source_height=m.DEFAULT_HEIGHT,
         initial_speed=0.0,
     ):
         # Initialize variables that will be filled in at runtime
@@ -154,8 +155,8 @@ class ParticleSink(ParticleRemover):
         self,
         obj,
         conditions,
-        sink_radius=m.DEFAULT_RADIUS_HEIGHT,
-        sink_height=m.DEFAULT_RADIUS_HEIGHT,
+        sink_radius=m.DEFAULT_RADIUS,
+        sink_height=m.DEFAULT_HEIGHT,
         default_physical_conditions=None,
         default_visual_conditions=None,
     ):
