@@ -58,5 +58,3 @@ def test_point_navigation_task():
 
 def test_behavior_task():
     task_tester("BehaviorTask")
-
-test_behavior_task()
