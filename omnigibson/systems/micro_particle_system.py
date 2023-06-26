@@ -431,6 +431,7 @@ class MicroParticleSystem(BaseSystem):
         # Create material
         cls._material = cls._create_particle_material_template()
         # Load the material if not already loaded
+        # TODO: Remove this if statement once clearing system completely removes prims from stage
         if not cls._material.loaded:
             cls._material.load()
         # Bind the material to the particle system (for isosurface) and the prototypes (for non-isosurface)
