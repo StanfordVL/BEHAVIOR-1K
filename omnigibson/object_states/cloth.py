@@ -8,13 +8,6 @@ class ClothState(BaseObjectState):
     This class is a subclass of BaseObjectState that adds dependencies
     on the default kinematics states.
     """
-    def _initialize(self):
-        # Run super
-        super()._initialize()
-
-        # Make sure the owned object is a cloth type
-        assert self.obj.prim_type == PrimType.CLOTH, f"Cannot use ClothState {self.__class__.__name__}, " \
-                                                     f"make sure object is created with prim_type=PrimType.CLOTH!"
 
     @classmethod
     def is_compatible(cls, obj, **kwargs):
