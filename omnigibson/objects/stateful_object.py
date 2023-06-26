@@ -225,6 +225,9 @@ class StatefulObject(BaseObject):
             else:
                 log.warning(f"State {state_type.__name__} is incompatible with obj {self.name}. Reason: {reason}")
                 # Remove the ability if it exists
+                # Note that the object may still have some of the states related to the desired ability. In this way,
+                # we guarantee that the existence of a certain ability in self.abilities means at ALL corresponding
+                # object state dependencies are met by the underlying object asset
                 ability = state_type_to_ability.get(state_type, None)
                 if ability in self._abilities:
                     self._abilities.pop(ability)
