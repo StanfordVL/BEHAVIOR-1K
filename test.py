@@ -26,11 +26,7 @@ def pause(time):
 
 def execute_controller(ctrl_gen, env):
     for action in ctrl_gen:
-        # print(action)
-        if action is None:
-            og.sim.step()
-        else:
-            env.step(action)
+        env.step(action)
         
 
 def main(random_selection=False, headless=False, short_exec=False):
@@ -84,17 +80,17 @@ def main(random_selection=False, headless=False, short_exec=False):
     og.sim.import_object(grasp_obj)
     grasp_obj.set_position([-0.3, -0.8, 0.5])
 
-    # marker = PrimitiveObject(
-    #     prim_path=f"/World/marker",
-    #     name="marker",
-    #     primitive_type="Cube",
-    #     size=0.07,
-    #     visual_only=True,
-    #     rgba=[1.0, 0, 0, 1.0],
-    # )
-    # og.sim.import_object(marker)
-    # marker.set_position([0.9993666, 0.9949612, 0.7048573])
-    # og.sim.step()
+    marker = PrimitiveObject(
+        prim_path=f"/World/marker",
+        name="marker",
+        primitive_type="Cube",
+        size=0.07,
+        visual_only=True,
+        rgba=[1.0, 0, 0, 1.0],
+    )
+    og.sim.import_object(marker)
+    marker.set_position([-0.3, -0.8, 0.5])
+    og.sim.step()
 
     # from IPython import embed; embed()
 
@@ -158,8 +154,8 @@ def main(random_selection=False, headless=False, short_exec=False):
             0.05,  # gripper
         ]
     )
-    # robot.set_joint_positions(start_joint_pos)
-    robot.tuck()
+    robot.set_joint_positions(start_joint_pos)
+    # robot.tuck()
     # robot.root_link.mass = 70
     og.sim.step()
     hand_controller = controller.grasp(grasp_obj)
@@ -170,6 +166,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     execute_controller(hand_controller, env)
     pause(1)
     execute_controller(place_controller, env)
+    pause(10)
     # print(robot.root_link.mass)
     # pause(50)
     # execute_controller(place_controller, env)
@@ -199,9 +196,8 @@ def main(random_selection=False, headless=False, short_exec=False):
     # sample_table_collision = [0.05725323620041453, 0.5163557640853469, 1.510323032160434, -4.410407307232964, -1.1433260958390707, -5.606768602222553, 1.0313821643138894, -4.181284701460742]
     # sample_self_collision = [0.03053552120088664, 1.0269865478752571, 1.1344740372495958, 6.158997020615134, 1.133466907494042, -4.544473644642829, 0.6930819484783561, 4.676661155308317]
     # while True:
-        # joint_pos = set_random_joint_position()
-        # random_pos = set_random_joint_position()
-        # test_collision(sample_self_collision)
+    #     random_pos = set_random_joint_position()
+    #     test_collision(sample_self_collision)
 
     # for action in navigate_controller:
     #     state, reward, done, info = env.step(action)

@@ -60,7 +60,6 @@ def plan_base_motion(
     goal().setY(end_conf[1])
     goal().setYaw(T.wrap_angle(end_conf[2]))
     print(goal)
-    # print(state_valid_fn(goal()))
     ss.setStartAndGoalStates(start, goal)
 
     # this will automatically choose a default planner with
@@ -159,15 +158,12 @@ def detect_robot_collision(robot, filter_objs=[]):
     for col_obj in collision_objects:
         if not any([f in col_obj.name for f in filter_objects]):
             filtered_collision_objects.append(col_obj)
-    # print(len(filtered_collision_objects) > 0)
-    # print(detect_self_collision(robot))
     return len(filtered_collision_objects) > 0 or detect_self_collision(robot)
 
 def detect_self_collision(robot):
     # contacts = robot.contact_list()
     robot_links = [link.prim_path for link in robot.links.values()]
     impulse_matrix = RigidContactAPI.get_impulses(robot_links, robot_links)
-    # print(np.max(impulse_matrix))
     return np.max(impulse_matrix) > 0.0
     # for c in contacts:
     #     if c.body0 in robot_links and c.body1 in robot_links:
