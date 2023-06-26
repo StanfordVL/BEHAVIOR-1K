@@ -91,7 +91,7 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin):
         # Check whether this state has toggledon if required or open if required
         for kwarg, state_type in zip(("requires_toggled_on", "requires_closed"), (ToggledOn, Open)):
             if kwargs.get(kwarg, False) and state_type not in obj.states:
-                return False, f"{cls.__name__} has requires_toggled_on but obj has no {state_type.__name__} state!"
+                return False, f"{cls.__name__} has {kwarg} but obj has no {state_type.__name__} state!"
 
         return True, None
 
