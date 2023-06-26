@@ -103,7 +103,7 @@ while true; do
     esac
 done
 
-#docker pull stanfordvl/omnigibson:test
+docker pull stanfordvl/omnigibson:latest
 DOCKER_DISPLAY=""
 OMNIGIBSON_HEADLESS=1
 if [ "$GUI" = true ] ; then
