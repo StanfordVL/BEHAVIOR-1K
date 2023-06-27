@@ -272,17 +272,6 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
         if self.method == ParticleModifyMethod.PROJECTION:
             # Construct naming prefix to apply to generated prims
             name_prefix = f"{self.obj.name}_{self.__class__.__name__}"
-            # Make sure projection mesh params are specified
-            # Import here to avoid circular imports
-            from omnigibson.objects.dataset_object import DatasetObject
-            if self._projection_mesh_params is None and isinstance(self.obj, DatasetObject):
-                # We try to grab metadata for this object
-                self._projection_mesh_params = self.obj.metadata.get("meta_links", dict()).get(m.LINK_NAME, None)
-            # Sanity check to make sure projection mesh params is not None
-            assert self._projection_mesh_params is not None, \
-                f"Projection mesh params must be specified for {self.obj.name}'s {self.__class__.__name__} state " \
-                f"when method=ParticleModifyMethod.PROJECTION!"
-
             shape_defaults = {
                 "radius": 0.5,
                 "height": 1.0,
@@ -849,7 +838,7 @@ class ParticleApplier(ParticleModifier):
             self.projection_source_sphere.initialize()
             self.projection_source_sphere.visible = False
             # Rotate by 90 degrees in y-axis so that the projection visualization aligns with the projection mesh
-            self.projection_source_sphere.set_orientation(T.euler2quat([0, np.pi / 2, 0]))
+            self.projection_source_sphere.set_local_pose(orientation=T.euler2quat([0, np.pi / 2, 0]))
 
             # Make sure the meta mesh is aligned with the meta link if visualizing
             # This corresponds to checking (a) position of tip of projection mesh should align with origin of
