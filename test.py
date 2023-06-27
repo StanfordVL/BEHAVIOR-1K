@@ -54,15 +54,6 @@ def main(random_selection=False, headless=False, short_exec=False):
     # Allow user to move camera more easily
     og.sim.enable_viewer_camera_teleoperation()
 
-    # table_cfg = dict(
-    #     type="DatasetObject",
-    #     name="table",
-    #     category="breakfast_table",
-    #     model="rjgmmy",
-    #     scale=0.9,
-    #     position=[0, 0, 0.58],
-    # )
-
     table = DatasetObject(
         name="table",
         category="breakfast_table",
@@ -79,6 +70,14 @@ def main(random_selection=False, headless=False, short_exec=False):
     )
     og.sim.import_object(grasp_obj)
     grasp_obj.set_position([-0.3, -0.8, 0.5])
+
+    cabinet = DatasetObject(
+        name="cabinet",
+        category="bottom_cabinet",
+        model="bamfsz"
+    )
+    og.sim.import_object(cabinet)
+    cabinet.set_position([-0.3, -0.8, 0.5])
 
     # marker = PrimitiveObject(
     #     prim_path=f"/World/marker",
@@ -107,22 +106,10 @@ def main(random_selection=False, headless=False, short_exec=False):
     # marker2.set_position([1.0, 1.0, 0.5])
     # og.sim.step()
 
-    
-    # from omnigibson.utils.sim_utils import land_object
-    # land_object(robot, np.zeros(3), z_offset=0.05)
-
-    # for link_name in ["l_wheel_link", "r_wheel_link"]:
-    #     link = robot.links[link_name]
-    #     for col_mesh in link.collision_meshes.values():
-    #         col_mesh.set_collision_approximation("boundingSphere")
-    # og.sim.step()
-
     # from IPython import embed; embed()
 
-    # robot.set_position([-1.01199755, -0.30455528, 0.0])
-    # robot.set_orientation(T.euler2quat([0, 0, 5.64995586]))
-    robot.set_position([0.0, -0.5, 0.05])
-    robot.set_orientation(T.euler2quat([0, 0, -np.pi/1.5]))
+    # robot.set_position([0.0, -0.5, 0.05])
+    # robot.set_orientation(T.euler2quat([0, 0, -np.pi/1.5]))
     og.sim.step()
 
     controller = StarterSemanticActionPrimitives(None, scene, robot)
@@ -133,7 +120,10 @@ def main(random_selection=False, headless=False, short_exec=False):
     # navigate_controller = controller._navigate_to_pose([0.0, 0.5, 0.0])
     # navigate_controller_marker = controller._navigate_to_obj(marker)
     navigate_controller_table = controller._navigate_to_obj(table)
-
+    navigate_controller = controller._navigate_to_obj(grasp_obj)
+    hand_controller = controller.grasp(grasp_obj)
+    place_controller = controller.place_on_top(table)
+    open_controller = controller.open(cabinet)
 
     # robot.untuck()
     start_joint_pos = np.array(
@@ -157,14 +147,9 @@ def main(random_selection=False, headless=False, short_exec=False):
     robot.set_joint_positions(start_joint_pos)
     # robot.tuck()
     og.sim.step()
-    hand_controller = controller.grasp(grasp_obj)
-    place_controller = controller.place_on_top(table)
+
     # execute_controller(hand_controller, env)
     # execute_controller(navigate_controller_marker, env)
-    # test_pose = ([0.21766903, -0.11778338,  0.70022976],[-0.56184953, -0.03555975,  0.21228494,  0.79874653])
-    # robot.set_position(test_pose[0])
-    # robot.set_orientation(test_pose[1])
-    # pause(10)
     
     # while True:
     #     with UndoableContext():
@@ -197,11 +182,15 @@ def main(random_selection=False, headless=False, short_exec=False):
     # pause(1)
     # execute_controller(place_controller, env)
     # pause(10)
+
     # test_pose = ([-0.3, 10.0, 0.05], T.euler2quat([0, np.pi/2, 0]))
     # print(controller._target_in_reach_of_robot(test_pose))
     # execute_controller(navigate_controller_table, env)
 
-    
+    pause(10)
+    # execute_controller(open_controller, env)
+
+
 
     # def test_collision(joint_pos):
     #     with UndoableContext():

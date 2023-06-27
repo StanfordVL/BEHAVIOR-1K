@@ -214,9 +214,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         yield from self._open_or_close(obj, False)
 
     def _open_or_close(self, obj, should_open):
-        hand_collision_fn = get_pose3d_hand_collision_fn(
-            self.robot, None, self._get_collision_body_ids(include_robot=True)
-        )
+        # hand_collision_fn = get_pose3d_hand_collision_fn(
+        #     self.robot, None, self._get_collision_body_ids(include_robot=True)
+        # )
 
         # Open the hand first
         yield from self._execute_release()
@@ -239,23 +239,23 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 )
 
         grasp_pose, target_poses, object_direction, joint_info, grasp_required = grasp_data
-        with UndoableContext(self.robot):
-            if hand_collision_fn(grasp_pose):
-                raise ActionPrimitiveError(
-                    ActionPrimitiveError.Reason.SAMPLING_ERROR,
-                    "Rejecting grasp pose due to collision.",
-                    {"object": obj, "grasp_pose": grasp_pose},
-                )
+        # with UndoableContext(self.robot):
+        #     if hand_collision_fn(grasp_pose):
+        #         raise ActionPrimitiveError(
+        #             ActionPrimitiveError.Reason.SAMPLING_ERROR,
+        #             "Rejecting grasp pose due to collision.",
+        #             {"object": obj, "grasp_pose": grasp_pose},
+        #         )
 
         # Prepare data for the approach later.
         approach_pos = grasp_pose[0] + object_direction * OPEN_GRASP_APPROACH_DISTANCE
         approach_pose = (approach_pos, grasp_pose[1])
 
         # If the grasp pose is too far, navigate
-        [bid] = obj.get_body_ids()  # TODO: Fix this!
-        check_joint = (bid, joint_info)
-        yield from self._navigate_if_needed(obj, pos_on_obj=approach_pos, check_joint=check_joint)
-        yield from self._navigate_if_needed(obj, pos_on_obj=grasp_pose[0], check_joint=check_joint)
+        # [bid] = obj.get_body_ids()  # TODO: Fix this!
+        # check_joint = (bid, joint_info)
+        # yield from self._navigate_if_needed(obj, pos_on_obj=approach_pos, check_joint=check_joint)
+        # yield from self._navigate_if_needed(obj, pos_on_obj=grasp_pose[0], check_joint=check_joint)
 
         yield from self._move_hand(grasp_pose)
 
@@ -264,10 +264,10 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         indented_print("Performing grasp approach for open.")
 
         try:
-            yield from self._move_hand_direct(approach_pose, ignore_failure=True, stop_on_contact=True)
+            yield from self._move_hand_direct_cartesian(approach_pose, ignore_failure=True, stop_on_contact=True)
         except ActionPrimitiveError:
             # An error will be raised when contact fails. If this happens, let's retreat back to the grasp pose.
-            yield from self._move_hand_direct(grasp_pose, ignore_failure=True)
+            yield from self._move_hand_direct_cartesian(grasp_pose, ignore_failure=True)
             raise
 
         if grasp_required:
