@@ -43,7 +43,8 @@ from omnigibson.utils.motion_planning_utils import (
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.control_utils import IKSolver
 from omnigibson.utils.grasping_planning_utils import (
-    get_grasp_poses_for_object_sticky
+    get_grasp_poses_for_object_sticky,
+    get_grasp_position_for_open
 )
 from omnigibson.objects import DatasetObject
 from omnigibson.controllers.controller_base import ControlType
@@ -57,7 +58,7 @@ DEFAULT_BODY_OFFSET_FROM_FLOOR = 0.05
 behavior_robot = None
 BehaviorRobot = None
 get_grasp_poses_for_object = None
-get_grasp_position_for_open = None
+# get_grasp_position_for_open = None
 plan_hand_motion_br = None
 get_pose3d_hand_collision_fn = None
 restoreState = None

@@ -42,7 +42,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     config_filename = "test.yaml"
     config = yaml.load(open(config_filename, "r"), Loader=yaml.FullLoader)
 
-    config["scene"]["load_object_categories"] = ["floors", "ceilings", "walls", "coffee_table", "desk"]
+    config["scene"]["load_object_categories"] = ["floors", "ceilings", "walls", "coffee_table", "bottom_cabinet"]
     # config["scene"]["load_object_categories"] = None
 
     # config["objects"] = [obj_cfg]
@@ -71,13 +71,18 @@ def main(random_selection=False, headless=False, short_exec=False):
     og.sim.import_object(grasp_obj)
     grasp_obj.set_position([-0.3, -0.8, 0.5])
 
-    cabinet = DatasetObject(
-        name="cabinet",
-        category="bottom_cabinet",
-        model="bamfsz"
-    )
-    og.sim.import_object(cabinet)
-    cabinet.set_position([-0.3, -0.8, 0.5])
+    for o in scene.objects:
+        if o.prim_path == "/World/bottom_cabinet_bamfsz_0":
+            cabinet = o
+
+    # cabinet = DatasetObject(
+    #     name="cabinet",
+    #     category="bottom_cabinet",
+    #     model="jhymlr"
+    # )
+    # og.sim.import_object(cabinest)
+    # cabinet.set_position([1.0, 0.0, 0.5])
+    # scene._add_object(cabinet)
 
     # marker = PrimitiveObject(
     #     prim_path=f"/World/marker",
@@ -148,8 +153,11 @@ def main(random_selection=False, headless=False, short_exec=False):
     # robot.tuck()
     og.sim.step()
 
-    # execute_controller(hand_controller, env)
-    # execute_controller(navigate_controller_marker, env)
+    robot.set_position([-1.0, -0.5, 0.05])
+    robot.set_orientation(T.euler2quat([0, 0, np.pi]))
+    og.sim.step()
+
+    execute_controller(open_controller, env)
     
     # while True:
     #     with UndoableContext():
@@ -186,11 +194,6 @@ def main(random_selection=False, headless=False, short_exec=False):
     # test_pose = ([-0.3, 10.0, 0.05], T.euler2quat([0, np.pi/2, 0]))
     # print(controller._target_in_reach_of_robot(test_pose))
     # execute_controller(navigate_controller_table, env)
-
-    pause(10)
-    # execute_controller(open_controller, env)
-
-
 
     # def test_collision(joint_pos):
     #     with UndoableContext():
