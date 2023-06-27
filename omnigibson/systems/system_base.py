@@ -1115,7 +1115,7 @@ def _create_system_from_metadata(system_name):
         asset_path = os.path.join(system_dir, f"{system_name}.usd")
         has_asset = os.path.exists(asset_path)
         if not has_asset:
-            if system_type == "visual":
+            if system_type == "macro_visual_particle":
                 # Fallback to stain asset
                 asset_path = os.path.join(gm.ASSET_PATH, "models", "stain", "stain.usd")
                 has_asset = True
@@ -1139,7 +1139,7 @@ def _create_system_from_metadata(system_name):
                     og.objects.PrimitiveObject(
                         prim_path=prim_path,
                         name=name,
-                        primtive_type="Sphere",
+                        primitive_type="Sphere",
                         category=system_name,
                         radius=0.015,
                         visible=False,
