@@ -41,6 +41,7 @@ def plan_base_motion(
     bounds.setHigh(7.0)
     space.setBounds(bounds)
 
+    print(space.getBounds())
     # create a simple setup object
     ss = ompl_geo.SimpleSetup(space)
     ss.setStateValidityChecker(ob.StateValidityCheckerFn(state_valid_fn))
@@ -60,6 +61,7 @@ def plan_base_motion(
     goal().setY(end_conf[1])
     goal().setYaw(T.wrap_angle(end_conf[2]))
     print(goal)
+    # from IPython import embed; embed()
     ss.setStartAndGoalStates(start, goal)
 
     # this will automatically choose a default planner with
@@ -148,7 +150,7 @@ def plan_arm_motion(
     return None
 
 def detect_robot_collision(robot, filter_objs=[]):
-    filter_objects = [o.name for o in filter_objs] + ["floor"]
+    filter_objects = [o.name for o in filter_objs] + ["floor", "potato"]
     obj_in_hand = obj_in_hand = robot._ag_obj_in_hand[robot.default_arm] 
     if obj_in_hand is not None:
         filter_objects.append(obj_in_hand.name)
@@ -158,6 +160,12 @@ def detect_robot_collision(robot, filter_objs=[]):
     for col_obj in collision_objects:
         if not any([f in col_obj.name for f in filter_objects]):
             filtered_collision_objects.append(col_obj)
+    # print("-----")
+    # print(filtered_collision_objects)
+    # for f in filtered_collision_objects:
+    #     if obj_in_hand is not None:
+    #         print(obj_in_hand.name)
+    #     print(f.name)
     return len(filtered_collision_objects) > 0 or detect_self_collision(robot)
 
 def detect_self_collision(robot):
@@ -169,6 +177,10 @@ def detect_self_collision(robot):
     #     if c.body0 in robot_links and c.body1 in robot_links:
     #         return True
     # return False
+
+def detect_hand_collision(robot, joint_pos, control_idx):
+    robot.set_joint_positions(joint_pos, control_idx)
+    return detect_robot_collision(robot)
 
 def remove_unnecessary_rotations(path):
     for start_idx in range(len(path) - 1):

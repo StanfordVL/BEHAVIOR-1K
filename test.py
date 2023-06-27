@@ -64,7 +64,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     # )
 
     table = DatasetObject(
-        name="potato",
+        name="table",
         category="breakfast_table",
         model="rjgmmy",
         scale = 0.3
@@ -73,24 +73,24 @@ def main(random_selection=False, headless=False, short_exec=False):
     table.set_position([1.0, 1.0, 0.58])
 
     grasp_obj = DatasetObject(
-        name="shaker",
+        name="potato",
         category="potato",
         model="lqjear"
     )
     og.sim.import_object(grasp_obj)
     grasp_obj.set_position([-0.3, -0.8, 0.5])
 
-    marker = PrimitiveObject(
-        prim_path=f"/World/marker",
-        name="marker",
-        primitive_type="Cube",
-        size=0.07,
-        visual_only=True,
-        rgba=[1.0, 0, 0, 1.0],
-    )
-    og.sim.import_object(marker)
-    marker.set_position([-0.3, -0.8, 0.5])
-    og.sim.step()
+    # marker = PrimitiveObject(
+    #     prim_path=f"/World/marker",
+    #     name="marker",
+    #     primitive_type="Cube",
+    #     size=0.07,
+    #     visual_only=True,
+    #     rgba=[1.0, 0, 0, 1.0],
+    # )
+    # og.sim.import_object(marker)
+    # marker.set_position([-0.3, -0.8, 0.5])
+    # og.sim.step()
 
     # from IPython import embed; embed()
 
@@ -132,7 +132,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     # navigate_controller = controller._navigate_to_pose([0.5, 2.5, 0.0])
     # navigate_controller = controller._navigate_to_pose([0.0, 0.5, 0.0])
     # navigate_controller_marker = controller._navigate_to_obj(marker)
-    navigate_controller_table = controller._navigate_to_obj(table)
+    # navigate_controller_table = controller._navigate_to_obj(table)
 
 
     # robot.untuck()
@@ -156,20 +156,35 @@ def main(random_selection=False, headless=False, short_exec=False):
     )
     robot.set_joint_positions(start_joint_pos)
     # robot.tuck()
-    # robot.root_link.mass = 70
     og.sim.step()
     hand_controller = controller.grasp(grasp_obj)
     place_controller = controller.place_on_top(table)
-    # print(robot.root_link.mass)
     # execute_controller(hand_controller, env)
     # execute_controller(navigate_controller_marker, env)
+    # test_pose = ([0.21766903, -0.11778338,  0.70022976],[-0.56184953, -0.03555975,  0.21228494,  0.79874653])
+    # robot.set_position(test_pose[0])
+    # robot.set_orientation(test_pose[1])
+    # pause(10)
+    
+    # pose = ([0.64614588, 0.49344251, 0.00523233], [ 0.00541938, -0.02392132,  0.31833339,  0.9476617 ])
+    # hand_pose = ([1.2112058 , 0.91612303, 0.43050346], [0.7996582 , 0.29997651, 0.01271829, 0.51999913])
+    # start_joint_pos = [0.0127592, 1.17074, 1.46882, -0.399443, 1.66954, 0.0000686818, 1.57074, -0.00000181259]
+    # control_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx["0"]])
+    # robot.set_position_orientation(*pose)
+    # robot.set_joint_positions(start_joint_pos, control_idx)
+    # og.sim.step()
+    # detect_robot_collision(robot)
+    # pause(100)
+
+    # controller._navigate_to_obj(table)
     execute_controller(hand_controller, env)
     pause(1)
     execute_controller(place_controller, env)
-    pause(10)
-    # print(robot.root_link.mass)
-    # pause(50)
-    # execute_controller(place_controller, env)
+    # pause(10)
+    # test_pose = ([-0.3, 10.0, 0.05], T.euler2quat([0, np.pi/2, 0]))
+    # print(controller._target_in_reach_of_robot(test_pose))
+    # execute_controller(navigate_controller_table, env)
+    pause(2)
 
     # def test_collision(joint_pos):
     #     with UndoableContext():
