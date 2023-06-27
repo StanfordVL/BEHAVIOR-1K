@@ -918,6 +918,16 @@ class ParticleApplier(ParticleModifier):
                 "If not sampling with raycast, ParticleApplier only supports `Cone` or `Cylinder` projection types!")
         self._in_mesh_local_particle_directions = directions / np.linalg.norm(directions, axis=-1).reshape(-1, 1)
 
+    def _update(self):
+        # If we're about to check for modification, update whether it the visualization should be active or not
+        if self.visualize and self._current_step == 0:
+            # Only one system in our conditions, so next(iter()) suffices
+            is_active = bool(np.all([condition(self.obj) for condition in next(iter(self.conditions.values()))]))
+            self.projection_emitter.GetProperty("inputs:active").Set(is_active)
+
+        # Run super
+        super()._update()
+
     def _modify_particles(self, system):
         # If at the limit, don't modify anything
         if self.obj.states[Saturated].get_value(system=system):
