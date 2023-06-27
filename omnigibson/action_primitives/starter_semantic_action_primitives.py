@@ -77,7 +77,7 @@ MAX_ATTEMPTS_FOR_SAMPLING_POSE_IN_ROOM = 60
 
 BIRRT_SAMPLING_CIRCLE_PROBABILITY = 0.5
 HAND_SAMPLING_DOMAIN_PADDING = 1  # Allow 1m of freedom around the sampling range.
-PREDICATE_SAMPLING_Z_OFFSET = 0.1
+PREDICATE_SAMPLING_Z_OFFSET = 0.2
 JOINT_CHECKING_RESOLUTION = np.pi / 18
 
 GRASP_APPROACH_DISTANCE = 0.2
@@ -317,23 +317,23 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             force_allow_any_extent = np.random.rand() < 0.5
             grasp_poses = get_grasp_poses_for_object_sticky(obj, force_allow_any_extent=force_allow_any_extent)
             grasp_pose, object_direction = random.choice(grasp_poses)
-            with UndoableContext():
-                joint_pos, control_idx = self._convert_cartesian_to_joint_space(grasp_pose)
-                if detect_hand_collision(self.robot, joint_pos, control_idx):
-                    raise ActionPrimitiveError(
-                        ActionPrimitiveError.Reason.SAMPLING_ERROR,
-                        "Rejecting grasp pose candidate due to collision",
-                        {"grasp_pose": grasp_pose},  # TODO: Add more info about collision.
-                    )
+            # with UndoableContext():
+            #     joint_pos, control_idx = self._convert_cartesian_to_joint_space(grasp_pose)
+            #     if detect_hand_collision(self.robot, joint_pos, control_idx):
+            #         raise ActionPrimitiveError(
+            #             ActionPrimitiveError.Reason.SAMPLING_ERROR,
+            #             "Rejecting grasp pose candidate due to collision",
+            #             {"grasp_pose": grasp_pose},  # TODO: Add more info about collision.
+            #         )
             # Prepare data for the approach later.
             approach_pos = grasp_pose[0] + object_direction * GRASP_APPROACH_DISTANCE
             approach_pose = (approach_pos, grasp_pose[1])
-            # print(grasp_pose)
+
             # If the grasp pose is too far, navigate.
             # yield from self._navigate_if_needed(obj, pos_on_obj=approach_pos)
             # yield from self._navigate_if_needed(obj, pos_on_obj=grasp_pose[0])
             yield from self._move_hand(grasp_pose)
-            # print("done")
+
             # Since the grasp pose is slightly off the object, we want to move towards the object, around 5cm.
             # It's okay if we can't go all the way because we run into the object.
             indented_print("Performing grasp approach.")
@@ -473,7 +473,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         arm_joints = joints[control_idx]
         for i, joint in enumerate(arm_joints):
             if joint_pos[i] < joint.lower_limit or joint_pos[i] > joint.upper_limit:
-                # print("failed")
                 return None, control_idx
             
         return joint_pos, control_idx
@@ -634,7 +633,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         # pos_on_obj = [1.1077145,  0.96007216, 0.41105416]
 
         pose = self._sample_pose_near_object(obj, pos_on_obj=pos_on_obj, **kwargs)
-        print(pos_on_obj)
         # # pose = [0.98078451, 0.61068289, 1.01672635]
         # print(self._test_pose(pose, np.array(pos_on_obj)))
         # pose_2d = self._get_robot_pose_from_2d_pose(pose)
@@ -704,6 +702,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             pose_2d = np.array(
                 [pos_on_obj[0] + distance * np.cos(yaw), pos_on_obj[1] + distance * np.sin(yaw), yaw + np.pi]
             )
+            # pose_2d = [1.21189, 0.625961, 1.87304]
+            # pos_on_obj = [1.0, 0.7, 0.5]
 
             # Check room
             if self.scene._seg_map.get_room_instance_by_point(pose_2d[:2]) not in obj_rooms:

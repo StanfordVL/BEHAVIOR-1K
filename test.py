@@ -132,7 +132,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     # navigate_controller = controller._navigate_to_pose([0.5, 2.5, 0.0])
     # navigate_controller = controller._navigate_to_pose([0.0, 0.5, 0.0])
     # navigate_controller_marker = controller._navigate_to_obj(marker)
-    # navigate_controller_table = controller._navigate_to_obj(table)
+    navigate_controller_table = controller._navigate_to_obj(table)
 
 
     # robot.untuck()
@@ -166,25 +166,42 @@ def main(random_selection=False, headless=False, short_exec=False):
     # robot.set_orientation(test_pose[1])
     # pause(10)
     
-    # pose = ([0.64614588, 0.49344251, 0.00523233], [ 0.00541938, -0.02392132,  0.31833339,  0.9476617 ])
-    # hand_pose = ([1.2112058 , 0.91612303, 0.43050346], [0.7996582 , 0.29997651, 0.01271829, 0.51999913])
-    # start_joint_pos = [0.0127592, 1.17074, 1.46882, -0.399443, 1.66954, 0.0000686818, 1.57074, -0.00000181259]
-    # control_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx["0"]])
+    # while True:
+    #     with UndoableContext():
+    #         pose_2d = [1.21189, 0.625961, 1.87304]
+    #         pose = controller._get_robot_pose_from_2d_pose(pose_2d)
+    #         robot.set_position_orientation(*pose)
+    #         og.sim.step()
+    #         print(detect_robot_collision(robot))
+    #         print("-------")
+    #         pause(2)
+
+
+    # pose_2d = [1.43015, 1.0724, -2.80638] 
+    # pose_2d = [1.21189, 0.625961, 1.87304]
+    # # print(controller._test_pose(pose_2d))
+    # # pause(10)
+    # pose = controller._get_robot_pose_from_2d_pose(pose_2d)
+    # # hand_pose = ([1.2112058 , 0.91612303, 0.43050346], [0.7996582 , 0.29997651, 0.01271829, 0.51999913])
+    # # start_joint_pos = [0.0127592, 1.17074, 1.46882, -0.399443, 1.66954, 0.0000686818, 1.57074, -0.00000181259]
+    # # control_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx["0"]])
     # robot.set_position_orientation(*pose)
-    # robot.set_joint_positions(start_joint_pos, control_idx)
+    # # robot.set_joint_positions(start_joint_pos, control_idx)
     # og.sim.step()
-    # detect_robot_collision(robot)
+    # print(detect_robot_collision(robot))
     # pause(100)
 
+    # execute_controller(navigate_controller_table, env)
     # controller._navigate_to_obj(table)
-    execute_controller(hand_controller, env)
-    pause(1)
-    execute_controller(place_controller, env)
+    # execute_controller(hand_controller, env)
+    # pause(1)
+    # execute_controller(place_controller, env)
     # pause(10)
     # test_pose = ([-0.3, 10.0, 0.05], T.euler2quat([0, np.pi/2, 0]))
     # print(controller._target_in_reach_of_robot(test_pose))
     # execute_controller(navigate_controller_table, env)
-    pause(2)
+
+    
 
     # def test_collision(joint_pos):
     #     with UndoableContext():
@@ -273,7 +290,6 @@ def main(random_selection=False, headless=False, short_exec=False):
 #     for obj in og.sim.scene.objects:
 #         for link in obj.links.values():
 #             link.set_attribute("SolveContacts", True)
-
 
 
 if __name__ == "__main__":
