@@ -37,7 +37,6 @@ def get_grasp_position_for_open(robot, target_obj, should_open, link_id=None):
     if len(relevant_joints) == 0:
         raise ValueError("Cannot open/close object without relevant joints.")
 
-    from IPython import embed; embed()
     # Make sure what we got is an appropriately open/close joint.
     random.shuffle(relevant_joints)
     selected_joint = None

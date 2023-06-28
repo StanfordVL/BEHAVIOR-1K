@@ -9,6 +9,9 @@ from omnigibson.object_states import ContactBodies
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.usd_utils import RigidContactAPI
 
+# Timing code
+from time import clock
+
 def plan_base_motion(
     robot,
     obj_in_hand,
@@ -16,6 +19,9 @@ def plan_base_motion(
     planning_time = 100.0,
     **kwargs,
 ):
+    solution_time = 0.0
+    simplify_time = 0.0
+
     def state_valid_fn(q):
         x = q.getX()
         y = q.getY()
@@ -24,7 +30,8 @@ def plan_base_motion(
             [x, y, 0.05], T.euler2quat((0, 0, yaw))
         )
         og.sim.step(render=False)
-        return not detect_robot_collision(robot)
+        state_valid = not detect_robot_collision(robot)
+        return state_valid
 
     pos = robot.get_position()
     yaw = T.quat2euler(robot.get_orientation())[2]
@@ -63,11 +70,17 @@ def plan_base_motion(
 
     # this will automatically choose a default planner with
     # default parameters
+    begin = clock()
     solved = ss.solve(planning_time)
+    end = clock()
+    solution_time = end - begin
 
     if solved:
         # try to shorten the path
+        begin = clock()
         ss.simplifySolution()
+        end = clock()
+        simplify_time = (end - begin)
         # print the simplified path
         sol_path = ss.getSolutionPath()
         return_path = []
@@ -76,6 +89,7 @@ def plan_base_motion(
             y = sol_path.getState(i).getY()
             yaw = sol_path.getState(i).getYaw()
             return_path.append([x, y, yaw])
+        write_to_file({"Base motion": "", "solution_time": solution_time, "simplify_time": simplify_time})
         return remove_unnecessary_rotations(return_path)
     return None
 
@@ -86,7 +100,9 @@ def plan_arm_motion(
     planning_time = 100.0,
     **kwargs,
 ):
-    
+    solution_time = 0.0
+    simplify_time = 0.0
+
     joint_control_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
     dim = len(joint_control_idx)
 
@@ -128,38 +144,44 @@ def plan_arm_motion(
 
     # this will automatically choose a default planner with
     # default parameters
+    begin = clock()
     solved = ss.solve(planning_time)
+    end = clock()
+    solution_time = (end - begin)
 
     if solved:
         # try to shorten the path
+        begin = clock()
         ss.simplifySolution()
+        end = clock()
+        simplify_time = (end - begin)
         # print the simplified path
         sol_path = ss.getSolutionPath()
         return_path = []
         for i in range(sol_path.getStateCount()):
             joint_pos = [sol_path.getState(i)[j] for j in range(dim)]
             return_path.append(joint_pos)
+        write_to_file({"Hand motion": "", "solution_time": solution_time, "simplify_time": simplify_time})
         return return_path
     return None
 
 def detect_robot_collision(robot, filter_objs=[]):
-    filter_objects = [o.name for o in filter_objs] + ["floor", "potato"]
-    obj_in_hand = obj_in_hand = robot._ag_obj_in_hand[robot.default_arm] 
+    filter_categories = ["floors"]
+    
+    obj_in_hand = robot._ag_obj_in_hand[robot.default_arm]
     if obj_in_hand is not None:
-        filter_objects.append(obj_in_hand.name)
-    # collision_objects = list(filter(lambda obj : "floor" not in obj.name, robot.states[ContactBodies].get_value()))
-    collision_objects = robot.states[ContactBodies].get_value()
-    filtered_collision_objects = []
-    for col_obj in collision_objects:
-        if not any([f in col_obj.name for f in filter_objects]):
-            filtered_collision_objects.append(col_obj)
-    # print("-----")
-    # print(filtered_collision_objects)
-    # for f in filtered_collision_objects:
-    #     if obj_in_hand is not None:
-    #         print(obj_in_hand.name)
-    #     print(f.name)
-    return len(filtered_collision_objects) > 0 or detect_self_collision(robot)
+        filter_objs.append(obj_in_hand)
+
+    collision_prims = list(robot.states[ContactBodies].get_value(ignore_objs=tuple(filter_objs)))
+
+    for col_prim in collision_prims:
+        tokens = col_prim.prim_path.split("/")
+        obj_prim_path = "/".join(tokens[:-1])
+        col_obj = og.sim.scene.object_registry("prim_path", obj_prim_path)
+        if col_obj.category in filter_categories:
+            collision_prims.remove(col_prim)
+
+    return len(collision_prims) > 0 or detect_self_collision(robot)
 
 def detect_self_collision(robot):
     # contacts = robot.contact_list()
@@ -183,3 +205,8 @@ def remove_unnecessary_rotations(path):
         theta = np.arctan2(segment[1], segment[0])
         path[start_idx] = (start[0], start[1], theta)
     return path
+
+def write_to_file(data):
+    with open("data.txt", "a") as f:
+        for key, val in data.items():
+            f.write(f"{key}: {str(val)}\n")

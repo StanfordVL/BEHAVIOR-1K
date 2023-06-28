@@ -9,6 +9,8 @@ from omnigibson.action_primitives.starter_semantic_action_primitives import Star
 import omnigibson.utils.transform_utils as T
 from omnigibson.objects.dataset_object import DatasetObject
 
+from omnigibson.utils.motion_planning_utils import write_to_file
+
 def pause(time):
     for _ in range(int(time*100)):
         # og.sim.render()
@@ -17,7 +19,6 @@ def pause(time):
 def execute_controller(ctrl_gen, env):
     for action in ctrl_gen:
         env.step(action)
-        
 
 def main():
     # Load the config
@@ -55,7 +56,7 @@ def main():
     
     def test_navigate_to_obj():
         ctrl_navigate = controller._navigate_to_obj(table)
-        execute_controller(ctrl_navigate._navigate_to_obj(table), env)
+        execute_controller(ctrl_navigate, env)
 
     def test_grasp():
         start_joint_pos = np.array(
@@ -83,6 +84,10 @@ def main():
         og.sim.step()
         execute_controller(ctrl_grasp, env)
 
+    def test_full_grasp():
+        ctrl_grasp = controller.grasp(grasp_obj)
+        execute_controller(ctrl_grasp, env)
+
     def test_place():
         test_grasp()
         pause(1)
@@ -90,7 +95,8 @@ def main():
         execute_controller(ctrl_grasp, env)
 
     test_place()
-
+    # test_full_grasp()
+    # write_to_file({"-----------": "-----------"})
 
 if __name__ == "__main__":
     main()
