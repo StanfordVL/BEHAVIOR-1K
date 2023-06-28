@@ -4,6 +4,7 @@ from scipy.spatial import ConvexHull, distance_matrix
 
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.object_state_base import BooleanState, AbsoluteObjectState
+from omnigibson.object_states.cloth import ClothState
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -33,7 +34,7 @@ FoldedLevelData contains the following fields:
 """
 FoldedLevelData = namedtuple("FoldedLevelData", ("smoothness", "area", "diagonal"))
 
-class FoldedLevel(AbsoluteObjectState):
+class FoldedLevel(AbsoluteObjectState, ClothState):
     """
     State representing the object's folded level.
     Value is a FoldedLevelData object.
@@ -129,7 +130,7 @@ class FoldedLevel(AbsoluteObjectState):
 
         return area, diagonal
 
-class Folded(AbsoluteObjectState, BooleanState):
+class Folded(AbsoluteObjectState, BooleanState, ClothState):
     @staticmethod
     def get_dependencies():
         return AbsoluteObjectState.get_dependencies() + [FoldedLevel]
@@ -150,7 +151,7 @@ class Folded(AbsoluteObjectState, BooleanState):
 
     # We don't need to dump / load anything since the cloth objects should handle it themselves
 
-class Unfolded(AbsoluteObjectState, BooleanState):
+class Unfolded(AbsoluteObjectState, BooleanState, ClothState):
     def _get_value(self):
         # Check the smoothness of the cloth
         folded_level = self.obj.states[FoldedLevel].get_value()

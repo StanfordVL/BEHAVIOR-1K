@@ -14,7 +14,8 @@ from bddl.logic_base import BinaryAtomicFormula, UnaryAtomicFormula, AtomicFormu
 from bddl.object_taxonomy import ObjectTaxonomy
 import omnigibson as og
 from omnigibson.macros import gm
-from omnigibson.utils.asset_utils import get_object_models_of_category
+from omnigibson.utils.constants import PrimType
+from omnigibson.utils.asset_utils import get_all_object_categories, get_all_object_category_models_with_abilities
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.python_utils import Wrapper
 from omnigibson.objects.dataset_object import DatasetObject
@@ -129,9 +130,15 @@ SUPPORTED_PREDICATES = {
     "filled": get_binary_predicate_for_state(object_states.Filled, "filled"),
     "cooked": get_unary_predicate_for_state(object_states.Cooked, "cooked"),
     "burnt": get_unary_predicate_for_state(object_states.Burnt, "burnt"),
+    "frozen": get_unary_predicate_for_state(object_states.Frozen, "frozen"),
+    "hot": get_unary_predicate_for_state(object_states.Heated, "hot"),
     "open": get_unary_predicate_for_state(object_states.Open, "open"),
     "toggled_on": get_unary_predicate_for_state(object_states.ToggledOn, "toggled_on"),
-    "frozen": get_unary_predicate_for_state(object_states.Frozen, "frozen"),
+    "attached": get_binary_predicate_for_state(object_states.AttachedTo, "attached"),
+    "overlaid": get_binary_predicate_for_state(object_states.Overlaid, "overlaid"),
+    "folded": get_unary_predicate_for_state(object_states.Folded, "folded"),
+    "unfolded": get_unary_predicate_for_state(object_states.Unfolded, "unfolded"),
+    "draped": get_binary_predicate_for_state(object_states.Draped, "draped"),
     "future": ObjectStateFuturePredicate,
     "real": ObjectStateRealPredicate,
     "insource": ObjectStateInsourcePredicate,
@@ -151,11 +158,6 @@ OBJECT_TAXONOMY = ObjectTaxonomy()
 FLOOR_SYNSET = "floor.n.01"
 with open(os.path.join(os.path.dirname(bddl.__file__), "activity_manifest.txt")) as f:
     BEHAVIOR_ACTIVITIES = {line.strip() for line in f.readlines()}
-NON_SAMPLEABLE_SYNSETS = set()
-non_sampleable_category_txt = os.path.join(gm.DATASET_PATH, "metadata/non_sampleable_categories.txt")
-if os.path.isfile(non_sampleable_category_txt):
-    with open(non_sampleable_category_txt) as f:
-        NON_SAMPLEABLE_SYNSETS = set([FLOOR_SYNSET] + [line.strip() for line in f.readlines()])
 
 
 class OmniGibsonBDDLBackend(BDDLBackend):
@@ -284,13 +286,13 @@ class BDDLSampler:
         self._backend = backend
         self._activity_conditions = activity_conditions
         self._object_scope = object_scope
-        self._object_instance_to_category = {
+        self._object_instance_to_synset = {
             obj_inst: obj_cat
             for obj_cat in self._activity_conditions.parsed_objects
             for obj_inst in self._activity_conditions.parsed_objects[obj_cat]
         }
         self._substance_instances = {obj_inst for obj_inst in self._object_scope.keys() if
-                                     self._object_instance_to_category[obj_inst] in SUBSTANCE_SYNSET_MAPPING}
+                                     self._object_instance_to_synset[obj_inst] in SUBSTANCE_SYNSET_MAPPING}
 
         # Initialize other variables that will be filled in later
         self._room_type_to_object_instance = None           # dict
@@ -313,6 +315,7 @@ class BDDLSampler:
                 - bool: Whether sampling was successful or not
                 - None or str: None if successful, otherwise the associated error message
         """
+        log.info("Sampling task...")
         # Reject scenes with missing non-sampleable objects
         # Populate object_scope with sampleable objects and the robot
         accept_scene, feedback = self._prepare_scene_for_sampling()
@@ -322,6 +325,8 @@ class BDDLSampler:
         accept_scene, feedback = self._sample_all_conditions(validate_goal=validate_goal)
         if not accept_scene:
             return accept_scene, feedback
+
+        log.info("Sampling succeeded!")
 
         return True, None
 
@@ -403,34 +408,33 @@ class BDDLSampler:
         for cond in self._activity_conditions.parsed_initial_conditions:
             if cond[0] == "inroom":
                 obj_inst, room_type = cond[1], cond[2]
-                obj_cat = self._object_instance_to_category[obj_inst]
-                if obj_cat not in NON_SAMPLEABLE_SYNSETS:
+                obj_synset = self._object_instance_to_synset[obj_inst]
+                abilities = OBJECT_TAXONOMY.get_abilities(obj_synset)
+                if "sceneObject" not in abilities:
                     # Invalid room assignment
-                    return "You have assigned room type for [{}], but [{}] is sampleable. Only non-sampleable objects can have room assignment.".format(
-                        obj_cat, obj_cat
-                    )
+                    return f"You have assigned room type for [{obj_synset}], but [{obj_synset}] is sampleable. " \
+                           f"Only non-sampleable (scene) objects can have room assignment."
                 if room_type not in og.sim.scene.seg_map.room_sem_name_to_ins_name:
                     # Missing room type
-                    return "Room type [{}] missing in scene [{}].".format(room_type, og.sim.scene.scene_model)
+                    return f"Room type [{room_type}] missing in scene [{og.sim.scene.scene_model}]."
                 if room_type not in self._room_type_to_object_instance:
                     self._room_type_to_object_instance[room_type] = []
                 self._room_type_to_object_instance[room_type].append(obj_inst)
 
                 if obj_inst in self._non_sampleable_object_instances:
                     # Duplicate room assignment
-                    return "Object [{}] has more than one room assignment".format(obj_inst)
+                    return f"Object [{obj_inst}] has more than one room assignment"
 
                 self._non_sampleable_object_instances.add(obj_inst)
 
-        for obj_cat in self._activity_conditions.parsed_objects:
-            if obj_cat not in NON_SAMPLEABLE_SYNSETS:
+        for obj_synset in self._activity_conditions.parsed_objects:
+            abilities = OBJECT_TAXONOMY.get_abilities(obj_synset)
+            if "sceneObject" not in abilities:
                 continue
-            for obj_inst in self._activity_conditions.parsed_objects[obj_cat]:
+            for obj_inst in self._activity_conditions.parsed_objects[obj_synset]:
                 if obj_inst not in self._non_sampleable_object_instances:
                     # Missing room assignment
-                    return "All non-sampleable objects should have room assignment. [{}] does not have one.".format(
-                        obj_inst
-                    )
+                    return f"All non-sampleable (scene) objects should have room assignment. [{obj_inst}] does not have one."
 
     def _build_sampling_order(self):
         """
@@ -508,19 +512,22 @@ class BDDLSampler:
         # affect each other
         self._object_sampling_orders["unary"].append({cond[0] for cond in sampling_groups["unary"]})
 
-        # Aggregate future objects
+        # Aggregate future objects and any unsampleable obj instances
+        # Unsampleable obj instances are strictly a superset of future obj instances
+        unsampleable_obj_instances = {cond.body[-1] for cond in unsampleable_conditions}
         self._future_obj_instances = {cond.body[0] for cond in unsampleable_conditions if isinstance(cond, ObjectStateFuturePredicate)}
+
         nonparticle_entities = set(self._object_scope.keys()) - self._substance_instances
 
         # Sanity check kinematic objects -- any non-system must be kinematically sampled
-        remaining_kinematic_entities = nonparticle_entities - self._future_obj_instances - \
+        remaining_kinematic_entities = nonparticle_entities - unsampleable_obj_instances - \
             self._non_sampleable_object_instances - set.union(*(self._object_sampling_orders["kinematic"] + [set()]))
         if len(remaining_kinematic_entities) != 0:
             return f"Some objects do not have any kinematic condition defined for them in the initial conditions: " \
                    f"{', '.join(remaining_kinematic_entities)}"
 
-        # Sanity check particle systems -- any non-future system must be sample as part of particle groups
-        remaining_particle_entities = self._substance_instances - self._future_obj_instances - sampled_particle_entities
+        # Sanity check particle systems -- any non-future system must be sampled as part of particle groups
+        remaining_particle_entities = self._substance_instances - unsampleable_obj_instances - sampled_particle_entities
         if len(remaining_particle_entities) != 0:
             return f"Some systems do not have any particle condition defined for them in the initial conditions: " \
                    f"{', '.join(remaining_particle_entities)}"
@@ -550,17 +557,20 @@ class BDDLSampler:
             room_type_to_scene_objs[room_type] = {}
             for obj_inst in self._room_type_to_object_instance[room_type]:
                 room_type_to_scene_objs[room_type][obj_inst] = {}
-                obj_cat = self._object_instance_to_category[obj_inst]
+                obj_synset = self._object_instance_to_synset[obj_inst]
 
                 # We allow burners to be used as if they are stoves
-                categories = OBJECT_TAXONOMY.get_subtree_categories(obj_cat)
-                if obj_cat == "stove.n.01":
-                    categories += OBJECT_TAXONOMY.get_subtree_categories("burner.n.02")
+                categories = OBJECT_TAXONOMY.get_subtree_categories(obj_synset)
+                abilities = OBJECT_TAXONOMY.get_abilities(obj_synset)
+
+                # Grab all models that fully support all abilities for the corresponding category
+                valid_models = {cat: set(get_all_object_category_models_with_abilities(cat, abilities))
+                                for cat in categories}
 
                 for room_inst in og.sim.scene.seg_map.room_sem_name_to_ins_name[room_type]:
                     # A list of scene objects that satisfy the requested categories
                     room_objs = og.sim.scene.object_registry("in_rooms", room_inst, default_val=[])
-                    scene_objs = [obj for obj in room_objs if obj.category in categories]
+                    scene_objs = [obj for obj in room_objs if obj.category in categories and obj.model in valid_models[obj.category]]
 
                     if len(scene_objs) != 0:
                         room_type_to_scene_objs[room_type][obj_inst][room_inst] = scene_objs
@@ -601,7 +611,6 @@ class BDDLSampler:
                         for condition, positive in conditions:
                             # Sample positive kinematic conditions that involve this candidate object
                             if condition.STATE_NAME in KINEMATIC_STATES_BDDL and positive and scene_obj in condition.body:
-
                                 success = condition.sample(binary_state=positive)
                                 log_msg = " ".join(
                                     [
@@ -682,53 +691,45 @@ class BDDLSampler:
         self._sampled_objects = set()
         num_new_obj = 0
         # Only populate self.object_scope for sampleable objects
-        for obj_cat in self._activity_conditions.parsed_objects:
+        available_categories = set(get_all_object_categories())
+        for obj_synset in self._activity_conditions.parsed_objects:
             # Don't populate agent
-            if obj_cat == "agent.n.01":
+            if obj_synset == "agent.n.01":
                 continue
             # Don't populate synsets that can't be sampled
-            if obj_cat in NON_SAMPLEABLE_SYNSETS:
+            abilities = OBJECT_TAXONOMY.get_abilities(obj_synset)
+            if "sceneObject" in abilities:
                 continue
 
             # Populate based on whether it's a substance or not
-            if obj_cat in SUBSTANCE_SYNSET_MAPPING:
-                assert len(self._activity_conditions.parsed_objects[obj_cat]) == 1, "Systems are singletons"
-                obj_inst = self._activity_conditions.parsed_objects[obj_cat][0]
+            if obj_synset in SUBSTANCE_SYNSET_MAPPING:
+                assert len(self._activity_conditions.parsed_objects[obj_synset]) == 1, "Systems are singletons"
+                obj_inst = self._activity_conditions.parsed_objects[obj_synset][0]
                 self._object_scope[obj_inst] = BDDLEntity(
                     bddl_inst=obj_inst,
-                    entity=None if obj_inst in self._future_obj_instances else get_system(SUBSTANCE_SYNSET_MAPPING[obj_cat]),
+                    entity=None if obj_inst in self._future_obj_instances else get_system(SUBSTANCE_SYNSET_MAPPING[obj_synset]),
                 )
             else:
-                is_sliceable = OBJECT_TAXONOMY.has_ability(obj_cat, "sliceable")
-                categories = OBJECT_TAXONOMY.get_subtree_categories(obj_cat)
+                valid_categories = set(OBJECT_TAXONOMY.get_subtree_categories(obj_synset))
+                categories = list(valid_categories.intersection(available_categories))
+                if len(categories) == 0:
+                    return f"None of the following categories could be found in the dataset for synset {obj_synset}: " \
+                           f"{valid_categories}"
 
-                # TODO: temporary hack
-                remove_categories = [
-                    "pop_case",  # too large
-                    "jewel",  # too small
-                    "ring",  # too small
-                ]
-                for remove_category in remove_categories:
-                    if remove_category in categories:
-                        categories.remove(remove_category)
-
-                for obj_inst in self._activity_conditions.parsed_objects[obj_cat]:
+                for obj_inst in self._activity_conditions.parsed_objects[obj_synset]:
                     # Don't explicitly sample if future
                     if obj_inst in self._future_obj_instances:
                         self._object_scope[obj_inst] = BDDLEntity(bddl_inst=obj_inst)
                         continue
 
                     category = np.random.choice(categories)
-                    # for sliceable objects, only get the whole objects
-                    try:
-                        model_choices = get_object_models_of_category(
-                            category, filter_method="sliceable_whole" if is_sliceable else None
-                        )
-                    except:
-                        return f"Missing object category: {category}"
 
+                    # Get all available models that support all of its synset abilities
+                    model_choices = get_all_object_category_models_with_abilities(
+                        category=category,
+                        abilities=OBJECT_TAXONOMY.get_abilities(obj_synset),
+                    )
                     if len(model_choices) == 0:
-                        # restore back to the play state
                         return f"Missing valid object models for category: {category}"
 
                     # TODO: This no longer works because model ID changes in the new asset
@@ -757,6 +758,7 @@ class BDDLSampler:
                         category=category,
                         model=model,
                         fit_avg_dim_volume=True,
+                        prim_type=PrimType.CLOTH if "cloth" in OBJECT_TAXONOMY.get_abilities(obj_synset) else PrimType.RIGID,
                     )
                     num_new_obj += 1
 
@@ -765,7 +767,7 @@ class BDDLSampler:
                     og.sim.import_object(simulator_obj)
 
                     # Set these objects to be far-away locations
-                    simulator_obj.set_position(np.array([100.0 + num_new_obj - 1, 100.0, -100.0]))
+                    simulator_obj.set_position(np.array([100.0, 100.0, -100.0]) + np.ones(3) * num_new_obj * 5.0)
 
                     self._sampled_objects.add(simulator_obj)
                     self._object_scope[obj_inst] = BDDLEntity(bddl_inst=obj_inst, entity=simulator_obj)
@@ -825,7 +827,7 @@ class BDDLSampler:
         """
         # Sample kinematics first, then particle states, then unary states
         for group in ("kinematic", "particle", "unary"):
-            log.debug(f"Sampling {group} states...")
+            log.info(f"Sampling {group} states...")
             if len(self._object_sampling_orders[group]) > 0:
                 # # Pop non-sampleable objects
                 # self._object_sampling_orders["kinematic"].pop(0)
@@ -839,9 +841,7 @@ class BDDLSampler:
                                 if success:
                                     break
                             if not success:
-                                return "Sampleable object conditions failed: {} {}".format(
-                                    condition.STATE_NAME, condition.body
-                                )
+                                return f"Sampleable object conditions failed: {condition.STATE_NAME} {condition.body}"
 
         # One more sim step to make sure the object states are propagated correctly
         # E.g. after sampling Filled.set_value(True), Filled.get_value() will become True only after one step

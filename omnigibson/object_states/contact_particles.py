@@ -19,10 +19,6 @@ class ContactParticles(RelativeObjectState, KinematicsMixin):
     """
     Object state that handles contact checking between rigid bodies and individual particles.
     """
-
-    def __init__(self, obj):
-        super().__init__(obj=obj)
-
     def _get_value(self, system, link=None):
         """
         Args:
@@ -74,3 +70,7 @@ class ContactParticles(RelativeObjectState, KinematicsMixin):
 
     def _set_value(self, system, new_value):
         raise NotImplementedError("ContactParticles state currently does not support setting.")
+
+    def _cache_is_valid(self, get_value_args):
+        # Cache is never valid since particles always change poses
+        return False

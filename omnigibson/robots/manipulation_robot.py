@@ -1285,15 +1285,6 @@ class ManipulationRobot(BaseRobot):
         # TODO AG
         return state_dict, idx
 
-    def can_toggle(self, toggle_position, toggle_distance_threshold):
-        # Calculate for any fingers in any arm
-        for arm in self.arm_names:
-            for link in self.finger_links[arm]:
-                link_pos = link.get_position()
-                if np.linalg.norm(np.array(link_pos) - np.array(toggle_position)) < toggle_distance_threshold:
-                    return True
-        return False
-
     @classproperty
     def _do_not_register_classes(cls):
         # Don't register this class since it's an abstract template

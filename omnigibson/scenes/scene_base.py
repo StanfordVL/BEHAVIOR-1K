@@ -11,7 +11,7 @@ from omnigibson.utils.python_utils import classproperty, Serializable, Registera
 from omnigibson.utils.registry_utils import SerializableRegistry
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.objects.object_base import BaseObject
-from omnigibson.systems.system_base import SYSTEM_REGISTRY, clear_all_systems
+from omnigibson.systems.system_base import SYSTEM_REGISTRY, clear_all_systems, get_system
 from omnigibson.objects.light_object import LightObject
 from omnigibson.robots.robot_base import m as robot_macros
 from pxr import Sdf, Gf
@@ -173,8 +173,9 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 name="skybox",
                 light_type="Dome",
                 intensity=1500,
+                fixed_base=True,
             )
-            og.sim.import_object(self._skybox)
+            og.sim.import_object(self._skybox, register=False)
             light_prim = self._skybox.light_link.prim
             light_prim.GetAttribute("color").Set(Gf.Vec3f(1.07, 0.85, 0.61))
             light_prim.GetAttribute("texture:file").Set(Sdf.AssetPath(m.DEFAULT_SKYBOX_TEXTURE))
@@ -189,6 +190,11 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             scene_info = json.load(f)
         init_info = scene_info["objects_info"]["init_info"]
         init_state = scene_info["state"]["object_registry"]
+        init_systems = scene_info["state"]["system_registry"].keys()
+
+        # Create desired systems
+        for system_name in init_systems:
+            get_system(system_name)
 
         # Iterate over all scene info, and instantiate object classes linked to the objects found on the stage
         # accordingly

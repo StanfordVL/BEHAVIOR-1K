@@ -96,22 +96,26 @@ class ClothPrim(GeomPrim):
         self._n_particles = len(positions)
 
         # Sample mesh keypoints / keyvalues and sanity check the AABB of these subsampled points vs. the actual points
-        self._keypoint_idx, self._keyface_idx = sample_mesh_keypoints(
-            mesh_prim=self._prim,
-            n_keypoints=m.N_CLOTH_KEYPOINTS,
-            n_keyfaces=m.N_CLOTH_KEYFACES,
-            deterministic=True,
-        )
+        success = False
+        for i in range(10):
+            self._keypoint_idx, self._keyface_idx = sample_mesh_keypoints(
+                mesh_prim=self._prim,
+                n_keypoints=m.N_CLOTH_KEYPOINTS,
+                n_keyfaces=m.N_CLOTH_KEYFACES,
+                seed=i,
+            )
 
-        keypoint_positions = positions[self._keypoint_idx]
-        keypoint_aabb = keypoint_positions.min(axis=0), keypoint_positions.max(axis=0)
-        true_aabb = positions.min(axis=0), positions.max(axis=0)
-        overlap_vol = max(min(true_aabb[1][0], keypoint_aabb[1][0]) - max(true_aabb[0][0], keypoint_aabb[0][0]), 0) * \
-            max(min(true_aabb[1][1], keypoint_aabb[1][1]) - max(true_aabb[0][1], keypoint_aabb[0][1]), 0) * \
-            max(min(true_aabb[1][2], keypoint_aabb[1][2]) - max(true_aabb[0][2], keypoint_aabb[0][2]), 0)
-        true_vol = np.product(true_aabb[1] - true_aabb[0])
-        assert overlap_vol / true_vol > m.KEYPOINT_COVERAGE_THRESHOLD, \
-            f"Did not adequately subsample keypoints for cloth {self.name}!"
+            keypoint_positions = positions[self._keypoint_idx]
+            keypoint_aabb = keypoint_positions.min(axis=0), keypoint_positions.max(axis=0)
+            true_aabb = positions.min(axis=0), positions.max(axis=0)
+            overlap_vol = max(min(true_aabb[1][0], keypoint_aabb[1][0]) - max(true_aabb[0][0], keypoint_aabb[0][0]), 0) * \
+                max(min(true_aabb[1][1], keypoint_aabb[1][1]) - max(true_aabb[0][1], keypoint_aabb[0][1]), 0) * \
+                max(min(true_aabb[1][2], keypoint_aabb[1][2]) - max(true_aabb[0][2], keypoint_aabb[0][2]), 0)
+            true_vol = np.product(true_aabb[1] - true_aabb[0])
+            if overlap_vol / true_vol > m.KEYPOINT_COVERAGE_THRESHOLD:
+                success = True
+                break
+        assert success, f"Did not adequately subsample keypoints for cloth {self.name}!"
 
     def _initialize(self):
         super()._initialize()

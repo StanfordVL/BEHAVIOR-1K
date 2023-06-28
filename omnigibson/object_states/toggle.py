@@ -9,22 +9,28 @@ from omnigibson.object_states.update_state_mixin import UpdateStateMixin
 from omnigibson.utils.usd_utils import create_primitive_mesh
 from omnigibson.utils.python_utils import classproperty
 from omni.isaac.core.utils.prims import get_prim_at_path
+from pxr import PhysicsSchemaTools, UsdGeom, Sdf
 
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
-m.TOGGLE_DISTANCE_THRESHOLD = 0.1
 m.TOGGLE_LINK_PREFIX = "togglebutton"
-m.TOGGLE_BUTTON_SCALE = 0.05
+m.DEFAULT_RADIUS = 0.05
 m.CAN_TOGGLE_STEPS = 5
 
 
 class ToggledOn(AbsoluteObjectState, BooleanState, LinkBasedStateMixin, UpdateStateMixin):
-    def __init__(self, obj):
+    def __init__(self, obj, radius=None):
+        self.radius = radius
         self.value = False
         self.robot_can_toggle_steps = 0
         self.visual_marker = None
+        self._check_overlap = None
+        self._robot_link_paths = None
+
+        # We also generate the function for checking overlaps at runtime
+
         super().__init__(obj)
 
     @classproperty
@@ -41,30 +47,54 @@ class ToggledOn(AbsoluteObjectState, BooleanState, LinkBasedStateMixin, UpdateSt
     def _initialize(self):
         super()._initialize()
         self.initialize_link_mixin()
-        mesh_prim_path = f"{self.link.prim_path}/visual_marker"
+        mesh_prim_path = f"{self.link.prim_path}/mesh_0"
+        pre_existing_mesh = get_prim_at_path(mesh_prim_path)
         # Create a primitive mesh if it doesn't already exist
-        if not get_prim_at_path(mesh_prim_path):
-            mesh = create_primitive_mesh(
-                prim_path=mesh_prim_path,
-                primitive_type="Sphere",
-                extents=m.TOGGLE_BUTTON_SCALE,
-            )
+        if not pre_existing_mesh:
+            button = UsdGeom.Sphere.Define(og.sim.stage, Sdf.Path(mesh_prim_path))
+            self.radius = m.DEFAULT_RADIUS if self.radius is None else self.radius
+        else:
+            # Infer radius from mesh if not specified as an input
+            self.radius = pre_existing_mesh.GetAttribute("radius").Get() if self.radius is None else self.radius
 
         # Create the visual geom instance referencing the generated mesh prim
         self.visual_marker = VisualGeomPrim(prim_path=mesh_prim_path, name=f"{self.obj.name}_visual_marker")
-        self.visual_marker.scale = 1 / self.obj.scale
+        self.visual_marker.set_attribute("radius", self.radius)
         self.visual_marker.initialize()
 
         # Make sure the marker isn't translated at all
         self.visual_marker.set_local_pose(translation=np.zeros(3), orientation=np.array([0, 0, 0, 1.0]))
 
+        # Store the projection mesh's IDs
+        projection_mesh_ids = PhysicsSchemaTools.encodeSdfPath(self.visual_marker.prim_path)
+
+        # Define function for checking overlap
+        valid_hit = False
+
+        def overlap_callback(hit):
+            nonlocal valid_hit
+            valid_hit = hit.rigid_body in self._robot_link_paths
+            # Continue traversal only if we don't have a valid hit yet
+            return not valid_hit
+
+        def check_overlap():
+            nonlocal valid_hit
+            valid_hit = False
+            og.sim.psqi.overlap_shape(*projection_mesh_ids, reportFn=overlap_callback)
+            return valid_hit
+
+        self._check_overlap = check_overlap
+
     def _update(self):
-        robot_can_toggle = False
+        # Avoid circular imports
+        from omnigibson.robots.manipulation_robot import ManipulationRobot
         # detect marker and hand interaction
-        for robot in og.sim.scene.robots:
-            robot_can_toggle = robot.can_toggle(self.link.get_position(), m.TOGGLE_DISTANCE_THRESHOLD)
-            if robot_can_toggle:
-                break
+        self._robot_link_paths = set(robot.links[finger_name].prim_path
+                                     for robot in og.sim.scene.robots
+                                     for finger_name in robot.finger_link_names if isinstance(robot, ManipulationRobot))
+
+        # Check overlap
+        robot_can_toggle = self._check_overlap() if len(self._robot_link_paths) > 0 else False
 
         if robot_can_toggle:
             self.robot_can_toggle_steps += 1

@@ -207,7 +207,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         if self.kinematic_only or ((not has_articulated_joints) and (not has_fixed_joints)):
             # Kinematic only, or non-jointed single body objects
             return None
-        elif not self.fixed_base:
+        elif not self.fixed_base and has_articulated_joints:
             # This is all remaining non-fixed objects
             # This is a bit hacky because omniverse is buggy
             # Articulation roots mess up the joint order if it's on a non-fixed base robot, e.g. a

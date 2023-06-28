@@ -171,7 +171,7 @@ class InteractiveTraversableScene(TraversableScene):
         whitelisted = self.load_object_categories is None or category in self.load_object_categories
 
         # This object is not located in one of the selected rooms, skip
-        valid_room = self.load_room_instances is None or len(set(self.load_room_instances) & set(in_rooms)) >= 0
+        valid_room = self.load_room_instances is None or len(set(self.load_room_instances) & set(in_rooms)) > 0
 
         # Check whether this is an agent and we allow agents
         agent_ok = self.include_robots or category != robot_macros.ROBOT_CATEGORY
