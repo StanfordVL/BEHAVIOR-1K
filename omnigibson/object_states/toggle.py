@@ -9,7 +9,7 @@ from omnigibson.object_states.update_state_mixin import UpdateStateMixin
 from omnigibson.utils.usd_utils import create_primitive_mesh
 from omnigibson.utils.python_utils import classproperty
 from omni.isaac.core.utils.prims import get_prim_at_path
-from pxr import PhysicsSchemaTools
+from pxr import PhysicsSchemaTools, UsdGeom, Sdf
 
 
 # Create settings for this module
@@ -51,11 +51,7 @@ class ToggledOn(AbsoluteObjectState, BooleanState, LinkBasedStateMixin, UpdateSt
         pre_existing_mesh = get_prim_at_path(mesh_prim_path)
         # Create a primitive mesh if it doesn't already exist
         if not pre_existing_mesh:
-            mesh = create_primitive_mesh(
-                prim_path=mesh_prim_path,
-                primitive_type="Sphere",
-                extents=1.0,
-            )
+            button = UsdGeom.Sphere.Define(og.sim.stage, Sdf.Path(mesh_prim_path))
             self.radius = m.DEFAULT_RADIUS if self.radius is None else self.radius
         else:
             # Infer radius from mesh if not specified as an input
@@ -63,7 +59,7 @@ class ToggledOn(AbsoluteObjectState, BooleanState, LinkBasedStateMixin, UpdateSt
 
         # Create the visual geom instance referencing the generated mesh prim
         self.visual_marker = VisualGeomPrim(prim_path=mesh_prim_path, name=f"{self.obj.name}_visual_marker")
-        self.visual_marker.scale = 2 * self.radius
+        self.visual_marker.set_attribute("radius", self.radius)
         self.visual_marker.initialize()
 
         # Make sure the marker isn't translated at all
