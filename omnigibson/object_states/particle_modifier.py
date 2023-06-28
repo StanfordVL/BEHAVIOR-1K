@@ -278,6 +278,7 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
                 "size": 1.0,
             }
             mesh_prim_path = f"{self.link.prim_path}/mesh_0"
+
             # Create a primitive shape if it doesn't already exist
             pre_existing_mesh = get_prim_at_path(mesh_prim_path)
             if not pre_existing_mesh:
@@ -292,11 +293,18 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
                         mesh.GetAttribute(shape_attr).Set(default_val)
             else:
                 # Potentially populate projection mesh params if the prim exists
+                mesh_type = pre_existing_mesh.GetTypeName()
                 if self._projection_mesh_params is None:
                     self._projection_mesh_params = {
-                        "type": pre_existing_mesh.GetTypeName(),
+                        "type": mesh_type,
                         "extents": np.array(pre_existing_mesh.GetAttribute("xformOp:scale").Get()),
                     }
+                # Otherwise, make sure we don't have a mismatch between the pre-existing shape type and the
+                # desired type since we can't delete the original mesh
+                else:
+                    assert self._projection_mesh_params["type"] == mesh_type, \
+                        f"Got mismatch in requested projection mesh type ({self._projection_mesh_params['type']}) and " \
+                        f"pre-existing mesh type ({mesh_type})"
 
             # Create the visual geom instance referencing the generated mesh prim, and then hide it
             self.projection_mesh = VisualGeomPrim(prim_path=mesh_prim_path, name=f"{name_prefix}_projection_mesh")
