@@ -166,7 +166,7 @@ def detect_robot_collision(robot, filter_objs=[]):
     #     if obj_in_hand is not None:
     #         print(obj_in_hand.name)
     #     print(f.name)
-    return len(filtered_collision_objects) > 0
+    return len(filtered_collision_objects) > 0 or detect_self_collision(robot)
 
 def detect_self_collision(robot):
     # contacts = robot.contact_list()
