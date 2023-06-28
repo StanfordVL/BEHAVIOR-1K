@@ -54,8 +54,8 @@ def main():
     controller = StarterSemanticActionPrimitives(None, scene, robot)
     
     def test_navigate_to_obj():
-        controller = controller._navigate_to_obj(table)
-        execute_controller(controller, env)
+        ctrl_navigate = controller._navigate_to_obj(table)
+        execute_controller(ctrl_navigate._navigate_to_obj(table), env)
 
     def test_grasp():
         start_joint_pos = np.array(
@@ -77,17 +77,17 @@ def main():
             ]
         )
         robot.set_joint_positions(start_joint_pos)
-        controller = controller.grasp(grasp_obj)
+        ctrl_grasp = controller.grasp(grasp_obj)
         robot.set_position([0.0, -0.5, 0.05])
         robot.set_orientation(T.euler2quat([0, 0,-np.pi/1.5]))
         og.sim.step()
-        execute_controller(controller, env)
+        execute_controller(ctrl_grasp, env)
 
     def test_place():
         test_grasp()
         pause(1)
-        place_controller = controller.place_on_top(table)
-        execute_controller(place_controller, env)
+        ctrl_grasp = controller.place_on_top(table)
+        execute_controller(ctrl_grasp, env)
 
     test_place()
 

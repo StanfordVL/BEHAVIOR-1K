@@ -139,13 +139,15 @@ class UndoableContext(object):
 
     def __exit__(self, *args):
         og.sim.load_state(self.state, serialized=False)
+        og.sim.step()
+        if self.obj_in_hand is not None:
+            self.robot._establish_grasp(ag_data=(self.obj_in_hand, self.obj_in_hand_link))
         og.sim._physics_context.set_gravity(value=-9.81)
         for obj in og.sim.scene.objects:
             for link in obj.links.values():
                 PhysxSchema.PhysxRigidBodyAPI(link.prim).GetSolveContactAttr().Set(True)
         og.sim.step()
-        if self.obj_in_hand is not None:
-            self.robot._establish_grasp(ag_data=(self.obj_in_hand, self.obj_in_hand_link))
+        
 
 
 
@@ -414,14 +416,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         
         obj_pose = self._sample_pose_with_object_and_predicate(predicate, obj_in_hand, obj)
         hand_pose = self._get_hand_pose_for_object_pose(obj_pose)
-        print("releasing")
-        yield from self._execute_release()
-        # print("hand pose")
-        # print(hand_pose)
-        print("navigating")
         yield from self._navigate_if_needed(obj, pos_on_obj=hand_pose[0])
         # yield from self._execute_release()
-        print("done navigating")
         # with UndoableContext():
         #     obj_in_hand.set_position_orientation(*hand_pose)
         #     for i in range(1000):
@@ -540,7 +536,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         action = self._empty_action()
         controller_name = "gripper_{}".format(self.arm)
         action[self.robot.controller_action_idx[controller_name]] = 1.0
-        print(self._get_obj_in_hand())
+        if self._get_obj_in_hand() is not None:
+            self.robot._release_grasp()
         for _ in range(MAX_STEPS_FOR_GRASP_OR_RELEASE):
             # Otherwise, keep applying the action!
             yield action

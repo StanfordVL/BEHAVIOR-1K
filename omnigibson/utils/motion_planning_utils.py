@@ -16,8 +16,6 @@ def plan_base_motion(
     planning_time = 100.0,
     **kwargs,
 ):
-    distance_fn = lambda q1, q2: np.linalg.norm(np.array(q2[:2]) - np.array(q1[:2]))
-
     def state_valid_fn(q):
         x = q.getX()
         y = q.getY()
@@ -41,7 +39,6 @@ def plan_base_motion(
     bounds.setHigh(7.0)
     space.setBounds(bounds)
 
-    print(space.getBounds())
     # create a simple setup object
     ss = ompl_geo.SimpleSetup(space)
     ss.setStateValidityChecker(ob.StateValidityCheckerFn(state_valid_fn))
@@ -61,7 +58,7 @@ def plan_base_motion(
     goal().setY(end_conf[1])
     goal().setYaw(T.wrap_angle(end_conf[2]))
     print(goal)
-    # from IPython import embed; embed()
+
     ss.setStartAndGoalStates(start, goal)
 
     # this will automatically choose a default planner with
@@ -120,10 +117,6 @@ def plan_arm_motion(
     ss.setPlanner(planner)
 
     start_conf = robot.get_joint_positions()[joint_control_idx]
-    # start_conf = [float(c) for c in start_conf]
-    # robot.set_joint_positions(start_conf, joint_control_idx)
-    og.sim.step(render=False)
-    # print(detect_robot_collision(robot))
     start = ob.State(space)
     for i in range(dim):
         start[i] = float(start_conf[i])
