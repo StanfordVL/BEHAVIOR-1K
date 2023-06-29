@@ -140,7 +140,8 @@ class UndoableContext(object):
     def __exit__(self, *args):
         og.sim.load_state(self.state, serialized=False)
         og.sim.step()
-        if self.obj_in_hand is not None:
+        # from IPython import embed; embed()
+        if self.obj_in_hand is not None and not self.robot._ag_obj_constraint_params[self.robot.default_arm]:
             self.robot._establish_grasp(ag_data=(self.obj_in_hand, self.obj_in_hand_link))
         og.sim._physics_context.set_gravity(value=-9.81)
         for obj in og.sim.scene.objects:

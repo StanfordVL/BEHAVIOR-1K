@@ -12,6 +12,29 @@ from omnigibson.utils.usd_utils import RigidContactAPI
 # Timing code
 from time import clock
 
+class Timer():
+    def __init__(self):
+        self.data = {
+            "num_state_checks": 0.0,
+            "total_state_check_time": 0.0,
+            "avg_state_check_time": 0.0
+        }
+
+    def start(self):
+        self.start_time = clock()
+
+    def end(self, name):
+        self.end_time = clock()
+        self.data[name] = self.end_time - self.start_time
+
+    def end_state_check(self):
+        self.end_time = clock()
+        self.data["num_state_checks"] += 1
+        self.data["total_state_check_time"] += (self.end_time - self.start_time)
+        self.data["avg_state_check_time"] = self.data["total_state_check_time"] / self.data["num_state_checks"]
+
+
+
 def plan_base_motion(
     robot,
     obj_in_hand,
@@ -19,10 +42,9 @@ def plan_base_motion(
     planning_time = 100.0,
     **kwargs,
 ):
-    solution_time = 0.0
-    simplify_time = 0.0
-
+    timer = Timer()
     def state_valid_fn(q):
+        timer.start()
         x = q.getX()
         y = q.getY()
         yaw = q.getYaw()
@@ -31,6 +53,7 @@ def plan_base_motion(
         )
         og.sim.step(render=False)
         state_valid = not detect_robot_collision(robot)
+        timer.end_state_check()
         return state_valid
 
     pos = robot.get_position()
@@ -72,15 +95,13 @@ def plan_base_motion(
     # default parameters
     begin = clock()
     solved = ss.solve(planning_time)
-    end = clock()
-    solution_time = end - begin
+    timer.data["solution_time"] = clock() - begin
 
     if solved:
         # try to shorten the path
         begin = clock()
         ss.simplifySolution()
-        end = clock()
-        simplify_time = (end - begin)
+        timer.data["simplify_time"] = clock() - begin
         # print the simplified path
         sol_path = ss.getSolutionPath()
         return_path = []
@@ -89,7 +110,7 @@ def plan_base_motion(
             y = sol_path.getState(i).getY()
             yaw = sol_path.getState(i).getYaw()
             return_path.append([x, y, yaw])
-        write_to_file({"Base motion": "", "solution_time": solution_time, "simplify_time": simplify_time})
+        write_to_file("-----Base motion planning----", timer.data)
         return remove_unnecessary_rotations(return_path)
     return None
 
@@ -100,17 +121,19 @@ def plan_arm_motion(
     planning_time = 100.0,
     **kwargs,
 ):
-    solution_time = 0.0
-    simplify_time = 0.0
+    timer = Timer()
 
     joint_control_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
     dim = len(joint_control_idx)
 
     def state_valid_fn(q):
+        timer.start()
         joint_pos = [q[i] for i in range(dim)]
         robot.set_joint_positions(joint_pos, joint_control_idx)
         og.sim.step(render=False)
-        return not detect_robot_collision(robot)
+        state_valid = not detect_robot_collision(robot)
+        timer.end_state_check()
+        return state_valid
     
     # create an SE2 state space
     space = ob.RealVectorStateSpace(dim)
@@ -146,22 +169,20 @@ def plan_arm_motion(
     # default parameters
     begin = clock()
     solved = ss.solve(planning_time)
-    end = clock()
-    solution_time = (end - begin)
+    timer.data["solution_time"] = clock() - begin
 
     if solved:
         # try to shorten the path
         begin = clock()
         ss.simplifySolution()
-        end = clock()
-        simplify_time = (end - begin)
-        # print the simplified path
+        timer.data["simplify_time"] = clock() - begin
+
         sol_path = ss.getSolutionPath()
         return_path = []
         for i in range(sol_path.getStateCount()):
             joint_pos = [sol_path.getState(i)[j] for j in range(dim)]
             return_path.append(joint_pos)
-        write_to_file({"Hand motion": "", "solution_time": solution_time, "simplify_time": simplify_time})
+        write_to_file("-----Arm motion planning----", timer.data)
         return return_path
     return None
 
@@ -206,7 +227,8 @@ def remove_unnecessary_rotations(path):
         path[start_idx] = (start[0], start[1], theta)
     return path
 
-def write_to_file(data):
+def write_to_file(header, data):
     with open("data.txt", "a") as f:
+        f.write(header + "\n")
         for key, val in data.items():
             f.write(f"{key}: {str(val)}\n")
