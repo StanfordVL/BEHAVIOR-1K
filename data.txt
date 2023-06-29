@@ -136,3 +136,33 @@ total_state_check_time: 22.967458999999494
 avg_state_check_time: 0.009198021225470362
 solution_time: 13.681049999999985
 simplify_time: 9.344822999999991
+-----Arm motion planning----
+num_state_checks: 6006.0
+total_state_check_time: 44.36568400000038
+avg_state_check_time: 0.007386893772893836
+solution_time: 32.01144500000001
+simplify_time: 12.440422999999996
+-----Arm motion planning----
+num_state_checks: 5140.0
+total_state_check_time: 37.280996999999886
+avg_state_check_time: 0.007253112256809316
+solution_time: 24.88560100000001
+simplify_time: 12.469617999999997
+-----Base motion planning----
+num_state_checks: 2800.0
+total_state_check_time: 26.390653999999046
+avg_state_check_time: 0.009425233571428231
+solution_time: 5.196798999999999
+simplify_time: 21.236779
+-----Arm motion planning----
+num_state_checks: 6989.0
+total_state_check_time: 67.95038900000091
+avg_state_check_time: 0.009722476606095423
+solution_time: 48.282208999999995
+simplify_time: 19.786264999999986
+-----Base motion planning----
+num_state_checks: 583.0
+total_state_check_time: 4.970662000000054
+avg_state_check_time: 0.008526006861063558
+solution_time: 1.2066939999999988
+simplify_time: 3.772787000000001

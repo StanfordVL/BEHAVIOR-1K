@@ -141,6 +141,7 @@ class UndoableContext(object):
         og.sim.load_state(self.state, serialized=False)
         og.sim.step()
         # from IPython import embed; embed()
+        print(self.robot._ag_obj_constraint_params[self.robot.default_arm])
         if self.obj_in_hand is not None and not self.robot._ag_obj_constraint_params[self.robot.default_arm]:
             self.robot._establish_grasp(ag_data=(self.obj_in_hand, self.obj_in_hand_link))
         og.sim._physics_context.set_gravity(value=-9.81)
@@ -542,8 +543,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         action = self._empty_action()
         controller_name = "gripper_{}".format(self.arm)
         action[self.robot.controller_action_idx[controller_name]] = 1.0
-        self.robot.release_grasp_immediately()
-        og.sim.step()
+        # self.robot.release_grasp_immediately()
+        # og.sim.step()
         for _ in range(MAX_STEPS_FOR_GRASP_OR_RELEASE):
             # Otherwise, keep applying the action!
             yield action

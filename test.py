@@ -10,6 +10,7 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.objects.dataset_object import DatasetObject
 
 from omnigibson.utils.motion_planning_utils import write_to_file, detect_self_collision
+from omnigibson.object_states import OnTop
     
 
 def pause(time):
@@ -131,26 +132,62 @@ def main():
     # replay_controller(env, "place.yaml")
     # execute_controller(controller._execute_release(), env)
     # pause(10)
+
     # test_place()
 
+    # test_full_grasp()
+
     def test_collision(joint_pos):
-        with UndoableContext():
+        with UndoableContext(robot):
             set_joint_position(joint_pos)
             og.sim.step()
             print(detect_self_collision(robot))
             print("-------")
-            pause(2)
+            # pause(2)
 
     def set_joint_position(joint_pos):
         joint_control_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
         robot.set_joint_positions(joint_pos, joint_control_idx)
 
-    sample_self_collision = [0.03053552120088664, 1.0269865478752571, 1.1344740372495958, 6.158997020615134, 1.133466907494042, -4.544473644642829, 0.6930819484783561, 4.676661155308317]
-    while True:
-        test_collision(sample_self_collision)
-        # set_joint_position(sample_self_collision)
-        # og.sim.step()
+    # sample_self_collision = [0.03053552120088664, 1.0269865478752571, 1.1344740372495958, 6.158997020615134, 1.133466907494042, -4.544473644642829, 0.6930819484783561, 4.676661155308317]
+    start_joint_pos = np.array(
+        [
+            0.0,
+            0.0,  # wheels
+            0.2,  # trunk
+            0.0,
+            1.1707963267948966,
+            0.0,  # head
+            1.4707963267948965,
+            -0.4,
+            1.6707963267948966,
+            0.0,
+            1.5707963267948966,
+            0.0,  # arm
+            0.05,
+            0.05,  # gripper
+        ]
+    )
+    robot.set_position([0.0, -0.5, 0.05])
+    robot.set_orientation(T.euler2quat([0, 0,-np.pi/1.5]))
+    robot.set_joint_positions(start_joint_pos)
+    # robot.untuck()
+    og.sim.step()
 
+    replay_controller(env, "grasp.yaml")
+    test = controller._sample_pose_with_object_and_predicate(OnTop, grasp_obj, table)
+    print(test)
+    # replay_controller(env, "place.yaml")
+    # test_navigate_to_obj()
+    # joint_control_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
+    # joint_pos = robot.get_joint_positions()[joint_control_idx]
+    # for i in range(10):
+    #     test_collision(joint_pos)
+    #     # set_joint_position(sample_self_collision)
+    #     og.sim.step()
+    
+    execute_controller(controller._execute_release(), env)
+    pause(10)
 
 
 if __name__ == "__main__":
