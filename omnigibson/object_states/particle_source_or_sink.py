@@ -155,10 +155,10 @@ class ParticleSink(ParticleRemover):
             For a given ParticleSystem, the list of 2-tuples will be converted into a list of function calls of the
             form above -- if all of its conditions evaluate to True and particles are detected within
             this particle modifier area, then we potentially modify those particles
-        sink_radius (float): Radius of the cylinder representing particles' sinking volume, if specified.
+        sink_radius (None or float): Radius of the cylinder representing particles' sinking volume, if specified.
             If both @sink_radius and @sink_height are None, values will be inferred directly from the underlying
             object asset, otherwise, it will be set to a default value
-        sink_height (float): Height of the cylinder representing particles' sinking volume, if specified.
+        sink_height (None or float): Height of the cylinder representing particles' sinking volume, if specified.
             If both @sink_radius and @sink_height are None, values will be inferred directly from the underlying
             object asset, otherwise, it will be set to a default value
 
@@ -175,8 +175,8 @@ class ParticleSink(ParticleRemover):
         self,
         obj,
         conditions,
-        sink_radius=m.DEFAULT_RADIUS,
-        sink_height=m.DEFAULT_HEIGHT,
+        sink_radius=None,
+        sink_height=None,
         default_physical_conditions=None,
         default_visual_conditions=None,
     ):
