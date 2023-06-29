@@ -113,6 +113,11 @@ class ParticleSource(ParticleApplier):
             "ParticleSource only supports PhysicalParticleSystem"
         return m.MAX_SOURCE_PARTICLES_PER_STEP
 
+    @classmethod
+    def requires_metalink(cls, **kwargs):
+        # Always requires metalink since projection is used
+        return True
+
     @classproperty
     def visualize(cls):
         # Don't visualize this source
@@ -217,6 +222,11 @@ class ParticleSink(ParticleRemover):
         assert is_physical_particle_system(system_name=system.name), \
             "ParticleSink only supports PhysicalParticleSystem"
         return m.MAX_PHYSICAL_PARTICLES_SOURCED_PER_STEP
+
+    @classmethod
+    def requires_metalink(cls, **kwargs):
+        # Always requires metalink since projection is used
+        return True
 
     @classproperty
     def metalink_prefix(cls):
