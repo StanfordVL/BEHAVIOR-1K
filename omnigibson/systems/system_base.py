@@ -740,7 +740,7 @@ class VisualParticleSystem(BaseSystem):
             scales (None or np.array): (n_particles, 3) shaped array specifying per-particle (x,y,z) scaling in its
                 local frame. If not specified, all we randomly sampled based on @cls.min_scale and @cls.max_scale
             link_prim_paths (None or list of str): Determines which link each generated particle will
-                be attached to. If not specified, all will be attached to the group object's root link
+                be attached to. If not specified, all will be attached to the group object's prim, NOT a link
         """
         raise NotImplementedError
 
