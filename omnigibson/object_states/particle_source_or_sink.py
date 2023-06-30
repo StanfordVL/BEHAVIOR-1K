@@ -15,8 +15,10 @@ m.SOURCE_LINK_PREFIX = "particlesource"
 m.SINK_LINK_PREFIX = "particlesink"
 
 # Default radius and height
-m.DEFAULT_RADIUS = 0.2
-m.DEFAULT_HEIGHT = 0.2
+m.DEFAULT_SOURCE_RADIUS = 0.0125
+m.DEFAULT_SOURCE_HEIGHT = 0.05
+m.DEFAULT_SINK_RADIUS = 0.05
+m.DEFAULT_SINK_HEIGHT = 0.05
 
 # Maximum number of particles that can be sourced / sunk per step
 m.MAX_SOURCE_PARTICLES_PER_STEP = 1000
@@ -76,8 +78,8 @@ class ParticleSource(ParticleApplier):
 
         # Define projection mesh params based on input kwargs
         if source_radius is not None or source_height is not None:
-            source_radius = m.DEFAULT_RADIUS if source_radius is None else source_radius
-            source_height = m.DEFAULT_HEIGHT if source_height is None else source_height
+            source_radius = m.DEFAULT_SOURCE_RADIUS if source_radius is None else source_radius
+            source_height = m.DEFAULT_SOURCE_HEIGHT if source_height is None else source_height
             projection_mesh_params = {
                 "type": "Cylinder",
                 "extents": [source_radius * 2, source_radius * 2, source_height],
@@ -189,8 +191,8 @@ class ParticleSink(ParticleRemover):
 
         # Define projection mesh params based on input kwargs
         if sink_radius is not None or sink_height is not None:
-            sink_radius = m.DEFAULT_RADIUS if sink_radius is None else sink_radius
-            sink_height = m.DEFAULT_HEIGHT if sink_height is None else sink_height
+            sink_radius = m.DEFAULT_SINK_RADIUS if sink_radius is None else sink_radius
+            sink_height = m.DEFAULT_SINK_HEIGHT if sink_height is None else sink_height
             projection_mesh_params = {
                 "type": "Cylinder",
                 "extents": [sink_radius * 2, sink_radius * 2, sink_height],
