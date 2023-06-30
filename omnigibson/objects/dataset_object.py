@@ -267,7 +267,9 @@ class DatasetObject(USDObject):
                 scale *= size_ratio
         # Otherwise, if manual bounding box is specified, scale based on ratio between that and the native bbox
         elif self._load_config["bounding_box"] is not None:
-            scale = self._load_config["bounding_box"] / self.native_bbox
+            scale = np.ones(3)
+            valid_idxes = ~np.isclose(self.native_bbox, 0.0)
+            scale[valid_idxes] = self._load_config["bounding_box"][valid_idxes] / self.native_bbox[valid_idxes]
         else:
             scale = np.ones(3) if self._load_config["scale"] is None else self._load_config["scale"]
 
