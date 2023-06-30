@@ -18,7 +18,7 @@ from omnigibson.robots.robot_base import BaseRobot
 from omnigibson.systems.system_base import get_system, add_callback_on_system_init, add_callback_on_system_clear, \
     REGISTERED_SYSTEMS
 from omnigibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
-from omnigibson.utils.bddl_utils import OmniGibsonBDDLBackend, SUBSTANCE_SYNSET_MAPPING, BDDLEntity, \
+from omnigibson.utils.bddl_utils import OmniGibsonBDDLBackend, BDDLEntity, \
     BEHAVIOR_ACTIVITIES, BDDLSampler
 from omnigibson.tasks.task_base import BaseTask
 from omnigibson.termination_conditions.predicate_goal import PredicateGoal

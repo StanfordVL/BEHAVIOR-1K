@@ -91,6 +91,10 @@ def get_binary_predicate_for_state(state_class, state_name):
     )
 
 
+def is_substance_synset(synset):
+    return "substance" in OBJECT_TAXONOMY.get_abilities(synset)
+
+
 def process_single_condition(condition):
     """
     Processes a single BDDL condition
@@ -146,13 +150,8 @@ SUPPORTED_PREDICATES = {
 
 KINEMATIC_STATES_BDDL = frozenset([state.__name__.lower() for state in _KINEMATIC_STATE_SET])
 
-# Load substance and object mapping
-with open(os.path.join(bddl.__path__[0], "generated_data", "substance_synset_mapping.json"), "r") as f:
-    SUBSTANCE_SYNSET_MAPPING = json.load(f)
-
 
 # BEHAVIOR-related
-# TODO (Josiah): SUBSTANCE_SYNSET_MAPPING should be subsumed into OBJECT_TAXONOMY once we have new bddl
 OBJECT_TAXONOMY = ObjectTaxonomy()
 # TODO (Josiah): Remove floor synset once we have new bddl release
 FLOOR_SYNSET = "floor.n.01"
@@ -185,11 +184,10 @@ class BDDLEntity(Wrapper):
         # Store synset and other info, and pass entity internally
         self.bddl_inst = bddl_inst
         self.synset = "_".join(self.bddl_inst.split("_")[:-1])
-        self.is_system = self.synset in SUBSTANCE_SYNSET_MAPPING
+        self.is_system = is_substance_synset(self.synset)
 
-        # Infer the correct category to assign, special casing agents
-        self.og_categories = [SUBSTANCE_SYNSET_MAPPING[self.synset]] if self.is_system else \
-            OBJECT_TAXONOMY.get_subtree_categories(self.synset)
+        # Infer the correct category to assign
+        self.og_categories = OBJECT_TAXONOMY.get_subtree_categories(self.synset)
 
         super().__init__(obj=entity)
 
@@ -292,7 +290,7 @@ class BDDLSampler:
             for obj_inst in self._activity_conditions.parsed_objects[obj_cat]
         }
         self._substance_instances = {obj_inst for obj_inst in self._object_scope.keys() if
-                                     self._object_instance_to_synset[obj_inst] in SUBSTANCE_SYNSET_MAPPING}
+                                     is_substance_synset(self._object_instance_to_synset[obj_inst])}
 
         # Initialize other variables that will be filled in later
         self._room_type_to_object_instance = None           # dict
@@ -702,12 +700,13 @@ class BDDLSampler:
                 continue
 
             # Populate based on whether it's a substance or not
-            if obj_synset in SUBSTANCE_SYNSET_MAPPING:
+            if is_substance_synset(obj_synset):
                 assert len(self._activity_conditions.parsed_objects[obj_synset]) == 1, "Systems are singletons"
                 obj_inst = self._activity_conditions.parsed_objects[obj_synset][0]
+                system_name = OBJECT_TAXONOMY.get_subtree_categories(obj_synset)[0]
                 self._object_scope[obj_inst] = BDDLEntity(
                     bddl_inst=obj_inst,
-                    entity=None if obj_inst in self._future_obj_instances else get_system(SUBSTANCE_SYNSET_MAPPING[obj_synset]),
+                    entity=None if obj_inst in self._future_obj_instances else get_system(system_name),
                 )
             else:
                 valid_categories = set(OBJECT_TAXONOMY.get_subtree_categories(obj_synset))

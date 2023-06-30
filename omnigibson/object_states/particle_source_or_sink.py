@@ -11,13 +11,14 @@ from omnigibson.utils.python_utils import classproperty
 m = create_module_macros(module_path=__file__)
 
 # Metalink naming prefixes
-# TODO: Update to particlesource / sink when the assets are updated
-m.SOURCE_LINK_PREFIX = "fluidsource"
-m.SINK_LINK_PREFIX = "fluidsink"
+m.SOURCE_LINK_PREFIX = "particlesource"
+m.SINK_LINK_PREFIX = "particlesink"
 
 # Default radius and height
-m.DEFAULT_RADIUS = 0.2
-m.DEFAULT_HEIGHT = 0.2
+m.DEFAULT_SOURCE_RADIUS = 0.0125
+m.DEFAULT_SOURCE_HEIGHT = 0.05
+m.DEFAULT_SINK_RADIUS = 0.05
+m.DEFAULT_SINK_HEIGHT = 0.05
 
 # Maximum number of particles that can be sourced / sunk per step
 m.MAX_SOURCE_PARTICLES_PER_STEP = 1000
@@ -77,8 +78,8 @@ class ParticleSource(ParticleApplier):
 
         # Define projection mesh params based on input kwargs
         if source_radius is not None or source_height is not None:
-            source_radius = m.DEFAULT_RADIUS if source_radius is None else source_radius
-            source_height = m.DEFAULT_HEIGHT if source_height is None else source_height
+            source_radius = m.DEFAULT_SOURCE_RADIUS if source_radius is None else source_radius
+            source_height = m.DEFAULT_SOURCE_HEIGHT if source_height is None else source_height
             projection_mesh_params = {
                 "type": "Cylinder",
                 "extents": [source_radius * 2, source_radius * 2, source_height],
@@ -112,6 +113,11 @@ class ParticleSource(ParticleApplier):
         assert is_physical_particle_system(system_name=system.name), \
             "ParticleSource only supports PhysicalParticleSystem"
         return m.MAX_SOURCE_PARTICLES_PER_STEP
+
+    @classmethod
+    def requires_metalink(cls, **kwargs):
+        # Always requires metalink since projection is used
+        return True
 
     @classproperty
     def visualize(cls):
@@ -155,10 +161,10 @@ class ParticleSink(ParticleRemover):
             For a given ParticleSystem, the list of 2-tuples will be converted into a list of function calls of the
             form above -- if all of its conditions evaluate to True and particles are detected within
             this particle modifier area, then we potentially modify those particles
-        sink_radius (float): Radius of the cylinder representing particles' sinking volume, if specified.
+        sink_radius (None or float): Radius of the cylinder representing particles' sinking volume, if specified.
             If both @sink_radius and @sink_height are None, values will be inferred directly from the underlying
             object asset, otherwise, it will be set to a default value
-        sink_height (float): Height of the cylinder representing particles' sinking volume, if specified.
+        sink_height (None or float): Height of the cylinder representing particles' sinking volume, if specified.
             If both @sink_radius and @sink_height are None, values will be inferred directly from the underlying
             object asset, otherwise, it will be set to a default value
 
@@ -175,8 +181,8 @@ class ParticleSink(ParticleRemover):
         self,
         obj,
         conditions,
-        sink_radius=m.DEFAULT_RADIUS,
-        sink_height=m.DEFAULT_HEIGHT,
+        sink_radius=None,
+        sink_height=None,
         default_physical_conditions=None,
         default_visual_conditions=None,
     ):
@@ -185,8 +191,8 @@ class ParticleSink(ParticleRemover):
 
         # Define projection mesh params based on input kwargs
         if sink_radius is not None or sink_height is not None:
-            sink_radius = m.DEFAULT_RADIUS if sink_radius is None else sink_radius
-            sink_height = m.DEFAULT_HEIGHT if sink_height is None else sink_height
+            sink_radius = m.DEFAULT_SINK_RADIUS if sink_radius is None else sink_radius
+            sink_height = m.DEFAULT_SINK_HEIGHT if sink_height is None else sink_height
             projection_mesh_params = {
                 "type": "Cylinder",
                 "extents": [sink_radius * 2, sink_radius * 2, sink_height],
@@ -217,6 +223,11 @@ class ParticleSink(ParticleRemover):
         assert is_physical_particle_system(system_name=system.name), \
             "ParticleSink only supports PhysicalParticleSystem"
         return m.MAX_PHYSICAL_PARTICLES_SOURCED_PER_STEP
+
+    @classmethod
+    def requires_metalink(cls, **kwargs):
+        # Always requires metalink since projection is used
+        return True
 
     @classproperty
     def metalink_prefix(cls):

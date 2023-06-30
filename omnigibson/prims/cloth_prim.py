@@ -168,6 +168,33 @@ class ClothPrim(GeomPrim):
         return p_world
 
     @property
+    def keypoint_idx(self):
+        """
+        Returns:
+            n-array: (N,) array specifying the keypoint particle IDs
+        """
+        return self._keypoint_idx
+
+    @property
+    def keyface_idx(self):
+        """
+        Returns:
+            n-array: (N,) array specifying the keyface IDs
+        """
+        return self._keyface_idx
+
+    @property
+    def faces(self):
+        """
+        Grabs particle indexes defining each of the faces for this cloth prim
+
+        Returns:
+             np.array: (N, 3) numpy array, where each of the N faces are defined by the 3 particle indices
+                corresponding to that face's vertices
+        """
+        return np.array(self.get_attribute("faceVertexIndices")).reshape(-1, 3)
+
+    @property
     def keyfaces(self):
         """
         Grabs particle indexes defining each of the keyfaces for this cloth prim.
@@ -177,7 +204,7 @@ class ClothPrim(GeomPrim):
              np.array: (N, 3) numpy array, where each of the N keyfaces are defined by the 3 particle indices
                 corresponding to that face's vertices
         """
-        return np.array(self.get_attribute("faceVertexIndices")).reshape(-1, 3)[self._keyface_idx]
+        return self.faces[self._keyface_idx]
 
     @property
     def keypoint_particle_positions(self):
@@ -247,6 +274,27 @@ class ClothPrim(GeomPrim):
 
         # the velocities attribute is w.r.t the world frame already
         self.set_attribute(attr="velocities", val=Vt.Vec3fArray.FromNumpy(vel))
+
+    def compute_face_normals(self, face_ids=None):
+        """
+        Grabs individual face normals for this cloth prim
+
+        Args:
+            face_ids (None or n-array): If specified, list of face IDs whose corresponding normals should be computed
+                If None, all faces will be used
+
+        Returns:
+            np.array: (N, 3) numpy array, where each of the N faces' normals are expressed in (x,y,z)
+                cartesian coordinates with respect to the world frame.
+        """
+        faces = self.faces if face_ids is None else self.faces[face_ids]
+        points = self.particle_positions[faces]
+
+        # Shape [F, 3]
+        v1 = points[:, 2, :] - points[:, 0, :]
+        v2 = points[:, 1, :] - points[:, 0, :]
+        normals = np.cross(v1, v2)
+        return normals / np.linalg.norm(normals, axis=1).reshape(-1, 1)
 
     def contact_list(self, keypoints_only=True):
         """
