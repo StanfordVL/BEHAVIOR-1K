@@ -34,10 +34,8 @@ class Timer():
         self.data["avg_state_check_time"] = self.data["total_state_check_time"] / self.data["num_state_checks"]
 
 
-
 def plan_base_motion(
     robot,
-    obj_in_hand,
     end_conf,
     planning_time = 100.0,
     **kwargs,
@@ -205,14 +203,14 @@ def detect_robot_collision(robot, filter_objs=[]):
     return len(collision_prims) > 0 or detect_self_collision(robot)
 
 def detect_self_collision(robot):
-    # contacts = robot.contact_list()
+    contacts = robot.contact_list()
     robot_links = [link.prim_path for link in robot.links.values()]
-    impulse_matrix = RigidContactAPI.get_impulses(robot_links, robot_links)
-    return np.max(impulse_matrix) > 0.0
-    # for c in contacts:
-    #     if c.body0 in robot_links and c.body1 in robot_links:
-    #         return True
-    # return False
+    for c in contacts:
+        link0 = c.body0.split("/")[-1]
+        link1 = c.body1.split("/")[-1]
+        if [link0, link1] not in robot.disabled_collision_pairs and c.body0 in robot_links and c.body1 in robot_links:
+            return True
+    return False
 
 def detect_hand_collision(robot, joint_pos, control_idx):
     robot.set_joint_positions(joint_pos, control_idx)

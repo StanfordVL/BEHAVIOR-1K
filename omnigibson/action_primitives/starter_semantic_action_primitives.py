@@ -58,7 +58,6 @@ DEFAULT_BODY_OFFSET_FROM_FLOOR = 0.05
 behavior_robot = None
 BehaviorRobot = None
 get_grasp_poses_for_object = None
-# get_grasp_position_for_open = None
 plan_hand_motion_br = None
 get_pose3d_hand_collision_fn = None
 restoreState = None
@@ -141,7 +140,6 @@ class UndoableContext(object):
         og.sim.load_state(self.state, serialized=False)
         og.sim.step()
         # from IPython import embed; embed()
-        print(self.robot._ag_obj_constraint_params[self.robot.default_arm])
         if self.obj_in_hand is not None and not self.robot._ag_obj_constraint_params[self.robot.default_arm]:
             self.robot._establish_grasp(ag_data=(self.obj_in_hand, self.obj_in_hand_link))
         og.sim._physics_context.set_gravity(value=-9.81)
@@ -340,7 +338,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
             # If the grasp pose is too far, navigate.
             # yield from self._navigate_if_needed(obj, pos_on_obj=approach_pos)
-            # yield from self._navigate_if_needed(obj, pos_on_obj=grasp_pose[0])
+            yield from self._navigate_if_needed(obj, pos_on_obj=grasp_pose[0])
 
             yield from self._move_hand(grasp_pose)
 
@@ -458,30 +456,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             
         return joint_pos, control_idx
 
-    def _prepare_move_hand(self):
-        joint_pos = np.array(
-            [
-                0.0,
-                0.0,  # wheels
-                0.2,  # trunk
-                0.0,
-                1.1707963267948966,
-                0.0,  # head
-                1.4707963267948965,
-                -0.4,
-                1.6707963267948966,
-                0.0,
-                1.5707963267948966,
-                0.0,  # arm
-                0.05,
-                0.05,  # gripper
-            ]
-        )
-        control_idx = np.concatenate([self.robot.trunk_control_idx, self.robot.arm_control_idx[self.arm]])
-        yield from self._move_hand_direct_joint(joint_pos[control_idx], control_idx)
-
     def _move_hand(self, target_pose):
-        yield from self._prepare_move_hand()
         joint_pos, control_idx = self._convert_cartesian_to_joint_space(target_pose)
 
         with UndoableContext(self.robot):
@@ -543,8 +518,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         action = self._empty_action()
         controller_name = "gripper_{}".format(self.arm)
         action[self.robot.controller_action_idx[controller_name]] = 1.0
-        # self.robot.release_grasp_immediately()
-        # og.sim.step()
+        self.robot.release_grasp_immediately()
         for _ in range(MAX_STEPS_FOR_GRASP_OR_RELEASE):
             # Otherwise, keep applying the action!
             yield action
@@ -572,15 +546,31 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
     def _reset_hand(self):
         control_idx = np.concatenate([self.robot.trunk_control_idx, self.robot.arm_control_idx[self.arm]])
-        default_pose = self.robot.tucked_default_joint_pos[control_idx]
+        default_pose = np.array(
+            [
+                0.0,
+                0.0,  # wheels
+                0.0,  # trunk
+                0.0,
+                0.0,
+                0.0,  # head
+                -0.22184,
+                1.53448,
+                1.46076,
+                -0.84995,
+                1.36904,
+                1.90996,  # arm
+                0.05,
+                0.05,  # gripper
+            ]
+        )
+        default_pose = default_pose[control_idx]
         yield from self._move_hand_direct_joint(default_pose, control_idx)
 
     def _navigate_to_pose(self, pose_2d):
         with UndoableContext(self.robot):
-            obj_in_hand = self._get_obj_in_hand()
             plan = plan_base_motion(
                 robot=self.robot,
-                obj_in_hand=obj_in_hand,
                 end_conf=pose_2d,
             )
 
@@ -643,14 +633,12 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         while True:
             body_target_pose = self._get_pose_in_robot_frame(pose)
 
-            # Accumulate the actions in the correct order.
             action = self._empty_action()
 
             is_angle_close, is_dist_close, angle, dist = is_close(([0, 0, 0], [0, 0, 0, 1]), body_target_pose, angle_threshold, dist_threshold)
             if is_dist_close: arrived_at_pos = True
 
             angle_to_waypoint = T.vecs2axisangle([1, 0, 0], [body_target_pose[0][0], body_target_pose[0][1], 0.0])[2]
-            # angle_to_target_pose = T.quat2euler(body_target_pose[1])[2]
 
             lin_vel = 0.0
             ang_vel = 0.0
@@ -756,7 +744,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     "Could not sample position with object and predicate.",
                     {"target_object": target_obj, "held_object": held_obj, "predicate": pred_map[predicate]},
                 )
-            # self.robot._establish_grasp()
             pos, orn = held_obj.get_position_orientation()
             return pos, orn
 
