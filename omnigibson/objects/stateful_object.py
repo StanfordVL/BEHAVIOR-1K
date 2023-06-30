@@ -6,7 +6,7 @@ from pxr.Sdf import ValueTypeNames as VT
 from pxr import Sdf, Gf
 
 import omnigibson as og
-from omnigibson.macros import create_module_macros
+from omnigibson.macros import create_module_macros, gm
 from omnigibson.object_states.factory import (
     get_default_states,
     get_state_name,
@@ -139,7 +139,9 @@ class StatefulObject(BaseObject):
         super()._post_load()
 
         # Prepare the object states
-        self.prepare_object_states()
+        self._states = {}
+        if gm.ENABLE_OBJECT_STATES:
+            self.prepare_object_states()
 
     def _initialize(self):
         # Run super first

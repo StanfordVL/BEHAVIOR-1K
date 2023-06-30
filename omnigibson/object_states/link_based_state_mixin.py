@@ -55,6 +55,7 @@ class LinkBasedStateMixin(BaseObjectState):
         Returns:
             None or RigidPrim: The link associated with this link-based state, if it exists
         """
+        assert self.links, f"LinkBasedStateMixin link not found for {self.obj.name}"
         return next(iter(self.links.values()))
 
     @property
