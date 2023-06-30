@@ -147,7 +147,9 @@ class DatasetObject(USDObject):
     @classmethod
     def get_usd_path(cls, category, model):
         """
-        Grabs the USD path for a DatasetObject corresponding to @category and @model
+        Grabs the USD path for a DatasetObject corresponding to @category and @model.
+
+        NOTE: This is the unencrypted path, NOT the encrypted path
 
         Args:
             category (str): Category for the object
