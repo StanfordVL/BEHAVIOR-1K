@@ -382,11 +382,11 @@ class ManipulationRobot(BaseRobot):
         for arm in self.arm_names:
             if self._ag_obj_in_hand[arm] is not None:
                 self._release_grasp(arm=arm)
+                self._ag_release_counter[arm] = int(np.ceil(m.RELEASE_WINDOW / og.sim.get_rendering_dt()))
+                self._handle_release_window(arm=arm)
                 # TODO: Verify not needed!
                 # for finger_link in self.finger_links[arm]:
                 #     finger_link.remove_filtered_collision_pair(prim=self._ag_obj_in_hand[arm])
-                self._ag_obj_in_hand[arm] = None
-                self._ag_release_counter[arm] = None
 
     def get_control_dict(self):
         # In addition to super method, add in EEF states
