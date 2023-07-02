@@ -55,6 +55,9 @@ class BasePrim(Serializable, UniquelyNamed, Recreatable, ABC):
         self._state_size = None
         self._n_duplicates = 0                              # Simple counter for keeping track of duplicates for unique name indexing
 
+        # Run super init
+        super().__init__()
+
         # Run some post-loading steps if this prim has already been loaded
         if is_prim_path_valid(prim_path=self._prim_path):
             log.debug(f"prim {name} already exists, skipping load")
@@ -62,9 +65,6 @@ class BasePrim(Serializable, UniquelyNamed, Recreatable, ABC):
             self._loaded = True
             # Run post load.
             self._post_load()
-
-        # Run super init
-        super().__init__()
 
     def _initialize(self):
         """
@@ -95,7 +95,7 @@ class BasePrim(Serializable, UniquelyNamed, Recreatable, ABC):
             Usd.Prim: Prim object loaded into the simulator
         """
         if self._loaded:
-            raise ValueError("Cannot load a single prim multiple times.")
+            raise ValueError(f"Cannot load prim {self.name} multiple times.")
 
         # Load prim
         self._prim = self._load()

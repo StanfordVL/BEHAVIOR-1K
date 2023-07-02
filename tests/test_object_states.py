@@ -905,6 +905,7 @@ def test_covered():
         get_system("water"),
         get_system("stain"),
         get_system("raspberry"),
+        get_system("diced_apple"),
     )
     for system in systems:
         assert breakfast_table.states[Covered].set_value(system, True)

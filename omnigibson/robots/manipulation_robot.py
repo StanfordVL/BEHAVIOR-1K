@@ -382,11 +382,11 @@ class ManipulationRobot(BaseRobot):
         for arm in self.arm_names:
             if self._ag_obj_in_hand[arm] is not None:
                 self._release_grasp(arm=arm)
+                self._ag_release_counter[arm] = int(np.ceil(m.RELEASE_WINDOW / og.sim.get_rendering_dt()))
+                self._handle_release_window(arm=arm)
                 # TODO: Verify not needed!
                 # for finger_link in self.finger_links[arm]:
                 #     finger_link.remove_filtered_collision_pair(prim=self._ag_obj_in_hand[arm])
-                self._ag_obj_in_hand[arm] = None
-                self._ag_release_counter[arm] = None
 
     def get_control_dict(self):
         # In addition to super method, add in EEF states
@@ -1284,15 +1284,6 @@ class ManipulationRobot(BaseRobot):
 
         # TODO AG
         return state_dict, idx
-
-    def can_toggle(self, toggle_position, toggle_distance_threshold):
-        # Calculate for any fingers in any arm
-        for arm in self.arm_names:
-            for link in self.finger_links[arm]:
-                link_pos = link.get_position()
-                if np.linalg.norm(np.array(link_pos) - np.array(toggle_position)) < toggle_distance_threshold:
-                    return True
-        return False
 
     @classproperty
     def _do_not_register_classes(cls):

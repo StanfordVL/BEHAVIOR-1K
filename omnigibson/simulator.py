@@ -421,6 +421,8 @@ class Simulator(SimulationContext, Serializable):
                 # Note that we don't explicitly do for obj in self._objects_to_initialize because additional objects
                 # may be added mid-iteration!!
                 # For this same reason, after we finish the loop, we keep any objects that are yet to be initialized
+                # First call zero-physics step update, so that handles are properly propagated
+                og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
                 for i in range(n_objects_to_initialize):
                     obj = self._objects_to_initialize[i]
                     obj.initialize()

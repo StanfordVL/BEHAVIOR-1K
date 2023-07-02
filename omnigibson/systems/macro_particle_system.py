@@ -120,8 +120,6 @@ class MacroParticleSystem(BaseSystem):
         # Clear all internal state
         cls._particle_object = None
         cls.particles = None
-        cls.min_scale = None
-        cls.max_scale = None
         cls._color = None
 
     @classproperty

@@ -34,6 +34,7 @@ class LightObject(StatefulObject):
         class_id=None,
         uuid=None,
         scale=None,
+        fixed_base=False,
         load_config=None,
         abilities=None,
         include_default_states=True,
@@ -56,11 +57,7 @@ class LightObject(StatefulObject):
             scale (None or float or 3-array): if specified, sets either the uniform (float) or x,y,z (3-array) scale
                 for this object. A single number corresponds to uniform scaling along the x,y,z axes, whereas a
                 3-array specifies per-axis scaling.
-            visible (bool): whether to render this object or not in the stage
             fixed_base (bool): whether to fix the base of this object or not
-            visual_only (bool): Whether this object should be visual only (and not collide with any other objects)
-            self_collisions (bool): Whether to enable self collisions for this object
-            prim_type (PrimType): Which type of prim the object is, Valid options are: {PrimType.RIGID, PrimType.CLOTH}
             load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
                 loading this prim at runtime.
             abilities (None or dict): If specified, manually adds specific object states to this object. It should be
@@ -94,7 +91,7 @@ class LightObject(StatefulObject):
             uuid=uuid,
             scale=scale,
             visible=True,
-            fixed_base=False,
+            fixed_base=fixed_base,
             visual_only=True,
             self_collisions=False,
             prim_type=PrimType.RIGID,

@@ -81,9 +81,28 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin):
         # we record that for use in the heat transfer process.
         self.requires_inside = requires_inside
 
+    @classmethod
+    def is_compatible(cls, obj, **kwargs):
+        # Run super first
+        compatible, reason = super().is_compatible(obj, **kwargs)
+        if not compatible:
+            return compatible, reason
+
+        # Check whether this state has toggledon if required or open if required
+        for kwarg, state_type in zip(("requires_toggled_on", "requires_closed"), (ToggledOn, Open)):
+            if kwargs.get(kwarg, False) and state_type not in obj.states:
+                return False, f"{cls.__name__} has {kwarg} but obj has no {state_type.__name__} state!"
+
+        return True, None
+
     @classproperty
     def metalink_prefix(cls):
         return m.HEATSOURCE_LINK_PREFIX
+
+    @classmethod
+    def requires_metalink(cls, **kwargs):
+        # No metalink required if inside
+        return not kwargs.get("requires_inside", False)
 
     @property
     def _default_link(self):

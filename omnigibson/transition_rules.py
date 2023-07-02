@@ -303,7 +303,7 @@ class RuleCondition:
         # Default is False
         return False
 
-    @classproperty
+    @property
     def modifies_filter_names(self):
         """
         Returns:
@@ -382,7 +382,7 @@ class TouchingAnyCondition(RuleCondition):
         # If objs is empty, return False, otherwise, True
         return len(objs) > 0
 
-    @classproperty
+    @property
     def modifies_filter_names(self):
         # Only modifies values from filter 1
         return {self._filter_1_name}
@@ -423,7 +423,7 @@ class StateCondition(RuleCondition):
         # Condition met if any object meets the condition
         return len(object_candidates[self._filter_name]) > 0
 
-    @classproperty
+    @property
     def modifies_filter_names(self):
         return {self._filter_name}
 
@@ -459,14 +459,14 @@ class ChangeConditionWrapper(RuleCondition):
         # then we store it, otherwise, we don't
         for filter_name in self.modifies_filter_names:
             objs = [obj for obj in object_candidates[filter_name] if obj not in self._last_valid_candidates]
-            object_candidates[self._filter_name] = objs
+            object_candidates[filter_name] = objs
             self._last_valid_candidates[filter_name] = set(objs)
             valid = valid and len(objs) > 0
 
         # Valid if any object conditions have changed and we still have valid objects
         return valid
 
-    @classproperty
+    @property
     def modifies_filter_names(self):
         # Return wrapped names
         return self._condition.modifies_filter_names
@@ -510,7 +510,7 @@ class OrConditionWrapper(RuleCondition):
 
         return True
 
-    @classproperty
+    @property
     def modifies_filter_names(self):
         # Return all wrapped names
         return set.union(*(condition.modifies_filter_names for condition in self._conditions))

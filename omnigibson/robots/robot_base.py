@@ -197,23 +197,6 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         """
         pass
 
-    def can_toggle(self, toggle_position, toggle_distance_threshold):
-        """
-        Returns True if the part of the robot that can toggle a toggleable is within the given range of a
-        point corresponding to a toggle marker
-        by default, we assume robot cannot toggle toggle markers
-
-        Args:
-            toggle_position (3-array): (x,y,z) cartesian position values as a reference point for evaluating
-                whether a toggle can occur
-            toggle_distance_threshold (float): distance value below which a toggle is allowed
-
-        Returns:
-            bool: True if the part of the robot that can toggle a toggleable is within the given range of a
-                point corresponding to a toggle marker. By default, we assume robot cannot toggle toggle markers
-        """
-        return False
-
     def get_obs(self):
         """
         Grabs all observations from the robot. This is keyword-mapped based on each observation modality

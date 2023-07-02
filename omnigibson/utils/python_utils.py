@@ -133,7 +133,7 @@ class Recreatable(metaclass=RecreatableAbcMeta):
 
 def create_object_from_init_info(init_info):
     """
-    Create a new object based on an given init info.
+    Create a new object based on given init info.
 
     Args:
         init_info (dict): Nested dictionary that contains an object's init information.
