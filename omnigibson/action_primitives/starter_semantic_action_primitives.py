@@ -518,7 +518,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         action = self._empty_action()
         controller_name = "gripper_{}".format(self.arm)
         action[self.robot.controller_action_idx[controller_name]] = 1.0
-        self.robot.release_grasp_immediately()
         for _ in range(MAX_STEPS_FOR_GRASP_OR_RELEASE):
             # Otherwise, keep applying the action!
             yield action
@@ -726,7 +725,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
     def _sample_pose_with_object_and_predicate(self, predicate, held_obj, target_obj):
         with UndoableContext(self.robot):
-            self.robot._release_grasp()
+            self.robot.release_grasp_immediately()
             pred_map = {object_states.OnTop: "onTop", object_states.Inside: "inside"}
             result = sample_kinematics(
                 pred_map[predicate],
