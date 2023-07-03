@@ -13,11 +13,13 @@ from addict import Dict
 macros = Dict()
 gm = macros.globals
 
-# Paths (either relative to this directory or global absolute paths) for assets
+# Path (either relative to OmniGibson root directory or global absolute path) for data
+gm.DATA_PATH = "data"
+
 # Assets correspond to non-objects / scenes (e.g.: robots), and dataset incliudes objects + scene
-gm.ASSET_PATH = "data/assets"
-gm.DATASET_PATH = "data/og_dataset"
-gm.KEY_PATH = "data/omnigibson.key"
+gm.ASSET_PATH = f"{gm.DATA_PATH}/assets"
+gm.DATASET_PATH = f"{gm.DATA_PATH}/og_dataset"
+gm.KEY_PATH = f"{gm.DATA_PATH}/omnigibson.key"
 
 # Whether to generate a headless or non-headless application upon OmniGibson startup
 gm.HEADLESS = (os.getenv("OMNIGIBSON_HEADLESS", 'False').lower() in ('true', '1', 't'))

@@ -1,6 +1,10 @@
 name: Build & deploy docs
 
-on: [pull_request]
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - og-develop
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.head_ref || github.sha }}
@@ -38,23 +42,34 @@ jobs:
         run: echo "HOME=/root" >> $GITHUB_ENV
 
       - name: Checkout source
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           submodules: true
           path: omnigibson-src
-
-      - name: Install dev requirements
-        working-directory: omnigibson-src
-        run: pip install -r requirements-dev.txt
 
       - name: Install
         working-directory: omnigibson-src
         run: pip install -e .
 
+      - name: Install dev requirements
+        working-directory: omnigibson-src
+        run: pip install -r requirements-dev.txt
+
       - name: Build docs
         working-directory: omnigibson-src
-        run: source /isaac-sim/setup_conda_env.sh && source build_docs.sh
+        run: source scripts/build_docs.sh
 
+      - name: Copy benchmark index page
+        working-directory: omnigibson-src
+        run: mkdir site/benchmark && cp scripts/benchmark* site/benchmark/ && cd site/benchmark && mv benchmark.html index.html
+
+      - name: Fetch benchmark file from gh-pages branch
+        working-directory: omnigibson-src
+        run: |
+          git fetch origin gh-pages:gh-pages --force
+          git show gh-pages:benchmark/data.js > ./site/benchmark/data.js
+          git diff
+          
       - name: Deploy to gh-pages
         uses: peaceiris/actions-gh-pages@v3
         with:
