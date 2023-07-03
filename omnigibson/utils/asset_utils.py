@@ -226,7 +226,7 @@ def get_all_object_category_models(category):
     """
     og_dataset_path = gm.DATASET_PATH
     og_categories_path = os.path.join(og_dataset_path, "objects", category)
-    return os.listdir(og_categories_path) if os.path.exists(og_categories_path) else []
+    return sorted(os.listdir(og_categories_path)) if os.path.exists(og_categories_path) else []
 
 
 def get_all_object_category_models_with_abilities(category, abilities):
