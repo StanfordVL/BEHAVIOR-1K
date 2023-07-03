@@ -240,13 +240,6 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
 
         return True, None
 
-    def initialize_link_mixin(self):
-        # Run super first
-        super().initialize_link_mixin()
-
-        # Make sure there's at most only a single metalink
-        assert len(self.links) <= 1, f"Can only have at most a single metalink for {self.__class__.__name__}!"
-
     def _initialize(self):
         super()._initialize()
 

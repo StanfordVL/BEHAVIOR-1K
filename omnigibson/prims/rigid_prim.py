@@ -13,10 +13,13 @@ from omnigibson.utils.constants import GEOM_TYPES
 from omnigibson.utils.sim_utils import CsRawData
 from omnigibson.utils.usd_utils import get_mesh_volume_and_com
 import omnigibson.utils.transform_utils as T
+from omnigibson.utils.ui_utils import create_module_logger
 
 # Import omni sensor based on type
 from omni.isaac.sensor import _sensor as _s
 
+# Create module logger
+log = create_module_logger(module_name=__name__)
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -175,11 +178,15 @@ class RigidPrim(XFormPrim):
                     mesh.set_rest_offset(m.DEFAULT_REST_OFFSET)
                     self._collision_meshes[mesh_name] = mesh
 
-                    volume, com = get_mesh_volume_and_com(mesh_prim)
+                    is_volume, volume, com = get_mesh_volume_and_com(mesh_prim)
                     vols.append(volume)
                     # We need to translate the center of mass from the mesh's local frame to the link's local frame
                     local_pos, local_orn = mesh.get_local_pose()
                     coms.append(T.quat2mat(local_orn) @ (com * mesh.scale) + local_pos)
+                    # If we're not a valid volume, use bounding box approximation for the underlying collision approx
+                    if not is_volume:
+                        log.warning(f"Got invalid (non-volume) collision mesh: {mesh.name}")
+                        mesh.set_collision_approximation("boundingCube")
                 else:
                     self._visual_meshes[mesh_name] = VisualGeomPrim(**mesh_kwargs)
 
@@ -427,7 +434,7 @@ class RigidPrim(XFormPrim):
         # TODO (eric): revise this once omni exposes API to query volume of GeomPrims
         volume = 0.0
         for collision_mesh in self._collision_meshes.values():
-            mesh_volume, _ = get_mesh_volume_and_com(collision_mesh.prim)
+            _, mesh_volume, _ = get_mesh_volume_and_com(collision_mesh.prim)
             volume += mesh_volume * np.product(collision_mesh.get_world_scale())
 
         return volume

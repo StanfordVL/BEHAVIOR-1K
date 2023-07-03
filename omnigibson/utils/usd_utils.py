@@ -792,17 +792,20 @@ def get_mesh_volume_and_com(mesh_prim):
         mesh_prim (Usd.Prim): Mesh prim to compute volume and center of mass for
 
     Returns:
-        Tuple[float, np.array]: Tuple containing the volume and center of mass in the mesh frame of @mesh_prim
+        Tuple[bool, float, np.array]: Tuple containing the (is_volume, volume, center_of_mass) in the mesh
+            frame of @mesh_prim
     """
     mesh_type = mesh_prim.GetPrimTypeInfo().GetTypeName()
     assert mesh_type in GEOM_TYPES, f"Invalid mesh type: {mesh_type}"
     # Default volume and com
     volume = 0.0
     com = np.zeros(3)
+    is_volume = True
     if mesh_type == "Mesh":
         # We construct a trimesh object from this mesh in order to infer its volume
         trimesh_mesh = mesh_prim_to_trimesh_mesh(mesh_prim, include_normals=False, include_texcoord=False)
-        if trimesh_mesh.is_volume:
+        is_volume = trimesh_mesh.is_volume
+        if is_volume:
             volume = trimesh_mesh.volume
             com = trimesh_mesh.center_mass
         else:
@@ -826,7 +829,7 @@ def get_mesh_volume_and_com(mesh_prim):
     else:
         raise ValueError(f"Cannot compute volume for mesh of type: {mesh_type}")
 
-    return volume, com
+    return is_volume, volume, com
 
 
 def create_primitive_mesh(prim_path, primitive_type, extents=1.0, u_patches=None, v_patches=None):
