@@ -328,6 +328,7 @@ def generate_fillable_volume(obj):
     if encrypted:
         encrypted_usd_path = usd_path.replace(".usd", ".encrypted.usd")
         encrypt_file(usd_path, encrypted_usd_path)
+        os.remove(usd_path)
 
 
 def generate_metalink(obj, metalink_prefix):
@@ -369,6 +370,7 @@ def generate_metalink(obj, metalink_prefix):
     if encrypted:
         encrypted_usd_path = usd_path.replace(".usd", ".encrypted.usd")
         encrypt_file(usd_path, encrypted_usd_path)
+        os.remove(usd_path)
 
 
 def generate_toggle_button_link(obj):
