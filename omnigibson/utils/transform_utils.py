@@ -1082,7 +1082,7 @@ def rad2deg(rad):
     return rad * 180. / np.pi
 
 
-def check_quat_right_angle(quat, atol=1e-2):
+def check_quat_right_angle(quat, atol=5e-2):
     """
     Check by making sure the quaternion is some permutation of +/- (1, 0, 0, 0),
     +/- (0.707, 0.707, 0, 0), or +/- (0.5, 0.5, 0.5, 0.5)
