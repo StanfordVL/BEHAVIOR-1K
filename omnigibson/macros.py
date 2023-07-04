@@ -13,7 +13,7 @@ from addict import Dict
 macros = Dict()
 gm = macros.globals
 
-# Path (either relative to OmniGibson root directory or global absolute path) for data
+# Path (either relative to OmniGibson/omnigibson directory or global absolute path) for data
 gm.DATA_PATH = "data"
 
 # Assets correspond to non-objects / scenes (e.g.: robots), and dataset incliudes objects + scene
