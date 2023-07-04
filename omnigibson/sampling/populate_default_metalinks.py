@@ -117,12 +117,12 @@ def sample_fillable_point_from_top(obj, n_rays, prop_successful):
                                                                       np.mean((aabb_high[:2] - aabb_low[:2]) / 10.0))
     down_results = raytest_batch(start_rays.reshape(-1, 3), end_rays.reshape(-1, 3))
     down_hit_results = np.array([result["position"] for result in down_results if result["hit"]])
+
     z = down_hit_results[:, 2].min() + 0.01
     point = down_hit_results[np.argmin(down_hit_results[:, 2])]
     point[2] += 0.01
     results = sample_radial_rays(point, n=n_rays)
-    # if "vtjwof" in obj.usd_path:
-    #     from IPython import embed; embed()
+
     if np.mean([result["hit"] for result in results]) >= prop_successful and np.all(
         [result["distance"] > 0 for result in results if result["hit"]]):
 
@@ -161,9 +161,6 @@ def generate_fillable_volume(obj):
     assert n_rays_quarter == n_rays / 4.0
     prop_successful = 0.75
 
-    if "kwyoqh" in obj.usd_path:
-        from IPython import embed; embed()
-
     for i in range(200):
         results = sample_radial_rays(point, n=n_rays)
         if np.mean([result["hit"] for result in results]) >= prop_successful and np.all([result["distance"] > 0 for result in results if result["hit"]]):
@@ -171,11 +168,6 @@ def generate_fillable_volume(obj):
             break
         point = np.random.uniform(low=aabb_low, high=aabb_high)
         point[2] = aabb_center[2]
-
-
-    # if "vtjwof" in obj.usd_path:
-    #     from IPython import embed; embed()
-
 
     if not success:
         # Try sampling from the top
@@ -214,8 +206,7 @@ def generate_fillable_volume(obj):
             start_point=center,
             end_point=center - np.array([0, 0, 4.0]),
         )
-        # if "bnpjjy" in obj.usd_path:
-        #     from IPython import embed; embed()
+
         assert down_ray["hit"]
         z_low = down_ray["position"][2]
         up_ray = raytest(
@@ -255,10 +246,6 @@ def generate_fillable_volume(obj):
             z += z_dist
             i += 1
 
-            # if "lfxtqa" in obj.usd_path:
-            #     from IPython import embed;
-            #     embed()
-
         # Prune previous layer
         mesh_points = mesh_points[:-len(layer_points)]
 
@@ -272,8 +259,6 @@ def generate_fillable_volume(obj):
 
     # 5. Create trimesh
     # print(f"n mesh points: {len(mesh_points)}")
-    if "fjpams" in obj.usd_path:
-        from IPython import embed; embed()
     tm = trimesh.Trimesh(vertices=np.array(mesh_points))
 
     # 6. Create convex hull
