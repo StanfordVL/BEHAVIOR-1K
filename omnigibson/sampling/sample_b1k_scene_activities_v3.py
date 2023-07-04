@@ -124,10 +124,6 @@ def main(random_selection=False, headless=False, short_exec=False):
                 "reset_joint_pos": "tuck",
             },
         ],
-        "task": {
-            "type": "BehaviorTask",
-            "online_object_sampling": True,
-        }
     }
 
     valid_tasks = get_valid_tasks()
@@ -144,6 +140,10 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     n_scene_objects = len(env.scene.objects)
 
+    # Set environment configuration after environment is loaded, because we will load the task
+    env.task_config["type"] = "BehaviorTask"
+    env.task_config["online_object_sampling"] = True
+
     should_start = args.start_at is None
     for activity in sorted(activities):
         if not should_start:
@@ -158,7 +158,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
         # Get info from spreadsheet
         row = ACTIVITY_TO_ROW[activity]
-        success, scene_id, user, reason = worksheet.get(f"B{row}:E{row}")
+        success, scene_id, user, reason, misc = worksheet.get(f"B{row}:F{row}")[0]
         # If we've already sampled successfully (success is populated with a 1) and we don't want to overwrite the
         # existing sampling result, skip
         if success != "" and int(success) != 0 and not args.overwrite_existing:
@@ -205,8 +205,8 @@ def main(random_selection=False, headless=False, short_exec=False):
 
             # Write to google sheets
             cell_list = worksheet.range(f"B{row}:E{row}")
-            for cell, val in zip(cell_list, (int(success), args.scene_model, USER, reason)):
-                cell.value = activity
+            for cell, val in zip(cell_list, (int(success), args.scene_model, USER, "" if reason is None else reason)):
+                cell.value = val
             worksheet.update_cells(cell_list)
 
             # Clear task callbacks
