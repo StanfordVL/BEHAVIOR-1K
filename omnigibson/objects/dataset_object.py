@@ -270,10 +270,13 @@ class DatasetObject(USDObject):
         # Otherwise, if manual bounding box is specified, scale based on ratio between that and the native bbox
         elif self._load_config["bounding_box"] is not None:
             scale = np.ones(3)
-            valid_idxes = ~np.isclose(self.native_bbox, 0.0)
+            valid_idxes = self.native_bbox > 1e-4
             scale[valid_idxes] = np.array(self._load_config["bounding_box"])[valid_idxes] / self.native_bbox[valid_idxes]
         else:
             scale = np.ones(3) if self._load_config["scale"] is None else self._load_config["scale"]
+
+        # Assert that the scale does not have too small dimensions
+        assert np.all(scale > 1e-4), f"Scale of {self.name} is too small: {scale}"
 
         # Set this scale in the load config -- it will automatically scale the object during self.initialize()
         self._load_config["scale"] = scale
