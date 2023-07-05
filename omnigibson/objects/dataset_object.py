@@ -105,9 +105,6 @@ class DatasetObject(USDObject):
         # Store variables
         self._in_rooms = in_rooms.split(",") if isinstance(in_rooms, str) else in_rooms
 
-        # Info that will be filled in at runtime
-        self.supporting_surfaces = None             # Dictionary mapping link names to surfaces represented by links
-
         # Make sure only one of bounding_box and scale are specified
         if bounding_box is not None and scale is not None:
             raise Exception("You cannot define both scale and bounding box size for an DatasetObject")
@@ -160,31 +157,6 @@ class DatasetObject(USDObject):
             str: Absolute filepath to the corresponding USD asset file
         """
         return os.path.join(gm.DATASET_PATH, "objects", category, model, "usd", f"{model}.usd")
-
-    def load_supporting_surfaces(self):
-        # Initialize dict of supporting surface info
-        self.supporting_surfaces = {}
-
-        # See if we have any height info -- if not, we can immediately return
-        heights_info = self.heights_per_link
-        if heights_info is None:
-            return
-
-        # TODO: Integrate images directly into usd file?
-        # We loop over all the predicates and corresponding supported links in our heights info
-        usd_dir = os.path.dirname(self._usd_path)
-        for predicate, links in heights_info.items():
-            height_maps = {}
-            for link_name, heights in links.items():
-                height_maps[link_name] = []
-                for i, z_value in enumerate(heights):
-                    # Get boolean birds-eye view xy-mask image for this surface
-                    img_fname = os.path.join(usd_dir, "../misc", "height_maps_per_link", predicate, link_name, f"{i}.png")
-                    xy_map = cv2.imread(img_fname, 0)
-                    # Add this map to the supporting surfaces for this link and predicate combination
-                    height_maps[link_name].append((z_value, xy_map))
-            # Add this heights map to the overall supporting surfaces
-            self.supporting_surfaces[predicate] = height_maps
 
     def sample_orientation(self):
         """
@@ -271,16 +243,16 @@ class DatasetObject(USDObject):
         # Otherwise, if manual bounding box is specified, scale based on ratio between that and the native bbox
         elif self._load_config["bounding_box"] is not None:
             scale = np.ones(3)
-            valid_idxes = ~np.isclose(self.native_bbox, 0.0)
+            valid_idxes = self.native_bbox > 1e-4
             scale[valid_idxes] = np.array(self._load_config["bounding_box"])[valid_idxes] / self.native_bbox[valid_idxes]
         else:
             scale = np.ones(3) if self._load_config["scale"] is None else self._load_config["scale"]
 
+        # Assert that the scale does not have too small dimensions
+        assert np.all(scale > 1e-4), f"Scale of {self.name} is too small: {scale}"
+
         # Set this scale in the load config -- it will automatically scale the object during self.initialize()
         self._load_config["scale"] = scale
-
-        # Load any supporting surfaces belonging to this object
-        self.load_supporting_surfaces()
 
         # Run super last
         super()._post_load()
@@ -425,16 +397,6 @@ class DatasetObject(USDObject):
             None or dict: Nested dictionary of object's metadata if it exists, else None
         """
         return self.get_custom_data().get("metadata", None)
-
-    @property
-    def heights_per_link(self):
-        """
-        Gets this object's heights per link information, if it exists
-
-        Returns:
-            None or dict: Nested dictionary of object's height per link information if it exists, else None
-        """
-        return self.get_custom_data().get("heights_per_link", None)
 
     @property
     def orientations(self):
