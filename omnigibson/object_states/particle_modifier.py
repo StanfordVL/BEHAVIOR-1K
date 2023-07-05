@@ -210,8 +210,6 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
         self.method = method
         self.projection_source_sphere = None
         self.projection_mesh = None
-        self.projection_system = None
-        self.projection_emitter = None
         self._check_in_mesh = None
         self._check_overlap = None
         self._link_prim_paths = None
@@ -522,11 +520,6 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
     def _get_value(self):
         pass
 
-    def remove(self):
-        # We need to remove the generated particle system if we've created one
-        if self.method == ParticleModifyMethod.PROJECTION:
-            delete_prim(self.projection_system.GetPrimPath().pathString)
-
     @staticmethod
     def get_dependencies():
         return AbsoluteObjectState.get_dependencies() + [AABB, Saturated, ModifiedParticles]
@@ -790,6 +783,9 @@ class ParticleApplier(ParticleModifier):
         self._in_mesh_local_particle_positions = None
         self._in_mesh_local_particle_directions = None
 
+        self.projection_system = None
+        self.projection_emitter = None
+
         # Run super
         super().__init__(obj=obj, method=method, conditions=conditions, projection_mesh_params=projection_mesh_params)
 
@@ -928,6 +924,11 @@ class ParticleApplier(ParticleModifier):
 
         # Run super
         super()._update()
+
+    def remove(self):
+        # We need to remove the projection visualization if it exists
+        if self.projection_system is not None:
+            delete_prim(self.projection_system.GetPrimPath().pathString)
 
     def _modify_particles(self, system):
         # If at the limit, don't modify anything

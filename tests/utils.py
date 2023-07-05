@@ -56,24 +56,7 @@ def assert_test_scene():
                 get_obj_cfg("shelf_back_panel", "shelf_back_panel", "gjsnrt", abilities={"attachable": {}}),
                 get_obj_cfg("shelf_shelf", "shelf_shelf", "ymtnqa", abilities={"attachable": {}}),
                 get_obj_cfg("shelf_baseboard", "shelf_baseboard", "hlhneo", abilities={"attachable": {}}),
-                get_obj_cfg("sink", "sink", "yfaufu", scale=np.ones(3), abilities={
-                    "toggleable": {},
-                    "particleSource": {
-                        "conditions": {
-                            "water": [lambda obj: obj.states[ToggledOn].get_value()],
-                        },
-                        "source_radius": 0.0125,
-                        "source_height": 0.05,
-                        "initial_speed": 0.0,  # Water merely falls out of the spout
-                    },
-                    "particleSink": {
-                        "conditions": {
-                            "water": None,  # No conditions, always sinking nearby particles
-                        },
-                        "sink_radius": 0.05,
-                        "sink_height": 0.05,
-                    }
-                }),
+                get_obj_cfg("sink", "sink", "yfaufu", scale=np.ones(3)),
             ],
             "robots": [
                 {
