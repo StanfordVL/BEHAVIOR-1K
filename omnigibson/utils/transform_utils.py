@@ -542,7 +542,17 @@ def quat2euler(quat):
     """
     return R.from_quat(quat).as_euler("xyz")
 
-def wrap_angle(theta, lower=-np.pi):  # [-np.pi, np.pi)
+def wrap_angle(theta, lower=-np.pi):
+    """"
+    Converts an angle to the range [lower, lower + 2*pi).
+    Defaults to wrapping to [-pi, pi).
+
+    Args:
+        theta (float): angle in radians
+
+    Returns:
+        float: angle in radians in range [lower, lower + 2*pi)
+    """
     return (theta - lower) % (2 * np.pi) + lower
 
 def pose_in_A_to_pose_in_B(pose_A, pose_A_in_B):

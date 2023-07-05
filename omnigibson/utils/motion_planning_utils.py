@@ -1,38 +1,11 @@
 import numpy as np
 from ompl import base as ob
 from ompl import geometric as ompl_geo
-# ob = None
-# ompl_geo = None
 
 import omnigibson as og
 from omnigibson.object_states import ContactBodies
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.usd_utils import RigidContactAPI
-
-# Timing code
-from time import clock
-
-class Timer():
-    def __init__(self):
-        self.data = {
-            "num_state_checks": 0.0,
-            "total_state_check_time": 0.0,
-            "avg_state_check_time": 0.0
-        }
-
-    def start(self):
-        self.start_time = clock()
-
-    def end(self, name):
-        self.end_time = clock()
-        self.data[name] = self.end_time - self.start_time
-
-    def end_state_check(self):
-        self.end_time = clock()
-        self.data["num_state_checks"] += 1
-        self.data["total_state_check_time"] += (self.end_time - self.start_time)
-        self.data["avg_state_check_time"] = self.data["total_state_check_time"] / self.data["num_state_checks"]
-
 
 def plan_base_motion(
     robot,
@@ -40,9 +13,7 @@ def plan_base_motion(
     planning_time = 100.0,
     **kwargs,
 ):
-    timer = Timer()
     def state_valid_fn(q):
-        timer.start()
         x = q.getX()
         y = q.getY()
         yaw = q.getYaw()
@@ -51,7 +22,6 @@ def plan_base_motion(
         )
         og.sim.step(render=False)
         state_valid = not detect_robot_collision(robot)
-        timer.end_state_check()
         return state_valid
 
     pos = robot.get_position()
@@ -91,15 +61,11 @@ def plan_base_motion(
 
     # this will automatically choose a default planner with
     # default parameters
-    begin = clock()
     solved = ss.solve(planning_time)
-    timer.data["solution_time"] = clock() - begin
 
     if solved:
         # try to shorten the path
-        begin = clock()
         ss.simplifySolution()
-        timer.data["simplify_time"] = clock() - begin
         # print the simplified path
         sol_path = ss.getSolutionPath()
         return_path = []
@@ -108,29 +74,23 @@ def plan_base_motion(
             y = sol_path.getState(i).getY()
             yaw = sol_path.getState(i).getYaw()
             return_path.append([x, y, yaw])
-        write_to_file("-----Base motion planning----", timer.data)
         return remove_unnecessary_rotations(return_path)
     return None
 
 def plan_arm_motion(
     robot,
-    obj_in_hand,
     end_conf,
     planning_time = 100.0,
     **kwargs,
 ):
-    timer = Timer()
-
     joint_control_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
     dim = len(joint_control_idx)
 
     def state_valid_fn(q):
-        timer.start()
         joint_pos = [q[i] for i in range(dim)]
         robot.set_joint_positions(joint_pos, joint_control_idx)
         og.sim.step(render=False)
         state_valid = not detect_robot_collision(robot)
-        timer.end_state_check()
         return state_valid
     
     # create an SE2 state space
@@ -165,22 +125,17 @@ def plan_arm_motion(
 
     # this will automatically choose a default planner with
     # default parameters
-    begin = clock()
     solved = ss.solve(planning_time)
-    timer.data["solution_time"] = clock() - begin
 
     if solved:
         # try to shorten the path
-        begin = clock()
         ss.simplifySolution()
-        timer.data["simplify_time"] = clock() - begin
 
         sol_path = ss.getSolutionPath()
         return_path = []
         for i in range(sol_path.getStateCount()):
             joint_pos = [sol_path.getState(i)[j] for j in range(dim)]
             return_path.append(joint_pos)
-        write_to_file("-----Arm motion planning----", timer.data)
         return return_path
     return None
 
@@ -205,10 +160,11 @@ def detect_robot_collision(robot, filter_objs=[]):
 def detect_self_collision(robot):
     contacts = robot.contact_list()
     robot_links = [link.prim_path for link in robot.links.values()]
+    disabled_pairs = [set(p) for p in robot.disabled_collision_pairs]
     for c in contacts:
         link0 = c.body0.split("/")[-1]
         link1 = c.body1.split("/")[-1]
-        if [link0, link1] not in robot.disabled_collision_pairs and c.body0 in robot_links and c.body1 in robot_links:
+        if {link0, link1} not in disabled_pairs and c.body0 in robot_links and c.body1 in robot_links:
             return True
     return False
 
@@ -224,9 +180,3 @@ def remove_unnecessary_rotations(path):
         theta = np.arctan2(segment[1], segment[0])
         path[start_idx] = (start[0], start[1], theta)
     return path
-
-def write_to_file(header, data):
-    with open("data.txt", "a") as f:
-        f.write(header + "\n")
-        for key, val in data.items():
-            f.write(f"{key}: {str(val)}\n")
