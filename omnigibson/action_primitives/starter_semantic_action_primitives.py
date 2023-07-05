@@ -342,8 +342,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             # Prepare data for the approach later.
             approach_pos = grasp_pose[0] + object_direction * GRASP_APPROACH_DISTANCE
             approach_pose = (approach_pos, grasp_pose[1])
-            print("approach_pose", approach_pose)
-            print("grasp_pose", grasp_pose)
+
             # If the grasp pose is too far, navigate.
             yield from self._navigate_if_needed(obj, pos_on_obj=grasp_pose[0])
             yield from self._move_hand(grasp_pose)
@@ -559,18 +558,19 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 0.0,  # wheels
                 0.0,  # trunk
                 0.0,
-                0.0,
+                -1.0,
                 0.0,  # head
-                -0.22184,
+                -1.0,
                 1.53448,
-                1.46076,
-                -0.84995,
+                2.2,
+                0.0,
                 1.36904,
                 1.90996,  # arm
                 0.05,
                 0.05,  # gripper
             ]
         )
+
         reset_pose_tiago = np.array(
             [
                 0.0,  
@@ -667,9 +667,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         dist_threshold = LOW_PRECISION_DIST_THRESHOLD if low_precision else DEFAULT_DIST_THRESHOLD
         angle_threshold = LOW_PRECISION_ANGLE_THRESHOLD if low_precision else DEFAULT_ANGLE_THRESHOLD
             
-        pose = self._get_robot_pose_from_2d_pose(pose_2d)
-        body_target_pose = self._get_pose_in_robot_frame(pose)
-
+        end_pose = self._get_robot_pose_from_2d_pose(pose_2d)
+        body_target_pose = self._get_pose_in_robot_frame(end_pose)
+        
         while np.linalg.norm(body_target_pose[0][:2]) > dist_threshold:
             if self.robot_model == "Tiago":
                 action = self._empty_action()
@@ -678,20 +678,22 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 action[self.robot.controller_action_idx["base"]] = base_action
                 yield action
             else:
-                diff_angle_to_waypoint = T.vecs2axisangle([1, 0, 0], [body_target_pose[0][0], body_target_pose[0][1], 0.0])[2]
-                if abs(diff_angle_to_waypoint) > DEFAULT_ANGLE_THRESHOLD:
-                    end_pose = (pose[0], T.euler2quat([0, 0, np.arctan2(pose[0][1], pose[0][0])]))
-                    yield from self._rotate_in_place(end_pose, angle_threshold=DEFAULT_ANGLE_THRESHOLD)
+                diff_pos = end_pose[0] - self.robot.get_position()
+                intermediate_pose = (end_pose[0], T.euler2quat([0, 0, np.arctan2(diff_pos[1], diff_pos[0])]))
+                body_intermediate_pose = self._get_pose_in_robot_frame(intermediate_pose)
+                diff_yaw = T.wrap_angle(T.quat2euler(body_intermediate_pose[1])[2])
+                if abs(diff_yaw) > DEFAULT_ANGLE_THRESHOLD:
+                    yield from self._rotate_in_place(intermediate_pose, angle_threshold=DEFAULT_ANGLE_THRESHOLD)
                 else:
                     action = self._empty_action()
                     base_action = [KP_LIN_VEL, 0.0]
                     action[self.robot.controller_action_idx["base"]] = base_action
                     yield action
-                
-            body_target_pose = self._get_pose_in_robot_frame(pose)
+
+            body_target_pose = self._get_pose_in_robot_frame(end_pose)
 
         # Rotate in place to final orientation once at location
-        yield from self._rotate_in_place(pose, angle_threshold=angle_threshold)
+        yield from self._rotate_in_place(end_pose, angle_threshold=angle_threshold)
         # raise ActionPrimitiveError(
         #     ActionPrimitiveError.Reason.EXECUTION_ERROR,
         #     "Could not move robot to desired waypoint.",
@@ -700,11 +702,11 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
     def _rotate_in_place(self, end_pose, angle_threshold = DEFAULT_ANGLE_THRESHOLD):
         body_target_pose = self._get_pose_in_robot_frame(end_pose)
-        diff_angle = T.vecs2axisangle([1, 0, 0], [body_target_pose[0][0], body_target_pose[0][1], 0.0])[2]
-        while abs(diff_angle) > angle_threshold:
+        diff_yaw = T.wrap_angle(T.quat2euler(body_target_pose[1])[2])
+        while abs(diff_yaw) > angle_threshold:
             action = self._empty_action()
 
-            direction = -1.0 if T.wrap_angle(diff_angle) < 0.0 else 1.0
+            direction = -1.0 if diff_yaw < 0.0 else 1.0
             ang_vel = 0.2 * direction
 
             base_action = [0.0, 0.0, ang_vel] if self.robot_model == "Tiago" else [0.0, ang_vel]
@@ -713,7 +715,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             yield action
 
             body_target_pose = self._get_pose_in_robot_frame(end_pose)
-            diff_angle = T.vecs2axisangle([1, 0, 0], [body_target_pose[0][0], body_target_pose[0][1], 0.0])[2]
+            diff_yaw = T.wrap_angle(T.quat2euler(body_target_pose[1])[2])
             
         yield self._empty_action()
             

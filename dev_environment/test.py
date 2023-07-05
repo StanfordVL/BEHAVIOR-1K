@@ -12,8 +12,6 @@ import cProfile, pstats, io
 import time
 import os
 import argparse
-    
-from omnigibson.objects import PrimitiveObject
 
 def pause(time):
     for _ in range(int(time*100)):
