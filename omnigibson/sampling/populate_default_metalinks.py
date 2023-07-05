@@ -371,10 +371,10 @@ def generate_particlesink_link(obj):
 
 
 ABILITY_TO_METALINK_FCN = {
-    # "particleSource": generate_particlesource_link,
-    # "particleSink": generate_particlesink_link,
-    "toggleable": generate_toggle_button_link,
-    "fillable": generate_fillable_volume,
+    "particleSource": generate_particlesource_link,
+    "particleSink": generate_particlesink_link,
+    # "toggleable": generate_toggle_button_link,
+    # "fillable": generate_fillable_volume,
 }
 
 ot = ObjectTaxonomy()
