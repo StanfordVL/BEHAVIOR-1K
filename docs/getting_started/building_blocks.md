@@ -277,7 +277,7 @@ This demo loads an apple and a knife, and showcases how apple can be diced into 
 python -m omnigibson.examples.object_states.folded_unfolded_state_demo
 ```
 
-This demo loads in three different cloth objects, and allows you to manipulate them while printing out their `Folded` state status in real-time. Try manipulate the object by holding down **`Shift`** and then **`Left-click + Drag`**!
+This demo loads in three different cloth objects, and allows you to manipulate them while printing out their `Folded` state status in real-time. Try manipulating the object by holding down **`Shift`** and then **`Left-click + Drag`**!
 
 ??? code "folded_unfolded_state_demo.py"
 
@@ -368,7 +368,7 @@ This demo loads in a stove (toggled on) and two apples. The first apple will be 
 python -m omnigibson.examples.object_states.overlaid_demo
 ```
 
-This demo loads in a carpet on top of a table. The demo allows you to manipulate the carpet while printing out their `Overlaid` state status in real-time. Try manipulate the object by holding down **`Shift`** and then **`Left-click + Drag`**!
+This demo loads in a carpet on top of a table. The demo allows you to manipulate the carpet while printing out their `Overlaid` state status in real-time. Try manipulating the object by holding down **`Shift`** and then **`Left-click + Drag`**!
 
 ??? code "overlaid_demo.py"
 

@@ -203,6 +203,6 @@ python -m omnigibson.examples.robots.robot_control_example # (1)!
 
     You probably need to [install FUSE](https://github.com/AppImage/AppImageKit/wiki/FUSE) to run the Omniverse Launcher AppImage.
 
-??? question "OmniGibson stucks at shader compilation upon startup"
+??? question "OmniGibson is stuck at shader compilation upon startup"
 
     The process could take up to 5 minutes. This is expected behavior, and should only occur once when you import OmniGibson for the first time.

@@ -11,8 +11,9 @@ import click
 
 def main():
     # Ask user which dataset to install
-    data_path = gm.DATA_PATH if os.path.isabs(gm.DATA_PATH) else os.path.abspath(f"omnigibson/{gm.DATA_PATH}")
-    print(f"OmniGibson will now install the full dataset and assets (~20GB) under {data_path}.")
+    print(f"OmniGibson will now install data under the following locations:")
+    print(f"    dataset (~22GB): {gm.DATASET_PATH}")
+    print(f"    assets (~1.5GB): {gm.ASSET_PATH}")
     print(f"If you want to install data under a different path, please change the DATA_PATH variable in omnigibson/macros.py and rerun scripts/download_dataset.py.")
     if click.confirm("Do you want to continue?"):
         # Only download if the dataset path doesn't exist

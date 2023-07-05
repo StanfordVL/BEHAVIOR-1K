@@ -14,12 +14,10 @@ macros = Dict()
 gm = macros.globals
 
 # Path (either relative to OmniGibson/omnigibson directory or global absolute path) for data
-gm.DATA_PATH = "data"
-
 # Assets correspond to non-objects / scenes (e.g.: robots), and dataset incliudes objects + scene
-gm.ASSET_PATH = f"{gm.DATA_PATH}/assets"
-gm.DATASET_PATH = f"{gm.DATA_PATH}/og_dataset"
-gm.KEY_PATH = f"{gm.DATA_PATH}/omnigibson.key"
+gm.ASSET_PATH = "data/assets"
+gm.DATASET_PATH = "data/og_dataset"
+gm.KEY_PATH = "data/omnigibson.key"
 
 # Whether to generate a headless or non-headless application upon OmniGibson startup
 gm.HEADLESS = (os.getenv("OMNIGIBSON_HEADLESS", 'False').lower() in ('true', '1', 't'))
