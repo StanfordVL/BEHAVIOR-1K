@@ -248,6 +248,12 @@ def main(random_selection=False, headless=False, short_exec=False):
             scene_initial_state = copy.deepcopy(env.scene._initial_state)
             og.sim.stop()
 
+            n_scene_objects = len(env.scene.objects)
+
+            # Set environment configuration after environment is loaded, because we will load the task
+            env.task_config["type"] = "BehaviorTask"
+            env.task_config["online_object_sampling"] = True
+
     # Shutdown at the end
     og.shutdown()
 
