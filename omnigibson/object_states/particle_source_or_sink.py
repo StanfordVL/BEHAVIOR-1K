@@ -181,8 +181,8 @@ class ParticleSink(ParticleRemover):
         self,
         obj,
         conditions,
-        sink_radius=None,
-        sink_height=None,
+        sink_radius=m.DEFAULT_SINK_RADIUS,
+        sink_height=m.DEFAULT_SINK_HEIGHT,
         default_physical_conditions=None,
         default_visual_conditions=None,
     ):
