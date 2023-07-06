@@ -253,15 +253,17 @@ def main(random_selection=False, headless=False, short_exec=False):
                 for obj in env.scene.objects[n_scene_objects:]:
                     og.sim.remove_object(obj)
 
-                # Clear all systems
-                clear_all_systems()
-                clear_pu()
+            # Clear all systems
+            clear_all_systems()
+            clear_pu()
 
-                og.sim.step()
-                og.sim.play()
-                # This will clear out the previous attachment group in macro particle systems
-                og.sim.scene.load_state(scene_initial_state)
-                og.sim.stop()
+            og.sim.step()
+            og.sim.play()
+            # This will clear out the previous attachment group in macro particle systems
+            og.sim.scene.load_state(scene_initial_state)
+            og.sim.step()
+            og.sim.scene.update_initial_state()
+            og.sim.stop()
 
         except Exception as e:
             og.log.error(traceback.format_exc())
