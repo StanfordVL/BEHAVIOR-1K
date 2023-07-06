@@ -1174,6 +1174,9 @@ def _create_system_from_metadata(system_name):
 
         # Generate the requested system
         system_cls = "".join([st.capitalize() for st in system_type.split("_")])
+        # MicroPhysicalParticle --> Granular
+        if system_cls == "MicroPhysicalParticle":
+            system_cls = "Granular"
         return systems.__dict__[f"{system_cls}System"].create(**system_kwargs)
 
 
