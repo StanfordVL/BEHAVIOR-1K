@@ -373,8 +373,8 @@ def generate_particlesink_link(obj):
 ABILITY_TO_METALINK_FCN = {
     "particleSource": generate_particlesource_link,
     "particleSink": generate_particlesink_link,
-    # "toggleable": generate_toggle_button_link,
-    # "fillable": generate_fillable_volume,
+    "toggleable": generate_toggle_button_link,
+    "fillable": generate_fillable_volume,
 }
 
 ot = ObjectTaxonomy()
@@ -391,6 +391,9 @@ SIDEWAYS_MODELS = {
     "wqgndf",
     "nbuspz",
     "spopfj",
+    "gwhcty",
+    "aqdbdu",
+    "pobfpe",
 }
 
 UPSIDE_DOWN_MODELS = {
@@ -429,6 +432,7 @@ SHALLOW_MODELS = {
     "iawoof",
     "iaaiyi",
     "tkgsho",
+    "vtjwof",
 }
 
 WIREMESH_MODELS = {
@@ -437,6 +441,7 @@ WIREMESH_MODELS = {
 
 BAD_MESH_MODELS = {
     "kdiwzf",
+    "cpozxi",
 }
 
 INVALID_MODELS = set.union(
