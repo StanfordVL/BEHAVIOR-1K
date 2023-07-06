@@ -153,7 +153,7 @@ There are two ways to setup **`OmniGibson`**:
 
                     1. The script will ask you which Isaac Sim to use. If you installed it in the default location, it should be `C:\Users\<USER_NAME>\AppData\Local\ov\pkg\isaac_sim-2022.2.0`
 
-                    This will create a conda env with `omnigibson` installed. Simply call `conda activate` to activate this environment.
+                    This will create a conda env with `omnigibson` installed. Simply call `conda activate` to activate it.
 
                 4. Download **`OmniGibson`** dataset (within the conda env):
 
