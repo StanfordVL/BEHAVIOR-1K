@@ -49,7 +49,6 @@ class Filled(RelativeObjectState, BooleanState):
                 system.generate_particles_from_link(
                     obj=self.obj,
                     link=contained_particles_state.link,
-                    mesh_name_prefixes="container",
                     check_contact=True,
                 )
             else:

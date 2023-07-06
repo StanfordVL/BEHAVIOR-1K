@@ -91,7 +91,7 @@ class ContainedParticles(RelativeObjectState, LinkBasedStateMixin):
 
         # Generate volume checker function for this object
         self.check_in_volume, calculate_volume = \
-            generate_points_in_volume_checker_function(obj=self.obj, volume_link=self.link, mesh_name_prefixes="container")
+            generate_points_in_volume_checker_function(obj=self.obj, volume_link=self.link)
 
         # Calculate volume
         self._volume = calculate_volume()
