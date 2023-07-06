@@ -286,7 +286,7 @@ def generate_fillable_volume(obj):
     obj_prim_path = prim.GetPath().pathString
     container_link_path = f"{obj_prim_path}/{container_link_prefix}_0_0_link"
     container_link = stage.DefinePrim(container_link_path, "Xform")
-    mesh_prim = create_mesh(prim_path=f"{container_link_path}/{container_link_prefix}_mesh_0", stage=stage).GetPrim()
+    mesh_prim = create_mesh(prim_path=f"{container_link_path}/mesh_0", stage=stage).GetPrim()
 
     # Write mesh data
     mesh_prim.GetAttribute("faceVertexCounts").Set(np.ones(len(ctm.faces), dtype=int) * 3)
