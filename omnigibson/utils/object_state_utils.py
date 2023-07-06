@@ -199,6 +199,8 @@ def sample_kinematics(
         for _ in range(int(0.2 / og.sim.get_physics_dt())):
             og.sim.step_physics()
             if len(objA.states[ContactBodies].get_value()) > 0:
+                # Take extra step for depenetration, then break
+                og.sim.step_physics()
                 break
 
         objA.keep_still()
