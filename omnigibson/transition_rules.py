@@ -1267,7 +1267,6 @@ class RecipeRule(BaseTransitionRule):
         out_system.generate_particles_from_link(
             obj=container,
             link=contained_particles_state.link,
-            mesh_name_prefixes="container",
             check_contact=cls.ignore_nonrecipe_objects,
             max_samples=volume // (np.pi * (out_system.particle_radius ** 3) * 4 / 3),
         )
