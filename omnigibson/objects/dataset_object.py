@@ -457,7 +457,7 @@ class DatasetObject(USDObject):
 
         return scales
 
-    def get_base_aligned_bbox(self, link_name=None, visual=False, xy_aligned=False, fallback_to_aabb=False, link_bbox_type="axis_aligned"):
+    def get_base_aligned_bbox(self, link_name=None, visual=True, xy_aligned=False, fallback_to_aabb=False, link_bbox_type="axis_aligned"):
         """
         Get a bounding box for this object that's axis-aligned in the object's base frame.
 
@@ -546,6 +546,9 @@ class DatasetObject(USDObject):
 
                 # Add the points to our collection of points.
                 points.extend(trimesh.transformations.transform_points(vertices_in_base_frame, bbox_center_in_base_frame))
+            elif bbox_type == "visual":
+                # Just skip for now
+                continue
             elif fallback_to_aabb:
                 # If no BB annotation is available, get the AABB for this link.
                 aabb_center, aabb_extent = BoundingBoxAPI.compute_center_extent(prim=link)
