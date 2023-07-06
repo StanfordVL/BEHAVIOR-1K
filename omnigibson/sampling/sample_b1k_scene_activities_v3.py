@@ -9,11 +9,13 @@ import omnigibson as og
 from omnigibson.macros import gm
 import json
 import csv
+import traceback
 from omnigibson.objects import DatasetObject
 from omnigibson.tasks import BehaviorTask
 from omnigibson.systems import remove_callback_on_system_init, remove_callback_on_system_clear
 from omnigibson.systems.system_base import clear_all_systems
 from omnigibson.utils.python_utils import clear as clear_pu
+from omnigibson.utils.bddl_utils import OBJECT_TAXONOMY
 from bddl.activity import Conditions
 import numpy as np
 import gspread
@@ -71,6 +73,19 @@ def get_predicates(conds):
     else:
         preds.append(conds[0])
     return preds
+
+def get_subjects(conds):
+    subjs = []
+    if isinstance(conds, str):
+        return subjs
+    assert isinstance(conds, list)
+    contains_list = np.any([isinstance(ele, list) for ele in conds])
+    if contains_list:
+        for ele in conds:
+            subjs += get_predicates(ele)
+    else:
+        subjs.append(conds[1])
+    return subjs
 
 
 def get_valid_tasks():
@@ -164,11 +179,24 @@ def main(random_selection=False, headless=False, short_exec=False):
         if success != "" and int(success) != 0 and not args.overwrite_existing:
             continue
 
-        # Skip any with unsupported predicates
+        should_sample, success, reason = True, False, ""
+
+        # Skip any with unsupported predicates, but still record the reason why we can't sample
         conditions = Conditions(activity, 0, simulator_name="omnigibson")
         init_predicates = set(get_predicates(conditions.parsed_initial_conditions))
-        if len(set.intersection(init_predicates, UNSUPPORTED_PREDICATES)) > 0:
-            continue
+        unsupported_predicates = set.intersection(init_predicates, UNSUPPORTED_PREDICATES)
+        if len(unsupported_predicates) > 0:
+            should_sample = False
+            reason = f"Unsupported predicate(s): {unsupported_predicates}"
+
+        # check for cloth covered
+        for cond in conditions.parsed_initial_conditions:
+            pred, subj = cond[0], cond[1]
+            if pred == "covered" and "cloth" in OBJECT_TAXONOMY.get_abilities("_".join(subj.split("_")[:-1])):
+                should_sample = False
+                reason = f"Requires cloth covered support"
+                break
+        # init_subjects = set("_".join(subj.split("_")[:-1]) for subj in get_subjects(conditions.parsed_initial_conditions))
 
         env.task_config["activity_name"] = activity
         scene_instance = BehaviorTask.get_cached_activity_scene_filename(
@@ -183,25 +211,29 @@ def main(random_selection=False, headless=False, short_exec=False):
 
         # Attempt to sample
         try:
-            env._load_task()
-            assert og.sim.is_stopped()
+            if should_sample:
+                env._load_task()
+                assert og.sim.is_stopped()
 
-            success = env.task.feedback is None
-            if success:
-                # Sampling success
-                og.sim.play()
-                # This will actually reset the objects to their sample poses
-                env.task.reset(env)
+                success = env.task.feedback is None
+                if success:
+                    # Sampling success
+                    og.sim.play()
+                    # This will actually reset the objects to their sample poses
+                    env.task.reset(env)
 
-                # TODO: figure out whether we also should update in_room for newly imported objects
-                env.task.save_task(override=args.overwrite_existing)
+                    # TODO: figure out whether we also should update in_room for newly imported objects
+                    env.task.save_task(override=args.overwrite_existing)
 
-                og.sim.stop()
-                og.log.info(f"\n\nSampling success: {activity}\n\n")
-                reason = ""
+                    og.sim.stop()
+                    og.log.info(f"\n\nSampling success: {activity}\n\n")
+                    reason = ""
+                else:
+                    og.log.error(f"\n\nSampling failed: {activity}.\n\nFeedback: {env.task.feedback}\n\n")
+                    reason = env.task.feedback
+            
             else:
-                og.log.error(f"\n\nSampling failed: {activity}.\n\nFeedback: {env.task.feedback}\n\n")
-                reason = env.task.feedback
+                og.log.error(f"\n\nSampling failed: {activity}.\n\nFeedback: {reason}\n\n")
 
             # Write to google sheets
             cell_list = worksheet.range(f"B{row}:E{row}")
@@ -209,28 +241,30 @@ def main(random_selection=False, headless=False, short_exec=False):
                 cell.value = val
             worksheet.update_cells(cell_list)
 
-            # Clear task callbacks
-            callback_name = f"{env.task.activity_name}_refresh"
-            og.sim.remove_callback_on_import_obj(name=callback_name)
-            og.sim.remove_callback_on_remove_obj(name=callback_name)
-            remove_callback_on_system_init(name=callback_name)
-            remove_callback_on_system_clear(name=callback_name)
+            # Clear task callbacks if sampled
+            if should_sample:
+                callback_name = f"{activity}_refresh"
+                og.sim.remove_callback_on_import_obj(name=callback_name)
+                og.sim.remove_callback_on_remove_obj(name=callback_name)
+                remove_callback_on_system_init(name=callback_name)
+                remove_callback_on_system_clear(name=callback_name)
 
-            # Remove all the additionally added objects
-            for obj in env.scene.objects[n_scene_objects:]:
-                og.sim.remove_object(obj)
+                # Remove all the additionally added objects
+                for obj in env.scene.objects[n_scene_objects:]:
+                    og.sim.remove_object(obj)
 
-            # Clear all systems
-            clear_all_systems()
-            clear_pu()
+                # Clear all systems
+                clear_all_systems()
+                clear_pu()
 
-            og.sim.step()
-            og.sim.play()
-            # This will clear out the previous attachment group in macro particle systems
-            og.sim.scene.load_state(scene_initial_state)
-            og.sim.stop()
+                og.sim.step()
+                og.sim.play()
+                # This will clear out the previous attachment group in macro particle systems
+                og.sim.scene.load_state(scene_initial_state)
+                og.sim.stop()
 
         except Exception as e:
+            og.log.error(traceback.format_exc())
             og.log.error(f"\n\nCaught exception sampling activity {activity} in scene {args.scene_model}:\n\n{e}\n\n")
 
             try:
