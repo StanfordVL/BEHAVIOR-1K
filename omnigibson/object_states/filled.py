@@ -8,7 +8,7 @@ from omnigibson.systems.system_base import PhysicalParticleSystem, is_physical_p
 m = create_module_macros(module_path=__file__)
 
 # Proportion of object's volume that must be filled for object to be considered filled
-m.VOLUME_FILL_PROPORTION = 0.3
+m.VOLUME_FILL_PROPORTION = 0.2
 
 
 class Filled(RelativeObjectState, BooleanState):
