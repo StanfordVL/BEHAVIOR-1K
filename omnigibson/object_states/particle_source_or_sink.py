@@ -196,7 +196,7 @@ class ParticleSink(ParticleRemover):
             projection_mesh_params = {
                 "type": "Cylinder",
                 "extents": [sink_radius * 2, sink_radius * 2, sink_height],
-            },
+            }
         else:
             projection_mesh_params = None
 
