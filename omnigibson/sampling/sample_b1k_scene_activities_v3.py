@@ -212,6 +212,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         # Attempt to sample
         try:
             if should_sample:
+                og.log.info(f"Sampling task: {activity}")
                 env._load_task()
                 assert og.sim.is_stopped()
 

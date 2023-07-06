@@ -19,7 +19,7 @@ class Filled(RelativeObjectState, BooleanState):
             "Can only get Filled state with a valid PhysicalParticleSystem!"
 
         # Check what volume is filled
-        if len(system.particle_instancers) > 0:
+        if system.n_particles > 0:
             particle_volume = 4 / 3 * np.pi * (system.particle_radius ** 3)
             n_particles = self.obj.states[ContainedParticles].get_value(system).n_in_volume
             prop_filled = particle_volume * n_particles / self.obj.states[ContainedParticles].volume
