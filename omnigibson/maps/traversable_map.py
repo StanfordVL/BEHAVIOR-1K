@@ -77,11 +77,13 @@ class TraversableMap(BaseMap):
         self.floor_map = []
         map_size = None
         for floor in range(len(self.floor_heights)):
-            if self.trav_map_with_objects:
-                # TODO: Shouldn't this be generated dynamically?
-                trav_map = np.array(Image.open(os.path.join(maps_path, "floor_trav_{}.png".format(floor))))
-            else:
-                trav_map = np.array(Image.open(os.path.join(maps_path, "floor_trav_no_obj_{}.png".format(floor))))
+            # if self.trav_map_with_objects:
+            #     # TODO: Shouldn't this be generated dynamically?
+            #     trav_map = np.array(Image.open(os.path.join(maps_path, "floor_trav_{}.png".format(floor))))
+            # else:
+            #     trav_map = np.array(Image.open(os.path.join(maps_path, "floor_trav_no_obj_{}.png".format(floor))))
+
+            trav_map = np.ones((1000, 1000), dtype=np.uint8) * 255
 
             # If we do not initialize the original size of the traversability map, we obtain it from the image
             # Then, we compute the final map size as the factor of scaling (default_resolution/resolution) times the
