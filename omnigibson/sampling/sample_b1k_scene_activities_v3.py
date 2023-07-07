@@ -82,10 +82,23 @@ def get_subjects(conds):
     contains_list = np.any([isinstance(ele, list) for ele in conds])
     if contains_list:
         for ele in conds:
-            subjs += get_predicates(ele)
+            subjs += get_subjects(ele)
     else:
         subjs.append(conds[1])
     return subjs
+
+def get_rooms(conds):
+    rooms = []
+    if isinstance(conds, str):
+        return rooms
+    assert isinstance(conds, list)
+    contains_list = np.any([isinstance(ele, list) for ele in conds])
+    if contains_list:
+        for ele in conds:
+            rooms += get_rooms(ele)
+    elif conds[0] == "inroom":
+        rooms.append(conds[2])
+    return rooms
 
 
 def get_valid_tasks():
@@ -212,6 +225,15 @@ def main(random_selection=False, headless=False, short_exec=False):
         # Attempt to sample
         try:
             if should_sample:
+                relevant_rooms = set(get_rooms(conditions.parsed_initial_conditions))
+                print(f"relevant rooms: {relevant_rooms}")
+                for obj in og.sim.scene.objects:
+                    if isinstance(obj, DatasetObject):
+                        obj_rooms = {"_".join(room.split("_")[:-1]) for room in obj.in_rooms}
+                        active = len(relevant_rooms.intersection(obj_rooms)) > 0
+                        obj.visual_only = not active
+                        obj.visible = active
+
                 og.log.info(f"Sampling task: {activity}")
                 env._load_task()
                 assert og.sim.is_stopped()

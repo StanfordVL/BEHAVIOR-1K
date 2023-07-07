@@ -370,9 +370,19 @@ def generate_particlesink_link(obj):
     return generate_metalink(obj=obj, metalink_prefix=macros.object_states.particle_source_or_sink.SINK_LINK_PREFIX)
 
 
+def generate_particleapplier_link(obj):
+    return generate_metalink(obj=obj, metalink_prefix=macros.object_states.particle_modifier.APPLICATION_LINK_PREFIX)
+
+
+def generate_particleremover_link(obj):
+    return generate_metalink(obj=obj, metalink_prefix=macros.object_states.particle_modifier.REMOVAL_LINK_PREFIX)
+
+
 ABILITY_TO_METALINK_FCN = {
     "particleSource": generate_particlesource_link,
     "particleSink": generate_particlesink_link,
+    "particleApplier": generate_particleapplier_link,
+    # "particleRemover": generate_particleremover_link,
     "toggleable": generate_toggle_button_link,
     "fillable": generate_fillable_volume,
 }
