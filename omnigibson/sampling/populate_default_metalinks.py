@@ -382,7 +382,7 @@ ABILITY_TO_METALINK_FCN = {
     "particleSource": generate_particlesource_link,
     "particleSink": generate_particlesink_link,
     "particleApplier": generate_particleapplier_link,
-    # "particleRemover": generate_particleremover_link,
+    "particleRemover": generate_particleremover_link,
     "toggleable": generate_toggle_button_link,
     "fillable": generate_fillable_volume,
 }
@@ -483,8 +483,6 @@ def populate_metalinks(start_at=None):
         print(f"{category} metalink abilities: {metalink_abilities}")
         if len(metalink_abilities) > 0:
             for model in get_all_object_category_models(category):
-                if model in INVALID_MODELS:
-                    continue
                 print(f"Creating metalinks for obj: {category}, {model}...")
                 obj = DatasetObject(
                     name="obj",
@@ -496,6 +494,8 @@ def populate_metalinks(start_at=None):
                 )
                 og.sim.import_object(obj)
                 for metalink_ability in metalink_abilities:
+                    if metalink_ability == "fillable" and model in INVALID_MODELS:
+                        continue
                     print(f"Creating metalink {metalink_ability}...")
                     ABILITY_TO_METALINK_FCN[metalink_ability](obj)
                 og.sim.stop()
