@@ -189,7 +189,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         success, scene_id, user, reason, misc = worksheet.get(f"B{row}:F{row}")[0]
         # If we've already sampled successfully (success is populated with a 1) and we don't want to overwrite the
         # existing sampling result, skip
-        if success != "" and int(success) != 0 and not args.overwrite_existing:
+        if success != "" and int(success) == 1 and not args.overwrite_existing:
             continue
 
         should_sample, success, reason = True, False, ""
@@ -258,11 +258,14 @@ def main(random_selection=False, headless=False, short_exec=False):
             else:
                 og.log.error(f"\n\nSampling failed: {activity}.\n\nFeedback: {reason}\n\n")
 
-            # Write to google sheets
-            cell_list = worksheet.range(f"B{row}:E{row}")
-            for cell, val in zip(cell_list, (int(success), args.scene_model, USER, "" if reason is None else reason)):
-                cell.value = val
-            worksheet.update_cells(cell_list)
+            # Get the current success value in case it's been updated
+            cell_success = worksheet.get(f"B{row}")[0][0]
+            if not (success != "" and int(success) == 1):
+                # Write to google sheets
+                cell_list = worksheet.range(f"B{row}:E{row}")
+                for cell, val in zip(cell_list, (int(success), args.scene_model, USER, "" if reason is None else reason)):
+                    cell.value = val
+                worksheet.update_cells(cell_list)
 
             # Clear task callbacks if sampled
             if should_sample:
