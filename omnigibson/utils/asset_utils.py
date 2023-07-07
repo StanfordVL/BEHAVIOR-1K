@@ -15,7 +15,8 @@ import progressbar
 import omnigibson as og
 from omnigibson.macros import gm
 from omnigibson.utils.ui_utils import create_module_logger
-from pxr import Usd
+if os.getenv("OMNIGIBSON_NO_OMNIVERSE", default=0) != "1":
+    from pxr import Usd
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
