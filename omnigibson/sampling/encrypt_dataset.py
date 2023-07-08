@@ -1,4 +1,5 @@
 from omnigibson.utils.asset_utils import get_all_object_models, encrypt_file
+import os
 
 for model_path in get_all_object_models():
     model_name = os.path.basename(model_path)
