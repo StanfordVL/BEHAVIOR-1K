@@ -260,7 +260,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
             # Get the current success value in case it's been updated
             cell_success = worksheet.get(f"B{row}")[0][0]
-            if not (success != "" and int(success) == 1):
+            if not (cell_success != "" and int(cell_success) == 1):
                 # Write to google sheets
                 cell_list = worksheet.range(f"B{row}:E{row}")
                 for cell, val in zip(cell_list, (int(success), args.scene_model, USER, "" if reason is None else reason)):
