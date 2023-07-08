@@ -259,7 +259,7 @@ def main(random_selection=False, headless=False, short_exec=False):
                 og.log.error(f"\n\nSampling failed: {activity}.\n\nFeedback: {reason}\n\n")
 
             # Get the current success value in case it's been updated
-            cell_success = worksheet.get(f"B{row}")[0][0]
+            cell_success, _, _, _, _ = worksheet.get(f"B{row}:F{row}")[0]
             if not (cell_success != "" and int(cell_success) == 1):
                 # Write to google sheets
                 cell_list = worksheet.range(f"B{row}:E{row}")
