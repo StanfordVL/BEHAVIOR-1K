@@ -357,7 +357,6 @@ def generate_metalink(obj, metalink_prefix):
         encrypt_file(usd_path, encrypted_usd_path)
         os.remove(usd_path)
 
-
 def generate_toggle_button_link(obj):
     return generate_metalink(obj=obj, metalink_prefix=macros.object_states.toggle.TOGGLE_LINK_PREFIX)
 
@@ -495,6 +494,9 @@ def populate_metalinks(start_at=None):
                 og.sim.import_object(obj)
                 for metalink_ability in metalink_abilities:
                     if metalink_ability == "fillable" and model in INVALID_MODELS:
+                        continue
+                    if metalink_ability == "particleRemover" and category != "vacuum":
+                        # Only vacuum is particleRemover with projection method
                         continue
                     print(f"Creating metalink {metalink_ability}...")
                     ABILITY_TO_METALINK_FCN[metalink_ability](obj)
