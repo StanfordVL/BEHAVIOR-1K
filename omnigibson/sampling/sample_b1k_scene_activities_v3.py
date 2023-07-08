@@ -155,6 +155,10 @@ def main(random_selection=False, headless=False, short_exec=False):
     }
 
     valid_tasks = get_valid_tasks()
+    invalid_tasks = [
+        "putting_clothes_in_storage",  # loading several cloths into sim takes too long / process gets killed
+        "sorting_laundry",  # loading several cloths into sim takes too long / process gets killed
+    ]
     mapping = parse_task_mapping(fpath=SCENE_MAPPING_FPATH)
     activities = get_scene_compatible_activities(scene_model=args.scene_model, mapping=mapping)
 
@@ -182,6 +186,12 @@ def main(random_selection=False, headless=False, short_exec=False):
 
         # Don't sample any invalid activities
         if activity not in valid_tasks:
+            continue
+
+        if activity in invalid_tasks:
+            continue
+
+        if activity not in ACTIVITY_TO_ROW:
             continue
 
         # Get info from spreadsheet
