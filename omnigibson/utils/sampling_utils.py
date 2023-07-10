@@ -725,6 +725,8 @@ def sample_cuboid_on_object(
     if np.any(cuboid_dimensions > 50.0):
         print("WARNING: Trying to sample for a very large cuboid (at least one dimensions > 50)."
               "This will take a prohibitively large amount of time!")
+        return [(None, None, None, None, defaultdict(list)) for _ in range(num_samples)]
+
     assert cuboid_dimensions.ndim <= 2
     assert cuboid_dimensions.shape[-1] == 3, "Cuboid dimensions need to contain all three dimensions."
     if cuboid_dimensions.ndim == 2:
