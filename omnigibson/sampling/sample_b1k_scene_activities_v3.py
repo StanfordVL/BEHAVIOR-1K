@@ -158,6 +158,12 @@ def main(random_selection=False, headless=False, short_exec=False):
     invalid_tasks = [
         "putting_clothes_in_storage",  # loading several cloths into sim takes too long / process gets killed
         "sorting_laundry",  # loading several cloths into sim takes too long / process gets killed
+        "preparing_clothes_for_the_next_day",  # loading several cloths into sim takes too long / process gets killed
+        "donating_clothing",  # loading several cloths into sim takes too long / process gets killed
+        "disinfect_laundry",  # loading several cloths into sim takes too long / process gets killed
+        "adding_chemicals_to_hot_tub",
+        "hanging_clothes_on_clothesline",
+        "clean_cement",  # object too large to sample?
     ]
     mapping = parse_task_mapping(fpath=SCENE_MAPPING_FPATH)
     activities = get_scene_compatible_activities(scene_model=args.scene_model, mapping=mapping)
