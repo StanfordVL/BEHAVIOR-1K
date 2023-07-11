@@ -2,6 +2,7 @@ import logging
 import os
 import yaml
 import copy
+import time
 import argparse
 import bddl
 import pkgutil
@@ -179,6 +180,9 @@ def main(random_selection=False, headless=False, short_exec=False):
                 should_start = True
             else:
                 continue
+
+        # sleep to avoid gspread query limits
+        time.sleep(1)
 
         # Don't sample any invalid activities
         if activity not in valid_tasks:
