@@ -155,16 +155,6 @@ def main(random_selection=False, headless=False, short_exec=False):
     }
 
     valid_tasks = get_valid_tasks()
-    invalid_tasks = [
-        "putting_clothes_in_storage",  # loading several cloths into sim takes too long / process gets killed
-        "sorting_laundry",  # loading several cloths into sim takes too long / process gets killed
-        "preparing_clothes_for_the_next_day",  # loading several cloths into sim takes too long / process gets killed
-        "donating_clothing",  # loading several cloths into sim takes too long / process gets killed
-        "disinfect_laundry",  # loading several cloths into sim takes too long / process gets killed
-        "adding_chemicals_to_hot_tub",
-        "hanging_clothes_on_clothesline",
-        "clean_cement",  # object too large to sample?
-    ]
     mapping = parse_task_mapping(fpath=SCENE_MAPPING_FPATH)
     activities = get_scene_compatible_activities(scene_model=args.scene_model, mapping=mapping)
 
@@ -194,15 +184,21 @@ def main(random_selection=False, headless=False, short_exec=False):
         if activity not in valid_tasks:
             continue
 
-        if activity in invalid_tasks:
-            continue
-
         if activity not in ACTIVITY_TO_ROW:
             continue
 
         # Get info from spreadsheet
         row = ACTIVITY_TO_ROW[activity]
         success, scene_id, user, reason, misc = worksheet.get(f"B{row}:F{row}")[0]
+
+        # If we manually do not want to sample the task (DO NOT SAMPLE == "DNS", skip)
+        if success.lower() == "dns":
+            continue
+
+        # Only sample stuff which is fixed
+        if "fixed" not in misc.lower():
+            continue
+
         # If we've already sampled successfully (success is populated with a 1) and we don't want to overwrite the
         # existing sampling result, skip
         if success != "" and int(success) == 1 and not args.overwrite_existing:
