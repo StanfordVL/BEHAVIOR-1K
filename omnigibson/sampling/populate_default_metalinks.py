@@ -403,6 +403,7 @@ SIDEWAYS_MODELS = {
     "gwhcty",
     "aqdbdu",
     "pobfpe",
+    "szzjzd",
 }
 
 UPSIDE_DOWN_MODELS = {
@@ -430,6 +431,11 @@ UPSIDE_DOWN_MODELS = {
 UNFILLABLE_MODELS = {
     "waousd",
     "vbiqcq",
+    "dhqrwr",
+    "nsxhvs",
+    "oshwps",
+    "vnvmkx",
+    "mvrhya",
 }
 
 SHALLOW_MODELS = {
