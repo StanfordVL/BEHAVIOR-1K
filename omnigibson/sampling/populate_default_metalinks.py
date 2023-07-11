@@ -377,6 +377,10 @@ def generate_particleremover_link(obj):
     return generate_metalink(obj=obj, metalink_prefix=macros.object_states.particle_modifier.REMOVAL_LINK_PREFIX)
 
 
+def generate_heat_source_or_sink_link(obj):
+    return generate_metalink(obj=obj, metalink_prefix=macros.object_states.heat_source_or_sink.HEATSOURCE_LINK_PREFIX)
+
+
 ABILITY_TO_METALINK_FCN = {
     "particleSource": generate_particlesource_link,
     "particleSink": generate_particlesink_link,
@@ -384,6 +388,8 @@ ABILITY_TO_METALINK_FCN = {
     "particleRemover": generate_particleremover_link,
     "toggleable": generate_toggle_button_link,
     "fillable": generate_fillable_volume,
+    "heatSource": generate_heat_source_or_sink_link,
+    "coldSource": generate_heat_source_or_sink_link,
 }
 
 ot = ObjectTaxonomy()
@@ -501,8 +507,9 @@ def populate_metalinks(start_at=None):
                 for metalink_ability in metalink_abilities:
                     if metalink_ability == "fillable" and model in INVALID_MODELS:
                         continue
-                    if metalink_ability == "particleRemover" and category != "vacuum":
-                        # Only vacuum is particleRemover with projection method
+                    if metalink_ability == "particleRemover" and abilities[metalink_ability]["method"] != "projection":
+                        continue
+                    if metalink_ability in ["coldSource", "heatSource"] and abilities[metalink_ability]["requires_inside"]:
                         continue
                     print(f"Creating metalink {metalink_ability}...")
                     ABILITY_TO_METALINK_FCN[metalink_ability](obj)
