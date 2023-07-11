@@ -19,7 +19,7 @@ m.VISUAL_PARTICLE_THRESHOLD = 5
 m.MAX_VISUAL_PARTICLES = 20
 
 # Number of physical particles needed in order for Covered --> True
-m.PHYSICAL_PARTICLE_THRESHOLD = 20
+m.PHYSICAL_PARTICLE_THRESHOLD = 5
 
 # Maximum number of physical particles to sample when setting an object to be covered = True
 m.MAX_PHYSICAL_PARTICLES = 5000
