@@ -13,13 +13,13 @@ import numpy as np
 m = create_module_macros(module_path=__file__)
 
 # Number of visual particles needed in order for Covered --> True
-m.VISUAL_PARTICLE_THRESHOLD = 5
+m.VISUAL_PARTICLE_THRESHOLD = 1
 
 # Maximum number of visual particles to sample when setting an object to be covered = True
 m.MAX_VISUAL_PARTICLES = 20
 
 # Number of physical particles needed in order for Covered --> True
-m.PHYSICAL_PARTICLE_THRESHOLD = 5
+m.PHYSICAL_PARTICLE_THRESHOLD = 1
 
 # Maximum number of physical particles to sample when setting an object to be covered = True
 m.MAX_PHYSICAL_PARTICLES = 5000
