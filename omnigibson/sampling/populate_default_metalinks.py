@@ -8,6 +8,7 @@ from pxr import Vt, UsdGeom, Gf, UsdPhysics, PhysxSchema, Sdf, Usd
 from omnigibson.utils.sampling_utils import raytest_batch, raytest #, sample_raytest_start_end_full_grid_topdown
 from omnigibson.utils.asset_utils import decrypt_file, encrypt_file, get_all_object_category_models, get_all_object_categories
 import omnigibson.utils.transform_utils as T
+from omnigibson.utils.constants import ParticleModifyMethod
 import trimesh
 from omni.kit.primitive.mesh.evaluators.cube import CubeEvaluator
 # from omni.isaac.core.utils.prims import get_prim_at_path, is_prim_path_valid
@@ -507,9 +508,9 @@ def populate_metalinks(start_at=None):
                 for metalink_ability in metalink_abilities:
                     if metalink_ability == "fillable" and model in INVALID_MODELS:
                         continue
-                    if metalink_ability == "particleRemover" and abilities[metalink_ability]["method"] != "projection":
+                    if metalink_ability == "particleRemover" and abilities[metalink_ability]["method"] != ParticleModifyMethod.PROJECTION:
                         continue
-                    if metalink_ability in ["coldSource", "heatSource"] and abilities[metalink_ability]["requires_inside"]:
+                    if metalink_ability in {"coldSource", "heatSource"} and abilities[metalink_ability]["requires_inside"]:
                         continue
                     print(f"Creating metalink {metalink_ability}...")
                     ABILITY_TO_METALINK_FCN[metalink_ability](obj)
