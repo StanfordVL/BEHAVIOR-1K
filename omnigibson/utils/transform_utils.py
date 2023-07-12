@@ -1097,3 +1097,14 @@ def check_quat_right_angle(quat, atol=1e-2):
         bool: Whether the quaternion is a right angle or not
     """
     return np.any(np.isclose(np.abs(quat).sum(), np.array([1.0, 1.414, 2.0]), atol=atol))
+
+
+def z_angle_from_quat(quat):
+    """Get the angle around the Z axis produced by the quaternion."""
+    rotated_X_axis = R.from_quat(quat).apply([1, 0, 0])
+    return np.arctan2(rotated_X_axis[1], rotated_X_axis[0])
+
+
+def z_rotation_from_quat(quat):
+    """Get the quaternion for the rotation around the Z axis produced by the quaternion."""
+    return R.from_euler("z", z_angle_from_quat(quat)).as_quat()
