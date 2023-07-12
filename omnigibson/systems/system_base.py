@@ -20,10 +20,10 @@ m = create_module_macros(module_path=__file__)
 
 # Parameters used if scaling particles relative to its parent object's scale
 m.BBOX_LOWER_LIMIT_FRACTION_OF_AABB = 0.06
-m.BBOX_LOWER_LIMIT_MIN = 0.01
+m.BBOX_LOWER_LIMIT_MIN = 0.002
 m.BBOX_LOWER_LIMIT_MAX = 0.02
 m.BBOX_UPPER_LIMIT_FRACTION_OF_AABB = 0.1
-m.BBOX_UPPER_LIMIT_MIN = 0.02
+m.BBOX_UPPER_LIMIT_MIN = 0.01
 m.BBOX_UPPER_LIMIT_MAX = 0.1
 
 
@@ -1157,7 +1157,7 @@ def _create_system_from_metadata(system_name):
 
         if system_type == "macro_visual_particle":
             system_kwargs["create_particle_template"] = generate_particle_template_fcn()
-            system_kwargs["relative_particle_scaling"] = metadata["relative_particle_scaling"]
+            system_kwargs["scale_relative_to_parent"] = metadata["relative_particle_scaling"]
         elif system_type == "micro_physical_particle" or system_type == "macro_physical_particle":
             system_kwargs["create_particle_template"] = generate_particle_template_fcn()
             system_kwargs["particle_density"] = metadata["particle_density"]
