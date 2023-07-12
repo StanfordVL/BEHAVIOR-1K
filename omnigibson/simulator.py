@@ -436,8 +436,8 @@ class Simulator(SimulationContext, Serializable):
                 # Re-initialize the physics view because the number of objects has changed
                 RigidContactAPI.initialize_view()
 
-                # Also refresh the transition rules that are currently active
-                TransitionRuleAPI.refresh_all_rules()
+                # # Also refresh the transition rules that are currently active
+                # TransitionRuleAPI.refresh_all_rules()
 
             # # Propagate states if the feature is enabled
             # if gm.ENABLE_OBJECT_STATES:
