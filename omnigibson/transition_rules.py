@@ -10,6 +10,7 @@ from omnigibson.systems import get_system, is_system_active, PhysicalParticleSys
 from omnigibson.objects.dataset_object import DatasetObject
 from omnigibson.object_states import *
 from omnigibson.utils.asset_utils import get_all_object_category_models
+from omnigibson.utils.constants import PrimType
 from omnigibson.utils.python_utils import Registerable, classproperty, subclass_factory
 from omnigibson.utils.registry_utils import Registry
 import omnigibson.utils.transform_utils as T
@@ -344,7 +345,7 @@ class TouchingAnyCondition(RuleCondition):
     def refresh(self, object_candidates):
         # Check whether we can use optimized computation or not -- this is determined by whether or not any objects
         # in our collision set are kinematic only
-        self._optimized = not np.any([obj.kinematic_only
+        self._optimized = not np.any([obj.kinematic_only or obj.prim_type == PrimType.CLOTH
                                   for f in (self._filter_1_name, self._filter_2_name) for obj in object_candidates[f]])
 
         if self._optimized:
@@ -1267,7 +1268,6 @@ class RecipeRule(BaseTransitionRule):
         out_system.generate_particles_from_link(
             obj=container,
             link=contained_particles_state.link,
-            mesh_name_prefixes="container",
             check_contact=cls.ignore_nonrecipe_objects,
             max_samples=volume // (np.pi * (out_system.particle_radius ** 3) * 4 / 3),
         )

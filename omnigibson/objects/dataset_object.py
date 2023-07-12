@@ -97,12 +97,13 @@ class DatasetObject(USDObject):
                 -- not both!
             fit_avg_dim_volume (bool): whether to fit the object to have the same volume as the average dimension
                 while keeping the aspect ratio. Note that if this is set, it will override both @scale and @bounding_box
-            in_rooms (None or list): If specified, sets the rooms that this object should belong to
+            in_rooms (None or str or list): If specified, sets the room(s) that this object should belong to. Either
+                a list of room type(s) or a single comma-delimited string of room type(s)
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
                 for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
         """
         # Store variables
-        self._in_rooms = in_rooms
+        self._in_rooms = in_rooms.split(",") if isinstance(in_rooms, str) else in_rooms
 
         # Make sure only one of bounding_box and scale are specified
         if bounding_box is not None and scale is not None:
@@ -456,7 +457,7 @@ class DatasetObject(USDObject):
 
         return scales
 
-    def get_base_aligned_bbox(self, link_name=None, visual=False, xy_aligned=False, fallback_to_aabb=False, link_bbox_type="axis_aligned"):
+    def get_base_aligned_bbox(self, link_name=None, visual=True, xy_aligned=False, fallback_to_aabb=False, link_bbox_type="axis_aligned"):
         """
         Get a bounding box for this object that's axis-aligned in the object's base frame.
 
@@ -545,6 +546,9 @@ class DatasetObject(USDObject):
 
                 # Add the points to our collection of points.
                 points.extend(trimesh.transformations.transform_points(vertices_in_base_frame, bbox_center_in_base_frame))
+            elif bbox_type == "visual":
+                # Just skip for now
+                continue
             elif fallback_to_aabb:
                 # If no BB annotation is available, get the AABB for this link.
                 aabb_center, aabb_extent = BoundingBoxAPI.compute_center_extent(prim=link)

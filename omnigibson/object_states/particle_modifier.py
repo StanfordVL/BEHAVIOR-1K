@@ -273,6 +273,11 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
             # Create a primitive shape if it doesn't already exist
             pre_existing_mesh = get_prim_at_path(mesh_prim_path)
             if not pre_existing_mesh:
+                if self._projection_mesh_params is None:
+                    self._projection_mesh_params = {
+                        "type": "Cone",
+                        "extents": np.ones(3) * 0.25,
+                    }
                 # Projection mesh params must be specified in order to determine scalings
                 assert self._projection_mesh_params is not None, \
                     f"Must specify projection_mesh_params for {self.__class__.__name__} " \
@@ -656,6 +661,9 @@ class ParticleRemover(ParticleModifier):
         # Create set of default system to condition mappings based on settings
         all_conditions = dict()
         for system_name in REGISTERED_SYSTEMS.keys():
+            # Ignore cloth
+            if system_name == "cloth":
+                continue
             default_system_conditions = self._default_physical_conditions if is_physical_particle_system(system_name) \
                 else self._default_visual_conditions
             if default_system_conditions is not None:

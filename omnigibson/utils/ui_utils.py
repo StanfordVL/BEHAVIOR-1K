@@ -266,6 +266,12 @@ class CameraMover:
         self._keyboard = self._appwindow.get_keyboard()
         self._sub_keyboard = self._input.subscribe_to_keyboard_events(self._keyboard, self._sub_keyboard_event)
 
+    def clear(self):
+        """
+        Clears this camera mover. After this is called, the camera mover cannot be used.
+        """
+        self._input.unsubscribe_to_keyboard_events(self._keyboard, self._sub_keyboard)
+
     def set_save_dir(self, save_dir):
         """
         Sets the absolute path corresponding to the image directory where recorded images from this CameraMover

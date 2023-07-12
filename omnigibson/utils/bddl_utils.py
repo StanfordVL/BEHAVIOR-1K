@@ -771,6 +771,12 @@ class BDDLSampler:
                     self._sampled_objects.add(simulator_obj)
                     self._object_scope[obj_inst] = BDDLEntity(bddl_inst=obj_inst, entity=simulator_obj)
 
+        # og.sim.stop()
+        # og.sim.step()
+        og.sim.play()
+        og.sim.stop()
+        # og.sim.scene.reset()
+
     def _sample_initial_conditions(self):
         """
         Sample initial conditions

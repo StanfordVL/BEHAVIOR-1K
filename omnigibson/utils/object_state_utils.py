@@ -154,6 +154,7 @@ def sample_kinematics(
         sampled_quaternion = sampling_results[0][2]
 
         sampling_success = sampled_vector is not None
+
         if sampling_success:
             # Move the object from the original parallel bbox to the sampled bbox
             parallel_bbox_rotation = R.from_quat(parallel_bbox_orn)
@@ -171,6 +172,18 @@ def sample_kinematics(
             diff = old_pos - parallel_bbox_center
             rotated_diff = additional_rotation.apply(diff)
             pos = sampled_vector + rotated_diff
+
+        elif predicate == "onTop":
+            # Place objA at center of objB's AABB, offset in z direction such that their AABBs are "stacked"
+            aabb_lower_a, aabb_upper_a = objA.states[AABB].get_value()
+            aabb_lower_b, aabb_upper_b = objB.states[AABB].get_value()
+            bbox_to_obj = objA.get_position() - (aabb_lower_a + aabb_upper_a) / 2.0
+            desired_bbox_pos = (aabb_lower_b + aabb_upper_b) / 2.0
+            desired_bbox_pos[2] = aabb_upper_b[2] + (aabb_upper_a[2] - aabb_lower_a[2]) / 2.0
+            pos = desired_bbox_pos + bbox_to_obj
+
+        # if "chicken" in objA.name:
+        #     from IPython import embed; embed()
 
         if pos is None:
             success = False
@@ -202,6 +215,10 @@ def sample_kinematics(
                 break
 
         objA.keep_still()
+        objB.keep_still()
+
+        # Take extra step for depenetration, then break
+        og.sim.step_physics()
 
         # Render at the end
         og.sim.render()
