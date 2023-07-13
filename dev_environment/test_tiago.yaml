@@ -1,0 +1,62 @@
+env:
+  initial_pos_z_offset: 0.1
+
+render:
+  viewer_width: 1280
+  viewer_height: 720
+
+scene:
+  type: InteractiveTraversableScene
+  scene_model: Rs_int
+  trav_map_resolution: 0.1
+  trav_map_erosion: 2
+  trav_map_with_objects: true
+  build_graph: true
+  num_waypoints: 1
+  waypoint_resolution: 0.2
+  load_object_categories: null
+  not_load_object_categories: null
+  load_room_types: null
+  load_room_instances: null
+  seg_map_resolution: 0.1
+  scene_source: OG
+  include_robots: true
+
+robots:
+  - type: Tiago
+    obs_modalities: [scan, rgb, depth]
+    scale: 1.0
+    self_collisions: true
+    action_normalize: false
+    action_type: continuous
+    grasping_mode: sticky
+    rigid_trunk: false
+    default_arm_pose: diagonal30
+    controller_config:
+      base:
+        name: JointController
+        motor_type: velocity
+      arm_left:
+        name: JointController
+        motor_type: position
+        command_input_limits: null
+        command_output_limits: null
+        use_delta_commands: false
+      arm_right:
+        name: JointController
+        motor_type: position
+        command_input_limits: null
+        command_output_limits: null
+        use_delta_commands: false
+      gripper_left:
+        name: MultiFingerGripperController
+        mode: binary
+      gripper_right:
+        name: MultiFingerGripperController
+        mode: binary
+      camera:
+        name: JointController
+        motor_type: velocity
+        use_delta_commands: false
+
+objects: []

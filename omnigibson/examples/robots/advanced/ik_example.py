@@ -164,6 +164,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         # Loop until the user requests an exit
         while not exit_now:
             og.sim.step()
+            print("running")
 
     # Always shut the simulation down cleanly at the end
     og.app.close()

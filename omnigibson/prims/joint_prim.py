@@ -848,7 +848,6 @@ class JointPrim(BasePrim):
         # Sanity checks -- make sure that we're articulated (no control type check like position and velocity
         # because we can't set effort targets) and that we're driven
         self.assert_articulated()
-        assert self._driven, "Cannot set efforts for joint that is not driven!"
 
         # Standardize input
         effort = np.array([effort]) if self._n_dof == 1 and not isinstance(effort, Iterable) else np.array(effort)
@@ -866,6 +865,9 @@ class JointPrim(BasePrim):
         Zero out all velocities for this prim
         """
         self.set_vel(np.zeros(self.n_dof))
+        # If not driven, set torque equal to zero as well
+        if not self.driven:
+            self.set_effort(np.zeros(self.n_dof))
 
     def _dump_state(self):
         pos, vel, effort = self.get_state() if self.articulated else (np.array([]), np.array([]), np.array([]))
@@ -882,7 +884,7 @@ class JointPrim(BasePrim):
         if self.articulated:
             self.set_pos(state["pos"], drive=False)
             self.set_vel(state["vel"], drive=False)
-            if self._driven:
+            if self.driven:
                 self.set_effort(state["effort"])
             if self._control_type == ControlType.POSITION:
                 self.set_pos(state["target_pos"], drive=True)

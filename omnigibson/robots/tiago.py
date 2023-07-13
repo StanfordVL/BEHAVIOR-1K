@@ -511,7 +511,28 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
     @property
     def disabled_collision_pairs(self):
-        return []
+        return [
+            ['wheel_rear_left_link', 'base_link'], 
+            ['wheel_rear_right_link', 'base_link'], 
+            ['wheel_front_right_link', 'base_link'], 
+            ['wheel_front_left_link', 'base_link'], 
+            ['torso_lift_link', 'torso_fixed_column_link'], 
+            ['torso_fixed_link', 'torso_fixed_column_link'], 
+            ['arm_left_tool_link', 'arm_left_6_link'], 
+            ['wrist_left_ft_link', 'arm_left_6_link'], 
+            ['wrist_left_ft_tool_link', 'arm_left_6_link'], 
+            ['gripper_left_link', 'arm_left_6_link'], 
+            ['gripper_left_link', 'wrist_left_ft_link'], 
+            ['arm_right_tool_link', 'arm_right_6_link'], 
+            ['wrist_right_ft_link', 'arm_right_6_link'], 
+            ['wrist_right_ft_tool_link', 'arm_right_6_link'], 
+            ['gripper_right_link', 'arm_right_6_link'], 
+            ['gripper_right_link', 'wrist_right_ft_link'], 
+            ['gripper_right_right_finger_link', 'gripper_right_left_finger_link'],
+            ['arm_left_5_link', 'arm_left_tool_link'],
+            ['arm_left_5_link', 'wrist_left_ft_link']
+        ]
+
 
     @property
     def arm_link_names(self):
