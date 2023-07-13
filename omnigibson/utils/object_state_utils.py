@@ -44,7 +44,7 @@ def sample_kinematics(
     predicate,
     objA,
     objB,
-    max_trials=10,
+    max_trials=40,
     z_offset=0.05,
     skip_falling=False,
 ):
@@ -226,7 +226,7 @@ def sample_kinematics(
     return success
 
 
-def sample_cloth_on_rigid(obj, other, max_trials=10, z_offset=0.05, randomize_xy=True):
+def sample_cloth_on_rigid(obj, other, max_trials=40, z_offset=0.05, randomize_xy=True):
     """
     Samples the cloth object @obj on the rigid object @other
 
