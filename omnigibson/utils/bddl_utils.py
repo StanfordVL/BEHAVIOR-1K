@@ -257,14 +257,6 @@ class BDDLEntity(Wrapper):
             f"Cannot call set_state() for BDDLEntity {self.synset} when the entity does not exist!"
         return self.wrapped_obj.states[state].set_value(*args, **kwargs)
 
-    def __getattr__(self, attr):
-        # Sanity check to make sure wrapped obj is not None -- if so, raise error
-        assert self.wrapped_obj is not None, f"Cannot access attribute {attr}, since no valid entity currently " \
-                                             f"wrapped for BDDLEntity synset {self.synset}!"
-
-        # Call super
-        return super().__getattr__(attr=attr)
-
 
 class BDDLSampler:
     def __init__(
