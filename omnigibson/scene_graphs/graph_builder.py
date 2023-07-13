@@ -58,14 +58,22 @@ def get_all_binary_states(objs, only_true=False):
                 continue
 
             for state_type, state_inst in obj1.states.items():
+                print("Checking pair", state_type, obj1.name, obj2.name)
                 if not issubclass(state_type, BooleanState) or not issubclass(state_type, RelativeObjectState):
                     continue
 
-                value = state_inst.get_value(obj2)
-                if only_true and not value:
+                if state_type in (object_states.NextTo, object_states.Touching):
                     continue
 
-                states.append((obj1, obj2, get_state_name(state_type), {"value": value}))
+                try:
+                    value = state_inst.get_value(obj2)
+                    if only_true and not value:
+                        continue
+
+                    states.append((obj1, obj2, get_state_name(state_type), {"value": value}))
+                except:
+                    # TODO: Maybe the states actually need to be robust to bad arguments.
+                    pass
 
     return states
 

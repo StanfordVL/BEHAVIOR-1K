@@ -60,3 +60,9 @@ task:
     max_steps: 50000
   reward_config:
     r_potential: 1.0
+
+scene_graph:
+  egocentric: true
+  full_obs: true
+  only_true: true
+  merge_parallel_edges: false
