@@ -19,11 +19,10 @@ class OnTop(KinematicsMixin, RelativeObjectState, BooleanState):
 
         state = og.sim.dump_state(serialized=False)
 
-        for _ in range(10):
-            if sample_kinematics("onTop", self.obj, other) and self.get_value(other):
-                return True
-            else:
-                og.sim.load_state(state, serialized=False)
+        if sample_kinematics("onTop", self.obj, other) and self.get_value(other):
+            return True
+        else:
+            og.sim.load_state(state, serialized=False)
 
         return False
 

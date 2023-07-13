@@ -34,11 +34,10 @@ class Overlaid(KinematicsMixin, RelativeObjectState, BooleanState):
             raise NotImplementedError("Overlaid does not support set_value(False)")
         state = og.sim.dump_state(serialized=False)
 
-        for _ in range(10):
-            if sample_cloth_on_rigid(self.obj, other, randomize_xy=False) and self.get_value(other):
-                return True
-            else:
-                og.sim.load_state(state, serialized=False)
+        if sample_cloth_on_rigid(self.obj, other, randomize_xy=False) and self.get_value(other):
+            return True
+        else:
+            og.sim.load_state(state, serialized=False)
 
         return False
 
