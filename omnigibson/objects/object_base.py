@@ -253,6 +253,20 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         raise NotImplementedError("Cannot set volume directly for an object!")
 
     @property
+    def scale(self):
+        # Just super call
+        return super().scale
+
+    @scale.setter
+    def scale(self, scale):
+        # call super first
+        # A bit esoteric -- see https://gist.github.com/Susensio/979259559e2bebcd0273f1a95d7c1e79
+        super(BaseObject, type(self)).scale.fset(self, scale)
+
+        # Update init info for scale
+        self._init_info["args"]["scale"] = scale
+
+    @property
     def link_prim_paths(self):
         return [link.prim_path for link in self._links.values()]
 
