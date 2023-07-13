@@ -5,6 +5,7 @@ from bddl.activity import (
     evaluate_goal_conditions,
     get_goal_conditions,
     get_ground_goal_state_options,
+    get_natural_initial_conditions,
     get_initial_conditions,
     get_natural_goal_conditions,
     get_object_scope,
@@ -252,6 +253,7 @@ class BehaviorTask(BaseTask):
         np.random.shuffle(self.instruction_order)
         self.currently_viewed_index = 0
         self.currently_viewed_instruction = self.instruction_order[self.currently_viewed_index]
+        self.activity_natural_language_initial_conditions = get_natural_initial_conditions(self.activity_conditions)
         self.activity_natural_language_goal_conditions = get_natural_goal_conditions(self.activity_conditions)
 
     def get_potential(self, env):

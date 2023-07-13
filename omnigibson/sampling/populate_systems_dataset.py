@@ -12,7 +12,7 @@ from nltk.corpus import wordnet as wn
 
 
 SUBSTANCE_CSV_FPATH = f"{os.path.dirname(bddl.__file__)}/generated_data/substance_hyperparams.csv"
-DATASET_PATH = "/scr/chengshu/iGibson3/omnigibson/data/og_dataset"
+DATASET_PATH = r"D:\iGibson3\omnigibson\data\og_dataset"
 
 object_taxonomy = ObjectTaxonomy()
 

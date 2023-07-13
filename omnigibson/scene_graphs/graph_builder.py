@@ -1,41 +1,36 @@
 import itertools
 import os
 
-import cv2
 import networkx as nx
 import numpy as np
-import pybullet as p
+from PIL import Image
 from matplotlib import pyplot as plt
 
-from igibson import object_states
-from igibson.activity.activity_base import iGBEHAVIORActivityInstance
-from igibson.external.pybullet_tools.utils import aabb_union, get_aabb, get_aabb_center, get_aabb_extent
-from igibson.object_states.factory import get_state_name
-from igibson.object_states.object_state_base import AbsoluteObjectState, BooleanState, RelativeObjectState
-from igibson.utils.utils import z_rotation_from_quat
+from omnigibson import object_states
+from omnigibson.sensors import VisionSensor
+from omnigibson.object_states.factory import get_state_name
+from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanState, RelativeObjectState
+from omnigibson.utils import transform_utils as T
 
 DRAW_EVERY = 1
 
 
-def get_robot(activity: iGBEHAVIORActivityInstance):
-    assert len(activity.simulator.robots) == 1, "Exactly one robot should be available."
-    return activity.simulator.robots[0]
+def get_robot(scene):
+    assert len(scene.robots) == 1, "Exactly one robot should be available."
+    return scene.robots[0]
 
 
 def get_robot_bbox(robot):
-    # The robot doesn't have a nicely annotated bounding box so we just append one for now.
-    aabb = aabb_union([get_aabb(part.get_body_id()) for part in robot.parts.values()])
-    center = get_aabb_center(aabb)
-    extent = get_aabb_extent(aabb)
-    return (center, [0, 0, 0, 1]), extent
+    # The robot doesn't have a nicely annotated bounding box so we just return AABB for now.
+    return T.pose2mat((robot.aabb_center, [0, 0, 0, 1])), robot.aabb_extent
 
 
 def get_robot_to_world_transform(robot):
-    # TODO: Maybe keep the graph in the base reference frame and only switch to eye for visualization.
-    robot_to_world = robot.parts["body"].get_position_orientation()
+    # TODO: Maybe do this in eye frame
+    robot_to_world = robot.get_position_orientation()
 
     # Get rid of any rotation outside xy plane
-    robot_to_world = robot_to_world[0], z_rotation_from_quat(robot_to_world[1])
+    robot_to_world = T.pose2mat((robot_to_world[0], T.z_rotation_from_quat(robot_to_world[1])))
 
     return robot_to_world
 
@@ -92,68 +87,65 @@ class SceneGraphBuilder(object):
         self.merge_parallel_edges = merge_parallel_edges
         self.last_desired_frame_to_world = None
 
+    def get_scene_graph(self):
+        return self.G.copy()
+
     def _get_desired_frame(self, robot):
-        desired_frame_to_world = ([0, 0, 0], [0, 0, 0, 1])
-        world_to_desired_frame = ([0, 0, 0], [0, 0, 0, 1])
+        desired_frame_to_world = np.eye(4)
+        world_to_desired_frame = np.eye(4)
         if self.egocentric:
             desired_frame_to_world = get_robot_to_world_transform(robot)
-            world_to_desired_frame = p.invertTransform(*desired_frame_to_world)
+            world_to_desired_frame = T.pose_inv(desired_frame_to_world)
 
         return desired_frame_to_world, world_to_desired_frame
 
-    def start(self, activity, log_reader):
+    def start(self, scene):
         assert self.G is None, "Cannot start graph builder multiple times."
 
-        robot = get_robot(activity)
+        robot = get_robot(scene)
         self.G = nx.DiGraph() if self.merge_parallel_edges else nx.MultiDiGraph()
 
         desired_frame_to_world, world_to_desired_frame = self._get_desired_frame(robot)
-        robot_pose = p.multiplyTransforms(*world_to_desired_frame, *get_robot_to_world_transform(robot))
+        robot_pose = world_to_desired_frame @ get_robot_to_world_transform(robot)
         robot_bbox_pose, robot_bbox_extent = get_robot_bbox(robot)
-        robot_bbox_pose = p.multiplyTransforms(*world_to_desired_frame, *robot_bbox_pose)
+        robot_bbox_pose = world_to_desired_frame @ robot_bbox_pose
         self.G.add_node(
-            robot.parts["body"], pose=robot_pose, bbox_pose=robot_bbox_pose, bbox_extent=robot_bbox_extent, states={}
+            robot, pose=robot_pose, bbox_pose=robot_bbox_pose, bbox_extent=robot_bbox_extent, states={}
         )
         self.last_desired_frame_to_world = desired_frame_to_world
 
-    def step(self, activity, log_reader):
+    def step(self, scene):
         assert self.G is not None, "Cannot step graph builder before starting it."
 
         # Prepare the necessary transformations.
-        robot = get_robot(activity)
+        robot = get_robot(scene)
         desired_frame_to_world, world_to_desired_frame = self._get_desired_frame(robot)
 
         # Update the position of everything that's already in the scene by using our relative position to last frame.
-        old_desired_to_new_desired = p.multiplyTransforms(*world_to_desired_frame, *self.last_desired_frame_to_world)
+        old_desired_to_new_desired = world_to_desired_frame @ self.last_desired_frame_to_world
         for obj in self.G.nodes:
-            self.G.nodes[obj]["pose"] = p.multiplyTransforms(*old_desired_to_new_desired, *self.G.nodes[obj]["pose"])
-            self.G.nodes[obj]["bbox_pose"] = p.multiplyTransforms(
-                *old_desired_to_new_desired, *self.G.nodes[obj]["bbox_pose"]
-            )
+            self.G.nodes[obj]["pose"] = old_desired_to_new_desired @ self.G.nodes[obj]["pose"]
+            self.G.nodes[obj]["bbox_pose"] = old_desired_to_new_desired @ self.G.nodes[obj]["bbox_pose"]
 
         # Update the robot's pose. We don't want to accumulate errors because of the repeated transforms.
-        self.G.nodes[robot.parts["body"]]["pose"] = p.multiplyTransforms(
-            *world_to_desired_frame, *get_robot_to_world_transform(robot)
-        )
+        self.G.nodes[robot]["pose"] = world_to_desired_frame @ get_robot_to_world_transform(robot)
         robot_bbox_pose, robot_bbox_extent = get_robot_bbox(robot)
-        robot_bbox_pose = p.multiplyTransforms(*world_to_desired_frame, *robot_bbox_pose)
-        self.G.nodes[robot.parts["body"]]["bbox_pose"] = robot_bbox_pose
-        self.G.nodes[robot.parts["body"]]["bbox_extent"] = robot_bbox_extent
+        robot_bbox_pose = world_to_desired_frame @ robot_bbox_pose
+        self.G.nodes[robot]["bbox_pose"] = robot_bbox_pose
+        self.G.nodes[robot]["bbox_extent"] = robot_bbox_extent
 
         # Go through the objects in FOV of the robot.
-        objs_to_add = set(activity.simulator.scene.get_objects()) | set(activity.object_scope.values())
+        objs_to_add = set(scene.objects)
         if not self.full_obs:
+            # TODO: This probably does not work
             # If we're not in full observability mode, only pick the objects in FOV of robot.
-            bids_in_fov = robot.parts["body"].states[object_states.ObjectsInFOVOfRobot].get_value()
+            bids_in_fov = robot.states[object_states.ObjectsInFOVOfRobot].get_value()
             objs_in_fov = set(
-                activity.simulator.scene.objects_by_id[bid]
+                scene.objects_by_id[bid]
                 for bid in bids_in_fov
-                if bid in activity.simulator.scene.objects_by_id
+                if bid in scene.objects_by_id
             )
             objs_to_add &= objs_in_fov
-
-        # Filter out any agent parts.
-        objs_to_add = {obj for obj in objs_to_add if obj.category != "agent"}
 
         for obj in objs_to_add:
             # Add the object if not already in the graph
@@ -161,11 +153,15 @@ class SceneGraphBuilder(object):
                 self.G.add_node(obj)
 
             # Get the relative position of the object & update it (reducing accumulated errors)
-            self.G.nodes[obj]["pose"] = p.multiplyTransforms(*world_to_desired_frame, *obj.get_position_orientation())
+            self.G.nodes[obj]["pose"] = world_to_desired_frame @ T.pose2mat(obj.get_position_orientation())
 
             # Get the bounding box.
-            bbox_center, bbox_orn, bbox_extent, _ = obj.get_base_aligned_bounding_box(visual=True)
-            self.G.nodes[obj]["bbox_pose"] = p.multiplyTransforms(*world_to_desired_frame, bbox_center, bbox_orn)
+            if hasattr(obj, "get_base_aligned_bbox"):
+                bbox_center, bbox_orn, bbox_extent, _ = obj.get_base_aligned_bbox(visual=True)
+                bbox_pose = T.pose2mat((bbox_center, bbox_orn))
+            else:
+                bbox_pose, bbox_extent = get_robot_bbox(robot)
+            self.G.nodes[obj]["bbox_pose"] = world_to_desired_frame @ bbox_pose
             self.G.nodes[obj]["bbox_extent"] = bbox_extent
 
             # Update the states of the object
@@ -191,27 +187,15 @@ class SceneGraphBuilder(object):
         self.last_desired_frame_to_world = desired_frame_to_world
 
 
-class SceneGraphBuilderWithVisualization(SceneGraphBuilder):
-    def __init__(self, show_window=True, out_path=None, realistic_positioning=False, *args, **kwargs):
-        """
-        @param show_window: Whether a cv2 GUI window containing the visualization should be shown.
-        @param out_path: Directory to output visualization frames to. If None, no frames will be saved.
-        @param realistic_positioning: Whether nodes should be positioned based on their position in the scene (if True)
-            or placed using a graphviz layout (neato) that makes it easier to read edges & find clusters.
-        @param args: Any positional arguments to forward to the SceneGraphBuilder constructor.
-        @param kwargs: Any keyword arguments to forward to the SceneGraphBuilder constructor. Note that the
-            merge_parallel_edges argument is forced to True here because the graph drawing mechanism cannot show
-            parallel edges.
-        """
-        super(SceneGraphBuilderWithVisualization, self).__init__(*args, **kwargs, merge_parallel_edges=True)
-        assert show_window or out_path, "One of show_window or out_path should be set."
-        self.show_window = show_window
-        self.out_path = out_path
-        self.out_writer = None
-        self.realistic_positioning = realistic_positioning
+def visualize_scene_graph(scene, G, show_window=True, realistic_positioning=False):
+    """
+    @param show_window: Whether a cv2 GUI window containing the visualization should be shown.
+    @param realistic_positioning: Whether nodes should be positioned based on their position in the scene (if True)
+        or placed using a graphviz layout (neato) that makes it easier to read edges & find clusters.
+    """
 
-    def draw_graph(self):
-        nodes = list(self.G.nodes)
+    def _draw_graph():
+        nodes = list(G.nodes)
         node_labels = {obj: obj.category for obj in nodes}
         colors = [
             "yellow"
@@ -220,12 +204,12 @@ class SceneGraphBuilderWithVisualization(SceneGraphBuilder):
             for obj in nodes
         ]
         positions = (
-            {obj: (-pose[0][1], pose[0][0]) for obj, pose in self.G.nodes.data("pose")}
-            if self.realistic_positioning
-            else nx.nx_pydot.pydot_layout(self.G, prog="neato")
+            {obj: (-pose[0][1], pose[0][0]) for obj, pose in G.nodes.data("pose")}
+            if realistic_positioning
+            else nx.nx_pydot.pydot_layout(G, prog="neato")
         )
         nx.drawing.draw_networkx(
-            self.G,
+            G,
             pos=positions,
             labels=node_labels,
             nodelist=nodes,
@@ -237,49 +221,45 @@ class SceneGraphBuilderWithVisualization(SceneGraphBuilder):
 
         edge_labels = {
             edge: ", ".join(
-                state + "=" + str(value) if not self.only_true else state  # Don't print value in only_true mode.
-                for state, value in self.G.edges[edge]["states"]
+                state + "=" + str(value)
+                for state, value in G.edges[edge]["states"]
             )
-            for edge in self.G.edges
+            for edge in G.edges
         }
-        nx.drawing.draw_networkx_edge_labels(self.G, pos=positions, edge_labels=edge_labels, font_size=4)
+        nx.drawing.draw_networkx_edge_labels(G, pos=positions, edge_labels=edge_labels, font_size=4)
 
-    def step(self, activity, *args):
-        super(SceneGraphBuilderWithVisualization, self).step(activity, *args)
+    # Prepare pyplot figure that's sized to match the robot video.
+    robot = get_robot(scene)
+    robot_camera_sensor, = [s for s in robot.sensors.values() if isinstance(s, VisionSensor) and "rgb" in s.modalities]
+    robot_view = (robot_camera_sensor.get_obs()["rgb"][..., :3]).astype(np.uint8)
+    imgheight, imgwidth, _ = robot_view.shape
 
-        if activity.simulator.frame_count % DRAW_EVERY != 0:
-            return
+    figheight = 4.8
+    figdpi = imgheight / figheight
+    figwidth = imgwidth / figdpi
 
-        # Prepare pyplot figure that's sized to match the robot video.
-        robot_view = (get_robot(activity).render_camera_image()[0][..., :3] * 255).astype(np.uint8)
-        imgheight, imgwidth, _ = robot_view.shape
+    # Draw the graph onto the figure.
+    fig = plt.figure(figsize=(figwidth, figheight), dpi=figdpi)
+    _draw_graph()
+    fig.canvas.draw()
 
-        figheight = 4.8
-        figdpi = imgheight / figheight
-        figwidth = imgwidth / figdpi
+    # if show_window:
+    #     plt.show()
 
-        # Draw the graph onto the figure.
-        fig = plt.figure(figsize=(figwidth, figheight), dpi=figdpi)
-        self.draw_graph()
-        fig.canvas.draw()
+    # # Convert the canvas to image
+    graph_view = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8, sep="")
+    graph_view = graph_view.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+    assert graph_view.shape == robot_view.shape
+    plt.close(fig)
 
-        # Convert the canvas to image
-        graph_view = np.fromstring(fig.canvas.tostring_rgb(), dtype=np.uint8, sep="")
-        graph_view = graph_view.reshape(fig.canvas.get_width_height()[::-1] + (3,))
-        assert graph_view.shape == robot_view.shape
-        plt.close(fig)
+    # # Combine the two images side-by-side
+    img = np.hstack((robot_view, graph_view))
 
-        # Combine the two images side-by-side
-        img = np.hstack((robot_view, graph_view))
+    # # Convert to BGR for cv2-based viewing.
+    # if show_window:
+    #     # display image with opencv or any operation you like
+    #     cv_img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+    #     cv2.imshow("SceneGraph", cv_img)
+    #     cv2.waitKey(1)
 
-        # Convert to BGR for cv2-based viewing.
-        img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-
-        if self.out_path:
-            frame_path = os.path.join(self.out_path, "%05d.png" % activity.simulator.frame_count)
-            cv2.imwrite(frame_path, img)
-
-        if self.show_window:
-            # display image with opencv or any operation you like
-            cv2.imshow("SceneGraph", img)
-            cv2.waitKey(1)
+    return Image.fromarray(img).save(r"D:\test.png")

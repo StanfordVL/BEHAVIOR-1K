@@ -165,6 +165,8 @@ class InteractiveTraversableScene(TraversableScene):
         super()._initialize()
         self._seg_map.room_sem_name_to_ins_name = defaultdict(list)
         for object in self.objects:
+            if not hasattr(object, "in_rooms") or object.in_rooms is None:
+                continue
             for in_room in object.in_rooms:
                 if in_room == "":
                     continue

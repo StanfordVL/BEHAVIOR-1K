@@ -25,7 +25,7 @@ class SceneGraphExporter(SceneGraphBuilder):
         super(SceneGraphExporter, self).start(activity, log_reader)
 
         scene = activity.simulator.scene
-        objs = set(scene.get_objects()) | set(activity.object_scope.values())
+        objs = set(scene.objects()) | set(activity.object_scope.values())
         self.num_obj = len(objs)
         self.dim = 34  # 34: dimension of all relevant information
         # create a dictionary that maps objs to ids
