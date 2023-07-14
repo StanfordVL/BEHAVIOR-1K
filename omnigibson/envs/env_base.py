@@ -383,7 +383,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
             dict: Information dictionary with added info
         """
         info["episode_length"] = self._current_step
-        info["scene_graph"] = self.get_scene_graph()
+
+        if self._scene_graph_builder is not None:
+            info["scene_graph"] = self.get_scene_graph()
 
     def step(self, action):
         """

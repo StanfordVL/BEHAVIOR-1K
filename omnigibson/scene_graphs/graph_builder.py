@@ -58,7 +58,6 @@ def get_all_binary_states(objs, only_true=False):
                 continue
 
             for state_type, state_inst in obj1.states.items():
-                print("Checking pair", state_type, obj1.name, obj2.name)
                 if not issubclass(state_type, BooleanState) or not issubclass(state_type, RelativeObjectState):
                     continue
 
