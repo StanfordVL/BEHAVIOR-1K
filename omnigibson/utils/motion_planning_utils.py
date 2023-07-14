@@ -1,6 +1,4 @@
 import numpy as np
-from ompl import base as ob
-from ompl import geometric as ompl_geo
 
 import omnigibson as og
 from omnigibson.object_states import ContactBodies
@@ -13,6 +11,9 @@ def plan_base_motion(
     planning_time = 100.0,
     **kwargs,
 ):
+    from ompl import base as ob
+    from ompl import geometric as ompl_geo
+
     def state_valid_fn(q):
         x = q.getX()
         y = q.getY()
@@ -83,6 +84,9 @@ def plan_arm_motion(
     planning_time = 100.0,
     **kwargs,
 ):
+    from ompl import base as ob
+    from ompl import geometric as ompl_geo
+
     joint_control_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
     dim = len(joint_control_idx)
 
