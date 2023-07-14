@@ -25,10 +25,11 @@ robots:
   - type: Fetch
     obs_modalities: [scan, rgb, depth]
     scale: 1.0
-    self_collision: false
-    action_normalize: true
+    self_collisions: true
+    # action_normalize: false
+    action_normalize: false
     action_type: continuous
-    grasping_mode: physical
+    grasping_mode: sticky
     rigid_trunk: false
     default_trunk_offset: 0.365
     default_arm_pose: diagonal30
@@ -37,14 +38,21 @@ robots:
       base:
         name: DifferentialDriveController
       arm_0:
-        name: InverseKinematicsController
-        kv: 2.0
+        name: JointController
+        motor_type: position
+        command_input_limits: null
+        command_output_limits: null
+        use_delta_commands: false
       gripper_0:
-        name: MultiFingerGripperController
-        mode: binary
+        name: JointController
+        motor_type: position
+        command_input_limits: [-1, 1]
+        command_output_limits: null
+        use_delta_commands: true
+        use_single_command: true
       camera:
         name: JointController
-        use_delta_commands: False
+        use_delta_commands: false
 
 objects: []
 
