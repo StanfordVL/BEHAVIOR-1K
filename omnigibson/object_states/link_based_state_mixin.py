@@ -27,9 +27,30 @@ class LinkBasedStateMixin(BaseObjectState):
         for link in obj.links.values():
             if metalink_prefix in link.name:
                 return True, None
+
         return False, f"LinkBasedStateMixin {cls.__name__} requires metalink with prefix {cls.metalink_prefix} " \
                       f"for obj {obj.name} but none was found! To get valid compatible object models, please use " \
                       f"omnigibson.utils.asset_utils.get_all_object_category_models_with_abilities(...)"
+
+    @classmethod
+    def is_compatible_asset(cls, prim, **kwargs):
+        # Run super first
+        compatible, reason = super().is_compatible_asset(prim, **kwargs)
+        if not compatible:
+            return compatible, reason
+
+        # Check whether this state requires metalink
+        if not cls.requires_metalink(**kwargs):
+            return True, None
+        metalink_prefix = cls.metalink_prefix
+        for child in prim.GetChildren():
+            if child.GetTypeName() == "Xform":
+                if metalink_prefix in child.GetName():
+                    return True, None
+
+        return False, f"LinkBasedStateMixin {cls.__name__} requires metalink with prefix {cls.metalink_prefix} " \
+                      f"for asset prim {prim.GetName()} but none was found! To get valid compatible object models, " \
+                      f"please use omnigibson.utils.asset_utils.get_all_object_category_models_with_abilities(...)"
 
     @classproperty
     def metalink_prefix(cls):

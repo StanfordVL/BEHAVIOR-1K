@@ -277,23 +277,13 @@ def get_all_object_category_models_with_abilities(category, abilities):
     valid_models = []
 
     def supports_state_types(states_and_params, obj_prim):
-        child_prim_names = [child.GetName() for child in obj_prim.GetChildren()]
         # Check all link states
         for state_type, params in states_and_params:
             kwargs = deepcopy(state_init_default_kwargs[state_type])
             kwargs.update(params)
-            if not state_compatible(state_type, kwargs, child_prim_names):
+            if not state_type.is_compatible_asset(prim=obj_prim, **kwargs)[0]:
                 return False
         return True
-
-    def state_compatible(state_type, state_params, child_names):
-        if not state_type.requires_metalink(**state_params):
-            return True
-        metalink_prefix = state_type.metalink_prefix
-        for child_name in child_names:
-            if metalink_prefix in child_name:
-                return True
-        return False
 
     for model in all_models:
         usd_path = DatasetObject.get_usd_path(category=category, model=model)

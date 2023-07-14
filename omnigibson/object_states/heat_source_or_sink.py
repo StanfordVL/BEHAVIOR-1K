@@ -1,4 +1,4 @@
-from omnigibson.macros import create_module_macros
+from omnigibson.macros import create_module_macros, macros
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.inside import Inside
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
@@ -92,6 +92,39 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin):
         for kwarg, state_type in zip(("requires_toggled_on", "requires_closed"), (ToggledOn, Open)):
             if kwargs.get(kwarg, False) and state_type not in obj.states:
                 return False, f"{cls.__name__} has {kwarg} but obj has no {state_type.__name__} state!"
+
+        return True, None
+
+    @classmethod
+    def is_compatible_asset(cls, prim, **kwargs):
+        # Run super first
+        compatible, reason = super().is_compatible_asset(prim, **kwargs)
+        if not compatible:
+            return compatible, reason
+
+        # Check whether this state has toggledon if required or open if required
+        for kwarg, state_type in zip(("requires_toggled_on", "requires_closed"), (ToggledOn, Open)):
+            if kwargs.get(kwarg, False) and not state_type.is_compatible_asset(prim=prim, **kwargs)[0]:
+                return False, f"{cls.__name__} has {kwarg} but obj has no {state_type.__name__} state!"
+
+        # # Check whether this state has toggledon metalink or articulated joints if required
+        # link_prefix = macros.object_states.toggle.TOGGLE_LINK_PREFIX
+        # has_link_prefix, has_joints = False, False
+        # for child in prim.GetChildren():
+        #     if child.GetPrimType() == "Xform":
+        #         if link_prefix in child.GetName():
+        #             has_link_prefix = True
+        #     for gchild in child.GetChildren():
+        #         gchild_type = gchild.GetPrimType().lower()
+        #         if "joint" in gchild_type and "fixed" not in gchild_type:
+        #             has_joints = True
+        #             break
+        #
+        # if kwargs.get("requires_toggled_on", False) and not has_link_prefix:
+        #     return False, f"{cls.__name__} has requires_toggled_on but obj has no link with prefix {link_prefix}!"
+        #
+        # if kwargs.get("requires_closed", False) and not has_joints:
+        #     return False, f"{cls.__name__} has requires_closed but obj has no articulated joints!"
 
         return True, None
 

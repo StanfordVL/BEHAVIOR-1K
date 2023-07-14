@@ -29,9 +29,7 @@ class Inside(KinematicsMixin, RelativeObjectState, BooleanState):
 
     def _get_value(self, other):
         # First check that the inner object's position is inside the outer's AABB.
-        # Since we usually check for a small set of outer objects, this is cheap.
-        # Also note that this produces garbage values for fixed objects - but we are
-        # assuming none of our inside-checking objects are fixed.
+        # Since we usually check for a small set of outer objects, this is cheap
         aabb_lower, aabb_upper = self.obj.states[AABB].get_value()
         inner_object_pos = (aabb_lower + aabb_upper) / 2.0
         outer_object_aabb = other.states[AABB].get_value()

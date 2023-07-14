@@ -72,6 +72,32 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
         # Default is True if all kwargs are met
         return True, None
 
+    @classmethod
+    def is_compatible_asset(cls, prim, **kwargs):
+        """
+        Determines whether this object state is compatible with object with corresponding prim @prim or not
+        (i.e.: whether the state can be successfully instantiated with @self.obj given other constructor
+        arguments **kwargs. This is a useful check to evaluate an object's USD that hasn't been explicitly imported
+        into OmniGibson yet.
+
+        NOTE: Can be further extended by subclass
+
+        Args:
+            prim (Usd.Prim): Object prim whose compatibility with this state should be checked
+
+        Returns:
+            2-tuple:
+                - bool: Whether the given object is compatible with this object state or not
+                - None or str: If not compatible, the reason why it is not compatible. Otherwise, None
+        """
+        # Make sure all required kwargs are specified
+        default_kwargs = inspect.signature(cls.__init__).parameters
+        for kwarg, val in default_kwargs.items():
+            if val.default == inspect._empty and kwarg not in kwargs and kwarg not in {"obj", "self"}:
+                return False, f"Missing required kwarg '{kwarg}'"
+        # Default is True if all kwargs are met
+        return True, None
+
     @property
     def stateful(self):
         """

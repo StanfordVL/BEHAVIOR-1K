@@ -238,6 +238,22 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
 
         return True, None
 
+    @classmethod
+    def is_compatible_asset(cls, prim, **kwargs):
+        # Run super first
+        compatible, reason = super().is_compatible_asset(prim, **kwargs)
+        if not compatible:
+            return compatible, reason
+
+        # Check whether this state has toggledon if required or saturated if required for any condition
+        conditions = kwargs.get("conditions", dict())
+        cond_types = {cond[0] for _, conds in conditions.items() for cond in conds}
+        for cond_type, state_type in zip((ParticleModifyCondition.TOGGLEDON,), (ToggledOn,)):
+            if cond_type in cond_types and not state_type.is_compatible_asset(prim=prim, **kwargs):
+                return False, f"{cls.__name__} requires {state_type.__name__} state!"
+
+        return True, None
+
     def _initialize(self):
         super()._initialize()
 
