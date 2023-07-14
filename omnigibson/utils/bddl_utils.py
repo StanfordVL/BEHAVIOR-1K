@@ -500,11 +500,9 @@ class BDDLSampler:
                     if condition.body[1] == cur_batch_inst:
                         inst_batch.add(condition.body[0])
                         next_batch.add(condition.body[0])
-
+                if len(inst_batch) > 0:
+                    self._object_sampling_orders["kinematic"].append(inst_batch)
             cur_batch = next_batch
-            self._object_sampling_orders["kinematic"].append(cur_batch)
-        # pop final value since it's an empty set
-        self._object_sampling_orders["kinematic"].pop(-1)
 
         # Now parse particles -- simply unordered, since particle systems shouldn't impact each other
         self._object_sampling_orders["particle"].append({cond[0] for cond in sampling_groups["particle"]})
