@@ -79,8 +79,7 @@ def get_assisted_grasping_categories():
     assisted_grasp_category_allow_list = set()
     avg_category_spec = get_og_avg_category_specs()
     for k, v in avg_category_spec.items():
-        if v["enable_ag"]:
-            assisted_grasp_category_allow_list.add(k)
+        assisted_grasp_category_allow_list.add(k)
     return assisted_grasp_category_allow_list
 
 
