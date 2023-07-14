@@ -24,13 +24,11 @@ from omnigibson import object_states
 from omnigibson.action_primitives.action_primitive_set_base import ActionPrimitiveError, BaseActionPrimitiveSet
 # from igibson.external.pybullet_tools.utils import set_joint_position
 # from omnigibson.object_states.on_floor import RoomFloor
-from omnigibson.utils.object_state_utils import sample_kinematics
+from omnigibson.utils.object_state_utils import sample_cuboid_for_predicate
 from omnigibson.object_states.utils import get_center_extent
 # from igibson.objects.articulated_object import URDFObject
 from omnigibson.objects.object_base import BaseObject
-# from igibson.robots import BaseRobot, behavior_robot
 from omnigibson.robots import BaseRobot
-# from igibson.robots.behavior_robot import DEFAULT_BODY_OFFSET_FROM_FLOOR, BehaviorRobot
 from omnigibson.tasks.behavior_task import BehaviorTask
 from omnigibson.utils.motion_planning_utils import (
     plan_base_motion,
@@ -38,8 +36,6 @@ from omnigibson.utils.motion_planning_utils import (
     detect_robot_collision,
     detect_hand_collision
 )
-# from igibson.utils.grasp_planning_utils import get_grasp_poses_for_object, get_grasp_position_for_open
-# from igibson.utils.utils import restoreState
 
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.control_utils import IKSolver
@@ -106,7 +102,9 @@ class UndoableContext(object):
         self.robot = robot
 
     def __enter__(self):
+        # TODO: This AG state set/reset logic needs to happen in the robot
         self.obj_in_hand = self.robot._ag_obj_in_hand[self.robot.default_arm]
+        self.contact_pos = self.robot._ag_obj_constraint_params[self.robot.default_arm]['contact_pos'] if 'contact_pos' in self.robot._ag_obj_constraint_params[self.robot.default_arm] else None
         # Store object in hand and the link of the object attached to the robot gripper to manually restore later
         if self.obj_in_hand is not None:
             obj_ag_link_path = self.robot._ag_obj_constraint_params[self.robot.default_arm]['ag_link_prim_path']
@@ -130,7 +128,7 @@ class UndoableContext(object):
         og.sim.load_state(self.state, serialized=False)
         og.sim.step()
         if self.obj_in_hand is not None and not self.robot._ag_obj_constraint_params[self.robot.default_arm]:
-            self.robot._establish_grasp(ag_data=(self.obj_in_hand, self.obj_in_hand_link))
+            self.robot._establish_grasp(ag_data=(self.obj_in_hand, self.obj_in_hand_link), contact_pos=self.contact_pos)
         og.sim.step()
         
 
@@ -146,7 +144,7 @@ class StarterSemanticActionPrimitive(IntEnum):
 
 
 class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
-    def __init__(self, task, scene, robot):
+    def __init__(self, task, scene, robot, teleport=False):
         logger.warning(
             "The StarterSemanticActionPrimitive is a work-in-progress and is only provided as an example. "
             "It currently only works with BehaviorRobot with its JointControllers set to absolute mode. "
@@ -165,6 +163,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         self.arm = self.robot.default_arm
         self.robot_model = self.robot.model_name
         self.robot_base_mass = self.robot._links["base_link"].mass
+        self.teleport = teleport
         # self._set_joint_velocities()
 
     # Set joint velocities for the robots so they move at appropriate speeds.
@@ -238,6 +237,12 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         # hand_collision_fn = get_pose3d_hand_collision_fn(
         #     self.robot, None, self._get_collision_body_ids(include_robot=True)
         # )
+        if self._get_obj_in_hand():
+            raise ActionPrimitiveError(
+                ActionPrimitiveError.Reason.PRE_CONDITION_ERROR,
+                "Cannot open or close an object while holding an object.",
+                {"object": obj},
+            )
 
         # Open the hand first
         yield from self._execute_release()
@@ -275,8 +280,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         # If the grasp pose is too far, navigate
         # [bid] = obj.get_body_ids()  # TODO: Fix this!
         # check_joint = (bid, joint_info)
-        # yield from self._navigate_if_needed(obj, pos_on_obj=approach_pos, check_joint=check_joint)
-        # yield from self._navigate_if_needed(obj, pos_on_obj=grasp_pose[0], check_joint=check_joint)
+        yield from self._navigate_if_needed(obj, pos_on_obj=approach_pos)  # , check_joint=check_joint)
+        yield from self._navigate_if_needed(obj, pos_on_obj=grasp_pose[0])  #, check_joint=check_joint)
 
         yield from self._move_hand(grasp_pose)
 
@@ -294,6 +299,11 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         if grasp_required:
             try:
                 yield from self._execute_grasp()
+                if self._get_obj_in_hand() is None:
+                    raise ActionPrimitiveError(
+                        ActionPrimitiveError.Reason.EXECUTION_ERROR,
+                        "Could not grasp object to open.",
+                    )
             except ActionPrimitiveError:
                 # Retreat back to the grasp pose.
                 yield from self._execute_release()
@@ -347,6 +357,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             yield from self._navigate_if_needed(obj, pos_on_obj=grasp_pose[0])
             yield from self._move_hand(grasp_pose)
 
+            # We can pre-grasp in sticky grasping mode.
+            yield from self._execute_grasp()
+
             # Since the grasp pose is slightly off the object, we want to move towards the object, around 5cm.
             # It's okay if we can't go all the way because we run into the object.
             indented_print("Performing grasp approach.")
@@ -355,16 +368,16 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             except ActionPrimitiveError:
                 # An error will be raised when contact fails. If this happens, let's retry.
                 # Retreat back to the grasp pose.
+                yield from self._execute_release()
                 yield from self._move_hand_direct_cartesian(grasp_pose)
                 raise
 
-            indented_print("Grasping.")
-            try:
-                yield from self._execute_grasp()
-            except ActionPrimitiveError:
-                # Retreat back to the grasp pose.
+            if self._get_obj_in_hand() is None:
                 yield from self._move_hand_direct_cartesian(grasp_pose)
-                raise
+                raise ActionPrimitiveError(
+                    ActionPrimitiveError.Reason.EXECUTION_ERROR,
+                    "No object detected in hand after executing grasp.",
+                )
 
         indented_print("Moving hand back to neutral position.")
         yield from self._reset_hand()
@@ -463,27 +476,34 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
     def _move_hand(self, target_pose):
         self._fix_robot_base()
-        self._settle_robot()
+        yield from self._settle_robot()
         joint_pos, control_idx = self._convert_cartesian_to_joint_space(target_pose)
 
-        with UndoableContext(self.robot):
-            plan = plan_arm_motion(
-                robot=self.robot,
-                end_conf=joint_pos
-            )
+        if self.teleport:
+            # Teleport the robot to the joint state
+            self.robot.set_joint_positions(joint_pos, control_idx)
 
-        if plan is None:
-            raise ActionPrimitiveError(
-                ActionPrimitiveError.Reason.PLANNING_ERROR,
-                "Could not make a hand motion plan.",
-                {"target_pose": target_pose},
-            )
-        
-        # Follow the plan to navigate.
-        indented_print("Plan has %d steps.", len(plan))
-        for i, joint_pos in enumerate(plan):
-            indented_print("Executing grasp plan step %d/%d", i + 1, len(plan))
-            yield from self._move_hand_direct_joint(joint_pos, control_idx)
+            # Yield a bunch of no-ops to give the robot time to settle.
+            yield from self._settle_robot()
+        else:
+            with UndoableContext(self.robot):
+                plan = plan_arm_motion(
+                    robot=self.robot,
+                    end_conf=joint_pos
+                )
+
+            if plan is None:
+                raise ActionPrimitiveError(
+                    ActionPrimitiveError.Reason.PLANNING_ERROR,
+                    "Could not make a hand motion plan.",
+                    {"target_pose": target_pose},
+                )
+            
+            # Follow the plan to navigate.
+            indented_print("Plan has %d steps.", len(plan))
+            for i, joint_pos in enumerate(plan):
+                indented_print("Executing grasp plan step %d/%d", i + 1, len(plan))
+                yield from self._move_hand_direct_joint(joint_pos, control_idx)
         self._unfix_robot_base()
 
     def _move_hand_direct_joint(self, joint_pos, control_idx, stop_on_contact=False):
@@ -514,12 +534,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         # Do nothing for a bit so that AG can trigger.
         for _ in range(MAX_WAIT_FOR_GRASP_OR_RELEASE):
             yield self._empty_action()
-
-        if self._get_obj_in_hand() is None:
-            raise ActionPrimitiveError(
-                ActionPrimitiveError.Reason.EXECUTION_ERROR,
-                "No object detected in hand after executing grasp.",
-            )
 
     def _execute_release(self):
         action = self._empty_action()
@@ -606,27 +620,32 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         yield from self._move_hand_direct_joint(reset_pose, control_idx)
 
     def _navigate_to_pose(self, pose_2d):
-        with UndoableContext(self.robot):
-            plan = plan_base_motion(
-                robot=self.robot,
-                end_conf=pose_2d,
-            )
+        if self.teleport:
+            robot_pose = self._get_robot_pose_from_2d_pose(pose_2d)
+            self.robot.set_position_orientation(*robot_pose)
+            yield from self._settle_robot()
+        else:
+            with UndoableContext(self.robot):
+                plan = plan_base_motion(
+                    robot=self.robot,
+                    end_conf=pose_2d,
+                )
 
-        if plan is None:
-            # TODO: Would be great to produce a more informative error.
-            raise ActionPrimitiveError(ActionPrimitiveError.Reason.PLANNING_ERROR, "Could not make a navigation plan.")
+            if plan is None:
+                # TODO: Would be great to produce a more informative error.
+                raise ActionPrimitiveError(ActionPrimitiveError.Reason.PLANNING_ERROR, "Could not make a navigation plan.")
 
-        self.draw_plan(plan)
-        # Follow the plan to navigate.
-        indented_print("Plan has %d steps.", len(plan))
-        for i, pose_2d in enumerate(plan):
-            indented_print("Executing navigation plan step %d/%d", i + 1, len(plan))
-            low_precision = True if i < len(plan) - 1 else False
-            yield from self._navigate_to_pose_direct(pose_2d, low_precision=low_precision)
+            self.draw_plan(plan)
+            # Follow the plan to navigate.
+            indented_print("Plan has %d steps.", len(plan))
+            for i, pose_2d in enumerate(plan):
+                indented_print("Executing navigation plan step %d/%d", i + 1, len(plan))
+                low_precision = True if i < len(plan) - 1 else False
+                yield from self._navigate_to_pose_direct(pose_2d, low_precision=low_precision)
 
     def draw_plan(self, plan):
         SEARCHED = []
-        trav_map = og.sim.scene._trav_map
+        trav_map = self.scene._trav_map
         for q in plan:
             # The below code is useful for plotting the RRT tree.
             SEARCHED.append(np.flip(trav_map.world_to_map((q[0], q[1]))))
@@ -648,13 +667,13 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             cv2.waitKey(1)
 
     def _navigate_if_needed(self, obj, pos_on_obj=None, **kwargs):
-        if pos_on_obj is not None:
-            pose_for_obj = (pos_on_obj, [0.0, 0.0, 0.0, 1.0])
-            if self._target_in_reach_of_robot(pose_for_obj):
-                # No need to navigate.
-                return
-        elif self._target_in_reach_of_robot(obj.get_position_orientation()):
-            return
+        # if pos_on_obj is not None:
+        #     pose_for_obj = (pos_on_obj, [0.0, 0.0, 0.0, 1.0])
+        #     if self._target_in_reach_of_robot(pose_for_obj):
+        #         # No need to navigate.
+        #         return
+        # elif self._target_in_reach_of_robot(obj.get_position_orientation()):
+        #     return
 
         yield from self._navigate_to_obj(obj, pos_on_obj=pos_on_obj, **kwargs)
 
@@ -774,27 +793,26 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         )
 
     def _sample_pose_with_object_and_predicate(self, predicate, held_obj, target_obj):
-        with UndoableContext(self.robot):
-            self.robot.release_grasp_immediately()
-            pred_map = {object_states.OnTop: "onTop", object_states.Inside: "inside"}
-            result = sample_kinematics(
-                pred_map[predicate],
-                held_obj,
-                target_obj,
-                use_ray_casting_method=True,
-                max_trials=MAX_ATTEMPTS_FOR_SAMPLING_POSE_WITH_OBJECT_AND_PREDICATE,
-                skip_falling=True,
-                z_offset=PREDICATE_SAMPLING_Z_OFFSET,
-            )
+        pred_map = {object_states.OnTop: "onTop", object_states.Inside: "inside"}
 
-            if not result:
-                raise ActionPrimitiveError(
-                    ActionPrimitiveError.Reason.SAMPLING_ERROR,
-                    "Could not sample position with object and predicate.",
-                    {"target_object": target_obj, "held_object": held_obj, "predicate": pred_map[predicate]},
-                )
-            pos, orn = held_obj.get_position_orientation()
-            return pos, orn
+        for _ in range(MAX_ATTEMPTS_FOR_SAMPLING_POSE_WITH_OBJECT_AND_PREDICATE):
+            _, _, bb_extents, bb_center_in_base = held_obj.get_base_aligned_bbox()
+            sampling_results = sample_cuboid_for_predicate(predicate, target_obj, bb_extents)
+            sampled_bb_center = sampling_results[0][0] + np.array([0, 0, PREDICATE_SAMPLING_Z_OFFSET])
+            sampled_bb_orn = sampling_results[0][2]
+
+            # Get the object pose by subtracting the offset
+            sampled_obj_pose = T.pose2mat((sampled_bb_center, sampled_bb_orn)) @ T.pose_inv(T.pose2mat((bb_center_in_base, [0, 0, 0, 1])))
+
+            # Return the pose
+            return T.mat2pose(sampled_obj_pose)
+
+        # If we get here, sampling failed.
+        raise ActionPrimitiveError(
+            ActionPrimitiveError.Reason.SAMPLING_ERROR,
+            "Could not sample position with object and predicate.",
+            {"target_object": target_obj, "held_object": held_obj, "predicate": pred_map[predicate]},
+        )
 
     def _test_pose(self, pose_2d, pos_on_obj=None, check_joint=None):
         with UndoableContext(self.robot):
@@ -854,8 +872,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
     
     # Function that is particularly useful for Fetch, where it gives time for the base of robot to settle due to its uneven base.
     def _settle_robot(self):
-        for _ in range(100):
-            og.sim.step()
+        yield from [self._empty_action() for _ in range(100)]
     
     def _fix_robot_base(self):
         self.robot_base_mass = self.robot._links['base_link'].mass
