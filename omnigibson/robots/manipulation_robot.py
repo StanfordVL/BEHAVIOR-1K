@@ -335,7 +335,10 @@ class ManipulationRobot(BaseRobot):
                 self._ag_obj_in_hand[arm].set_position_orientation(*T.mat2pose(hmat=new_obj_pose))
 
     def apply_action(self, action):
-        # First run assisted grasping
+        # Run super method as normal
+        super().apply_action(action)
+
+        # Then run assisted grasping
         if self.grasping_mode != "physical":
             self._handle_assisted_grasping(action=action)
 
@@ -343,9 +346,6 @@ class ManipulationRobot(BaseRobot):
         for arm in self.arm_names:
             if self._ag_freeze_gripper[arm]:
                 self._freeze_gripper(arm)
-
-        # Run super method as normal
-        super().apply_action(action)
 
     def deploy_control(self, control, control_type, indices=None, normalized=False):
         # We intercept the gripper control and replace it with the current joint position if we're freezing our gripper
@@ -1077,9 +1077,9 @@ class ManipulationRobot(BaseRobot):
                 f"Gripper {arm} controller command dim must be 1 to use assisted grasping, got: {cmd_dim}."
 
             # TODO: Why are we separately checking for complementary conditions?
-            threshold = np.mean(self._controllers[f"gripper_{arm}"].command_input_limits)
-            applying_grasp = action[self.controller_action_idx[f"gripper_{arm}"][0]] < threshold
-            releasing_grasp = action[self.controller_action_idx[f"gripper_{arm}"][0]] > threshold
+            controlled_joints = self._controllers[f"gripper_{arm}"].dof_idx
+            threshold = np.mean(np.array(self.control_limits["position"])[:, controlled_joints], axis=0)
+            applying_grasp = np.any(self._last_control[controlled_joints] < threshold)
 
             # Execute gradual release of object
             if self._ag_obj_in_hand[arm]:
@@ -1093,7 +1093,7 @@ class ManipulationRobot(BaseRobot):
                     if gm.AG_CLOTH:
                         self._update_constraint_cloth(arm=arm)
 
-                    if releasing_grasp:
+                    if not applying_grasp:
                         self._release_grasp(arm=arm)
 
             elif applying_grasp:
