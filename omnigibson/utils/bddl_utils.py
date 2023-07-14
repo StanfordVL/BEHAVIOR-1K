@@ -615,32 +615,42 @@ class BDDLSampler:
                         success = True
                         # If this candidate object is not involved in any conditions,
                         # success will be True by default and this object will qualify
+                        parent_obj_name = obj.name
+                        conditions_to_sample = []
                         for condition, positive in conditions:
                             # Sample positive kinematic conditions that involve this candidate object
                             if condition.STATE_NAME in KINEMATIC_STATES_BDDL and positive and scene_obj in condition.body:
-                                child_scope_name, parent_obj_name = condition.body[0], obj.name
-                                success = condition.sample(binary_state=positive)
-                                log_msg = " ".join(
-                                    [
-                                        f"{condition_type} kinematic condition sampling",
-                                        room_type,
-                                        scene_obj,
-                                        room_inst,
-                                        parent_obj_name,
-                                        condition.STATE_NAME,
-                                        str(condition.body),
-                                        str(success),
-                                    ]
-                                )
-                                log.info(log_msg)
+                                child_scope_name = condition.body[0]
+                                entity = self._object_scope[child_scope_name]
+                                conditions_to_sample.append((condition, positive, entity, child_scope_name))
 
-                                # Record the result for the child object
-                                assert parent_obj_name not in problematic_objs[child_scope_name], \
-                                    f"Multiple kinematic relationships attempted for pair {condition.body}"
-                                problematic_objs[child_scope_name][parent_obj_name] = success
-                                # If any condition fails for this candidate object, skip
-                                if not success:
-                                    break
+                        # Sort children based on their AABB so the larger objects are sampled first
+                        conditions_to_sample = reversed(sorted(conditions_to_sample, key=lambda x: np.product(x[2].aabb_extent)))
+
+                        # Sample!
+                        for condition, positive, entity, child_scope_name in conditions_to_sample:
+                            success = condition.sample(binary_state=positive)
+                            log_msg = " ".join(
+                                [
+                                    f"{condition_type} kinematic condition sampling",
+                                    room_type,
+                                    scene_obj,
+                                    room_inst,
+                                    parent_obj_name,
+                                    condition.STATE_NAME,
+                                    str(condition.body),
+                                    str(success),
+                                ]
+                            )
+                            log.info(log_msg)
+
+                            # Record the result for the child object
+                            assert parent_obj_name not in problematic_objs[child_scope_name], \
+                                f"Multiple kinematic relationships attempted for pair {condition.body}"
+                            problematic_objs[child_scope_name][parent_obj_name] = success
+                            # If any condition fails for this candidate object, skip
+                            if not success:
+                                break
 
                         # If this candidate object fails, move on to the next candidate object
                         if not success:
@@ -874,7 +884,7 @@ class BDDLSampler:
                     # Sample!
                     for condition, positive, entity, child_scope_name in conditions_to_sample:
                         success = False
-                        while not success and (group != "kinematic" or np.all(entity.scale >= m.MIN_DYNAMIC_SCALE)):
+                        while True:
                             num_trials = 1
                             for _ in range(num_trials):
                                 success = condition.sample(binary_state=positive)
@@ -882,20 +892,28 @@ class BDDLSampler:
                                     # Update state
                                     state = og.sim.dump_state(serialized=False)
                                     break
+                            if success:
+                                # Can terminate immediately
+                                break
 
-                            if not success:
-                                # Can't re-sample non-kinematics or rescale cloth or agent, so in
-                                # those cases terminate immediately
-                                if group != "kinematic" or "agent" in child_scope_name or entity.prim_type == PrimType.CLOTH:
-                                    break
-                                # Re-scale and re-attempt
-                                # Re-scaling is not respected unless sim cycle occurs
-                                og.sim.stop()
-                                entity.scale -= m.DYNAMIC_SCALE_INCREMENT
-                                log.info(f"Kinematic sampling {condition.STATE_NAME} {condition.body} failed, rescaling obj: {child_scope_name} to {entity.scale}")
-                                og.sim.play()
-                                og.sim.load_state(state, serialized=False)
-                                og.sim.step_physics()
+                            # Can't re-sample non-kinematics or rescale cloth or agent, so in
+                            # those cases terminate immediately
+                            if group != "kinematic" or "agent" in child_scope_name or entity.prim_type == PrimType.CLOTH:
+                                break
+
+                            # If any scales are equal or less than the lower threshold, terminate immediately
+                            new_scale = entity.scale - m.DYNAMIC_SCALE_INCREMENT
+                            if np.any(new_scale < m.MIN_DYNAMIC_SCALE):
+                                break
+
+                            # Re-scale and re-attempt
+                            # Re-scaling is not respected unless sim cycle occurs
+                            og.sim.stop()
+                            entity.scale = new_scale
+                            log.info(f"Kinematic sampling {condition.STATE_NAME} {condition.body} failed, rescaling obj: {child_scope_name} to {entity.scale}")
+                            og.sim.play()
+                            og.sim.load_state(state, serialized=False)
+                            og.sim.step_physics()
                         if not success:
                             return f"Sampleable object conditions failed: {condition.STATE_NAME} {condition.body}"
 
