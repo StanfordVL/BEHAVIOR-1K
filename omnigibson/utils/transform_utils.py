@@ -500,14 +500,6 @@ def axisangle2quat(vec):
     Returns:
         np.array: (x,y,z,w) vec4 float angles
     """
-    # Grab angle
-    angle = np.linalg.norm(vec)
-
-    # handle zero-rotation case
-    if math.isclose(angle, 0.0):
-        return np.array([0.0, 0.0, 0.0, 1.0])
-
-    # otherwise convert like normal
     return R.from_rotvec(vec).as_quat()
 
 
@@ -996,15 +988,15 @@ def vecs2axisangle(vec0, vec1):
     Converts the angle from unnormalized 3D vectors @vec0 to @vec1 into an axis-angle representation of the angle
 
     Args:
-        vec0 (3-array): (x,y,z) 3D vector, possibly unnormalized
-        vec1 (3-array): (x,y,z) 3D vector, possibly unnormalized
+        vec0 (np.array): (..., 3) (x,y,z) 3D vector, possibly unnormalized
+        vec1 (np.array): (..., 3) (x,y,z) 3D vector, possibly unnormalized
     """
     # Normalize vectors
-    vec0 = normalize(vec0)
-    vec1 = normalize(vec1)
+    vec0 = normalize(vec0, axis=-1)
+    vec1 = normalize(vec1, axis=-1)
 
     # Get cross product for direction of angle, and multiply by arcos of the dot product which is the angle
-    return np.cross(vec0, vec1) * np.arccos(np.dot(vec0, vec1))
+    return np.cross(vec0, vec1) * np.arccos((vec0 * vec1).sum(-1, keepdims=True))
 
 
 def l2_distance(v1, v2):
@@ -1064,7 +1056,8 @@ def anorm(x, axis=None, keepdims=False):
 
 def normalize(v, axis=None, eps=1e-10):
     """L2 Normalize along specified axes."""
-    return v / max(anorm(v, axis=axis, keepdims=True), eps)
+    norm = anorm(v, axis=axis, keepdims=True)
+    return v / np.where(norm < eps, eps, norm)
 
 
 def cartesian_to_polar(x, y):

@@ -7,8 +7,9 @@ import trimesh
 
 import omnigibson as og
 from omnigibson.macros import gm, create_module_macros
+from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.systems.system_base import BaseSystem, VisualParticleSystem, PhysicalParticleSystem, REGISTERED_SYSTEMS
-from omnigibson.utils.constants import SemanticClass
+from omnigibson.utils.constants import SemanticClass, PrimType
 from omnigibson.utils.python_utils import classproperty, subclass_factory, snake_case_to_camel_case
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object_symmetric_bimodal_distribution
 import omnigibson.utils.transform_utils as T
@@ -422,7 +423,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         if orientations is None:
             orientations = np.zeros((n_particles, 4))
             orientations[:, -1] = 1.0
-        link_prim_paths = [obj.root_link.prim_path] * n_particles if link_prim_paths is None else link_prim_paths
+        link_prim_paths = [None] * n_particles if link_prim_paths is None else link_prim_paths
 
         scales = cls.sample_scales_by_group(group=group, n=n_particles) if scales is None else scales
         bbox_extents_local = [(cls._particle_object.aabb_extent * scale).tolist() for scale in scales]
@@ -436,8 +437,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         z_up[-1] = 1.0
         for position, orientation, scale, bbox_extent_local, link_prim_path in \
                 zip(positions, orientations, scales, bbox_extents_local, link_prim_paths):
-            link_name = link_prim_path.split("/")[-1]
-            link = obj.links[link_name]
+            link = None if link_prim_path is None else obj.links[link_prim_path.split("/")[-1]]
             # Possibly shift the particle slightly away from the object if we're not clipping into objects
             if cls._CLIP_INTO_OBJECTS:
                 # Shift the particle halfway down
@@ -446,7 +446,10 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                 position -= normal * base_to_center
 
             # Create particle
-            particle = cls.add_particle(prim_path=link_prim_path, scale=scale)
+            particle = cls.add_particle(
+                prim_path=obj.prim_path if link_prim_path is None else link_prim_path,
+                scale=scale,
+            )
 
             # Add to group
             cls._group_particles[group][particle.name] = particle
@@ -475,31 +478,47 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         avg_scale = np.cbrt(np.product(obj.scale))
         bbox_extents_global = scales * cls._particle_object.aabb_extent.reshape(1, 3) * avg_scale
 
-        # Sample locations for all particles
-        # TODO: Does simulation need to play at this point in time? Answer: yes
-        results = sample_cuboid_on_object_symmetric_bimodal_distribution(
-            obj=obj,
-            num_samples=max_samples,
-            cuboid_dimensions=bbox_extents_global,
-            bimodal_mean_fraction=cls._SAMPLING_BIMODAL_MEAN_FRACTION,
-            bimodal_stdev_fraction=cls._SAMPLING_BIMODAL_STDEV_FRACTION,
-            axis_probabilities=cls._SAMPLING_AXIS_PROBABILITIES,
-            undo_cuboid_bottom_padding=True,
-            verify_cuboid_empty=False,
-            aabb_offset=cls._SAMPLING_AABB_OFFSET,
-            max_sampling_attempts=cls._SAMPLING_MAX_ATTEMPTS,
-            refuse_downwards=True,
-        )
+        if obj.prim_type == PrimType.CLOTH:
+            # raise NotImplementedError("Sampling for cloth not implemented yet!")
+            # Sample locations based on randomly sampled keyfaces
+            cloth = obj.root_link
+            assert len(cloth.keyface_idx) >= max_samples, \
+                "Insufficient number of keyfaces from which to sample group visual particles for cloth!"
+            face_ids = np.random.choice(cloth.keyface_idx, max_samples, replace=False)
+            # Positions are the midpoints of each requested face
+            normals = cloth.compute_face_normals(face_ids=face_ids)
+            positions = cloth.particle_positions[cloth.faces[face_ids]].mean(axis=1)
+            # Orientations are the normals
+            z_up = np.zeros_like(normals)
+            z_up[:, 2] = 1.0
+            orientations = T.axisangle2quat(T.vecs2axisangle(z_up, normals))
+            link_prim_paths = None
+        else:
+            # Sample locations for all particles
+            results = sample_cuboid_on_object_symmetric_bimodal_distribution(
+                obj=obj,
+                num_samples=max_samples,
+                cuboid_dimensions=bbox_extents_global,
+                bimodal_mean_fraction=cls._SAMPLING_BIMODAL_MEAN_FRACTION,
+                bimodal_stdev_fraction=cls._SAMPLING_BIMODAL_STDEV_FRACTION,
+                axis_probabilities=cls._SAMPLING_AXIS_PROBABILITIES,
+                undo_cuboid_bottom_padding=True,
+                verify_cuboid_empty=False,
+                aabb_offset=cls._SAMPLING_AABB_OFFSET,
+                max_sampling_attempts=cls._SAMPLING_MAX_ATTEMPTS,
+                refuse_downwards=True,
+            )
 
-        # Use sampled points
-        positions, orientations, particle_scales, link_prim_paths = [], [], [], []
-        for result, scale in zip(results, scales):
-            position, normal, quaternion, hit_link, reasons = result
-            if position is not None:
-                positions.append(position)
-                orientations.append(quaternion)
-                particle_scales.append(scale)
-                link_prim_paths.append(hit_link)
+            # Use sampled points
+            positions, orientations, particle_scales, link_prim_paths = [], [], [], []
+            for result, scale in zip(results, scales):
+                position, normal, quaternion, hit_link, reasons = result
+                if position is not None:
+                    positions.append(position)
+                    orientations.append(quaternion)
+                    particle_scales.append(scale)
+                    link_prim_paths.append(hit_link)
+            scales = particle_scales
 
         success = len(positions) >= min_samples_for_success
         # If we generated a sufficient number of points, generate them in the simulator
@@ -542,9 +561,15 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
             link_tfs_batch = np.zeros((n_particles, 4, 4))
             particle_local_poses_batch = np.zeros_like(link_tfs_batch)
             for i, name in enumerate(particles):
-                link = cls._particles_info[name]["link"]
-                if link not in link_tfs:
-                    link_tfs[link] = T.pose2mat(link.get_position_orientation())
+                obj, link = cls._particles_info[name]["obj"], cls._particles_info[name]["link"]
+                if link is None:
+                    if obj not in link_tfs:
+                        # We want local object pose, NOT the physx pose -- since this will grab the root link
+                        # pose which we don't want!
+                        link_tfs[obj] = T.pose2mat(obj.get_local_pose())
+                else:
+                    if link not in link_tfs:
+                        link_tfs[link] = T.pose2mat(link.get_position_orientation())
                 link_tfs_batch[i] = link_tfs[link]
                 particle_local_poses_batch[i] = cls._particles_local_mat[name]
 
@@ -575,9 +600,10 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         name = list(cls.particles.keys())[idx]
         # First, get local pose, scale it by the parent link's scale, and then convert into a matrix
         # Note that particles_local_mat already takes the parent scale into account when computing the transform!
-        parent_link = cls._particles_info[name]["link"]
+        parent_obj, parent_link = cls._particles_info[name]["obj"], cls._particles_info[name]["link"]
         local_mat = cls._particles_local_mat[name]
-        link_tf = T.pose2mat(parent_link.get_position_orientation())
+        link_tf = T.pose2mat(parent_obj.get_local_pose()) if parent_link is None else \
+            T.pose2mat(parent_link.get_position_orientation())
 
         # Multiply the local pose by the link's global transform, then return as pos, quat tuple
         return T.mat2pose(link_tf @ local_mat)
@@ -622,12 +648,15 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
             link_tfs = dict()
             link_tfs_batch = np.zeros((cls.n_particles, 4, 4))
             for i, name in enumerate(particles):
-                link = cls._particles_info[name]["link"]
-                if link in link_tfs:
-                    link_tf = link_tfs[link]
+                obj, link = cls._particles_info[name]["obj"], cls._particles_info[name]["link"]
+                if link is None:
+                    if obj not in link_tfs:
+                        link_tfs[obj] = T.pose2mat(obj.get_local_pose())
+                    link_tf = link_tfs[obj]
                 else:
-                    link_tf = T.pose2mat(link.get_position_orientation())
-                    link_tfs[link] = link_tf
+                    if link not in link_tfs:
+                        link_tfs[link] = T.pose2mat(link.get_position_orientation())
+                    link_tf = link_tfs[link]
                 link_tfs_batch[i] = link_tf
 
             particle_local_poses_batch = np.matmul(np.linalg.inv(link_tfs_batch), particle_local_poses_batch)
@@ -664,8 +693,9 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         global_mat[:3, 3] = position
         global_mat[:3, :3] = T.quat2mat(orientation)
         # First, get global pose, scale it by the parent link's scale, and then convert into a matrix
-        parent_link = cls._particles_info[name]["link"]
-        link_tf = T.pose2mat(parent_link.get_position_orientation())
+        parent_obj, parent_link = cls._particles_info[name]["obj"], cls._particles_info[name]["link"]
+        link_tf = T.pose2mat(XFormPrim.get_local_pose(parent_obj)) if parent_link is None else \
+            T.pose2mat(parent_link.get_position_orientation())
         local_mat = np.linalg.inv(link_tf) @ global_mat
 
         cls._modify_particle_local_mat(name=name, mat=local_mat, ignore_scale=False)
@@ -698,8 +728,9 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         """
         particle = cls.particles[name]
         parent_link = cls._particles_info[name]["link"]
+        scale = np.ones(3) if parent_link is None else parent_link.scale
         local_pos, local_quat = particle.get_local_pose()
-        local_pos = local_pos if ignore_scale else local_pos * parent_link.scale
+        local_pos = local_pos if ignore_scale else local_pos * scale
         return T.pose2mat((local_pos, local_quat))
 
     @classmethod
@@ -714,8 +745,9 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         """
         particle = cls.particles[name]
         parent_link = cls._particles_info[name]["link"]
+        scale = np.ones(3) if parent_link is None else parent_link.scale
         local_pos, local_quat = T.mat2pose(mat)
-        local_pos = local_pos if ignore_scale else local_pos / parent_link.scale
+        local_pos = local_pos if ignore_scale else local_pos / scale
         particle.set_local_pose(local_pos, local_quat)
 
         # Store updated value
@@ -732,9 +764,10 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
             particle_idns (list of list of int): Per-group unique id numbers for the particles assigned to that group.
                 List should be same length as @group_idns with sub-entries corresponding to the desired number of
                 particles assigned to that group
-            particle_attached_link_names (list of list of str): Per-group link names corresponding to the specific
-                links each particle is attached for each group. List should be same length as @group_idns with
-                sub-entries corresponding to the desired number of particles assigned to that group
+            particle_attached_link_names (list of list of str or None): Per-group link names corresponding to the
+                specific links each particle is attached for each group. List should be same length as @group_idns with
+                sub-entries corresponding to the desired number of particles assigned to that group. Individual entries
+                can be None if the corresponding particle is not attached to any link, but rather to the object itself
         """
         # We have to be careful here -- some particle groups may have been deleted / are mismatched, so we need
         # to update accordingly, potentially deleting stale groups and creating new groups as needed
@@ -775,9 +808,14 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
             for particle_idn, link_name in zip(info["particle_idns"], info["link_names"]):
                 # Create the necessary particles
                 # Use scale (1,1,1) since it will get overridden anyways when loading state
-                particle = cls.add_particle(prim_path=f"{obj.prim_path}/{link_name}", scale=np.ones(3), idn=int(particle_idn))
+                link = None if link_name is None else obj.links[link_name]
+                particle = cls.add_particle(
+                    prim_path=obj.prim_path if link is None else link.prim_path,
+                    scale=np.ones(3),
+                    idn=int(particle_idn),
+                )
                 cls._group_particles[name][particle.name] = particle
-                cls._particles_info[particle.name] = dict(obj=obj, link=obj.links[link_name])
+                cls._particles_info[particle.name] = dict(obj=obj, link=link)
 
     @classmethod
     def create(cls, name, create_particle_template, min_scale=None, max_scale=None, scale_relative_to_parent=False, **kwargs):
@@ -847,7 +885,9 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                 particle_attached_obj_uuid=cls._group_objects[group_name].uuid,
                 n_particles=cls.num_group_particles(group=group_name),
                 particle_idns=[cls.particle_name2idn(name=name) for name in group_particles.keys()],
-                particle_attached_link_names=[cls._particles_info[name]["link"].prim_path.split("/")[-1] for name in group_particles.keys()],
+                particle_attached_link_names=[
+                    None if cls._particles_info[name]["link"] is None else
+                    cls._particles_info[name]["link"].prim_path.split("/")[-1] for name in group_particles.keys()],
             )
 
         state["n_groups"] = len(cls._group_particles)
@@ -884,6 +924,8 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         state_group_flat = [[state["n_groups"]]]
         for group_name, group_dict in groups_dict.items():
             group_obj_link2id = {link_name: i for i, link_name in enumerate(cls._group_objects[group_name].links.keys())}
+            # Assign -1 if there's no link
+            group_obj_link2id[None] = -1
             state_group_flat += [
                 [group_dict["particle_attached_obj_uuid"]],
                 [group_dict["n_particles"]],
@@ -905,6 +947,8 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
             obj_uuid, n_particles = int(state[idx]), int(state[idx + 1])
             obj = og.sim.scene.object_registry("uuid", obj_uuid)
             group_obj_id2link = {i: link_name for i, link_name in enumerate(obj.links.keys())}
+            # Parse -1 when there's no link
+            group_obj_id2link[-1] = None
             group_objs.append(obj)
             groups_dict[obj.name] = dict(
                 particle_attached_obj_uuid=obj_uuid,
