@@ -30,7 +30,7 @@ def get_grasp_poses_for_object_sticky(target_obj, force_allow_any_extent=True):
     grasp_center_pos = T.mat2pose(
         T.pose2mat((bbox_center_in_world, bbox_quat_in_world)) @  # base frame to world frame
         T.pose2mat((grasp_center_in_base_frame, [0, 0, 0, 1]))    # grasp pose in base frame
-    )[0]
+    )[0] + np.array([0, 0, 0.02])
     towards_object_in_world_frame = bbox_center_in_world - grasp_center_pos
     towards_object_in_world_frame /= np.linalg.norm(towards_object_in_world_frame)
 
