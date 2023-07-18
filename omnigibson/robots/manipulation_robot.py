@@ -5,7 +5,6 @@ import numpy as np
 import omnigibson as og
 from omnigibson.macros import gm, create_module_macros
 from omnigibson.object_states import ContactBodies
-from omnigibson.utils.asset_utils import get_assisted_grasping_categories
 import omnigibson.utils.transform_utils as T
 from omnigibson.controllers import (
     IsGraspingState,
@@ -29,11 +28,10 @@ m = create_module_macros(module_path=__file__)
 
 # Assisted grasping parameters
 m.ASSIST_FRACTION = 1.0
-m.ASSIST_GRASP_OBJ_CATEGORIES = get_assisted_grasping_categories()
 m.ASSIST_GRASP_MASS_THRESHOLD = 10.0
 m.ARTICULATED_ASSIST_FRACTION = 0.7
 m.MIN_ASSIST_FORCE = 0
-m.MAX_ASSIST_FORCE = 500
+m.MAX_ASSIST_FORCE = 100
 m.ASSIST_FORCE = m.MIN_ASSIST_FORCE + (m.MAX_ASSIST_FORCE - m.MIN_ASSIST_FORCE) * m.ASSIST_FRACTION
 m.CONSTRAINT_VIOLATION_THRESHOLD = 0.1
 m.RELEASE_WINDOW = 1 / 30.0  # release window in seconds
@@ -46,7 +44,7 @@ AG_MODES = {
 GraspingPoint = namedtuple("GraspingPoint", ["link_name", "position"])  # link_name (str), position (x,y,z tuple)
 
 
-def can_assisted_grasp(obj):
+def can_assisted_grasp(obj, link_name):
     """
     Check whether an object @obj can be grasped. This is done
     by checking its category to see if is in the allowlist.
@@ -58,14 +56,16 @@ def can_assisted_grasp(obj):
         bool: Whether or not this object can be grasped
     """
 
-    if isinstance(obj, DatasetObject) and obj.category != "object":
-        # Use manually defined allowlist
-        return obj.category in m.ASSIST_GRASP_OBJ_CATEGORIES
-    else:
-        # Use fallback based on mass
-        mass = obj.mass
-        print(f"Mass for AG: obj: {mass}, max mass: {m.ASSIST_GRASP_MASS_THRESHOLD}, obj: {obj.name}")
-        return mass <= m.ASSIST_GRASP_MASS_THRESHOLD
+    # Allow based on mass
+    mass = obj.mass
+    if mass <= m.ASSIST_GRASP_MASS_THRESHOLD:
+        return True
+    
+    # Also allow AG of moving links of fixed objects
+    if obj.fixed_base and link_name != "base_link":
+        return True
+    
+    return False
 
 
 class ManipulationRobot(BaseRobot):
@@ -766,7 +766,7 @@ class ManipulationRobot(BaseRobot):
         ag_obj = og.sim.scene.object_registry("prim_path", ag_obj_prim_path)
 
         # Return None if object cannot be assisted grasped or not touching at least two fingers
-        if ag_obj is None or (not can_assisted_grasp(ag_obj)) or (not touching_at_least_two_fingers):
+        if ag_obj is None or (not can_assisted_grasp(ag_obj, ag_obj_link_name)) or (not touching_at_least_two_fingers):
             return None
 
         # Get object and its contacted link
@@ -789,7 +789,6 @@ class ManipulationRobot(BaseRobot):
             # for finger_link in self.finger_links[arm]:
             #     finger_link.remove_filtered_collision_pair(prim=self._ag_obj_in_hand[arm])
             self._ag_obj_in_hand[arm] = None
-            print("released")
             self._ag_release_counter[arm] = None
 
     def _freeze_gripper(self, arm="default"):
@@ -1054,7 +1053,6 @@ class ManipulationRobot(BaseRobot):
             "contact_pos": contact_pos,
         }
         self._ag_obj_in_hand[arm] = ag_obj
-        print(ag_obj.name, "in hand")
         self._ag_freeze_gripper[arm] = True
         # Disable collisions while picking things up
         # TODO: Verify not needed!
@@ -1089,10 +1087,6 @@ class ManipulationRobot(BaseRobot):
                 if self._ag_release_counter[arm] is not None:
                     self._handle_release_window(arm=arm)
                 else:
-                    # constraint_violated = (
-                    #     get_constraint_violation(self._ag_obj_cid[arm]) > m.CONSTRAINT_VIOLATION_THRESHOLD
-                    # )
-                    # if constraint_violated or releasing_grasp:
                     if gm.AG_CLOTH:
                         self._update_constraint_cloth(arm=arm)
 
