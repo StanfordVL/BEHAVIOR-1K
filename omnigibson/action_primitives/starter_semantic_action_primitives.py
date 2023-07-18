@@ -46,18 +46,7 @@ from omnigibson.utils.grasping_planning_utils import (
 from omnigibson.objects import DatasetObject
 from omnigibson.controllers.controller_base import ControlType
 
-# Fake imports
-p = None
-set_joint_position = None
-RoomFloor = None
-URDFObject = None
 DEFAULT_BODY_OFFSET_FROM_FLOOR = 0.05
-behavior_robot = None
-BehaviorRobot = None
-get_grasp_poses_for_object = None
-plan_hand_motion_br = None
-get_pose3d_hand_collision_fn = None
-restoreState = None
 
 KP_LIN_VEL = 0.3
 KP_ANGLE_VEL = 0.2
@@ -74,7 +63,7 @@ MAX_ATTEMPTS_FOR_SAMPLING_POSE_IN_ROOM = 60
 
 BIRRT_SAMPLING_CIRCLE_PROBABILITY = 0.5
 HAND_SAMPLING_DOMAIN_PADDING = 1  # Allow 1m of freedom around the sampling range.
-PREDICATE_SAMPLING_Z_OFFSET = 0.2
+PREDICATE_SAMPLING_Z_OFFSET = 0.02
 JOINT_CHECKING_RESOLUTION = np.pi / 18
 
 GRASP_APPROACH_DISTANCE = 0.2
@@ -141,6 +130,7 @@ class StarterSemanticActionPrimitive(IntEnum):
     OPEN = 3
     CLOSE = 4
     NAVIGATE_TO = 5  # For mostly debugging purposes.
+    RELEASE = 6  # For reorienting grasp
 
 
 class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
@@ -159,6 +149,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             StarterSemanticActionPrimitive.OPEN: self.open,
             StarterSemanticActionPrimitive.CLOSE: self.close,
             StarterSemanticActionPrimitive.NAVIGATE_TO: self._navigate_to_obj,
+            StarterSemanticActionPrimitive.RELEASE: self.release,
         }
         self.arm = self.robot.default_arm
         self.robot_model = self.robot.model_name
@@ -232,6 +223,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
     def close(self, obj):
         yield from self._open_or_close(obj, False)
+
+    def release(self):
+        yield from self._execute_release()
 
     def _open_or_close(self, obj, should_open):
         # hand_collision_fn = get_pose3d_hand_collision_fn(
