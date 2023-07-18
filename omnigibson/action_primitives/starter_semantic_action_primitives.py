@@ -478,7 +478,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         return joint_pos, control_idx
 
     def _move_hand(self, target_pose):
-        self._fix_robot_base()
         yield from self._settle_robot()
         joint_pos, control_idx = self._convert_cartesian_to_joint_space(target_pose)
 
@@ -553,8 +552,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             yield action
 
         # Do nothing for a bit so that AG can trigger.
-        for _ in range(MAX_WAIT_FOR_GRASP_OR_RELEASE):
-            yield self._empty_action()
+        # for _ in range(MAX_WAIT_FOR_GRASP_OR_RELEASE):
+        #     yield self._empty_action()
 
         if self._get_obj_in_hand() is not None:
             raise ActionPrimitiveError(
@@ -884,10 +883,3 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         yield from [self._empty_action() for _ in range(10)]
         while np.linalg.norm(self.robot.get_linear_velocity()) > 0.01:
             yield self._empty_action()
-    
-    def _fix_robot_base(self):
-        self.robot_base_mass = self.robot._links['base_link'].mass
-        self.robot._links['base_link'].mass = 10000
-
-    def _unfix_robot_base(self):
-        self.robot._links['base_link'].mass = self.robot_base_mass

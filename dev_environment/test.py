@@ -44,6 +44,8 @@ def main():
     scene = env.scene
     robot = env.robots[0]
 
+    robot._links['base_link'].mass = 10000
+
     # Allow user to move camera more easily
     og.sim.enable_viewer_camera_teleoperation()
 

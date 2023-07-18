@@ -758,7 +758,7 @@ class ManipulationRobot(BaseRobot):
 
         # Make sure at least two fingers are in contact with this object
         robot_contacts = robot_contact_links[ag_prim_path]
-        touching_at_least_two_fingers = len({link.prim_path for link in self.finger_links[arm]}.intersection(robot_contacts)) >= 2
+        touching_at_least_two_fingers = True # len({link.prim_path for link in self.finger_links[arm]}.intersection(robot_contacts)) >= 2
 
         # TODO: Better heuristic, hacky, we assume the parent object prim path is the prim_path minus the last "/" item
         ag_obj_prim_path = "/".join(ag_prim_path.split("/")[:-1])
@@ -789,6 +789,7 @@ class ManipulationRobot(BaseRobot):
             # for finger_link in self.finger_links[arm]:
             #     finger_link.remove_filtered_collision_pair(prim=self._ag_obj_in_hand[arm])
             self._ag_obj_in_hand[arm] = None
+            print("released")
             self._ag_release_counter[arm] = None
 
     def _freeze_gripper(self, arm="default"):
@@ -1053,6 +1054,7 @@ class ManipulationRobot(BaseRobot):
             "contact_pos": contact_pos,
         }
         self._ag_obj_in_hand[arm] = ag_obj
+        print(ag_obj.name, "in hand")
         self._ag_freeze_gripper[arm] = True
         # Disable collisions while picking things up
         # TODO: Verify not needed!
@@ -1077,9 +1079,10 @@ class ManipulationRobot(BaseRobot):
                 f"Gripper {arm} controller command dim must be 1 to use assisted grasping, got: {cmd_dim}."
 
             # TODO: Why are we separately checking for complementary conditions?
-            controlled_joints = self._controllers[f"gripper_{arm}"].dof_idx
+            controller = self._controllers[f"gripper_{arm}"]
+            controlled_joints = controller.dof_idx
             threshold = np.mean(np.array(self.control_limits["position"])[:, controlled_joints], axis=0)
-            applying_grasp = np.any(self._last_control[controlled_joints] < threshold)
+            applying_grasp = np.any(controller.control < threshold)
 
             # Execute gradual release of object
             if self._ag_obj_in_hand[arm]:
