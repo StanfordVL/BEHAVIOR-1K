@@ -5,7 +5,7 @@ import argparse
 
 import omnigibson as og
 from omnigibson.macros import gm
-from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitives
+from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitives, StarterSemanticActionPrimitiveSet
 import omnigibson.utils.transform_utils as T
 from omnigibson.objects.dataset_object import DatasetObject
 
@@ -104,8 +104,7 @@ def main():
         execute_controller(controller.grasp(grasp_obj), env)
 
     def test_grasp():
-        set_start_pose()
-        execute_controller(controller.grasp(grasp_obj), env)
+        execute_controller(controller.apply_ref(StarterSemanticActionPrimitiveSet.GRASP, grasp_obj), env)
 
     def test_place():
         test_grasp()
@@ -130,26 +129,5 @@ def main():
     # test_grasp()
     # test_place()
 
-    pause(5)
-
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Run test script")
-    parser.add_argument(
-        "--profile",
-        action="store_true",
-        help="If set, profile code and generate .prof file",
-    )
-    args = parser.parse_args()
-    if args.profile:
-        pr = cProfile.Profile()
-        pr.enable()
-        main()
-        pr.disable()
-        s = io.StringIO()
-        results = pstats.Stats(pr)
-        filename = f'profile-{os.path.basename(__file__)}-{time.strftime("%Y%m%d-%H%M%S")}'
-        results.dump_stats(f"./profiles/{filename}.prof")
-        os.system(f"flameprof ./profiles/{filename}.prof > ./profiles/{filename}.svg")
-        # Run `snakeviz ./profiles/<filename>.prof` to visualize stack trace or open <filename>.svg in a browser
-    else:
-        main()
+    main()

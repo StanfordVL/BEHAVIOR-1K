@@ -29,7 +29,7 @@ class ActionPrimitiveError(ValueError):
     def __init__(self, reason: Reason, message, metadata=None):
         self.reason = reason
         self.metadata = metadata if metadata is not None else {}
-        super().__init__(f"{reason}: {message}. Additional info: {metadata}")
+        super().__init__(f"{reason.name}: {message}. Additional info: {metadata}")
 
 
 class BaseActionPrimitiveSet(with_metaclass(ABCMeta, object)):
