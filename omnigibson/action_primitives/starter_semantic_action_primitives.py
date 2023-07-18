@@ -506,7 +506,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             for i, joint_pos in enumerate(plan):
                 indented_print("Executing grasp plan step %d/%d", i + 1, len(plan))
                 yield from self._move_hand_direct_joint(joint_pos, control_idx)
-        self._unfix_robot_base()
 
     def _move_hand_direct_joint(self, joint_pos, control_idx, stop_on_contact=False, max_steps_for_hand_move=MAX_STEPS_FOR_HAND_MOVE, ignore_failure=False):
         action = self._empty_action()
