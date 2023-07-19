@@ -631,10 +631,13 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
             particle_local_poses_batch = np.zeros_like(link_tfs_batch)
             for i, name in enumerate(particles):
                 obj, link = cls._particles_info[name]["obj"], cls._particles_info[name]["link"]
-                if link is None:
+                is_cloth = obj.prim_type == PrimType.CLOTH
+                if is_cloth:
                     if obj not in link_tfs:
-                        # We want local object pose, NOT the physx pose -- since this will grab the root link
-                        # pose which we don't want!
+                        # We want World --> obj transform, NOT the World --> root_link transform, since these particles
+                        # do NOT exist under a link but rather the object prim itself. So we use XFormPrim to directly
+                        # get the transform, and not obj.get_local_pose() which will give us the local pose of the
+                        # root link!
                         link_tfs[obj] = T.pose2mat(XFormPrim.get_local_pose(obj))
                 else:
                     if link not in link_tfs:
