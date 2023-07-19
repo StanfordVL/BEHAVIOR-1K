@@ -341,6 +341,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
     _particles_local_mat = None
 
     # Maps group name to array of face_ids where particles are located if the group object is a cloth type
+    # Maps group name to np.array of face IDs (int) that particles are attached to
     _cloth_face_ids = None
 
     # Default behavior for this class -- whether to clip generated particles halfway into objects when sampling
