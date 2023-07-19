@@ -673,8 +673,9 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         # First, get local pose, scale it by the parent link's scale, and then convert into a matrix
         # Note that particles_local_mat already takes the parent scale into account when computing the transform!
         parent_obj, parent_link = cls._particles_info[name]["obj"], cls._particles_info[name]["link"]
+        is_cloth = parent_obj.prim_type == PrimType.CLOTH
         local_mat = cls._particles_local_mat[name]
-        link_tf = T.pose2mat(XFormPrim.get_local_pose(parent_obj)) if parent_link is None else \
+        link_tf = T.pose2mat(XFormPrim.get_local_pose(parent_obj)) if is_cloth else \
             T.pose2mat(parent_link.get_position_orientation())
 
         # Multiply the local pose by the link's global transform, then return as pos, quat tuple
@@ -721,8 +722,13 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
             link_tfs_batch = np.zeros((cls.n_particles, 4, 4))
             for i, name in enumerate(particles):
                 obj, link = cls._particles_info[name]["obj"], cls._particles_info[name]["link"]
-                if link is None:
+                is_cloth = obj.prim_type == PrimType.CLOTH
+                if is_cloth:
                     if obj not in link_tfs:
+                        # We want World --> obj transform, NOT the World --> root_link transform, since these particles
+                        # do NOT exist under a link but rather the object prim itself. So we use XFormPrim to directly
+                        # get the transform, and not obj.get_local_pose() which will give us the local pose of the
+                        # root link!
                         link_tfs[obj] = T.pose2mat(XFormPrim.get_local_pose(obj))
                     link_tf = link_tfs[obj]
                 else:
@@ -766,7 +772,8 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         global_mat[:3, :3] = T.quat2mat(orientation)
         # First, get global pose, scale it by the parent link's scale, and then convert into a matrix
         parent_obj, parent_link = cls._particles_info[name]["obj"], cls._particles_info[name]["link"]
-        link_tf = T.pose2mat(XFormPrim.get_local_pose(parent_obj)) if parent_link is None else \
+        is_cloth = parent_obj.prim_type == PrimType.CLOTH
+        link_tf = T.pose2mat(XFormPrim.get_local_pose(parent_obj)) if is_cloth else \
             T.pose2mat(parent_link.get_position_orientation())
         local_mat = np.linalg.inv(link_tf) @ global_mat
 
@@ -799,8 +806,9 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
             np.array: (4, 4) homogeneous transform matrix
         """
         particle = cls.particles[name]
-        parent_link = cls._particles_info[name]["link"]
-        scale = np.ones(3) if parent_link is None else parent_link.scale
+        parent_obj, parent_link = cls._particles_info[name]["obj"], cls._particles_info[name]["link"]
+        is_cloth = parent_obj.prim_type == PrimType.CLOTH
+        scale = np.ones(3) if is_cloth else parent_link.scale
         local_pos, local_quat = particle.get_local_pose()
         local_pos = local_pos if ignore_scale else local_pos * scale
         return T.pose2mat((local_pos, local_quat))
@@ -816,8 +824,9 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
             ignore_scale (bool): Whether to ignore the parent_link scale when setting the local transform
         """
         particle = cls.particles[name]
-        parent_link = cls._particles_info[name]["link"]
-        scale = np.ones(3) if parent_link is None else parent_link.scale
+        parent_obj, parent_link = cls._particles_info[name]["obj"], cls._particles_info[name]["link"]
+        is_cloth = parent_obj.prim_type == PrimType.CLOTH
+        scale = np.ones(3) if is_cloth else parent_link.scale
         local_pos, local_quat = T.mat2pose(mat)
         local_pos = local_pos if ignore_scale else local_pos / scale
         particle.set_local_pose(local_pos, local_quat)
@@ -884,7 +893,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                 # Use scale (1,1,1) since it will get overridden anyways when loading state
                 link = None if is_cloth else obj.links[link_name]
                 particle = cls.add_particle(
-                    prim_path=obj.prim_path if link is None else link.prim_path,
+                    prim_path=obj.prim_path if is_cloth else link.prim_path,
                     scale=np.ones(3),
                     idn=int(particle_idn),
                 )
