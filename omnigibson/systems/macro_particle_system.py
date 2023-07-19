@@ -384,10 +384,10 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                 z_up = np.zeros_like(normals)
                 z_up[:, 2] = 1.0
                 orientations = T.axisangle2quat(T.vecs2axisangle(z_up, normals))
-                if cls._CLIP_INTO_OBJECTS:
+                if not cls._CLIP_INTO_OBJECTS:
                     offset = np.array([cls._particle_object.aabb_extent * particle.scale for particle in cls._group_particles[group].values()]) / 2.0
                     # Shift the particles halfway down
-                    positions -= normals * offset[2].reshape(-1, 1)
+                    positions += normals * offset[2].reshape(-1, 1)
 
                 # Set the group particle poses
                 cls.set_group_particles_position_orientation(group=group, positions=positions, orientations=orientations)
@@ -467,11 +467,21 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
 
         # Standardize orientations and links
         obj = cls._group_objects[group]
+        is_cloth = obj.prim_type == PrimType.CLOTH
+
+        # If cloth, run the following sanity checks:
+        # (1) make sure link prim paths are not specified -- we can ONLY apply particles under the object xform prim
+        # (2) make sure object prim path exists at /World/<NAME> -- global pose inference assumes this is the case
+        if is_cloth:
+            assert link_prim_paths is None, "link_prim_paths should not be specified for cloth object group!"
+            assert obj.prim.GetParent().GetPath().pathString == "/World", \
+                "cloth object should exist as direct child of /World prim!"
+
         n_particles = positions.shape[0]
         if orientations is None:
             orientations = np.zeros((n_particles, 4))
             orientations[:, -1] = 1.0
-        link_prim_paths = [None] * n_particles if link_prim_paths is None else link_prim_paths
+        link_prim_paths = [None] * n_particles if is_cloth else link_prim_paths
 
         scales = cls.sample_scales_by_group(group=group, n=n_particles) if scales is None else scales
         bbox_extents_local = [(cls._particle_object.aabb_extent * scale).tolist() for scale in scales]
@@ -485,17 +495,22 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         z_up[-1] = 1.0
         for position, orientation, scale, bbox_extent_local, link_prim_path in \
                 zip(positions, orientations, scales, bbox_extents_local, link_prim_paths):
-            link = None if link_prim_path is None else obj.links[link_prim_path.split("/")[-1]]
+            link = None if is_cloth else obj.links[link_prim_path.split("/")[-1]]
             # Possibly shift the particle slightly away from the object if we're not clipping into objects
-            if cls._CLIP_INTO_OBJECTS:
+            # Note: For particles tied to rigid objects, the given position is on the surface of the object,
+            # so clipping would move the particle INTO the object surface, whereas for particles tied to cloth objects,
+            # the given position is at the particle location (i.e.: already clipped), so NO clipping would move the
+            # particle AWAY from the object surface
+            if (is_cloth and not cls._CLIP_INTO_OBJECTS) or (not is_cloth and cls._CLIP_INTO_OBJECTS):
                 # Shift the particle halfway down
                 base_to_center = bbox_extent_local[2] / 2.0
                 normal = (T.quat2mat(orientation) @ z_up).flatten()
-                position -= normal * base_to_center
+                offset = normal * base_to_center if is_cloth else -normal * base_to_center
+                position += offset
 
             # Create particle
             particle = cls.add_particle(
-                prim_path=obj.prim_path if link_prim_path is None else link_prim_path,
+                prim_path=obj.prim_path if is_cloth else link_prim_path,
                 scale=scale,
             )
 
