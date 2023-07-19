@@ -543,12 +543,12 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         bbox_extents_global = scales * cls._particle_object.aabb_extent.reshape(1, 3) * avg_scale
 
         if obj.prim_type == PrimType.CLOTH:
-            # raise NotImplementedError("Sampling for cloth not implemented yet!")
             # Sample locations based on randomly sampled keyfaces
             cloth = obj.root_link
             assert len(cloth.keyface_idx) >= max_samples, \
                 "Insufficient number of keyfaces from which to sample group visual particles for cloth!"
-            face_ids = np.random.choice(cloth.keyface_idx, max_samples, replace=False)
+            n_faces = len(cloth.faces)
+            face_ids = np.random.choice(n_faces, min(max_samples, n_faces), replace=False)
             # Positions are the midpoints of each requested face
             normals = cloth.compute_face_normals(face_ids=face_ids)
             positions = cloth.particle_positions[cloth.faces[face_ids]].mean(axis=1)
