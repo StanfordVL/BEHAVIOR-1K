@@ -6,7 +6,7 @@ on:
       - 'main'
       - 'docker-action'
 env:
-  REGISTRY_USER: omnigibson
+  REGISTRY_USER: ${{ secrets.REGISTRY_USER }}
   REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
 
 jobs:
