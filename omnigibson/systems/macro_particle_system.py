@@ -451,7 +451,8 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         if "face_id" in particle_info:
             # Also remove from cloth face ids
             face_ids = cls._cloth_face_ids[group]
-            cls._cloth_face_ids[group] = np.delete(face_ids, (face_ids == particle_info["face_id"].argmax()))
+            idx_mapping = {face_id: i for i, face_id in enumerate(face_ids)}
+            cls._cloth_face_ids[group] = np.delete(face_ids, idx_mapping[particle_info["face_id"]])
 
     @classmethod
     def generate_group_particles(
