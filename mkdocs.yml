@@ -62,8 +62,6 @@ markdown_extensions:
       custom_checkbox: true
   - attr_list
   - md_in_html
-  - attr_list
-  - md_in_html
 
 # extra plugins
 plugins:

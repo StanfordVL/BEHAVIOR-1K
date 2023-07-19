@@ -6,12 +6,12 @@ if [[ -d ~/.local/share/ov/pkg ]] && [[ $(ls ~/.local/share/ov/pkg | grep isaac_
 then
   FOUND_ISAAC_SIM_PATH=$(ls -d ~/.local/share/ov/pkg/* | grep isaac_sim | tail -n 1) 
   echo "We found Isaac Sim installed at [4m$FOUND_ISAAC_SIM_PATH[0m. OmniGibson will use it by default."
-  read -p "If you want to use a different one, please type in the path containing isaac-sim.bat here (press enter to skip) >>> " ISAAC_SIM_PATH
+  read -p "If you want to use a different one, please type in the path containing isaac-sim.sh here (press enter to skip) >>> " ISAAC_SIM_PATH
   ISAAC_SIM_PATH=${ISAAC_SIM_PATH:-$FOUND_ISAAC_SIM_PATH}
 else
   echo "We did not find Isaac Sim under ~/.local/share/ov/pkg."
   echo "If you haven't installed Isaac Sim yet, please do so before running this setup script."
-  read -p "If you have already installed it in a custom location, please type in the path containing isaac-sim.bat here >>> " ISAAC_SIM_PATH
+  read -p "If you have already installed it in a custom location, please type in the path containing isaac-sim.sh here >>> " ISAAC_SIM_PATH
 fi
 
 while [[ ! -f "${ISAAC_SIM_PATH}/isaac-sim.sh" ]]; do
@@ -23,7 +23,7 @@ echo -e "\nUsing Isaac Sim at [4m$ISAAC_SIM_PATH[0m\n"
 # Choose venv name 
 echo "The new conda environment will be named [4momnigibson[0m by default."
 read -p "If you want to use a different name, please type in here (press enter to skip) >>> " conda_name
-conda_name=${name:-omnigibson}
+conda_name=${conda_name:-omnigibson}
 echo -e "\nUsing [4m$conda_name[0m as the conda environment name\n"
 
 # Create a conda environment with python 3.7

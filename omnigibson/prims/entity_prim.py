@@ -160,17 +160,6 @@ class EntityPrim(XFormPrim):
 
         self._materials = materials
 
-    @property
-    def aabb(self):
-        if self._prim_type == PrimType.CLOTH:
-            particle_positions = self.root_link.particle_positions
-            aabb_low, aabb_hi = np.min(particle_positions, axis=0), np.max(particle_positions, axis=0)
-        else:  # Rigid
-            aabb_low, aabb_hi = super().aabb
-            aabb_low, aabb_hi = np.array(aabb_low), np.array(aabb_hi)
-
-        return aabb_low, aabb_hi
-
     def update_links(self, load_config=None):
         """
         Helper function to refresh owned joints. Useful for synchronizing internal data if
@@ -319,9 +308,9 @@ class EntityPrim(XFormPrim):
                         # Compute the joint frame orientation in the object frame
                         joint_orn = T.quat_multiply(quaternion1=joint_local_orn, quaternion0=link_local_orn)
 
-                        assert T.check_quat_right_angle(joint_orn), \
-                            f"Objects that are NOT uniformly scaled requires all joints to have orientations that " \
-                            f"are factors of 90 degrees! Got orn: {joint_orn} for object {self.name}"
+                        # assert T.check_quat_right_angle(joint_orn), \
+                        #     f"Objects that are NOT uniformly scaled requires all joints to have orientations that " \
+                        #     f"are factors of 90 degrees! Got orn: {joint_orn} for object {self.name}"
 
                         # Find the joint axis unit vector (e.g. [1, 0, 0] for "X", [0, 1, 0] for "Y", etc.)
                         axis_in_joint_frame = np.zeros(3)
@@ -1264,8 +1253,10 @@ class EntityPrim(XFormPrim):
         # If we're a cloth prim type, we compute the bounding box from the limits of the particles. Otherwise, use the
         # normal method for computing bounding box
         if self._prim_type == PrimType.CLOTH:
+            particle_contact_offset = self.root_link.cloth_system.particle_contact_offset
             particle_positions = self.root_link.particle_positions
-            aabb_lo, aabb_hi = np.min(particle_positions, axis=0), np.max(particle_positions, axis=0)
+            aabb_lo, aabb_hi = np.min(particle_positions, axis=0) - particle_contact_offset, \
+                np.max(particle_positions, axis=0) + particle_contact_offset
         else:
             aabb_lo, aabb_hi = super().aabb
             aabb_lo, aabb_hi = np.array(aabb_lo), np.array(aabb_hi)

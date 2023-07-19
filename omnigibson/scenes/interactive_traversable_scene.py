@@ -4,6 +4,7 @@ from omnigibson.scenes.traversable_scene import TraversableScene
 from omnigibson.maps.segmentation_map import SegmentationMap
 from omnigibson.utils.asset_utils import get_og_scene_path
 from omnigibson.utils.ui_utils import create_module_logger
+from collections import defaultdict
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -30,6 +31,7 @@ class InteractiveTraversableScene(TraversableScene):
         not_load_object_categories=None,
         load_room_types=None,
         load_room_instances=None,
+        load_task_relevant_only=False,
         seg_map_resolution=0.1,
         include_robots=True,
     ):
@@ -50,6 +52,7 @@ class InteractiveTraversableScene(TraversableScene):
             not_load_object_categories (None or list): if specified, do not load these object categories into the scene
             load_room_types (None or list): only load objects in these room types into the scene
             load_room_instances (None or list): if specified, only load objects in these room instances into the scene
+            load_task_relevant_only (bool): Whether only task relevant objects (and building structure) should be loaded
             seg_map_resolution (float): room segmentation map resolution
             include_robots (bool): whether to also include the robot(s) defined in the scene
         """
@@ -64,6 +67,7 @@ class InteractiveTraversableScene(TraversableScene):
         self.load_object_categories = None
         self.not_load_object_categories = None
         self.load_room_instances = None
+        self.load_task_relevant_only = load_task_relevant_only
 
         # Get scene information
         if scene_file is None:
@@ -160,12 +164,31 @@ class InteractiveTraversableScene(TraversableScene):
         if self.has_connectivity_graph:
             self._trav_map.load_map(maps_path)
 
+    def _initialize(self):
+        super()._initialize()
+        self._seg_map.room_sem_name_to_ins_name = defaultdict(list)
+        for object in self.objects:
+            if not hasattr(object, "in_rooms") or object.in_rooms is None:
+                continue
+            for in_room in object.in_rooms:
+                if in_room == "":
+                    continue
+                room_type = "_".join(in_room.split("_")[:-1])
+                if in_room not in self._seg_map.room_sem_name_to_ins_name[room_type]:
+                    self._seg_map.room_sem_name_to_ins_name[room_type].append(in_room)
+
     def _should_load_object(self, obj_info):
         category = obj_info["args"].get("category", "object")
         in_rooms = obj_info["args"].get("in_rooms", [])
 
+        # TODO: Remove this ugliness once updated
+        in_rooms = in_rooms.split(",") if isinstance(in_rooms, str) else in_rooms
+
         # Do not load these object categories (can blacklist building structures as well)
-        not_blacklisted = self.not_load_object_categories is None or category not in self.not_load_object_categories
+        not_blacklisted = (
+            (self.not_load_object_categories is None or category not in self.not_load_object_categories) and
+            (not self.load_task_relevant_only or obj_info["args"]["bddl_object_scope"])
+        )
 
         # Only load these object categories (no need to white list building structures)
         whitelisted = self.load_object_categories is None or category in self.load_object_categories
@@ -177,7 +200,7 @@ class InteractiveTraversableScene(TraversableScene):
         agent_ok = self.include_robots or category != robot_macros.ROBOT_CATEGORY
 
         # We only load this model if all the above conditions are met
-        return not_blacklisted and whitelisted and valid_room and agent_ok
+        return not_blacklisted and whitelisted and (valid_room or category in {"floors", "walls", "ceilings"}) and agent_ok
 
     @property
     def seg_map(self):

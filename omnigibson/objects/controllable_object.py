@@ -90,6 +90,9 @@ class ControllableObject(BaseObject):
         self._controllers = None
         self.dof_names_ordered = None
 
+        self._last_control = None
+        self._last_control_type = None
+
         # Run super init
         super().__init__(
             prim_path=prim_path,
@@ -307,8 +310,19 @@ class ControllableObject(BaseObject):
         # Run convert actions to controls
         control, control_type = self._actions_to_control(action=action)
 
+        self._last_control = control
+        self._last_control_type = control_type
+
         # Deploy control signals
         self.deploy_control(control=control, control_type=control_type, indices=None, normalized=False)
+
+    @property
+    def last_control(self):
+        return self._last_control
+    
+    @property
+    def last_control_type(self):
+        return self._last_control_type
 
     def _actions_to_control(self, action):
         """

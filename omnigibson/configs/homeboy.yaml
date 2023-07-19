@@ -14,7 +14,6 @@ scene:
   build_graph: true
   num_waypoints: 1
   waypoint_resolution: 0.2
-  load_object_categories: null
   not_load_object_categories: null
   load_room_types: null
   load_room_instances: null
@@ -57,25 +56,21 @@ robots:
 
 objects: []
 
-# task:
-#   type: PointNavigationTask
-#   robot_idn: 0
-#   floor: 0
-#   initial_pos: null
-#   initial_quat: null
-#   goal_pos: null
-#   goal_tolerance: 0.36    # turtlebot bodywidth
-#   goal_in_polar: false
-#   path_range: [1.0, 10.0]
-#   visualize_goal: true
-#   visualize_path: false
-#   n_vis_waypoints: 25
-#   reward_type: geodesic
-#   termination_config:
-#     max_collisions: 500
-#     max_steps: 500
-#     fall_height: 0.03
-#   reward_config:
-#     r_potential: 1.0
-#     r_collision: 0.1
-#     r_pointgoal: 10.0
+task:
+  type: BehaviorTask
+  activity_name: make_a_military_care_package
+  activity_definition_id: 0
+  activity_instance_id: 0
+  online_object_sampling: false
+  debug_object_sampling: null
+  highlight_task_relevant_objects: false
+  termination_config:
+    max_steps: 50000
+  reward_config:
+    r_potential: 1.0
+
+scene_graph:
+  egocentric: true
+  full_obs: true
+  only_true: true
+  merge_parallel_edges: false

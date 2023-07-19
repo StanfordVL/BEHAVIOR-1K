@@ -126,6 +126,18 @@ class Open(AbsoluteObjectState, BooleanState):
 
         # Check the metadata info to get relevant joints information
         self.relevant_joints_info = _get_relevant_joints(self.obj)
+        assert self.relevant_joints_info[1], f"No relevant joints for Open state found for object {self.obj.name}"
+
+    @classmethod
+    def is_compatible(cls, obj, **kwargs):
+        # Run super first
+        compatible, reason = super().is_compatible(obj, **kwargs)
+        if not compatible:
+            return compatible, reason
+
+        # Check whether this object has any openable joints
+        return (True, None) if obj.n_joints > 0 else \
+            (False, f"No relevant joints for Open state found for object {obj.name}")
 
     def _get_value(self):
         both_sides, relevant_joints, joint_directions = self.relevant_joints_info

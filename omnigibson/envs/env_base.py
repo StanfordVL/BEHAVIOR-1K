@@ -1,9 +1,11 @@
+import copy
 import gym
 import numpy as np
 
 import omnigibson as og
 from omnigibson.objects import REGISTERED_OBJECTS
 from omnigibson.robots import REGISTERED_ROBOTS
+from omnigibson.scene_graphs.graph_builder import SceneGraphBuilder
 from omnigibson.tasks import REGISTERED_TASKS
 from omnigibson.scenes import REGISTERED_SCENES
 from omnigibson.utils.gym_utils import GymObservable, recursively_generate_flat_dict
@@ -321,6 +323,14 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self.load_observation_space()
         self._load_action_space()
 
+        # Load the scene graph builder
+        self._scene_graph_builder = None
+        if "scene_graph" in self.config and self.config["scene_graph"] is not None:
+            self._scene_graph_builder = SceneGraphBuilder(**self.config["scene_graph"])
+            # Here we can directly start it because we have already loaded everything & played
+            self._scene_graph_builder.start(self.scene)
+            self._scene_graph_builder.step(self.scene) # let's take a step too.
+
         # Denote that the scene is loaded
         self._loaded = True
 
@@ -351,6 +361,16 @@ class Environment(gym.Env, GymObservable, Recreatable):
             obs = recursively_generate_flat_dict(dic=obs)
 
         return obs
+    
+    def get_scene_graph(self):
+        """
+        Get the current scene graph.
+
+        Returns:
+            SceneGraph: Current scene graph
+        """
+        assert self._scene_graph_builder is not None, "Scene graph builder must be specified in config!"
+        return self._scene_graph_builder.get_scene_graph()
 
     def _populate_info(self, info):
         """
@@ -363,6 +383,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
             dict: Information dictionary with added info
         """
         info["episode_length"] = self._current_step
+
+        if self._scene_graph_builder is not None:
+            info["scene_graph"] = self.get_scene_graph()
 
     def step(self, action):
         """

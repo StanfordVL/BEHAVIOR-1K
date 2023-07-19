@@ -5,6 +5,7 @@ from bddl.activity import (
     evaluate_goal_conditions,
     get_goal_conditions,
     get_ground_goal_state_options,
+    get_natural_initial_conditions,
     get_initial_conditions,
     get_natural_goal_conditions,
     get_object_scope,
@@ -72,7 +73,7 @@ class BehaviorTask(BaseTask):
         if predefined_problem is None:
             assert activity_name is not None, \
                 "Activity name must be specified if no predefined_problem is specified for BehaviorTask!"
-            assert_valid_key(key=activity_name, valid_keys=BEHAVIOR_ACTIVITIES, name="Behavior Task")
+            # assert_valid_key(key=activity_name, valid_keys=BEHAVIOR_ACTIVITIES, name="Behavior Task")
         else:
             # Infer activity name
             activity_name = predefined_problem.split("problem ")[-1].split("-")[0]
@@ -252,6 +253,7 @@ class BehaviorTask(BaseTask):
         np.random.shuffle(self.instruction_order)
         self.currently_viewed_index = 0
         self.currently_viewed_instruction = self.instruction_order[self.currently_viewed_index]
+        self.activity_natural_language_initial_conditions = get_natural_initial_conditions(self.activity_conditions)
         self.activity_natural_language_goal_conditions = get_natural_goal_conditions(self.activity_conditions)
 
     def get_potential(self, env):

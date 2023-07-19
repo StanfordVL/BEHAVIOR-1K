@@ -86,6 +86,14 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         return self._skybox
 
     @property
+    def floor_plane(self):
+        """
+        Returns:
+            None or XFormPrim: Generated floor plane prim, if it is used
+        """
+        return self._floor_plane
+
+    @property
     def object_registry(self):
         """
         Returns:
@@ -200,7 +208,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # accordingly
         for obj_name, obj_info in init_info.items():
             # Check whether we should load the object or not
-            if not self._should_load_object(obj_info=obj_info):
+            if not self._should_load_object(obj_info=obj_info) or obj_name == "skybox":
                 continue
             # Create object class instance
             obj = create_object_from_init_info(obj_info)

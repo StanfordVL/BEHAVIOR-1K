@@ -113,10 +113,7 @@ cfg["robots"] = [ # (1)!
 3. Execute `print(og.ALL_SENSOR_MODALITIES)` for a list of all available observation modalities!
 
 ## 📋 **Defining a task**
-Lastly, we can optionally define a task to load into our scene. Since we're just getting started, let's load a "Dummy" task: (1)
-{ .annotate }
-
-1. Note: this is the task that is loaded anyways even if we don't explicitly define a task in our config!
+Lastly, we can optionally define a task to load into our scene. Since we're just getting started, let's load a "Dummy" task (which is the task that is loaded anyways even if we don't explicitly define a task in our config): 
 
 ```{.python .annotate}
 cfg["task"] = {
@@ -151,6 +148,7 @@ obs, rew, done, info = env.step(env.action_space.sample())
 
     ``` py linenums="1"
     import omnigibson as og
+    from omnigibson.macros import gm
     
     cfg = dict()
     
