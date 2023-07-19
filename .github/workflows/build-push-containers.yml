@@ -5,6 +5,9 @@ on:
     branches:
       - 'main'
       - 'docker-action'
+env:
+  REGISTRY_USER: omnigibson
+  REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
 
 jobs:
   docker:
