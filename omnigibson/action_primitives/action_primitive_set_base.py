@@ -38,7 +38,10 @@ class ActionPrimitiveError(ValueError):
 class ActionPrimitiveErrorGroup(ValueError):
     def __init__(self, exceptions: List[ActionPrimitiveError]) -> None:
         self._exceptions = tuple(exceptions)
-        super().__init__("\n\n".join([str(e) for e in exceptions]))
+        submessages = ["Attempt {i}: {e}" for i, e in enumerate(exceptions)]
+        submessages = "\n\n".join(submessages)
+        message = "An error occurred during each attempt of this action.\n\n" + submessages
+        super().__init__(message)
 
     @property
     def exceptions(self):
