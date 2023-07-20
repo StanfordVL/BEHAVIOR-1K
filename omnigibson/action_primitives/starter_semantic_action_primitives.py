@@ -207,19 +207,19 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 # If we're not holding anything, release the hand so it doesn't stick to anything else.
                 if not self._get_obj_in_hand():
                     yield from self._execute_release()
-            except:
+            except ActionPrimitiveError:
                 pass
 
             try:
                 # Make sure we retract the arm after every step
                 yield from self._reset_hand()
-            except:
+            except ActionPrimitiveError:
                 pass
 
             try:
                 # Settle before returning.
                 yield from self._settle_robot()
-            except:
+            except ActionPrimitiveError:
                 pass
 
             # Stop on success
@@ -312,7 +312,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             yield from self._move_hand_direct_cartesian(
                 self.robot.eef_links[self.arm].get_position_orientation(), ignore_failure=True
             )
-        except:
+        except ActionPrimitiveError:
             # Let go - we do not want to be holding anything after return of primitive.
             yield from self._execute_release()
             raise
@@ -548,23 +548,23 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         revolute_joint_idxes = [i for i, x in enumerate(joints) if x.joint_type == JointType.JOINT_REVOLUTE]
         
         for joint_pos, control_idx in joint_space_data:
-            # Check if the movement can be done roughly linearly.
-            linear_check_joint_mask = np.isin(control_idx, revolute_joint_idxes)
-            linear_check_joint_idxes = control_idx[linear_check_joint_mask]
-            linear_check_joint_positions = joint_pos[linear_check_joint_mask]
-            current_joint_positions = self.robot.get_joint_positions()[control_idx][linear_check_joint_mask]
+            # # Check if the movement can be done roughly linearly.
+            # linear_check_joint_mask = np.isin(control_idx, revolute_joint_idxes)
+            # linear_check_joint_idxes = control_idx[linear_check_joint_mask]
+            # linear_check_joint_positions = joint_pos[linear_check_joint_mask]
+            # current_joint_positions = self.robot.get_joint_positions()[control_idx][linear_check_joint_mask]
 
-            failed_joints = []
-            for joint_idx, target_joint_pos, current_joint_pos in zip(linear_check_joint_idxes, linear_check_joint_positions, current_joint_positions):
-                if np.abs(target_joint_pos - current_joint_pos) > np.rad2deg(45):
-                    failed_joints.append(joints[joint_idx].joint_name)
+            # failed_joints = []
+            # for joint_idx, target_joint_pos, current_joint_pos in zip(linear_check_joint_idxes, linear_check_joint_positions, current_joint_positions):
+            #     if np.abs(target_joint_pos - current_joint_pos) > np.rad2deg(45):
+            #         failed_joints.append(joints[joint_idx].joint_name)
 
-            if failed_joints:
-                raise ActionPrimitiveError(
-                    ActionPrimitiveError.Reason.EXECUTION_ERROR,
-                    "You cannot reach the target position in a straight line - it requires rotating your arm which might cause collisions. You might need to get closer and retry",
-                    {"failed joints": failed_joints}
-                )
+            # if failed_joints:
+            #     raise ActionPrimitiveError(
+            #         ActionPrimitiveError.Reason.EXECUTION_ERROR,
+            #         "You cannot reach the target position in a straight line - it requires rotating your arm which might cause collisions. You might need to get closer and retry",
+            #         {"failed joints": failed_joints}
+            #     )
 
             # Otherwise, move the joint
             yield from self._move_hand_direct_joint(joint_pos, control_idx, stop_on_contact=stop_on_contact, ignore_failure=True)
@@ -681,7 +681,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         indented_print("Resetting hand")
         try:
             yield from self._move_hand_joint(reset_pose, control_idx)
-        except:
+        except ActionPrimitiveError:
             indented_print("Could not do a planned reset of the hand - probably obj_in_hand collides with body")
             yield from self._move_hand_direct_joint(reset_pose, control_idx, ignore_failure=True)
 
