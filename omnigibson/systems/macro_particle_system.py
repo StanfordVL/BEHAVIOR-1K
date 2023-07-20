@@ -451,11 +451,12 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         super().remove_particle_by_name(name=name)
 
         # Remove this particle from its respective group as well
-        group = cls._particles_info[name]["obj"].name
+        parent_obj = cls._particles_info[name]["obj"]
+        group = cls.get_group_name(obj=parent_obj)
         cls._group_particles[group].pop(name)
         cls._particles_local_mat.pop(name)
         particle_info = cls._particles_info.pop(name)
-        if "face_id" in particle_info:
+        if cls._is_cloth_obj(obj=parent_obj):
             # Also remove from cloth face ids
             face_ids = cls._cloth_face_ids[group]
             idx_mapping = {face_id: i for i, face_id in enumerate(face_ids)}
