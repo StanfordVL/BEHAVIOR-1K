@@ -224,15 +224,22 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             except ActionPrimitiveError as e:
                 last_error = e
 
-            # Cleanup
             try:
                 # If we're not holding anything, release the hand so it doesn't stick to anything else.
                 if not self._get_obj_in_hand():
-                    self._execute_release()
+                    yield from self._execute_release()
+            except:
+                pass
 
+            try:
                 # Make sure we retract the arm after every step
-                self._reset_hand()
-                self._settle_robot()
+                yield from self._reset_hand()
+            except:
+                pass
+
+            try:
+                # Settle before returning.
+                yield from self._settle_robot()
             except:
                 pass
 
