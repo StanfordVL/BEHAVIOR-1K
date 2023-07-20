@@ -499,7 +499,9 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
     @property
     def arm_control_idx(self):
-        return {"left": np.array([7, 10, 13, 15, 17, 19, 21]), "right": np.array([8, 11, 14, 16, 18, 20, 22])}
+        return {"left": np.array([7, 10, 13, 15, 17, 19, 21]),
+                "right": np.array([8, 11, 14, 16, 18, 20, 22]),
+                "combined": np.array([7, 8, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22])}
 
     @property
     def gripper_control_idx(self):
@@ -512,27 +514,116 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
     @property
     def disabled_collision_pairs(self):
         return [
-            ['wheel_rear_left_link', 'base_link'], 
-            ['wheel_rear_right_link', 'base_link'], 
-            ['wheel_front_right_link', 'base_link'], 
-            ['wheel_front_left_link', 'base_link'], 
-            ['torso_lift_link', 'torso_fixed_column_link'], 
-            ['torso_fixed_link', 'torso_fixed_column_link'], 
-            ['arm_left_tool_link', 'arm_left_6_link'], 
-            ['wrist_left_ft_link', 'arm_left_6_link'], 
-            ['wrist_left_ft_tool_link', 'arm_left_6_link'], 
-            ['gripper_left_link', 'arm_left_6_link'], 
-            ['gripper_left_link', 'wrist_left_ft_link'], 
-            ['arm_right_tool_link', 'arm_right_6_link'], 
-            ['wrist_right_ft_link', 'arm_right_6_link'], 
-            ['wrist_right_ft_tool_link', 'arm_right_6_link'], 
-            ['gripper_right_link', 'arm_right_6_link'], 
-            ['gripper_right_link', 'wrist_right_ft_link'], 
-            ['gripper_right_right_finger_link', 'gripper_right_left_finger_link'],
-            ['arm_left_5_link', 'arm_left_tool_link'],
-            ['arm_left_5_link', 'wrist_left_ft_link']
+            ["arm_left_1_link", "arm_left_2_link"],
+            ["arm_left_2_link", "arm_left_3_link"],
+            ["arm_left_3_link", "arm_left_4_link"],
+            ["arm_left_4_link", "arm_left_5_link"],
+            ["arm_left_5_link", "arm_left_6_link"],
+            ["arm_left_6_link", "arm_left_7_link"],
+            ["arm_right_1_link", "arm_right_2_link"],
+            ["arm_right_2_link", "arm_right_3_link"],
+            ["arm_right_3_link", "arm_right_4_link"],
+            ["arm_right_4_link", "arm_right_5_link"],
+            ["arm_right_5_link", "arm_right_6_link"],
+            ["arm_right_6_link", "arm_right_7_link"],
+            ["gripper_right_right_finger_link", "gripper_right_left_finger_link"],
+            ["gripper_right_link", "wrist_right_ft_link"],
+            ["arm_right_6_link", "gripper_right_link"],
+            ["arm_right_6_link", "wrist_right_ft_tool_link"],
+            ["arm_right_6_link", "wrist_right_ft_link"],
+            ["arm_right_6_link", "arm_right_tool_link"],
+            ["arm_right_5_link", "wrist_right_ft_link"],
+            ["arm_right_5_link", "arm_right_tool_link"],
+            ["gripper_left_right_finger_link", "gripper_left_left_finger_link"],
+            ["gripper_left_link", "wrist_left_ft_link"],
+            ["arm_left_6_link", "gripper_left_link"],
+            ["arm_left_6_link", "wrist_left_ft_tool_link"],
+            ["arm_left_6_link", "wrist_left_ft_link"],
+            ["arm_left_6_link", "arm_left_tool_link"],
+            ["arm_left_5_link", "wrist_left_ft_link"],
+            ["arm_left_5_link", "arm_left_tool_link"],
+            ["torso_lift_link", "torso_fixed_column_link"],
+            ["torso_fixed_link", "torso_fixed_column_link"],
+            ["base_antenna_left_link", "torso_fixed_link"],
+            ["base_antenna_right_link", "torso_fixed_link"],
+            ["base_link", "wheel_rear_left_link"],
+            ["base_link", "wheel_rear_right_link"],
+            ["base_link", "wheel_front_left_link"],
+            ["base_link", "wheel_front_right_link"],
+            ["base_link", "base_dock_link"],
+            ["base_link", "base_antenna_right_link"],
+            ["base_link", "base_antenna_left_link"],
+            ["base_link", "torso_fixed_column_link"],
+            ["base_link", "suspension_front_left_link"],
+            ["base_link", "suspension_front_right_link"],
+            ["base_link", "torso_fixed_link"],
+            ["suspension_front_left_link", "wheel_front_left_link"],
+            ["torso_lift_link", "arm_right_1_link"],
+            ["torso_lift_link", "arm_right_2_link"],
+            ["torso_lift_link", "arm_left_1_link"],
+            ["torso_lift_link", "arm_left_2_link"],
+            ["arm_left_tool_link", "wrist_left_ft_link"],
+            ["wrist_left_ft_link", "wrist_left_ft_tool_link"],
+            ["wrist_left_ft_tool_link", "gripper_left_link"],
+            ['gripper_left_grasping_frame', 'gripper_left_left_finger_link'], 
+            ['gripper_left_grasping_frame', 'gripper_left_right_finger_link'], 
+            ['wrist_right_ft_link', 'arm_right_tool_link'], 
+            ['wrist_right_ft_tool_link', 'wrist_right_ft_link'], 
+            ['gripper_right_link', 'wrist_right_ft_tool_link'], 
+            ['head_1_link', 'head_2_link'],
+            ['torso_fixed_column_link', 'arm_right_1_link'],
+            ['torso_fixed_column_link', 'arm_left_1_link'],
+            ['arm_left_1_link', 'arm_left_3_link'],
+            ['arm_right_1_link', 'arm_right_3_link'],
+            ['base_link', 'arm_right_4_link'],
+            ['base_link', 'arm_right_5_link'],
+            ['base_link', 'arm_left_4_link'],
+            ['base_link', 'arm_left_5_link'],
         ]
 
+    @property
+    def primitive_disabled_collision_pairs(self):
+        return self.disabled_collision_pairs
+
+    @property
+    def manipulation_link_names(self):
+        return [
+            "torso_fixed_link", 
+            "torso_lift_link", 
+            "arm_left_1_link", 
+            "arm_left_2_link", 
+            "arm_left_3_link", 
+            "arm_left_4_link", 
+            "arm_left_5_link", 
+            "arm_left_6_link", 
+            "arm_left_7_link", 
+            "arm_left_tool_link", 
+            "wrist_left_ft_link", 
+            "wrist_left_ft_tool_link", 
+            "gripper_left_link", 
+            # "gripper_left_grasping_frame", 
+            "gripper_left_left_finger_link", 
+            "gripper_left_right_finger_link", 
+            "gripper_left_tool_link", 
+            "arm_right_1_link", 
+            "arm_right_2_link", 
+            "arm_right_3_link", 
+            "arm_right_4_link", 
+            "arm_right_5_link", 
+            "arm_right_6_link", 
+            "arm_right_7_link", 
+            "arm_right_tool_link", 
+            "wrist_right_ft_link", 
+            "wrist_right_ft_tool_link", 
+            "gripper_right_link", 
+            # "gripper_right_grasping_frame", 
+            "gripper_right_left_finger_link", 
+            "gripper_right_right_finger_link", 
+            "gripper_right_tool_link", 
+            "head_1_link", 
+            "head_2_link", 
+            "xtion_link", 
+        ]
 
     @property
     def arm_link_names(self):
@@ -557,9 +648,14 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         return os.path.join(gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford/tiago_dual_omnidirectional_stanford_33.usd")
 
     @property
+    def simplified_mesh_usd_path(self):
+        return os.path.join(gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford/tiago_dual_omnidirectional_stanford_33_simplified_collision_mesh.usd")
+
+    @property
     def robot_arm_descriptor_yamls(self):
         return {"left": os.path.join(gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford_left_arm_descriptor.yaml"),
-                "right": os.path.join(gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford_right_arm_fixed_trunk_descriptor.yaml")}
+                "right": os.path.join(gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford_right_arm_fixed_trunk_descriptor.yaml"),
+                "combined": os.path.join(gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford.yaml")}
 
     @property
     def urdf_path(self):
