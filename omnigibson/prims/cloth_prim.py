@@ -527,7 +527,7 @@ class ClothPrim(GeomPrim):
         Args:
             group (int): Particle group this instancer belongs to
         """
-        return self.set_attribute(attr="physxParticle:particleGroup", val=group)
+        self.set_attribute(attr="physxParticle:particleGroup", val=group)
 
     def _dump_state(self):
         # Run super first
