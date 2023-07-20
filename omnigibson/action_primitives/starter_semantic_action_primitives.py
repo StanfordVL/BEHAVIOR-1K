@@ -21,12 +21,9 @@ from pxr import PhysxSchema
 
 import omnigibson as og
 from omnigibson import object_states
-from omnigibson.action_primitives.action_primitive_set_base import ActionPrimitiveError, BaseActionPrimitiveSet
-# from igibson.external.pybullet_tools.utils import set_joint_position
-# from omnigibson.object_states.on_floor import RoomFloor
+from omnigibson.action_primitives.action_primitive_set_base import ActionPrimitiveError, ActionPrimitiveErrorGroup, BaseActionPrimitiveSet
 from omnigibson.utils.object_state_utils import sample_cuboid_for_predicate
 from omnigibson.object_states.utils import get_center_extent
-# from igibson.objects.articulated_object import URDFObject
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.robots import BaseRobot
 from omnigibson.tasks.behavior_task import BehaviorTask
@@ -43,7 +40,6 @@ from omnigibson.utils.grasping_planning_utils import (
     get_grasp_poses_for_object_sticky,
     get_grasp_position_for_open
 )
-from omnigibson.objects import DatasetObject
 from omnigibson.controllers.controller_base import ControlType
 
 DEFAULT_BODY_OFFSET_FROM_FLOOR = 0.05
@@ -216,13 +212,13 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         assert attempts > 0, "Must make at least one attempt"
         ctrl = self.controller_functions[prim]
 
-        last_error = None
+        errors = []
         for _ in range(attempts):
             # Attempt
             try:
                 yield from ctrl(*args)
             except ActionPrimitiveError as e:
-                last_error = e
+                errors.append(e)
 
             try:
                 # If we're not holding anything, release the hand so it doesn't stick to anything else.
@@ -244,10 +240,10 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 pass
 
             # Stop on success
-            if not last_error:
+            if not errors:
                 return
 
-        raise last_error
+        raise ActionPrimitiveErrorGroup(errors)
 
     def _open(self, obj):
         yield from self._open_or_close(obj, True)
@@ -442,7 +438,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         yield from self._navigate_if_needed(obj, pos_on_obj=hand_pose[0])
         yield from self._move_hand(hand_pose)
         yield from self._execute_release()
+        yield from self._settle_robot()
 
+        # TODO: Fix thi
         if not obj_in_hand.states[predicate].get_value(obj):
             raise ActionPrimitiveError(
                 ActionPrimitiveError.Reason.EXECUTION_ERROR,
@@ -545,16 +543,26 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         start_pos, start_orn = self.robot.eef_links[self.arm].get_position_orientation()
         travel_distance = np.linalg.norm(target_pose[0] - start_pos)
         num_poses = np.max([2, int(travel_distance / MAX_CARTESIAN_HAND_STEP) + 1])
-        pos_waypoints = np.linspace(start_pos, target_pose[0], num_poses)[1:]
+        pos_waypoints = np.linspace(start_pos, target_pose[0], num_poses)
 
         # Also interpolate the rotations
         combined_rotation = Rotation.from_quat(np.array([start_orn, target_pose[1]]))
         slerp = Slerp([0, 1], combined_rotation)
-        orn_waypoints = slerp(np.linspace(0, 1, num_poses)[1:])
+        orn_waypoints = slerp(np.linspace(0, 1, num_poses))
         quat_waypoints = [x.as_quat() for x in orn_waypoints]
+
+        # Joint positions
+        joint_space_data = [self._convert_cartesian_to_joint_space(waypoint) for waypoint in zip(pos_waypoints, quat_waypoints)]
+
+        # Check if the delta between any two is too high
+        joint_positions = np.array(list(zip(*joint_space_data))[0])
+        if np.any(np.abs(np.diff(joint_positions, axis=0)) > MAX_CARTESIAN_HAND_STEP):
+            raise ActionPrimitiveError(
+                ActionPrimitiveError.Reason.EXECUTION_ERROR,
+                "Could not reach target position in a straight line. Might need to get closer and retry."
+            )
         
-        for waypoint in zip(pos_waypoints, quat_waypoints):
-            joint_pos, control_idx = self._convert_cartesian_to_joint_space(waypoint)
+        for joint_pos, control_idx in joint_space_data:
             yield from self._move_hand_direct_joint(joint_pos, control_idx, stop_on_contact=stop_on_contact, ignore_failure=True)
 
             current_pos, current_orn = self.robot.eef_links[self.arm].get_position_orientation()

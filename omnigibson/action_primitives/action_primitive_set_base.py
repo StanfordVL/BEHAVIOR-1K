@@ -1,6 +1,7 @@
 import inspect
 from abc import ABCMeta, abstractmethod
 from enum import IntEnum
+from typing import List
 
 from future.utils import with_metaclass
 
@@ -9,7 +10,6 @@ from omnigibson.scenes.interactive_traversable_scene import InteractiveTraversab
 from omnigibson.tasks.task_base import BaseTask
 
 REGISTERED_PRIMITIVE_SETS = {}
-
 
 class ActionPrimitiveError(ValueError):
     class Reason(IntEnum):
@@ -30,6 +30,16 @@ class ActionPrimitiveError(ValueError):
         self.reason = reason
         self.metadata = metadata if metadata is not None else {}
         super().__init__(f"{reason.name}: {message}. Additional info: {metadata}")
+
+
+class ActionPrimitiveErrorGroup(ValueError):
+    def __init__(self, exceptions: List[ActionPrimitiveError]) -> None:
+        self._exceptions = tuple(exceptions)
+        super().__init__("\n\n".join([str(e) for e in exceptions]))
+
+    @property
+    def exceptions(self):
+        return self._exceptions
 
 
 class BaseActionPrimitiveSet(with_metaclass(ABCMeta, object)):
