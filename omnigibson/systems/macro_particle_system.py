@@ -393,7 +393,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                 z_extent = cls._particle_object.aabb_extent[2]
                 if not cls._CLIP_INTO_OBJECTS and z_extent > 0:
                     z_offsets = np.array([z_extent * particle.scale[2] for particle in cls._group_particles[group].values()]) / 2.0
-                    # Shift the particles halfway down
+                    # Shift the particles halfway up
                     positions += normals * z_offsets.reshape(-1, 1)
 
                 # Set the group particle poses
@@ -552,8 +552,6 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
         if obj.prim_type == PrimType.CLOTH:
             # Sample locations based on randomly sampled keyfaces
             cloth = obj.root_link
-            assert len(cloth.keyface_idx) >= max_samples, \
-                "Insufficient number of keyfaces from which to sample group visual particles for cloth!"
             n_faces = len(cloth.faces)
             face_ids = np.random.choice(n_faces, min(max_samples, n_faces), replace=False)
             # Positions are the midpoints of each requested face
