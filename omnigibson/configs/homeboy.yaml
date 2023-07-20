@@ -14,9 +14,11 @@ scene:
   build_graph: true
   num_waypoints: 1
   waypoint_resolution: 0.2
+  load_object_categories: null
   not_load_object_categories: null
   load_room_types: null
   load_room_instances: null
+  load_task_relevant_only: true
   seg_map_resolution: 0.1
   scene_source: OG
   include_robots: true
