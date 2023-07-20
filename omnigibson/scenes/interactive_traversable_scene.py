@@ -177,7 +177,8 @@ class InteractiveTraversableScene(TraversableScene):
                 if in_room not in self._seg_map.room_sem_name_to_ins_name[room_type]:
                     self._seg_map.room_sem_name_to_ins_name[room_type].append(in_room)
 
-    def _should_load_object(self, obj_info):
+    def _should_load_object(self, obj_info, task_metadata):
+        name = obj_info["args"]["name"]
         category = obj_info["args"].get("category", "object")
         in_rooms = obj_info["args"].get("in_rooms", [])
 
@@ -185,9 +186,10 @@ class InteractiveTraversableScene(TraversableScene):
         in_rooms = in_rooms.split(",") if isinstance(in_rooms, str) else in_rooms
 
         # Do not load these object categories (can blacklist building structures as well)
+        task_relevant_names = set(task_metadata["inst_to_name"].values()) if "inst_to_name" in task_metadata else set()
         not_blacklisted = (
             (self.not_load_object_categories is None or category not in self.not_load_object_categories) and
-            (not self.load_task_relevant_only or obj_info["args"]["bddl_object_scope"])
+            (not self.load_task_relevant_only or name in task_relevant_names)
         )
 
         # Only load these object categories (no need to white list building structures)
