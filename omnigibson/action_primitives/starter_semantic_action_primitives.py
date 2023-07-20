@@ -17,6 +17,7 @@ from matplotlib import pyplot as plt
 import gym
 import numpy as np
 from scipy.spatial.transform import Rotation, Slerp
+from omnigibson.utils.constants import JointType
 from pxr import PhysxSchema
 
 import omnigibson as og
@@ -152,26 +153,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         self.robot_model = self.robot.model_name
         self.robot_base_mass = self.robot._links["base_link"].mass
         self.teleport = teleport
-        # self._set_joint_velocities()
-
-    # Set joint velocities for the robots so they move at appropriate speeds.
-    # Not speeding up joints because joint controller is position controller. Asking Josiah about this 
-    def _set_joint_velocities(self):
-        control_idx = np.concatenate([self.robot.trunk_control_idx, self.robot.arm_control_idx[self.arm]])
-        if self.robot_model == "Tiago":
-            joint_gains = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
-            joints = np.array([joint for joint in self.robot.joints.values()])
-            arm_joints = joints[control_idx]
-            for i, joint in enumerate(arm_joints):
-                pass
-                # damps = []
-                # joint.set_control_type(ControlType.POSITION, kp=10000000.0)
-                # print(joint.name)
-                # for dof_handle, dof_property in zip(joint._dof_handles, joint._dof_properties):
-                #     damps.append(dof_property.stiffness)
-                # print(damps)
-                # print("-------")
-
 
     def get_action_space(self):
         if ACTIVITY_RELEVANT_OBJECTS_ONLY:
@@ -215,8 +196,10 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         errors = []
         for _ in range(attempts):
             # Attempt
+            success = False
             try:
                 yield from ctrl(*args)
+                success = True
             except ActionPrimitiveError as e:
                 errors.append(e)
 
@@ -240,7 +223,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 pass
 
             # Stop on success
-            if not errors:
+            if success:
                 return
 
         raise ActionPrimitiveErrorGroup(errors)
@@ -259,7 +242,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             raise ActionPrimitiveError(
                 ActionPrimitiveError.Reason.PRE_CONDITION_ERROR,
                 "Cannot open or close an object while holding an object",
-                {"object": obj},
+                {"object in hand": self._get_obj_in_hand()},
             )
 
         # Open the hand first
@@ -278,8 +261,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 # We were trying to do something but didn't have the data.
                 raise ActionPrimitiveError(
                     ActionPrimitiveError.Reason.SAMPLING_ERROR,
-                    "Could not sample grasp position for object",
-                    {"object": obj},
+                    "Could not sample grasp position for target object",
+                    {"target object": obj.name},
                 )
 
         grasp_pose, target_poses, object_direction, joint_info, grasp_required = grasp_data
@@ -287,8 +270,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         #     if hand_collision_fn(grasp_pose):
         #         raise ActionPrimitiveError(
         #             ActionPrimitiveError.Reason.SAMPLING_ERROR,
-        #             "Rejecting grasp pose due to collision",
-        #             {"object": obj, "grasp_pose": grasp_pose},
+        #             "Rejecting grasp pose due to collision. Try again",
+        #             {"target object": obj.name},
         #         )
 
         # Prepare data for the approach later.
@@ -315,7 +298,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 if self._get_obj_in_hand() is None:
                     raise ActionPrimitiveError(
                         ActionPrimitiveError.Reason.EXECUTION_ERROR,
-                        "Could not grasp object to open",
+                        "Could not grasp the target object to open or close. Try again",
+                        {"target object": obj.name},
                     )
 
             for target_pose in target_poses:
@@ -335,8 +319,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         if obj.states[object_states.Open].get_value() != should_open:
             raise ActionPrimitiveError(
-                ActionPrimitiveError.Reason.EXECUTION_ERROR,
-                "Could not open or close object"
+                ActionPrimitiveError.Reason.POST_CONDITION_ERROR,
+                "Despite executing the planned trajectory, the object did not open or close as expected. Maybe try again",
+                {"target object": obj.name, "is it currently open": obj.states[object_states.Open].get_value()},
             )
 
     def _grasp(self, obj):
@@ -348,8 +333,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             else:
                 raise ActionPrimitiveError(
                     ActionPrimitiveError.Reason.PRE_CONDITION_ERROR,
-                    "Cannot grasp when hand is already full",
-                    {"object": obj, "object_in_hand": obj_in_hand},
+                    "Cannot grasp when your hand is already full",
+                    {"target object": obj.name, "object currently in hand": obj_in_hand.name},
                 )
             
         if self._get_obj_in_hand() != obj:
@@ -382,15 +367,16 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
             if self._get_obj_in_hand() is None:
                 raise ActionPrimitiveError(
-                    ActionPrimitiveError.Reason.EXECUTION_ERROR,
-                    "No object detected in hand after executing grasp",
+                    ActionPrimitiveError.Reason.POST_CONDITION_ERROR,
+                    "Grasp completed, but no object detected in hand after executing grasp",
+                    {"target object": obj.name},
                 )
 
         if self._get_obj_in_hand() != obj:
             raise ActionPrimitiveError(
-                ActionPrimitiveError.Reason.EXECUTION_ERROR,
-                "An unexpected object was detected in hand after executing grasp",
-                {"expected_object": obj, "actual_object": self._get_obj_in_hand()},
+                ActionPrimitiveError.Reason.POST_CONDITION_ERROR,
+                "An unexpected object was detected in hand after executing grasp. Consider releasing it",
+                {"expected object": obj.name, "actual object": self._get_obj_in_hand().name},
             )
 
     def _place_on_top(self, obj):
@@ -421,16 +407,16 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         if obj.states[object_states.ToggledOn].get_value() != value:
             raise ActionPrimitiveError(
-                ActionPrimitiveError.Reason.EXECUTION_ERROR,
-                "Failed to toggle object",
-                {"object": obj}
+                ActionPrimitiveError.Reason.POST_CONDITION_ERROR,
+                "The object did not toggle as expected - maybe try again",
+                {"target object": obj.name, "is it currently toggled on": obj.states[object_states.ToggledOn].get_value()}
             )
 
     def _place_with_predicate(self, obj, predicate):
         obj_in_hand = self._get_obj_in_hand()
         if obj_in_hand is None:
             raise ActionPrimitiveError(
-                ActionPrimitiveError.Reason.PRE_CONDITION_ERROR, "Cannot place object if not holding one"
+                ActionPrimitiveError.Reason.PRE_CONDITION_ERROR, "You need to be grasping an object first to place it somewhere."
             )
         
         obj_pose = self._sample_pose_with_object_and_predicate(predicate, obj_in_hand, obj)
@@ -440,12 +426,18 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         yield from self._execute_release()
         yield from self._settle_robot()
 
-        # TODO: Fix thi
+        if self._get_obj_in_hand() is not None:
+            raise ActionPrimitiveError(
+                ActionPrimitiveError.Reason.EXECUTION_ERROR,
+                "Could not release object - the object is still in your hand",
+                {"object": self._get_obj_in_hand().name}
+            )
+
         if not obj_in_hand.states[predicate].get_value(obj):
             raise ActionPrimitiveError(
                 ActionPrimitiveError.Reason.EXECUTION_ERROR,
-                "Failed to place object",
-                {"held_object": obj_in_hand, "target_object": obj}
+                "Failed to place object at the desired place (probably dropped). The object was still released, so you need to grasp it again to continue",
+                {"dropped object": obj_in_hand.name, "target object": obj.name}
             )
 
     def _convert_cartesian_to_joint_space(self, target_pose):
@@ -453,8 +445,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         if joint_pos is None:
             raise ActionPrimitiveError(
                 ActionPrimitiveError.Reason.PLANNING_ERROR,
-                "Could not find joint positions for target pose",
-                {"target_pose": target_pose},
+                "Could not find joint positions for target pose. You cannot reach it. Try again for a new pose"
             )
         return joint_pos, control_idx
     
@@ -508,7 +499,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             if plan is None:
                 raise ActionPrimitiveError(
                     ActionPrimitiveError.Reason.PLANNING_ERROR,
-                    "Could not make a hand motion plan"
+                    "There is no accessible path from where you are to the desired joint position. Try again"
                 )
             
             # Follow the plan to navigate.
@@ -534,7 +525,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         if not ignore_failure:
             raise ActionPrimitiveError(
                 ActionPrimitiveError.Reason.EXECUTION_ERROR,
-                "Could not move hand to target joint position"
+                "Your hand was obstructed from moving to the desired joint position"
             )
 
     def _move_hand_direct_cartesian(self, target_pose, stop_on_contact=False, ignore_failure=False):
@@ -553,18 +544,32 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         # Joint positions
         joint_space_data = [self._convert_cartesian_to_joint_space(waypoint) for waypoint in zip(pos_waypoints, quat_waypoints)]
-
-        # Check if the delta between any two is too high
-        joint_positions = np.array(list(zip(*joint_space_data))[0])
-        if np.any(np.abs(np.diff(joint_positions, axis=0)) > MAX_CARTESIAN_HAND_STEP):
-            raise ActionPrimitiveError(
-                ActionPrimitiveError.Reason.EXECUTION_ERROR,
-                "Could not reach target position in a straight line. Might need to get closer and retry."
-            )
+        joints = list(self.robot.joints.values())
+        revolute_joint_idxes = [i for i, x in enumerate(joints) if x.joint_type == JointType.JOINT_REVOLUTE]
         
         for joint_pos, control_idx in joint_space_data:
+            # Check if the movement can be done roughly linearly.
+            linear_check_joint_mask = np.isin(control_idx, revolute_joint_idxes)
+            linear_check_joint_idxes = control_idx[linear_check_joint_mask]
+            linear_check_joint_positions = joint_pos[linear_check_joint_mask]
+            current_joint_positions = self.robot.get_joint_positions()[control_idx][linear_check_joint_mask]
+
+            failed_joints = []
+            for joint_idx, target_joint_pos, current_joint_pos in zip(linear_check_joint_idxes, linear_check_joint_positions, current_joint_positions):
+                if np.abs(target_joint_pos - current_joint_pos) > np.rad2deg(45):
+                    failed_joints.append(joints[joint_idx].joint_name)
+
+            if failed_joints:
+                raise ActionPrimitiveError(
+                    ActionPrimitiveError.Reason.EXECUTION_ERROR,
+                    "You cannot reach the target position in a straight line - it requires rotating your arm which might cause collisions. You might need to get closer and retry",
+                    {"failed joints": failed_joints}
+                )
+
+            # Otherwise, move the joint
             yield from self._move_hand_direct_joint(joint_pos, control_idx, stop_on_contact=stop_on_contact, ignore_failure=True)
 
+            # Also decide if we can stop early.
             current_pos, current_orn = self.robot.eef_links[self.arm].get_position_orientation()
             pos_diff = np.linalg.norm(np.array(current_pos) - np.array(target_pose[0]))
             orn_diff = (Rotation.from_quat(current_orn) * Rotation.from_quat(target_pose[1]).inv()).magnitude()
@@ -577,7 +582,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         if not ignore_failure:
             raise ActionPrimitiveError(
                 ActionPrimitiveError.Reason.EXECUTION_ERROR,
-                "Could not move hand to target cartesian position"
+                "Your hand was obstructed from moving to the desired world position"
             )
 
     def _execute_grasp(self):
@@ -606,8 +611,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         if self._get_obj_in_hand() is not None:
             raise ActionPrimitiveError(
                 ActionPrimitiveError.Reason.EXECUTION_ERROR,
-                "Object still detected in hand after executing release",
-                {"object_in_hand": self._get_obj_in_hand()},
+                "An object was still detected in your hand after executing release",
+                {"object in hand": self._get_obj_in_hand().name},
             )
         
     def _empty_action(self):
@@ -694,7 +699,10 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
             if plan is None:
                 # TODO: Would be great to produce a more informative error.
-                raise ActionPrimitiveError(ActionPrimitiveError.Reason.PLANNING_ERROR, "Could not make a navigation plan")
+                raise ActionPrimitiveError(
+                    ActionPrimitiveError.Reason.PLANNING_ERROR,
+                    "Could not make a navigation plan to get to the target position"
+                )
 
             self.draw_plan(plan)
             # Follow the plan to navigate.
@@ -822,7 +830,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             return pose_2d
  
         raise ActionPrimitiveError(
-            ActionPrimitiveError.Reason.SAMPLING_ERROR, "Could not find valid position near object"
+            ActionPrimitiveError.Reason.SAMPLING_ERROR,
+            "Could not find valid position near object to travel to",
+            {"target object": obj.name}
         )
 
     @staticmethod
@@ -849,7 +859,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 return pose
 
         raise ActionPrimitiveError(
-            ActionPrimitiveError.Reason.SAMPLING_ERROR, "Could not find valid position in room", {"room": room}
+            ActionPrimitiveError.Reason.SAMPLING_ERROR,
+            "Could not find valid position in the given room to travel to",
+            {"room": room}
         )
 
     def _sample_pose_with_object_and_predicate(self, predicate, held_obj, target_obj):
@@ -870,8 +882,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         # If we get here, sampling failed.
         raise ActionPrimitiveError(
             ActionPrimitiveError.Reason.SAMPLING_ERROR,
-            "Could not sample position with object and predicate",
-            {"target_object": target_obj, "held_object": held_obj, "predicate": pred_map[predicate]},
+            "Could not find a position to put this object in the desired relation to the target object",
+            {"target object": target_obj.name, "object in hand": held_obj.name, "relation": pred_map[predicate]},
         )
 
     def _test_pose(self, pose_2d, pos_on_obj=None, check_joint=None):

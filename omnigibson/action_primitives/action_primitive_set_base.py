@@ -26,6 +26,9 @@ class ActionPrimitiveError(ValueError):
         # A sampling error occurred: a position to place an object could not be found.
         SAMPLING_ERROR = 3
 
+        # The execution of the primitive happened correctly, but while checking post-conditions, an error was found.
+        POST_CONDITION_ERROR = 4
+
     def __init__(self, reason: Reason, message, metadata=None):
         self.reason = reason
         self.metadata = metadata if metadata is not None else {}
