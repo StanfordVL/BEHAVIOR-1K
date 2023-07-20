@@ -1014,8 +1014,10 @@ def vecs2quat(vec0, vec1, normalized=False):
         vec0 = normalize(vec0, axis=-1)
         vec1 = normalize(vec1, axis=-1)
 
-    # Get cross product for direction of angle, and multiply by arcos of the dot product which is the angle
-    return np.concatenate([np.cross(vec0, vec1), 1 + np.sum(vec0 * vec1, axis=-1, keepdims=True)], axis=-1)
+    # Half-way Quaternion Solution -- see https://stackoverflow.com/a/11741520
+    cos_theta = np.sum(vec0 * vec1, axis=-1, keepdims=True)
+    quat_unnormalized = np.where(cos_theta == -1, np.array([1.0, 0, 0, 0]), np.concatenate([np.cross(vec0, vec1), 1 + cos_theta], axis=-1))
+    return quat_unnormalized / np.linalg.norm(quat_unnormalized, axis=-1, keepdims=True)
 
 
 def l2_distance(v1, v2):
