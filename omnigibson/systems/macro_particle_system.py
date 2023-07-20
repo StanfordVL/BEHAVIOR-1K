@@ -375,21 +375,26 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
 
         # Iterate over all objects, and update all particles belonging to any cloth objects
         for name, obj in cls._group_objects.items():
-            if obj.prim_type == PrimType.CLOTH:
+            group = cls.get_group_name(obj=obj)
+            if obj.prim_type == PrimType.CLOTH and cls.num_group_particles(group=group) > 0:
                 # Update the transforms
-                group = cls.get_group_name(obj=obj)
                 cloth = obj.root_link
                 face_ids = cls._cloth_face_ids[group]
-                normals = cloth.compute_face_normals(face_ids=face_ids)
-                positions = cloth.particle_positions[cloth.faces[face_ids]].mean(axis=1)
+                idxs = cloth.faces[face_ids].flatten()
+                positions = cloth.compute_particle_positions(idxs=idxs).reshape(-1, 3, 3)
+                normals = cloth.compute_face_normals_from_particle_positions(positions=positions)
+
+                # The actual positions we want are the face centroids, or the mean of all the positions
+                positions = positions.mean(axis=1)
                 # Orientations are the normals
                 z_up = np.zeros_like(normals)
                 z_up[:, 2] = 1.0
-                orientations = T.axisangle2quat(T.vecs2axisangle(z_up, normals))
-                if not cls._CLIP_INTO_OBJECTS:
-                    offset = np.array([cls._particle_object.aabb_extent * particle.scale for particle in cls._group_particles[group].values()]) / 2.0
+                orientations = T.vecs2quat(z_up, normals, normalized=True)
+                z_extent = cls._particle_object.aabb_extent[2]
+                if not cls._CLIP_INTO_OBJECTS and z_extent > 0:
+                    z_offsets = np.array([z_extent * particle.scale[2] for particle in cls._group_particles[group].values()]) / 2.0
                     # Shift the particles halfway down
-                    positions += normals * offset[2].reshape(-1, 1)
+                    positions += normals * z_offsets.reshape(-1, 1)
 
                 # Set the group particle poses
                 cls.set_group_particles_position_orientation(group=group, positions=positions, orientations=orientations)
@@ -553,7 +558,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
             face_ids = np.random.choice(n_faces, min(max_samples, n_faces), replace=False)
             # Positions are the midpoints of each requested face
             normals = cloth.compute_face_normals(face_ids=face_ids)
-            positions = cloth.particle_positions[cloth.faces[face_ids]].mean(axis=1)
+            positions = cloth.compute_particle_positions(idxs=cloth.faces[face_ids].flatten()).reshape(-1, 3, 3).mean(axis=1)
             # Orientations are the normals
             z_up = np.zeros_like(normals)
             z_up[:, 2] = 1.0
@@ -741,7 +746,8 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                     link_tf = link_tfs[link]
                 link_tfs_batch[i] = link_tf
 
-            particle_local_poses_batch = np.matmul(np.linalg.inv(link_tfs_batch), particle_local_poses_batch)
+            # particle_local_poses_batch = np.matmul(np.linalg.inv(link_tfs_batch), particle_local_poses_batch)
+            particle_local_poses_batch = np.linalg.solve(link_tfs_batch, particle_local_poses_batch)
 
         for i, name in enumerate(particles):
             cls._modify_particle_local_mat(name=name, mat=particle_local_poses_batch[i], ignore_scale=local)

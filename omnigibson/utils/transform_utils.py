@@ -999,6 +999,25 @@ def vecs2axisangle(vec0, vec1):
     return np.cross(vec0, vec1) * np.arccos((vec0 * vec1).sum(-1, keepdims=True))
 
 
+def vecs2quat(vec0, vec1, normalized=False):
+    """
+    Converts the angle from unnormalized 3D vectors @vec0 to @vec1 into a quaternion representation of the angle
+
+    Args:
+        vec0 (np.array): (..., 3) (x,y,z) 3D vector, possibly unnormalized
+        vec1 (np.array): (..., 3) (x,y,z) 3D vector, possibly unnormalized
+        normalized (bool): If True, @vec0 and @vec1 are assumed to already be normalized and we will skip the
+            normalization step (more efficient)
+    """
+    # Normalize vectors if requested
+    if not normalized:
+        vec0 = normalize(vec0, axis=-1)
+        vec1 = normalize(vec1, axis=-1)
+
+    # Get cross product for direction of angle, and multiply by arcos of the dot product which is the angle
+    return np.concatenate([np.cross(vec0, vec1), 1 + np.sum(vec0 * vec1, axis=-1, keepdims=True)], axis=-1)
+
+
 def l2_distance(v1, v2):
     """Returns the L2 distance between vector v1 and v2."""
     return np.linalg.norm(np.array(v1) - np.array(v2))
