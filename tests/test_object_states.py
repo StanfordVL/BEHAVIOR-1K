@@ -1,12 +1,13 @@
 from omnigibson.macros import macros as m
 from omnigibson.object_states import *
 from omnigibson.systems import get_system
+from omnigibson.utils.constants import PrimType
 from omnigibson.utils.physx_utils import apply_force_at_pos, apply_torque
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.usd_utils import BoundingBoxAPI
 import omnigibson as og
 
-from utils import og_test, get_random_pose
+from utils import og_test, get_random_pose, place_objA_on_objB_bbox, place_obj_on_floor_plane
 
 import pytest
 import numpy as np
@@ -18,24 +19,18 @@ def test_on_top():
     bowl = og.sim.scene.object_registry("name", "bowl")
     dishtowel = og.sim.scene.object_registry("name", "dishtowel")
 
-    breakfast_table.set_position([0., 0., 0.53])
-    bowl.set_position([0., 0., 0.7])
-    dishtowel.set_position([0.5, 0., 0.67])
+    place_obj_on_floor_plane(breakfast_table)
+    for i, obj in enumerate((bowl, dishtowel)):
+        place_objA_on_objB_bbox(obj, breakfast_table)
+        for _ in range(5):
+            og.sim.step()
 
-    for _ in range(5):
+        assert obj.states[OnTop].get_value(breakfast_table)
+
+        obj.set_position(np.ones(3) * 10 * (i + 1))
         og.sim.step()
 
-    assert bowl.states[OnTop].get_value(breakfast_table)
-    assert dishtowel.states[OnTop].get_value(breakfast_table)
-
-    bowl.set_position([10., 10., 1.])
-    dishtowel.set_position([20., 20., 1.])
-
-    for _ in range(5):
-        og.sim.step()
-
-    assert not bowl.states[OnTop].get_value(breakfast_table)
-    assert not dishtowel.states[OnTop].get_value(breakfast_table)
+        assert not obj.states[OnTop].get_value(breakfast_table)
 
     assert bowl.states[OnTop].set_value(breakfast_table, True)
     assert dishtowel.states[OnTop].set_value(breakfast_table, True)
@@ -50,9 +45,9 @@ def test_inside():
     bowl = og.sim.scene.object_registry("name", "bowl")
     dishtowel = og.sim.scene.object_registry("name", "dishtowel")
 
-    bottom_cabinet.set_position([0., 0., 0.38])
+    place_obj_on_floor_plane(bottom_cabinet)
     bowl.set_position([0., 0., 0.08])
-    dishtowel.set_position([0, 0., 0.63])
+    dishtowel.set_position([0, 0., 0.5])
 
     for _ in range(5):
         og.sim.step()
@@ -82,24 +77,18 @@ def test_under():
     bowl = og.sim.scene.object_registry("name", "bowl")
     dishtowel = og.sim.scene.object_registry("name", "dishtowel")
 
-    breakfast_table.set_position([0., 0., 0.53])
-    bowl.set_position([0., 0., 0.04])
-    dishtowel.set_position([0.3, 0., 0.02])
+    place_obj_on_floor_plane(breakfast_table)
+    for i, obj in enumerate((bowl, dishtowel)):
+        place_obj_on_floor_plane(obj)
+        for _ in range(5):
+            og.sim.step()
 
-    for _ in range(5):
+        assert obj.states[Under].get_value(breakfast_table)
+
+        obj.set_position(np.ones(3) * 10 * (i + 1))
         og.sim.step()
 
-    assert bowl.states[Under].get_value(breakfast_table)
-    assert dishtowel.states[Under].get_value(breakfast_table)
-
-    bowl.set_position([10., 10., 1.])
-    dishtowel.set_position([20., 20., 1.])
-
-    for _ in range(5):
-        og.sim.step()
-
-    assert not bowl.states[Under].get_value(breakfast_table)
-    assert not dishtowel.states[Under].get_value(breakfast_table)
+        assert not obj.states[Under].get_value(breakfast_table)
 
     assert bowl.states[Under].set_value(breakfast_table, True)
     assert dishtowel.states[Under].set_value(breakfast_table, True)
@@ -114,28 +103,20 @@ def test_touching():
     bowl = og.sim.scene.object_registry("name", "bowl")
     dishtowel = og.sim.scene.object_registry("name", "dishtowel")
 
-    breakfast_table.set_position([0., 0., 0.53])
-    bowl.set_position([0., 0., 0.7])
-    dishtowel.set_position([0.5, 0., 0.67])
+    place_obj_on_floor_plane(breakfast_table)
+    for i, obj in enumerate((bowl, dishtowel)):
+        place_objA_on_objB_bbox(obj, breakfast_table)
+        for _ in range(5):
+            og.sim.step()
 
-    for _ in range(5):
+        assert obj.states[Touching].get_value(breakfast_table)
+        assert breakfast_table.states[Touching].get_value(obj)
+
+        obj.set_position(np.ones(3) * 10 * (i + 1))
         og.sim.step()
 
-    assert bowl.states[Touching].get_value(breakfast_table)
-    assert breakfast_table.states[Touching].get_value(bowl)
-    assert dishtowel.states[Touching].get_value(breakfast_table)
-    assert breakfast_table.states[Touching].get_value(dishtowel)
-
-    bowl.set_position([10., 10., 1.])
-    dishtowel.set_position([20., 20., 1.])
-
-    for _ in range(5):
-        og.sim.step()
-
-    assert not bowl.states[Touching].get_value(breakfast_table)
-    assert not breakfast_table.states[Touching].get_value(bowl)
-    assert not dishtowel.states[Touching].get_value(breakfast_table)
-    assert not breakfast_table.states[Touching].get_value(dishtowel)
+        assert not obj.states[Touching].get_value(breakfast_table)
+        assert not breakfast_table.states[Touching].get_value(obj)
 
     with pytest.raises(NotImplementedError):
         bowl.states[Touching].set_value(breakfast_table, None)
@@ -147,30 +128,22 @@ def test_contact_bodies():
     bowl = og.sim.scene.object_registry("name", "bowl")
     dishtowel = og.sim.scene.object_registry("name", "dishtowel")
 
-    breakfast_table.set_position([0., 0., 0.53])
-    bowl.set_position([0., 0., 0.7])
-    dishtowel.set_position([0.5, 0., 0.67])
+    place_obj_on_floor_plane(breakfast_table)
+    for i, obj in enumerate((bowl, dishtowel)):
+        place_objA_on_objB_bbox(obj, breakfast_table)
+        for _ in range(5):
+            og.sim.step()
 
-    for _ in range(5):
+        # TODO: rigid body's ContactBodies should include cloth
+        if obj.prim_type != PrimType.CLOTH:
+            assert obj.root_link in breakfast_table.states[ContactBodies].get_value()
+        assert breakfast_table.root_link in obj.states[ContactBodies].get_value()
+
+        obj.set_position(np.ones(3) * 10 * (i + 1))
         og.sim.step()
 
-    assert bowl.root_link in breakfast_table.states[ContactBodies].get_value()
-    # TODO: rigid body's ContactBodies should include cloth
-    # assert dishtowel.root_link in breakfast_table.states[ContactBodies].get_value()
-    assert breakfast_table.root_link in bowl.states[ContactBodies].get_value()
-    assert breakfast_table.root_link in dishtowel.states[ContactBodies].get_value()
-
-    bowl.set_position([10., 10., 1.])
-    dishtowel.set_position([20., 20., 1.])
-
-    for _ in range(5):
-        og.sim.step()
-
-    assert bowl.root_link not in breakfast_table.states[ContactBodies].get_value()
-    # TODO: rigid body's ContactBodies should include cloth
-    # assert dishtowel.root_link in breakfast_table.states[ContactBodies].get_value()
-    assert breakfast_table.root_link not in bowl.states[ContactBodies].get_value()
-    assert breakfast_table.root_link not in dishtowel.states[ContactBodies].get_value()
+        assert obj.root_link not in breakfast_table.states[ContactBodies].get_value()
+        assert breakfast_table.root_link not in obj.states[ContactBodies].get_value()
 
     with pytest.raises(NotImplementedError):
         bowl.states[ContactBodies].set_value(None)
@@ -182,28 +155,20 @@ def test_next_to():
     bowl = og.sim.scene.object_registry("name", "bowl")
     dishtowel = og.sim.scene.object_registry("name", "dishtowel")
 
-    bottom_cabinet.set_position([0., 0., 0.38])
-    bowl.set_position([0.4, 0., 0.04])
-    dishtowel.set_position([0., 0.4, 0.02])
+    place_obj_on_floor_plane(bottom_cabinet)
+    for i, (axis, obj) in enumerate(zip(("x", "y"), (bowl, dishtowel))):
+        place_obj_on_floor_plane(obj, **{f"{axis}_offset": 0.3})
+        for _ in range(5):
+            og.sim.step()
 
-    for _ in range(5):
+        assert obj.states[NextTo].get_value(bottom_cabinet)
+        assert bottom_cabinet.states[NextTo].get_value(obj)
+
+        obj.set_position(np.ones(3) * 10 * (i + 1))
         og.sim.step()
 
-    assert bowl.states[NextTo].get_value(bottom_cabinet)
-    assert bottom_cabinet.states[NextTo].get_value(bowl)
-    assert dishtowel.states[NextTo].get_value(bottom_cabinet)
-    assert bottom_cabinet.states[NextTo].get_value(dishtowel)
-
-    bowl.set_position([10., 10., 1.])
-    dishtowel.set_position([20., 20., 1.])
-
-    for _ in range(5):
-        og.sim.step()
-
-    assert not bowl.states[NextTo].get_value(bottom_cabinet)
-    assert not bottom_cabinet.states[NextTo].get_value(bowl)
-    assert not dishtowel.states[NextTo].get_value(bottom_cabinet)
-    assert not bottom_cabinet.states[NextTo].get_value(dishtowel)
+        assert not obj.states[NextTo].get_value(bottom_cabinet)
+        assert not bottom_cabinet.states[NextTo].get_value(obj)
 
     with pytest.raises(NotImplementedError):
         bowl.states[NextTo].set_value(bottom_cabinet, None)
@@ -214,18 +179,16 @@ def test_overlaid():
     breakfast_table = og.sim.scene.object_registry("name", "breakfast_table")
     carpet = og.sim.scene.object_registry("name", "carpet")
 
-    breakfast_table.set_position([0., 0., 0.53])
-    carpet.set_position([0.0, 0., 0.67])
+    place_obj_on_floor_plane(breakfast_table)
+    place_objA_on_objB_bbox(carpet, breakfast_table)
 
     for _ in range(5):
         og.sim.step()
 
     assert carpet.states[Overlaid].get_value(breakfast_table)
 
-    carpet.set_position([20., 20., 1.])
-
-    for _ in range(5):
-        og.sim.step()
+    carpet.set_position(np.ones(3) * 20.0)
+    og.sim.step()
 
     assert not carpet.states[Overlaid].get_value(breakfast_table)
 
@@ -286,26 +249,18 @@ def test_adjacency():
     bowl = og.sim.scene.object_registry("name", "bowl")
     dishtowel = og.sim.scene.object_registry("name", "dishtowel")
 
-    bottom_cabinet.set_position([0., 0., 0.38])
-    bowl.set_position([0.4, 0., 0.04])
-    dishtowel.set_position([0., 0.4, 0.02])
+    place_obj_on_floor_plane(bottom_cabinet)
+    for i, (axis, obj) in enumerate(zip(("x", "y"), (bowl, dishtowel))):
+        place_obj_on_floor_plane(obj, **{f"{axis}_offset": 0.4})
+        og.sim.step()
 
-    # Need to take one sim step
-    og.sim.step()
+        assert bottom_cabinet in set.union(
+            *(axis.positive_neighbors | axis.negative_neighbors
+              for coordinate in obj.states[HorizontalAdjacency].get_value() for axis in coordinate)
+        )
 
-    assert bottom_cabinet in set.union(
-        *(axis.positive_neighbors | axis.negative_neighbors
-          for coordinate in bowl.states[HorizontalAdjacency].get_value() for axis in coordinate)
-    )
-
-    assert bottom_cabinet in set.union(
-        *(axis.positive_neighbors | axis.negative_neighbors
-          for coordinate in dishtowel.states[HorizontalAdjacency].get_value() for axis in coordinate)
-    )
-
-    bottom_cabinet.set_position([0., 0., 0.38])
-    bowl.set_position([0., -0.08, 1.])
-    dishtowel.set_position([0., -0.08, 2.0])
+    bowl.set_position([0., 0., 1.])
+    dishtowel.set_position([0., 0., 2.0])
 
     # Need to take one sim step
     og.sim.step()
@@ -333,14 +288,14 @@ def test_temperature():
     bagel = og.sim.scene.object_registry("name", "bagel")
     dishtowel = og.sim.scene.object_registry("name", "cookable_dishtowel")
 
-    microwave.set_position_orientation([0., 0., 0.15], [0, 0, 0, 1])
-    stove.set_position_orientation([1, 0., 0.45], [0, 0, 0, 1])
-    fridge.set_position_orientation([2, 0., 0.98], [0, 0, 0, 1])
-    plywood.set_position_orientation([3, 0, 0.05], [0, 0, 0, 1])
+    place_obj_on_floor_plane(microwave)
+    place_obj_on_floor_plane(stove, x_offset=1.0)
+    place_obj_on_floor_plane(fridge, x_offset=2.0)
+    place_obj_on_floor_plane(plywood, x_offset=3.0)
 
     # Set the objects to be far away
-    bagel.set_position_orientation([-0.5, 0., 0.03], [0, 0, 0, 1])
-    dishtowel.set_position_orientation([-1.0, 0.0, 0.02], [0, 0, 0, 1])
+    place_obj_on_floor_plane(bagel, x_offset=-0.5)
+    place_obj_on_floor_plane(dishtowel, x_offset=-1.0)
 
     for _ in range(5):
         og.sim.step()
@@ -384,8 +339,8 @@ def test_temperature():
     assert dishtowel.states[Temperature].get_value() > m.object_states.temperature.DEFAULT_TEMPERATURE
 
     # Set the objects to be far away
-    bagel.set_position_orientation([-0.5, 0., 0.03], [0, 0, 0, 1])
-    dishtowel.set_position_orientation([-1.0, 0.0, 0.02], [0, 0, 0, 1])
+    place_obj_on_floor_plane(bagel, x_offset=-0.5)
+    place_obj_on_floor_plane(dishtowel, x_offset=-1.0)
     for _ in range(5):
         og.sim.step()
 
@@ -439,8 +394,8 @@ def test_temperature():
     assert dishtowel.states[Temperature].set_value(m.object_states.temperature.DEFAULT_TEMPERATURE)
 
     # Set the objects to be near the plywood
-    bagel.set_position_orientation([2.9, 0, 0.03], [0, 0, 0, 1])
-    dishtowel.set_position_orientation([3.1, 0, 0.02], [0, 0, 0, 1])
+    place_obj_on_floor_plane(bagel, x_offset=2.9)
+    place_obj_on_floor_plane(dishtowel, x_offset=3.1)
 
     for _ in range(5):
         og.sim.step()
@@ -677,19 +632,21 @@ def test_toggled_on():
     stove = og.sim.scene.object_registry("name", "stove")
     robot = og.sim.scene.object_registry("name", "robot0")
 
-    stove.set_position_orientation([1.5, 0.3, 0.45], T.euler2quat([0, 0, -np.pi / 2.0]))
-    robot.set_position_orientation([0.01, 0.38, 0], [0, 0, 0, 1])
+    stove.set_position_orientation([1.46, 0.3, 0.45], T.euler2quat([0, 0, -np.pi / 2.0]))
+    robot.set_position_orientation([0.01, 0.38, 0.01], [0, 0, 0, 1])
 
     assert not stove.states[ToggledOn].get_value()
 
     robot.joints["torso_lift_joint"].set_pos(0.0)
-    robot.joints["shoulder_pan_joint"].set_pos(np.pi / 2)
-    robot.joints["shoulder_lift_joint"].set_pos(np.pi / 36)
+    robot.joints["shoulder_pan_joint"].set_pos(0.0)
+    robot.joints["shoulder_lift_joint"].set_pos(np.pi / 15)
     robot.joints["upperarm_roll_joint"].set_pos(0.0)
     robot.joints["elbow_flex_joint"].set_pos(0.0)
     robot.joints["forearm_roll_joint"].set_pos(0.0)
     robot.joints["wrist_flex_joint"].set_pos(0.0)
     robot.joints["wrist_roll_joint"].set_pos(0.0)
+    robot.joints["l_gripper_finger_joint"].set_pos(0.0)
+    robot.joints["r_gripper_finger_joint"].set_pos(0.0)
 
     steps = m.object_states.toggle.CAN_TOGGLE_STEPS
     for _ in range(steps):
@@ -780,7 +737,8 @@ def test_attached_to():
 @og_test
 def test_fluid_source():
     sink = og.sim.scene.object_registry("name", "sink")
-    sink.set_position_orientation([0, 0, 0.7], [0, 0, 0, 1])
+
+    place_obj_on_floor_plane(sink)
     for _ in range(3):
         og.sim.step()
 
@@ -801,7 +759,7 @@ def test_fluid_source():
 @og_test
 def test_fluid_sink():
     sink = og.sim.scene.object_registry("name", "sink")
-    sink.set_position_orientation([0, 0, 0.7], [0, 0, 0, 1])
+    place_obj_on_floor_plane(sink)
     for _ in range(3):
         og.sim.step()
 
@@ -872,8 +830,8 @@ def test_draped():
     breakfast_table = og.sim.scene.object_registry("name", "breakfast_table")
     carpet = og.sim.scene.object_registry("name", "carpet")
 
-    breakfast_table.set_position([0., 0., 0.53])
-    carpet.set_position([0.0, 0., 0.67])
+    place_obj_on_floor_plane(breakfast_table)
+    place_objA_on_objB_bbox(carpet, breakfast_table)
 
     for _ in range(5):
         og.sim.step()
@@ -896,7 +854,7 @@ def test_draped():
 def test_covered():
     breakfast_table = og.sim.scene.object_registry("name", "breakfast_table")
 
-    breakfast_table.set_position([0., 0., 0.53])
+    place_obj_on_floor_plane(breakfast_table)
 
     for _ in range(5):
         og.sim.step()
