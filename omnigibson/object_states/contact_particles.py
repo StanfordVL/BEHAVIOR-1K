@@ -12,6 +12,7 @@ from omnigibson.systems.system_base import PhysicalParticleSystem, is_physical_p
 m = create_module_macros(module_path=__file__)
 
 # Distance tolerance for detecting contact
+m.CONTACT_AABB_TOLERANCE = 2.5e-2
 m.CONTACT_TOLERANCE = 5e-3
 
 
@@ -54,8 +55,8 @@ class ContactParticles(RelativeObjectState, KinematicsMixin):
         lower, upper = self.obj.states[AABB].get_value() if link is None else link.aabb
 
         # Add margin for filtering inbound
-        lower = lower - (system.particle_radius + 0.01)
-        upper = upper + (system.particle_radius + 0.01)
+        lower = lower - (system.particle_radius + m.CONTACT_AABB_TOLERANCE)
+        upper = upper + (system.particle_radius + m.CONTACT_AABB_TOLERANCE)
 
         # Iterate over all particles and aggregate contacts
         positions = system.get_particles_position_orientation()[0]

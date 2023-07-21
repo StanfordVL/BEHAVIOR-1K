@@ -594,7 +594,8 @@ class ClothPrim(GeomPrim):
 
     def reset(self):
         """
-        Reset the points to their default positions in the local frame
+        Reset the points to their default positions in the local frame, and also zeroes out velocities
         """
         if self.initialized:
             self.set_attribute(attr="points", val=Vt.Vec3fArray.FromNumpy(self._default_positions))
+            self.particle_velocities = np.zeros((self._n_particles, 3))
