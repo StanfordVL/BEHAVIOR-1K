@@ -607,6 +607,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     context=context
                 )
 
+            plan = self._add_linearly_interpolated_waypoints(plan, 3)
+
             if plan is None:
                 raise ActionPrimitiveError(
                     ActionPrimitiveError.Reason.PLANNING_ERROR,
@@ -618,6 +620,13 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             for i, joint_pos in enumerate(plan):
                 indented_print("Executing grasp plan step %d/%d", i + 1, len(plan))
                 yield from self._move_hand_direct_joint(joint_pos, control_idx)
+
+    def _add_linearly_interpolated_waypoints(self, plan, num_waypoints):
+        interpolated_plan = []
+        for i in range(len(plan) - 1):
+            interpolated_plan += np.linspace(plan[i], plan[i+1], num_waypoints + 1).tolist()
+        interpolated_plan += plan[-1]
+        return interpolated_plan
 
     def _move_hand_direct_joint(self, joint_pos, control_idx, stop_on_contact=False, max_steps_for_hand_move=MAX_STEPS_FOR_HAND_MOVE, ignore_failure=False):
         action = self._empty_action()
