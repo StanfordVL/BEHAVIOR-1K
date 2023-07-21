@@ -160,17 +160,6 @@ class EntityPrim(XFormPrim):
 
         self._materials = materials
 
-    @property
-    def aabb(self):
-        if self._prim_type == PrimType.CLOTH:
-            particle_positions = self.root_link.particle_positions
-            aabb_low, aabb_hi = np.min(particle_positions, axis=0), np.max(particle_positions, axis=0)
-        else:  # Rigid
-            aabb_low, aabb_hi = super().aabb
-            aabb_low, aabb_hi = np.array(aabb_low), np.array(aabb_hi)
-
-        return aabb_low, aabb_hi
-
     def update_links(self, load_config=None):
         """
         Helper function to refresh owned joints. Useful for synchronizing internal data if
@@ -1264,7 +1253,7 @@ class EntityPrim(XFormPrim):
         # If we're a cloth prim type, we compute the bounding box from the limits of the particles. Otherwise, use the
         # normal method for computing bounding box
         if self._prim_type == PrimType.CLOTH:
-            particle_positions = self.root_link.particle_positions
+            particle_positions = self.root_link.compute_particle_positions()
             aabb_lo, aabb_hi = np.min(particle_positions, axis=0), np.max(particle_positions, axis=0)
         else:
             aabb_lo, aabb_hi = super().aabb

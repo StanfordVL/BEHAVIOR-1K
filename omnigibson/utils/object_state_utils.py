@@ -203,6 +203,9 @@ def sample_kinematics(
 
         objA.keep_still()
 
+        # Take extra step for depenetration, then break
+        og.sim.step_physics()
+
         # Render at the end
         og.sim.render()
 

@@ -439,6 +439,10 @@ class Simulator(SimulationContext, Serializable):
                 # Also refresh the transition rules that are currently active
                 TransitionRuleAPI.refresh_all_rules()
 
+            # Update any system-related state
+            for system in self.scene.systems:
+                system.update()
+
             # Propagate states if the feature is enabled
             if gm.ENABLE_OBJECT_STATES:
                 # Step the object states in global topological order (if the scene exists)
