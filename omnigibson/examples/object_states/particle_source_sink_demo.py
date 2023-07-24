@@ -3,6 +3,7 @@ import numpy as np
 import omnigibson as og
 from omnigibson import object_states
 from omnigibson.macros import gm
+from omnigibson.utils.constants import ParticleModifyCondition
 
 # Make sure object states are enabled and GPU dynamics are used
 gm.ENABLE_OBJECT_STATES = True
@@ -44,23 +45,24 @@ def main(random_selection=False, headless=False, short_exec=False):
         name="sink",
         category="sink",
         model="yfaufu",
-        scale=[0.8, 0.8, 0.8],
+        scale=5.5,
         abilities={
             "toggleable": {},
             "particleSource": {
                 "conditions": {
-                    "water": [check_toggledon],   # Must be toggled on for water source to be active
+                    "water": [(ParticleModifyCondition.TOGGLEDON, True)],   # Must be toggled on for water source to be active
                 },
-                "source_radius": 0.0125,
-                "source_height": 0.05,
+                # TODO: Remove once asset canonical scale is fixed
+                "source_radius": 0.0025,
+                "source_height": 0.01,
                 "initial_speed": 0.0,               # Water merely falls out of the spout
             },
             "particleSink": {
                 "conditions": {
-                    "water": None,  # No conditions, always sinking nearby particles
+                    "water": [],  # No conditions, always sinking nearby particles
                 },
-                "sink_radius": 0.05,
-                "sink_height": 0.05,
+                "sink_radius": 0.01,
+                "sink_height": 0.1,
             },
         },
         position=[-0.7, 0, 0.56],
