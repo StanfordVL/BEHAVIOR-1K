@@ -107,25 +107,6 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin):
             if kwargs.get(kwarg, False) and not state_type.is_compatible_asset(prim=prim, **kwargs)[0]:
                 return False, f"{cls.__name__} has {kwarg} but obj has no {state_type.__name__} state!"
 
-        # # Check whether this state has toggledon metalink or articulated joints if required
-        # link_prefix = macros.object_states.toggle.TOGGLE_LINK_PREFIX
-        # has_link_prefix, has_joints = False, False
-        # for child in prim.GetChildren():
-        #     if child.GetPrimType() == "Xform":
-        #         if link_prefix in child.GetName():
-        #             has_link_prefix = True
-        #     for gchild in child.GetChildren():
-        #         gchild_type = gchild.GetPrimType().lower()
-        #         if "joint" in gchild_type and "fixed" not in gchild_type:
-        #             has_joints = True
-        #             break
-        #
-        # if kwargs.get("requires_toggled_on", False) and not has_link_prefix:
-        #     return False, f"{cls.__name__} has requires_toggled_on but obj has no link with prefix {link_prefix}!"
-        #
-        # if kwargs.get("requires_closed", False) and not has_joints:
-        #     return False, f"{cls.__name__} has requires_closed but obj has no articulated joints!"
-
         return True, None
 
     @classproperty
