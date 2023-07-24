@@ -546,10 +546,10 @@ class DatasetObject(USDObject):
 
                 # Add the points to our collection of points.
                 points.extend(trimesh.transformations.transform_points(vertices_in_base_frame, bbox_center_in_base_frame))
-            elif bbox_type == "visual":
-                # Just skip for now
-                continue
             elif fallback_to_aabb:
+                # If we're visual and the mesh is not visible, there is no fallback so continue
+                if bbox_type == "visual" and not np.all(tuple(mesh.visible for mesh in meshes.values())):
+                    continue
                 # If no BB annotation is available, get the AABB for this link.
                 aabb_center, aabb_extent = BoundingBoxAPI.compute_center_extent(prim=link)
                 aabb_vertices_in_world = aabb_center + np.array(list(itertools.product((1, -1), repeat=3))) * (
