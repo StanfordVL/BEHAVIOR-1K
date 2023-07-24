@@ -222,25 +222,19 @@ def arm_planning_validity_fn(context, joint_pos):
 
         return not valid_hit
 
-    def check_overlap():
-        nonlocal valid_hit
-        nonlocal mesh_hit
-        valid_hit = False
-
-        for link in context.robot_meshes_copy:
-            for mesh in context.robot_meshes_copy[link]:
-                if valid_hit:
-                    return valid_hit
-                mesh_id = PhysicsSchemaTools.encodeSdfPath(mesh.prim_path)
-                mesh_hit = mesh.prim_path
-                if mesh._prim.GetTypeName() == "Mesh":
-                    og.sim.psqi.overlap_mesh(*mesh_id, reportFn=overlap_callback)
-                else:
-                    og.sim.psqi.overlap_shape(*mesh_id, reportFn=overlap_callback)
-            
-        return valid_hit
+    for link in context.robot_meshes_copy:
+        for mesh in context.robot_meshes_copy[link]:
+            if valid_hit:
+                return not valid_hit
+            mesh_id = PhysicsSchemaTools.encodeSdfPath(mesh.prim_path)
+            mesh_hit = mesh.prim_path
+            if mesh._prim.GetTypeName() == "Mesh":
+                og.sim.psqi.overlap_mesh(*mesh_id, reportFn=overlap_callback)
+            else:
+                og.sim.psqi.overlap_shape(*mesh_id, reportFn=overlap_callback)
+        
+    return not valid_hit
     
-    return not check_overlap()
 
 def remove_unnecessary_rotations(path):
     for start_idx in range(len(path) - 1):
