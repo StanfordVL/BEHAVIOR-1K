@@ -239,7 +239,7 @@ class XFormPrim(BasePrim):
 
     def get_local_pose(self):
         """
-        Gets prim's pose with respect to the prim's local frame (it's parent frame)
+        Gets prim's pose with respect to the prim's local frame (its parent frame)
 
         Returns:
             2-tuple:

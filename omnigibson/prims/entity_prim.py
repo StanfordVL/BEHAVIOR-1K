@@ -1254,9 +1254,9 @@ class EntityPrim(XFormPrim):
         # normal method for computing bounding box
         if self._prim_type == PrimType.CLOTH:
             particle_contact_offset = self.root_link.cloth_system.particle_contact_offset
-            particle_positions = self.root_link.particle_positions
+            particle_positions = self.root_link.compute_particle_positions()
             aabb_lo, aabb_hi = np.min(particle_positions, axis=0) - particle_contact_offset, \
-                np.max(particle_positions, axis=0) + particle_contact_offset
+                               np.max(particle_positions, axis=0) + particle_contact_offset
         else:
             aabb_lo, aabb_hi = super().aabb
             aabb_lo, aabb_hi = np.array(aabb_lo), np.array(aabb_hi)

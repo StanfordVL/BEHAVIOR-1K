@@ -57,19 +57,10 @@ class FoldedLevel(AbsoluteObjectState, ClothState):
         Calculate the percantage of surface normals that are sufficiently close to the z-axis.
         """
         cloth = self.obj.root_link
-        points = cloth.particle_positions[cloth.keyfaces]
-
-        # Shape [F, 3]
-        v1 = points[:, 2, :] - points[:, 0, :]
-        v2 = points[:, 1, :] - points[:, 0, :]
-        normals = np.cross(v1, v2)
-        normals_norm = np.linalg.norm(normals, axis=1)
-
-        valid_normals = normals[normals_norm.nonzero()] / np.expand_dims(normals_norm[normals_norm.nonzero()], axis=1)
-        assert valid_normals.shape[0] > 0
+        normals = cloth.compute_face_normals(face_ids=cloth.keyfaces)
 
         # projection onto the z-axis
-        proj = np.abs(np.dot(valid_normals, np.array([0.0, 0.0, 1.0])))
+        proj = np.abs(np.dot(normals, np.array([0.0, 0.0, 1.0])))
         percentage = np.mean(proj > np.cos(m.NORMAL_Z_ANGLE_DIFF))
         return percentage
 
