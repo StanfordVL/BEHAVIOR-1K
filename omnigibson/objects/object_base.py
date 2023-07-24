@@ -1,5 +1,6 @@
 from abc import ABCMeta
 import numpy as np
+from collections import Iterable
 
 import omnigibson as og
 from omnigibson.macros import create_module_macros, gm
@@ -100,7 +101,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
 
         # Create load config from inputs
         load_config = dict() if load_config is None else load_config
-        load_config["scale"] = scale
+        load_config["scale"] = np.array(scale) if isinstance(scale, Iterable) else scale
         load_config["visible"] = visible
         load_config["visual_only"] = visual_only
         load_config["self_collisions"] = self_collisions

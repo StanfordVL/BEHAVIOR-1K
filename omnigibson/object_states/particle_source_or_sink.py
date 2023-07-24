@@ -5,6 +5,7 @@ from omnigibson.macros import create_module_macros
 from omnigibson.object_states.particle_modifier import ParticleApplier, ParticleRemover
 from omnigibson.systems.system_base import is_physical_particle_system
 from omnigibson.utils.constants import ParticleModifyMethod
+from omnigibson.utils.geometry_utils import get_particle_positions_from_frame
 from omnigibson.utils.python_utils import classproperty
 
 # Create settings for this module
@@ -83,7 +84,7 @@ class ParticleSource(ParticleApplier):
             projection_mesh_params = {
                 "type": "Cylinder",
                 "extents": [source_radius * 2, source_radius * 2, source_height],
-            },
+            }
         else:
             projection_mesh_params = None
 
@@ -105,7 +106,17 @@ class ParticleSource(ParticleApplier):
         # This is equivalent to the time it takes for a generated particle to travel @source_height distance
         # Note that object state steps are discretized by og.sim.render_step
         # Note: t derived from quadratic formula: height = 0.5 g t^2 + v0 t
-        t = (-self._initial_speed + np.sqrt(self._initial_speed ** 2 + 2 * og.sim.gravity * self._projection_mesh_params["extents"][2])) / og.sim.gravity
+        # Note: height must be considered in the world frame, so we convert the distance from local into world frame
+        pos, quat = self.link.get_position_orientation()
+        points = np.array([np.zeros(3), np.array([0, 0, self._projection_mesh_params["extents"][2]])])
+        points = get_particle_positions_from_frame(
+            pos=pos,
+            quat=quat,
+            scale=self.obj.scale,
+            particle_positions=points,
+        )
+        distance = np.linalg.norm(points[1] - points[0])
+        t = (-self._initial_speed + np.sqrt(self._initial_speed ** 2 + 2 * og.sim.gravity * distance)) / og.sim.gravity
         self._n_steps_per_modification = np.ceil(1 + t / og.sim.get_rendering_dt()).astype(int)
 
     def _get_max_particles_limit_per_step(self, system):
