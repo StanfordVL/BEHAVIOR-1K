@@ -77,7 +77,7 @@ class ObjectStateBinaryPredicate(BinaryAtomicFormula):
     STATE_NAME = None
 
     def _evaluate(self, entity1, entity2, **kwargs):
-        return entity1.get_state(self.STATE_CLASS, entity2.wrapped_obj, **kwargs) if entity2.exists else None
+        return entity1.get_state(self.STATE_CLASS, entity2.wrapped_obj, **kwargs) if entity2.exists else False
 
     def _sample(self, entity1, entity2, binary_state, **kwargs):
         return entity1.set_state(self.STATE_CLASS, entity2.wrapped_obj, binary_state, **kwargs) if entity2.exists else None
@@ -758,7 +758,7 @@ class BDDLSampler:
                     # Get all available models that support all of its synset abilities
                     model_choices = get_all_object_category_models_with_abilities(
                         category=category,
-                        abilities=OBJECT_TAXONOMY.get_abilities(obj_synset),
+                        abilities=OBJECT_TAXONOMY.get_abilities(OBJECT_TAXONOMY.get_synset_from_category(category)),
                     )
                     if len(model_choices) == 0:
                         return f"Missing valid object models for category: {category}"
