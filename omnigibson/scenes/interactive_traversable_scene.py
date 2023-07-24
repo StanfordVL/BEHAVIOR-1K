@@ -161,17 +161,6 @@ class InteractiveTraversableScene(TraversableScene):
         if self.has_connectivity_graph:
             self._trav_map.load_map(maps_path)
 
-    def _initialize(self):
-        super()._initialize()
-        self._seg_map.room_sem_name_to_ins_name = defaultdict(list)
-        for object in self.objects:
-            for in_room in object.in_rooms:
-                if in_room == "":
-                    continue
-                room_type = "_".join(in_room.split("_")[:-1])
-                if in_room not in self._seg_map.room_sem_name_to_ins_name[room_type]:
-                    self._seg_map.room_sem_name_to_ins_name[room_type].append(in_room)
-
     def _should_load_object(self, obj_info):
         category = obj_info["args"].get("category", "object")
         in_rooms = obj_info["args"].get("in_rooms", [])
@@ -192,7 +181,7 @@ class InteractiveTraversableScene(TraversableScene):
         agent_ok = self.include_robots or category != robot_macros.ROBOT_CATEGORY
 
         # We only load this model if all the above conditions are met
-        return not_blacklisted and whitelisted and (valid_room or category in {"floors", "walls", "ceilings"}) and agent_ok
+        return not_blacklisted and whitelisted and valid_room and agent_ok
 
     @property
     def seg_map(self):
