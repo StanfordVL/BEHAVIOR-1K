@@ -762,25 +762,8 @@ class BDDLSampler:
                     if len(model_choices) == 0:
                         return f"Missing valid object models for category: {category}"
 
-                    # TODO: This no longer works because model ID changes in the new asset
-                    # Filter object models if the object category is openable
-                    # synset = OBJECT_TAXONOMY.get_synset_from_category(category)
-                    # if OBJECT_TAXONOMY.has_ability(synset, "openable"):
-                    #     # Always use the articulated version of a certain object if its category is openable
-                    #     # E.g. backpack, jar, etc
-                    #     model_choices = [m for m in model_choices if "articulated_" in m]
-                    #     if len(model_choices) == 0:
-                    #         return "{} is Openable, but does not have articulated models.".format(category)
-
                     # Randomly select an object model
                     model = np.random.choice(model_choices)
-
-                    # TODO: temporary hack no longer works because model ID changes in the new asset
-                    # for "collecting aluminum cans", we need pop cans (not bottles)
-                    # if category == "pop" and self.activity_name in ["collecting_aluminum_cans"]:
-                    #     model = np.random.choice([str(i) for i in range(40, 46)])
-                    # if category == "spoon" and self.activity_name in ["polishing_silver"]:
-                    #     model = np.random.choice([str(i) for i in [2, 5, 6]])
 
                     # create the object
                     simulator_obj = DatasetObject(
@@ -802,11 +785,8 @@ class BDDLSampler:
                     self._sampled_objects.add(simulator_obj)
                     self._object_scope[obj_inst] = BDDLEntity(bddl_inst=obj_inst, entity=simulator_obj)
 
-        # og.sim.stop()
-        # og.sim.step()
         og.sim.play()
         og.sim.stop()
-        # og.sim.scene.reset()
 
     def _sample_initial_conditions(self):
         """
