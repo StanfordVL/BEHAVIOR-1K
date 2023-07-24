@@ -283,12 +283,91 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         if self.robot_model == "Tiago":
             self._setup_tiago()
 
+        self._load_robot_copy()
+
     # Disable grasping frame for Tiago robot (Should be cleaned up in the future)
     def _setup_tiago(self):
         for link in self.robot.links.values():
             for mesh in link.collision_meshes.values():
                 if "grasping_frame" in link.prim_path:
                     mesh.collision_enabled = False
+
+    def _load_robot_copy(self):
+        # Create FK solver
+        fk_descriptor = "combined" if "combined" in self.robot.robot_arm_descriptor_yamls else self.robot.default_arm
+        self.fk_solver = FKSolver(
+            robot_description_path=self.robot.robot_arm_descriptor_yamls[fk_descriptor],
+            robot_urdf_path=self.robot.urdf_path,
+        )
+
+        robots_to_copy = [
+            {
+                "robot": self.robot,
+                "copy_path": "/World/robot_copy"
+            }
+        ]
+        if hasattr(self.robot, 'simplified_mesh_usd_path'):
+            simplified_robot = { 
+                "robot": USDObject("simplified_copy", self.robot.simplified_mesh_usd_path),
+                "copy_path": "/World/simplified_robot_copy"         
+            }
+            robots_to_copy.append(simplified_robot)
+
+        for robot_copy in robots_to_copy:
+            # Create prim under which robot meshes are nested and set position
+            CreatePrimCommand("Xform", robot_copy.copy_path).do()
+            self.robot_copy.collision_enabled = False
+
+            # Set robot meshes to copy, either simplified version of Tiago or full version of other robots
+            arm_links = self.robot.manipulation_link_names
+            link_poses = None
+            robot_to_copy = None
+            if self.robot.model_name == "Tiago" and self.mode == "base":
+                robot_to_copy =  USDObject("tiago_copy", self.robot.simplified_mesh_usd_path)
+                og.sim.import_object(robot_to_copy)
+
+                joint_combined_idx = np.concatenate([self.robot.trunk_control_idx, self.robot.arm_control_idx["combined"]])
+                joint_pos = np.array(self.robot.get_joint_positions()[joint_combined_idx])
+                link_poses = self.fk_solver.get_link_poses(joint_pos, arm_links)
+            else:
+                robot_to_copy = self.robot
+
+            # Copy robot meshes
+            for link in robot_to_copy.links.values():
+                for mesh in link.collision_meshes.values():
+                    split_path = mesh.prim_path.split("/")
+                    link_name = split_path[3]
+                    # Do not copy grasping frame (this is necessary for Tiago, but should be cleaned up in the future)
+                    if "grasping_frame" in link_name:
+                        continue
+
+                    mesh_copy_path = self.robot_copy_path + "/" + link_name
+                    mesh_copy_path += f"_{split_path[-1]}" if split_path[-1] != "collisions" else ""
+                    mesh_command = CopyPrimCommand(mesh.prim_path, path_to=mesh_copy_path)
+                    mesh_command.do()
+                    mesh_copy = CollisionGeomPrim(mesh_copy_path, mesh_copy_path)
+                    relative_pose = T.relative_pose_transform(*mesh.get_position_orientation(), *link.get_position_orientation())
+                    if link_name not in self.robot_meshes_copy.keys():
+                        self.robot_meshes_copy[link_name] = [mesh_copy]
+                        self.robot_meshes_relative_poses[link_name] = [relative_pose]
+                    else:
+                        self.robot_meshes_copy[link_name].append(mesh_copy)
+                        self.robot_meshes_relative_poses[link_name].append(relative_pose)
+
+                    # Set poses of meshes relative to the robot to construct the robot
+                    if self.robot.model_name == "Tiago" and self.mode == "base" and link_name in arm_links:
+                        link_pose = link_poses[link_name]
+                        mesh_copy_pose = T.pose_transform(*link_pose, *relative_pose)
+                        self._set_prim_pose(mesh_copy.prim, mesh_copy_pose)
+                    else:
+                        mesh_in_robot = T.relative_pose_transform(*mesh.get_position_orientation(), *robot_to_copy.get_position_orientation())
+                        self._set_prim_pose(mesh_copy.prim, mesh_in_robot)
+
+                    if self.mode == "base":
+                        mesh_copy.collision_enabled = False
+                    elif self.mode == "arm":
+                        mesh_copy.collision_enabled = True
+
 
 
     def get_action_space(self):
