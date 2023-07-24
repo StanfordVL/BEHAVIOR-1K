@@ -64,6 +64,10 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
                 - bool: Whether the given object is compatible with this object state or not
                 - None or str: If not compatible, the reason why it is not compatible. Otherwise, None
         """
+        # Make sure all required dependencies are included in this object's state dictionary
+        for dep in cls.get_dependencies():
+            if dep not in obj.states:
+                return False, f"Missing required dependency state {dep.__name__}"
         # Make sure all required kwargs are specified
         default_kwargs = inspect.signature(cls.__init__).parameters
         for kwarg, val in default_kwargs.items():

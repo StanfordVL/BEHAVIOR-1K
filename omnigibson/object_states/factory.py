@@ -112,19 +112,28 @@ def get_states_for_ability(ability):
     return _ABILITY_TO_STATE_MAPPING[ability]
 
 
-def get_state_dependency_graph():
+def get_state_dependency_graph(states=None):
     """
+    Args:
+        states (None or Iterable): If specified, specific state(s) to sort. Otherwise, will generate dependency graph
+            over all states
+
     Returns:
         nx.DiGraph: State dependency graph of supported object states
     """
+    states = REGISTERED_OBJECT_STATES.values() if states is None else states
     dependencies = {state: state.get_dependencies() + state.get_optional_dependencies()
-                    for state in REGISTERED_OBJECT_STATES.values()}
+                    for state in states}
     return nx.DiGraph(dependencies)
 
 
-def get_states_by_dependency_order():
+def get_states_by_dependency_order(states=None):
     """
+    Args:
+        states (None or Iterable): If specified, specific state(s) to sort. Otherwise, will generate dependency graph
+            over all states
+
     Returns:
         list: all states in topological order of dependency
     """
-    return list(reversed(list(nx.algorithms.topological_sort(get_state_dependency_graph()))))
+    return list(reversed(list(nx.algorithms.topological_sort(get_state_dependency_graph(states)))))
