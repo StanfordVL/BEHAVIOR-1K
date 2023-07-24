@@ -12,6 +12,18 @@ def plan_base_motion(
     planning_time = 100.0,
     **kwargs
 ):
+    """
+    Plans a base motion to a 2d pose
+
+    Args:
+        robot (omnigibson.object_states.Robot): Robot object to plan for
+        end_conf (Iterable): [x, y, yaw] 2d pose to plan to
+        context (UndoableContext): Context to plan in that includes the robot copy
+        planning_time (float): Time to plan for
+    
+    Returns:
+        Array of arrays: Array of 2d poses that the robot should navigate to
+    """
     from ompl import base as ob
     from ompl import geometric as ompl_geo
 
@@ -83,6 +95,18 @@ def plan_arm_motion(
     planning_time = 100.0,
     **kwargs
 ):
+    """
+    Plans an arm motion to a final joint position
+
+    Args:
+        robot (BaseRobot): Robot object to plan for
+        end_conf (Iterable): Final joint position to plan to
+        context (UndoableContext): Context to plan in that includes the robot copy
+        planning_time (float): Time to plan for
+    
+    Returns:
+        Array of arrays: Array of joint positions that the robot should navigate to
+    """
     from ompl import base as ob
     from ompl import geometric as ompl_geo
 
@@ -153,8 +177,17 @@ def plan_arm_motion(
         return return_path
     return None
 
-# Moves robot and detects robot collisions with the environment, but not with itself
 def detect_robot_collision(context, pose):
+    """
+    Moves robot and detects robot collisions with the environment, but not with itself
+
+    Args:
+        context (UndoableContext): Context to plan in that includes the robot copy
+        pose (Array): Pose in the world frame to check for collisions at
+    
+    Returns:
+        bool: Whether the robot is in collision
+    """
     translation = pose[0]
     orientation = pose[1]
     # context.robot_copy.prim.set_local_poses(np.array([translation]), np.array([orientation]))
@@ -175,8 +208,17 @@ def detect_robot_collision(context, pose):
                     return True
     return False
 
-# Detects robot collisions with the environment, but not with itself
 def detect_robot_collision_in_sim(robot, filter_objs=[]):
+    """
+    Detects robot collisions with the environment, but not with itself using the ContactBodies API
+
+    Args:
+        context (UndoableContext): Context to plan in that includes the robot copy
+        pose (Array): Pose in the world frame to check for collisions at
+    
+    Returns:
+        bool: Whether the robot is in collision
+    """
     filter_categories = ["floors"]
     
     obj_in_hand = robot._ag_obj_in_hand[robot.default_arm]
@@ -194,9 +236,17 @@ def detect_robot_collision_in_sim(robot, filter_objs=[]):
 
     return len(collision_prims) > 0
     
-
-# Sets joint positions of robot and detects robot collisions with the environment and itself
 def arm_planning_validity_fn(context, joint_pos):
+    """
+    Sets joint positions of the robot and detects robot collisions with the environment and itself
+
+    Args:
+        context (UndoableContext): Context to plan in that includes the robot copy
+        joint_pos (Array): Joint positions to set the robot to
+    
+    Returns:
+        bool: Whether the robot is in a valid state i.e. not in collision
+    """
     arm_links = context.robot.manipulation_link_names
     link_poses = context.fk_solver.get_link_poses(joint_pos, arm_links)
 
@@ -237,6 +287,16 @@ def arm_planning_validity_fn(context, joint_pos):
     
 
 def remove_unnecessary_rotations(path):
+    """
+    Removes unnecessary rotations from a path for the base where the yaw for each pose in the path is in the direction of the
+    the position of the next pose in the path
+
+    Args:
+        path (Array of arrays): Array of 2d poses
+    
+    Returns:
+        Array of arrays: Array of 2d poses with unnecessary rotations removed
+    """
     for start_idx in range(len(path) - 1):
         start = np.array(path[start_idx][:2])
         end = np.array(path[start_idx + 1][:2])

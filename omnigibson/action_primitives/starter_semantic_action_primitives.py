@@ -307,7 +307,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
     def _get_obj_in_hand(self):
         """
-        Get object in robot's hand
+        Get object in the robot's hand
 
         Returns:
             StatefulObject or None: Object if robot is holding something or None if it is not
@@ -327,6 +327,20 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         return self.controller_functions[action](target_obj)
     
     def apply_ref(self, prim, *args, attempts=3):
+        """
+        Yields action for robot to execute the primitive with the given arguments.
+
+        Args:
+            prim (StarterSemanticActionPrimitiveSet): Primitive to execute
+            args: Arguments for the primitive
+            attempts (int): Number of attempts to make before raising an error
+        
+        Returns:
+            np.array or None: Action array for one step for the robot tto execute the primitve or None if primitive completed
+        
+        Raises:
+            ActionPrimitiveError: If primitive fails to execute
+        """
         assert attempts > 0, "Must make at least one attempt"
         ctrl = self.controller_functions[prim]
 
@@ -452,7 +466,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
     def _grasp(self, obj):
         """
-        Yields action for robot to navigate to object if needed, then to grasp it
+        Yields action for the robot to navigate to object if needed, then to grasp it
 
         Args:
             StatefulObject: Object for robot to grasp
@@ -514,7 +528,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
     def _place_on_top(self, obj):
         """
-        Yields action for robot to navigate to the object if needed, then to place it
+        Yields action for the robot to navigate to the object if needed, then to place it
 
         Args:
             obj (StatefulObject): Object for robot to place the object in its hand on
@@ -556,7 +570,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
     def _place_with_predicate(self, obj, predicate):
         """
-        Yields action for robot to navigate to the object if needed, then to place it
+        Yields action for the robot to navigate to the object if needed, then to place it
 
         Args:
             obj (StatefulObject): Object for robot to place the object in its hand on
@@ -586,14 +600,15 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
     def _convert_cartesian_to_joint_space(self, target_pose):
         """
-        Gets joint positions for arm so eef is at the target pose
+        Gets joint positions for the arm so eef is at the target pose
 
         Args:
             target_pose (Iterable of array): Position and orientation arrays in an iterable for pose for the eef
         
         Returns:
-            np.array or None: Joint positions to reach target pose or None if impossible to reach target pose
-            np.array: Indices for joints in the robot
+            2-tuple
+                - np.array or None: Joint positions to reach target pose or None if impossible to reach target pose
+                - np.array: Indices for joints in the robot
         """
         relative_target_pose = self._get_pose_in_robot_frame(target_pose)
         joint_pos, control_idx = self._ik_solver_cartesian_to_joint_space(relative_target_pose)
@@ -607,13 +622,13 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
     
     def _target_in_reach_of_robot(self, target_pose):
         """
-        Determines whether eef for robot can reach target pose in world frame
+        Determines whether the eef for the robot can reach the target pose in the world frame
 
         Args:
-            target_pose (Iterable of array): Position and orientation arrays in an iterable for pose for the eef
+            target_pose (Iterable of array): Position and orientation arrays in an iterable for the pose for the eef
         
         Returns:
-            bool: Whether eef can reach target pose
+            bool: Whether eef can reach the target pose
         """
         relative_target_pose = self._get_pose_in_robot_frame(target_pose)
         joint_pos, _ = self._ik_solver_cartesian_to_joint_space(relative_target_pose)
@@ -627,12 +642,23 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             target_pose (Iterable of array): Position and orientation arrays in an iterable for pose for the eef
         
         Returns:
-            bool: Whether eef can reach target pose
+            bool: Whether eef can the reach target pose
         """
         joint_pos, _ = self._ik_solver_cartesian_to_joint_space(relative_target_pose)
         return False if joint_pos is None else True
 
     def _ik_solver_cartesian_to_joint_space(self, relative_target_pose):
+        """
+        Get joint positions for the arm so eef is at the target pose where the target pose is in the robot frame
+
+        Args:
+            relative_target_pose (Iterable of array): Position and orientation arrays in an iterable for pose in the robot frame
+        
+        Returns:
+            2-tuple
+                - np.array or None: Joint positions to reach target pose or None if impossible to reach the target pose
+                - np.array: Indices for joints in the robot
+        """
         control_idx = np.concatenate([self.robot.trunk_control_idx, self.robot.arm_control_idx[self.arm]])
         ik_solver = IKSolver(
             robot_description_path=self.robot.robot_arm_descriptor_yamls[self.arm],
@@ -654,7 +680,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
     def _move_hand(self, target_pose):
         """
-        Yields action for robot to move hand so eef is in the target pose using planner
+        Yields action for the robot to move hand so the eef is in the target pose using the planner
 
         Args:
             target_pose (Iterable of array): Position and orientation arrays in an iterable for pose
@@ -668,7 +694,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
     def _move_hand_joint(self, joint_pos, control_idx):
         """
-        Yields action for robot to move arm to reach the specified joint positions using planner
+        Yields action for the robot to move arm to reach the specified joint positions using the planner
 
         Args:
             joint_pos (np.array): Joint positions for the arm
@@ -705,8 +731,17 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 indented_print("Executing grasp plan step %d/%d", i + 1, len(plan))
                 yield from self._move_hand_direct_joint(joint_pos, control_idx)
 
-    # Adds waypoints to the plan so the distance between values in the plan never exceeds the max_inter_dist. 
     def _add_linearly_interpolated_waypoints(self, plan, max_inter_dist):
+        """
+        Adds waypoints to the plan so the distance between values in the plan never exceeds the max_inter_dist.
+
+        Args:
+            plan (Array of arrays): Planned path
+            max_inter_dist (float): Maximum distance between values in the plan
+        
+        Returns:
+            Array of arrays: Planned path with additional waypoints
+        """
         plan = np.array(plan)
         interpolated_plan = []
         for i in range(len(plan) - 1):
@@ -718,7 +753,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
     def _move_hand_direct_joint(self, joint_pos, control_idx, stop_on_contact=False, max_steps_for_hand_move=MAX_STEPS_FOR_HAND_MOVE, ignore_failure=False):
         """
-        Yields action for robot to move arm to reach the specified joint positions by directly actuating with no planner
+        Yields action for the robot to move its arm to reach the specified joint positions by directly actuating with no planner
 
         Args:
             joint_pos (np.array): Array of joint positions for the arm
@@ -751,7 +786,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
     def _move_hand_direct_cartesian(self, target_pose, stop_on_contact=False, ignore_failure=False):
         """
-        Yields action for robot to move arm to reach the specified target pose by moving the eef along a line in cartesian
+        Yields action for the robot to move its arm to reach the specified target pose by moving the eef along a line in cartesian
         space from its current pose
 
         Args:
@@ -796,7 +831,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
     def _execute_grasp(self):
         """
-        Yields action for robot to grasp
+        Yields action for the robot to grasp
 
         Returns:
             np.array or None: Action array for one step for the robot to grasp or None if its done grasping
@@ -813,7 +848,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
     def _execute_release(self):
         """
-        Yields action for robot to release its grasp
+        Yields action for the robot to release its grasp
 
         Returns:
             np.array or None: Action array for one step for the robot to release or None if its done releasing
@@ -918,7 +953,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
     def _navigate_to_pose(self, pose_2d):
         """
-        Yields action to navigate robot to the specified 2d pose
+        Yields the action to navigate robot to the specified 2d pose
 
         Args:
             pose_2d (Iterable): (x, y, yaw) 2d pose 
@@ -942,7 +977,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 # TODO: Would be great to produce a more informative error.
                 raise ActionPrimitiveError(ActionPrimitiveError.Reason.PLANNING_ERROR, "Could not make a navigation plan")
 
-            self.draw_plan(plan)
+            self._draw_plan(plan)
             # Follow the plan to navigate.
             indented_print("Plan has %d steps", len(plan))
             for i, pose_2d in enumerate(plan):
@@ -950,7 +985,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 low_precision = True if i < len(plan) - 1 else False
                 yield from self._navigate_to_pose_direct(pose_2d, low_precision=low_precision)
 
-    def draw_plan(self, plan):
+    def _draw_plan(self, plan):
         SEARCHED = []
         trav_map = self.scene._trav_map
         for q in plan:
@@ -975,11 +1010,11 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
     def _navigate_if_needed(self, obj, pose_on_obj=None, **kwargs):
         """
-        Yields action to navigate robot to be in range of the object if it not in the range
+        Yields action to navigate the robot to be in range of the object if it not in the range
 
         Args:
-            obj (StatefulObject): object for the robot to be in range of
-            pose_on_obj (Iterable): (pos, quat) pose
+            obj (StatefulObject): Object for the robot to be in range of
+            pose_on_obj (Iterable): (pos, quat) Pose
 
         Returns:
             np.array or None: Action array for one step for the robot to navigate or None if it is done navigating
@@ -995,7 +1030,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
     def _navigate_to_obj(self, obj, pose_on_obj=None, **kwargs):
         """
-        Yields action to navigate robot to be in range of the pose
+        Yields action to navigate the robot to be in range of the pose
 
         Args:
             obj (StatefulObject): object to be in range of
@@ -1009,7 +1044,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
     def _navigate_to_pose_direct(self, pose_2d, low_precision=False):
         """
-        Yields action to navigate robot to the 2d pose without planning
+        Yields action to navigate the robot to the 2d pose without planning
 
         Args:
             pose_2d (Iterable): (x, y, yaw) 2d pose
@@ -1051,11 +1086,12 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
     def _rotate_in_place(self, end_pose, angle_threshold = DEFAULT_ANGLE_THRESHOLD):
         """
-        Yields action to rotate robot to the 2d pose
+        Yields action to rotate the robot to the 2d end pose
 
         Args:
             end_pose (Iterable): (x, y, yaw) 2d pose
-            angle_threshold (float): The angle difference between the robot's current and end pose that 
+            angle_threshold (float): The angle difference between the robot's current and end pose that determines when the robot is done rotating
+        
         Returns:
             np.array or None: Action array for one step for the robot to rotate or None if it is done rotating
         """
@@ -1078,6 +1114,18 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         yield self._empty_action()
             
     def _sample_pose_near_object(self, obj, pose_on_obj=None, **kwargs):
+        """
+        Returns a 2d pose for the robot within in the range of the object and where the robot is not in collision with anything
+
+        Args:
+            obj (StatefulObject): Object to sample a 2d pose near
+            pose_on_obj (Iterable of arrays or None): The pose to sample near
+
+        Returns:
+            2-tuple:
+                - 3-array: (x,y,z) Position in the world frame
+                - 4-array: (x,y,z,w) Quaternion orientation in the world frame
+        """
         if pose_on_obj is None:
             pos_on_obj = self._sample_position_on_aabb_face(obj)
             pose_on_obj = np.array([pos_on_obj, [0, 0, 0, 1]])
@@ -1107,6 +1155,15 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
     @staticmethod
     def _sample_position_on_aabb_face(target_obj):
+        """
+        Returns a position on the axis-aligned bounding box (AABB) faces of the target object.
+
+        Args:
+            target_obj (StatefulObject): Object to sample a position on
+
+        Returns:
+            3-array: (x,y,z) Position in the world frame
+        """
         aabb_center, aabb_extent = get_center_extent(target_obj.states)
         # We want to sample only from the side-facing faces.
         face_normal_axis = random.choice([0, 1])
@@ -1120,6 +1177,17 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         return np.random.uniform(face_min, face_max)
 
     def _sample_pose_in_room(self, room: str):
+        """
+        Returns a pose for the robot within in the room where the robot is not in collision with anything
+
+        Args:
+            room (str): Name of room
+
+        Returns:
+            2-tuple:
+                - 3-array: (x,y,z) Position in the world frame
+                - 4-array: (x,y,z,w) Quaternion orientation in the world frame
+        """
         # TODO(MP): Bias the sampling near the agent.
         for _ in range(MAX_ATTEMPTS_FOR_SAMPLING_POSE_IN_ROOM):
             _, pos = self.scene.get_random_point_by_room_instance(room)
@@ -1133,6 +1201,19 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         )
 
     def _sample_pose_with_object_and_predicate(self, predicate, held_obj, target_obj):
+        """
+        Returns a pose for the held object relative to the target object that satisfies the predicate
+
+        Args:
+            predicate (object_states.OnTop or object_states.Inside): Relation between held object and the target object
+            held_obj (StatefulObject): Object held by the robot
+            target_obj (StatefulObject): Object to sample a pose relative to
+
+        Returns:
+            2-tuple:
+                - 3-array: (x,y,z) Position in the world frame
+                - 4-array: (x,y,z,w) Quaternion orientation in the world frame
+        """
         pred_map = {object_states.OnTop: "onTop", object_states.Inside: "inside"}
 
         for _ in range(MAX_ATTEMPTS_FOR_SAMPLING_POSE_WITH_OBJECT_AND_PREDICATE):
@@ -1155,6 +1236,17 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         )
 
     def _test_pose(self, pose_2d, context, pose_on_obj=None, check_joint=None):
+        """
+        Determines whether the robot can reach the pose on the object and is not in collision at the specified 2d pose
+
+        Args:
+            pose_2d (Iterable): (x, y, yaw) 2d pose
+            context (Context): Undoable context reference
+            pose_on_obj (Iterable of arrays): Pose on the object in the world frame
+
+        Returns:
+            bool: True if the robot is in a valid pose, False otherwise
+        """
         pose = self._get_robot_pose_from_2d_pose(pose_2d)
         if pose_on_obj is not None:
             relative_pose = T.relative_pose_transform(*pose_on_obj, *pose)
@@ -1168,16 +1260,48 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
     @staticmethod
     def _get_robot_pose_from_2d_pose(pose_2d):
-        
+        """
+        Gets 3d pose from 2d pose
+
+        Args:
+            pose_2d (Iterable): (x, y, yaw) 2d pose
+
+        Returns:
+            2-tuple:
+                - 3-array: (x,y,z) Position in the world frame
+                - 4-array: (x,y,z,w) Quaternion orientation in the world frame
+        """
         pos = np.array([pose_2d[0], pose_2d[1], DEFAULT_BODY_OFFSET_FROM_FLOOR])
         orn = T.euler2quat([0, 0, pose_2d[2]])
         return pos, orn
 
     def _get_pose_in_robot_frame(self, pose):
+        """
+        Converts the pose in the world frame to the robot frame
+
+        Args:
+            pose_2d (Iterable): (x, y, yaw) 2d pose
+
+        Returns:
+            2-tuple:
+                - 3-array: (x,y,z) Position in the world frame
+                - 4-array: (x,y,z,w) Quaternion orientation in the world frame
+        """
         body_pose = self.robot.get_position_orientation()
         return T.relative_pose_transform(*pose, *body_pose)
 
     def _get_hand_pose_for_object_pose(self, desired_pose):
+        """
+        Gets the pose of the hand for the desired object pose
+
+        Args:
+            desired_pose (Iterable of arrays): Pose of the object in the world frame
+
+        Returns:
+            2-tuple:
+                - 3-array: (x,y,z) Position of the hand in the world frame
+                - 4-array: (x,y,z,w) Quaternion orientation of the hand in the world frame
+        """
         obj_in_hand = self._get_obj_in_hand()
 
         assert obj_in_hand is not None
@@ -1196,6 +1320,12 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
     
     # Function that is particularly useful for Fetch, where it gives time for the base of robot to settle due to its uneven base.
     def _settle_robot(self):
+        """
+        Yields a no op action for a few steps to allow the robot and physics to settle
+
+        Returns:
+            np.array or None: Action array for one step for the robot to do nothing
+        """
         yield from [self._empty_action() for _ in range(10)]
         while np.linalg.norm(self.robot.get_linear_velocity()) > 0.01:
             yield self._empty_action()

@@ -30,7 +30,16 @@ OPEN_GRASP_OFFSET = np.array([0, 0.05, -0.12])  # 5cm back and 12cm up.
 
 #     return grasp_candidate
 
-def get_grasp_poses_for_object_sticky(target_obj, force_allow_any_extent=True):
+def get_grasp_poses_for_object_sticky(target_obj):
+    """
+    Target object to get a grasp pose for
+
+    Args:
+        target_object (StatefulObject): Object to get a grasp pose for
+    
+    Returns:
+        Array of arrays: Array of possible grasp poses
+    """
     bbox_center_in_world, bbox_quat_in_world, bbox_extent_in_base_frame, _ = target_obj.get_base_aligned_bbox(
         visual=False
     )
