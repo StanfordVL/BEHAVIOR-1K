@@ -96,6 +96,12 @@ logger = logging.getLogger(__name__)
 def indented_print(msg, *args, **kwargs):
     logger.debug("  " * len(inspect.stack()) + str(msg), *args, **kwargs)
 
+    
+class RobotCopy():
+    def __init__(self, prim, meshes, relative_poses):
+        self.prim = prim
+        self.meshes = meshes
+        self.relative_poses = relative_poses
 
 class UndoableContext(object):
     def __init__(self, robot, mode=None):
