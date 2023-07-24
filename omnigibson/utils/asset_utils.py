@@ -261,9 +261,6 @@ def get_all_object_category_models_with_abilities(category, abilities):
         for dependency in state_type.get_dependencies():
             if all(other_state != dependency for other_state, _ in state_types_and_params):
                 state_types_and_params.append((dependency, dict()))
-    # Prune so that only the link-based states remain
-    state_types_and_params = [state_type_and_params for state_type_and_params in state_types_and_params
-                              if issubclass(state_type_and_params[0], LinkBasedStateMixin)]
 
     # Get mapping for class init kwargs
     state_init_default_kwargs = dict()
