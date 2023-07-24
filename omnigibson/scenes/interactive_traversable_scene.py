@@ -187,9 +187,10 @@ class InteractiveTraversableScene(TraversableScene):
 
         # Do not load these object categories (can blacklist building structures as well)
         task_relevant_names = set(task_metadata["inst_to_name"].values()) if "inst_to_name" in task_metadata else set()
+        is_task_relevant = name in task_relevant_names or category in ("walls", "floors")
         not_blacklisted = (
             (self.not_load_object_categories is None or category not in self.not_load_object_categories) and
-            (not self.load_task_relevant_only or name in task_relevant_names)
+            (not self.load_task_relevant_only or is_task_relevant)
         )
 
         # Only load these object categories (no need to white list building structures)
