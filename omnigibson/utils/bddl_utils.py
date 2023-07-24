@@ -163,8 +163,7 @@ KINEMATIC_STATES_BDDL = frozenset([state.__name__.lower() for state in _KINEMATI
 OBJECT_TAXONOMY = ObjectTaxonomy()
 # TODO (Josiah): Remove floor synset once we have new bddl release
 FLOOR_SYNSET = "floor.n.01"
-with open(os.path.join(os.path.dirname(bddl.__file__), "activity_manifest.txt")) as f:
-    BEHAVIOR_ACTIVITIES = {line.strip() for line in f.readlines()}
+BEHAVIOR_ACTIVITIES = sorted(os.listdir(os.path.join(os.path.dirname(bddl.__file__), "activity_definitions")))
 
 
 class OmniGibsonBDDLBackend(BDDLBackend):
