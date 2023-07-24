@@ -11,6 +11,10 @@ from scipy.stats import truncnorm
 import omnigibson as og
 from omnigibson.macros import create_module_macros, gm
 import omnigibson.utils.transform_utils as T
+from omnigibson.utils.ui_utils import create_module_logger
+
+# Create module logger
+log = create_module_logger(module_name=__name__)
 
 
 # Create settings for this module
@@ -723,8 +727,8 @@ def sample_cuboid_on_object(
 
     cuboid_dimensions = np.array(cuboid_dimensions)
     if np.any(cuboid_dimensions > 50.0):
-        print("WARNING: Trying to sample for a very large cuboid (at least one dimensions > 50)."
-              "This will take a prohibitively large amount of time!")
+        log.warning("WARNING: Trying to sample for a very large cuboid (at least one dimensions > 50). "
+              "Terminating immediately, no hits will be registered.")
         return [(None, None, None, None, defaultdict(list)) for _ in range(num_samples)]
 
     assert cuboid_dimensions.ndim <= 2
@@ -884,14 +888,14 @@ def sample_cuboid_on_object(
             break
 
     if gm.DEBUG:
-        print("Sampling rejection reasons:")
+        og.log.debug("Sampling rejection reasons:")
         counter = Counter()
 
         for instance in results:
             for reason, refusals in instance[-1].items():
                 counter[reason] += len(refusals)
 
-        print("\n".join("%s: %d" % pair for pair in counter.items()))
+        og.log.debug("\n".join("%s: %d" % pair for pair in counter.items()))
 
     return results
 
