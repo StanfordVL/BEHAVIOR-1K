@@ -475,7 +475,7 @@ class DatasetObject(USDObject):
             4-tuple:
                 - 3-array: (x,y,z) bbox center position in world frame
                 - 3-array: (x,y,z,w) bbox quaternion orientation in world frame
-                - 3-array: (x,y,z) bbox extent in world frame
+                - 3-array: (x,y,z) bbox extent in desired frame
                 - 3-array: (x,y,z) bbox center in desired frame
         """
         assert self.prim_type == PrimType.RIGID, "get_base_aligned_bbox is only supported for rigid objects."
