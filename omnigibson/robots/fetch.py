@@ -385,6 +385,11 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
     
     @property
     def primitive_disabled_collision_pairs(self):
+        """
+        Returns:
+            Array of arrays: Disabled collision pairs for necessary for primitives. Including these in disabled_collision_pairs
+            throws an error. When bug is fixed, these can be merged with disabled_collision_pairs.
+        """
         return [
             ["torso_lift_link", "shoulder_lift_link"],
             ["torso_lift_link", "torso_fixed_link"],

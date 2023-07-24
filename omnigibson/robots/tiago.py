@@ -583,6 +583,10 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
     @property
     def primitive_disabled_collision_pairs(self):
+        """
+        Returns:
+            Array of arrays: This property in Fetch exists due to a bug. To keep consistency, this exists here. When the bug is fixed in Fetch, this property can be removed from here.
+        """
         return self.disabled_collision_pairs
 
     @property

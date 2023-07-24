@@ -44,8 +44,10 @@ def plan_base_motion(
 
     # set lower and upper bounds
     bounds = ob.RealVectorBounds(2)
-    bounds.setLow(-3.0)
-    bounds.setHigh(3.0)
+    map = og.sim.scene._seg_map
+    map_bound = (map.map_size / 2) * map.map_resolution
+    bounds.setLow(-map_bound)
+    bounds.setHigh(map_bound)
     space.setBounds(bounds)
 
     # create a simple setup object
