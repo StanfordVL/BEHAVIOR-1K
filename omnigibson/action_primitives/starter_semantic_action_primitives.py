@@ -277,14 +277,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         if self.robot_model == "Tiago":
             self._setup_tiago()
 
-    # Disable grasping frame for Tiago robot (Should be cleaned up in the future)
-    def _setup_tiago(self):
-        for link in self.robot.links.values():
-            for mesh in link.collision_meshes.values():
-                if "grasping_frame" in link.prim_path:
-                    mesh.collision_enabled = False
-
-
     def get_action_space(self):
         if ACTIVITY_RELEVANT_OBJECTS_ONLY:
             assert isinstance(self.task, BehaviorTask), "Activity relevant objects can only be used for BEHAVIOR tasks"
