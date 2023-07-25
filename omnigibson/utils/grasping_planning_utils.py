@@ -14,7 +14,32 @@ PRISMATIC_JOINT_FRACTION_ACROSS_SURFACE_AXIS_BOUNDS = (0.2, 0.8)
 GRASP_OFFSET = np.array([0, 0.05, -0.08])
 OPEN_GRASP_OFFSET = np.array([0, 0.05, -0.12])  # 5cm back and 12cm up.
 
-def get_grasp_poses_for_object_sticky(target_obj, force_allow_any_extent=True):
+# def get_grasp_poses_for_object_sticky(target_obj, force_allow_any_extent=True):
+#     bbox_center_in_world, bbox_quat_in_world, bbox_extent_in_base_frame, _ = target_obj.get_base_aligned_bbox(
+#         visual=False
+#     )
+
+#     grasp_center_pos = bbox_center_in_world + np.array([0, 0, np.max(bbox_extent_in_base_frame) + 0.05])
+#     towards_object_in_world_frame = bbox_center_in_world - grasp_center_pos
+#     towards_object_in_world_frame /= np.linalg.norm(towards_object_in_world_frame)
+
+#     grasp_quat = T.euler2quat([0, np.pi/2, 0])
+
+#     grasp_pose = (grasp_center_pos, grasp_quat)
+#     grasp_candidate = [(grasp_pose, towards_object_in_world_frame)]
+
+#     return grasp_candidate
+
+def get_grasp_poses_for_object_sticky(target_obj):
+    """
+    Target object to get a grasp pose for
+
+    Args:
+        target_object (StatefulObject): Object to get a grasp pose for
+    
+    Returns:
+        Array of arrays: Array of possible grasp poses
+    """
     bbox_center_in_world, bbox_quat_in_world, bbox_extent_in_base_frame, _ = target_obj.get_base_aligned_bbox(
         visual=False
     )
