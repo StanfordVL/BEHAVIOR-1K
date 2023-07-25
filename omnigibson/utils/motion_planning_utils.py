@@ -3,14 +3,27 @@ import numpy as np
 import omnigibson as og
 from omnigibson.object_states import ContactBodies
 import omnigibson.utils.transform_utils as T
-from omnigibson.utils.usd_utils import RigidContactAPI
+from pxr import PhysicsSchemaTools, Gf
 
 def plan_base_motion(
     robot,
     end_conf,
+    context,
     planning_time = 100.0,
-    **kwargs,
+    **kwargs
 ):
+    """
+    Plans a base motion to a 2d pose
+
+    Args:
+        robot (omnigibson.object_states.Robot): Robot object to plan for
+        end_conf (Iterable): [x, y, yaw] 2d pose to plan to
+        context (UndoableContext): Context to plan in that includes the robot copy
+        planning_time (float): Time to plan for
+    
+    Returns:
+        Array of arrays: Array of 2d poses that the robot should navigate to
+    """
     from ompl import base as ob
     from ompl import geometric as ompl_geo
 
@@ -18,11 +31,8 @@ def plan_base_motion(
         x = q.getX()
         y = q.getY()
         yaw = q.getYaw()
-        robot.set_position_orientation(
-            [x, y, 0.05], T.euler2quat((0, 0, yaw))
-        )
-        og.sim.step(render=False)
-        state_valid = not detect_robot_collision(robot)
+        pose = ([x, y, 0.0], T.euler2quat((0, 0, yaw)))
+        state_valid = not detect_robot_collision(context, pose)
         return state_valid
 
     pos = robot.get_position()
@@ -33,9 +43,13 @@ def plan_base_motion(
     space = ob.SE2StateSpace()
 
     # set lower and upper bounds
+    bbox_vals = []
+    for floor in filter(lambda o: o.category == "floors", og.sim.scene.objects):
+        bbox_vals += floor.aabb[0][:2].tolist()
+        bbox_vals += floor.aabb[1][:2].tolist()
     bounds = ob.RealVectorBounds(2)
-    bounds.setLow(-7.0)
-    bounds.setHigh(7.0)
+    bounds.setLow(min(bbox_vals))
+    bounds.setHigh(max(bbox_vals))
     space.setBounds(bounds)
 
     # create a simple setup object
@@ -43,7 +57,7 @@ def plan_base_motion(
     ss.setStateValidityChecker(ob.StateValidityCheckerFn(state_valid_fn))
 
     si = ss.getSpaceInformation()
-    planner = ompl_geo.LBKPIECE1(si)
+    planner = ompl_geo.RRTConnect(si)
     ss.setPlanner(planner)
 
     start = ob.State(space)
@@ -81,21 +95,40 @@ def plan_base_motion(
 def plan_arm_motion(
     robot,
     end_conf,
+    context,
     planning_time = 100.0,
-    **kwargs,
+    **kwargs
 ):
+    """
+    Plans an arm motion to a final joint position
+
+    Args:
+        robot (BaseRobot): Robot object to plan for
+        end_conf (Iterable): Final joint position to plan to
+        context (UndoableContext): Context to plan in that includes the robot copy
+        planning_time (float): Time to plan for
+    
+    Returns:
+        Array of arrays: Array of joint positions that the robot should navigate to
+    """
     from ompl import base as ob
     from ompl import geometric as ompl_geo
 
     joint_control_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
     dim = len(joint_control_idx)
 
+    if "combined" in robot.robot_arm_descriptor_yamls:
+        joint_combined_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx["combined"]])
+        initial_joint_pos = np.array(robot.get_joint_positions()[joint_combined_idx])
+        control_idx_in_joint_pos = np.where(np.in1d(joint_combined_idx, joint_control_idx))[0]
+    else:
+        initial_joint_pos = np.array(robot.get_joint_positions()[joint_control_idx])
+        control_idx_in_joint_pos = np.arange(dim)
+
     def state_valid_fn(q):
-        joint_pos = [q[i] for i in range(dim)]
-        robot.set_joint_positions(joint_pos, joint_control_idx)
-        og.sim.step(render=False)
-        state_valid = not detect_robot_collision(robot)
-        return state_valid
+        joint_pos = initial_joint_pos
+        joint_pos[control_idx_in_joint_pos] = [q[i] for i in range(dim)]
+        return arm_planning_validity_fn(context, joint_pos)
     
     # create an SE2 state space
     space = ob.RealVectorStateSpace(dim)
@@ -105,6 +138,10 @@ def plan_arm_motion(
     joints = np.array([joint for joint in robot.joints.values()])
     arm_joints = joints[joint_control_idx]
     for i, joint in enumerate(arm_joints):
+        if end_conf[i] > joint.upper_limit:
+            end_conf[i] = joint.upper_limit
+        if end_conf[i] < joint.lower_limit:
+            end_conf[i] = joint.lower_limit
         bounds.setLow(i, float(joint.lower_limit))
         bounds.setHigh(i, float(joint.upper_limit))
     space.setBounds(bounds)
@@ -114,7 +151,8 @@ def plan_arm_motion(
     ss.setStateValidityChecker(ob.StateValidityCheckerFn(state_valid_fn))
 
     si = ss.getSpaceInformation()
-    planner = ompl_geo.LBKPIECE1(si)
+    planner = ompl_geo.RRTConnect(si)
+    planner.setRange(0.01)
     ss.setPlanner(planner)
 
     start_conf = robot.get_joint_positions()[joint_control_idx]
@@ -133,7 +171,7 @@ def plan_arm_motion(
 
     if solved:
         # try to shorten the path
-        ss.simplifySolution()
+        # ss.simplifySolution()
 
         sol_path = ss.getSolutionPath()
         return_path = []
@@ -143,7 +181,48 @@ def plan_arm_motion(
         return return_path
     return None
 
-def detect_robot_collision(robot, filter_objs=[]):
+def detect_robot_collision(context, pose):
+    """
+    Moves robot and detects robot collisions with the environment, but not with itself
+
+    Args:
+        context (UndoableContext): Context to plan in that includes the robot copy
+        pose (Array): Pose in the world frame to check for collisions at
+    
+    Returns:
+        bool: Whether the robot is in collision
+    """
+    translation = pose[0]
+    orientation = pose[1]
+    # context.robot_copy.prim.set_local_poses(np.array([translation]), np.array([orientation]))
+    translation = Gf.Vec3d(*np.array(translation, dtype=float))
+    context.robot_copy.prim.GetAttribute("xformOp:translate").Set(translation)
+
+    orientation = np.array(orientation, dtype=float)[[3, 0, 1, 2]]
+    context.robot_copy.prim.GetAttribute("xformOp:orient").Set(Gf.Quatd(*orientation)) 
+                
+    for link in context.robot_meshes_copy:
+        for mesh in context.robot_meshes_copy[link]:
+            mesh_id = PhysicsSchemaTools.encodeSdfPath(mesh.prim_path)
+            if mesh._prim.GetTypeName() == "Mesh":
+                if og.sim.psqi.overlap_mesh_any(*mesh_id):
+                    return True
+            else:
+                if og.sim.psqi.overlap_shape_any(*mesh_id):
+                    return True
+    return False
+
+def detect_robot_collision_in_sim(robot, filter_objs=[]):
+    """
+    Detects robot collisions with the environment, but not with itself using the ContactBodies API
+
+    Args:
+        context (UndoableContext): Context to plan in that includes the robot copy
+        pose (Array): Pose in the world frame to check for collisions at
+    
+    Returns:
+        bool: Whether the robot is in collision
+    """
     filter_categories = ["floors"]
     
     obj_in_hand = robot._ag_obj_in_hand[robot.default_arm]
@@ -159,24 +238,69 @@ def detect_robot_collision(robot, filter_objs=[]):
         if col_obj.category in filter_categories:
             collision_prims.remove(col_prim)
 
-    return len(collision_prims) > 0 or detect_self_collision(robot)
+    return len(collision_prims) > 0
+    
+def arm_planning_validity_fn(context, joint_pos):
+    """
+    Sets joint positions of the robot and detects robot collisions with the environment and itself
 
-def detect_self_collision(robot):
-    contacts = robot.contact_list()
-    robot_links = [link.prim_path for link in robot.links.values()]
-    disabled_pairs = [set(p) for p in robot.disabled_collision_pairs]
-    for c in contacts:
-        link0 = c.body0.split("/")[-1]
-        link1 = c.body1.split("/")[-1]
-        if {link0, link1} not in disabled_pairs and c.body0 in robot_links and c.body1 in robot_links:
-            return True
-    return False
+    Args:
+        context (UndoableContext): Context to plan in that includes the robot copy
+        joint_pos (Array): Joint positions to set the robot to
+    
+    Returns:
+        bool: Whether the robot is in a valid state i.e. not in collision
+    """
+    arm_links = context.robot.manipulation_link_names
+    link_poses = context.fk_solver.get_link_poses(joint_pos, arm_links)
 
-def detect_hand_collision(robot, joint_pos, control_idx):
-    robot.set_joint_positions(joint_pos, control_idx)
-    return detect_robot_collision(robot)
+    for link in arm_links:
+        pose = link_poses[link]
+        if link in context.robot_meshes_copy.keys():
+            for mesh, relative_pose in zip(context.robot_meshes_copy[link], context.robot_meshes_relative_poses[link]):
+                mesh_pose = T.pose_transform(*pose, *relative_pose)
+                translation = Gf.Vec3d(*np.array(mesh_pose[0], dtype=float))
+                mesh._prim.GetAttribute("xformOp:translate").Set(translation)
+                orientation = np.array(mesh_pose[1], dtype=float)[[3, 0, 1, 2]]
+                mesh._prim.GetAttribute("xformOp:orient").Set(Gf.Quatd(*orientation))
+
+    # Define function for checking overlap
+    valid_hit = False
+    mesh_hit = None
+
+    def overlap_callback(hit):
+        nonlocal valid_hit
+        nonlocal mesh_hit
+        
+        valid_hit = hit.rigid_body not in context.disabled_collision_pairs_dict[mesh_hit]
+
+        return not valid_hit
+
+    for link in context.robot_meshes_copy:
+        for mesh in context.robot_meshes_copy[link]:
+            if valid_hit:
+                return not valid_hit
+            mesh_id = PhysicsSchemaTools.encodeSdfPath(mesh.prim_path)
+            mesh_hit = mesh.prim_path
+            if mesh._prim.GetTypeName() == "Mesh":
+                og.sim.psqi.overlap_mesh(*mesh_id, reportFn=overlap_callback)
+            else:
+                og.sim.psqi.overlap_shape(*mesh_id, reportFn=overlap_callback)
+        
+    return not valid_hit
+    
 
 def remove_unnecessary_rotations(path):
+    """
+    Removes unnecessary rotations from a path for the base where the yaw for each pose in the path is in the direction of the
+    the position of the next pose in the path
+
+    Args:
+        path (Array of arrays): Array of 2d poses
+    
+    Returns:
+        Array of arrays: Array of 2d poses with unnecessary rotations removed
+    """
     for start_idx in range(len(path) - 1):
         start = np.array(path[start_idx][:2])
         end = np.array(path[start_idx + 1][:2])
