@@ -14,7 +14,7 @@ PRISMATIC_JOINT_FRACTION_ACROSS_SURFACE_AXIS_BOUNDS = (0.2, 0.8)
 GRASP_OFFSET = np.array([0, 0.05, -0.08])
 OPEN_GRASP_OFFSET = np.array([0, 0.05, -0.12])  # 5cm back and 12cm up.
 
-# def get_grasp_poses_for_object_sticky(target_obj, force_allow_any_extent=True):
+# def get_grasp_poses_for_object_sticky(target_obj):
 #     bbox_center_in_world, bbox_quat_in_world, bbox_extent_in_base_frame, _ = target_obj.get_base_aligned_bbox(
 #         visual=False
 #     )
