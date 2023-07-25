@@ -274,8 +274,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         self.robot_model = self.robot.model_name
         self.robot_base_mass = self.robot._links["base_link"].mass
         self.teleport = teleport
-        if self.robot_model == "Tiago":
-            self._setup_tiago()
 
     def get_action_space(self):
         if ACTIVITY_RELEVANT_OBJECTS_ONLY:
