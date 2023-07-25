@@ -59,7 +59,7 @@ KP_LIN_VEL = 0.3
 KP_ANGLE_VEL = 0.2
 
 MAX_CARTESIAN_HAND_STEP = 0.002
-MAX_STEPS_FOR_HAND_MOVE = 100
+MAX_STEPS_FOR_HAND_MOVE = 500
 MAX_STEPS_FOR_HAND_MOVE_WHEN_OPENING = 30
 MAX_STEPS_FOR_GRASP_OR_RELEASE = 30
 MAX_WAIT_FOR_GRASP_OR_RELEASE = 10
@@ -499,8 +499,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             yield from self._execute_release()
 
             # Allow grasping from suboptimal extents if we've tried enough times.
-            force_allow_any_extent = np.random.rand() < 0.5
-            grasp_poses = get_grasp_poses_for_object_sticky(obj, force_allow_any_extent=force_allow_any_extent)
+            grasp_poses = get_grasp_poses_for_object_sticky(obj)
             grasp_pose, object_direction = random.choice(grasp_poses)
 
             # Prepare data for the approach later.
@@ -732,9 +731,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     end_conf=joint_pos,
                     context=context
                 )
-
-            plan = self._add_linearly_interpolated_waypoints(plan, 0.3)
-
+            plan = self._add_linearly_interpolated_waypoints(plan, 0.1)
             if plan is None:
                 raise ActionPrimitiveError(
                     ActionPrimitiveError.Reason.PLANNING_ERROR,
@@ -763,8 +760,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         for i in range(len(plan) - 1):
             max_diff = max(plan[i+1] - plan[i])
             num_intervals = ceil(max_diff / max_inter_dist)
-            interpolated_plan += np.linspace(plan[i], plan[i+1], num_intervals).tolist()
-        interpolated_plan += plan[-1]
+            interpolated_plan += np.linspace(plan[i], plan[i+1], num_intervals, endpoint=False).tolist()
+        interpolated_plan.append(plan[-1].tolist())
         return interpolated_plan
 
     def _move_hand_direct_joint(self, joint_pos, control_idx, stop_on_contact=False, max_steps_for_hand_move=MAX_STEPS_FOR_HAND_MOVE, ignore_failure=False):
