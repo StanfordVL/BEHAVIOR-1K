@@ -368,7 +368,9 @@ class ManipulationRobot(BaseRobot):
 
         # Remove joint and filtered collision restraints
         og.sim.stage.RemovePrim(self._ag_obj_constraint_params[arm]["ag_joint_prim_path"])
+        print("Removed AG joint to ", self._ag_data[arm][0].name)
         self._ag_data[arm] = None
+        print("Removed AG data.")
         self._ag_obj_constraints[arm] = None
         self._ag_obj_constraint_params[arm] = {}
         self._ag_freeze_gripper[arm] = False
@@ -1034,6 +1036,7 @@ class ManipulationRobot(BaseRobot):
             joint_frame_in_child_frame_pos=child_frame_pos / ag_obj.scale,
             joint_frame_in_child_frame_quat=child_frame_orn,
         )
+        print("Created AG joint to ", ag_obj.name)
 
         # Save a reference to this joint prim
         self._ag_obj_constraints[arm] = joint_prim
@@ -1094,7 +1097,12 @@ class ManipulationRobot(BaseRobot):
                         self._release_grasp(arm=arm)
 
             elif applying_grasp:
+                pre_obj = self._ag_data[arm][0] if self._ag_data[arm] is not None else None
                 self._ag_data[arm] = self._calculate_in_hand_object(arm=arm)
+                post_obj = self._ag_data[arm][0] if self._ag_data[arm] is not None else None
+                if post_obj != pre_obj:
+                    name = post_obj.name if post_obj is not None else None
+                    print("Set AG data to", name)
                 self._establish_grasp(arm=arm, ag_data=self._ag_data[arm])
 
     def _update_constraint_cloth(self, arm="default"):
