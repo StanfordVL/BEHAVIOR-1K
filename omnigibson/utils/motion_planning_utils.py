@@ -43,11 +43,13 @@ def plan_base_motion(
     space = ob.SE2StateSpace()
 
     # set lower and upper bounds
+    bbox_vals = []
+    for floor in filter(lambda o: o.category == "floors", og.sim.scene.objects):
+        bbox_vals += floor.aabb[0][:2].tolist()
+        bbox_vals += floor.aabb[1][:2].tolist()
     bounds = ob.RealVectorBounds(2)
-    map = og.sim.scene._seg_map
-    map_bound = (map.map_size / 2) * map.map_resolution
-    bounds.setLow(-map_bound)
-    bounds.setHigh(map_bound)
+    bounds.setLow(min(bbox_vals))
+    bounds.setHigh(max(bbox_vals))
     space.setBounds(bounds)
 
     # create a simple setup object
