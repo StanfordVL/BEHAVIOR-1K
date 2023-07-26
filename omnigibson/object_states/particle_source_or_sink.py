@@ -130,8 +130,8 @@ class ParticleSource(ParticleApplier):
         # Always requires metalink since projection is used
         return True
 
-    @classproperty
-    def visualize(cls):
+    @property
+    def visualize(self):
         # Don't visualize this source
         return False
 

@@ -7,6 +7,7 @@ from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
 from omnigibson.object_states.update_state_mixin import UpdateStateMixin
 from omnigibson.utils.usd_utils import create_primitive_mesh
+from omni.isaac.core.utils.bounds import recompute_extents
 from omnigibson.utils.python_utils import classproperty
 from omni.isaac.core.utils.prims import get_prim_at_path
 from pxr import PhysicsSchemaTools, UsdGeom, Sdf
@@ -60,6 +61,7 @@ class ToggledOn(AbsoluteObjectState, BooleanState, LinkBasedStateMixin, UpdateSt
         # Create the visual geom instance referencing the generated mesh prim
         self.visual_marker = VisualGeomPrim(prim_path=mesh_prim_path, name=f"{self.obj.name}_visual_marker")
         self.visual_marker.set_attribute("radius", self.radius)
+        recompute_extents(prim=self.visual_marker.prim)
         self.visual_marker.initialize()
 
         # Make sure the marker isn't translated at all

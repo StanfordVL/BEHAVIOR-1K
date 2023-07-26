@@ -53,7 +53,7 @@ class Filled(RelativeObjectState, BooleanState):
                 )
             else:
                 # Going from True --> False, remove all particles inside the volume
-                system.remove_particles(idxs=contained_particles_state.get_value().in_volume.nonzero()[0])
+                system.remove_particles(idxs=contained_particles_state.get_value(system).in_volume.nonzero()[0])
 
         return True
 

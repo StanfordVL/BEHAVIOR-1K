@@ -9,7 +9,7 @@ from omnigibson.object_states.contact_bodies import ContactBodies
 from omnigibson.object_states.contact_particles import ContactParticles
 from omnigibson.object_states.covered import Covered
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
-from omnigibson.object_states.object_state_base import AbsoluteObjectState
+from omnigibson.object_states.object_state_base import RelativeObjectState
 from omnigibson.object_states.saturated import ModifiedParticles, Saturated
 from omnigibson.object_states.toggle import ToggledOn
 from omnigibson.object_states.update_state_mixin import UpdateStateMixin
@@ -31,7 +31,7 @@ from pxr import PhysicsSchemaTools, UsdGeom, Gf, Sdf
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
-m.APPLICATION_LINK_PREFIX = "particleapplication"
+m.APPLICATION_LINK_PREFIX = "particleapplier"
 m.REMOVAL_LINK_PREFIX = "particleremover"
 
 # How many samples within the application area to generate per update step
@@ -169,7 +169,7 @@ def create_projection_visualization(
     return get_prim_at_path(system_path), emitter_prim
 
 
-class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixin):
+class ParticleModifier(RelativeObjectState, LinkBasedStateMixin, UpdateStateMixin):
     """
     Object state representing an object that has the ability to modify visual and / or physical particles within the
     active simulation.
@@ -539,11 +539,11 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
 
     @staticmethod
     def get_dependencies():
-        return AbsoluteObjectState.get_dependencies() + [AABB, Saturated, ModifiedParticles]
+        return RelativeObjectState.get_dependencies() + [AABB, Saturated, ModifiedParticles]
 
     @staticmethod
     def get_optional_dependencies():
-        return AbsoluteObjectState.get_optional_dependencies() + [Covered, ToggledOn, ContactBodies, ContactParticles]
+        return RelativeObjectState.get_optional_dependencies() + [Covered, ToggledOn, ContactBodies, ContactParticles]
 
     @classproperty
     def supported_active_systems(cls):
@@ -822,7 +822,7 @@ class ParticleApplier(ParticleModifier):
         # get_system will initialize the system if it's not initialized already.
         system = get_system(system_name)
 
-        if self.method == ParticleModifyMethod.PROJECTION and self.visualize:
+        if self.visualize:
             assert self._projection_mesh_params["type"] in {"Cylinder", "Cone"}, \
                 f"{self.__class__.__name__} visualization only supports Cylinder and Cone types!"
             radius, height = np.mean(self._projection_mesh_params["extents"][:2]) / 2.0, self._projection_mesh_params["extents"][2]
@@ -1188,14 +1188,14 @@ class ParticleApplier(ParticleModifier):
         return m.MAX_VISUAL_PARTICLES_APPLIED_PER_STEP if is_visual_particle_system(system_name=system.name) else \
             m.MAX_PHYSICAL_PARTICLES_APPLIED_PER_STEP
 
-    @classproperty
-    def visualize(cls):
+    @property
+    def visualize(self):
         """
         Returns:
             bool: Whether this Applier should be visualized or not
         """
-        # True by default
-        return True
+        # Visualize if projection method is used
+        return self.method == ParticleModifyMethod.PROJECTION
 
     @classproperty
     def metalink_prefix(cls):
