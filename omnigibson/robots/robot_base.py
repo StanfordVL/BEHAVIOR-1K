@@ -171,7 +171,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
                     self._sensors[sensor.name] = sensor
 
         # Since proprioception isn't an actual sensor, we need to possibly manually add it here as well
-        if self._obs_modalities == "all":
+        if self._obs_modalities == "all" or "proprio" in self._obs_modalities:
             obs_modalities.add("proprio")
 
         # Update our overall obs modalities
@@ -263,7 +263,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
 
         # Have to handle proprio separately since it's not an actual sensor
         if "proprio" in self._obs_modalities:
-            obs_space["proprio"] = self._build_obs_box_space(shape=(self.proprioception_dim,), low=-np.inf, high=np.inf)
+            obs_space["proprio"] = self._build_obs_box_space(shape=(self.proprioception_dim,), low=-np.inf, high=np.inf, dtype=np.float64)
 
         return obs_space
 
