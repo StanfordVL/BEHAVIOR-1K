@@ -204,8 +204,10 @@ class DatasetObject(USDObject):
 
         # Apply any forced roughness updates
         for material in self.materials:
-            material.reflection_roughness_texture_influence = 0.0
-            material.reflection_roughness_constant = gm.FORCE_ROUGHNESS
+            if ("reflection_roughness_texture_influence" in material.shader_input_names and
+                "reflection_roughness_constant" in material.shader_input_names):
+                material.reflection_roughness_texture_influence = 0.0
+                material.reflection_roughness_constant = gm.FORCE_ROUGHNESS
 
         # Set the joint frictions based on category
         friction = SPECIAL_JOINT_FRICTIONS.get(self.category, DEFAULT_JOINT_FRICTION)
