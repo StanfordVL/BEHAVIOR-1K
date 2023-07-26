@@ -59,7 +59,7 @@ KP_LIN_VEL = 0.3
 KP_ANGLE_VEL = 0.2
 
 MAX_CARTESIAN_HAND_STEP = 0.002
-MAX_STEPS_FOR_HAND_MOVE = 100
+MAX_STEPS_FOR_HAND_MOVE = 500
 MAX_STEPS_FOR_HAND_MOVE_WHEN_OPENING = 30
 MAX_STEPS_FOR_GRASP_OR_RELEASE = 30
 MAX_WAIT_FOR_GRASP_OR_RELEASE = 10
@@ -763,9 +763,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     end_conf=joint_pos,
                     context=context
                 )
-
             plan = self._add_linearly_interpolated_waypoints(plan, 0.1)
-
             if plan is None:
                 raise ActionPrimitiveError(
                     ActionPrimitiveError.Reason.PLANNING_ERROR,

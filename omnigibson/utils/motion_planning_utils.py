@@ -240,7 +240,6 @@ def detect_robot_collision_in_sim(robot, filter_objs=[]):
         col_obj = og.sim.scene.object_registry("prim_path", obj_prim_path)
         if col_obj.category in filter_categories:
             collision_prims.remove(col_prim)
-
     return len(collision_prims) > 0
     
 def arm_planning_validity_fn(context, joint_pos):

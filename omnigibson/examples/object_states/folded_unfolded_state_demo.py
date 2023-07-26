@@ -94,7 +94,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         # Fold all three cloths along the x-axis
         for i in range(3):
             obj = objs[i]
-            pos = obj.root_link.particle_positions
+            pos = obj.root_link.compute_particle_positions()
             x_min, x_max = np.min(pos, axis=0)[0], np.max(pos, axis=0)[0]
             x_extent = x_max - x_min
             # Get indices for the bottom 10 percent vertices in the x-axis
@@ -111,16 +111,14 @@ def main(random_selection=False, headless=False, short_exec=False):
 
             increments = 25
             for ctrl_pts in np.concatenate([np.linspace(start, mid, increments), np.linspace(mid, end, increments)]):
-                pos = obj.root_link.particle_positions
-                pos[indices] = ctrl_pts
-                obj.root_link.particle_positions = pos
+                obj.root_link.set_particle_positions(ctrl_pts, idxs=indices)
                 og.sim.step()
                 print_state()
 
         # Fold the t-shirt twice again along the y-axis
         for direction in [-1, 1]:
             obj = shirt
-            pos = obj.root_link.particle_positions
+            pos = obj.root_link.compute_particle_positions()
             y_min, y_max = np.min(pos, axis=0)[1], np.max(pos, axis=0)[1]
             y_extent = y_max - y_min
             if direction == 1:
@@ -139,9 +137,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
             increments = 25
             for ctrl_pts in np.concatenate([np.linspace(start, mid, increments), np.linspace(mid, end, increments)]):
-                pos = obj.root_link.particle_positions
-                pos[indices] = ctrl_pts
-                obj.root_link.particle_positions = pos
+                obj.root_link.set_particle_positions(ctrl_pts, idxs=indices)
                 env.step(np.array([]))
                 print_state()
 
