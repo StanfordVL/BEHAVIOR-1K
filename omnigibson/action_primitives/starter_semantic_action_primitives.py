@@ -104,7 +104,7 @@ class UndoableContext(object):
     def __init__(self, robot, robot_copy, robot_copy_type="original", self_collisions=False):
         self.robot = robot
         self.robot_copy = robot_copy
-        self.robot_copy_type = robot_copy_type
+        self.robot_copy_type = robot_copy_type if robot_copy_type in robot_copy.prims.keys() else "original"
         self.self_collisions = self_collisions
         self.disabled_meshes = []
 
@@ -1038,8 +1038,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             self.robot.set_position_orientation(*robot_pose)
             yield from self._settle_robot()
         else:
-            robot_copy_type = "simplified" if self.robot_model == "Tiago" else "original"
-            with UndoableContext(self.robot, self.robot_copy, robot_copy_type, False) as context:
+            with UndoableContext(self.robot, self.robot_copy, "simplified", False) as context:
                 plan = plan_base_motion(
                     robot=self.robot,
                     end_conf=pose_2d,
@@ -1206,8 +1205,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             pos_on_obj = self._sample_position_on_aabb_face(obj)
             pose_on_obj = np.array([pos_on_obj, [0, 0, 0, 1]])
 
-        robot_copy_type = "simplified" if self.robot_model == "Tiago" else "original"
-        with UndoableContext(self.robot, self.robot_copy, robot_copy_type, False) as context:
+        with UndoableContext(self.robot, self.robot_copy, "simplified", False) as context:
             obj_rooms = obj.in_rooms if obj.in_rooms else [self.scene._seg_map.get_room_instance_by_point(pose_on_obj[0][:2])]
             for _ in range(MAX_ATTEMPTS_FOR_SAMPLING_POSE_NEAR_OBJECT):
                 distance = np.random.uniform(0.0, 1.0)
