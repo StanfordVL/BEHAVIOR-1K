@@ -235,8 +235,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         self.robot_base_mass = self.robot._links["base_link"].mass
         self.teleport = teleport
 
-        self.robot_copy = RobotCopy()
-        self._load_robot_copy()
+        self.robot_copy = self._load_robot_copy(robot)
 
         if self.robot_model == "Tiago":
             self._setup_tiago()
@@ -248,16 +247,19 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 if "grasping_frame" in link.prim_path:
                     mesh.collision_enabled = False
 
-    def _load_robot_copy(self):
+    @staticmethod
+    def _load_robot_copy(robot):
+        robot_copy = RobotCopy()
+
         robots_to_copy = {
             "original": {
-                "robot": self.robot,
+                "robot": robot,
                 "copy_path": "/World/robot_copy"
             }
         }
-        if hasattr(self.robot, 'simplified_mesh_usd_path'):
+        if hasattr(robot, 'simplified_mesh_usd_path'):
             simplified_robot = { 
-                "robot": USDObject("simplified_copy", self.robot.simplified_mesh_usd_path),
+                "robot": USDObject("simplified_copy", robot.simplified_mesh_usd_path),
                 "copy_path": "/World/simplified_robot_copy"         
             }
             robots_to_copy['simplified'] = simplified_robot
@@ -302,17 +304,18 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                         copy_robot_meshes_relative_poses[link_name][mesh_name] = relative_pose
 
                     copy_mesh.GetAttribute("physics:collisionEnabled").Set(False)
-                copy_robot_links_relative_poses[link_name] = T.relative_pose_transform(*link.get_position_orientation(), *self.robot.get_position_orientation())
+                copy_robot_links_relative_poses[link_name] = T.relative_pose_transform(*link.get_position_orientation(), *robot.get_position_orientation())
             
             if robot_type == "simplified":
                 og.sim.remove_object(robot_to_copy)
 
-            self.robot_copy.prims[robot_type] = copy_robot
-            self.robot_copy.meshes[robot_type] = copy_robot_meshes
-            self.robot_copy.relative_poses[robot_type] = copy_robot_meshes_relative_poses
-            self.robot_copy.links_relative_poses[robot_type] = copy_robot_links_relative_poses
+            robot_copy.prims[robot_type] = copy_robot
+            robot_copy.meshes[robot_type] = copy_robot_meshes
+            robot_copy.relative_poses[robot_type] = copy_robot_meshes_relative_poses
+            robot_copy.links_relative_poses[robot_type] = copy_robot_links_relative_poses
 
         og.sim.step()
+        return robot_copy
 
     def get_action_space(self):
         if ACTIVITY_RELEVANT_OBJECTS_ONLY:
