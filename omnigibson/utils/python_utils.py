@@ -315,6 +315,33 @@ def snake_case_to_camel_case(snake_case_text):
     return ''.join(item.title() for item in snake_case_text.split('_'))
 
 
+def meets_minimum_version(test_version, minimum_version):
+    """
+    Verify that @test_version meets the @minimum_version
+
+    Args:
+        test_version (str): Python package version. Should be, e.g., 0.26.1
+        minimum_version (str): Python package version to test against. Should be, e.g., 0.27.2
+
+    Returns:
+        bool: Whether @test_version meets @minimum_version
+    """
+    test_nums = [int(num) for num in test_version.split(".")]
+    minimum_nums = [int(num) for num in minimum_version.split(".")]
+    assert len(test_nums) == 3
+    assert len(minimum_nums) == 3
+
+    for test_num, minimum_num in zip(test_nums, minimum_nums):
+        if test_num > minimum_num:
+            return True
+        elif test_num < minimum_num:
+            return False
+        # Otherwise, we continue through all sub-versions
+
+    # If we get here, that means test_version == threshold_version, so this is a success
+    return True
+
+
 class UniquelyNamed:
     """
     Simple class that implements a name property, that must be implemented by a subclass. Note that any @Named
