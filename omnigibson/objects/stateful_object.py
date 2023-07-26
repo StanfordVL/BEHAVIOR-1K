@@ -141,8 +141,7 @@ class StatefulObject(BaseObject):
 
         # Prepare the object states
         self._states = {}
-        if gm.ENABLE_OBJECT_STATES:
-            self.prepare_object_states()
+        self.prepare_object_states()
 
     def _initialize(self):
         # Run super first
@@ -206,9 +205,10 @@ class StatefulObject(BaseObject):
             self._include_default_states else dict()
 
         # Map the state type (class) to ability name and params
-        for ability, params in self._abilities.items():
-            for state_type in get_states_for_ability(ability):
-                states_info[state_type] = {"ability": ability, "params": params}
+        if gm.ENABLE_OBJECT_STATES:
+            for ability, params in self._abilities.items():
+                for state_type in get_states_for_ability(ability):
+                    states_info[state_type] = {"ability": ability, "params": params}
 
         # Add the dependencies into the list, too, and sort based on the dependency chain
         # Must iterate over explicit tuple since dictionary changes size mid-iteration
