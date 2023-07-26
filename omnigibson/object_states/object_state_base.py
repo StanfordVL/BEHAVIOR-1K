@@ -67,7 +67,7 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
         # Make sure all required kwargs are specified
         default_kwargs = inspect.signature(cls.__init__).parameters
         for kwarg, val in default_kwargs.items():
-            if val.default == inspect._empty and kwarg not in kwargs and kwarg not in {"obj", "self"}:
+            if val.default == inspect._empty and kwarg not in kwargs and kwarg not in {"obj", "self", "args", "kwargs"}:
                 return False, f"Missing required kwarg '{kwarg}'"
         # Default is True if all kwargs are met
         return True, None

@@ -142,6 +142,14 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
             callback(cls)
 
     @classmethod
+    def update(cls):
+        """
+        Executes any necessary system updates, once per og.sim._non_physics_step
+        """
+        # Default is no-op
+        pass
+
+    @classmethod
     def remove_all_particles(cls):
         """
         Removes all particles and deletes them from the simulator
