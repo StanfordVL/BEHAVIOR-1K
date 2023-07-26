@@ -152,7 +152,6 @@ def plan_arm_motion(
 
     si = ss.getSpaceInformation()
     planner = ompl_geo.RRTConnect(si)
-    planner.setRange(0.01)
     ss.setPlanner(planner)
 
     start_conf = robot.get_joint_positions()[joint_control_idx]
@@ -278,10 +277,6 @@ def arm_planning_validity_fn(context, joint_pos):
         nonlocal mesh_path
         
         valid_hit = hit.rigid_body not in context.disabled_collision_pairs_dict[mesh_path]
-        if valid_hit:
-            print(mesh_path)
-            print(hit.rigid_body)
-            print("------")
 
         return not valid_hit
 
