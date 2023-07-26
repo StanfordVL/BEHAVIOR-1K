@@ -292,7 +292,7 @@ class ParticleModifier(RelativeObjectState, LinkBasedStateMixin, UpdateStateMixi
             if not pre_existing_mesh:
                 # Projection mesh params must be specified in order to determine scalings
                 assert self._projection_mesh_params is not None, \
-                    f"Must specify projection_mesh_params for {self.__class__.__name__} " \
+                    f"Must specify projection_mesh_params for {self.obj.name}'s {self.__class__.__name__} " \
                     f"since it has no pre-existing projection mesh!"
                 mesh = UsdGeom.__dict__[self._projection_mesh_params["type"]].Define(og.sim.stage, mesh_prim_path).GetPrim()
                 property_names = set(mesh.GetPropertyNames())
@@ -1202,6 +1202,19 @@ class ParticleApplier(ParticleModifier):
     def requires_metalink(cls, **kwargs):
         # No metalink required for adjacency
         return kwargs.get("method", ParticleModifyMethod.ADJACENCY) != ParticleModifyMethod.ADJACENCY
+
+    @classmethod
+    def is_compatible(cls, obj, **kwargs):
+        # Run super first
+        compatible, reason = super().is_compatible(obj, **kwargs)
+        if not compatible:
+            return compatible, reason
+
+        # Check whether GPU dynamics are enabled (necessary for this object state)
+        if not gm.USE_GPU_DYNAMICS:
+            return False, f"gm.USE_GPU_DYNAMICS must be True in order to use object state {cls.__name__}."
+
+        return True, None
 
     @property
     def _default_link(self):

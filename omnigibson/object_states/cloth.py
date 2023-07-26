@@ -1,3 +1,4 @@
+from omnigibson.macros import gm
 from omnigibson.object_states.object_state_base import BaseObjectState
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.python_utils import classproperty
@@ -16,9 +17,16 @@ class ClothState(BaseObjectState):
         if not compatible:
             return compatible, reason
 
-        return (True, None) if obj.prim_type == PrimType.CLOTH else \
-            (False, f"Cannot use ClothState {cls.__name__} with rigid object, make sure object is created "
-                    f"with prim_type=PrimType.CLOTH!")
+        # Check for cloth type
+        if obj.prim_type != PrimType.CLOTH:
+            return False, f"Cannot use ClothState {cls.__name__} with rigid object, make sure object is created " \
+                          f"with prim_type=PrimType.CLOTH!"
+
+        # Check for GPU dynamics
+        if not gm.USE_GPU_DYNAMICS:
+            return False, f"gm.USE_GPU_DYNAMICS must be True in order to use object state {cls.__name__}."
+
+        return True, None
 
     @classproperty
     def _do_not_register_classes(cls):
