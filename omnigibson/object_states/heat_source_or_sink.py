@@ -163,9 +163,6 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin):
 
         return True
 
-    def _set_value(self, new_value):
-        raise NotImplementedError("Setting heat source capability is not supported.")
-
     def affects_obj(self, obj):
         """
         Computes whether this heat source or sink object is affecting object @obj

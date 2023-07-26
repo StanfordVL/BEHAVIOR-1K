@@ -135,9 +135,6 @@ class VerticalAdjacency(AbsoluteObjectState):
         # Return the adjacencies from the only axis we passed in.
         return bodies_by_axis[0]
 
-    def _set_value(self, new_value):
-        raise NotImplementedError("VerticalAdjacency state currently does not support setting.")
-
     @staticmethod
     def get_dependencies():
         return AbsoluteObjectState.get_dependencies() + [AABB]
@@ -176,9 +173,6 @@ class HorizontalAdjacency(AbsoluteObjectState):
 
         # Return the adjacencies.
         return bodies_by_plane
-
-    def _set_value(self, new_value):
-        raise NotImplementedError("HorizontalAdjacency state currently does not support setting.")
 
     @staticmethod
     def get_dependencies():

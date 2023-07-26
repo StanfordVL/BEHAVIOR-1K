@@ -11,9 +11,6 @@ class NextTo(KinematicsMixin, RelativeObjectState, BooleanState):
     def get_dependencies():
         return KinematicsMixin.get_dependencies() + [HorizontalAdjacency]
 
-    def _set_value(self, other, new_value):
-        raise NotImplementedError()
-
     def _get_value(self, other):
         objA_states = self.obj.states
         objB_states = other.states

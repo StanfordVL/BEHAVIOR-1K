@@ -337,7 +337,7 @@ class ParticleModifier(RelativeObjectState, LinkBasedStateMixin, UpdateStateMixi
 
             # Make sure the mesh is translated so that its tip lies at the metalink origin, and rotated so the vector
             # from tip to tail faces the positive x axis
-            z_offset = self._projection_mesh_params["extents"][2] / 2
+            z_offset = 0.0 if self._projection_mesh_params["type"] == "Sphere" else self._projection_mesh_params["extents"][2] / 2
 
             self.projection_mesh.set_local_pose(
                 translation=np.array([0, 0, -z_offset]),
@@ -531,10 +531,7 @@ class ParticleModifier(RelativeObjectState, LinkBasedStateMixin, UpdateStateMixi
         # Update the current step
         self._current_step = (self._current_step + 1) % self.n_steps_per_modification
 
-    def _set_value(self, new_value):
-        raise ValueError(f"Cannot set valueless state {self.__class__.__name__}.")
-
-    def _get_value(self):
+    def _get_value(self, system):
         pass
 
     @staticmethod

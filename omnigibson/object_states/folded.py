@@ -50,9 +50,6 @@ class FoldedLevel(AbsoluteObjectState, ClothState):
         area, diagonal = self.calculate_projection_area_and_diagonal([0, 1])
         return FoldedLevelData(smoothness, area / self.area_unfolded, diagonal / self.diagonal_unfolded)
 
-    def _set_value(self, new_value):
-        raise NotImplementedError("FoldedLevel state currently does not support setting.")
-
     def calculate_smoothness(self):
         """
         Calculate the percantage of surface normals that are sufficiently close to the z-axis.

@@ -1,4 +1,4 @@
-from abc import ABC, abstractmethod
+from abc import ABC
 import inspect
 import omnigibson as og
 from omnigibson.utils.python_utils import classproperty, Serializable, Registerable, Recreatable
@@ -304,7 +304,7 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
         return val
 
     def _get_value(self, *args, **kwargs):
-        raise NotImplementedError
+        raise NotImplementedError(f"_get_value not implemented for {self.__class__.__name__} state.")
 
     def set_value(self, *args, **kwargs):
         """
@@ -321,7 +321,7 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
         return val
 
     def _set_value(self, *args, **kwargs):
-        raise NotImplementedError
+        raise NotImplementedError(f"_set_value not implemented for {self.__class__.__name__} state.")
 
     def remove(self):
         """
@@ -354,13 +354,11 @@ class AbsoluteObjectState(BaseObjectState):
     the value.
     """
 
-    @abstractmethod
     def _get_value(self):
-        raise NotImplementedError()
+        raise NotImplementedError(f"_get_value not implemented for {self.__class__.__name__} state.")
 
-    @abstractmethod
     def _set_value(self, new_value):
-        raise NotImplementedError()
+        raise NotImplementedError(f"_set_value not implemented for {self.__class__.__name__} state.")
 
     @classproperty
     def _do_not_register_classes(cls):
@@ -376,13 +374,11 @@ class RelativeObjectState(BaseObjectState):
     Note that subclasses will typically compute values on-the-fly.
     """
 
-    @abstractmethod
     def _get_value(self, other):
-        raise NotImplementedError()
+        raise NotImplementedError(f"_get_value not implemented for {self.__class__.__name__} state.")
 
-    @abstractmethod
     def _set_value(self, other, new_value):
-        raise NotImplementedError()
+        raise NotImplementedError(f"_set_value not implemented for {self.__class__.__name__} state.")
 
     @classproperty
     def _do_not_register_classes(cls):

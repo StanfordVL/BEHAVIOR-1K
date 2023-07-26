@@ -6,8 +6,6 @@ from omnigibson.utils.usd_utils import RigidContactAPI
 
 
 class Touching(KinematicsMixin, RelativeObjectState, BooleanState):
-    def _set_value(self, other, new_value):
-        raise NotImplementedError()
 
     @staticmethod
     def _check_contact(obj_a, obj_b):
