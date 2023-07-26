@@ -34,7 +34,7 @@ def execute_controller(ctrl_gen, env, filename=None):
 
 def main():
     # Load the config
-    config_filename = "../omnigibson/configs/homeboy.yaml"
+    config_filename = os.path.join(og.example_config_path, "homeboy.yaml")
     config = yaml.load(open(config_filename, "r"), Loader=yaml.FullLoader)
 
     # config["scene"]["load_object_categories"] = ["floors", "ceilings", "walls", "coffee_table"]
