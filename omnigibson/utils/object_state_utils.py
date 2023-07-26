@@ -18,6 +18,7 @@ import omnigibson.utils.transform_utils as T
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
+m.DEFAULT_SAMPLING_ATTEMPTS = 100
 m.ON_TOP_RAY_CASTING_SAMPLING_PARAMS = Dict({
     "bimodal_stdev_fraction": 1e-6,
     "bimodal_mean_fraction": 1.0,
@@ -44,7 +45,7 @@ def sample_kinematics(
     predicate,
     objA,
     objB,
-    max_trials=40,
+    max_trials=m.DEFAULT_SAMPLING_ATTEMPTS,
     z_offset=0.05,
     skip_falling=False,
 ):
