@@ -1,6 +1,7 @@
 import inspect
 from abc import ABCMeta, abstractmethod
 from enum import IntEnum
+from typing import List
 
 from future.utils import with_metaclass
 
@@ -9,7 +10,6 @@ from omnigibson.scenes.interactive_traversable_scene import InteractiveTraversab
 from omnigibson.tasks.task_base import BaseTask
 
 REGISTERED_PRIMITIVE_SETS = {}
-
 
 class ActionPrimitiveError(ValueError):
     class Reason(IntEnum):
@@ -26,10 +26,26 @@ class ActionPrimitiveError(ValueError):
         # A sampling error occurred: a position to place an object could not be found.
         SAMPLING_ERROR = 3
 
+        # The execution of the primitive happened correctly, but while checking post-conditions, an error was found.
+        POST_CONDITION_ERROR = 4
+
     def __init__(self, reason: Reason, message, metadata=None):
         self.reason = reason
         self.metadata = metadata if metadata is not None else {}
         super().__init__(f"{reason.name}: {message}. Additional info: {metadata}")
+
+
+class ActionPrimitiveErrorGroup(ValueError):
+    def __init__(self, exceptions: List[ActionPrimitiveError]) -> None:
+        self._exceptions = tuple(exceptions)
+        submessages = [f"Attempt {i}: {e}" for i, e in enumerate(exceptions)]
+        submessages = "\n\n".join(submessages)
+        message = "An error occurred during each attempt of this action.\n\n" + submessages
+        super().__init__(message)
+
+    @property
+    def exceptions(self):
+        return self._exceptions
 
 
 class BaseActionPrimitiveSet(with_metaclass(ABCMeta, object)):
