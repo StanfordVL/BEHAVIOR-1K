@@ -14,67 +14,67 @@ PRISMATIC_JOINT_FRACTION_ACROSS_SURFACE_AXIS_BOUNDS = (0.2, 0.8)
 GRASP_OFFSET = np.array([0, 0.05, -0.08])
 OPEN_GRASP_OFFSET = np.array([0, 0.05, -0.12])  # 5cm back and 12cm up.
 
-# def get_grasp_poses_for_object_sticky(target_obj, force_allow_any_extent=True):
-#     bbox_center_in_world, bbox_quat_in_world, bbox_extent_in_base_frame, _ = target_obj.get_base_aligned_bbox(
-#         visual=False
-#     )
-
-#     grasp_center_pos = bbox_center_in_world + np.array([0, 0, np.max(bbox_extent_in_base_frame) + 0.05])
-#     towards_object_in_world_frame = bbox_center_in_world - grasp_center_pos
-#     towards_object_in_world_frame /= np.linalg.norm(towards_object_in_world_frame)
-
-#     grasp_quat = T.euler2quat([0, np.pi/2, 0])
-
-#     grasp_pose = (grasp_center_pos, grasp_quat)
-#     grasp_candidate = [(grasp_pose, towards_object_in_world_frame)]
-
-#     return grasp_candidate
-
 def get_grasp_poses_for_object_sticky(target_obj):
-    """
-    Target object to get a grasp pose for
-
-    Args:
-        target_object (StatefulObject): Object to get a grasp pose for
-    
-    Returns:
-        Array of arrays: Array of possible grasp poses
-    """
     bbox_center_in_world, bbox_quat_in_world, bbox_extent_in_base_frame, _ = target_obj.get_base_aligned_bbox(
         visual=False
     )
 
-    # Pick an axis and a direction.
-    approach_axis = random.choice([0, 1, 2])
-    approach_direction = random.choice([-1, 1]) if approach_axis != 2 else 1
-    constant_dimension_in_base_frame = approach_direction * bbox_extent_in_base_frame * np.eye(3)[approach_axis]
-    randomizable_dimensions_in_base_frame = bbox_extent_in_base_frame - np.abs(constant_dimension_in_base_frame)
-    random_dimensions_in_base_frame = np.random.uniform([-1, -1, 0], [1, 1, 1]) # note that we don't allow going below center
-    grasp_center_in_base_frame = random_dimensions_in_base_frame * randomizable_dimensions_in_base_frame + constant_dimension_in_base_frame
-
-    grasp_center_pos = T.mat2pose(
-        T.pose2mat((bbox_center_in_world, bbox_quat_in_world)) @  # base frame to world frame
-        T.pose2mat((grasp_center_in_base_frame, [0, 0, 0, 1]))    # grasp pose in base frame
-    )[0] + np.array([0, 0, 0.02])
+    grasp_center_pos = bbox_center_in_world + np.array([0, 0, np.max(bbox_extent_in_base_frame) + 0.05])
     towards_object_in_world_frame = bbox_center_in_world - grasp_center_pos
     towards_object_in_world_frame /= np.linalg.norm(towards_object_in_world_frame)
 
-    # For the grasp, we want the X+ direction to be the direction of the object's surface.
-    # The other two directions can be randomized.
-    rand_vec = np.random.rand(3)
-    rand_vec /= np.linalg.norm(rand_vec)
-    grasp_x = towards_object_in_world_frame
-    grasp_y = np.cross(rand_vec, grasp_x)
-    grasp_y /= np.linalg.norm(grasp_y)
-    grasp_z = np.cross(grasp_x, grasp_y)
-    grasp_z /= np.linalg.norm(grasp_z)
-    grasp_mat = np.array([grasp_x, grasp_y, grasp_z]).T
-    grasp_quat = Rotation.from_matrix(grasp_mat).as_quat()
+    grasp_quat = T.euler2quat([0, np.pi/2, 0])
 
     grasp_pose = (grasp_center_pos, grasp_quat)
     grasp_candidate = [(grasp_pose, towards_object_in_world_frame)]
 
     return grasp_candidate
+
+# def get_grasp_poses_for_object_sticky(target_obj):
+#     """
+#     Target object to get a grasp pose for
+
+#     Args:
+#         target_object (StatefulObject): Object to get a grasp pose for
+    
+#     Returns:
+#         Array of arrays: Array of possible grasp poses
+#     """
+#     bbox_center_in_world, bbox_quat_in_world, bbox_extent_in_base_frame, _ = target_obj.get_base_aligned_bbox(
+#         visual=False
+#     )
+
+#     # Pick an axis and a direction.
+#     approach_axis = random.choice([0, 1, 2])
+#     approach_direction = random.choice([-1, 1]) if approach_axis != 2 else 1
+#     constant_dimension_in_base_frame = approach_direction * bbox_extent_in_base_frame * np.eye(3)[approach_axis]
+#     randomizable_dimensions_in_base_frame = bbox_extent_in_base_frame - np.abs(constant_dimension_in_base_frame)
+#     random_dimensions_in_base_frame = np.random.uniform([-1, -1, 0], [1, 1, 1]) # note that we don't allow going below center
+#     grasp_center_in_base_frame = random_dimensions_in_base_frame * randomizable_dimensions_in_base_frame + constant_dimension_in_base_frame
+
+#     grasp_center_pos = T.mat2pose(
+#         T.pose2mat((bbox_center_in_world, bbox_quat_in_world)) @  # base frame to world frame
+#         T.pose2mat((grasp_center_in_base_frame, [0, 0, 0, 1]))    # grasp pose in base frame
+#     )[0] + np.array([0, 0, 0.02])
+#     towards_object_in_world_frame = bbox_center_in_world - grasp_center_pos
+#     towards_object_in_world_frame /= np.linalg.norm(towards_object_in_world_frame)
+
+#     # For the grasp, we want the X+ direction to be the direction of the object's surface.
+#     # The other two directions can be randomized.
+#     rand_vec = np.random.rand(3)
+#     rand_vec /= np.linalg.norm(rand_vec)
+#     grasp_x = towards_object_in_world_frame
+#     grasp_y = np.cross(rand_vec, grasp_x)
+#     grasp_y /= np.linalg.norm(grasp_y)
+#     grasp_z = np.cross(grasp_x, grasp_y)
+#     grasp_z /= np.linalg.norm(grasp_z)
+#     grasp_mat = np.array([grasp_x, grasp_y, grasp_z]).T
+#     grasp_quat = Rotation.from_matrix(grasp_mat).as_quat()
+
+#     grasp_pose = (grasp_center_pos, grasp_quat)
+#     grasp_candidate = [(grasp_pose, towards_object_in_world_frame)]
+
+#     return grasp_candidate
 
 def get_grasp_position_for_open(robot, target_obj, should_open, link_id=None):
     # Pick a moving link of the object.

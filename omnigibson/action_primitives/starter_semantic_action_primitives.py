@@ -98,6 +98,7 @@ class RobotCopy():
         self.prims = {}
         self.meshes = {}
         self.relative_poses = {}
+        self.links_relative_poses = {}
 
 class UndoableContext(object):
     def __init__(self, robot, robot_copy, robot_copy_type="original", self_collisions=False):
@@ -118,7 +119,6 @@ class UndoableContext(object):
             for mesh in meshes.values():
                 mesh.GetAttribute("physics:collisionEnabled").Set(False)
         for d_mesh in self.disabled_meshes:
-            mesh.GetAttribute("physics:collisionEnabled").Set(False)
             d_mesh.collision_enabled = True
 
     def _assemble_robot_copy(self):
@@ -128,30 +128,23 @@ class UndoableContext(object):
             robot_urdf_path=self.robot.urdf_path,
         )
         arm_links = self.robot.manipulation_link_names
-        joint_combined_idx = np.concatenate([self.robot.trunk_control_idx, self.robot.arm_control_idx["combined"]])
+        joint_combined_idx = np.concatenate([self.robot.trunk_control_idx, self.robot.arm_control_idx[fk_descriptor]])
         joint_pos = np.array(self.robot.get_joint_positions()[joint_combined_idx])
         link_poses = self.fk_solver.get_link_poses(joint_pos, arm_links)
 
         # Set position of robot copy root prim
-        self._set_prim_pose(self.robot_copy.prims[self.robot_copy_type].prim, self.robot.get_position_orientation())
-
+        self._set_prim_pose(self.robot_copy.prims[self.robot_copy_type], self.robot.get_position_orientation())
+        # from IPython import embed; embed()
         # Assemble robot meshes
-        for link in self.robot.links.values():
-            for mesh_name, mesh in enumerate(link.collision_meshes):
-                link_name = mesh.prim_path.split("/")[3]
-                copy_mesh = self.robot_copy.meshes[self.robot_copy_type][link_name][mesh_name]
+        for link_name, meshes in self.robot_copy.meshes[self.robot_copy_type].items():
+            for mesh_name, copy_mesh in meshes.items():
                 # Skip grasping frame (this is necessary for Tiago, but should be cleaned up in the future)
                 if "grasping_frame" in link_name:
                     continue
-
                 # Set poses of meshes relative to the robot to construct the robot
-                if self.robot_copy_type == "simplified" and link_name in arm_links:
-                    link_pose = link_poses[link_name]
-                    mesh_copy_pose = T.pose_transform(*link_pose, *self.robot_copy.relative_poses[self.robot_copy_type][link_name][mesh_name])
-                    self._set_prim_pose(copy_mesh, mesh_copy_pose)
-                else:
-                    mesh_in_robot = T.relative_pose_transform(*mesh.get_position_orientation(), *self.robot.get_position_orientation())
-                    self._set_prim_pose(copy_mesh, mesh_in_robot)
+                link_pose = link_poses[link_name] if self.robot_copy_type == "simplified" and link_name in arm_links else self.robot_copy.links_relative_poses[self.robot_copy_type][link_name]
+                mesh_copy_pose = T.pose_transform(*link_pose, *self.robot_copy.relative_poses[self.robot_copy_type][link_name][mesh_name])
+                self._set_prim_pose(copy_mesh, mesh_copy_pose)
 
                 if self.self_collisions:
                     copy_mesh.GetAttribute("physics:collisionEnabled").Set(True)
@@ -191,22 +184,23 @@ class UndoableContext(object):
 
     def _construct_disabled_collision_pairs_dict(self):
         self.disabled_collision_pairs_dict = {}
+        robot_meshes_copy = self.robot_copy.meshes[self.robot_copy_type]
 
         # Filter out collision pairs of meshes part of the same link
-        for link in self.robot_meshes_copy:
-            for mesh in self.robot_meshes_copy[link]:
-                self.disabled_collision_pairs_dict[mesh.prim_path] = [m.prim_path for m in self.robot_meshes_copy[link]]
+        for meshes in robot_meshes_copy.values():
+            for mesh in meshes.values():
+                self.disabled_collision_pairs_dict[mesh.GetPrimPath().pathString] = [m.GetPrimPath().pathString for m in meshes.values()]
 
         # Filter out collision pairs of meshes part of disabled collision pairs
         for pair in self.robot.primitive_disabled_collision_pairs:
             link_1 = pair[0]
             link_2 = pair[1]
-            if link_1 in self.robot_meshes_copy.keys() and link_2 in self.robot_meshes_copy.keys():
-                for mesh in self.robot_meshes_copy[link_1]:
-                    self.disabled_collision_pairs_dict[mesh.prim_path] += [m.prim_path for m in self.robot_meshes_copy[link_2]]
+            if link_1 in robot_meshes_copy.keys() and link_2 in robot_meshes_copy.keys():
+                for mesh in robot_meshes_copy[link_1].values():
+                    self.disabled_collision_pairs_dict[mesh.GetPrimPath().pathString] += [m.GetPrimPath().pathString for m in robot_meshes_copy[link_2].values()]
 
-                for mesh in self.robot_meshes_copy[link_2]:
-                    self.disabled_collision_pairs_dict[mesh.prim_path] += [m.prim_path for m in self.robot_meshes_copy[link_1]]
+                for mesh in robot_meshes_copy[link_2].values():
+                    self.disabled_collision_pairs_dict[mesh.GetPrimPath().pathString] += [m.GetPrimPath().pathString for m in robot_meshes_copy[link_1].values()]
 
 class StarterSemanticActionPrimitiveSet(IntEnum):
     GRASP = 0
@@ -239,12 +233,13 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         self.arm = self.robot.default_arm
         self.robot_model = self.robot.model_name
         self.robot_base_mass = self.robot._links["base_link"].mass
-        self.robot_copy = RobotCopy()
         self.teleport = teleport
+
+        self.robot_copy = RobotCopy()
+        self._load_robot_copy()
+
         if self.robot_model == "Tiago":
             self._setup_tiago()
-
-        self._load_robot_copy()
 
     # Disable grasping frame for Tiago robot (Should be cleaned up in the future)
     def _setup_tiago(self):
@@ -267,15 +262,16 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             }
             robots_to_copy['simplified'] = simplified_robot
 
-        for robot_type, rc in enumerate(robots_to_copy):
+        for robot_type, rc in robots_to_copy.items():
             copy_robot = None
             copy_robot_meshes = {}
             copy_robot_meshes_relative_poses = {}
- 
+            copy_robot_links_relative_poses = {}
             # Create prim under which robot meshes are nested and set position
             CreatePrimCommand("Xform", rc['copy_path']).do()
             copy_robot = get_prim_at_path(rc['copy_path'])
-            copy_robot.GetAttribute("physics:collisionEnabled").Set(False)
+            
+            # copy_robot.GetAttribute("physics:collisionEnabled").Set(False)
 
             robot_to_copy = None
             if robot_type == "simplified":
@@ -286,19 +282,19 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
             # Copy robot meshes
             for link in robot_to_copy.links.values():
-                for mesh_name, mesh in enumerate(link.collision_meshes):
+                link_name = link.prim_path.split("/")[-1]
+                for mesh_name, mesh in link.collision_meshes.items():
                     split_path = mesh.prim_path.split("/")
-                    link_name = split_path[3]
                     # Do not copy grasping frame (this is necessary for Tiago, but should be cleaned up in the future)
                     if "grasping_frame" in link_name:
                         continue
 
-                    copy_mesh_path = self.robot_copy_path + "/" + link_name
+                    copy_mesh_path = rc['copy_path'] + "/" + link_name
                     copy_mesh_path += f"_{split_path[-1]}" if split_path[-1] != "collisions" else ""
                     CopyPrimCommand(mesh.prim_path, path_to=copy_mesh_path).do()
                     copy_mesh = get_prim_at_path(copy_mesh_path)
                     relative_pose = T.relative_pose_transform(*mesh.get_position_orientation(), *link.get_position_orientation())
-                    if link_name not in self.robot_meshes_copy.keys():
+                    if link_name not in copy_robot_meshes.keys():
                         copy_robot_meshes[link_name] = {mesh_name: copy_mesh}
                         copy_robot_meshes_relative_poses[link_name] = {mesh_name: relative_pose}
                     else:
@@ -306,13 +302,15 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                         copy_robot_meshes_relative_poses[link_name][mesh_name] = relative_pose
 
                     copy_mesh.GetAttribute("physics:collisionEnabled").Set(False)
-
+                copy_robot_links_relative_poses[link_name] = T.relative_pose_transform(*link.get_position_orientation(), *self.robot.get_position_orientation())
+            
             if robot_type == "simplified":
                 og.sim.remove_object(robot_to_copy)
 
             self.robot_copy.prims[robot_type] = copy_robot
             self.robot_copy.meshes[robot_type] = copy_robot_meshes
             self.robot_copy.relative_poses[robot_type] = copy_robot_meshes_relative_poses
+            self.robot_copy.links_relative_poses[robot_type] = copy_robot_links_relative_poses
 
         og.sim.step()
 
@@ -533,8 +531,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             yield from self._execute_release()
 
             # Allow grasping from suboptimal extents if we've tried enough times.
-            force_allow_any_extent = np.random.rand() < 0.5
-            grasp_poses = get_grasp_poses_for_object_sticky(obj, force_allow_any_extent=force_allow_any_extent)
+            grasp_poses = get_grasp_poses_for_object_sticky(obj)
             grasp_pose, object_direction = random.choice(grasp_poses)
 
             # Prepare data for the approach later.
@@ -767,7 +764,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     context=context
                 )
 
-            plan = self._add_linearly_interpolated_waypoints(plan, 0.3)
+            plan = self._add_linearly_interpolated_waypoints(plan, 0.1)
 
             if plan is None:
                 raise ActionPrimitiveError(
@@ -797,8 +794,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         for i in range(len(plan) - 1):
             max_diff = max(plan[i+1] - plan[i])
             num_intervals = ceil(max_diff / max_inter_dist)
-            interpolated_plan += np.linspace(plan[i], plan[i+1], num_intervals).tolist()
-        interpolated_plan += plan[-1]
+            interpolated_plan += np.linspace(plan[i], plan[i+1], num_intervals, endpoint=False).tolist()
+        interpolated_plan.append(plan[-1].tolist())
         return interpolated_plan
 
     def _move_hand_direct_joint(self, joint_pos, control_idx, stop_on_contact=False, max_steps_for_hand_move=MAX_STEPS_FOR_HAND_MOVE, ignore_failure=False):

@@ -171,7 +171,7 @@ def plan_arm_motion(
 
     if solved:
         # try to shorten the path
-        # ss.simplifySolution()
+        ss.simplifySolution()
 
         sol_path = ss.getSolutionPath()
         return_path = []
@@ -206,8 +206,8 @@ def detect_robot_collision(context, pose):
                 
     for meshes in robot_copy.meshes[robot_copy_type].values():
         for mesh in meshes.values():
-            mesh_id = PhysicsSchemaTools.encodeSdfPath(mesh.prim_path)
-            if mesh._prim.GetTypeName() == "Mesh":
+            mesh_id = PhysicsSchemaTools.encodeSdfPath(mesh.GetPrimPath().pathString)
+            if mesh.GetTypeName() == "Mesh":
                 if og.sim.psqi.overlap_mesh_any(*mesh_id):
                     return True
             else:
@@ -263,7 +263,7 @@ def arm_planning_validity_fn(context, joint_pos):
     for link in arm_links:
         pose = link_poses[link]
         if link in robot_copy.meshes[robot_copy_type].keys():
-            for mesh, relative_pose in zip(robot_copy.meshes[robot_copy_type][link], robot_copy.relative_poses[robot_copy_type][link]):
+            for mesh, relative_pose in zip(robot_copy.meshes[robot_copy_type][link].values(), robot_copy.relative_poses[robot_copy_type][link].values()):
                 mesh_pose = T.pose_transform(*pose, *relative_pose)
                 translation = Gf.Vec3d(*np.array(mesh_pose[0], dtype=float))
                 mesh.GetAttribute("xformOp:translate").Set(translation)
@@ -272,23 +272,27 @@ def arm_planning_validity_fn(context, joint_pos):
 
     # Define function for checking overlap
     valid_hit = False
-    mesh_hit = None
+    mesh_path = None
 
     def overlap_callback(hit):
         nonlocal valid_hit
-        nonlocal mesh_hit
+        nonlocal mesh_path
         
-        valid_hit = hit.rigid_body not in context.disabled_collision_pairs_dict[mesh_hit]
+        valid_hit = hit.rigid_body not in context.disabled_collision_pairs_dict[mesh_path]
+        if valid_hit:
+            print(mesh_path)
+            print(hit.rigid_body)
+            print("------")
 
         return not valid_hit
 
-    for link in context.robot_meshes_copy:
-        for mesh in context.robot_meshes_copy[link]:
+    for meshes in robot_copy.meshes[robot_copy_type].values():
+        for mesh in meshes.values():
             if valid_hit:
                 return not valid_hit
-            mesh_id = PhysicsSchemaTools.encodeSdfPath(mesh.prim_path)
-            mesh_hit = mesh.prim_path
-            if mesh._prim.GetTypeName() == "Mesh":
+            mesh_path = mesh.GetPrimPath().pathString
+            mesh_id = PhysicsSchemaTools.encodeSdfPath(mesh_path)
+            if mesh.GetTypeName() == "Mesh":
                 og.sim.psqi.overlap_mesh(*mesh_id, reportFn=overlap_callback)
             else:
                 og.sim.psqi.overlap_shape(*mesh_id, reportFn=overlap_callback)
