@@ -22,7 +22,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         name="table",
         category="breakfast_table",
         model="rjgmmy",
-        scale=0.9,
+        bounding_box=[1.36, 1.08, 0.84],
         position=[0, 0, 0.58],
     )
 
@@ -31,7 +31,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         name="apple",
         category="apple",
         model="agveuv",
-        scale=1.5,
+        bounding_box=[0.098, 0.098, 0.115],
         position=[0.085, 0,  0.92],
         abilities={"diceable": {}}
     )
@@ -41,7 +41,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         name="knife",
         category="table_knife",
         model="lrdmpf",
-        scale=2.5,
+        bounding_box=[0.401, 0.044, 0.009],
         position=[0, 0, 10.0],
     )
 

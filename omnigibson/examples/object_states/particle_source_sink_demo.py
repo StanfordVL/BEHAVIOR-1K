@@ -44,28 +44,23 @@ def main(random_selection=False, headless=False, short_exec=False):
         type="DatasetObject",
         name="sink",
         category="sink",
-        model="yfaufu",
-        scale=5.5,
+        model="egwapq",
+        bounding_box=[2.427, 0.625, 1.2],
         abilities={
             "toggleable": {},
             "particleSource": {
                 "conditions": {
                     "water": [(ParticleModifyCondition.TOGGLEDON, True)],   # Must be toggled on for water source to be active
                 },
-                # TODO: Remove once asset canonical scale is fixed
-                "source_radius": 0.0025,
-                "source_height": 0.01,
                 "initial_speed": 0.0,               # Water merely falls out of the spout
             },
             "particleSink": {
                 "conditions": {
                     "water": [],  # No conditions, always sinking nearby particles
                 },
-                "sink_radius": 0.01,
-                "sink_height": 0.1,
             },
         },
-        position=[-0.7, 0, 0.56],
+        position=[0.0, 0, 0.42],
     )
 
     cfg["objects"] = [sink_cfg]
@@ -75,8 +70,8 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Set camera to ideal angle for viewing objects
     og.sim.viewer_camera.set_position_orientation(
-        position=np.array([-0.71452157, -0.88294428,  1.85640559]),
-        orientation=np.array([ 0.44909348, -0.00142818, -0.00284131,  0.89347912]),
+        position=np.array([ 0.37860532, -0.65396566,  1.4067066 ]),
+        orientation=np.array([0.49909498, 0.15201752, 0.24857062, 0.81609284]),
     )
 
     # Take a few steps to let the objects settle, and then turn on the sink
