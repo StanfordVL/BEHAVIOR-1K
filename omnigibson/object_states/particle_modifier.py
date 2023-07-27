@@ -1015,6 +1015,7 @@ class ParticleApplier(ParticleModifier):
             # Generate particle info -- maps group name to particle info for that group,
             # i.e.: positions, orientations, and link_prim_paths
             particles_info = defaultdict(lambda: defaultdict(lambda: []))
+            modifier_avg_scale = np.cbrt(np.product(self.obj.scale))
             for hit, scale in zip(hits[:n_particles], scales[:n_particles]):
                 # Infer which object was hit
                 hit_obj = og.sim.scene.object_registry("prim_path", "/".join(hit[3].split("/")[:-1]), None)
@@ -1026,7 +1027,7 @@ class ParticleApplier(ParticleModifier):
                     # Add to info
                     particles_info[group]["positions"].append(hit[0])
                     particles_info[group]["orientations"].append(hit[2])
-                    particles_info[group]["scales"].append(scale)
+                    particles_info[group]["scales"].append(scale * modifier_avg_scale / np.cbrt(np.product(hit_obj.scale)))
                     particles_info[group]["link_prim_paths"].append(hit[3])
             # Generate all the particles for each group
             for group, particle_info in particles_info.items():
