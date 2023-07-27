@@ -22,21 +22,21 @@ m.DEFAULT_SAMPLING_ATTEMPTS = 100
 m.ON_TOP_RAY_CASTING_SAMPLING_PARAMS = Dict({
     "bimodal_stdev_fraction": 1e-6,
     "bimodal_mean_fraction": 1.0,
-    "aabb_offset": 0.01,
+    "aabb_offset_fraction": 0.02,
     "max_sampling_attempts": 50,
 })
 
 m.INSIDE_RAY_CASTING_SAMPLING_PARAMS = Dict({
     "bimodal_stdev_fraction": 0.4,
     "bimodal_mean_fraction": 0.5,
-    "aabb_offset": 0.0,
+    "aabb_offset_fraction": -0.02,
     "max_sampling_attempts": 100,
 })
 
 m.UNDER_RAY_CASTING_SAMPLING_PARAMS = Dict({
     "bimodal_stdev_fraction": 1e-6,
     "bimodal_mean_fraction": 0.5,
-    "aabb_offset": 0.01,
+    "aabb_offset_fraction": 0.02,
     "max_sampling_attempts": 50,
 })
 
@@ -235,9 +235,6 @@ def sample_kinematics(
 
         objA.keep_still()
         objB.keep_still()
-
-        # Take extra step for depenetration, then break
-        og.sim.step_physics()
 
         # Take extra step for depenetration, then break
         og.sim.step_physics()
