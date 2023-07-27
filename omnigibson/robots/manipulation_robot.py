@@ -339,8 +339,8 @@ class ManipulationRobot(BaseRobot):
         super().apply_action(action)
 
         # Then run assisted grasping
-        if self.grasping_mode != "physical":
-            self._handle_assisted_grasping(action=action)
+        # if self.grasping_mode != "physical":
+        #     self._handle_assisted_grasping(action=action)
 
         # Potentially freeze gripper joints
         for arm in self.arm_names:

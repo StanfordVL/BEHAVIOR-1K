@@ -212,7 +212,7 @@ class StarterSemanticActionPrimitiveSet(IntEnum):
     RELEASE = 6  # For reorienting grasp
 
 
-class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
+class StarterSemanticActionPrimitiveGenerator(BaseActionPrimitiveGenerator):
     def __init__(self, task, scene, robot, teleport=False):
         logger.warning(
             "The StarterSemanticActionPrimitive is a work-in-progress and is only provided as an example. "

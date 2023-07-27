@@ -6,10 +6,11 @@ from typing import List
 from future.utils import with_metaclass
 
 from omnigibson.robots import BaseRobot
+from omnigibson.robots.manipulation_robot import ManipulationRobot
 from omnigibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
 from omnigibson.tasks.task_base import BaseTask
 
-REGISTERED_PRIMITIVE_SETS = {}
+REGISTERED_PRIMITIVE_GENERATORS = {}
 
 class ActionPrimitiveError(ValueError):
     class Reason(IntEnum):
@@ -48,7 +49,7 @@ class ActionPrimitiveErrorGroup(ValueError):
         return self._exceptions
 
 
-class BaseActionPrimitiveSet(with_metaclass(ABCMeta, object)):
+class BaseActionPrimitiveGenerator(with_metaclass(ABCMeta, object)):
     def __init_subclass__(cls, **kwargs):
         """
         Registers all subclasses as part of this registry. This is useful to decouple internal codebase from external
@@ -58,12 +59,12 @@ class BaseActionPrimitiveSet(with_metaclass(ABCMeta, object)):
         in our code.
         """
         if not inspect.isabstract(cls):
-            REGISTERED_PRIMITIVE_SETS[cls.__name__] = cls
+            REGISTERED_PRIMITIVE_GENERATORS[cls.__name__] = cls
 
     def __init__(self, task, scene, robot):
         self.task: BaseTask = task
         self.scene: InteractiveTraversableScene = scene
-        self.robot: BaseRobot = robot
+        self.robot: ManipulationRobot = robot
 
     @abstractmethod
     def get_action_space(self):
