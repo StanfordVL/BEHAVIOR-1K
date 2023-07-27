@@ -410,6 +410,21 @@ class DatasetObject(USDObject):
         return None if metadata is None else metadata.get("orientations", None)
 
     @property
+    def scale(self):
+        # Just super call
+        return super().scale
+
+    @scale.setter
+    def scale(self, scale):
+        # call super first
+        # A bit esoteric -- see https://gist.github.com/Susensio/979259559e2bebcd0273f1a95d7c1e79
+        super(DatasetObject, type(self)).scale.fset(self, scale)
+
+        # Remove bounding_box from scale if it's in our args
+        if "bounding_box" in self._init_info["args"]:
+            self._init_info["args"].pop("bounding_box")
+
+    @property
     def scaled_bbox_center_in_base_frame(self):
         """
         where the base_link origin is wrt. the bounding box center. This allows us to place the model correctly
