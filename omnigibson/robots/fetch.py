@@ -477,3 +477,9 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
     @property
     def urdf_path(self):
         return os.path.join(gm.ASSET_PATH, "models/fetch/fetch.urdf")
+
+    @property
+    def arm_workspace_range(self):
+        return {
+            self.default_arm : [-0.25 * np.pi, 0.25 * np.pi]
+        }
