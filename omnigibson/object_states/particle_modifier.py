@@ -670,11 +670,13 @@ class ParticleRemover(ParticleModifier):
         # Create set of default system to condition mappings based on settings
         all_conditions = dict()
         for system_name in REGISTERED_SYSTEMS.keys():
-            # Ignore cloth
-            if system_name == "cloth":
+            if is_physical_particle_system(system_name):
+                default_system_conditions = self._default_physical_conditions
+            elif is_visual_particle_system(system_name):
+                default_system_conditions = self._default_visual_conditions
+            else:
+                # Don't process any other systems, continue
                 continue
-            default_system_conditions = self._default_physical_conditions if is_physical_particle_system(system_name) \
-                else self._default_visual_conditions
             if default_system_conditions is not None:
                 all_conditions[system_name] = default_system_conditions + [self._generate_limit_condition(system_name)]
 
