@@ -36,9 +36,6 @@ def main(random_selection=False, headless=False, short_exec=False):
         }
     }
 
-    def check_toggledon(obj):
-        return obj.states[object_states.ToggledOn].get_value()
-
     # Define objects to load into the environment
     sink_cfg = dict(
         type="DatasetObject",
