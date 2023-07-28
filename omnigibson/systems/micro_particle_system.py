@@ -429,7 +429,7 @@ class MicroParticleSystem(BaseSystem):
 
         cls.system_prim = cls._create_particle_system()
         # Create material
-        cls._material = MicroParticleSystem._create_particle_material_template() #cls._create_particle_material_template()
+        cls._material = cls._create_particle_material_template()
         # Load the material if not already loaded
         # TODO: Remove this if statement once clearing system completely removes prims from stage
         if not cls._material.loaded:
