@@ -57,6 +57,7 @@ def assert_test_scene():
                 get_obj_cfg("shelf_back_panel", "shelf_back_panel", "gjsnrt", abilities={"attachable": {}}),
                 get_obj_cfg("shelf_shelf", "shelf_shelf", "ymtnqa", abilities={"attachable": {}}),
                 get_obj_cfg("shelf_baseboard", "shelf_baseboard", "hlhneo", abilities={"attachable": {}}),
+                get_obj_cfg("oyster", "oyster", "enzocs"),
                 get_obj_cfg("sink", "sink", "egwapq", scale=np.ones(3)),
                 get_obj_cfg("stockpot", "stockpot", "dcleem", abilities={"fillable": {}}),
                 get_obj_cfg("applier_dishtowel", "dishtowel", "dtfspn", abilities={"particleApplier": {"method": ParticleModifyMethod.ADJACENCY, "conditions": {"water": []}}}),

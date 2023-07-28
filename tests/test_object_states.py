@@ -1,6 +1,6 @@
 from omnigibson.macros import macros as m
 from omnigibson.object_states import *
-from omnigibson.systems import get_system, is_physical_particle_system
+from omnigibson.systems import get_system, is_physical_particle_system, is_visual_particle_system
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.physx_utils import apply_force_at_pos, apply_torque
 import omnigibson.utils.transform_utils as T
@@ -1126,6 +1126,7 @@ def test_contains():
 
 @og_test
 def test_covered():
+    oyster = og.sim.scene.object_registry("name", "oyster")
     breakfast_table = og.sim.scene.object_registry("name", "breakfast_table")
 
     systems = (
@@ -1134,26 +1135,28 @@ def test_covered():
         get_system("raspberry"),
         get_system("diced_apple"),
     )
-    for system in systems:
-        breakfast_table.set_position_orientation(position=np.ones(3) * 50.0, orientation=[0, 0, 0, 1.0])
-        place_obj_on_floor_plane(breakfast_table)
+    for obj in (oyster, breakfast_table):
+        for system in systems:
+            sampleable = is_visual_particle_system(system.name) or np.all(obj.aabb_extent > (2 * system.particle_radius))
+            obj.set_position_orientation(position=np.ones(3) * 50.0, orientation=[0, 0, 0, 1.0])
+            place_obj_on_floor_plane(obj)
 
-        for _ in range(5):
-            og.sim.step()
+            for _ in range(5):
+                og.sim.step()
 
-        assert breakfast_table.states[Covered].set_value(system, True)
+            assert obj.states[Covered].set_value(system, True) == sampleable
 
-        for _ in range(5):
-            og.sim.step()
+            for _ in range(5):
+                og.sim.step()
 
-        assert breakfast_table.states[Covered].get_value(system)
-        breakfast_table.states[Covered].set_value(system, False)
+            assert obj.states[Covered].get_value(system)
+            obj.states[Covered].set_value(system, False)
 
-        for _ in range(5):
-            og.sim.step()
-        assert not breakfast_table.states[Covered].get_value(system)
+            for _ in range(5):
+                og.sim.step()
+            assert not obj.states[Covered].get_value(system)
 
-        system.remove_all_particles()
+            system.remove_all_particles()
 
 
 def test_clear_sim():
