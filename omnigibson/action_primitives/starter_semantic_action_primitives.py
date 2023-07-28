@@ -551,7 +551,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             # It's okay if we can't go all the way because we run into the object.
             indented_print("Performing grasp approach")
             yield from self._move_hand_direct_cartesian(approach_pose, stop_on_contact=True)
-            
+
             # Step once to update
             yield self._empty_action()
 
@@ -561,6 +561,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     "Grasp completed, but no object detected in hand after executing grasp",
                     {"target object": obj.name},
                 )
+            
+            yield from self._reset_hand()
 
         if self._get_obj_in_hand() != obj:
             raise ActionPrimitiveError(
@@ -630,6 +632,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         
         obj_pose = self._sample_pose_with_object_and_predicate(predicate, obj_in_hand, obj)
         hand_pose = self._get_hand_pose_for_object_pose(obj_pose)
+        print(hand_pose)
         yield from self._navigate_if_needed(obj, pose_on_obj=hand_pose)
         yield from self._move_hand(hand_pose)
         yield from self._execute_release()
@@ -822,7 +825,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             diff_joint_pos = np.absolute(np.array(current_joint_pos) - np.array(joint_pos))
             if max(diff_joint_pos) < 0.005:
                 return
-            if stop_on_contact and detect_robot_collision_in_sim(self.robot):
+            if stop_on_contact and detect_robot_collision_in_sim(self.robot, ignore_obj_in_hand=False):
                 return
             yield action
 
@@ -892,7 +895,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             if pos_diff < 0.001 and orn_diff < np.deg2rad(0.1):
                 return
             
-            if stop_on_contact and detect_robot_collision_in_sim(self.robot):
+            if stop_on_contact and detect_robot_collision_in_sim(self.robot, ignore_obj_in_hand=False):
                 return
 
         if not ignore_failure:
@@ -915,8 +918,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             yield action
 
         # Do nothing for a bit so that AG can trigger.
-        for _ in range(MAX_WAIT_FOR_GRASP_OR_RELEASE):
-            yield self._empty_action()
+        # for _ in range(MAX_WAIT_FOR_GRASP_OR_RELEASE):
+        #     yield self._empty_action()
 
     def _execute_release(self):
         """
@@ -931,10 +934,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         for _ in range(MAX_STEPS_FOR_GRASP_OR_RELEASE):
             # Otherwise, keep applying the action!
             yield action
-
-        # Do nothing for a bit so that AG can trigger.
-        # for _ in range(MAX_WAIT_FOR_GRASP_OR_RELEASE):
-        #     yield self._empty_action()
 
         if self._get_obj_in_hand() is not None:
             raise ActionPrimitiveError(
@@ -1210,10 +1209,10 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             for _ in range(MAX_ATTEMPTS_FOR_SAMPLING_POSE_NEAR_OBJECT):
                 distance = np.random.uniform(0.0, 1.0)
                 yaw = np.random.uniform(-np.pi, np.pi)
+                avg_arm_workspace_range = np.mean(self.robot.arm_workspace_range[self.arm])
                 pose_2d = np.array(
-                    [pose_on_obj[0][0] + distance * np.cos(yaw), pose_on_obj[0][1] + distance * np.sin(yaw), yaw + np.pi]
+                    [pose_on_obj[0][0] + distance * np.cos(yaw), pose_on_obj[0][1] + distance * np.sin(yaw), yaw + np.pi - avg_arm_workspace_range]
                 )
-
                 # Check room
                 if self.scene._seg_map.get_room_instance_by_point(pose_2d[:2]) not in obj_rooms:
                     indented_print("Candidate position is in the wrong room.")
