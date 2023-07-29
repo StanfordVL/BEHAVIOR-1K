@@ -9,9 +9,11 @@ import numpy as np
 
 
 class Draped(RelativeObjectState, KinematicsMixin, BooleanStateMixin, ClothStateMixin):
-    @staticmethod
-    def get_dependencies():
-        return KinematicsMixin.get_dependencies() + RelativeObjectState.get_dependencies() + [ContactBodies]
+    @classmethod
+    def get_dependencies(cls):
+        deps = super().get_dependencies()
+        deps.add(ContactBodies)
+        return deps
 
     def _set_value(self, other, new_value):
         if not new_value:

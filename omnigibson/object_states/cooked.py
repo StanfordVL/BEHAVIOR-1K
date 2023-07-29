@@ -14,9 +14,11 @@ class Cooked(AbsoluteObjectState, BooleanStateMixin):
         super(Cooked, self).__init__(obj)
         self.cook_temperature = cook_temperature
 
-    @staticmethod
-    def get_dependencies():
-        return AbsoluteObjectState.get_dependencies() + [MaxTemperature]
+    @classmethod
+    def get_dependencies(cls):
+        deps = super().get_dependencies()
+        deps.add(MaxTemperature)
+        return deps
 
     def _set_value(self, new_value):
         current_max_temp = self.obj.states[MaxTemperature].get_value()
