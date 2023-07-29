@@ -1,17 +1,18 @@
-from IPython import embed
-
 import omnigibson as og
-from omnigibson.object_states.kinematics import KinematicsMixin
+from omnigibson.object_states.kinematics_mixin import KinematicsMixin
 from omnigibson.object_states.adjacency import VerticalAdjacency
-from omnigibson.object_states.object_state_base import BooleanState, RelativeObjectState
+from omnigibson.object_states.object_state_base import BooleanStateMixin, RelativeObjectState
 from omnigibson.object_states.touching import Touching
 from omnigibson.utils.object_state_utils import sample_kinematics
 
 
-class OnTop(KinematicsMixin, RelativeObjectState, BooleanState):
-    @staticmethod
-    def get_dependencies():
-        return KinematicsMixin.get_dependencies() + RelativeObjectState.get_dependencies() + [Touching, VerticalAdjacency]
+class OnTop(KinematicsMixin, RelativeObjectState, BooleanStateMixin):
+
+    @classmethod
+    def get_dependencies(cls):
+        deps = super().get_dependencies()
+        deps.update({Touching, VerticalAdjacency})
+        return deps
 
     def _set_value(self, other, new_value):
         if not new_value:

@@ -1,7 +1,7 @@
 import random
 
 from omnigibson.macros import create_module_macros
-from omnigibson.object_states.object_state_base import BooleanState, AbsoluteObjectState
+from omnigibson.object_states.object_state_base import BooleanStateMixin, AbsoluteObjectState
 from omnigibson.utils.constants import JointType
 from omnigibson.utils.ui_utils import create_module_logger
 
@@ -113,7 +113,7 @@ def _get_relevant_joints(obj):
     return both_sides, relevant_joints, joint_directions
 
 
-class Open(AbsoluteObjectState, BooleanState):
+class Open(AbsoluteObjectState, BooleanStateMixin):
     def __init__(self, obj):
         self.relevant_joints_info = None
 

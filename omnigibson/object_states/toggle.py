@@ -4,9 +4,8 @@ import omnigibson as og
 from omnigibson.macros import create_module_macros
 from omnigibson.prims.geom_prim import VisualGeomPrim
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
-from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
+from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanStateMixin
 from omnigibson.object_states.update_state_mixin import UpdateStateMixin
-from omnigibson.utils.usd_utils import create_primitive_mesh
 from omni.isaac.core.utils.bounds import recompute_extents
 from omnigibson.utils.python_utils import classproperty
 from omni.isaac.core.utils.prims import get_prim_at_path
@@ -21,7 +20,7 @@ m.DEFAULT_RADIUS = 0.05
 m.CAN_TOGGLE_STEPS = 5
 
 
-class ToggledOn(AbsoluteObjectState, BooleanState, LinkBasedStateMixin, UpdateStateMixin):
+class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, UpdateStateMixin):
     def __init__(self, obj, radius=None):
         self.radius = radius
         self.value = False

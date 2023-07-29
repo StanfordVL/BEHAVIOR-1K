@@ -3,8 +3,8 @@ from collections import namedtuple
 from scipy.spatial import ConvexHull, distance_matrix
 
 from omnigibson.macros import create_module_macros
-from omnigibson.object_states.object_state_base import BooleanState, AbsoluteObjectState
-from omnigibson.object_states.cloth import ClothState
+from omnigibson.object_states.object_state_base import BooleanStateMixin, AbsoluteObjectState
+from omnigibson.object_states.cloth_mixin import ClothStateMixin
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -35,7 +35,7 @@ FoldedLevelData contains the following fields:
 FoldedLevelData = namedtuple("FoldedLevelData", ("smoothness", "area", "diagonal"))
 
 
-class FoldedLevel(AbsoluteObjectState, ClothState):
+class FoldedLevel(AbsoluteObjectState, ClothStateMixin):
     """
     State representing the object's folded level.
     Value is a FoldedLevelData object.
@@ -119,10 +119,13 @@ class FoldedLevel(AbsoluteObjectState, ClothState):
 
         return area, diagonal
 
-class Folded(AbsoluteObjectState, BooleanState, ClothState):
-    @staticmethod
-    def get_dependencies():
-        return AbsoluteObjectState.get_dependencies() + [FoldedLevel]
+
+class Folded(AbsoluteObjectState, BooleanStateMixin, ClothStateMixin):
+    @classmethod
+    def get_dependencies(cls):
+        deps = super().get_dependencies()
+        deps.add(FoldedLevel)
+        return deps
 
     def _get_value(self):
         # Check the smoothness of the cloth
@@ -140,7 +143,14 @@ class Folded(AbsoluteObjectState, BooleanState, ClothState):
 
     # We don't need to dump / load anything since the cloth objects should handle it themselves
 
-class Unfolded(AbsoluteObjectState, BooleanState, ClothState):
+
+class Unfolded(AbsoluteObjectState, BooleanStateMixin, ClothStateMixin):
+    @classmethod
+    def get_dependencies(cls):
+        deps = super().get_dependencies()
+        deps.add(FoldedLevel)
+        return deps
+
     def _get_value(self):
         # Check the smoothness of the cloth
         folded_level = self.obj.states[FoldedLevel].get_value()

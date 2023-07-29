@@ -2,7 +2,7 @@ import numpy as np
 from collections import namedtuple
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
-from omnigibson.object_states.object_state_base import RelativeObjectState, BooleanState
+from omnigibson.object_states.object_state_base import RelativeObjectState, BooleanStateMixin
 from omnigibson.systems.system_base import VisualParticleSystem, PhysicalParticleSystem, is_visual_particle_system, \
     is_physical_particle_system
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
@@ -103,16 +103,14 @@ class ContainedParticles(RelativeObjectState, LinkBasedStateMixin):
         """
         return self._volume
 
-    @staticmethod
-    def get_optional_dependencies():
-        return []
 
-
-class Contains(RelativeObjectState, BooleanState):
+class Contains(RelativeObjectState, BooleanStateMixin):
     def _get_value(self, system):
         # Grab value from Contains state; True if value is greater than 0
         return self.obj.states[ContainedParticles].get_value(system=system).n_in_volume > 0
 
-    @staticmethod
-    def get_dependencies():
-        return [ContainedParticles]
+    @classmethod
+    def get_dependencies(cls):
+        deps = super().get_dependencies()
+        deps.add(ContainedParticles)
+        return deps

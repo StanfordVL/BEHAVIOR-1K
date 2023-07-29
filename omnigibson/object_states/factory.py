@@ -1,6 +1,6 @@
 import networkx as nx
 
-from omnigibson.object_states.kinematics import KinematicsMixin
+from omnigibson.object_states.kinematics_mixin import KinematicsMixin
 from omnigibson.object_states import *
 
 _ABILITY_TO_STATE_MAPPING = {

@@ -1,6 +1,6 @@
 import numpy as np
 from omnigibson.macros import create_module_macros
-from omnigibson.object_states.object_state_base import RelativeObjectState, BooleanState
+from omnigibson.object_states.object_state_base import RelativeObjectState, BooleanStateMixin
 from omnigibson.systems.system_base import UUID_TO_SYSTEMS, REGISTERED_SYSTEMS
 from omnigibson.utils.python_utils import get_uuid
 
@@ -87,7 +87,7 @@ class ModifiedParticles(RelativeObjectState):
         return state_dict, n_systems * 2 + 1
 
 
-class Saturated(RelativeObjectState, BooleanState):
+class Saturated(RelativeObjectState, BooleanStateMixin):
     def __init__(self, obj, default_limit=m.DEFAULT_SATURATION_LIMIT):
         # Run super first
         super().__init__(obj=obj)
@@ -165,9 +165,11 @@ class Saturated(RelativeObjectState, BooleanState):
 
         return albedo_add, diffuse_tint
 
-    @staticmethod
-    def get_dependencies():
-        return RelativeObjectState.get_dependencies() + [ModifiedParticles]
+    @classmethod
+    def get_dependencies(cls):
+        deps = super().get_dependencies()
+        deps.add(ModifiedParticles)
+        return deps
 
     def _sync_systems(self, systems):
         """

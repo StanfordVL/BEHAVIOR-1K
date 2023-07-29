@@ -1,16 +1,16 @@
-from IPython import embed
-
 import omnigibson as og
 from omnigibson.object_states.adjacency import VerticalAdjacency
-from omnigibson.object_states.kinematics import KinematicsMixin
-from omnigibson.object_states.object_state_base import BooleanState, RelativeObjectState
+from omnigibson.object_states.kinematics_mixin import KinematicsMixin
+from omnigibson.object_states.object_state_base import BooleanStateMixin, RelativeObjectState
 from omnigibson.utils.object_state_utils import sample_kinematics
 
 
-class Under(KinematicsMixin, RelativeObjectState, BooleanState):
-    @staticmethod
-    def get_dependencies():
-        return KinematicsMixin.get_dependencies() + RelativeObjectState.get_dependencies() + [VerticalAdjacency]
+class Under(RelativeObjectState, KinematicsMixin, BooleanStateMixin):
+    @classmethod
+    def get_dependencies(cls):
+        deps = super().get_dependencies()
+        deps.add(VerticalAdjacency)
+        return deps
 
     def _set_value(self, other, new_value):
         if not new_value:

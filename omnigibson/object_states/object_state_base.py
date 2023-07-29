@@ -14,8 +14,8 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
     RelativeObjectState.
     """
 
-    @staticmethod
-    def get_dependencies():
+    @classmethod
+    def get_dependencies(cls):
         """
         Get the dependency states for this state, e.g. states that need to be explicitly enabled on the current object
         before the current state is usable. States listed here will be enabled for all objects that have this current
@@ -23,12 +23,12 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
         *any* object.
 
         Returns:
-            list of str: List of strings corresponding to state keys.
+            set of str: Set of strings corresponding to state keys.
         """
-        return []
+        return set()
 
-    @staticmethod
-    def get_optional_dependencies():
+    @classmethod
+    def get_optional_dependencies(cls):
         """
         Get states that should be processed prior to this state if they are already enabled. These states will not be
         enabled because of this state's dependency on them, but if they are already enabled for another reason (e.g.
@@ -36,9 +36,9 @@ class BaseObjectState(Serializable, Registerable, Recreatable, ABC):
         state being processed on *any* object.
 
         Returns:
-            list of str: List of strings corresponding to state keys.
+            set of str: Set of strings corresponding to state keys.
         """
-        return []
+        return set()
 
     def __init__(self, obj):
         super().__init__()
@@ -388,9 +388,28 @@ class RelativeObjectState(BaseObjectState):
         return classes
 
 
-class BooleanState:
+class IntrinsicObjectState(BaseObjectState):
+    """
+    This class is used to track object states that should NOT have getters / setters implemented, since the associated
+    ability / state is intrinsic to the state
+    """
+
+    def _get_value(self):
+        raise NotImplementedError(f"_get_value not implemented for IntrinsicObjectState {self.__class__.__name__} state.")
+
+    def _set_value(self, new_value):
+        raise NotImplementedError(f"_set_value not implemented for IntrinsicObjectState {self.__class__.__name__} state.")
+
+    @classproperty
+    def _do_not_register_classes(cls):
+        # Don't register this class since it's an abstract template
+        classes = super()._do_not_register_classes
+        classes.add("IntrinsicObjectState")
+        return classes
+
+
+class BooleanStateMixin(BaseObjectState):
     """
     This class is a mixin used to indicate that a state has a boolean value.
     """
-
     pass

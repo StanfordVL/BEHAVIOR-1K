@@ -1,18 +1,18 @@
-from IPython import embed
-
 import omnigibson as og
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.adjacency import HorizontalAdjacency, VerticalAdjacency, flatten_planes
-from omnigibson.object_states.kinematics import KinematicsMixin
-from omnigibson.object_states.object_state_base import BooleanState, RelativeObjectState
+from omnigibson.object_states.kinematics_mixin import KinematicsMixin
+from omnigibson.object_states.object_state_base import BooleanStateMixin, RelativeObjectState
 from omnigibson.utils.object_state_utils import sample_kinematics
 from omnigibson.utils.usd_utils import BoundingBoxAPI
 
 
-class Inside(KinematicsMixin, RelativeObjectState, BooleanState):
-    @staticmethod
-    def get_dependencies():
-        return KinematicsMixin.get_dependencies() + [AABB, HorizontalAdjacency, VerticalAdjacency]
+class Inside(RelativeObjectState, KinematicsMixin, BooleanStateMixin):
+    @classmethod
+    def get_dependencies(cls):
+        deps = super().get_dependencies()
+        deps.update({AABB, HorizontalAdjacency, VerticalAdjacency})
+        return deps
 
     def _set_value(self, other, new_value):
         if not new_value:

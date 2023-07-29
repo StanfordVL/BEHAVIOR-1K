@@ -4,10 +4,9 @@ from omnigibson.utils.constants import PrimType
 from omnigibson.utils.python_utils import classproperty
 
 
-class ClothState(BaseObjectState):
+class ClothStateMixin(BaseObjectState):
     """
-    This class is a subclass of BaseObjectState that adds dependencies
-    on the default kinematics states.
+    This class is a subclass of BaseObjectState that adds dependencies assuming the owned object is PrimType.CLOTH
     """
 
     @classmethod
@@ -19,7 +18,7 @@ class ClothState(BaseObjectState):
 
         # Check for cloth type
         if obj.prim_type != PrimType.CLOTH:
-            return False, f"Cannot use ClothState {cls.__name__} with rigid object, make sure object is created " \
+            return False, f"Cannot use ClothStateMixin {cls.__name__} with rigid object, make sure object is created " \
                           f"with prim_type=PrimType.CLOTH!"
 
         # Check for GPU dynamics
@@ -32,5 +31,5 @@ class ClothState(BaseObjectState):
     def _do_not_register_classes(cls):
         # Don't register this class since it's an abstract template
         classes = super()._do_not_register_classes
-        classes.add("ClothState")
+        classes.add("ClothStateMixin")
         return classes

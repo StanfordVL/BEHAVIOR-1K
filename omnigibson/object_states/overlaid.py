@@ -1,5 +1,5 @@
-from omnigibson.object_states.kinematics import KinematicsMixin
-from omnigibson.object_states.object_state_base import BooleanState, RelativeObjectState
+from omnigibson.object_states.kinematics_mixin import KinematicsMixin
+from omnigibson.object_states.object_state_base import BooleanStateMixin, RelativeObjectState
 from omnigibson.object_states.touching import Touching
 from omnigibson.utils.constants import PrimType
 import omnigibson.utils.transform_utils as T
@@ -24,10 +24,13 @@ m.OVERLAP_AREA_PERCENTAGE = 0.5
 m.SAMPLING_Z_OFFSET = 0.01
 
 
-class Overlaid(KinematicsMixin, RelativeObjectState, BooleanState):
-    @staticmethod
-    def get_dependencies():
-        return KinematicsMixin.get_dependencies() + RelativeObjectState.get_dependencies() + [Touching]
+class Overlaid(KinematicsMixin, RelativeObjectState, BooleanStateMixin):
+
+    @classmethod
+    def get_dependencies(cls):
+        deps = super().get_dependencies()
+        deps.add(Touching)
+        return deps
 
     def _set_value(self, other, new_value):
         if not new_value:

@@ -139,13 +139,17 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin):
         """
         return self._temperature
 
-    @staticmethod
-    def get_dependencies():
-        return AbsoluteObjectState.get_dependencies() + [AABB, Inside]
+    @classmethod
+    def get_dependencies(cls):
+        deps = super().get_dependencies()
+        deps.update({AABB, Inside})
+        return deps
 
-    @staticmethod
-    def get_optional_dependencies():
-        return AbsoluteObjectState.get_optional_dependencies() + [ToggledOn, Open]
+    @classmethod
+    def get_optional_dependencies(cls):
+        deps = super().get_optional_dependencies()
+        deps.update({ToggledOn, Open})
+        return deps
 
     def _initialize(self):
         # Run super first

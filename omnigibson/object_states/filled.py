@@ -1,7 +1,7 @@
 import numpy as np
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.contains import ContainedParticles
-from omnigibson.object_states.object_state_base import RelativeObjectState, BooleanState
+from omnigibson.object_states.object_state_base import RelativeObjectState, BooleanStateMixin
 from omnigibson.systems.system_base import PhysicalParticleSystem, is_physical_particle_system
 
 # Create settings for this module
@@ -11,7 +11,7 @@ m = create_module_macros(module_path=__file__)
 m.VOLUME_FILL_PROPORTION = 0.2
 
 
-class Filled(RelativeObjectState, BooleanState):
+class Filled(RelativeObjectState, BooleanStateMixin):
 
     def _get_value(self, system):
         # Sanity check to make sure system is valid
@@ -57,10 +57,8 @@ class Filled(RelativeObjectState, BooleanState):
 
         return True
 
-    @staticmethod
-    def get_dependencies():
-        return [ContainedParticles]
-
-    @staticmethod
-    def get_optional_dependencies():
-        return []
+    @classmethod
+    def get_dependencies(cls):
+        deps = super().get_dependencies()
+        deps.add(ContainedParticles)
+        return deps
