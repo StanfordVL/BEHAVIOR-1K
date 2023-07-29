@@ -31,7 +31,7 @@ from omnigibson.tasks.behavior_task import BehaviorTask
 from omnigibson.utils.motion_planning_utils import (
     plan_base_motion,
     plan_arm_motion,
-    detect_robot_collision,
+    set_base_and_detect_collision,
     detect_robot_collision_in_sim
 )
 
@@ -99,27 +99,25 @@ class RobotCopy():
         self.meshes = {}
         self.relative_poses = {}
         self.links_relative_poses = {}
+        self.reset_pose = {
+            "original": ([0, 0, -5.0], [0, 0, 0, 1]),
+            "simplified": ([5, 0, -5.0], [0, 0, 0, 1]),
+        }
 
 class UndoableContext(object):
-    def __init__(self, robot, robot_copy, robot_copy_type="original", self_collisions=False):
+    def __init__(self, robot, robot_copy, robot_copy_type="original"):
         self.robot = robot
         self.robot_copy = robot_copy
         self.robot_copy_type = robot_copy_type if robot_copy_type in robot_copy.prims.keys() else "original"
-        self.self_collisions = self_collisions
-        self.disabled_meshes = []
+        self.disabled_collision_pairs_dict = {}
 
     def __enter__(self):
         self._assemble_robot_copy()
-        self._disable_colliders()
-        self._construct_disabled_collision_pairs_dict()
+        self._construct_disabled_collision_pairs()
         return self 
 
     def __exit__(self, *args):
-        for meshes in self.robot_copy.meshes[self.robot_copy_type].values():
-            for mesh in meshes.values():
-                mesh.GetAttribute("physics:collisionEnabled").Set(False)
-        for d_mesh in self.disabled_meshes:
-            d_mesh.collision_enabled = True
+        self._set_prim_pose(self.robot_copy.prims[self.robot_copy_type], self.robot_copy.reset_pose[self.robot_copy_type])
 
     def _assemble_robot_copy(self):
         fk_descriptor = "combined" if "combined" in self.robot.robot_arm_descriptor_yamls else self.robot.default_arm
@@ -134,7 +132,6 @@ class UndoableContext(object):
 
         # Set position of robot copy root prim
         self._set_prim_pose(self.robot_copy.prims[self.robot_copy_type], self.robot.get_position_orientation())
-        # from IPython import embed; embed()
         # Assemble robot meshes
         for link_name, meshes in self.robot_copy.meshes[self.robot_copy_type].items():
             for mesh_name, copy_mesh in meshes.items():
@@ -146,44 +143,13 @@ class UndoableContext(object):
                 mesh_copy_pose = T.pose_transform(*link_pose, *self.robot_copy.relative_poses[self.robot_copy_type][link_name][mesh_name])
                 self._set_prim_pose(copy_mesh, mesh_copy_pose)
 
-                if self.self_collisions:
-                    copy_mesh.GetAttribute("physics:collisionEnabled").Set(True)
-                else:
-                    copy_mesh.GetAttribute("physics:collisionEnabled").Set(False)
-
     def _set_prim_pose(self, prim, pose):
         translation = Gf.Vec3d(*np.array(pose[0], dtype=float))
         prim.GetAttribute("xformOp:translate").Set(translation)
         orientation = np.array(pose[1], dtype=float)[[3, 0, 1, 2]]
         prim.GetAttribute("xformOp:orient").Set(Gf.Quatd(*orientation)) 
 
-    def _disable_colliders(self):
-        # Disable original robot colliders so copy collide with it
-        for link in self.robot.links.values():
-            for mesh in link.collision_meshes.values(): 
-                # Keep collision not enabled for the grasping frame on Tiago (Should be cleaned up in the future)
-                if "grasping_frame" not in link.prim_path:
-                    mesh.collision_enabled = False
-                    self.disabled_meshes.append(mesh)
-
-        filter_categories = ["floors"]
-        for obj in og.sim.scene.objects:
-            if obj.category in filter_categories:
-                for link in obj.links.values():
-                    for mesh in link.collision_meshes.values():
-                        mesh.collision_enabled = False
-                        self.disabled_meshes.append(mesh)
-
-        # Disable object in hand
-        obj_in_hand = self.robot._ag_obj_in_hand[self.robot.default_arm] 
-        if obj_in_hand is not None:
-            for link in obj_in_hand.links.values():
-                    for mesh in link.collision_meshes.values():
-                        mesh.collision_enabled = False
-                        self.disabled_meshes.append(mesh)
-
-    def _construct_disabled_collision_pairs_dict(self):
-        self.disabled_collision_pairs_dict = {}
+    def _construct_disabled_collision_pairs(self):
         robot_meshes_copy = self.robot_copy.meshes[self.robot_copy_type]
 
         # Filter out collision pairs of meshes part of the same link
@@ -201,6 +167,24 @@ class UndoableContext(object):
 
                 for mesh in robot_meshes_copy[link_2].values():
                     self.disabled_collision_pairs_dict[mesh.GetPrimPath().pathString] += [m.GetPrimPath().pathString for m in robot_meshes_copy[link_1].values()]
+        
+        # Filter out colliders all robot copy meshes should ignore
+        disabled_colliders = []
+
+        # Disable original robot colliders so copy can't collide with it
+        disabled_colliders += [link.prim_path for link in self.robot.links.values()]
+        filter_categories = ["floors"]
+        for obj in og.sim.scene.objects:
+            if obj.category in filter_categories:
+                disabled_colliders += [link.prim_path for link in obj.links.values()]
+
+        # Disable object in hand
+        obj_in_hand = self.robot._ag_obj_in_hand[self.robot.default_arm] 
+        if obj_in_hand is not None:
+            disabled_colliders += [link.prim_path for link in obj_in_hand.links.values()]
+
+        for colliders in self.disabled_collision_pairs_dict.values():
+            colliders += disabled_colliders
 
 class StarterSemanticActionPrimitiveSet(IntEnum):
     GRASP = 0
@@ -269,11 +253,15 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             copy_robot_meshes = {}
             copy_robot_meshes_relative_poses = {}
             copy_robot_links_relative_poses = {}
+
             # Create prim under which robot meshes are nested and set position
             CreatePrimCommand("Xform", rc['copy_path']).do()
             copy_robot = get_prim_at_path(rc['copy_path'])
-            
-            # copy_robot.GetAttribute("physics:collisionEnabled").Set(False)
+            reset_pose = robot_copy.reset_pose[robot_type]
+            translation = Gf.Vec3d(*np.array(reset_pose[0], dtype=float))
+            copy_robot.GetAttribute("xformOp:translate").Set(translation)
+            orientation = np.array(reset_pose[1], dtype=float)[[3, 0, 1, 2]]
+            copy_robot.GetAttribute("xformOp:orient").Set(Gf.Quatd(*orientation)) 
 
             robot_to_copy = None
             if robot_type == "simplified":
@@ -303,7 +291,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                         copy_robot_meshes[link_name][mesh_name] = copy_mesh
                         copy_robot_meshes_relative_poses[link_name][mesh_name] = relative_pose
 
-                    copy_mesh.GetAttribute("physics:collisionEnabled").Set(False)
                 copy_robot_links_relative_poses[link_name] = T.relative_pose_transform(*link.get_position_orientation(), *robot.get_position_orientation())
             
             if robot_type == "simplified":
@@ -632,7 +619,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         
         obj_pose = self._sample_pose_with_object_and_predicate(predicate, obj_in_hand, obj)
         hand_pose = self._get_hand_pose_for_object_pose(obj_pose)
-        print(hand_pose)
         yield from self._navigate_if_needed(obj, pose_on_obj=hand_pose)
         yield from self._move_hand(hand_pose)
         yield from self._execute_release()
@@ -763,7 +749,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             # Yield a bunch of no-ops to give the robot time to settle.
             yield from self._settle_robot()
         else:
-            with UndoableContext(self.robot, self.robot_copy, "original", True) as context:
+            with UndoableContext(self.robot, self.robot_copy, "original") as context:
                 plan = plan_arm_motion(
                     robot=self.robot,
                     end_conf=joint_pos,
@@ -1037,7 +1023,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             self.robot.set_position_orientation(*robot_pose)
             yield from self._settle_robot()
         else:
-            with UndoableContext(self.robot, self.robot_copy, "simplified", False) as context:
+            with UndoableContext(self.robot, self.robot_copy, "simplified") as context:
                 plan = plan_base_motion(
                     robot=self.robot,
                     end_conf=pose_2d,
@@ -1204,7 +1190,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             pos_on_obj = self._sample_position_on_aabb_face(obj)
             pose_on_obj = np.array([pos_on_obj, [0, 0, 0, 1]])
 
-        with UndoableContext(self.robot, self.robot_copy, "simplified", False) as context:
+        with UndoableContext(self.robot, self.robot_copy, "simplified") as context:
             obj_rooms = obj.in_rooms if obj.in_rooms else [self.scene._seg_map.get_room_instance_by_point(pose_on_obj[0][:2])]
             for _ in range(MAX_ATTEMPTS_FOR_SAMPLING_POSE_NEAR_OBJECT):
                 distance = np.random.uniform(0.0, 1.0)
@@ -1329,7 +1315,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             if not self._target_in_reach_of_robot_relative(relative_pose):
                 return False
 
-        if detect_robot_collision(context, pose):
+        if set_base_and_detect_collision(context, pose):
             indented_print("Candidate position failed collision test.")
             return False
         return True

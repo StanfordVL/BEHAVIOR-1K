@@ -32,8 +32,7 @@ def plan_base_motion(
         y = q.getY()
         yaw = q.getYaw()
         pose = ([x, y, 0.0], T.euler2quat((0, 0, yaw)))
-        state_valid = not detect_robot_collision(context, pose)
-        return state_valid
+        return not set_base_and_detect_collision(context, pose)
 
     pos = robot.get_position()
     yaw = T.quat2euler(robot.get_orientation())[2]
@@ -128,7 +127,7 @@ def plan_arm_motion(
     def state_valid_fn(q):
         joint_pos = initial_joint_pos
         joint_pos[control_idx_in_joint_pos] = [q[i] for i in range(dim)]
-        return arm_planning_validity_fn(context, joint_pos)
+        return not set_arm_and_detect_collision(context, joint_pos)
     
     # create an SE2 state space
     space = ob.RealVectorStateSpace(dim)
@@ -180,9 +179,9 @@ def plan_arm_motion(
         return return_path
     return None
 
-def detect_robot_collision(context, pose):
+def set_base_and_detect_collision(context, pose):
     """
-    Moves robot and detects robot collisions with the environment, but not with itself
+    Moves the robot and detects robot collisions with the environment and itself
 
     Args:
         context (UndoableContext): Context to plan in that includes the robot copy
@@ -202,17 +201,75 @@ def detect_robot_collision(context, pose):
 
     orientation = np.array(orientation, dtype=float)[[3, 0, 1, 2]]
     robot_copy.prims[robot_copy_type].GetAttribute("xformOp:orient").Set(Gf.Quatd(*orientation)) 
-                
+
+    return detect_robot_collision(context)
+
+def set_arm_and_detect_collision(context, joint_pos):
+    """
+    Sets joint positions of the robot and detects robot collisions with the environment and itself
+
+    Args:
+        context (UndoableContext): Context to plan in that includes the robot copy
+        joint_pos (Array): Joint positions to set the robot to
+    
+    Returns:
+        bool: Whether the robot is in a valid state i.e. not in collision
+    """
+    robot_copy = context.robot_copy
+    robot_copy_type = context.robot_copy_type
+    
+    arm_links = context.robot.manipulation_link_names
+    link_poses = context.fk_solver.get_link_poses(joint_pos, arm_links)
+
+    for link in arm_links:
+        pose = link_poses[link]
+        if link in robot_copy.meshes[robot_copy_type].keys():
+            for mesh, relative_pose in zip(robot_copy.meshes[robot_copy_type][link].values(), robot_copy.relative_poses[robot_copy_type][link].values()):
+                mesh_pose = T.pose_transform(*pose, *relative_pose)
+                translation = Gf.Vec3d(*np.array(mesh_pose[0], dtype=float))
+                mesh.GetAttribute("xformOp:translate").Set(translation)
+                orientation = np.array(mesh_pose[1], dtype=float)[[3, 0, 1, 2]]
+                mesh.GetAttribute("xformOp:orient").Set(Gf.Quatd(*orientation))
+
+    return detect_robot_collision(context)
+
+def detect_robot_collision(context):
+    """
+    Detects robot collisions
+
+    Args:
+        context (UndoableContext): Context to plan in that includes the robot copy
+    
+    Returns:
+        bool: Whether the robot is in collision
+    """
+    robot_copy = context.robot_copy
+    robot_copy_type = context.robot_copy_type
+
+    # Define function for checking overlap
+    valid_hit = False
+    mesh_path = None
+
+    def overlap_callback(hit):
+        nonlocal valid_hit
+        nonlocal mesh_path
+
+        valid_hit = hit.rigid_body not in context.disabled_collision_pairs_dict[mesh_path]
+
+        return not valid_hit
+
     for meshes in robot_copy.meshes[robot_copy_type].values():
         for mesh in meshes.values():
-            mesh_id = PhysicsSchemaTools.encodeSdfPath(mesh.GetPrimPath().pathString)
+            if valid_hit:
+                return valid_hit
+            mesh_path = mesh.GetPrimPath().pathString
+            mesh_id = PhysicsSchemaTools.encodeSdfPath(mesh_path)
             if mesh.GetTypeName() == "Mesh":
-                if og.sim.psqi.overlap_mesh_any(*mesh_id):
-                    return True
+                og.sim.psqi.overlap_mesh(*mesh_id, reportFn=overlap_callback)
             else:
-                if og.sim.psqi.overlap_shape_any(*mesh_id):
-                    return True
-    return False
+                og.sim.psqi.overlap_shape(*mesh_id, reportFn=overlap_callback)
+        
+    return valid_hit
 
 def detect_robot_collision_in_sim(robot, filter_objs=[], ignore_obj_in_hand=True):
     """
@@ -241,58 +298,6 @@ def detect_robot_collision_in_sim(robot, filter_objs=[], ignore_obj_in_hand=True
         if col_obj.category in filter_categories:
             collision_prims.remove(col_prim)
     return len(collision_prims) > 0
-    
-def arm_planning_validity_fn(context, joint_pos):
-    """
-    Sets joint positions of the robot and detects robot collisions with the environment and itself
-
-    Args:
-        context (UndoableContext): Context to plan in that includes the robot copy
-        joint_pos (Array): Joint positions to set the robot to
-    
-    Returns:
-        bool: Whether the robot is in a valid state i.e. not in collision
-    """
-    robot_copy = context.robot_copy
-    robot_copy_type = context.robot_copy_type
-    
-    arm_links = context.robot.manipulation_link_names
-    link_poses = context.fk_solver.get_link_poses(joint_pos, arm_links)
-
-    for link in arm_links:
-        pose = link_poses[link]
-        if link in robot_copy.meshes[robot_copy_type].keys():
-            for mesh, relative_pose in zip(robot_copy.meshes[robot_copy_type][link].values(), robot_copy.relative_poses[robot_copy_type][link].values()):
-                mesh_pose = T.pose_transform(*pose, *relative_pose)
-                translation = Gf.Vec3d(*np.array(mesh_pose[0], dtype=float))
-                mesh.GetAttribute("xformOp:translate").Set(translation)
-                orientation = np.array(mesh_pose[1], dtype=float)[[3, 0, 1, 2]]
-                mesh.GetAttribute("xformOp:orient").Set(Gf.Quatd(*orientation))
-
-    # Define function for checking overlap
-    valid_hit = False
-    mesh_path = None
-
-    def overlap_callback(hit):
-        nonlocal valid_hit
-        nonlocal mesh_path
-        
-        valid_hit = hit.rigid_body not in context.disabled_collision_pairs_dict[mesh_path]
-
-        return not valid_hit
-
-    for meshes in robot_copy.meshes[robot_copy_type].values():
-        for mesh in meshes.values():
-            if valid_hit:
-                return not valid_hit
-            mesh_path = mesh.GetPrimPath().pathString
-            mesh_id = PhysicsSchemaTools.encodeSdfPath(mesh_path)
-            if mesh.GetTypeName() == "Mesh":
-                og.sim.psqi.overlap_mesh(*mesh_id, reportFn=overlap_callback)
-            else:
-                og.sim.psqi.overlap_shape(*mesh_id, reportFn=overlap_callback)
-        
-    return not valid_hit
     
 
 def remove_unnecessary_rotations(path):
