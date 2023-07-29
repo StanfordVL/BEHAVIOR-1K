@@ -1126,6 +1126,7 @@ def test_contains():
 
 @og_test
 def test_covered():
+    bracelet = og.sim.scene.object_registry("name", "bracelet")
     oyster = og.sim.scene.object_registry("name", "oyster")
     breakfast_table = og.sim.scene.object_registry("name", "breakfast_table")
 
@@ -1135,7 +1136,7 @@ def test_covered():
         get_system("raspberry"),
         get_system("diced_apple"),
     )
-    for obj in (oyster, breakfast_table):
+    for obj in (bracelet, oyster, breakfast_table):
         for system in systems:
             sampleable = is_visual_particle_system(system.name) or np.all(obj.aabb_extent > (2 * system.particle_radius))
             obj.set_position_orientation(position=np.ones(3) * 50.0, orientation=[0, 0, 0, 1.0])
@@ -1149,7 +1150,7 @@ def test_covered():
             for _ in range(5):
                 og.sim.step()
 
-            assert obj.states[Covered].get_value(system)
+            assert obj.states[Covered].get_value(system) == sampleable
             obj.states[Covered].set_value(system, False)
 
             for _ in range(5):
@@ -1157,6 +1158,8 @@ def test_covered():
             assert not obj.states[Covered].get_value(system)
 
             system.remove_all_particles()
+
+        obj.set_position_orientation(position=np.ones(3) * 75.0, orientation=[0, 0, 0, 1.0])
 
 
 def test_clear_sim():
