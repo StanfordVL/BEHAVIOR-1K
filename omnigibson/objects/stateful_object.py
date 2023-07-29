@@ -421,7 +421,7 @@ class StatefulObject(BaseObject):
         the current albedo map by adding and scaling the values. See @self._update_albedo_value for details.
 
         Args:
-            object_state (BooleanState or None): the object state that the diffuse color should match to
+            object_state (BooleanStateMixin or None): the object state that the diffuse color should match to
         """
         for material in self.materials:
             self._update_albedo_value(object_state, material)
@@ -433,7 +433,7 @@ class StatefulObject(BaseObject):
         albedo_value = diffuse_tint * (albedo_value + albedo_add)
 
         Args:
-            object_state (BooleanState or None): the object state that the diffuse color should match to
+            object_state (BooleanStateMixin or None): the object state that the diffuse color should match to
             material (MaterialPrim): the material to use to update the albedo value
         """
         if object_state is None:

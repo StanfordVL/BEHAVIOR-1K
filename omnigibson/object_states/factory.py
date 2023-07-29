@@ -122,8 +122,7 @@ def get_state_dependency_graph(states=None):
         nx.DiGraph: State dependency graph of supported object states
     """
     states = REGISTERED_OBJECT_STATES.values() if states is None else states
-    dependencies = {state: state.get_dependencies() + state.get_optional_dependencies()
-                    for state in states}
+    dependencies = {state: set.union(state.get_dependencies(), state.get_optional_dependencies()) for state in states}
     return nx.DiGraph(dependencies)
 
 

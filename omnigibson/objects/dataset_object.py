@@ -292,7 +292,7 @@ class DatasetObject(USDObject):
         it modifies the current albedo map by adding and scaling the values. See @self._update_albedo_value for details.
 
         Args:
-            object_state (BooleanState or None): the object state that the diffuse color should match to
+            object_state (BooleanStateMixin or None): the object state that the diffuse color should match to
         """
         # TODO: uncomment these once our dataset has the object state-conditioned texture maps
         # DEFAULT_ALBEDO_MAP_SUFFIX = frozenset({"DIFFUSE", "COMBINED", "albedo"})
