@@ -204,6 +204,9 @@ def sample_kinematics(
         desired_bbox_pos = (aabb_lower_b + aabb_upper_b) / 2.0
         desired_bbox_pos[2] = aabb_upper_b[2] + (aabb_upper_a[2] - aabb_lower_a[2]) / 2.0
         pos = desired_bbox_pos + bbox_to_obj
+        success = True
+
+    if success and not skip_falling:
         objA.set_position_orientation(pos, orientation)
         objA.keep_still()
 
@@ -215,29 +218,14 @@ def sample_kinematics(
             og.sim.step_physics()
             i += 1
         objA.keep_still()
-        og.sim.step_physics()
+        objB.keep_still()
+        # Step a few times so velocity can become non-zero if the objects are moving
+        for i in range(5):
+            og.sim.step_physics()
         i = 0
         while np.linalg.norm(objA.get_linear_velocity()) > 1e-3 and i < n_steps_max:
             og.sim.step_physics()
             i += 1
-
-        success = True
-
-    if success and not skip_falling:
-        objA.set_position_orientation(pos, orientation)
-        objA.keep_still()
-
-        # Let it fall for 0.2 second
-        for _ in range(int(0.2 / og.sim.get_physics_dt())):
-            og.sim.step_physics()
-            if len(objA.states[ContactBodies].get_value()) > 0:
-                break
-
-        objA.keep_still()
-        objB.keep_still()
-
-        # Take extra step for depenetration, then break
-        og.sim.step_physics()
 
         # Render at the end
         og.sim.render()
