@@ -1030,6 +1030,10 @@ class ParticleApplier(ParticleModifier):
                     # Add to info
                     particles_info[group]["positions"].append(hit[0])
                     particles_info[group]["orientations"].append(hit[2])
+                    # Since particles' scales are sampled with respect to the modifier object, but are being placed
+                    # (in the USD hierarchy) underneath the in_contact object, we need to compensate for the relative
+                    # scale differences between the two objects, so that "moving" the particle to the new object won't
+                    # cause it to unexpectedly shrink / grow based on that parent's (potentially) different scale
                     particles_info[group]["scales"].append(scale * modifier_avg_scale / np.cbrt(np.product(hit_obj.scale)))
                     particles_info[group]["link_prim_paths"].append(hit[3])
             # Generate all the particles for each group
