@@ -1,5 +1,6 @@
 from abc import ABCMeta
 import numpy as np
+from collections import Iterable
 
 import omnigibson as og
 from omnigibson.macros import create_module_macros, gm
@@ -100,7 +101,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
 
         # Create load config from inputs
         load_config = dict() if load_config is None else load_config
-        load_config["scale"] = scale
+        load_config["scale"] = np.array(scale) if isinstance(scale, Iterable) else scale
         load_config["visible"] = visible
         load_config["visual_only"] = visual_only
         load_config["self_collisions"] = self_collisions
@@ -251,6 +252,20 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
     @volume.setter
     def volume(self, volume):
         raise NotImplementedError("Cannot set volume directly for an object!")
+
+    @property
+    def scale(self):
+        # Just super call
+        return super().scale
+
+    @scale.setter
+    def scale(self, scale):
+        # call super first
+        # A bit esoteric -- see https://gist.github.com/Susensio/979259559e2bebcd0273f1a95d7c1e79
+        super(BaseObject, type(self)).scale.fset(self, scale)
+
+        # Update init info for scale
+        self._init_info["args"]["scale"] = scale
 
     @property
     def link_prim_paths(self):

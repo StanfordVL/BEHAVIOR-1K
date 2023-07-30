@@ -1488,6 +1488,7 @@ MacroVisualParticleSystem.create(
         fixed_base=False,
         visual_only=True,
         include_default_states=False,
+        abilities={},
     )
 )
 
@@ -1504,6 +1505,7 @@ MacroVisualParticleSystem.create(
         fixed_base=False,
         visual_only=True,
         include_default_states=False,
+        abilities={},
     ),
 )
 
@@ -1521,6 +1523,7 @@ MacroPhysicalParticleSystem.create(
         include_default_states=False,
         category="raspberry",
         model="spkers",
+        abilities={},
     ),
     scale=np.ones(3) * 5.0,
 )

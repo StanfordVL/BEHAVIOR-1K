@@ -23,6 +23,3 @@ class ContactBodies(AbsoluteObjectState):
         assert ignore_objs is None or isinstance(ignore_objs, tuple), \
             "ignore_objs must either be None or a tuple of objects to ignore!"
         return rigid_prims if ignore_objs is None else rigid_prims - prims_to_rigid_prim_set(ignore_objs)
-
-    def _set_value(self, new_value):
-        raise NotImplementedError("ContactBodies state currently does not support setting.")

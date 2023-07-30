@@ -8,13 +8,12 @@ from omnigibson.macros import create_module_macros
 import omnigibson.utils.transform_utils as T
 from omnigibson.object_states.contact_subscribed_state_mixin import ContactSubscribedStateMixin
 from omnigibson.object_states.joint_break_subscribed_state_mixin import JointBreakSubscribedStateMixin
-from omnigibson.object_states.update_state_mixin import UpdateStateMixin
-from omnigibson.object_states.object_state_base import BooleanState, RelativeObjectState
+from omnigibson.object_states.object_state_base import BooleanStateMixin, RelativeObjectState
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from omnigibson.object_states.contact_bodies import ContactBodies
 from omnigibson.utils.constants import JointType
 from omnigibson.utils.usd_utils import create_joint
-from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
+from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.python_utils import classproperty
 
 # Create module logger
@@ -33,7 +32,7 @@ m.DEFAULT_BREAK_FORCE = 10000  # Newton
 m.DEFAULT_BREAK_TORQUE = 10000  # Newton-Meter
 
 
-class AttachedTo(RelativeObjectState, BooleanState, ContactSubscribedStateMixin, JointBreakSubscribedStateMixin, LinkBasedStateMixin):
+class AttachedTo(RelativeObjectState, BooleanStateMixin, ContactSubscribedStateMixin, JointBreakSubscribedStateMixin, LinkBasedStateMixin):
     """
         Handles attachment between two rigid objects, by creating a fixed/spherical joint between self.obj (child) and
         other (parent). At any given moment, an object can only be attached to at most one other object, i.e.
@@ -54,9 +53,11 @@ class AttachedTo(RelativeObjectState, BooleanState, ContactSubscribedStateMixin,
         """
         return m.ATTACHMENT_LINK_PREFIX
 
-    @staticmethod
-    def get_dependencies():
-        return RelativeObjectState.get_dependencies() + [ContactBodies]
+    @classmethod
+    def get_dependencies(cls):
+        deps = super().get_dependencies()
+        deps.add(ContactBodies)
+        return deps
 
     def _initialize(self):
         super()._initialize()

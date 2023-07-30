@@ -2,7 +2,7 @@ import omnigibson as og
 
 from omnigibson.macros import gm
 from omnigibson.object_states import *
-from omnigibson.utils.constants import PrimType
+from omnigibson.utils.constants import PrimType, ParticleModifyCondition, ParticleModifyMethod
 import omnigibson.utils.transform_utils as T
 import numpy as np
 
@@ -20,7 +20,7 @@ def og_test(func):
 
 num_objs = 0
 
-def get_obj_cfg(name, category, model, prim_type=PrimType.RIGID, scale=None, abilities=None):
+def get_obj_cfg(name, category, model, prim_type=PrimType.RIGID, scale=None, abilities=None, visual_only=False):
     global num_objs
     num_objs += 1
     return {
@@ -33,6 +33,7 @@ def get_obj_cfg(name, category, model, prim_type=PrimType.RIGID, scale=None, abi
         "position": [150, 150, num_objs * 5],
         "scale": scale,
         "abilities": abilities,
+        "visual_only": visual_only,
     }
 
 def assert_test_scene():
@@ -56,7 +57,14 @@ def assert_test_scene():
                 get_obj_cfg("shelf_back_panel", "shelf_back_panel", "gjsnrt", abilities={"attachable": {}}),
                 get_obj_cfg("shelf_shelf", "shelf_shelf", "ymtnqa", abilities={"attachable": {}}),
                 get_obj_cfg("shelf_baseboard", "shelf_baseboard", "hlhneo", abilities={"attachable": {}}),
-                get_obj_cfg("sink", "sink", "yfaufu", scale=np.ones(3)),
+                get_obj_cfg("bracelet", "bracelet", "thqqmo"),
+                get_obj_cfg("oyster", "oyster", "enzocs"),
+                get_obj_cfg("sink", "sink", "egwapq", scale=np.ones(3)),
+                get_obj_cfg("stockpot", "stockpot", "dcleem", abilities={"fillable": {}}),
+                get_obj_cfg("applier_dishtowel", "dishtowel", "dtfspn", abilities={"particleApplier": {"method": ParticleModifyMethod.ADJACENCY, "conditions": {"water": []}}}),
+                get_obj_cfg("remover_dishtowel", "dishtowel", "dtfspn", abilities={"particleRemover": {"method": ParticleModifyMethod.ADJACENCY, "conditions": {"water": []}}}),
+                get_obj_cfg("spray_bottle", "spray_bottle", "asztxi", visual_only=True, abilities={"toggleable": {}, "particleApplier": {"method": ParticleModifyMethod.PROJECTION, "conditions": {"water": [(ParticleModifyCondition.TOGGLEDON, True)]}}}),
+                get_obj_cfg("vacuum", "vacuum", "bdmsbr", visual_only=True, abilities={"toggleable": {}, "particleRemover": {"method": ParticleModifyMethod.PROJECTION, "conditions": {"water": [(ParticleModifyCondition.TOGGLEDON, True)]}}}),
             ],
             "robots": [
                 {
@@ -89,6 +97,8 @@ def get_random_pose(pos_low=10.0, pos_hi=20.0):
 
 
 def place_objA_on_objB_bbox(objA, objB, x_offset=0.0, y_offset=0.0, z_offset=0.01):
+    objA.keep_still()
+    objB.keep_still()
     # Reset pose if cloth object
     if objA.prim_type == PrimType.CLOTH:
         objA.root_link.reset()
@@ -103,6 +113,7 @@ def place_objA_on_objB_bbox(objA, objB, x_offset=0.0, y_offset=0.0, z_offset=0.0
 
 
 def place_obj_on_floor_plane(obj, x_offset=0.0, y_offset=0.0, z_offset=0.01):
+    obj.keep_still()
     # Reset pose if cloth object
     if obj.prim_type == PrimType.CLOTH:
         obj.root_link.reset()

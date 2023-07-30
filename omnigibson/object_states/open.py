@@ -1,7 +1,7 @@
 import random
 
 from omnigibson.macros import create_module_macros
-from omnigibson.object_states.object_state_base import BooleanState, AbsoluteObjectState
+from omnigibson.object_states.object_state_base import BooleanStateMixin, AbsoluteObjectState
 from omnigibson.utils.constants import JointType
 from omnigibson.utils.ui_utils import create_module_logger
 
@@ -113,7 +113,7 @@ def _get_relevant_joints(obj):
     return both_sides, relevant_joints, joint_directions
 
 
-class Open(AbsoluteObjectState, BooleanState):
+class Open(AbsoluteObjectState, BooleanStateMixin):
     def __init__(self, obj):
         self.relevant_joints_info = None
 
@@ -126,6 +126,40 @@ class Open(AbsoluteObjectState, BooleanState):
 
         # Check the metadata info to get relevant joints information
         self.relevant_joints_info = _get_relevant_joints(self.obj)
+        assert self.relevant_joints_info[1], f"No relevant joints for Open state found for object {self.obj.name}"
+
+    @classmethod
+    def is_compatible(cls, obj, **kwargs):
+        # Run super first
+        compatible, reason = super().is_compatible(obj, **kwargs)
+        if not compatible:
+            return compatible, reason
+
+        # Check whether this object has any openable joints
+        return (True, None) if obj.n_joints > 0 else \
+            (False, f"No relevant joints for Open state found for object {obj.name}")
+
+    @classmethod
+    def is_compatible_asset(cls, prim, **kwargs):
+        # Run super first
+        compatible, reason = super().is_compatible_asset(prim, **kwargs)
+        if not compatible:
+            return compatible, reason
+
+        def _find_articulated_joints(prim):
+            for child in prim.GetChildren():
+                child_type = child.GetTypeName().lower()
+                if "joint" in child_type and "fixed" not in child_type:
+                    return True
+                for gchild in child.GetChildren():
+                    gchild_type = gchild.GetTypeName().lower()
+                    if "joint" in gchild_type and "fixed" not in gchild_type:
+                        return True
+            return False
+
+        # Check whether this object has any openable joints
+        return (True, None) if _find_articulated_joints(prim=prim) else \
+            (False, f"No relevant joints for Open state found for asset prim {prim.GetName()}")
 
     def _get_value(self):
         both_sides, relevant_joints, joint_directions = self.relevant_joints_info

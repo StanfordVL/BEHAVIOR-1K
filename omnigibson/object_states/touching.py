@@ -1,13 +1,11 @@
 from omnigibson.object_states.contact_bodies import ContactBodies
-from omnigibson.object_states.kinematics import KinematicsMixin
-from omnigibson.object_states.object_state_base import BooleanState, RelativeObjectState
+from omnigibson.object_states.kinematics_mixin import KinematicsMixin
+from omnigibson.object_states.object_state_base import BooleanStateMixin, RelativeObjectState
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.usd_utils import RigidContactAPI
 
 
-class Touching(KinematicsMixin, RelativeObjectState, BooleanState):
-    def _set_value(self, other, new_value):
-        raise NotImplementedError()
+class Touching(KinematicsMixin, RelativeObjectState, BooleanStateMixin):
 
     @staticmethod
     def _check_contact(obj_a, obj_b):

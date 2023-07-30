@@ -24,9 +24,9 @@ def main(random_selection=False, headless=False, short_exec=False):
         name="banana",
         category="banana",
         model="vvyyyv",
-        scale=[3.0, 5.0, 2.0],
+        bounding_box=[0.643, 0.224, 0.269],
         position=[-0.906661, -0.545106,  0.136824],
-        orientation=[0, 0, 0.76040583, -0.6494482 ],
+        orientation=[0, 0, 0.76040583, -0.6494482],
     )
 
     door_cfg = dict(
@@ -34,6 +34,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         name="door",
         category="door",
         model="ohagsq",
+        bounding_box=[1.528, 0.064, 1.299],
         position=[-2.0, 0, 0.70000001],
         orientation=[0, 0, -0.38268343,  0.92387953],
     )

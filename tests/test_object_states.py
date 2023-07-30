@@ -1,6 +1,6 @@
 from omnigibson.macros import macros as m
 from omnigibson.object_states import *
-from omnigibson.systems import get_system
+from omnigibson.systems import get_system, is_physical_particle_system, is_visual_particle_system
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.physx_utils import apply_force_at_pos, apply_torque
 import omnigibson.utils.transform_utils as T
@@ -236,7 +236,8 @@ def test_aabb():
     assert np.all((breakfast_table.states[AABB].get_value()[0] < pos1) & (pos1 < breakfast_table.states[AABB].get_value()[1]))
 
     pp = dishtowel.root_link.compute_particle_positions()
-    assert np.allclose(dishtowel.states[AABB].get_value(), (pp.min(axis=0), pp.max(axis=0)))
+    offset = dishtowel.root_link.cloth_system.particle_contact_offset
+    assert np.allclose(dishtowel.states[AABB].get_value(), (pp.min(axis=0) - offset, pp.max(axis=0) + offset))
     assert np.all((dishtowel.states[AABB].get_value()[0] < pos2) & (pos2 < dishtowel.states[AABB].get_value()[1]))
 
     with pytest.raises(NotImplementedError):
@@ -735,7 +736,7 @@ def test_attached_to():
 
 
 @og_test
-def test_fluid_source():
+def test_particle_source():
     sink = og.sim.scene.object_registry("name", "sink")
 
     place_obj_on_floor_plane(sink)
@@ -755,9 +756,13 @@ def test_fluid_source():
     # Sink is toggled on, some water should be present
     assert water_system.n_particles > 0
 
+    # Cannot set this state
+    with pytest.raises(NotImplementedError):
+        sink.states[ParticleSource].set_value(water_system, True)
+
 
 @og_test
-def test_fluid_sink():
+def test_particle_sink():
     sink = og.sim.scene.object_registry("name", "sink")
     place_obj_on_floor_plane(sink)
     for _ in range(3):
@@ -775,9 +780,159 @@ def test_fluid_sink():
     for _ in range(sink.states[ParticleSink].n_steps_per_modification):
         og.sim.step()
 
-    # TODO: current water sink annotation is wrong, so this test is failing.
     # There should be no water particles because the fluid source absorbs them.
-    # assert water_system.n_particles == 0
+    assert water_system.n_particles == 0
+
+    # Cannot set this state
+    with pytest.raises(NotImplementedError):
+        sink.states[ParticleSink].set_value(water_system, True)
+
+
+@og_test
+def test_particle_applier():
+    breakfast_table = og.sim.scene.object_registry("name", "breakfast_table")
+    spray_bottle = og.sim.scene.object_registry("name", "spray_bottle")
+    applier_dishtowel = og.sim.scene.object_registry("name", "applier_dishtowel")
+
+    # Test projection
+
+    place_obj_on_floor_plane(breakfast_table)
+    place_objA_on_objB_bbox(spray_bottle, breakfast_table, z_offset=0.1)
+    spray_bottle.set_orientation(np.array([0.707, 0, 0, 0.707]))
+    for _ in range(3):
+        og.sim.step()
+
+    assert not spray_bottle.states[ToggledOn].get_value()
+    water_system = get_system("water")
+    # Spray bottle is toggled off, no water should be present
+    assert water_system.n_particles == 0
+
+    # Take number of steps for water to be generated, make sure there is still no water
+    n_applier_steps = spray_bottle.states[ParticleApplier].n_steps_per_modification
+    for _ in range(n_applier_steps):
+        og.sim.step()
+
+    assert water_system.n_particles == 0
+
+    # Turn particle applier on, and verify particles are generated after the same number of steps are taken
+    spray_bottle.states[ToggledOn].set_value(True)
+
+    for _ in range(n_applier_steps):
+        og.sim.step()
+
+    # Some water should be present
+    assert water_system.n_particles > 0
+
+    # Test adjacency
+
+    water_system.remove_all_particles()
+    spray_bottle.set_position_orientation(position=np.ones(3) * 50.0, orientation=np.array([0, 0, 0, 1.0]))
+
+    place_objA_on_objB_bbox(applier_dishtowel, breakfast_table)
+    og.sim.step()
+
+    # no water should be present
+    assert water_system.n_particles == 0
+
+    # Take number of steps for water to be generated
+    n_applier_steps = applier_dishtowel.states[ParticleApplier].n_steps_per_modification
+    for _ in range(n_applier_steps):
+        og.sim.step()
+
+    # Some water should be present
+    assert water_system.n_particles > 0
+
+    # Cannot set this state
+    with pytest.raises(NotImplementedError):
+        spray_bottle.states[ParticleApplier].set_value(water_system, True)
+
+
+@og_test
+def test_particle_remover():
+    breakfast_table = og.sim.scene.object_registry("name", "breakfast_table")
+    vacuum = og.sim.scene.object_registry("name", "vacuum")
+    remover_dishtowel = og.sim.scene.object_registry("name", "remover_dishtowel")
+
+    # Test projection
+
+    place_obj_on_floor_plane(breakfast_table)
+    place_objA_on_objB_bbox(vacuum, breakfast_table, z_offset=0.02)
+    for _ in range(3):
+        og.sim.step()
+
+    assert not vacuum.states[ToggledOn].get_value()
+    water_system = get_system("water")
+    # Place single particle of water on middle of table
+    water_system.generate_particles(positions=[np.array([0, 0, breakfast_table.aabb[1][2] + water_system.particle_radius])])
+    assert water_system.n_particles > 0
+
+    # Take number of steps for water to be removed, make sure there is still water
+    n_remover_steps = vacuum.states[ParticleRemover].n_steps_per_modification
+    for _ in range(n_remover_steps):
+        og.sim.step()
+
+    assert water_system.n_particles > 0
+
+    # Turn particle remover on, and verify particles are generated after the same number of steps are taken
+    vacuum.states[ToggledOn].set_value(True)
+
+    for _ in range(n_remover_steps):
+        og.sim.step()
+
+    # No water should be present
+    assert water_system.n_particles == 0
+
+    # Test adjacency
+
+    vacuum.set_position(np.ones(3) * 50.0)
+    place_objA_on_objB_bbox(remover_dishtowel, breakfast_table, z_offset=0.03)
+    og.sim.step()
+    # Place single particle of water on middle of table
+    water_system.generate_particles(positions=[np.array([0, 0, breakfast_table.aabb[1][2] + water_system.particle_radius])])
+
+    # Water should be present
+    assert water_system.n_particles > 0
+
+    # Take number of steps for water to be removed
+    n_remover_steps = remover_dishtowel.states[ParticleRemover].n_steps_per_modification
+    for _ in range(n_remover_steps):
+        og.sim.step()
+
+    # No water should be present
+    assert water_system.n_particles == 0
+
+    # Cannot set this state
+    with pytest.raises(NotImplementedError):
+        vacuum.states[ParticleRemover].set_value(water_system, True)
+
+
+@og_test
+def test_saturated():
+    remover_dishtowel = og.sim.scene.object_registry("name", "remover_dishtowel")
+
+    place_obj_on_floor_plane(remover_dishtowel)
+
+    for _ in range(5):
+        og.sim.step()
+
+    water_system = get_system("water")
+
+    # Place single row of water above dishtowel
+    n_particles = 5
+    remover_dishtowel.states[Saturated].set_limit(water_system, n_particles)
+    water_system.generate_particles(positions=[np.array([0, 0, remover_dishtowel.aabb[1][2] + water_system.particle_radius * (1 + 2 * i)]) for i in range(n_particles)])
+
+    # Take a few steps
+    for _ in range(20):
+        og.sim.step()
+
+    # Make sure Saturated is True, and no particles exist
+    assert water_system.n_particles == 0
+    assert remover_dishtowel.states[Saturated].get_value(water_system)
+
+    # Make sure we can toggle saturated to be true and false
+    assert remover_dishtowel.states[Saturated].set_value(water_system, False)
+    assert remover_dishtowel.states[Saturated].set_value(water_system, True)
 
 
 @og_test
@@ -825,6 +980,50 @@ def test_open():
     assert not microwave.states[Open].get_value()
     assert not bottom_cabinet.states[Open].get_value()
 
+
+@og_test
+def test_folded_unfolded():
+    carpet = og.sim.scene.object_registry("name", "carpet")
+
+    place_obj_on_floor_plane(carpet)
+
+    for _ in range(5):
+        og.sim.step()
+
+    assert not carpet.states[Folded].get_value()
+    assert carpet.states[Unfolded].get_value()
+
+    pos = carpet.root_link.compute_particle_positions()
+    x_min, x_max = np.min(pos, axis=0)[0], np.max(pos, axis=0)[0]
+    x_extent = x_max - x_min
+    # Get indices for the bottom 10 percent vertices in the x-axis
+    indices = np.argsort(pos, axis=0)[:, 0][:(pos.shape[0] // 10)]
+    start = np.copy(pos[indices])
+
+    # lift up a bit
+    mid = np.copy(start)
+    mid[:, 2] += x_extent * 0.2
+
+    # move towards x_max
+    end = np.copy(mid)
+    end[:, 0] += x_extent * 0.9
+
+    increments = 25
+    for ctrl_pts in np.concatenate([np.linspace(start, mid, increments), np.linspace(mid, end, increments)]):
+        carpet.root_link.set_particle_positions(ctrl_pts, idxs=indices)
+        og.sim.step()
+
+    assert carpet.states[Folded].get_value()
+    assert not carpet.states[Unfolded].get_value()
+    assert carpet.states[Unfolded].set_value(True)
+
+    with pytest.raises(NotImplementedError):
+        carpet.states[Unfolded].set_value(False)
+
+    with pytest.raises(NotImplementedError):
+        carpet.states[Folded].set_value(True)
+
+
 @og_test
 def test_draped():
     breakfast_table = og.sim.scene.object_registry("name", "breakfast_table")
@@ -833,7 +1032,7 @@ def test_draped():
     place_obj_on_floor_plane(breakfast_table)
     place_objA_on_objB_bbox(carpet, breakfast_table)
 
-    for _ in range(5):
+    for _ in range(10):
         og.sim.step()
 
     assert carpet.states[Draped].get_value(breakfast_table)
@@ -850,14 +1049,40 @@ def test_draped():
     with pytest.raises(NotImplementedError):
         carpet.states[Draped].set_value(breakfast_table, False)
 
+
 @og_test
-def test_covered():
-    breakfast_table = og.sim.scene.object_registry("name", "breakfast_table")
+def test_filled():
+    stockpot = og.sim.scene.object_registry("name", "stockpot")
 
-    place_obj_on_floor_plane(breakfast_table)
+    systems = (
+        get_system("water"),
+        get_system("raspberry"),
+        get_system("diced_apple"),
+    )
+    for system in systems:
+        stockpot.set_position_orientation(position=np.ones(3) * 50.0, orientation=[0, 0, 0, 1.0])
+        place_obj_on_floor_plane(stockpot)
+        for _ in range(5):
+            og.sim.step()
 
-    for _ in range(5):
-        og.sim.step()
+        assert stockpot.states[Filled].set_value(system, True)
+
+        for _ in range(5):
+            og.sim.step()
+
+        assert stockpot.states[Filled].get_value(system)
+        stockpot.states[Filled].set_value(system, False)
+
+        for _ in range(5):
+            og.sim.step()
+        assert not stockpot.states[Filled].get_value(system)
+
+        system.remove_all_particles()
+
+
+@og_test
+def test_contains():
+    stockpot = og.sim.scene.object_registry("name", "stockpot")
 
     systems = (
         get_system("water"),
@@ -866,17 +1091,75 @@ def test_covered():
         get_system("diced_apple"),
     )
     for system in systems:
-        assert breakfast_table.states[Covered].set_value(system, True)
-
+        stockpot.set_position_orientation(position=np.ones(3) * 50.0, orientation=[0, 0, 0, 1.0])
+        place_obj_on_floor_plane(stockpot)
         for _ in range(5):
             og.sim.step()
 
-        assert breakfast_table.states[Covered].get_value(system)
-        breakfast_table.states[Covered].set_value(system, False)
+        # Sample single particle
+        if is_physical_particle_system(system_name=system.name):
+            system.generate_particles(positions=[np.array([0, 0, stockpot.aabb[1][2] + system.particle_radius * 1.01])])
+            assert not stockpot.states[Contains].get_value(system)
+        else:
+            if system.get_group_name(stockpot) not in system.groups:
+                system.create_attachment_group(stockpot)
+            system.generate_group_particles(
+                group=system.get_group_name(stockpot),
+                positions=np.array([np.array([0, 0, stockpot.aabb[1][2] - 0.1])]),
+                link_prim_paths=[stockpot.root_link.prim_path],
+            )
 
-        for _ in range(5):
+        for _ in range(10):
             og.sim.step()
-        assert not breakfast_table.states[Covered].get_value(system)
+
+        assert stockpot.states[Contains].get_value(system)
+
+        # Remove all particles and make sure contains returns False
+        system.remove_all_particles()
+        og.sim.step()
+        assert not stockpot.states[Contains].get_value(system)
+
+        # Cannot set Contains state
+        with pytest.raises(NotImplementedError):
+            stockpot.states[Contains].set_value(system, True)
+
+
+@og_test
+def test_covered():
+    bracelet = og.sim.scene.object_registry("name", "bracelet")
+    oyster = og.sim.scene.object_registry("name", "oyster")
+    breakfast_table = og.sim.scene.object_registry("name", "breakfast_table")
+
+    systems = (
+        get_system("water"),
+        get_system("stain"),
+        get_system("raspberry"),
+        get_system("diced_apple"),
+    )
+    for obj in (bracelet, oyster, breakfast_table):
+        for system in systems:
+            sampleable = is_visual_particle_system(system.name) or np.all(obj.aabb_extent > (2 * system.particle_radius))
+            obj.set_position_orientation(position=np.ones(3) * 50.0, orientation=[0, 0, 0, 1.0])
+            place_obj_on_floor_plane(obj)
+
+            for _ in range(5):
+                og.sim.step()
+
+            assert obj.states[Covered].set_value(system, True) == sampleable
+
+            for _ in range(5):
+                og.sim.step()
+
+            assert obj.states[Covered].get_value(system) == sampleable
+            obj.states[Covered].set_value(system, False)
+
+            for _ in range(5):
+                og.sim.step()
+            assert not obj.states[Covered].get_value(system)
+
+            system.remove_all_particles()
+
+        obj.set_position_orientation(position=np.ones(3) * 75.0, orientation=[0, 0, 0, 1.0])
 
 
 def test_clear_sim():

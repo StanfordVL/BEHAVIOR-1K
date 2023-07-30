@@ -18,8 +18,7 @@ from omnigibson.robots.robot_base import BaseRobot
 from omnigibson.systems.system_base import get_system, add_callback_on_system_init, add_callback_on_system_clear, \
     REGISTERED_SYSTEMS
 from omnigibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
-from omnigibson.utils.bddl_utils import OmniGibsonBDDLBackend, BDDLEntity, \
-    BEHAVIOR_ACTIVITIES, BDDLSampler
+from omnigibson.utils.bddl_utils import OmniGibsonBDDLBackend, BDDLEntity, BEHAVIOR_ACTIVITIES, BDDLSampler
 from omnigibson.tasks.task_base import BaseTask
 from omnigibson.termination_conditions.predicate_goal import PredicateGoal
 from omnigibson.termination_conditions.timeout import Timeout
@@ -68,6 +67,9 @@ class BehaviorTask(BaseTask):
             termination_config=None,
             reward_config=None,
     ):
+        # Make sure object states are enabled
+        assert gm.ENABLE_OBJECT_STATES, "Must set gm.ENABLE_OBJECT_STATES=True in order to use BehaviorTask!"
+
         # Make sure task name is valid if not specifying a predefined problem
         if predefined_problem is None:
             assert activity_name is not None, \
@@ -137,7 +139,7 @@ class BehaviorTask(BaseTask):
         # Possibly modify the scene to load if we're using online_object_sampling
         scene_instance, scene_file = scene_cfg["scene_instance"], scene_cfg["scene_file"]
         activity_name = task_cfg["predefined_problem"].split("problem ")[-1].split("-")[0] if \
-            "predefined_problem" in task_cfg else task_cfg["activity_name"]
+            task_cfg.get("predefined_problem", None) is not None else task_cfg["activity_name"]
         if scene_file is None and scene_instance is None and not task_cfg["online_object_sampling"]:
             scene_instance = cls.get_cached_activity_scene_filename(
                 scene_model=scene_cfg["scene_model"],

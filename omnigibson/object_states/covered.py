@@ -1,31 +1,27 @@
-import omnigibson as og
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states import AABB
-from omnigibson.object_states.object_state_base import RelativeObjectState, BooleanState
+from omnigibson.object_states.object_state_base import RelativeObjectState, BooleanStateMixin
 from omnigibson.object_states.contact_particles import ContactParticles
-from omnigibson.systems.system_base import VisualParticleSystem, PhysicalParticleSystem, \
-    is_visual_particle_system, is_physical_particle_system
-from omnigibson.systems import get_system
-from omnigibson.utils.python_utils import classproperty
-import numpy as np
+from omnigibson.systems.system_base import VisualParticleSystem, is_visual_particle_system, is_physical_particle_system
+
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
 # Number of visual particles needed in order for Covered --> True
-m.VISUAL_PARTICLE_THRESHOLD = 5
+m.VISUAL_PARTICLE_THRESHOLD = 1
 
 # Maximum number of visual particles to sample when setting an object to be covered = True
 m.MAX_VISUAL_PARTICLES = 20
 
 # Number of physical particles needed in order for Covered --> True
-m.PHYSICAL_PARTICLE_THRESHOLD = 20
+m.PHYSICAL_PARTICLE_THRESHOLD = 1
 
 # Maximum number of physical particles to sample when setting an object to be covered = True
 m.MAX_PHYSICAL_PARTICLES = 5000
 
 
-class Covered(RelativeObjectState, BooleanState):
+class Covered(RelativeObjectState, BooleanStateMixin):
     def __init__(self, obj):
         # Run super first
         super().__init__(obj)
@@ -33,10 +29,11 @@ class Covered(RelativeObjectState, BooleanState):
         # Set internal values
         self._visual_particle_group = None
 
-    @staticmethod
-    def get_dependencies():
-        # AABB needed for sampling visual particles on an object
-        return RelativeObjectState.get_dependencies() + [AABB, ContactParticles]
+    @classmethod
+    def get_dependencies(cls):
+        deps = super().get_dependencies()
+        deps.update({AABB, ContactParticles})
+        return deps
 
     def remove(self):
         if self._initialized:

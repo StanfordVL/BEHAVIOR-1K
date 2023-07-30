@@ -1,17 +1,17 @@
 import numpy as np
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.contains import ContainedParticles
-from omnigibson.object_states.object_state_base import RelativeObjectState, BooleanState
+from omnigibson.object_states.object_state_base import RelativeObjectState, BooleanStateMixin
 from omnigibson.systems.system_base import PhysicalParticleSystem, is_physical_particle_system
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
 # Proportion of object's volume that must be filled for object to be considered filled
-m.VOLUME_FILL_PROPORTION = 0.3
+m.VOLUME_FILL_PROPORTION = 0.2
 
 
-class Filled(RelativeObjectState, BooleanState):
+class Filled(RelativeObjectState, BooleanStateMixin):
 
     def _get_value(self, system):
         # Sanity check to make sure system is valid
@@ -19,7 +19,7 @@ class Filled(RelativeObjectState, BooleanState):
             "Can only get Filled state with a valid PhysicalParticleSystem!"
 
         # Check what volume is filled
-        if len(system.particle_instancers) > 0:
+        if system.n_particles > 0:
             particle_volume = 4 / 3 * np.pi * (system.particle_radius ** 3)
             n_particles = self.obj.states[ContainedParticles].get_value(system).n_in_volume
             prop_filled = particle_volume * n_particles / self.obj.states[ContainedParticles].volume
@@ -49,19 +49,16 @@ class Filled(RelativeObjectState, BooleanState):
                 system.generate_particles_from_link(
                     obj=self.obj,
                     link=contained_particles_state.link,
-                    mesh_name_prefixes="container",
                     check_contact=True,
                 )
             else:
                 # Going from True --> False, remove all particles inside the volume
-                system.remove_particles(idxs=contained_particles_state.get_value().in_volume.nonzero()[0])
+                system.remove_particles(idxs=contained_particles_state.get_value(system).in_volume.nonzero()[0])
 
         return True
 
-    @staticmethod
-    def get_dependencies():
-        return [ContainedParticles]
-
-    @staticmethod
-    def get_optional_dependencies():
-        return []
+    @classmethod
+    def get_dependencies(cls):
+        deps = super().get_dependencies()
+        deps.add(ContainedParticles)
+        return deps

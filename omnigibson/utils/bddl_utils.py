@@ -3,6 +3,7 @@ import bddl
 import os
 import numpy as np
 import networkx as nx
+from collections import defaultdict
 from bddl.activity import (
     get_goal_conditions,
     get_ground_goal_state_options,
@@ -13,7 +14,7 @@ from bddl.condition_evaluation import Negation
 from bddl.logic_base import BinaryAtomicFormula, UnaryAtomicFormula, AtomicFormula
 from bddl.object_taxonomy import ObjectTaxonomy
 import omnigibson as og
-from omnigibson.macros import gm
+from omnigibson.macros import gm, create_module_macros
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.asset_utils import get_all_object_categories, get_all_object_category_models_with_abilities
 from omnigibson.utils.ui_utils import create_module_logger
@@ -26,6 +27,13 @@ from omnigibson.systems.system_base import is_system_active, get_system
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
+
+
+# Create settings for this module
+m = create_module_macros(module_path=__file__)
+
+m.MIN_DYNAMIC_SCALE = 0.5
+m.DYNAMIC_SCALE_INCREMENT = 0.1
 
 
 class UnsampleablePredicate:
@@ -69,7 +77,7 @@ class ObjectStateBinaryPredicate(BinaryAtomicFormula):
     STATE_NAME = None
 
     def _evaluate(self, entity1, entity2, **kwargs):
-        return entity1.get_state(self.STATE_CLASS, entity2.wrapped_obj, **kwargs) if entity2.exists else None
+        return entity1.get_state(self.STATE_CLASS, entity2.wrapped_obj, **kwargs) if entity2.exists else False
 
     def _sample(self, entity1, entity2, binary_state, **kwargs):
         return entity1.set_state(self.STATE_CLASS, entity2.wrapped_obj, binary_state, **kwargs) if entity2.exists else None
@@ -155,8 +163,7 @@ KINEMATIC_STATES_BDDL = frozenset([state.__name__.lower() for state in _KINEMATI
 OBJECT_TAXONOMY = ObjectTaxonomy()
 # TODO (Josiah): Remove floor synset once we have new bddl release
 FLOOR_SYNSET = "floor.n.01"
-with open(os.path.join(os.path.dirname(bddl.__file__), "activity_manifest.txt")) as f:
-    BEHAVIOR_ACTIVITIES = {line.strip() for line in f.readlines()}
+BEHAVIOR_ACTIVITIES = sorted(os.listdir(os.path.join(os.path.dirname(bddl.__file__), "activity_definitions")))
 
 
 class OmniGibsonBDDLBackend(BDDLBackend):
@@ -257,14 +264,6 @@ class BDDLEntity(Wrapper):
             f"Cannot call set_state() for BDDLEntity {self.synset} when the entity does not exist!"
         return self.wrapped_obj.states[state].set_value(*args, **kwargs)
 
-    def __getattr__(self, attr):
-        # Sanity check to make sure wrapped obj is not None -- if so, raise error
-        assert self.wrapped_obj is not None, f"Cannot access attribute {attr}, since no valid entity currently " \
-                                             f"wrapped for BDDLEntity synset {self.synset}!"
-
-        # Call super
-        return super().__getattr__(attr=attr)
-
 
 class BDDLSampler:
     def __init__(
@@ -294,12 +293,12 @@ class BDDLSampler:
 
         # Initialize other variables that will be filled in later
         self._room_type_to_object_instance = None           # dict
-        self._non_sampleable_object_instances = None        # set of str
+        self._inroom_object_instances = None        # set of str
         self._object_sampling_orders = None                 # dict mapping str to list of str
         self._sampled_objects = None                        # set of BaseObject
         self._future_obj_instances = None                   # set of str
-        self._non_sampleable_object_conditions = None       # list of (condition, positive) tuple
-        self._non_sampleable_object_scope_filtered_initial = None   # dict mapping str to BDDLEntity
+        self._inroom_object_conditions = None       # list of (condition, positive) tuple
+        self._inroom_object_scope_filtered_initial = None   # dict mapping str to BDDLEntity
 
     def sample(self, validate_goal=False):
         """
@@ -373,7 +372,7 @@ class BDDLSampler:
                 - bool: Whether the generated scene activity should be accepted or not
                 - dict: Any feedback from the sampling / initialization process
         """
-        error_msg = self._parse_non_sampleable_object_room_assignment()
+        error_msg = self._parse_inroom_object_room_assignment()
         if error_msg:
             log.error(error_msg)
             return False, error_msg
@@ -383,7 +382,7 @@ class BDDLSampler:
             log.error(error_msg)
             return False, error_msg
 
-        error_msg = self._build_non_sampleable_object_scope()
+        error_msg = self._build_inroom_object_scope()
         if error_msg:
             log.error(error_msg)
             return False, error_msg
@@ -397,12 +396,12 @@ class BDDLSampler:
 
         return True, None
 
-    def _parse_non_sampleable_object_room_assignment(self):
+    def _parse_inroom_object_room_assignment(self):
         """
         Infers which rooms each object is assigned to
         """
         self._room_type_to_object_instance = dict()
-        self._non_sampleable_object_instances = set()
+        self._inroom_object_instances = set()
         for cond in self._activity_conditions.parsed_initial_conditions:
             if cond[0] == "inroom":
                 obj_inst, room_type = cond[1], cond[2]
@@ -419,18 +418,18 @@ class BDDLSampler:
                     self._room_type_to_object_instance[room_type] = []
                 self._room_type_to_object_instance[room_type].append(obj_inst)
 
-                if obj_inst in self._non_sampleable_object_instances:
+                if obj_inst in self._inroom_object_instances:
                     # Duplicate room assignment
                     return f"Object [{obj_inst}] has more than one room assignment"
 
-                self._non_sampleable_object_instances.add(obj_inst)
+                self._inroom_object_instances.add(obj_inst)
 
         for obj_synset in self._activity_conditions.parsed_objects:
             abilities = OBJECT_TAXONOMY.get_abilities(obj_synset)
             if "sceneObject" not in abilities:
                 continue
             for obj_inst in self._activity_conditions.parsed_objects[obj_synset]:
-                if obj_inst not in self._non_sampleable_object_instances:
+                if obj_inst not in self._inroom_object_instances:
                     # Missing room assignment
                     return f"All non-sampleable (scene) objects should have room assignment. [{obj_inst}] does not have one."
 
@@ -444,7 +443,7 @@ class BDDLSampler:
         sampling_groups = {group: [] for group in ("kinematic", "particle", "unary")}
         self._object_sampling_conditions = {group: [] for group in ("kinematic", "particle", "unary")}
         self._object_sampling_orders = {group: [] for group in ("kinematic", "particle", "unary")}
-        self._non_sampleable_object_conditions = []
+        self._inroom_object_conditions = []
 
         # First, sort initial conditions into kinematic, particle and unary groups
         # bddl.condition_evaluation.HEAD, each with one child.
@@ -484,23 +483,25 @@ class BDDLSampler:
             # This means that there's no ordering constraint in terms of sampling, because we know the, e.g., furniture
             # object already exists in the scene and is placed, so these specific conditions can be sampled without
             # any dependencies
-            if len(self._non_sampleable_object_instances.intersection(set(condition.body))) > 0:
-                self._non_sampleable_object_conditions.append((condition, positive))
+            if len(self._inroom_object_instances.intersection(set(condition.body))) > 0:
+                self._inroom_object_conditions.append((condition, positive))
 
         # Now, sort each group, ignoring the futures (since they don't get sampled)
         # First handle kinematics, then particles, then unary
 
         # Start with the non-sampleable objects as the first sampled set, then infer recursively
-        cur_batch = self._non_sampleable_object_instances
+        cur_batch = self._inroom_object_instances
         while len(cur_batch) > 0:
             next_batch = set()
-            for condition, _ in self._object_sampling_conditions["kinematic"]:
-                if condition.body[1] in cur_batch:
-                    next_batch.add(condition.body[0])
+            for cur_batch_inst in cur_batch:
+                inst_batch = set()
+                for condition, _ in self._object_sampling_conditions["kinematic"]:
+                    if condition.body[1] == cur_batch_inst:
+                        inst_batch.add(condition.body[0])
+                        next_batch.add(condition.body[0])
+                if len(inst_batch) > 0:
+                    self._object_sampling_orders["kinematic"].append(inst_batch)
             cur_batch = next_batch
-            self._object_sampling_orders["kinematic"].append(cur_batch)
-        # pop final value since it's an empty set
-        self._object_sampling_orders["kinematic"].pop(-1)
 
         # Now parse particles -- simply unordered, since particle systems shouldn't impact each other
         self._object_sampling_orders["particle"].append({cond[0] for cond in sampling_groups["particle"]})
@@ -519,7 +520,7 @@ class BDDLSampler:
 
         # Sanity check kinematic objects -- any non-system must be kinematically sampled
         remaining_kinematic_entities = nonparticle_entities - unsampleable_obj_instances - \
-            self._non_sampleable_object_instances - set.union(*(self._object_sampling_orders["kinematic"] + [set()]))
+            self._inroom_object_instances - set.union(*(self._object_sampling_orders["kinematic"] + [set()]))
         if len(remaining_kinematic_entities) != 0:
             return f"Some objects do not have any kinematic condition defined for them in the initial conditions: " \
                    f"{', '.join(remaining_kinematic_entities)}"
@@ -530,9 +531,9 @@ class BDDLSampler:
             return f"Some systems do not have any particle condition defined for them in the initial conditions: " \
                    f"{', '.join(remaining_particle_entities)}"
 
-    def _build_non_sampleable_object_scope(self):
+    def _build_inroom_object_scope(self):
         """
-        Store simulator object options for non-sampleable objects in self.non_sampleable_object_scope
+        Store simulator object options for non-sampleable objects in self.inroom_object_scope
         {
             "living_room": {
                 "table1": {
@@ -576,7 +577,7 @@ class BDDLSampler:
         error_msg = self._consolidate_room_instance(room_type_to_scene_objs, "initial_pre-sampling")
         if error_msg:
             return error_msg
-        self._non_sampleable_object_scope = room_type_to_scene_objs
+        self._inroom_object_scope = room_type_to_scene_objs
 
     def _filter_object_scope(self, input_object_scope, conditions, condition_type):
         """
@@ -590,9 +591,16 @@ class BDDLSampler:
             condition_type (str): What type of condition to sample, e.g., "initial"
 
         Returns:
-            dict: Filtered object scope
+            2-tuple:
+
+                - dict: Filtered object scope
+                - list of str: The name of children object(s) that have the highest proportion of kinematic sampling
+                    failures
         """
         filtered_object_scope = {}
+        # Maps child obj name (SCOPE name) to parent obj name (OBJECT name) to T / F,
+        # ie: if the kinematic relationship was sampled successfully
+        problematic_objs = defaultdict(dict)
         for room_type in input_object_scope:
             filtered_object_scope[room_type] = {}
             for scene_obj in input_object_scope[room_type]:
@@ -606,27 +614,42 @@ class BDDLSampler:
                         success = True
                         # If this candidate object is not involved in any conditions,
                         # success will be True by default and this object will qualify
+                        parent_obj_name = obj.name
+                        conditions_to_sample = []
                         for condition, positive in conditions:
                             # Sample positive kinematic conditions that involve this candidate object
                             if condition.STATE_NAME in KINEMATIC_STATES_BDDL and positive and scene_obj in condition.body:
-                                success = condition.sample(binary_state=positive)
-                                log_msg = " ".join(
-                                    [
-                                        "{} kinematic condition sampling".format(condition_type),
-                                        room_type,
-                                        scene_obj,
-                                        room_inst,
-                                        obj.name,
-                                        condition.STATE_NAME,
-                                        str(condition.body),
-                                        str(success),
-                                    ]
-                                )
-                                log.info(log_msg)
+                                child_scope_name = condition.body[0]
+                                entity = self._object_scope[child_scope_name]
+                                conditions_to_sample.append((condition, positive, entity, child_scope_name))
 
-                                # If any condition fails for this candidate object, skip
-                                if not success:
-                                    break
+                        # Sort children based on their AABB so the larger objects are sampled first
+                        conditions_to_sample = reversed(sorted(conditions_to_sample, key=lambda x: np.product(x[2].aabb_extent)))
+
+                        # Sample!
+                        for condition, positive, entity, child_scope_name in conditions_to_sample:
+                            success = condition.sample(binary_state=positive)
+                            log_msg = " ".join(
+                                [
+                                    f"{condition_type} kinematic condition sampling",
+                                    room_type,
+                                    scene_obj,
+                                    room_inst,
+                                    parent_obj_name,
+                                    condition.STATE_NAME,
+                                    str(condition.body),
+                                    str(success),
+                                ]
+                            )
+                            log.info(log_msg)
+
+                            # Record the result for the child object
+                            assert parent_obj_name not in problematic_objs[child_scope_name], \
+                                f"Multiple kinematic relationships attempted for pair {condition.body}"
+                            problematic_objs[child_scope_name][parent_obj_name] = success
+                            # If any condition fails for this candidate object, skip
+                            if not success:
+                                break
 
                         # If this candidate object fails, move on to the next candidate object
                         if not success:
@@ -636,7 +659,12 @@ class BDDLSampler:
                             filtered_object_scope[room_type][scene_obj][room_inst] = []
                         filtered_object_scope[room_type][scene_obj][room_inst].append(obj)
 
-        return filtered_object_scope
+        # Compute most problematic objects
+        problematic_objs_by_proportion = defaultdict(list)
+        for child_scope_name, parent_obj_names in problematic_objs.items():
+            problematic_objs_by_proportion[np.mean(list(parent_obj_names.values()))].append(child_scope_name)
+
+        return filtered_object_scope, problematic_objs_by_proportion[min(problematic_objs_by_proportion.keys())]
 
     def _consolidate_room_instance(self, filtered_object_scope, condition_type):
         """
@@ -645,6 +673,9 @@ class BDDLSampler:
         Args:
             filtered_object_scope (dict): Filtered object scope
             condition_type (str): What type of condition to sample, e.g., "initial"
+
+        Returns:
+            None or str: Error message, if any
         """
         for room_type in filtered_object_scope:
             # For each room_type, filter in room_inst that has successful
@@ -726,30 +757,13 @@ class BDDLSampler:
                     # Get all available models that support all of its synset abilities
                     model_choices = get_all_object_category_models_with_abilities(
                         category=category,
-                        abilities=OBJECT_TAXONOMY.get_abilities(obj_synset),
+                        abilities=OBJECT_TAXONOMY.get_abilities(OBJECT_TAXONOMY.get_synset_from_category(category)),
                     )
                     if len(model_choices) == 0:
                         return f"Missing valid object models for category: {category}"
 
-                    # TODO: This no longer works because model ID changes in the new asset
-                    # Filter object models if the object category is openable
-                    # synset = OBJECT_TAXONOMY.get_synset_from_category(category)
-                    # if OBJECT_TAXONOMY.has_ability(synset, "openable"):
-                    #     # Always use the articulated version of a certain object if its category is openable
-                    #     # E.g. backpack, jar, etc
-                    #     model_choices = [m for m in model_choices if "articulated_" in m]
-                    #     if len(model_choices) == 0:
-                    #         return "{} is Openable, but does not have articulated models.".format(category)
-
                     # Randomly select an object model
                     model = np.random.choice(model_choices)
-
-                    # TODO: temporary hack no longer works because model ID changes in the new asset
-                    # for "collecting aluminum cans", we need pop cans (not bottles)
-                    # if category == "pop" and self.activity_name in ["collecting_aluminum_cans"]:
-                    #     model = np.random.choice([str(i) for i in range(40, 46)])
-                    # if category == "spoon" and self.activity_name in ["polishing_silver"]:
-                    #     model = np.random.choice([str(i) for i in [2, 5, 6]])
 
                     # create the object
                     simulator_obj = DatasetObject(
@@ -771,6 +785,9 @@ class BDDLSampler:
                     self._sampled_objects.add(simulator_obj)
                     self._object_scope[obj_inst] = BDDLEntity(bddl_inst=obj_inst, entity=simulator_obj)
 
+        og.sim.play()
+        og.sim.stop()
+
     def _sample_initial_conditions(self):
         """
         Sample initial conditions
@@ -778,8 +795,8 @@ class BDDLSampler:
         Returns:
             None or str: If successful, returns None. Otherwise, returns an error message
         """
-        error_msg, self._non_sampleable_object_scope_filtered_initial = self._sample_conditions(
-            self._non_sampleable_object_scope, self._non_sampleable_object_conditions, "initial"
+        error_msg, self._inroom_object_scope_filtered_initial = self._sample_conditions(
+            self._inroom_object_scope, self._inroom_object_conditions, "initial"
         )
         return error_msg
 
@@ -807,7 +824,7 @@ class BDDLSampler:
                 goal_condition_processed.append((condition, positive))
 
             error_msg, _ = self._sample_conditions(
-                self._non_sampleable_object_scope_filtered_initial, goal_condition_processed, "goal"
+                self._inroom_object_scope_filtered_initial, goal_condition_processed, "goal"
             )
             if not error_msg:
                 # if one set of goal conditions (and initial conditions) are satisfied, sampling is successful
@@ -825,22 +842,59 @@ class BDDLSampler:
             None or str: If successful, returns None. Otherwise, returns an error message
         """
         # Sample kinematics first, then particle states, then unary states
+        state = og.sim.dump_state(serialized=False)
         for group in ("kinematic", "particle", "unary"):
             log.info(f"Sampling {group} states...")
             if len(self._object_sampling_orders[group]) > 0:
-                # # Pop non-sampleable objects
-                # self._object_sampling_orders["kinematic"].pop(0)
                 for cur_batch in self._object_sampling_orders[group]:
+                    conditions_to_sample = []
                     for condition, positive in self._object_sampling_conditions[group]:
                         # Sample conditions that involve the current batch of objects
-                        if condition.body[0] in cur_batch:
-                            num_trials = 10
+                        child_scope_name = condition.body[0]
+                        if child_scope_name in cur_batch:
+                            entity = self._object_scope[child_scope_name]
+                            conditions_to_sample.append((condition, positive, entity, child_scope_name))
+
+                    # If we're sampling kinematics, sort children based on their AABB, so that the larger objects
+                    # are sampled first
+                    if group == "kinematic":
+                        conditions_to_sample = reversed(sorted(conditions_to_sample, key=lambda x: np.product(x[2].aabb_extent)))
+
+                    # Sample!
+                    for condition, positive, entity, child_scope_name in conditions_to_sample:
+                        success = False
+                        while True:
+                            num_trials = 1
                             for _ in range(num_trials):
                                 success = condition.sample(binary_state=positive)
                                 if success:
+                                    # Update state
+                                    state = og.sim.dump_state(serialized=False)
                                     break
-                            if not success:
-                                return f"Sampleable object conditions failed: {condition.STATE_NAME} {condition.body}"
+                            if success:
+                                # Can terminate immediately
+                                break
+
+                            # Can't re-sample non-kinematics or rescale cloth or agent, so in
+                            # those cases terminate immediately
+                            if group != "kinematic" or "agent" in child_scope_name or entity.prim_type == PrimType.CLOTH:
+                                break
+
+                            # If any scales are equal or less than the lower threshold, terminate immediately
+                            new_scale = entity.scale - m.DYNAMIC_SCALE_INCREMENT
+                            if np.any(new_scale < m.MIN_DYNAMIC_SCALE):
+                                break
+
+                            # Re-scale and re-attempt
+                            # Re-scaling is not respected unless sim cycle occurs
+                            og.sim.stop()
+                            entity.scale = new_scale
+                            log.info(f"Kinematic sampling {condition.STATE_NAME} {condition.body} failed, rescaling obj: {child_scope_name} to {entity.scale}")
+                            og.sim.play()
+                            og.sim.load_state(state, serialized=False)
+                            og.sim.step_physics()
+                        if not success:
+                            return f"Sampleable object conditions failed: {condition.STATE_NAME} {condition.body}"
 
         # One more sim step to make sure the object states are propagated correctly
         # E.g. after sampling Filled.set_value(True), Filled.get_value() will become True only after one step
@@ -860,8 +914,24 @@ class BDDLSampler:
         Returns:
             None or str: If successful, returns None. Otherwise, returns an error message
         """
-        filtered_object_scope = self._filter_object_scope(input_object_scope, conditions, condition_type)
-        error_msg = self._consolidate_room_instance(filtered_object_scope, condition_type)
+        error_msg, problematic_objs = "", []
+        while not np.any([np.any(self._object_scope[obj_inst].scale < m.MIN_DYNAMIC_SCALE) for obj_inst in problematic_objs]):
+            filtered_object_scope, problematic_objs = self._filter_object_scope(input_object_scope, conditions, condition_type)
+            error_msg = self._consolidate_room_instance(filtered_object_scope, condition_type)
+            if error_msg is None:
+                break
+            # Re-scaling is not respected unless sim cycle occurs
+            og.sim.stop()
+            for obj_inst in problematic_objs:
+                obj = self._object_scope[obj_inst]
+                # Can't rescale cloth or agent, so play again and then terminate immediately if found
+                if "agent" in obj_inst or obj.prim_type == PrimType.CLOTH:
+                    og.sim.play()
+                    return error_msg, None
+                assert np.all(obj.scale > m.DYNAMIC_SCALE_INCREMENT)
+                obj.scale -= m.DYNAMIC_SCALE_INCREMENT
+            og.sim.play()
+
         if error_msg:
             return error_msg, None
         return self._maximum_bipartite_matching(filtered_object_scope, condition_type), filtered_object_scope

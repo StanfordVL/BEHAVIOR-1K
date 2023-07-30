@@ -157,7 +157,7 @@ def create_joint(prim_path, joint_type, body0=None, body1=None, enabled=True,
 
     Args:
         prim_path (str): absolute path to where the joint will be created
-        joint_type (str): type of joint to create. Valid options are:
+        joint_type (str or JointType): type of joint to create. Valid options are:
             "FixedJoint", "Joint", "PrismaticJoint", "RevoluteJoint", "SphericalJoint"
                         (equivalently, one of JointType)
         body0 (str or None): absolute path to the first body's prim. At least @body0 or @body1 must be specified.
