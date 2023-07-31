@@ -22,7 +22,7 @@ from pxr import PhysxSchema
 
 import omnigibson as og
 from omnigibson import object_states
-from omnigibson.action_primitives.action_primitive_set_base import ActionPrimitiveError, ActionPrimitiveErrorGroup, BaseActionPrimitiveSet
+from omnigibson.action_primitives.action_primitive_set_base import ActionPrimitiveError, ActionPrimitiveErrorGroup, BaseActionPrimitiveGenerator
 from omnigibson.utils.object_state_utils import sample_cuboid_for_predicate
 from omnigibson.object_states.utils import get_center_extent
 from omnigibson.objects.object_base import BaseObject
@@ -425,7 +425,7 @@ class StarterSemanticActionPrimitiveGenerator(BaseActionPrimitiveGenerator):
             raise ActionPrimitiveError(
                 ActionPrimitiveError.Reason.PRE_CONDITION_ERROR,
                 "Cannot open or close an object while holding an object",
-                {"object in hand": self._get_obj_in_hand()},
+                {"object in hand": self._get_obj_in_hand().name},
             )
 
         # Open the hand first

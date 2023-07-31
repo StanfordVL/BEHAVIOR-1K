@@ -5,7 +5,7 @@ import argparse
 
 import omnigibson as og
 from omnigibson.macros import gm
-from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitives, StarterSemanticActionPrimitiveSet
+from omnigibson.action_primitives.symbolic_semantic_action_primitives import SymbolicSemanticActionPrimitiveGenerator
 import omnigibson.utils.transform_utils as T
 from omnigibson.objects.dataset_object import DatasetObject
 
@@ -67,15 +67,15 @@ def main():
     # grasp_obj.set_position([-0.3, -0.8, 0.5])
     # og.sim.step()
 
-    controller = StarterSemanticActionPrimitives(None, scene, robot, teleport=True)
+    controller = SymbolicSemanticActionPrimitiveGenerator(None, scene, robot)
 
     def test_grasp():
         grasp_obj, = scene.object_registry("category", "bottle_of_vodka")
-        execute_controller(controller.apply_ref(StarterSemanticActionPrimitiveSet.GRASP, grasp_obj), env)
+        execute_controller(controller.apply_ref(SymbolicSemanticActionPrimitiveGenerator.PrimitiveSet.GRASP, grasp_obj), env)
 
     def test_place():
         box, = scene.object_registry("category", "storage_box")
-        execute_controller(controller.apply_ref(StarterSemanticActionPrimitiveSet.PLACE_INSIDE, box), env)
+        execute_controller(controller.apply_ref(SymbolicSemanticActionPrimitiveGenerator.PrimitiveSet.PLACE_INSIDE, box), env)
 
     # Work more reliably
     # IPython.embed()

@@ -23,6 +23,7 @@ from pxr import PhysxSchema
 import omnigibson as og
 from omnigibson import object_states
 from omnigibson.action_primitives.action_primitive_set_base import ActionPrimitiveError, ActionPrimitiveErrorGroup, BaseActionPrimitiveGenerator
+from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitiveGenerator, UndoableContext
 from omnigibson.utils.object_state_utils import sample_cuboid_for_predicate
 from omnigibson.object_states.utils import get_center_extent
 from omnigibson.objects import BaseObject, DatasetObject
@@ -113,6 +114,8 @@ class SymbolicSemanticActionPrimitiveGenerator(BaseActionPrimitiveGenerator):
         self.arm = self.robot.default_arm
         self.robot_model = self.robot.model_name
         self.robot_base_mass = self.robot._links["base_link"].mass
+
+        self.robot_copy = StarterSemanticActionPrimitiveGenerator._load_robot_copy(robot)
 
         if self.robot_model == "Tiago":
             self._setup_tiago()
@@ -216,7 +219,14 @@ class SymbolicSemanticActionPrimitiveGenerator(BaseActionPrimitiveGenerator):
             raise ActionPrimitiveError(
                 ActionPrimitiveError.Reason.PRE_CONDITION_ERROR,
                 "Cannot open or close an object while holding an object",
-                {"object in hand": self._get_obj_in_hand()},
+                {"object in hand": self._get_obj_in_hand().name},
+            )
+        
+        if object_states.Open not in obj.states:
+            raise ActionPrimitiveError(
+                ActionPrimitiveError.Reason.PRE_CONDITION_ERROR,
+                "The target object is not openable.",
+                {"target object": obj.name}
             )
 
         # Don't do anything if the object is already closed and we're trying to close.
@@ -313,6 +323,13 @@ class SymbolicSemanticActionPrimitiveGenerator(BaseActionPrimitiveGenerator):
                 "Cannot toggle an object while holding an object",
                 {"object in hand": self._get_obj_in_hand()},
             )
+        
+        if object_states.ToggledOn not in obj.states:
+            raise ActionPrimitiveError(
+                ActionPrimitiveError.Reason.PRE_CONDITION_ERROR,
+                "The target object is not toggleable.",
+                {"target object": obj.name}
+            )
 
         if obj.states[object_states.ToggledOn].get_value() == value:
             return
@@ -386,7 +403,7 @@ class SymbolicSemanticActionPrimitiveGenerator(BaseActionPrimitiveGenerator):
         Returns:
             bool: Whether eef can the reach target pose
         """
-        return np.linalg.norm(relative_target_pose) < 2.0
+        return np.linalg.norm(relative_target_pose[0]) < 2.0
      
     def _empty_action(self):
         """
@@ -560,6 +577,8 @@ class SymbolicSemanticActionPrimitiveGenerator(BaseActionPrimitiveGenerator):
         for _ in range(MAX_ATTEMPTS_FOR_SAMPLING_POSE_WITH_OBJECT_AND_PREDICATE):
             _, _, bb_extents, bb_center_in_base = held_obj.get_base_aligned_bbox()
             sampling_results = sample_cuboid_for_predicate(pred_map[predicate], target_obj, bb_extents)
+            if sampling_results[0][0] is None:
+                continue
             sampled_bb_center = sampling_results[0][0] + np.array([0, 0, PREDICATE_SAMPLING_Z_OFFSET])
             sampled_bb_orn = sampling_results[0][2]
 
