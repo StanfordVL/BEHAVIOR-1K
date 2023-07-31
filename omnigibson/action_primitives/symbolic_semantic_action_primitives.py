@@ -292,6 +292,12 @@ class SymbolicSemanticActionPrimitiveGenerator(BaseActionPrimitiveGenerator):
             )
         
     def _release(self):
+        if not self._get_obj_in_hand():
+            raise ActionPrimitiveError(
+                ActionPrimitiveError.Reason.PRE_CONDITION_ERROR,
+                "Cannot release an object if you're not already holding an object",
+            )
+        
         self.robot._release_grasp(self.arm)
         yield from self._settle_robot()
 

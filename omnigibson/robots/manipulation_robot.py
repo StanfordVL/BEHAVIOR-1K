@@ -384,6 +384,7 @@ class ManipulationRobot(BaseRobot):
                 self._release_grasp(arm=arm)
                 self._ag_release_counter[arm] = int(np.ceil(m.RELEASE_WINDOW / og.sim.get_rendering_dt()))
                 self._handle_release_window(arm=arm)
+                assert not self._ag_obj_in_hand[arm], "Object still in ag list after release!"
                 # TODO: Verify not needed!
                 # for finger_link in self.finger_links[arm]:
                 #     finger_link.remove_filtered_collision_pair(prim=self._ag_obj_in_hand[arm])
