@@ -481,5 +481,5 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
     @property
     def arm_workspace_range(self):
         return {
-            self.default_arm : [-0.25 * np.pi, 0.25 * np.pi]
+            self.default_arm : [np.deg2rad(-45), np.deg2rad(45)]
         }

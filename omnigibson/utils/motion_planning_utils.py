@@ -150,7 +150,7 @@ def plan_arm_motion(
     ss.setStateValidityChecker(ob.StateValidityCheckerFn(state_valid_fn))
 
     si = ss.getSpaceInformation()
-    planner = ompl_geo.RRTConnect(si)
+    planner = ompl_geo.BITstar(si)
     ss.setPlanner(planner)
 
     start_conf = robot.get_joint_positions()[joint_control_idx]
@@ -169,7 +169,7 @@ def plan_arm_motion(
 
     if solved:
         # try to shorten the path
-        ss.simplifySolution()
+        # ss.simplifySolution()
 
         sol_path = ss.getSolutionPath()
         return_path = []
