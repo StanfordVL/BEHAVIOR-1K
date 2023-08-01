@@ -478,9 +478,16 @@ class Simulator(SimulationContext, Serializable):
             # We suppress warnings from omni.usd because it complains about values set in the native USD
             # These warnings occur because the native USD file has some type mismatch in the `scale` property,
             # where the property expects a double but for whatever reason the USD interprets its values as floats
+            # We supperss omni.physicsschema.plugin when kinematic_only objects are placed with scale ~1.0, to suppress
+            # the following error:
+            # [omni.physicsschema.plugin] ScaleOrientation is not supported for rigid bodies, prim path: [...] You may
+            #   ignore this if the scale is close to uniform.
             # We also need to suppress the following error when flat cache is used:
             # [omni.physx.plugin] Transformation change on non-root links is not supported.
-            with suppress_omni_log(channels=["omni.usd", "omni.physx.plugin"] if gm.ENABLE_FLATCACHE else ["omni.usd"]):
+            channels = ["omni.usd", "omni.physicsschema.plugin"]
+            if gm.ENABLE_FLATCACHE:
+                channels.append("omni.physx.plugin")
+            with suppress_omni_log(channels=channels):
                 super().play()
 
             # Take a render step -- this is needed so that certain (unknown, maybe omni internal state?) is populated
