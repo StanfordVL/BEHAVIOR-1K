@@ -541,7 +541,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             # Since the grasp pose is slightly off the object, we want to move towards the object, around 5cm.
             # It's okay if we can't go all the way because we run into the object.
             indented_print("Performing grasp approach")
-            yield from self._move_hand_direct_cartesian(approach_pose, stop_on_contact=True, obj_to_track=obj_to_track)
+            yield from self._move_hand_direct_cartesian(approach_pose, stop_on_contact=True)
 
             # Step once to update
             yield self._empty_action()
@@ -886,7 +886,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             #     )
 
             # Otherwise, move the joint
-            yield from self._move_hand_direct_joint(joint_pos, control_idx, stop_on_contact=stop_on_contact, ignore_failure=True, obj_to_track=obj_to_track)
+            yield from self._move_hand_direct_joint(joint_pos, control_idx, stop_on_contact=stop_on_contact, ignore_failure=True)
 
             # Also decide if we can stop early.
             current_pos, current_orn = self.robot.eef_links[self.arm].get_position_orientation()
@@ -1074,15 +1074,35 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         #     0.045,
         #     0.045,
         # ])
+        
         reset_pose_tiago = np.array([
-            -1.78029833e-04,  3.20231302e-05, -1.85759447e-07,
-            0.0, -0.2,
-            0.0,  0.1, -6.10000000e-01,
-            -1.10000000e+00,  0.00000000e+00, -1.10000000e+00,  1.47000000e+00,
-            0.00000000e+00,  8.70000000e-01,  2.71000000e+00,  1.50000000e+00,
-            1.71000000e+00, -1.50000000e+00, -1.57000000e+00,  4.50000000e-01,
-            1.39000000e+00,  0.00000000e+00,  0.00000000e+00,  4.50000000e-02,
-            4.50000000e-02,  4.50000000e-02,  4.50000000e-02
+            -1.78029833e-04,  
+            3.20231302e-05, 
+            -1.85759447e-07,
+            0.0, 
+            -0.2,
+            0.0,  
+            0.1, 
+            -6.10000000e-01,
+            -1.10000000e+00,  
+            0.00000000e+00, 
+            -1.10000000e+00,  
+            1.47000000e+00,
+            0.00000000e+00,  
+            8.70000000e-01,  
+            2.71000000e+00,  
+            1.50000000e+00,
+            1.71000000e+00, 
+            -1.50000000e+00, 
+            -1.57000000e+00,  
+            4.50000000e-01,
+            1.39000000e+00,  
+            0.00000000e+00,  
+            0.00000000e+00,  
+            4.50000000e-02,
+            4.50000000e-02,  
+            4.50000000e-02,  
+            4.50000000e-02
         ])
         return reset_pose_tiago if self.robot_model == "Tiago" else reset_pose_fetch
     
@@ -1211,7 +1231,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 body_intermediate_pose = self._get_pose_in_robot_frame(intermediate_pose)
                 diff_yaw = T.wrap_angle(T.quat2euler(body_intermediate_pose[1])[2])
                 if abs(diff_yaw) > DEFAULT_ANGLE_THRESHOLD:
-                    yield from self._rotate_in_place(intermediate_pose, angle_threshold=DEFAULT_ANGLE_THRESHOLD, obj_to_track=obj_to_track)
+                    yield from self._rotate_in_place(intermediate_pose, angle_threshold=DEFAULT_ANGLE_THRESHOLD)
                 else:
                     action = self._empty_action()
                     base_action = [KP_LIN_VEL, 0.0]
@@ -1221,7 +1241,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             body_target_pose = self._get_pose_in_robot_frame(end_pose)
 
         # Rotate in place to final orientation once at location
-        yield from self._rotate_in_place(end_pose, angle_threshold=angle_threshold, obj_to_track=obj_to_track)
+        yield from self._rotate_in_place(end_pose, angle_threshold=angle_threshold)
 
     def _rotate_in_place(self, end_pose, angle_threshold = DEFAULT_ANGLE_THRESHOLD):
         """
