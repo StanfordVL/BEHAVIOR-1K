@@ -71,11 +71,11 @@ def main():
 
     def test_grasp():
         grasp_obj, = scene.object_registry("category", "bottle_of_vodka")
-        execute_controller(controller.apply_ref(StarterSemanticActionPrimitiveSet.GRASP, False, grasp_obj), env)
+        execute_controller(controller.apply_ref(StarterSemanticActionPrimitiveSet.GRASP, grasp_obj), env)
 
     def test_place():
         box, = scene.object_registry("category", "storage_box")
-        execute_controller(controller.apply_ref(StarterSemanticActionPrimitiveSet.PLACE_INSIDE, False, box), env)
+        execute_controller(controller.apply_ref(StarterSemanticActionPrimitiveSet.PLACE_INSIDE, box), env)
 
     # Work more reliably
     # IPython.embed()

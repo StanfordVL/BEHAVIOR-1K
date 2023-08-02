@@ -346,14 +346,14 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         action = StarterSemanticActionPrimitiveSet(action_idx)
         return self.controller_functions[action](target_obj)
     
-    def apply_ref(self, prim, track_object, *args, attempts=3):
+    def apply_ref(self, prim, *args, track_object=False, attempts=3):
         """
         Yields action for robot to execute the primitive with the given arguments.
 
         Args:
             prim (StarterSemanticActionPrimitiveSet): Primitive to execute
-            track_object (bool): Whether to track object while executing the primitive
             args: Arguments for the primitive
+            track_object (bool): Whether to track object while executing the primitive
             attempts (int): Number of attempts to make before raising an error
         
         Returns:
@@ -370,7 +370,10 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             # Attempt
             success = False
             try:
-                self._tracking_object = args[0] if track_object else None
+                if track_object and args:
+                    self._tracking_object = args[0]
+                elif not track_object:
+                    self._tracking_object =  None
                 yield from ctrl(*args)
                 success = True
             except ActionPrimitiveError as e:
