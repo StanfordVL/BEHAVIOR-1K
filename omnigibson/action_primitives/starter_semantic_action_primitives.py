@@ -370,10 +370,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             # Attempt
             success = False
             try:
-                if track_object and args:
-                    self._tracking_object = args[0]
-                elif not track_object:
-                    self._tracking_object =  None
+                self._tracking_object = args[0] if track_object and args else None
                 yield from ctrl(*args)
                 success = True
             except ActionPrimitiveError as e:
