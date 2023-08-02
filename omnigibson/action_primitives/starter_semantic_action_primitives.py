@@ -1045,34 +1045,44 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             ]
         )
 
+        # reset_pose_tiago = np.array([
+        #     -1.78029833e-04,  
+        #     3.20231302e-05, 
+        #     -1.85759447e-07, 
+        #     -1.16488536e-07,
+        #     4.55182843e-08,  
+        #     2.36128806e-04,  
+        #     0.15,  
+        #     0.94,
+        #     -1.1,  
+        #     0.0, 
+        #     -0.9,  
+        #     1.47,
+        #     0.0,  
+        #     2.1,  
+        #     2.71,  
+        #     1.5,
+        #     1.71,  
+        #     1.3, 
+        #     -1.57, 
+        #     -1.4,
+        #     1.39,  
+        #     0.0,  
+        #     0.0,  
+        #     0.045,
+        #     0.045,
+        #     0.045,
+        #     0.045,
+        # ])
         reset_pose_tiago = np.array([
-            -1.78029833e-04,  
-            3.20231302e-05, 
-            -1.85759447e-07, 
-            -1.16488536e-07,
-            4.55182843e-08,  
-            2.36128806e-04,  
-            0.15,  
-            0.94,
-            -1.1,  
-            0.0, 
-            -0.9,  
-            1.47,
-            0.0,  
-            2.1,  
-            2.71,  
-            1.5,
-            1.71,  
-            1.3, 
-            -1.57, 
-            -1.4,
-            1.39,  
-            0.0,  
-            0.0,  
-            0.045,
-            0.045,
-            0.045,
-            0.045,
+            -1.78029833e-04,  3.20231302e-05, -1.85759447e-07,
+            0.0, -0.2,
+            0.0,  0.1, -6.10000000e-01,
+            -1.10000000e+00,  0.00000000e+00, -1.10000000e+00,  1.47000000e+00,
+            0.00000000e+00,  8.70000000e-01,  2.71000000e+00,  1.50000000e+00,
+            1.71000000e+00, -1.50000000e+00, -1.57000000e+00,  4.50000000e-01,
+            1.39000000e+00,  0.00000000e+00,  0.00000000e+00,  4.50000000e-02,
+            4.50000000e-02,  4.50000000e-02,  4.50000000e-02
         ])
         return reset_pose_tiago if self.robot_model == "Tiago" else reset_pose_fetch
     
@@ -1201,7 +1211,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 body_intermediate_pose = self._get_pose_in_robot_frame(intermediate_pose)
                 diff_yaw = T.wrap_angle(T.quat2euler(body_intermediate_pose[1])[2])
                 if abs(diff_yaw) > DEFAULT_ANGLE_THRESHOLD:
-                    yield from self._rotate_in_place(intermediate_pose, angle_threshold=DEFAULT_ANGLE_THRESHOLD)
+                    yield from self._rotate_in_place(intermediate_pose, angle_threshold=DEFAULT_ANGLE_THRESHOLD, obj_to_track=obj_to_track)
                 else:
                     action = self._empty_action()
                     base_action = [KP_LIN_VEL, 0.0]
@@ -1211,7 +1221,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             body_target_pose = self._get_pose_in_robot_frame(end_pose)
 
         # Rotate in place to final orientation once at location
-        yield from self._rotate_in_place(end_pose, angle_threshold=angle_threshold)
+        yield from self._rotate_in_place(end_pose, angle_threshold=angle_threshold, obj_to_track=obj_to_track)
 
     def _rotate_in_place(self, end_pose, angle_threshold = DEFAULT_ANGLE_THRESHOLD):
         """
