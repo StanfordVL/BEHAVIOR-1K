@@ -255,6 +255,10 @@ def detect_robot_collision(context):
         nonlocal mesh_path
 
         valid_hit = hit.rigid_body not in context.disabled_collision_pairs_dict[mesh_path]
+        # if valid_hit:
+        #     print(mesh_path)
+        #     print(hit.rigid_body)
+        #     print("---------")
 
         return not valid_hit
 

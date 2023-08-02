@@ -64,6 +64,7 @@ MAX_STEPS_FOR_HAND_MOVE_WHEN_OPENING = 30
 MAX_STEPS_FOR_GRASP_OR_RELEASE = 30
 MAX_WAIT_FOR_GRASP_OR_RELEASE = 10
 MAX_STEPS_FOR_WAYPOINT_NAVIGATION = 200
+MAX_ATTEMPTS_FOR_OPEN_CLOSE = 5
 
 MAX_ATTEMPTS_FOR_SAMPLING_POSE_WITH_OBJECT_AND_PREDICATE = 20
 MAX_ATTEMPTS_FOR_SAMPLING_POSE_NEAR_OBJECT = 200
@@ -408,9 +409,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         yield from self._open_or_close(obj, False)
 
     def _open_or_close(self, obj, should_open):
-        # hand_collision_fn = get_pose3d_hand_collision_fn(
-        #     self.robot, None, self._get_collision_body_ids(include_robot=True)
-        # )
         if self._get_obj_in_hand():
             raise ActionPrimitiveError(
                 ActionPrimitiveError.Reason.PRE_CONDITION_ERROR,
@@ -421,74 +419,83 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         # Open the hand first
         yield from self._execute_release()
 
-        # Don't do anything if the object is already closed and we're trying to close.
-        if not should_open and not obj.states[object_states.Open].get_value():
-            return
+        marker = None
+        from omnigibson.objects.primitive_object import PrimitiveObject
+        def set_marker(position):
+            marker = PrimitiveObject(
+                prim_path=f"/World/marker",
+                name="marker",
+                primitive_type="Cube",
+                size=0.07,
+                visual_only=True,
+                rgba=[1.0, 0, 0, 1.0],
+            )
+            og.sim.import_object(marker)
+            marker.set_position(position)
+            og.sim.step()
 
-        grasp_data = get_grasp_position_for_open(self.robot, obj, should_open)
-        if grasp_data is None:
-            if should_open and obj.states[object_states.Open].get_value():
-                # It's already open so we're good
+        def remove_marker():
+            marker.remove()
+            og.sim.step()
+
+        for _ in range(MAX_ATTEMPTS_FOR_OPEN_CLOSE):
+            if should_open == obj.states[object_states.Open].get_value():
                 return
-            else:
-                # We were trying to do something but didn't have the data.
-                raise ActionPrimitiveError(
-                    ActionPrimitiveError.Reason.SAMPLING_ERROR,
-                    "Could not sample grasp position for target object",
-                    {"target object": obj.name},
-                )
-
-        grasp_pose, target_poses, object_direction, joint_info, grasp_required = grasp_data
-        # with UndoableContext(self.robot):
-        #     if hand_collision_fn(grasp_pose):
-        #         raise ActionPrimitiveError(
-        #             ActionPrimitiveError.Reason.SAMPLING_ERROR,
-        #             "Rejecting grasp pose due to collision. Try again",
-        #             {"target object": obj.name},
-        #         )
-
-        # Prepare data for the approach later.
-        approach_pos = grasp_pose[0] + object_direction * OPEN_GRASP_APPROACH_DISTANCE
-        approach_pose = (approach_pos, grasp_pose[1])
-
-        # If the grasp pose is too far, navigate
-        # [bid] = obj.get_body_ids()  # TODO: Fix this!
-        # check_joint = (bid, joint_info)
-        yield from self._navigate_if_needed(obj, pos_on_obj=approach_pos)  # , check_joint=check_joint)
-        yield from self._navigate_if_needed(obj, pos_on_obj=grasp_pose[0])  #, check_joint=check_joint)
-
-        yield from self._move_hand(grasp_pose)
-
-        # Since the grasp pose is slightly off the object, we want to move towards the object, around 5cm.
-        # It's okay if we can't go all the way because we run into the object.
-        indented_print("Performing grasp approach for open")
-        
-        yield from self._move_hand_direct_cartesian(approach_pose, ignore_failure=True, stop_on_contact=True)
-
-        try:
-            if grasp_required:
-                yield from self._execute_grasp()
-                if self._get_obj_in_hand() is None:
+            
+            try:
+                grasp_data = get_grasp_position_for_open(self.robot, obj, should_open)
+                if grasp_data is None:
+                    # We were trying to do something but didn't have the data.
                     raise ActionPrimitiveError(
-                        ActionPrimitiveError.Reason.EXECUTION_ERROR,
-                        "Could not grasp the target object to open or close. Try again",
+                        ActionPrimitiveError.Reason.SAMPLING_ERROR,
+                        "Could not sample grasp position for target object",
                         {"target object": obj.name},
                     )
 
-            for target_pose in target_poses:
-                yield from self._move_hand_direct_cartesian(
-                    target_pose, ignore_failure=True, max_steps_for_hand_move=MAX_STEPS_FOR_HAND_MOVE_WHEN_OPENING
-                )
+                grasp_pose, target_poses, object_direction, joint_info, grasp_required = grasp_data
 
-            # Moving to target pose often fails. Let's get the hand to apply the correct actions for its current pos
-            # This prevents the hand from jerking into its desired position when we do a release.
-            yield from self._move_hand_direct_cartesian(
-                self.robot.eef_links[self.arm].get_position_orientation(), ignore_failure=True
-            )
-        except ActionPrimitiveError:
-            # Let go - we do not want to be holding anything after return of primitive.
-            yield from self._execute_release()
-            raise
+                # Prepare data for the approach later.
+                approach_pos = grasp_pose[0] + object_direction * OPEN_GRASP_APPROACH_DISTANCE
+                approach_pose = (approach_pos, grasp_pose[1])
+
+                # If the grasp pose is too far, navigate
+                yield from self._navigate_if_needed(obj, pose_on_obj=grasp_pose)  #, check_joint=check_joint)
+
+                yield from self._move_hand(grasp_pose)
+
+                # We can pre-grasp in sticky grasping mode.
+                yield from self._execute_grasp()
+
+                # Since the grasp pose is slightly off the object, we want to move towards the object, around 5cm.
+                # It's okay if we can't go all the way because we run into the object.
+                indented_print("Performing grasp approach for open")
+                
+                yield from self._move_hand_direct_cartesian(approach_pose, ignore_failure=True, stop_on_contact=True)
+
+                # Step once to update
+                yield self._empty_action()
+
+                # if grasp_required:
+                #     if self._get_obj_in_hand() is None:
+                #         raise ActionPrimitiveError(
+                #             ActionPrimitiveError.Reason.EXECUTION_ERROR,
+                #             "Could not grasp the target object to open or close. Try again",
+                #             {"target object": obj.name},
+                #         )
+
+                for target_pose in target_poses:
+                    yield from self._move_hand_direct_cartesian(target_pose, ignore_failure=True)
+
+                # Moving to target pose often fails. Let's get the hand to apply the correct actions for its current pos
+                # This prevents the hand from jerking into its desired position when we do a release.
+                yield from self._move_hand_direct_cartesian(
+                    self.robot.eef_links[self.arm].get_position_orientation(), ignore_failure=True
+                )
+            except ActionPrimitiveError:
+                # Let go - we do not want to be holding anything after return of primitive.
+                yield from self._execute_release()
+                raise
+
 
         if obj.states[object_states.Open].get_value() != should_open:
             raise ActionPrimitiveError(
@@ -864,26 +871,22 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         # Joint positions
         joint_space_data = [self._convert_cartesian_to_joint_space(waypoint) for waypoint in zip(pos_waypoints, quat_waypoints)]
         joints = list(self.robot.joints.values())
-        revolute_joint_idxes = [i for i, x in enumerate(joints) if x.joint_type == JointType.JOINT_REVOLUTE]
         
         for joint_pos, control_idx in joint_space_data:
-            # # Check if the movement can be done roughly linearly.
-            # linear_check_joint_mask = np.isin(control_idx, revolute_joint_idxes)
-            # linear_check_joint_idxes = control_idx[linear_check_joint_mask]
-            # linear_check_joint_positions = joint_pos[linear_check_joint_mask]
-            # current_joint_positions = self.robot.get_joint_positions()[control_idx][linear_check_joint_mask]
+            # Check if the movement can be done roughly linearly.
+            current_joint_positions = self.robot.get_joint_positions()[control_idx]
 
-            # failed_joints = []
-            # for joint_idx, target_joint_pos, current_joint_pos in zip(linear_check_joint_idxes, linear_check_joint_positions, current_joint_positions):
-            #     if np.abs(target_joint_pos - current_joint_pos) > np.rad2deg(45):
-            #         failed_joints.append(joints[joint_idx].joint_name)
+            failed_joints = []
+            for joint_idx, target_joint_pos, current_joint_pos in zip(control_idx, joint_pos, current_joint_positions):
+                if np.abs(target_joint_pos - current_joint_pos) > np.rad2deg(45):
+                    failed_joints.append(joints[joint_idx].joint_name)
 
-            # if failed_joints:
-            #     raise ActionPrimitiveError(
-            #         ActionPrimitiveError.Reason.EXECUTION_ERROR,
-            #         "You cannot reach the target position in a straight line - it requires rotating your arm which might cause collisions. You might need to get closer and retry",
-            #         {"failed joints": failed_joints}
-            #     )
+            if failed_joints:
+                raise ActionPrimitiveError(
+                    ActionPrimitiveError.Reason.EXECUTION_ERROR,
+                    "You cannot reach the target position in a straight line - it requires rotating your arm which might cause collisions. You might need to get closer and retry",
+                    {"failed joints": failed_joints}
+                )
 
             # Otherwise, move the joint
             yield from self._move_hand_direct_joint(joint_pos, control_idx, stop_on_contact=stop_on_contact, ignore_failure=True)
@@ -895,6 +898,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             if pos_diff < 0.001 and orn_diff < np.deg2rad(0.1):
                 return
             
+            print(detect_robot_collision_in_sim(self.robot, ignore_obj_in_hand=False))
             if stop_on_contact and detect_robot_collision_in_sim(self.robot, ignore_obj_in_hand=False):
                 return
 
