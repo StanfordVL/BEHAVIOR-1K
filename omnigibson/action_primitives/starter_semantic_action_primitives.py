@@ -419,25 +419,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         # Open the hand first
         yield from self._execute_release()
 
-        marker = None
-        from omnigibson.objects.primitive_object import PrimitiveObject
-        def set_marker(position):
-            marker = PrimitiveObject(
-                prim_path=f"/World/marker",
-                name="marker",
-                primitive_type="Cube",
-                size=0.07,
-                visual_only=True,
-                rgba=[1.0, 0, 0, 1.0],
-            )
-            og.sim.import_object(marker)
-            marker.set_position(position)
-            og.sim.step()
-
-        def remove_marker():
-            marker.remove()
-            og.sim.step()
-
         for _ in range(MAX_ATTEMPTS_FOR_OPEN_CLOSE):
             if should_open == obj.states[object_states.Open].get_value():
                 return
@@ -898,7 +879,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             if pos_diff < 0.001 and orn_diff < np.deg2rad(0.1):
                 return
             
-            print(detect_robot_collision_in_sim(self.robot, ignore_obj_in_hand=False))
             if stop_on_contact and detect_robot_collision_in_sim(self.robot, ignore_obj_in_hand=False):
                 return
 
