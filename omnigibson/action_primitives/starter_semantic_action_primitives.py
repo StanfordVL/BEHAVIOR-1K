@@ -218,6 +218,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         self.robot_model = self.robot.model_name
         self.robot_base_mass = self.robot._links["base_link"].mass
         self.teleport = teleport
+        self._tracking_object = None
 
         self.robot_copy = self._load_robot_copy(robot)
 
@@ -345,12 +346,13 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         action = StarterSemanticActionPrimitiveSet(action_idx)
         return self.controller_functions[action](target_obj)
     
-    def apply_ref(self, prim, *args, attempts=3):
+    def apply_ref(self, prim, track_object, *args, attempts=3):
         """
         Yields action for robot to execute the primitive with the given arguments.
 
         Args:
             prim (StarterSemanticActionPrimitiveSet): Primitive to execute
+            track_object (bool): Whether to track object while executing the primitive
             args: Arguments for the primitive
             attempts (int): Number of attempts to make before raising an error
         
@@ -368,6 +370,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             # Attempt
             success = False
             try:
+                self._tracking_object = args[0] if track_object else None
                 yield from ctrl(*args)
                 success = True
             except ActionPrimitiveError as e:
@@ -494,18 +497,16 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 {"target object": obj.name, "is it currently open": obj.states[object_states.Open].get_value()},
             )
 
-    def _grasp(self, obj, track_obj=False):
+    def _grasp(self, obj):
         """
         Yields action for the robot to navigate to object if needed, then to grasp it
 
         Args:
             StatefulObject: Object for robot to grasp
-            track_obj (bool): Whether to track the object during grasping
 
         Returns:
             np.array or None: Action array for one step for the robot to grasp or None if grasp completed
         """
-        obj_to_track = obj if track_obj else None
 
         # Don't do anything if the object is already grasped.
         obj_in_hand = self._get_obj_in_hand()
@@ -531,11 +532,11 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             approach_pos = grasp_pose[0] + object_direction * GRASP_APPROACH_DISTANCE
             approach_pose = (approach_pos, grasp_pose[1])
             # If the grasp pose is too far, navigate.
-            yield from self._navigate_if_needed(obj, pose_on_obj=grasp_pose, obj_to_track=obj_to_track)
-            yield from self._move_hand(grasp_pose, obj_to_track=obj_to_track)
+            yield from self._navigate_if_needed(obj, pose_on_obj=grasp_pose)
+            yield from self._move_hand(grasp_pose)
 
             # We can pre-grasp in sticky grasping mode.
-            yield from self._execute_grasp(obj_to_track=obj_to_track)
+            yield from self._execute_grasp()
 
             # Since the grasp pose is slightly off the object, we want to move towards the object, around 5cm.
             # It's okay if we can't go all the way because we run into the object.
@@ -552,7 +553,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     {"target object": obj.name},
                 )
             
-            yield from self._reset_hand(obj_to_track=None)
+            yield from self._reset_hand()
 
         if self._get_obj_in_hand() != obj:
             raise ActionPrimitiveError(
@@ -561,33 +562,29 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 {"expected object": obj.name, "actual object": self._get_obj_in_hand().name},
             )
 
-    def _place_on_top(self, obj, track_obj=False):
+    def _place_on_top(self, obj):
         """
         Yields action for the robot to navigate to the object if needed, then to place an object on it
 
         Args:
             obj (StatefulObject): Object for robot to place the object in its hand on
-            track_obj (bool): Whether to track the object during placing
         
         Returns:
             np.array or None: Action array for one step for the robot to place or None if place completed
         """
-        obj_to_track = obj if track_obj else None
-        yield from self._place_with_predicate(obj, object_states.OnTop, obj_to_track=obj_to_track)
+        yield from self._place_with_predicate(obj, object_states.OnTop)
 
-    def _place_inside(self, obj, track_obj=False):
+    def _place_inside(self, obj):
         """
         Yields action for the robot to navigate to the object if needed, then to place an object in it
 
         Args:
             obj (StatefulObject): Object for robot to place the object in its hand on
-            track_obj (bool): Whether to track the object during placing
         
         Returns:
             np.array or None: Action array for one step for the robot to place or None if place completed
         """
-        obj_to_track = obj if track_obj else None
-        yield from self._place_with_predicate(obj, object_states.Inside, obj_to_track=obj_to_track)
+        yield from self._place_with_predicate(obj, object_states.Inside)
 
     def _toggle_on(self, obj):
         yield from self._toggle(obj, True)
@@ -616,14 +613,13 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 {"target object": obj.name, "is it currently toggled on": obj.states[object_states.ToggledOn].get_value()}
             )
 
-    def _place_with_predicate(self, obj, predicate, obj_to_track=None):
+    def _place_with_predicate(self, obj, predicate):
         """
         Yields action for the robot to navigate to the object if needed, then to place it
 
         Args:
             obj (StatefulObject): Object for robot to place the object in its hand on
             predicate (object_states.OnTop or object_states.Inside): Determines whether to place on top or inside
-            obj_to_track (StatefulObject): Object to track with the camera
 
         Returns:
             np.array or None: Action array for one step for the robot to place or None if place completed
@@ -636,9 +632,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         
         obj_pose = self._sample_pose_with_object_and_predicate(predicate, obj_in_hand, obj)
         hand_pose = self._get_hand_pose_for_object_pose(obj_pose)
-        yield from self._navigate_if_needed(obj, pose_on_obj=hand_pose, obj_to_track=obj_to_track)
-        yield from self._move_hand(hand_pose, obj_to_track=obj_to_track)
-        yield from self._execute_release(obj_to_track=obj_to_track)
+        yield from self._navigate_if_needed(obj, pose_on_obj=hand_pose)
+        yield from self._move_hand(hand_pose)
+        yield from self._execute_release()
         yield from self._settle_robot()
 
         if self._get_obj_in_hand() is not None:
@@ -734,29 +730,27 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         else:
             return joint_pos, control_idx
 
-    def _move_hand(self, target_pose, obj_to_track=None):
+    def _move_hand(self, target_pose):
         """
         Yields action for the robot to move hand so the eef is in the target pose using the planner
 
         Args:
             target_pose (Iterable of array): Position and orientation arrays in an iterable for pose
-            obj_to_track (StatefulObject): Object to track with the camera
 
         Returns:
             np.array or None: Action array for one step for the robot to move hand or None if its at the target pose
         """
         yield from self._settle_robot()
         joint_pos, control_idx = self._convert_cartesian_to_joint_space(target_pose)
-        yield from self._move_hand_joint(joint_pos, control_idx, obj_to_track=obj_to_track)
+        yield from self._move_hand_joint(joint_pos, control_idx)
 
-    def _move_hand_joint(self, joint_pos, control_idx, obj_to_track=None):
+    def _move_hand_joint(self, joint_pos, control_idx):
         """
         Yields action for the robot to move arm to reach the specified joint positions using the planner
 
         Args:
             joint_pos (np.array): Joint positions for the arm
             control_idx (np.array): Indices of the joints to move
-            obj_to_track (StatefulObject): Object to track with the camera
         
         Returns:
             np.array or None: Action array for one step for the robot to move arm or None if its at the joint positions
@@ -785,7 +779,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             indented_print("Plan has %d steps", len(plan))
             for i, joint_pos in enumerate(plan):
                 indented_print("Executing grasp plan step %d/%d", i + 1, len(plan))
-                yield from self._move_hand_direct_joint(joint_pos, control_idx, obj_to_track=obj_to_track)
+                yield from self._move_hand_direct_joint(joint_pos, control_idx)
 
     def _add_linearly_interpolated_waypoints(self, plan, max_inter_dist):
         """
@@ -807,7 +801,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         interpolated_plan.append(plan[-1].tolist())
         return interpolated_plan
 
-    def _move_hand_direct_joint(self, joint_pos, control_idx, stop_on_contact=False, max_steps_for_hand_move=MAX_STEPS_FOR_HAND_MOVE, ignore_failure=False, obj_to_track=None):
+    def _move_hand_direct_joint(self, joint_pos, control_idx, stop_on_contact=False, max_steps_for_hand_move=MAX_STEPS_FOR_HAND_MOVE, ignore_failure=False):
         """
         Yields action for the robot to move its arm to reach the specified joint positions by directly actuating with no planner
 
@@ -824,7 +818,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         action = self._empty_action()
         controller_name = "arm_{}".format(self.arm)
         action[self.robot.controller_action_idx[controller_name]] = joint_pos
-        action = self._overwrite_head_action(action, obj_to_track) if obj_to_track is not None else action
+        action = self._overwrite_head_action(action, self._tracking_object) if self._tracking_object is not None else action
 
         for _ in range(max_steps_for_hand_move):
             current_joint_pos = self.robot.get_joint_positions()[control_idx]
@@ -841,7 +835,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 "Your hand was obstructed from moving to the desired joint position"
             )
 
-    def _move_hand_direct_cartesian(self, target_pose, stop_on_contact=False, ignore_failure=False, obj_to_track=None):
+    def _move_hand_direct_cartesian(self, target_pose, stop_on_contact=False, ignore_failure=False):
         """
         Yields action for the robot to move its arm to reach the specified target pose by moving the eef along a line in cartesian
         space from its current pose
@@ -850,7 +844,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             target_pose (Iterable of array): Position and orientation arrays in an iterable for pose
             stop_on_contact (boolean): Determines whether to stop move once an object is hit
             ignore_failure (boolean): Determines whether to throw error for not reaching final joint positions
-            obj_to_track (StatefulObject): Object to track with the camera
         
         Returns:
             np.array or None: Action array for one step for the robot to move arm or None if its at the target pose
@@ -911,18 +904,15 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 "Your hand was obstructed from moving to the desired world position"
             )
 
-    def _execute_grasp(self, obj_to_track=None):
+    def _execute_grasp(self):
         """
         Yields action for the robot to grasp
-        
-        Args:
-            obj_to_track (StatefulObject): Object to track with the camera
 
         Returns:
             np.array or None: Action array for one step for the robot to grasp or None if its done grasping
         """
         action = self._empty_action()
-        action = self._overwrite_head_action(action, obj_to_track) if obj_to_track is not None else action
+        action = self._overwrite_head_action(action, self._tracking_object) if self._tracking_object is not None else action
         controller_name = "gripper_{}".format(self.arm)
         action[self.robot.controller_action_idx[controller_name]] = -1.0
         for _ in range(MAX_STEPS_FOR_GRASP_OR_RELEASE):
@@ -932,18 +922,15 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         # for _ in range(MAX_WAIT_FOR_GRASP_OR_RELEASE):
         #     yield self._empty_action()
 
-    def _execute_release(self, obj_to_track=None):
+    def _execute_release(self):
         """
         Yields action for the robot to release its grasp
-
-        Args:
-            obj_to_track (StatefulObject): Object to track with the camera
 
         Returns:
             np.array or None: Action array for one step for the robot to release or None if its done releasing
         """
         action = self._empty_action()
-        action = self._overwrite_head_action(action, obj_to_track) if obj_to_track is not None else action
+        action = self._overwrite_head_action(action, self._tracking_object) if self._tracking_object is not None else action
         controller_name = "gripper_{}".format(self.arm)
         action[self.robot.controller_action_idx[controller_name]] = 1.0
         for _ in range(MAX_STEPS_FOR_GRASP_OR_RELEASE):
@@ -1022,12 +1009,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         return action
 
-    def _reset_hand(self, obj_to_track=None):
+    def _reset_hand(self):
         """
         Yields action to move the hand to the position optimal for executing subsequent action primitives
-
-        Args:
-            obj_to_track (StatefulObject): Object to track with the camera
 
         Returns:
             np.array or None: Action array for one step for the robot to reset its hand or None if it is done resetting
@@ -1036,10 +1020,10 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         reset_pose = self._get_reset_joint_pos()[control_idx]
         indented_print("Resetting hand")
         try:
-            yield from self._move_hand_joint(reset_pose, control_idx, obj_to_track=obj_to_track)
+            yield from self._move_hand_joint(reset_pose, control_idx)
         except ActionPrimitiveError:
             indented_print("Could not do a planned reset of the hand - probably obj_in_hand collides with body")
-            yield from self._move_hand_direct_joint(reset_pose, control_idx, ignore_failure=True, obj_to_track=obj_to_track)
+            yield from self._move_hand_direct_joint(reset_pose, control_idx, ignore_failure=True)
     
     def _get_reset_joint_pos(self):
         reset_pose_fetch = np.array(
@@ -1092,13 +1076,12 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         ])
         return reset_pose_tiago if self.robot_model == "Tiago" else reset_pose_fetch
     
-    def _navigate_to_pose(self, pose_2d, obj_to_track=None):
+    def _navigate_to_pose(self, pose_2d):
         """
         Yields the action to navigate robot to the specified 2d pose
 
         Args:
             pose_2d (Iterable): (x, y, yaw) 2d pose
-            obj_to_track (StatefulObject): Object to track with the camera 
 
         Returns:
             np.array or None: Action array for one step for the robot to navigate or None if it is done navigating
@@ -1128,7 +1111,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             for i, pose_2d in enumerate(plan):
                 indented_print("Executing navigation plan step %d/%d", i + 1, len(plan))
                 low_precision = True if i < len(plan) - 1 else False
-                yield from self._navigate_to_pose_direct(pose_2d, low_precision=low_precision, obj_to_track=obj_to_track)
+                yield from self._navigate_to_pose_direct(pose_2d, low_precision=low_precision)
 
     def _draw_plan(self, plan):
         SEARCHED = []
@@ -1153,14 +1136,13 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             cv2.imshow("SceneGraph", img)
             cv2.waitKey(1)
 
-    def _navigate_if_needed(self, obj, pose_on_obj=None, obj_to_track=None, **kwargs):
+    def _navigate_if_needed(self, obj, pose_on_obj=None, **kwargs):
         """
         Yields action to navigate the robot to be in range of the object if it not in the range
 
         Args:
             obj (StatefulObject): Object for the robot to be in range of
             pose_on_obj (Iterable): (pos, quat) Pose
-            obj_to_track (StatefulObject): Object to track with the camera
 
         Returns:
             np.array or None: Action array for one step for the robot to navigate or None if it is done navigating
@@ -1172,9 +1154,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         elif self._target_in_reach_of_robot(obj.get_position_orientation()):
             return
 
-        yield from self._navigate_to_obj(obj, pose_on_obj=pose_on_obj, obj_to_track=obj_to_track, **kwargs)
+        yield from self._navigate_to_obj(obj, pose_on_obj=pose_on_obj, **kwargs)
 
-    def _navigate_to_obj(self, obj, pose_on_obj=None, obj_to_track=None, **kwargs):
+    def _navigate_to_obj(self, obj, pose_on_obj=None, **kwargs):
         """
         Yields action to navigate the robot to be in range of the pose
 
@@ -1186,16 +1168,15 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             np.array or None: Action array for one step for the robot to navigate in range or None if it is done navigating
         """
         pose = self._sample_pose_near_object(obj, pose_on_obj=pose_on_obj, **kwargs)
-        yield from self._navigate_to_pose(pose, obj_to_track=obj_to_track)
+        yield from self._navigate_to_pose(pose)
 
-    def _navigate_to_pose_direct(self, pose_2d, low_precision=False, obj_to_track=None):
+    def _navigate_to_pose_direct(self, pose_2d, low_precision=False):
         """
         Yields action to navigate the robot to the 2d pose without planning
 
         Args:
             pose_2d (Iterable): (x, y, yaw) 2d pose
             low_precision (bool): Determines whether to navigate to the pose within a large range (low precision) or small range (high precison)
-            obj_to_track (StatefulObject): Object to track with the camera
 
         Returns:
             np.array or None: Action array for one step for the robot to navigate or None if it is done navigating
@@ -1212,7 +1193,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 direction_vec = body_target_pose[0][:2] / (np.linalg.norm(body_target_pose[0][:2]) * 5)
                 base_action = [direction_vec[0], direction_vec[1], 0.0]
                 action[self.robot.controller_action_idx["base"]] = base_action
-                action = self._overwrite_head_action(action, obj_to_track) if obj_to_track is not None else action
+                action = self._overwrite_head_action(action, self._tracking_object) if self._tracking_object is not None else action
                 yield action
             else:
                 diff_pos = end_pose[0] - self.robot.get_position()
@@ -1232,14 +1213,13 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         # Rotate in place to final orientation once at location
         yield from self._rotate_in_place(end_pose, angle_threshold=angle_threshold)
 
-    def _rotate_in_place(self, end_pose, angle_threshold = DEFAULT_ANGLE_THRESHOLD, obj_to_track=None):
+    def _rotate_in_place(self, end_pose, angle_threshold = DEFAULT_ANGLE_THRESHOLD):
         """
         Yields action to rotate the robot to the 2d end pose
 
         Args:
             end_pose (Iterable): (x, y, yaw) 2d pose
             angle_threshold (float): The angle difference between the robot's current and end pose that determines when the robot is done rotating
-            obj_to_track (StatefulObject): Object to track with the camera
 
         Returns:
             np.array or None: Action array for one step for the robot to rotate or None if it is done rotating
@@ -1255,7 +1235,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             base_action = [0.0, 0.0, ang_vel] if self.robot_model == "Tiago" else [0.0, ang_vel]
             action[self.robot.controller_action_idx["base"]] = base_action
             
-            action = self._overwrite_head_action(action, obj_to_track) if obj_to_track is not None else action
+            action = self._overwrite_head_action(action, self._tracking_object) if self._tracking_object is not None else action
             yield action
 
             body_target_pose = self._get_pose_in_robot_frame(end_pose)
