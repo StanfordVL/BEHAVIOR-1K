@@ -298,7 +298,7 @@ class SymbolicSemanticActionPrimitiveGenerator(BaseActionPrimitiveGenerator):
                 "Cannot release an object if you're not already holding an object",
             )
         
-        self.robot._release_grasp(self.arm)
+        self.robot.release_grasp_immediately()
         yield from self._settle_robot()
 
     def _place_on_top(self, obj):
