@@ -33,7 +33,8 @@ from omnigibson.utils.motion_planning_utils import (
     plan_base_motion,
     plan_arm_motion,
     detect_robot_collision,
-    detect_robot_collision_in_sim
+    detect_robot_collision_in_sim,
+    set_base_and_detect_collision
 )
 
 import omnigibson.utils.transform_utils as T
@@ -73,7 +74,7 @@ logger = logging.getLogger(__name__)
 
 
 def indented_print(msg, *args, **kwargs):
-    logger.debug("  " * len(inspect.stack()) + str(msg), *args, **kwargs)
+    print("  " * len(inspect.stack()) + str(msg), *args, **kwargs)
 
 class SymbolicSemanticActionPrimitiveGenerator(BaseActionPrimitiveGenerator):
     class PrimitiveSet(IntEnum):
@@ -103,11 +104,11 @@ class SymbolicSemanticActionPrimitiveGenerator(BaseActionPrimitiveGenerator):
           self.PrimitiveSet.CLOSE: self._close,
           self.PrimitiveSet.TOGGLE_ON: self._toggle_on,
           self.PrimitiveSet.TOGGLE_OFF: self._toggle_off,
-          # self.PrimitiveSet.SOAK_UNDER: self._soak_under,
-          # self.PrimitiveSet.SOAK_INSIDE: self._soak_inside,
-          # self.PrimitiveSet.WIPE: self._wipe,
-          # self.PrimitiveSet.SLICE: self._slice,
-          # self.PrimitiveSet.PLACE_NEAR_HEATING_ELEMENT: self._place_near_heating_element,
+          self.PrimitiveSet.SOAK_UNDER: self._soak_under,
+          self.PrimitiveSet.SOAK_INSIDE: self._soak_inside,
+          self.PrimitiveSet.WIPE: self._wipe,
+          self.PrimitiveSet.SLICE: self._slice,
+          self.PrimitiveSet.PLACE_NEAR_HEATING_ELEMENT: self._place_near_heating_element,
           self.PrimitiveSet.NAVIGATE_TO: self._navigate_to_obj,
           self.PrimitiveSet.RELEASE: self._release,
         }
@@ -385,6 +386,19 @@ class SymbolicSemanticActionPrimitiveGenerator(BaseActionPrimitiveGenerator):
                 "Failed to place object at the desired place (probably dropped). The object was still released, so you need to grasp it again to continue",
                 {"dropped object": obj_in_hand.name, "target object": obj.name}
             )
+        
+    def _soak_under():
+        pass
+    def _soak_inside():
+        pass
+    def _wipe():
+        pass
+    def _slice():
+        pass
+    def _place_near_heating_element():
+        pass
+    def _wait_for_cooked():
+        pass
   
     def _target_in_reach_of_robot(self, target_pose):
         """
@@ -492,7 +506,7 @@ class SymbolicSemanticActionPrimitiveGenerator(BaseActionPrimitiveGenerator):
             pos_on_obj = self._sample_position_on_aabb_face(obj)
             pose_on_obj = np.array([pos_on_obj, [0, 0, 0, 1]])
 
-        with UndoableContext(self.robot, self.robot_copy, "simplified", False) as context:
+        with UndoableContext(self.robot, self.robot_copy, "simplified") as context:
             obj_rooms = obj.in_rooms if obj.in_rooms else [self.scene._seg_map.get_room_instance_by_point(pose_on_obj[0][:2])]
             for _ in range(MAX_ATTEMPTS_FOR_SAMPLING_POSE_NEAR_OBJECT):
                 distance = np.random.uniform(0.0, 1.0)
@@ -502,9 +516,9 @@ class SymbolicSemanticActionPrimitiveGenerator(BaseActionPrimitiveGenerator):
                 )
 
                 # Check room
-                if self.scene._seg_map.get_room_instance_by_point(pose_2d[:2]) not in obj_rooms:
-                    indented_print("Candidate position is in the wrong room.")
-                    continue
+                # if self.scene._seg_map.get_room_instance_by_point(pose_2d[:2]) not in obj_rooms:
+                #     indented_print("Candidate position is in the wrong room.")
+                #     continue
 
                 if not self._test_pose(pose_2d, context, pose_on_obj=pose_on_obj, **kwargs):
                     continue
@@ -619,7 +633,7 @@ class SymbolicSemanticActionPrimitiveGenerator(BaseActionPrimitiveGenerator):
             if not self._target_in_reach_of_robot_relative(relative_pose):
                 return False
 
-        if detect_robot_collision(context, pose):
+        if set_base_and_detect_collision(context, pose):
             indented_print("Candidate position failed collision test.")
             return False
         return True
