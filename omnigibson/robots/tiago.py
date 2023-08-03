@@ -664,6 +664,13 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
     @property
     def urdf_path(self):
         return os.path.join(gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford.urdf")
+    
+    @property
+    def arm_workspace_range(self):
+        return {
+            "left": [np.deg2rad(15), np.deg2rad(75)],
+            "right": [np.deg2rad(-75), np.deg2rad(-15)],
+        }
 
     def get_position_orientation(self):
         # If the simulator is playing, return the pose of the base_footprint link frame

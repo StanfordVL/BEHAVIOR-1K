@@ -32,8 +32,7 @@ def plan_base_motion(
         y = q.getY()
         yaw = q.getYaw()
         pose = ([x, y, 0.0], T.euler2quat((0, 0, yaw)))
-        state_valid = not detect_robot_collision(context, pose)
-        return state_valid
+        return not set_base_and_detect_collision(context, pose)
 
     pos = robot.get_position()
     yaw = T.quat2euler(robot.get_orientation())[2]
@@ -128,7 +127,7 @@ def plan_arm_motion(
     def state_valid_fn(q):
         joint_pos = initial_joint_pos
         joint_pos[control_idx_in_joint_pos] = [q[i] for i in range(dim)]
-        return arm_planning_validity_fn(context, joint_pos)
+        return not set_arm_and_detect_collision(context, joint_pos)
     
     # create an SE2 state space
     space = ob.RealVectorStateSpace(dim)
@@ -151,7 +150,7 @@ def plan_arm_motion(
     ss.setStateValidityChecker(ob.StateValidityCheckerFn(state_valid_fn))
 
     si = ss.getSpaceInformation()
-    planner = ompl_geo.RRTConnect(si)
+    planner = ompl_geo.BITstar(si)
     ss.setPlanner(planner)
 
     start_conf = robot.get_joint_positions()[joint_control_idx]
@@ -170,7 +169,7 @@ def plan_arm_motion(
 
     if solved:
         # try to shorten the path
-        ss.simplifySolution()
+        # ss.simplifySolution()
 
         sol_path = ss.getSolutionPath()
         return_path = []
@@ -180,9 +179,9 @@ def plan_arm_motion(
         return return_path
     return None
 
-def detect_robot_collision(context, pose):
+def set_base_and_detect_collision(context, pose):
     """
-    Moves robot and detects robot collisions with the environment, but not with itself
+    Moves the robot and detects robot collisions with the environment and itself
 
     Args:
         context (UndoableContext): Context to plan in that includes the robot copy
@@ -202,46 +201,10 @@ def detect_robot_collision(context, pose):
 
     orientation = np.array(orientation, dtype=float)[[3, 0, 1, 2]]
     robot_copy.prims[robot_copy_type].GetAttribute("xformOp:orient").Set(Gf.Quatd(*orientation)) 
-                
-    for meshes in robot_copy.meshes[robot_copy_type].values():
-        for mesh in meshes.values():
-            mesh_id = PhysicsSchemaTools.encodeSdfPath(mesh.GetPrimPath().pathString)
-            if mesh.GetTypeName() == "Mesh":
-                if og.sim.psqi.overlap_mesh_any(*mesh_id):
-                    return True
-            else:
-                if og.sim.psqi.overlap_shape_any(*mesh_id):
-                    return True
-    return False
 
-def detect_robot_collision_in_sim(robot, filter_objs=[]):
-    """
-    Detects robot collisions with the environment, but not with itself using the ContactBodies API
+    return detect_robot_collision(context)
 
-    Args:
-        robot (BaseRobot): Robot object to detect collisions for
-        filter_objs (Array of StatefulObject): Objects to ignore collisions with
-    
-    Returns:
-        bool: Whether the robot is in collision
-    """
-    filter_categories = ["floors"]
-    
-    obj_in_hand = robot._ag_obj_in_hand[robot.default_arm]
-    if obj_in_hand is not None:
-        filter_objs.append(obj_in_hand)
-
-    collision_prims = list(robot.states[ContactBodies].get_value(ignore_objs=tuple(filter_objs)))
-
-    for col_prim in collision_prims:
-        tokens = col_prim.prim_path.split("/")
-        obj_prim_path = "/".join(tokens[:-1])
-        col_obj = og.sim.scene.object_registry("prim_path", obj_prim_path)
-        if col_obj.category in filter_categories:
-            collision_prims.remove(col_prim)
-    return len(collision_prims) > 0
-    
-def arm_planning_validity_fn(context, joint_pos):
+def set_arm_and_detect_collision(context, joint_pos):
     """
     Sets joint positions of the robot and detects robot collisions with the environment and itself
 
@@ -268,6 +231,21 @@ def arm_planning_validity_fn(context, joint_pos):
                 orientation = np.array(mesh_pose[1], dtype=float)[[3, 0, 1, 2]]
                 mesh.GetAttribute("xformOp:orient").Set(Gf.Quatd(*orientation))
 
+    return detect_robot_collision(context)
+
+def detect_robot_collision(context):
+    """
+    Detects robot collisions
+
+    Args:
+        context (UndoableContext): Context to plan in that includes the robot copy
+    
+    Returns:
+        bool: Whether the robot is in collision
+    """
+    robot_copy = context.robot_copy
+    robot_copy_type = context.robot_copy_type
+
     # Define function for checking overlap
     valid_hit = False
     mesh_path = None
@@ -275,7 +253,7 @@ def arm_planning_validity_fn(context, joint_pos):
     def overlap_callback(hit):
         nonlocal valid_hit
         nonlocal mesh_path
-        
+
         valid_hit = hit.rigid_body not in context.disabled_collision_pairs_dict[mesh_path]
 
         return not valid_hit
@@ -283,7 +261,7 @@ def arm_planning_validity_fn(context, joint_pos):
     for meshes in robot_copy.meshes[robot_copy_type].values():
         for mesh in meshes.values():
             if valid_hit:
-                return not valid_hit
+                return valid_hit
             mesh_path = mesh.GetPrimPath().pathString
             mesh_id = PhysicsSchemaTools.encodeSdfPath(mesh_path)
             if mesh.GetTypeName() == "Mesh":
@@ -291,7 +269,35 @@ def arm_planning_validity_fn(context, joint_pos):
             else:
                 og.sim.psqi.overlap_shape(*mesh_id, reportFn=overlap_callback)
         
-    return not valid_hit
+    return valid_hit
+
+def detect_robot_collision_in_sim(robot, filter_objs=[], ignore_obj_in_hand=True):
+    """
+    Detects robot collisions with the environment, but not with itself using the ContactBodies API
+
+    Args:
+        robot (BaseRobot): Robot object to detect collisions for
+        filter_objs (Array of StatefulObject): Objects to ignore collisions with
+        ignore_obj_in_hand (bool): Whether to ignore collisions with the object in the robot's hand
+    
+    Returns:
+        bool: Whether the robot is in collision
+    """
+    filter_categories = ["floors"]
+    
+    obj_in_hand = robot._ag_obj_in_hand[robot.default_arm]
+    if obj_in_hand is not None and ignore_obj_in_hand:
+        filter_objs.append(obj_in_hand)
+
+    collision_prims = list(robot.states[ContactBodies].get_value(ignore_objs=tuple(filter_objs)))
+
+    for col_prim in collision_prims:
+        tokens = col_prim.prim_path.split("/")
+        obj_prim_path = "/".join(tokens[:-1])
+        col_obj = og.sim.scene.object_registry("prim_path", obj_prim_path)
+        if col_obj.category in filter_categories:
+            collision_prims.remove(col_prim)
+    return len(collision_prims) > 0
     
 
 def remove_unnecessary_rotations(path):
