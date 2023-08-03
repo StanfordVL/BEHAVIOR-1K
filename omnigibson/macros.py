@@ -19,6 +19,10 @@ gm.ASSET_PATH = "data/assets"
 gm.DATASET_PATH = "data/og_dataset"
 gm.KEY_PATH = "data/omnigibson.key"
 
+# Which GPU to use -- None will result in omni automatically using an appropriate GPU. Otherwise, set with either
+# integer or string-form integer
+gm.GPU_ID = os.getenv("OMNIGIBSON_GPU_ID", None)
+
 # Whether to generate a headless or non-headless application upon OmniGibson startup
 gm.HEADLESS = (os.getenv("OMNIGIBSON_HEADLESS", 'False').lower() in ('true', '1', 't'))
 
