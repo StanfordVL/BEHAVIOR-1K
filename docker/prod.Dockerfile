@@ -4,6 +4,8 @@ FROM stanfordvl/omnigibson-dev
 ADD . /omnigibson-src
 WORKDIR /omnigibson-src
 
+SHELL ["micromamba", "run", "-n", "omnigibson", "/bin/bash", "--login", "-c"]
+
 # Install OmniGibson
 RUN micromamba run -n omnigibson pip install -e .
 
