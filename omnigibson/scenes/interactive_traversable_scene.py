@@ -163,10 +163,11 @@ class InteractiveTraversableScene(TraversableScene):
 
     def _should_load_object(self, obj_info):
         category = obj_info["args"].get("category", "object")
-        in_rooms = obj_info["args"].get("in_rooms", [])
+        in_rooms = obj_info["args"].get("in_rooms", None)
 
-        # TODO: Remove this ugliness once updated
-        in_rooms = in_rooms.split(",") if isinstance(in_rooms, str) else in_rooms
+        if isinstance(in_rooms, str):
+            assert "," not in in_rooms
+        in_rooms = [in_rooms] if isinstance(in_rooms, str) else in_rooms
 
         # Do not load these object categories (can blacklist building structures as well)
         not_blacklisted = self.not_load_object_categories is None or category not in self.not_load_object_categories
