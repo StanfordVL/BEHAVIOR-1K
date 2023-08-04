@@ -408,7 +408,7 @@ def sample_raytest_start_end_symmetric_bimodal_distribution(
             - (n, s, 3)-array: (num_samples, max_sampling_attempts, 3) shaped array representing the end points for
                 raycasting defined in the world frame
     """
-    bbox_center, bbox_orn, bbox_bf_extent, _ = obj.get_base_aligned_bbox(xy_aligned=True, fallback_to_aabb=True)
+    bbox_center, bbox_orn, bbox_bf_extent, _ = obj.get_base_aligned_bbox(xy_aligned=True)
     aabb_offset = aabb_offset_fraction * bbox_bf_extent if aabb_offset is None else aabb_offset
     half_extent_with_offset = (bbox_bf_extent / 2) + aabb_offset
 
@@ -468,7 +468,7 @@ def sample_raytest_start_end_full_grid_topdown(
             - (n, s, 3)-array: (num_samples, max_sampling_attempts, 3) shaped array representing the end points for
                 raycasting defined in the world frame
     """
-    bbox_center, bbox_orn, bbox_bf_extent, _ = obj.get_base_aligned_bbox(xy_aligned=True, fallback_to_aabb=True)
+    bbox_center, bbox_orn, bbox_bf_extent, _ = obj.get_base_aligned_bbox(xy_aligned=True)
     aabb_offset = aabb_offset_fraction * bbox_bf_extent if aabb_offset is None else aabb_offset
 
     half_extent_with_offset = (bbox_bf_extent / 2) + aabb_offset

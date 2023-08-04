@@ -91,7 +91,7 @@ def _get_relevant_joints(obj):
         return default_both_sides, default_relevant_joints, default_joint_directions
 
     # Get joint IDs and names from metadata annotation. If not, return default values.
-    if m.METADATA_FIELD not in obj.metadata:
+    if m.METADATA_FIELD not in obj.metadata or len(obj.metadata[m.METADATA_FIELD]) == 0:
         log.debug(f"No openable joint metadata found for object {obj.name}")
         return default_both_sides, default_relevant_joints, default_joint_directions
 
