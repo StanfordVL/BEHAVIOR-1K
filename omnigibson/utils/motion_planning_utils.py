@@ -1,4 +1,5 @@
 import numpy as np
+from math import ceil
 
 import omnigibson as og
 from omnigibson.object_states import ContactBodies
@@ -26,6 +27,67 @@ def plan_base_motion(
     """
     from ompl import base as ob
     from ompl import geometric as ompl_geo
+
+    ANGLE_DIFF = 0.3
+    DIST_DIFF = 0.1
+
+    class CustomMotionValidator(ob.MotionValidator):
+        """
+        Rotate towards goal position, then move in a straight line and rotate to goal orientation
+        """
+
+        def __init__(self, si, space):
+            super(CustomMotionValidator, self).__init__(si)
+            self.space = space
+
+        def create_state(self, x, y, yaw):
+            state = ob.State(self.space)
+            state().setX(x)
+            state().setY(y)
+            state().setYaw(T.wrap_angle(yaw))
+            return state
+        
+        def checkMotion(self, s1, s2):
+            # from IPython import embed; embed()
+            if not si.isValid(s2):
+                return False
+            
+            start = np.array([s1.getX(), s1.getY(), s1.getYaw()])
+            goal = np.array([s2.getX(), s2.getY(), s2.getYaw()])
+            segment = goal[:2] - start[:2]
+            segment_theta = np.arctan2(segment[1], segment[0])
+            from IPython import embed; embed()
+            # Start rotation
+            diff = T.wrap_angle(segment_theta - start[2])
+            direction = np.sign(diff)
+            diff = abs(diff)
+            num_points = ceil(diff / ANGLE_DIFF) + 1
+            nav_angle = np.linspace(0.0, diff, num_points) * direction
+            angles = nav_angle + start[2]
+            for i in range(num_points):
+                if not si.isValid(self.create_state(start[0], start[1], angles[i])()):
+                    return False
+
+            # Navigation
+            dist = np.linalg.norm(segment)
+            num_points = ceil(dist / DIST_DIFF) + 1
+            nav_x = np.linspace(start[0], goal[0], num_points).tolist()
+            nav_y = np.linspace(start[1], goal[1], num_points).tolist()
+            for i in range(num_points):
+                if not si.isValid(self.create_state(nav_x[i], nav_y[i], segment_theta)()):
+                    return False
+                
+            # Goal rotation
+            diff = T.wrap_angle(goal[2] - segment_theta)
+            direction = np.sign(diff)
+            diff = abs(diff)
+            num_points = ceil(diff / ANGLE_DIFF) + 1
+            nav_angle = np.linspace(0.0, diff, num_points) * direction
+            angles = nav_angle + segment_theta
+            for i in range(num_points):
+                if not si.isValid(self.create_state(goal[0], goal[1], angles[i])()):
+                    return False
+            return True
 
     def state_valid_fn(q):
         x = q.getX()
@@ -56,6 +118,7 @@ def plan_base_motion(
     ss.setStateValidityChecker(ob.StateValidityCheckerFn(state_valid_fn))
 
     si = ss.getSpaceInformation()
+    si.setMotionValidator(CustomMotionValidator(si, space))
     planner = ompl_geo.RRTConnect(si)
     ss.setPlanner(planner)
 
