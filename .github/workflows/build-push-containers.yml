@@ -21,6 +21,7 @@ jobs:
         name: Login to NVCR
         uses: docker/login-action@v2
         with:
+          registry: nvcr.io
           username: ${{ secrets.NVCR_USERNAME }}
           password: ${{ secrets.NVCR_PASSWORD }}   
       -
