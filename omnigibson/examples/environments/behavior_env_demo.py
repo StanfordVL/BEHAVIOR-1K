@@ -21,7 +21,7 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     # Ask the user whether they want online object sampling or not
     sampling_options = {
-        # False: "Use a pre-sampled cached BEHAVIOR activity scene", # TODO: Add the file needed in dataset
+        False: "Use a pre-sampled cached BEHAVIOR activity scene",
         True: "Sample the BEHAVIOR activity in an online fashion",
     }
     should_sample = choose_from_options(options=sampling_options, name="online object sampling", random_selection=random_selection)
