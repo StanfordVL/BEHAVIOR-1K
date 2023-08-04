@@ -7,7 +7,6 @@ on:
     branches:
       - 'main'
       - 'og-develop'
-      - 'docker-action'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.head_ref || github.sha }}
@@ -72,3 +71,5 @@ jobs:
           tags: ${{ steps.meta-prod.outputs.tags }}
           labels: ${{ steps.meta-prod.outputs.labels }}
           file: docker/prod.Dockerfile
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
