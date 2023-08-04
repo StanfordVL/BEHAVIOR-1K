@@ -9,6 +9,10 @@ on:
       - 'og-develop'
       - 'docker-action'
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.head_ref || github.sha }}
+  cancel-in-progress: true
+
 jobs:
   docker:
     runs-on: [self-hosted, linux, gpu]
