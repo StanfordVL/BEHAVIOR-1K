@@ -98,12 +98,14 @@ class DatasetObject(USDObject):
             fit_avg_dim_volume (bool): whether to fit the object to have the same volume as the average dimension
                 while keeping the aspect ratio. Note that if this is set, it will override both @scale and @bounding_box
             in_rooms (None or str or list): If specified, sets the room(s) that this object should belong to. Either
-                a list of room type(s) or a single comma-delimited string of room type(s)
+                a list of room type(s) or a single room type
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
                 for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
         """
         # Store variables
-        self._in_rooms = in_rooms.split(",") if isinstance(in_rooms, str) else in_rooms
+        if isinstance(in_rooms, str):
+            assert "," not in in_rooms
+        self._in_rooms = [in_rooms] if isinstance(in_rooms, str) else in_rooms
 
         # Make sure only one of bounding_box and scale are specified
         if bounding_box is not None and scale is not None:
