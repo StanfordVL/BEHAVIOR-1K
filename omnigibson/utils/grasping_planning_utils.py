@@ -1,10 +1,12 @@
 import numpy as np
 import random
-from scipy.spatial.transform import Rotation
+from scipy.spatial.transform import Rotation as R
 
 import omnigibson.utils.transform_utils as T
 from omnigibson.object_states.open import _get_relevant_joints
 from omnigibson.utils.constants import JointType, JointAxis
+from omni.isaac.core.utils.rotations import gf_quat_to_np_array
+
 
 p = None
 grasp_position_for_open_on_revolute_joint = None
@@ -123,9 +125,15 @@ def grasp_position_for_open_on_prismatic_joint(robot, target_obj, relevant_joint
     # Match the push axis to one of the bb axes.
     push_axis_idx = JointAxis.index(relevant_joint.axis)
     canonical_push_axis = np.eye(3)[push_axis_idx]
+    joint_orientation = gf_quat_to_np_array(relevant_joint.get_attribute("physics:localRot0"))[[1, 2, 3, 0]]
+    push_axis = R.from_quat(joint_orientation).apply([1, 0, 0])
+    assert np.isclose(np.max(np.abs(push_axis)), 1.0)  # Make sure we're aligned with a bb axis.
+    push_axis_idx = np.argmax(np.abs(push_axis))
+    canonical_push_axis = np.eye(3)[push_axis_idx]
+
+
     # TODO: Need to figure out how to get the correct push direction.
-    # canonical_push_direction = canonical_push_axis * np.sign(push_axis[push_axis_idx])
-    canonical_push_direction = canonical_push_axis * 1
+    canonical_push_direction = canonical_push_axis * np.sign(push_axis[push_axis_idx])
 
     # Pick the closer of the two faces along the push axis as our favorite.
     points_along_push_axis = (
@@ -155,51 +163,31 @@ def grasp_position_for_open_on_prismatic_joint(robot, target_obj, relevant_joint
         PRISMATIC_JOINT_FRACTION_ACROSS_SURFACE_AXIS_BOUNDS[1] * diff_lateral_pos_wrt_surface_center,
     )
     lateral_pos_wrt_surface_center = min_lateral_pos_wrt_surface_center + sampled_lateral_pos_wrt_min
-    grasp_position_in_bbox_frame = center_of_selected_surface_along_push_axis + lateral_pos_wrt_surface_center
-
-    # Get the appropriate rotation
-    # palm = canonical_push_axis * -push_axis_closer_side_sign
-    # wrist = canonical_y_axis
-    # lateral = np.cross(wrist, palm)
-    # hand_orn_in_bbox_frame = get_hand_rotation_from_axes(lateral, wrist, palm)
-    hand_orn_in_bbox_frame = T.euler2quat([0, 0, -np.pi])
-
-    # Apply an additional random rotation along the face plane
-    # random_rot = random.choice([np.pi, np.pi / 2, 0, -np.pi / 2])
-    # hand_orn_in_bbox_frame = hand_orn_in_bbox_frame * Rotation.from_rotvec([0, 0, random_rot])
-
-    # Finally apply our predetermined rotation around the X axis.
-    # grasp_orn_in_bbox_frame = hand_orn_in_bbox_frame * Rotation.from_euler("X", -GRASP_ANGLE)
-    # grasp_quat_in_bbox_frame = grasp_orn_in_bbox_frame.as_quat()
-    grasp_quat_in_bbox_frame = hand_orn_in_bbox_frame
+    grasp_position_in_bbox_frame = center_of_selected_surface_along_push_axis + lateral_pos_wrt_surface_center + canonical_push_direction * 0.2
+    grasp_quat_in_bbox_frame = T.quat_inverse(joint_orientation)
 
     # Now apply the grasp offset.
-    # offset_in_bbox_frame = hand_orn_in_bbox_frame.apply(OPEN_GRASP_OFFSET)
-    offset_grasp_pose_in_bbox_frame = (grasp_position_in_bbox_frame + OPEN_GRASP_OFFSET, grasp_quat_in_bbox_frame)
+    offset_grasp_pose_in_bbox_frame = (grasp_position_in_bbox_frame, grasp_quat_in_bbox_frame)
     offset_grasp_pose_in_world_frame = T.pose_transform(
         bbox_center_in_world, bbox_quat_in_world, *offset_grasp_pose_in_bbox_frame
     )
 
     # To compute the rotation position, we want to decide how far along the rotation axis we'll go.
-    # target_joint_pos = relevant_joint.upper_limit if should_open else relevant_joint.lower_limit
-    # [target_bid] = target_obj.get_body_ids()
-    # current_joint_pos = get_joint_position(target_bid, link_id)
-    # required_pos_change = target_joint_pos - current_joint_pos
-    # push_vector_in_bbox_frame = canonical_push_direction * required_pos_change
-    # target_hand_pos_in_bbox_frame = grasp_position_in_bbox_frame + push_vector_in_bbox_frame
-    # target_hand_pos_in_world_frame = p.multiplyTransforms(
-    #     bbox_center_in_world, bbox_quat_in_world, target_hand_pos_in_bbox_frame, grasp_quat_in_bbox_frame
-    # )
+    target_joint_pos = relevant_joint.upper_limit if should_open else relevant_joint.lower_limit
+    current_joint_pos = relevant_joint.get_state()[0][0]
+    
+    required_pos_change = target_joint_pos - current_joint_pos
+    push_vector_in_bbox_frame = canonical_push_direction * required_pos_change
+    target_hand_pos_in_bbox_frame = grasp_position_in_bbox_frame + push_vector_in_bbox_frame
+    target_hand_pos_in_world_frame = T.pose_transform(
+        bbox_center_in_world, bbox_quat_in_world, target_hand_pos_in_bbox_frame, grasp_quat_in_bbox_frame
+    )
 
     # Compute the approach direction.
-    # approach_direction_in_world_frame = Rotation.from_quat(bbox_quat_in_world).apply(palm)
+    approach_direction_in_world_frame = R.from_quat(bbox_quat_in_world).apply(canonical_push_axis * -push_axis_closer_side_sign)
 
     # Decide whether a grasp is required. If approach direction and displacement are similar, no need to grasp.
-    # grasp_required = np.dot(push_vector_in_bbox_frame, palm) < 0
-
-    target_hand_pos_in_world_frame = None
-    approach_direction_in_world_frame = None
-    grasp_required = None
+    grasp_required = np.dot(push_vector_in_bbox_frame, canonical_push_axis * -push_axis_closer_side_sign) < 0
 
     return (
         offset_grasp_pose_in_world_frame,
