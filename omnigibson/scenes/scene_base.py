@@ -11,7 +11,7 @@ from omnigibson.utils.python_utils import classproperty, Serializable, Registera
 from omnigibson.utils.registry_utils import SerializableRegistry
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.objects.object_base import BaseObject
-from omnigibson.systems import SYSTEM_REGISTRY
+from omnigibson.systems.system_base import SYSTEM_REGISTRY, clear_all_systems, get_system
 from omnigibson.objects.light_object import LightObject
 from omnigibson.robots.robot_base import m as robot_macros
 from pxr import Sdf, Gf
@@ -84,6 +84,14 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             None or LightObject: Skybox light associated with this scene, if it is used
         """
         return self._skybox
+
+    @property
+    def floor_plane(self):
+        """
+        Returns:
+            None or XFormPrim: Generated floor plane prim, if it is used
+        """
+        return self._floor_plane
 
     @property
     def object_registry(self):
@@ -173,6 +181,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 name="skybox",
                 light_type="Dome",
                 intensity=1500,
+                fixed_base=True,
             )
             og.sim.import_object(self._skybox, register=False)
             light_prim = self._skybox.light_link.prim
@@ -189,6 +198,11 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             scene_info = json.load(f)
         init_info = scene_info["objects_info"]["init_info"]
         init_state = scene_info["state"]["object_registry"]
+        init_systems = scene_info["state"]["system_registry"].keys()
+
+        # Create desired systems
+        for system_name in init_systems:
+            get_system(system_name)
 
         # Iterate over all scene info, and instantiate object classes linked to the objects found on the stage
         # accordingly
@@ -205,6 +219,17 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 position=init_state[obj_name]["root_link"]["pos"],
                 orientation=init_state[obj_name]["root_link"]["ori"],
             )
+
+    def _load_metadata_from_scene_file(self):
+        """
+        Loads metadata from self.scene_file and stores it within the world prim's CustomData
+        """
+        with open(self.scene_file, "r") as f:
+            scene_info = json.load(f)
+
+        # Write the metadata
+        for key, data in scene_info.get("metadata", dict()).items():
+            og.sim.write_metadata(key=key, data=data)
 
     def _should_load_object(self, obj_info):
         """
@@ -241,8 +266,10 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         self._load()
 
         # If we have any scene file specified, use it to load the objects within it and also update the initial state
+        # and metadata
         if self.scene_file is not None:
             self._load_objects_from_scene_file()
+            self._load_metadata_from_scene_file()
 
         # We're now loaded
         self._loaded = True
@@ -251,17 +278,12 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         if not og.sim.is_stopped():
             og.sim.stop()
 
-    def clear_systems(self):
-        # Clears systems so they can be re-initialized
-        for system in self.systems:
-            system.clear()
-
     def clear(self):
         """
         Clears any internal state before the scene is destroyed
         """
-        # Must clear all systems
-        self.clear_systems()
+        # Clears systems so they can be re-initialized
+        clear_all_systems()
 
     def _initialize(self):
         """
@@ -398,8 +420,9 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # let scene._load() load the object when called later on.
         prim = obj.load()
 
-        # If this object is fixed, disable collisions between the fixed links of the fixed objects
-        if obj.fixed_base:
+        # If this object is fixed and is NOT an agent, disable collisions between the fixed links of the fixed objects
+        # This is to account for cases such as Tiago, which has a fixed base which is needed for its global base joints
+        if obj.fixed_base and obj.category != robot_macros.ROBOT_CATEGORY:
             # TODO: Remove building hotfix once asset collision meshes are fixed!!
             building_categories = {"walls", "floors", "ceilings"}
             for fixed_obj in self.fixed_objects.values():
@@ -469,10 +492,10 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
     def fixed_objects(self):
         """
         Returns:
-            dict: Keyword-mapped objects that are fixed in the scene. Maps object name to their object class instances
-                (DatasetObject)
+            dict: Keyword-mapped objects that are fixed in the scene, IGNORING any robots.
+                Maps object name to their object class instances (DatasetObject)
         """
-        return {obj.name: obj for obj in self.object_registry("fixed_base", True, default_val=[])}
+        return {obj.name: obj for obj in self.object_registry("fixed_base", True, default_val=[]) if obj.category != robot_macros.ROBOT_CATEGORY}
 
     def get_random_floor(self):
         """

@@ -55,9 +55,21 @@ class OnFire(HeatSourceOrSink, UpdateStateMixin):
         )
         self.ignition_temperature = ignition_temperature
 
-    @staticmethod
-    def get_dependencies():
-        return HeatSourceOrSink.get_dependencies() + [Temperature]
+    @classmethod
+    def requires_metalink(cls, **kwargs):
+        # Does not require metalink to be specified
+        return False
+
+    @property
+    def _default_link(self):
+        # Fallback to root link
+        return self.obj.root_link
+
+    @classmethod
+    def get_dependencies(cls):
+        deps = super().get_dependencies()
+        deps.add(Temperature)
+        return deps
 
     def _update(self):
         # If it's on fire, maintain the fire temperature

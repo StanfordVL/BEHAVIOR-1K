@@ -405,7 +405,7 @@ class VisionSensor(BaseSensor):
             pose=gym.spaces.Box(low=-np.inf, high=np.inf, shape=(4, 4), dtype=float),
             fov=gym.spaces.Box(low=0, high=np.inf, shape=(), dtype=float),
             focal_length=gym.spaces.Box(low=0, high=np.inf, shape=(), dtype=float),
-            horizontal_aperature=gym.spaces.Box(low=0, high=np.inf, shape=(), dtype=float),
+            horizontal_aperture=gym.spaces.Box(low=0, high=np.inf, shape=(), dtype=float),
             view_projection_matrix=gym.spaces.Box(low=-np.inf, high=np.inf, shape=(4, 4), dtype=float),
             resolution=gym.spaces.Dict(dict(
                 width=gym.spaces.Box(low=1, high=MAX_VIEWER_SIZE, shape=(), dtype=np.uint),

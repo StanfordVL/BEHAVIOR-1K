@@ -22,9 +22,10 @@ import trimesh
 
 import omnigibson as og
 from omnigibson.macros import gm
-from omnigibson.utils.constants import JointType, PRIMITIVE_MESH_TYPES
+from omnigibson.utils.constants import JointType, PRIMITIVE_MESH_TYPES, PrimType, GEOM_TYPES
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.ui_utils import suppress_omni_log
+
 import omnigibson.utils.transform_utils as T
 
 GF_TO_VT_MAPPING = {
@@ -156,7 +157,7 @@ def create_joint(prim_path, joint_type, body0=None, body1=None, enabled=True,
 
     Args:
         prim_path (str): absolute path to where the joint will be created
-        joint_type (str): type of joint to create. Valid options are:
+        joint_type (str or JointType): type of joint to create. Valid options are:
             "FixedJoint", "Joint", "PrismaticJoint", "RevoluteJoint", "SphericalJoint"
                         (equivalently, one of JointType)
         body0 (str or None): absolute path to the first body's prim. At least @body0 or @body1 must be specified.
@@ -226,6 +227,138 @@ def create_joint(prim_path, joint_type, body0=None, body1=None, enabled=True,
 
     # Return this joint
     return joint_prim
+
+
+class RigidContactAPI:
+    """
+    Class containing class methods to aggregate rigid body contacts across all rigid bodies in the simulator
+    """
+    # Dictionary mapping rigid body prim path to corresponding index in the contact view matrix
+    _PATH_TO_IDX = None
+
+    # Contact view for generating contact matrices at each timestep
+    _CONTACT_VIEW = None
+
+    # Current aggregated contacts over all rigid bodies at the current timestep. Shape: (N, N, 3)
+    _CONTACT_MATRIX = None
+
+    # Current cache, mapping 2-tuple (prim_paths_a, prim_paths_b) to contact values
+    _CONTACT_CACHE = None
+
+    @classmethod
+    def initialize_view(cls):
+        """
+        Initializes the rigid contact view. Note: Can only be done when sim is playing!
+        """
+        assert og.sim.is_playing(), "Cannot create rigid contact view while sim is not playing!"
+
+        # Compile deterministic mapping from rigid body path to idx
+        # Note that omni's ordering is based on the top-down object ordering path on the USD stage, which coincidentally
+        # matches the same ordering we store objects in our registry. So the mapping we generate from our registry
+        # mapping aligns with omni's ordering!
+        i = 0
+        cls._PATH_TO_IDX = dict()
+        for obj in og.sim.scene.objects:
+            if obj.prim_type == PrimType.RIGID:
+                for link in obj.links.values():
+                    if not link.kinematic_only:
+                        cls._PATH_TO_IDX[link.prim_path] = i
+                        i += 1
+
+        # If there are no valid objects, clear the view and terminate early
+        if i == 0:
+            cls._CONTACT_VIEW = None
+            return
+
+        # Generate rigid body view, making sure to update the simulation first (without physics) so that the physx
+        # backend is synchronized with any newly added objects
+        # We also suppress the omni tensor plugin from giving warnings we expect
+        og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
+        with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
+            cls._CONTACT_VIEW = og.sim.physics_sim_view.create_rigid_contact_view(
+                pattern="/World/*/*",
+                filter_patterns=list(cls._PATH_TO_IDX.keys()),
+            )
+
+        # Sanity check generated view -- this should generate square matrices of shape (N, N, 3)
+        n_bodies = len(cls._PATH_TO_IDX)
+        # from IPython import embed; embed()
+        assert cls._CONTACT_VIEW.sensor_count == n_bodies and cls._CONTACT_VIEW.filter_count == n_bodies, \
+            f"Got unexpected contact view shape. Expected: ({n_bodies}, {n_bodies}); " \
+            f"got: ({cls._CONTACT_VIEW.sensor_count}, {cls._CONTACT_VIEW.filter_count})"
+
+    @classmethod
+    def get_body_idx(cls, prim_path):
+        """
+        Returns:
+            int: idx assigned to the rigid body defined by @prim_path
+        """
+        return cls._PATH_TO_IDX[prim_path]
+
+    @classmethod
+    def get_all_impulses(cls):
+        """
+        Grab all impulses at the current timestep
+
+        Returns:
+            n-array: (N, N, 3) impulse array defining current impulses between all N contact-sensor enabled rigid bodies
+                in the simulator
+        """
+        # Generate the contact matrix if it doesn't already exist
+        if cls._CONTACT_MATRIX is None:
+            cls._CONTACT_MATRIX = cls._CONTACT_VIEW.get_contact_force_matrix(dt=1.0)
+
+        return cls._CONTACT_MATRIX
+
+    @classmethod
+    def get_impulses(cls, prim_paths_a, prim_paths_b):
+        """
+        Grabs the matrix representing all impulse forces between rigid prims from @prim_paths_a and
+        rigid prims from @prim_paths_b
+
+        Args:
+            prim_paths_a (list of str): Rigid body prim path(s) with which to grab contact impulses against
+                any of the rigid body prim path(s) defined by @prim_paths_b
+            prim_paths_b (list of str): Rigid body prim path(s) with which to grab contact impulses against
+                any of the rigid body prim path(s) defined by @prim_paths_a
+
+        Returns:
+            n-array: (N, M, 3) impulse array defining current impulses between N bodies from @prim_paths_a and M bodies
+                from @prim_paths_b
+        """
+        # Compute subset of matrix and return
+        idxs_a = [cls._PATH_TO_IDX[path] for path in prim_paths_a]
+        idxs_b = [cls._PATH_TO_IDX[path] for path in prim_paths_b]
+        return cls.get_all_impulses()[idxs_a][:, idxs_b]
+
+    @classmethod
+    def in_contact(cls, prim_paths_a, prim_paths_b):
+        """
+        Check if any rigid prim from @prim_paths_a is in contact with any rigid prim from @prim_paths_b
+
+        Args:
+            prim_paths_a (list of str): Rigid body prim path(s) with which to check contact against any of the rigid
+                body prim path(s) defined by @prim_paths_b
+            prim_paths_b (list of str): Rigid body prim path(s) with which to check contact against any of the rigid
+                body prim path(s) defined by @prim_paths_a
+
+        Returns:
+            bool: Whether any body from @prim_paths_a is in contact with any body from @prim_paths_b
+        """
+        # Check if the contact tuple already exists in the cache; if so, return the value
+        key = (tuple(prim_paths_a), tuple(prim_paths_b))
+        if key not in cls._CONTACT_CACHE:
+            # In contact if any of the matrix values representing the interaction between the two groups is non-zero
+            cls._CONTACT_CACHE[key] = np.any(cls.get_impulses(prim_paths_a=prim_paths_a, prim_paths_b=prim_paths_b))
+        return cls._CONTACT_CACHE[key]
+
+    @classmethod
+    def clear(cls):
+        """
+        Clears the internal contact matrix and cache
+        """
+        cls._CONTACT_MATRIX = None
+        cls._CONTACT_CACHE = dict()
 
 
 class CollisionAPI:
@@ -363,6 +496,7 @@ class BoundingBoxAPI:
         """
         # Create cache if it doesn't already exist
         if cls.CACHE_NON_FLATCACHE is None:
+            og.sim.psi.fetch_results()
             cls.CACHE_NON_FLATCACHE = create_bbox_cache(use_extents_hint=False)
 
         # Grab aabb
@@ -516,7 +650,7 @@ class FlatcacheAPI:
         # For any prim transforms that were manually updated, we need to restore their original transforms
         for prim in cls.MODIFIED_PRIMS:
             cls.reset_raw_object_transforms_in_usd(prim)
-        cls.FLATCACHE_MODIFIED_PRIMS = set()
+        cls.MODIFIED_PRIMS = set()
 
 
 def clear():
@@ -573,12 +707,15 @@ def create_mesh_prim_with_default_xform(primitive_type, prim_path, u_patches=Non
     carb.settings.get_settings().set(evaluator.SETTING_OBJECT_HALF_SCALE, hs_backup)
 
 
-def mesh_prim_to_trimesh_mesh(mesh_prim):
+def mesh_prim_to_trimesh_mesh(mesh_prim, include_normals=True, include_texcoord=True):
     """
     Generates trimesh mesh from @mesh_prim
 
     Args:
         mesh_prim (Usd.Prim): Mesh prim to convert into trimesh mesh
+        include_normals (bool): Whether to include the normals in the resulting trimesh or not
+        include_texcoord (bool): Whether to include the corresponding 2D-texture coordinates in the resulting
+            trimesh or not
 
     Returns:
         trimesh.Trimesh: Generated trimesh mesh
@@ -594,7 +731,105 @@ def mesh_prim_to_trimesh_mesh(mesh_prim):
             faces.append([face_indices[i], face_indices[i + j + 1], face_indices[i + j + 2]])
         i += count
 
-    return trimesh.Trimesh(vertices=vertices, faces=faces)
+    kwargs = dict(vertices=vertices, faces=faces)
+
+    if include_normals:
+        kwargs["vertex_normals"] = np.array(mesh_prim.GetAttribute("normals").Get())
+
+    if include_texcoord:
+        kwargs["visual"] = trimesh.visual.TextureVisuals(uv=np.array(mesh_prim.GetAttribute("primvars:st").Get()))
+
+    return trimesh.Trimesh(**kwargs)
+
+
+def sample_mesh_keypoints(mesh_prim, n_keypoints, n_keyfaces, seed=None):
+    """
+    Samples keypoints and keyfaces for mesh @mesh_prim
+
+    Args:
+        mesh_prim (Usd.Prim): Mesh prim to be sampled from
+        n_keypoints (int): number of (unique) keypoints to randomly sample from @mesh_prim
+        n_keyfaces (int): number of (unique) keyfaces to randomly sample from @mesh_prim
+        seed (None or int): If set, sets the random seed for deterministic results
+
+    Returns:
+        2-tuple:
+            - n-array: (n,) 1D int array representing the randomly sampled point idxs from @mesh_prim.
+                Note that since this is without replacement, the total length of the array may be less than
+                @n_keypoints
+            - None or n-array: 1D int array representing the randomly sampled face idxs from @mesh_prim.
+                Note that since this is without replacement, the total length of the array may be less than
+                @n_keyfaces
+    """
+    # Set seed if deterministic
+    if seed is not None:
+        np.random.seed(seed)
+
+    # Generate trimesh mesh from which to aggregate points
+    tm = mesh_prim_to_trimesh_mesh(mesh_prim=mesh_prim, include_normals=False, include_texcoord=False)
+    n_unique_vertices, n_unique_faces = len(tm.vertices), len(tm.faces)
+    faces_flat = tm.faces.flatten()
+    n_vertices = len(faces_flat)
+
+    # Sample vertices
+    unique_vertices = np.unique(faces_flat, return_index=True)[1]
+    assert len(unique_vertices) == n_unique_vertices
+    keypoint_idx = np.random.choice(unique_vertices, size=n_keypoints, replace=False) if \
+        n_unique_vertices > n_keypoints else unique_vertices
+
+    # Sample faces
+    keyface_idx = np.random.choice(n_unique_faces, size=n_keyfaces, replace=False) if \
+        n_unique_faces > n_keyfaces else np.arange(n_unique_faces)
+
+    return keypoint_idx, keyface_idx
+
+
+def get_mesh_volume_and_com(mesh_prim):
+    """
+    Computes the volume and center of mass for @mesh_prim
+
+    Args:
+        mesh_prim (Usd.Prim): Mesh prim to compute volume and center of mass for
+
+    Returns:
+        Tuple[bool, float, np.array]: Tuple containing the (is_volume, volume, center_of_mass) in the mesh
+            frame of @mesh_prim
+    """
+    mesh_type = mesh_prim.GetPrimTypeInfo().GetTypeName()
+    assert mesh_type in GEOM_TYPES, f"Invalid mesh type: {mesh_type}"
+    # Default volume and com
+    volume = 0.0
+    com = np.zeros(3)
+    is_volume = True
+    if mesh_type == "Mesh":
+        # We construct a trimesh object from this mesh in order to infer its volume
+        trimesh_mesh = mesh_prim_to_trimesh_mesh(mesh_prim, include_normals=False, include_texcoord=False)
+        is_volume = trimesh_mesh.is_volume
+        if is_volume:
+            volume = trimesh_mesh.volume
+            com = trimesh_mesh.center_mass
+        else:
+            # If the mesh is not a volume, we compute its convex hull and use that instead
+            try:
+                trimesh_mesh_convex = trimesh_mesh.convex_hull
+                volume = trimesh_mesh_convex.volume
+                com = trimesh_mesh_convex.center_mass
+            except:
+                # if convex hull computation fails, it usually means the mesh is degenerated. We just skip it.
+                pass
+    elif mesh_type == "Sphere":
+        volume = 4 / 3 * np.pi * (mesh_prim.GetAttribute("radius").Get() ** 3)
+    elif mesh_type == "Cube":
+        volume = mesh_prim.GetAttribute("size").Get() ** 3
+    elif mesh_type == "Cone":
+        volume = np.pi * (mesh_prim.GetAttribute("radius").Get() ** 2) * mesh_prim.GetAttribute("height").Get() / 3
+        com = np.array([0, 0, mesh_prim.GetAttribute("height").Get() / 4])
+    elif mesh_type == "Cylinder":
+        volume = np.pi * (mesh_prim.GetAttribute("radius").Get() ** 2) * mesh_prim.GetAttribute("height").Get()
+    else:
+        raise ValueError(f"Cannot compute volume for mesh of type: {mesh_type}")
+
+    return is_volume, volume, com
 
 
 def create_primitive_mesh(prim_path, primitive_type, extents=1.0, u_patches=None, v_patches=None):

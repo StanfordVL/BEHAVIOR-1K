@@ -107,7 +107,7 @@ class TraversableMap(BaseMap):
 
             # We search for the largest connected areas
             if self.build_graph:
-                # Directly set map siz
+                # Directly set map size
                 self.floor_graph = self.build_trav_graph(map_size, maps_path, floor, trav_map)
 
             self.floor_map.append(trav_map)

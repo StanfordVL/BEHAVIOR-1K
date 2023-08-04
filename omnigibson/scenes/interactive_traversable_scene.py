@@ -4,6 +4,7 @@ from omnigibson.scenes.traversable_scene import TraversableScene
 from omnigibson.maps.segmentation_map import SegmentationMap
 from omnigibson.utils.asset_utils import get_og_scene_path
 from omnigibson.utils.ui_utils import create_module_logger
+from collections import defaultdict
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -164,6 +165,9 @@ class InteractiveTraversableScene(TraversableScene):
         category = obj_info["args"].get("category", "object")
         in_rooms = obj_info["args"].get("in_rooms", [])
 
+        # TODO: Remove this ugliness once updated
+        in_rooms = in_rooms.split(",") if isinstance(in_rooms, str) else in_rooms
+
         # Do not load these object categories (can blacklist building structures as well)
         not_blacklisted = self.not_load_object_categories is None or category not in self.not_load_object_categories
 
@@ -171,7 +175,7 @@ class InteractiveTraversableScene(TraversableScene):
         whitelisted = self.load_object_categories is None or category in self.load_object_categories
 
         # This object is not located in one of the selected rooms, skip
-        valid_room = self.load_room_instances is None or len(set(self.load_room_instances) & set(in_rooms)) >= 0
+        valid_room = self.load_room_instances is None or len(set(self.load_room_instances) & set(in_rooms)) > 0
 
         # Check whether this is an agent and we allow agents
         agent_ok = self.include_robots or category != robot_macros.ROBOT_CATEGORY

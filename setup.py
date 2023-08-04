@@ -40,6 +40,8 @@ setup(
         "imageio-ffmpeg",
         "termcolor",
         "progressbar",
+        "pymeshlab",
+        "click"
     ],
     tests_require=[],
     python_requires=">=3",

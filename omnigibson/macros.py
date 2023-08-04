@@ -13,11 +13,15 @@ from addict import Dict
 macros = Dict()
 gm = macros.globals
 
-# Paths (either relative to this directory or global absolute paths) for assets
+# Path (either relative to OmniGibson/omnigibson directory or global absolute path) for data
 # Assets correspond to non-objects / scenes (e.g.: robots), and dataset incliudes objects + scene
 gm.ASSET_PATH = "data/assets"
 gm.DATASET_PATH = "data/og_dataset"
 gm.KEY_PATH = "data/omnigibson.key"
+
+# Which GPU to use -- None will result in omni automatically using an appropriate GPU. Otherwise, set with either
+# integer or string-form integer
+gm.GPU_ID = os.getenv("OMNIGIBSON_GPU_ID", None)
 
 # Whether to generate a headless or non-headless application upon OmniGibson startup
 gm.HEADLESS = (os.getenv("OMNIGIBSON_HEADLESS", 'False').lower() in ('true', '1', 't'))
@@ -65,9 +69,6 @@ gm.ENABLE_TRANSITION_RULES = True
 # Default settings for the omni UI viewer
 gm.DEFAULT_VIEWER_WIDTH = 1280
 gm.DEFAULT_VIEWER_HEIGHT = 720
-
-# Whether to use encrypted assets
-gm.USE_ENCRYPTED_ASSETS = True
 
 # (Demo-purpose) Whether to activate Assistive Grasping mode for Cloth (it's handled differently from RigidBody)
 gm.AG_CLOTH = False

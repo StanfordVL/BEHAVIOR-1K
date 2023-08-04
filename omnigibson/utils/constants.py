@@ -9,7 +9,7 @@ from omnigibson.macros import gm
 from omnigibson.utils.asset_utils import get_og_avg_category_specs
 
 MAX_INSTANCE_COUNT = 1024
-MAX_CLASS_COUNT = 2048
+MAX_CLASS_COUNT = 4096
 MAX_VIEWER_SIZE = 2048
 
 
@@ -53,6 +53,14 @@ class SemanticClass(IntEnum):
 class ParticleModifyMethod(IntEnum):
     ADJACENCY = 0
     PROJECTION = 1
+
+
+# Specific condition types for applying / removing particles
+class ParticleModifyCondition(IntEnum):
+    FUNCTION = 0
+    SATURATED = 1
+    TOGGLEDON = 2
+    GRAVITY = 3
 
 
 # Valid omni characters for specifying strings, e.g. prim paths
@@ -101,6 +109,8 @@ PRIMITIVE_MESH_TYPES = {
 # Valid geom types
 GEOM_TYPES = {"Sphere", "Cube", "Capsule", "Cone", "Cylinder", "Mesh"}
 
+# Valid joint axis
+JointAxis = ["X", "Y", "Z"]
 
 # TODO: Clean up this class to be better enum with sanity checks
 # Joint types
@@ -146,8 +156,6 @@ class JointType:
 AVERAGE_OBJ_DENSITY = 67.0
 AVERAGE_CATEGORY_SPECS = get_og_avg_category_specs()
 
-KINEMATICS_STATES = frozenset({"inside", "ontop", "under"})
-
 
 def get_collision_group_mask(groups_to_exclude=[]):
     """Get a collision group mask that has collisions enabled for every group except those in groups_to_exclude."""
@@ -162,21 +170,6 @@ class OccupancyGridState:
     UNKNOWN = 0.5
     FREESPACE = 1.0
 
-
-# BEHAVIOR-related
-FLOOR_SYNSET = "floor.n.01"
-NON_SAMPLEABLE_OBJECTS = []
-non_sampleable_category_txt = os.path.join(gm.DATASET_PATH, "metadata/non_sampleable_categories.txt")
-if os.path.isfile(non_sampleable_category_txt):
-    with open(non_sampleable_category_txt) as f:
-        NON_SAMPLEABLE_OBJECTS = [FLOOR_SYNSET] + [line.strip() for line in f.readlines()]
-MACRO_PARTICLE_SYNSETS = {"stain.n.01", "dust.n.01"}
-WATER_SYNSETS = {"water.n.06"}
-SYSTEM_SYNSETS_TO_SYSTEM_NAMES = {
-    "water.n.06": "water",
-    "stain.n.01": "stain",
-    "dust.n.01": "dust",
-}
 
 MAX_TASK_RELEVANT_OBJS = 50
 TASK_RELEVANT_OBJS_OBS_DIM = 9

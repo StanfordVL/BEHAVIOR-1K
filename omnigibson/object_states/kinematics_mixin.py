@@ -2,6 +2,7 @@ from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.contact_bodies import ContactBodies
 from omnigibson.object_states.object_state_base import BaseObjectState
 from omnigibson.object_states.pose import Pose
+from omnigibson.utils.python_utils import classproperty
 
 
 class KinematicsMixin(BaseObjectState):
@@ -10,9 +11,11 @@ class KinematicsMixin(BaseObjectState):
     on the default kinematics states.
     """
 
-    @staticmethod
-    def get_dependencies():
-        return BaseObjectState.get_dependencies() + [Pose, AABB, ContactBodies]
+    @classmethod
+    def get_dependencies(cls):
+        deps = super().get_dependencies()
+        deps.update({Pose, AABB, ContactBodies})
+        return deps
 
     def cache_info(self, get_value_args):
         # Import here to avoid circular imports
@@ -40,3 +43,10 @@ class KinematicsMixin(BaseObjectState):
                 if obj.states[Pose].has_changed(get_value_args=(), value=pose, info={}, t=t):
                     return False
         return True
+
+    @classproperty
+    def _do_not_register_classes(cls):
+        # Don't register this class since it's an abstract template
+        classes = super()._do_not_register_classes
+        classes.add("KinematicsMixin")
+        return classes

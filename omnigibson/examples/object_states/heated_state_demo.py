@@ -26,7 +26,7 @@ def main():
             name=f"bowl{i}",
             category="bowl",
             model="ajzltc",
-            scale=scale,
+            bounding_box=np.array([0.329, 0.293, 0.168]) * scale,
             abilities={"heatable": {}},
             position=[x, 0, 0.2],
         ))

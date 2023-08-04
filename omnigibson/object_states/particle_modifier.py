@@ -9,28 +9,29 @@ from omnigibson.object_states.contact_bodies import ContactBodies
 from omnigibson.object_states.contact_particles import ContactParticles
 from omnigibson.object_states.covered import Covered
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
-from omnigibson.object_states.object_state_base import AbsoluteObjectState
+from omnigibson.object_states.object_state_base import IntrinsicObjectState
+from omnigibson.object_states.saturated import ModifiedParticles, Saturated
 from omnigibson.object_states.toggle import ToggledOn
 from omnigibson.object_states.update_state_mixin import UpdateStateMixin
-from omnigibson.systems.macro_particle_system import VisualParticleSystem
-from omnigibson.systems.micro_particle_system import PhysicalParticleSystem
-from omnigibson.systems import get_system, is_visual_particle_system, is_physical_particle_system, is_system_active
-from omnigibson.utils.constants import ParticleModifyMethod, PrimType
-from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function, get_particle_positions_from_frame
-from omnigibson.utils.python_utils import assert_valid_key, classproperty
+from omnigibson.systems.system_base import VisualParticleSystem, PhysicalParticleSystem, get_system, \
+    is_visual_particle_system, is_physical_particle_system, is_system_active, REGISTERED_SYSTEMS
+from omnigibson.utils.constants import ParticleModifyMethod, ParticleModifyCondition, PrimType
+from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function, \
+    get_particle_positions_in_frame, get_particle_positions_from_frame
+from omnigibson.utils.python_utils import classproperty
 from omnigibson.utils.deprecated_utils import Core
 from omnigibson.utils.ui_utils import suppress_omni_log
 from omnigibson.utils.usd_utils import create_primitive_mesh, FlatcacheAPI
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.sampling_utils import sample_cuboid_on_object
-from omni.isaac.core.utils.prims import get_prim_at_path, delete_prim, move_prim, is_prim_path_valid
+from omni.isaac.core.utils.prims import get_prim_at_path, delete_prim, is_prim_path_valid
 from pxr import PhysicsSchemaTools, UsdGeom, Gf, Sdf
 
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
-m.APPLICATION_LINK_PREFIX = "particleapplication"
+m.APPLICATION_LINK_PREFIX = "particleapplier"
 m.REMOVAL_LINK_PREFIX = "particleremover"
 
 # How many samples within the application area to generate per update step
@@ -58,7 +59,7 @@ m.PARTICLE_MODIFIER_ADJACENCY_AREA_MARGIN = 0.05
 # Settings for determining how the projection particles are visualized as they're projected
 m.PROJECTION_VISUALIZATION_CONE_TIP_RADIUS = 0.001
 m.PROJECTION_VISUALIZATION_RATE = 200
-m.PROJECTION_VISUALIZATION_SPEED = 3.0
+m.PROJECTION_VISUALIZATION_SPEED = 2.0
 m.PROJECTION_VISUALIZATION_ORIENTATION_BIAS = 1e6
 m.PROJECTION_VISUALIZATION_SPREAD_FACTOR = 0.8
 
@@ -70,6 +71,7 @@ def create_projection_visualization(
         projection_radius,
         projection_height,
         particle_radius,
+        parent_scale,
         material=None,
 ):
     """
@@ -81,8 +83,12 @@ def create_projection_visualization(
         shape (str): Shape of the projection to generate. Valid options are: {Sphere, Cone}
         projection_name (str): Name associated with this projection visualization. Should be unique!
         projection_radius (float): Radius of the generated projection visualization overall volume
+            (specified in local frame)
         projection_height (float): Height of the generated projection visualization overall volume
+            (specified in local frame)
         particle_radius (float): Radius of the particles composing the projection visualization
+        parent_scale (3-array): If specified, specifies the (x,y,z) scale of the parent Xform prim of the
+            generated source sphere prim at @prim_path. This will be used to scale the visualization accordingly
         material (None or MaterialPrim): If specified, specifies the material to associate with the generated
             particles within the projection visualization
 
@@ -93,6 +99,7 @@ def create_projection_visualization(
     """
     # Create the desired shape which will be used as the source input prim into the generated projection visualization
     source = UsdGeom.Sphere.Define(og.sim.stage, Sdf.Path(prim_path))
+
     # Modify the radius according to the desired @shape (and also infer the desired spread values)
     if shape == "Cylinder":
         source_radius = projection_radius
@@ -103,13 +110,22 @@ def create_projection_visualization(
         spread_ratio = projection_radius * 2.0 / projection_height
         spread = np.ones(3) * spread_ratio * m.PROJECTION_VISUALIZATION_SPREAD_FACTOR
     else:
-        raise ValueError(f"Invalid shape specified for projection visualization! Valid options are: [Sphere, Cylinder], got: {shape}")
+        raise ValueError(f"Invalid shape specified for projection visualization! Valid options are: [Cone, Cylinder], got: {shape}")
     # Set the radius
     source.GetRadiusAttr().Set(source_radius)
     # Also make the prim invisible
     UsdGeom.Imageable(source.GetPrim()).MakeInvisible()
     # Generate the ComputeGraph nodes to render the projection
     core = Core(lambda val: None, particle_system_name=projection_name)
+
+    # Scale radius and height by the parent scale -- projection always points in the negative-z direction of the
+    # parent frame
+    # We do this AFTER we create the source sphere because the actual projection is scaled in the world frame, whereas
+    # the source sphere is already scaled by its own parent frame
+    # NOTE: The generated projection visualization will NOT match the underlying projection mesh if the parent link is
+    # scaled non-uniformly!!
+    projection_radius *= np.mean(parent_scale[:2])
+    projection_height *= parent_scale[2]
 
     # Suppress omni warnings here -- we don't have control over this API, but omni likes to complain about this
     with suppress_omni_log(channels=["omni.graph.core.plugin", "omni.usd", "rtx.neuraylib.plugin"]):
@@ -153,67 +169,91 @@ def create_projection_visualization(
     return get_prim_at_path(system_path), emitter_prim
 
 
-class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixin):
+class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMixin):
     """
     Object state representing an object that has the ability to modify visual and / or physical particles within the
     active simulation.
 
     Args:
         obj (StatefulObject): Object to which this state will be applied
-        method (ParticleModifyMethod): Method to modify particles. Current options supported are ADJACENCY (i.e.:
-            "touching" particles) or PROJECTION (i.e.: "spraying" particles)
-        conditions (dict): Dictionary mapping the names of ParticleSystem (str) to None or the corresponding condition /
-            list of conditions (where None represents no conditions) necessary in order for this particle modifier to be
-            able to modify particles belonging to @ParticleSystem. Each condition should be a function, whose signature
-            is as follows:
+        conditions (dict): Dictionary mapping the names of ParticleSystem (str) to None or list of 2-tuples, where
+            None represents no conditions, or each 2-tuple is interpreted as a single condition in the form of
+            (ParticleModifyCondition, value) necessary in order for this particle modifier to be
+            able to modify particles belonging to @ParticleSystem. Expected types of val are as follows:
+
+            SATURATED: string name of the desired system that this modifier must be saturated by, e.g., "water"
+            TOGGLEDON: boolean T/F; whether this modifier must be toggled on or not
+            GRAVITY: boolean T/F; whether this modifier must be pointing downwards (T) or upwards (F)
+            FUNCTION: a function, whose signature is as follows:
 
                 def condition(obj) --> bool
 
-            Where @obj is the specific object that this ParticleModifier state belongs to.
-            For a given ParticleSystem, if all of its conditions evaluate to True and particles are detected within
+                Where @obj is the specific object that this ParticleModifier state belongs to.
+
+            For a given ParticleSystem, the list of 2-tuples will be converted into a list of function calls of the
+            form above -- if all of its conditions evaluate to True and particles are detected within
             this particle modifier area, then we potentially modify those particles
+        method (ParticleModifyMethod): Method to modify particles. Current options supported are ADJACENCY (i.e.:
+            "touching" particles) or PROJECTION (i.e.: "spraying" particles)
         projection_mesh_params (None or dict): If specified and @method is ParticleModifyMethod.PROJECTION,
-            manually overrides any metadata found from @obj.metadata to infer what projection volume to generate
+            manually overrides any data inferred directly from this object to infer what projection volume to generate
             for this particle modifier. Expected entries are as follows:
 
-                "type": (str), one of {"Cylinder", "Cone"}
+                "type": (str), one of {"Cylinder", "Cone", "Cube", "Sphere"}
                 "extents": (3-array), the (x,y,z) extents of the generated volume (specified in local link frame!)
-                "visualize": (bool), whether to visualize this projection or not
 
             If None, information found from @obj.metadata will be used instead.
             NOTE: x-direction should align with the projection mesh's height (i.e.: z) parameter in @extents!
     """
-    def __init__(self, obj, method, conditions, projection_mesh_params=None):
+    def __init__(self, obj, conditions, method=ParticleModifyMethod.ADJACENCY, projection_mesh_params=None):
 
         # Store internal variables
         self.method = method
-        self.conditions = conditions
         self.projection_source_sphere = None
         self.projection_mesh = None
-        self.projection_system = None
-        self.projection_emitter = None
         self._check_in_mesh = None
         self._check_overlap = None
         self._link_prim_paths = None
         self._current_step = None
         self._projection_mesh_params = projection_mesh_params
 
-        # Map of system to number of modified particles (only include systems specified in the conditions)
-        self.modified_particle_count = dict([(system_name, 0) for system_name in self.conditions])
-
-        # Standardize the conditions (make sure every system has at least one condition, which to make sure
-        # the particle modifier isn't already limited with the specific number of particles)
-        for system_name, conds in conditions.items():
-            # Make sure the system is supported
-            assert is_visual_particle_system(system_name) or is_physical_particle_system(system_name), f"Unsupported system for ParticleModifier {system_name}"
-            # Make sure conds isn't empty and is a list
-            conds = [] if conds is None else list(conds)
-            # Add the condition to avoid limits
-            conds.append(self._generate_limit_condition(system_name))
-            conditions[system_name] = conds
+        # Parse conditions
+        self.conditions = self._parse_conditions(conditions=conditions)
 
         # Run super method
         super().__init__(obj)
+
+    @classmethod
+    def is_compatible(cls, obj, **kwargs):
+        # Run super first
+        compatible, reason = super().is_compatible(obj, **kwargs)
+        if not compatible:
+            return compatible, reason
+
+        # Check whether this state has toggledon if required or saturated if required for any condition
+        conditions = kwargs.get("conditions", dict())
+        cond_types = {cond[0] for _, conds in conditions.items() for cond in conds}
+        for cond_type, state_type in zip((ParticleModifyCondition.TOGGLEDON,), (ToggledOn,)):
+            if cond_type in cond_types and state_type not in obj.states:
+                return False, f"{cls.__name__} requires {state_type.__name__} state!"
+
+        return True, None
+
+    @classmethod
+    def is_compatible_asset(cls, prim, **kwargs):
+        # Run super first
+        compatible, reason = super().is_compatible_asset(prim, **kwargs)
+        if not compatible:
+            return compatible, reason
+
+        # Check whether this state has toggledon if required or saturated if required for any condition
+        conditions = kwargs.get("conditions", dict())
+        cond_types = {cond[0] for _, conds in conditions.items() for cond in conds}
+        for cond_type, state_type in zip((ParticleModifyCondition.TOGGLEDON,), (ToggledOn,)):
+            if cond_type in cond_types and not state_type.is_compatible_asset(prim=prim, **kwargs):
+                return False, f"{cls.__name__} requires {state_type.__name__} state!"
+
+        return True, None
 
     def _initialize(self):
         super()._initialize()
@@ -240,37 +280,64 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
         if self.method == ParticleModifyMethod.PROJECTION:
             # Construct naming prefix to apply to generated prims
             name_prefix = f"{self.obj.name}_{self.__class__.__name__}"
-            # Make sure projection mesh params are specified
-            # Import here to avoid circular imports
-            from omnigibson.objects.dataset_object import DatasetObject
-            if self._projection_mesh_params is None and isinstance(self.obj, DatasetObject):
-                # We try to grab metadata for this object
-                self._projection_mesh_params = self.obj.metadata.get("meta_links", dict()).get(m.LINK_NAME, None)
-            # Sanity check to make sure projection mesh params is not None
-            assert self._projection_mesh_params is not None, \
-                f"Projection mesh params must be specified for {self.obj.name}'s {self.__class__.__name__} state " \
-                f"when method=ParticleModifyMethod.PROJECTION!"
+            shape_defaults = {
+                "radius": 0.5,
+                "height": 1.0,
+                "size": 1.0,
+            }
+            mesh_prim_path = f"{self.link.prim_path}/mesh_0"
 
-            mesh_prim_path = f"{self.link.prim_path}/projection_mesh"
             # Create a primitive shape if it doesn't already exist
-            radius, height = self._projection_mesh_params["extents"][0] / 2.0, self._projection_mesh_params["extents"][2]
-            if not get_prim_at_path(mesh_prim_path):
+            pre_existing_mesh = get_prim_at_path(mesh_prim_path)
+            if not pre_existing_mesh:
+                # Projection mesh params must be specified in order to determine scalings
+                assert self._projection_mesh_params is not None, \
+                    f"Must specify projection_mesh_params for {self.obj.name}'s {self.__class__.__name__} " \
+                    f"since it has no pre-existing projection mesh!"
                 mesh = UsdGeom.__dict__[self._projection_mesh_params["type"]].Define(og.sim.stage, mesh_prim_path).GetPrim()
-                mesh.GetAttribute("height").Set(height)
-                mesh.GetAttribute("radius").Set(radius)
+                property_names = set(mesh.GetPropertyNames())
+                for shape_attr, default_val in shape_defaults.items():
+                    if shape_attr in property_names:
+                        mesh.GetAttribute(shape_attr).Set(default_val)
+            else:
+                # Potentially populate projection mesh params if the prim exists
+                mesh_type = pre_existing_mesh.GetTypeName()
+                if self._projection_mesh_params is None:
+                    self._projection_mesh_params = {
+                        "type": mesh_type,
+                        "extents": np.array(pre_existing_mesh.GetAttribute("xformOp:scale").Get()),
+                    }
+                # Otherwise, make sure we don't have a mismatch between the pre-existing shape type and the
+                # desired type since we can't delete the original mesh
+                else:
+                    assert self._projection_mesh_params["type"] == mesh_type, \
+                        f"Got mismatch in requested projection mesh type ({self._projection_mesh_params['type']}) and " \
+                        f"pre-existing mesh type ({mesh_type})"
 
             # Create the visual geom instance referencing the generated mesh prim, and then hide it
             self.projection_mesh = VisualGeomPrim(prim_path=mesh_prim_path, name=f"{name_prefix}_projection_mesh")
             self.projection_mesh.initialize()
             self.projection_mesh.visible = False
 
-            # Make sure the object updates its meshes
+            # Make sure the shape-based attributes are not set, and only the scaling is set
+            property_names = set(self.projection_mesh.prim.GetPropertyNames())
+            for shape_attr, default_val in shape_defaults.items():
+                if shape_attr in property_names:
+                    val = self.projection_mesh.get_attribute(shape_attr)
+                    assert val == default_val, \
+                        f"Projection mesh should have shape-based attribute {shape_attr} == {default_val}! Got: {val}"
+
+            # Set the scale based on projection mesh params
+            self.projection_mesh.scale = np.array(self._projection_mesh_params["extents"])
+
+            # Make sure the object updates its meshes, and assert that there's only a single visual mesh
             self.link.update_meshes()
+            assert len(self.link.visual_meshes) == 1, \
+                f"Expected only a single projection mesh for {self.link}, got: {len(self.link.visual_meshes)}"
 
             # Make sure the mesh is translated so that its tip lies at the metalink origin, and rotated so the vector
             # from tip to tail faces the positive x axis
-            z_offset = self._projection_mesh_params["extents"][2] if self._projection_mesh_params["type"] == "Cone" \
-                else self._projection_mesh_params["extents"][2] / 2
+            z_offset = 0.0 if self._projection_mesh_params["type"] == "Sphere" else self._projection_mesh_params["extents"][2] / 2
 
             self.projection_mesh.set_local_pose(
                 translation=np.array([0, 0, -z_offset]),
@@ -278,11 +345,7 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
             )
 
             # Generate the function for checking whether points are within the projection mesh
-            self._check_in_mesh, _ = generate_points_in_volume_checker_function(
-                obj=self.obj,
-                volume_link=self.link,
-                mesh_name_prefixes="projection",
-            )
+            self._check_in_mesh, _ = generate_points_in_volume_checker_function(obj=self.obj, volume_link=self.link)
 
             # Store the projection mesh's IDs
             projection_mesh_ids = PhysicsSchemaTools.encodeSdfPath(self.projection_mesh.prim_path)
@@ -324,6 +387,92 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
         # Store check overlap function
         self._check_overlap = check_overlap
 
+        # Set saturation limits
+        for system_name in self.conditions.keys():
+            system = get_system(system_name, force_active=False)
+            self.obj.states[Saturated].set_limit(system=system, limit=self.visual_particle_modification_limit if
+            is_visual_particle_system(system_name=system.name) else self.physical_particle_modification_limit)
+
+    def _generate_condition(self, condition_type, value):
+        """
+        Generates a valid condition function given @condition_type and its corresponding @value
+
+        Args:
+            condition_type (ParticleModifyCondition): Type of condition to generate
+            value (any): Corresponding value whose type depends on @condition_type:
+
+                SATURATED: string name of the desired system that this modifier must be saturated by, e.g., "water"
+                TOGGLEDON: boolean T/F; whether this modifier must be toggled on or not
+                GRAVITY: boolean T/F; whether this modifier must be pointing downwards (T) or upwards (F)
+                FUNCTION: a function, whose signature is as follows:
+
+                    def condition(obj) --> bool
+
+                    Where @obj is the specific object that this ParticleModifier state belongs to.
+
+        Returns:
+            function: Condition function whose signature is identical to FUNCTION listed above
+        """
+        # Avoid circular imports
+        from omnigibson.object_states.saturated import Saturated
+        if condition_type == ParticleModifyCondition.FUNCTION:
+            cond = value
+        elif condition_type == ParticleModifyCondition.SATURATED:
+            cond = lambda obj: is_system_active(value) and obj.states[Saturated].get_value(get_system(value))
+        elif condition_type == ParticleModifyCondition.TOGGLEDON:
+            cond = lambda obj: obj.states[ToggledOn].get_value() == value
+        elif condition_type == ParticleModifyCondition.GRAVITY:
+            # Particles spawn in negative z-axis direction, so check positive dot product of link frame with global
+            cond = lambda obj: (np.dot(T.quat2mat(obj.states[self.__class__].link.get_orientation()) @ np.array([0, 0, 1]), np.array([0, 0, 1])) > 0) == value
+        else:
+            raise ValueError(f"Got invalid ParticleModifyCondition: {condition_type}")
+        return cond
+
+    def _parse_conditions(self, conditions):
+        """
+        Parse conditions and store them internally
+
+        Args:
+            conditions (dict): Dictionary mapping the names of ParticleSystem (str) to None or list of 2-tuples, where
+                None represents no conditions, or each 2-tuple is interpreted as a single condition in the form of
+                (ParticleModifyCondition, value) necessary in order for this particle modifier to be
+                able to modify particles belonging to @ParticleSystem. Expected types of val are as follows:
+
+                SATURATED: string name of the desired system that this modifier must be saturated by, e.g., "water"
+                TOGGLEDON: boolean T/F; whether this modifier must be toggled on or not
+                GRAVITY: boolean T/F; whether this modifier must be pointing downwards (T) or upwards (F)
+                FUNCTION: a function, whose signature is as follows:
+
+                    def condition(obj) --> bool
+
+                    Where @obj is the specific object that this ParticleModifier state belongs to.
+
+                For a given ParticleSystem, the list of 2-tuples will be converted into a list of function calls of the
+                form above -- if all of its conditions evaluate to True and particles are detected within
+                this particle modifier area, then we potentially modify those particles
+
+        Returns:
+            dict: Dictionary mapping the names of ParticleSystem (str) to list of condition functions
+        """
+        parsed_conditions = dict()
+        # Standardize the conditions (make sure every system has at least one condition, which to make sure
+        # the particle modifier isn't already limited with the specific number of particles)
+        for system_name, conds in conditions.items():
+            # Make sure the system is supported
+            assert is_visual_particle_system(system_name) or is_physical_particle_system(system_name), \
+                f"Unsupported system for ParticleModifier: {system_name}"
+            # Make sure conds isn't empty and is a list
+            conds = [] if conds is None else list(conds)
+            system_conditions = []
+            for cond_type, cond_val in conds:
+                cond = self._generate_condition(condition_type=cond_type, value=cond_val)
+                system_conditions.append(cond)
+            # Always add limit condition at the end
+            system_conditions.append(self._generate_limit_condition(system_name))
+            parsed_conditions[system_name] = system_conditions
+
+        return parsed_conditions
+
     @abstractmethod
     def _modify_particles(self, system):
         """
@@ -338,7 +487,7 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
         Must be implemented by subclass.
 
         Args:
-            system (ParticleSystem): Particle system whose corresponding particles will be checked for modification
+            system (BaseSystem): Particle system whose corresponding particles will be checked for modification
         """
         raise NotImplementedError()
 
@@ -353,13 +502,9 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
             function: Limit checker function, with signature condition(obj) --> bool, where @obj is the specific object
                 that this ParticleModifier state belongs to
         """
-        assert system_name in self.conditions, f"System {system_name} is not defined in the conditions."
-        if is_visual_particle_system(system_name):
-            def condition(obj):
-                return self.modified_particle_count[system_name] < self.visual_particle_modification_limit
-        elif is_physical_particle_system(system_name):
-            def condition(obj):
-                return self.modified_particle_count[system_name] < self.physical_particle_modification_limit
+        system = get_system(system_name, force_active=False)
+        def condition(obj):
+            return not self.obj.states[Saturated].get_value(system=system)
 
         return condition
 
@@ -379,75 +524,24 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
                     if np.all([condition(self.obj) for condition in conditions]):
                         system = get_system(system_name)
                         # Sanity check for oversaturation
-                        self.check_at_limit(system=system, verify_not_over_limit=True)
+                        self.obj.states[Saturated].get_value(system=system)
                         # Potentially modify particles within the volume
                         self._modify_particles(system=system)
 
         # Update the current step
         self._current_step = (self._current_step + 1) % self.n_steps_per_modification
 
-    def _set_value(self, new_value):
-        raise ValueError(f"Cannot set valueless state {self.__class__.__name__}.")
+    @classmethod
+    def get_dependencies(cls):
+        deps = super().get_dependencies()
+        deps.update({AABB, Saturated, ModifiedParticles})
+        return deps
 
-    def _get_value(self):
-        pass
-
-    def remove(self):
-        # We need to remove the generated particle system if we've created one
-        if self.method == ParticleModifyMethod.PROJECTION:
-            delete_prim(self.projection_system.GetPrimPath().pathString)
-
-    @staticmethod
-    def get_dependencies():
-        return AbsoluteObjectState.get_dependencies() + [AABB]
-
-    @staticmethod
-    def get_optional_dependencies():
-        return AbsoluteObjectState.get_optional_dependencies() + [Covered, ToggledOn, ContactBodies, ContactParticles]
-
-    def check_at_limit(self, system, verify_not_over_limit=False):
-        """
-        Checks whether this object is fully limited with particles modified from particle system @system. Also,
-        potentially sanity checks whether the object is over the limit, if @verify_not_over_limit is True
-
-        Args:
-            system (ParticleSystem): System to check for particle limitations within this object
-            verify_not_over_limit (bool): Whether to sanity check whether this object is over the limit with particles
-                from @system
-
-        Returns:
-            bool: True if the object has reached its limit with objects from @system, otherwise False
-        """
-        assert system.name in self.conditions, f"System {system.name} is not defined in the conditions."
-        if issubclass(system, VisualParticleSystem):
-            limit = self.visual_particle_modification_limit
-        elif issubclass(system, PhysicalParticleSystem):
-            limit = self.physical_particle_modification_limit
-
-        # If requested, run sanity check to make sure we're not over the limit with this system's particles
-        if verify_not_over_limit:
-            assert self.modified_particle_count[system.name] <= limit, \
-                f"{self.__class__.__name__} should not be over the limit! " \
-                f"Max: {limit}, got: {self.modified_particle_count[system.name]}"
-
-        return self.modified_particle_count[system.name] == limit
-
-    def set_at_limit(self, system, value):
-        """
-        Sets whether this particle modifier is at its limit for system @system
-
-        Args:
-            system (ParticleSystem): System to set corresponding absorbed particle count limit level for
-            value (bool): Whether to set the particle limit level to be at its limit or not
-        """
-        assert system.name in self.conditions, f"System {system.name} is not defined in the conditions."
-        n_particles = 0
-        if value:
-            if issubclass(system, VisualParticleSystem):
-                n_particles = self.visual_particle_modification_limit
-            elif issubclass(system, PhysicalParticleSystem):
-                n_particles = self.physical_particle_modification_limit
-        self.modified_particle_count[system.name] = n_particles
+    @classmethod
+    def get_optional_dependencies(cls):
+        deps = super().get_optional_dependencies()
+        deps.update({Covered, ToggledOn, ContactBodies, ContactParticles})
+        return deps
 
     @classproperty
     def supported_active_systems(cls):
@@ -483,44 +577,118 @@ class ParticleModifier(AbsoluteObjectState, LinkBasedStateMixin, UpdateStateMixi
 
     @property
     def state_size(self):
-        # One entry per system plus the current_step
-        return len(self.modified_particle_count) + 1
+        # Only store the current_step
+        return 1
 
     def _dump_state(self):
-        systems_dict = dict()
-        for system_name, val in self.modified_particle_count.items():
-            systems_dict[system_name] = val
-        return dict(current_step=self._current_step, systems=systems_dict)
+        return dict(current_step=int(self._current_step))
 
     def _load_state(self, state):
-        for system_name in self.modified_particle_count:
-            self.modified_particle_count[system_name] = state["systems"][system_name]
         self._current_step = state["current_step"]
 
     def _serialize(self, state):
-        return np.concatenate([
-            [state["current_step"]],
-            list(state["systems"].values())
-        ]).astype(float)
+        return np.array([state["current_step"]], dtype=float)
 
     def _deserialize(self, state):
         current_step = int(state[0])
-        systems_dict = dict()
-        for i, system_name in enumerate(self.modified_particle_count):
-            systems_dict[system_name] = int(state[1 + i])  # system particle count starts from idx 1
-        state_dict = dict(current_step=current_step, systems=systems_dict)
+        state_dict = dict(current_step=current_step)
 
-        return state_dict, len(self.modified_particle_count) + 1
+        return state_dict, 1
+
+    @classproperty
+    def _do_not_register_classes(cls):
+        # Don't register this class since it's an abstract template
+        classes = super()._do_not_register_classes
+        classes.add("ParticleModifier")
+        return classes
 
 
 class ParticleRemover(ParticleModifier):
     """
     ParticleModifier where the modification results in potentially removing particles from the simulation.
+
+    Args:
+        obj (StatefulObject): Object to which this state will be applied
+        conditions (dict): Dictionary mapping the names of ParticleSystem (str) to None or list of 2-tuples, where
+            None represents no conditions, or each 2-tuple is interpreted as a single condition in the form of
+            (ParticleModifyCondition, value) necessary in order for this particle modifier to be
+            able to modify particles belonging to @ParticleSystem. Expected types of val are as follows:
+
+            SATURATED: string name of the desired system that this modifier must be saturated by, e.g., "water"
+            TOGGLEDON: boolean T/F; whether this modifier must be toggled on or not
+            GRAVITY: boolean T/F; whether this modifier must be pointing downwards (T) or upwards (F)
+            FUNCTION: a function, whose signature is as follows:
+
+                def condition(obj) --> bool
+
+                Where @obj is the specific object that this ParticleModifier state belongs to.
+
+            For a given ParticleSystem, the list of 2-tuples will be converted into a list of function calls of the
+            form above -- if all of its conditions evaluate to True and particles are detected within
+            this particle modifier area, then we potentially modify those particles
+        method (ParticleModifyMethod): Method to modify particles. Current options supported are ADJACENCY (i.e.:
+            "touching" particles) or PROJECTION (i.e.: "spraying" particles)
+        projection_mesh_params (None or dict): If specified and @method is ParticleModifyMethod.PROJECTION,
+            manually overrides any data inferred directly from this object to infer what projection volume to generate
+            for this particle modifier. Expected entries are as follows:
+
+                "type": (str), one of {"Cylinder", "Cone", "Cube", "Sphere"}
+                "extents": (3-array), the (x,y,z) extents of the generated volume (specified in local link frame!)
+
+            If None, information found from @obj.metadata will be used instead.
+            NOTE: x-direction should align with the projection mesh's height (i.e.: z) parameter in @extents!
+        default_physical_conditions (None or list): Condition(s) needed to remove any physical particles not explicitly
+            specified in @conditions. If None, then it is assumed that no other physical particles can be removed. If
+            not None, should be in same format as an entry in @conditions, i.e.: list of (ParticleModifyCondition, val)
+            2-tuples
+        default_visual_conditions (None or list): Condition(s) needed to remove any visual particles not explicitly
+            specified in @conditions. If None, then it is assumed that no other visual particles can be removed. If
+            not None, should be in same format as an entry in @conditions, i.e.: list of (ParticleModifyCondition, val)
+            2-tuples
     """
+    def __init__(
+        self,
+        obj,
+        conditions,
+        method=ParticleModifyMethod.ADJACENCY,
+        projection_mesh_params=None,
+        default_physical_conditions=None,
+        default_visual_conditions=None,
+    ):
+        # Store values
+        self._default_physical_conditions = default_physical_conditions if default_physical_conditions is None else \
+            [self._generate_condition(cond_type, cond_val) for cond_type, cond_val in default_physical_conditions]
+        self._default_visual_conditions = default_visual_conditions if default_visual_conditions is None else \
+            [self._generate_condition(cond_type, cond_val) for cond_type, cond_val in default_visual_conditions]
+
+        # Run super
+        super().__init__(obj=obj, conditions=conditions, method=method, projection_mesh_params=projection_mesh_params)
+
+    def _parse_conditions(self, conditions):
+        # Run super first
+        parsed_conditions = super()._parse_conditions(conditions=conditions)
+
+        # Create set of default system to condition mappings based on settings
+        all_conditions = dict()
+        for system_name in REGISTERED_SYSTEMS.keys():
+            if is_physical_particle_system(system_name):
+                default_system_conditions = self._default_physical_conditions
+            elif is_visual_particle_system(system_name):
+                default_system_conditions = self._default_visual_conditions
+            else:
+                # Don't process any other systems, continue
+                continue
+            if default_system_conditions is not None:
+                all_conditions[system_name] = default_system_conditions + [self._generate_limit_condition(system_name)]
+
+        # Overwrite conditions based on manually-specified ones
+        all_conditions.update(parsed_conditions)
+
+        return all_conditions
 
     def _modify_particles(self, system):
         # If at the limit, return
-        if self.check_at_limit(system=system):
+        if self.obj.states[Saturated].get_value(system=system):
             return
 
         # If the system has no particles, return
@@ -528,48 +696,35 @@ class ParticleRemover(ParticleModifier):
             return
 
         # Check the system
-        if issubclass(system, VisualParticleSystem):
+        if is_visual_particle_system(system_name=system.name):
             # Iterate over all particles and remove any that are within the relaxed AABB of the remover volume
-            particle_names = list(system.particles.keys())
             particle_positions = system.get_particles_position_orientation()[0]
             inbound_idxs = self._check_in_mesh(particle_positions).nonzero()[0]
-            max_particle_absorbed = self.visual_particle_modification_limit - self.modified_particle_count[system.name]
-            for idx in inbound_idxs[:max_particle_absorbed]:
-                system.remove_particle(particle_names[idx])
-            self.modified_particle_count[system.name] += min(len(inbound_idxs), max_particle_absorbed)
+            modification_limit = self.visual_particle_modification_limit
 
-        elif issubclass(system, PhysicalParticleSystem):
-            instancer_to_particle_idxs = {}
+        # Physical system
+        else:
             # If the object is a cloth, we have to use check_in_mesh with the relaxed AABB since we can't detect
             # collisions via scene query interface. Alternatively, if we're using the projection method,
             # we also need to use check_in_mesh to check for overlap with the projection mesh.
-            if self.obj.prim_type == PrimType.CLOTH or self.method == ParticleModifyMethod.PROJECTION:
-                for inst in system.particle_instancers.values():
-                    inbound_idxs = self._check_in_mesh(inst.particle_positions).nonzero()[0]
-                    instancer_to_particle_idxs[inst] = inbound_idxs
-            # Otherwise, we can simply use the ContactParticle state to infer contacts
-            else:
-                instancer_to_particle_idxs = self.obj.states[ContactParticles].get_value(system, self.link)
+            inbound_idxs = self._check_in_mesh(system.get_particles_position_orientation()[0]).nonzero()[0] \
+                if self.obj.prim_type == PrimType.CLOTH or self.method == ParticleModifyMethod.PROJECTION else \
+                np.array(list(self.obj.states[ContactParticles].get_value(system, self.link)))
+            modification_limit = self.physical_particle_modification_limit
 
-            # Iterate over all particles and hide any that are detected to be removed
-            for inst, particle_idxs in instancer_to_particle_idxs.items():
-                # If at the limit, stop absorbing
-                if self.check_at_limit(system=system):
-                    break
-                max_particle_absorbed = self.physical_particle_modification_limit - \
-                                        self.modified_particle_count[system.name]
-                particles_to_absorb = min(len(particle_idxs), max_particle_absorbed)
-                particle_idxs_to_absorb = list(particle_idxs)[:particles_to_absorb]
-
-                # Remove these particles from the instancer
-                inst.remove_particles(idxs=particle_idxs_to_absorb)
-
-                # Keep track of the particles that have been absorbed
-                self.modified_particle_count[system.name] += particles_to_absorb
+        n_modified_particles = self.obj.states[ModifiedParticles].get_value(system)
+        n_particles_absorbed = min(len(inbound_idxs), modification_limit - n_modified_particles)
+        system.remove_particles(inbound_idxs[:n_particles_absorbed])
+        self.obj.states[ModifiedParticles].set_value(system, n_modified_particles + n_particles_absorbed)
 
     @classproperty
     def metalink_prefix(cls):
         return m.REMOVAL_LINK_PREFIX
+
+    @classmethod
+    def requires_metalink(cls, **kwargs):
+        # No metalink required for adjacency
+        return kwargs.get("method", ParticleModifyMethod.ADJACENCY) != ParticleModifyMethod.ADJACENCY
 
     @property
     def _default_link(self):
@@ -595,26 +750,31 @@ class ParticleApplier(ParticleModifier):
 
     Args:
         obj (StatefulObject): Object to which this state will be applied
-        method (ParticleModifyMethod): Method to modify particles. Current options supported are:
-            ADJACENCY (i.e.: "touching" particles)
-            PROJECTION (i.e.: "spraying" particles)
-        conditions (dict): Dictionary mapping ParticleSystem to None or corresponding condition / list of conditions
-            (where None represents no conditions) necessary in order for this particle modifier to be able to
-            modify particles belonging to @ParticleSystem. Each condition should be a function, whose signature
-            is as follows:
+        conditions (dict): Dictionary mapping the names of ParticleSystem (str) to None or list of 2-tuples, where
+            None represents no conditions, or each 2-tuple is interpreted as a single condition in the form of
+            (ParticleModifyCondition, value) necessary in order for this particle modifier to be
+            able to modify particles belonging to @ParticleSystem. Expected types of val are as follows:
+
+            SATURATED: string name of the desired system that this modifier must be saturated by, e.g., "water"
+            TOGGLEDON: boolean T/F; whether this modifier must be toggled on or not
+            GRAVITY: boolean T/F; whether this modifier must be pointing downwards (T) or upwards (F)
+            FUNCTION: a function, whose signature is as follows:
 
                 def condition(obj) --> bool
 
-            Where @obj is the specific object that this ParticleModifier state belongs to.
-            For a given ParticleSystem, if all of its conditions evaluate to True and particles are detected within
+                Where @obj is the specific object that this ParticleModifier state belongs to.
+
+            For a given ParticleSystem, the list of 2-tuples will be converted into a list of function calls of the
+            form above -- if all of its conditions evaluate to True and particles are detected within
             this particle modifier area, then we potentially modify those particles
+        method (ParticleModifyMethod): Method to modify particles. Current options supported are ADJACENCY (i.e.:
+            "touching" particles) or PROJECTION (i.e.: "spraying" particles)
         projection_mesh_params (None or dict): If specified and @method is ParticleModifyMethod.PROJECTION,
-            manually overrides any metadata found from @obj.metadata to infer what projection volume to generate
+            manually overrides any data inferred directly from this object to infer what projection volume to generate
             for this particle modifier. Expected entries are as follows:
 
-                "type": (str), one of {"Cylinder", "Cone", "Sphere"}
+                "type": (str), one of {"Cylinder", "Cone", "Cube", "Sphere"}
                 "extents": (3-array), the (x,y,z) extents of the generated volume (specified in local link frame!)
-                "visualize": (bool), whether to visualize this projection or not
 
             If None, information found from @obj.metadata will be used instead.
         sample_with_raycast (bool): If True, will only sample particles at raycast hits. Otherwise, will bypass sampling
@@ -624,7 +784,15 @@ class ParticleApplier(ParticleModifier):
             direction of the velocity is inferred from the particle sampling process.
         """
 
-    def __init__(self, obj, method, conditions, projection_mesh_params=None, sample_with_raycast=True, initial_speed=0.0):
+    def __init__(
+        self,
+        obj,
+        conditions,
+        method=ParticleModifyMethod.ADJACENCY,
+        projection_mesh_params=None,
+        sample_with_raycast=True,
+        initial_speed=0.0,
+    ):
         # Store internal value
         self._sample_particle_locations = None
         self._sample_with_raycast = sample_with_raycast
@@ -634,6 +802,9 @@ class ParticleApplier(ParticleModifier):
         # initialized so we can quickly spawn them at runtime
         self._in_mesh_local_particle_positions = None
         self._in_mesh_local_particle_directions = None
+
+        self.projection_system = None
+        self.projection_emitter = None
 
         # Run super
         super().__init__(obj=obj, method=method, conditions=conditions, projection_mesh_params=projection_mesh_params)
@@ -651,11 +822,13 @@ class ParticleApplier(ParticleModifier):
         # get_system will initialize the system if it's not initialized already.
         system = get_system(system_name)
 
-        if self.method == ParticleModifyMethod.PROJECTION and self._projection_mesh_params["visualize"]:
-            radius, height = self._projection_mesh_params["extents"][0] / 2.0, self._projection_mesh_params["extents"][2]
+        if self.visualize:
+            assert self._projection_mesh_params["type"] in {"Cylinder", "Cone"}, \
+                f"{self.__class__.__name__} visualization only supports Cylinder and Cone types!"
+            radius, height = np.mean(self._projection_mesh_params["extents"][:2]) / 2.0, self._projection_mesh_params["extents"][2]
             # Generate the projection visualization
-            particle_radius = m.VISUAL_PARTICLE_PROJECTION_PARTICLE_RADIUS if issubclass(system, VisualParticleSystem) else system.particle_radius
-            particle_material = system.particle_object.material if issubclass(system, VisualParticleSystem) else system.material
+            particle_radius = m.VISUAL_PARTICLE_PROJECTION_PARTICLE_RADIUS if \
+                is_visual_particle_system(system_name=system.name) else system.particle_radius
 
             name_prefix = f"{self.obj.name}_{self.__class__.__name__}"
             # Create the projection visualization if it doesn't already exist, otherwise we reference it directly
@@ -673,7 +846,8 @@ class ParticleApplier(ParticleModifier):
                     projection_radius=radius,
                     projection_height=height,
                     particle_radius=particle_radius,
-                    material=particle_material,
+                    parent_scale=self.link.scale,
+                    material=system.material,
                 )
 
             # Create the visual geom instance referencing the generated source mesh prim, and then hide it
@@ -681,7 +855,16 @@ class ParticleApplier(ParticleModifier):
             self.projection_source_sphere.initialize()
             self.projection_source_sphere.visible = False
             # Rotate by 90 degrees in y-axis so that the projection visualization aligns with the projection mesh
-            self.projection_source_sphere.set_orientation(T.euler2quat([0, np.pi / 2, 0]))
+            self.projection_source_sphere.set_local_pose(orientation=T.euler2quat([0, np.pi / 2, 0]))
+
+            # Make sure the meta mesh is aligned with the meta link if visualizing
+            # This corresponds to checking (a) position of tip of projection mesh should align with origin of
+            # metalink, and (b) zero relative orientation between the metalink and the projection mesh
+            local_pos, local_quat = self.projection_mesh.get_local_pose()
+            assert np.all(np.isclose(local_pos + np.array([0, 0, height / 2.0]), 0.0)), \
+                "Projection mesh tip should align with metalink position!"
+            assert np.all(np.isclose(T.quat2euler(local_quat), 0.0)), \
+                "Projection mesh orientation should align with metalink orientation!"
 
         # Store which method to use for sampling particle locations
         if self._sample_with_raycast:
@@ -709,16 +892,15 @@ class ParticleApplier(ParticleModifier):
         if @self._sample_with_raycast is False, meaning that we were deterministically sample particles.
 
         Args:
-            system (ParticleSystem): Particle system whose particles will be spawned from this ParticleApplier
+            system (BaseSystem): Particle system whose particles will be spawned from this ParticleApplier
         """
         # We now pre-compute local particle positions that are within the projection mesh used to infer spawn pos
-        # We sample the range of each extent minus the particle radius
+        # We sample over the entire object AABB, assuming most will be filtered out
         sampling_distance = 2 * system.particle_radius
         extent = np.array(self._projection_mesh_params["extents"])
         h = extent[2]
-        low = np.array([-extent[0] / 2, -extent[1] / 2, -h])
-        high = np.array([extent[0] / 2, extent[1] / 2, 0])
-        n_particles_per_axis = (extent / sampling_distance).astype(int)
+        low, high = self.obj.aabb
+        n_particles_per_axis = ((high - low) / sampling_distance).astype(int)
         assert np.all(n_particles_per_axis), f"link {self.link.name} is too small to sample any particle of radius {system.particle_radius}."
         # 1e-10 is added because the extent might be an exact multiple of particle radius
         arrs = [np.arange(lo + system.particle_radius, hi - system.particle_radius + 1e-10, system.particle_radius * 2)
@@ -726,17 +908,18 @@ class ParticleApplier(ParticleModifier):
         # Generate 3D-rectangular grid of points, and only keep the ones inside the mesh
         points = np.stack([arr.flatten() for arr in np.meshgrid(*arrs)]).T
         pos, quat = self.link.get_position_orientation()
-        points_in_world_frame = get_particle_positions_from_frame(
+        points = points[np.where(self._check_in_mesh(points))[0]]
+        # Convert the points into local frame
+        points_in_local_frame = get_particle_positions_in_frame(
             pos=pos,
             quat=quat,
             scale=self.obj.scale,
             particle_positions=points,
         )
-        points = points[np.where(self._check_in_mesh(points_in_world_frame))[0]]
         n_max_particles = self._get_max_particles_limit_per_step(system=system)
         # Potentially sub-sample points based on max particle limit per step
-        self._in_mesh_local_particle_positions = points if n_max_particles > len(points) else \
-            points[np.random.choice(len(points), n_max_particles, replace=False)]
+        self._in_mesh_local_particle_positions = points_in_local_frame if n_max_particles > len(points) else \
+            points_in_local_frame[np.random.choice(len(points_in_local_frame), n_max_particles, replace=False)]
         # Also programmatically compute the directions of each particle position -- this is the normalized
         # vector pointing from source to the particle
         projection_type = self._projection_mesh_params["type"]
@@ -752,23 +935,39 @@ class ParticleApplier(ParticleModifier):
                 "If not sampling with raycast, ParticleApplier only supports `Cone` or `Cylinder` projection types!")
         self._in_mesh_local_particle_directions = directions / np.linalg.norm(directions, axis=-1).reshape(-1, 1)
 
+    def _update(self):
+        # If we're about to check for modification, update whether it the visualization should be active or not
+        if self.visualize and self._current_step == 0:
+            # Only one system in our conditions, so next(iter()) suffices
+            is_active = bool(np.all([condition(self.obj) for condition in next(iter(self.conditions.values()))]))
+            self.projection_emitter.GetProperty("inputs:active").Set(is_active)
+
+        # Run super
+        super()._update()
+
+    def remove(self):
+        # We need to remove the projection visualization if it exists
+        if self.projection_system is not None:
+            delete_prim(self.projection_system.GetPrimPath().pathString)
+
     def _modify_particles(self, system):
         # If at the limit, don't modify anything
-        if self.check_at_limit(system=system):
+        if self.obj.states[Saturated].get_value(system=system):
             return
 
         if self._sample_with_raycast:
             # Sample potential locations to apply particles, and then apply them
             start_points, end_points = self._sample_particle_locations(system=system)
             n_samples = len(start_points)
+            is_visual = is_visual_particle_system(system_name=system.name)
 
-            if issubclass(system, VisualParticleSystem):
+            if is_visual:
                 group = system.get_group_name(obj=self.obj)
                 # Create an attachment group if necessary
                 if group not in system.groups:
                     system.create_attachment_group(obj=self.obj)
                 avg_scale = np.cbrt(np.product(self.obj.scale))
-                scales = system.sample_scales(group=group, n=len(start_points))
+                scales = system.sample_scales_by_group(group=group, n=len(start_points))
                 cuboid_dimensions = scales * system.particle_object.aabb_extent.reshape(1, 3) * avg_scale
             else:
                 scales = None
@@ -782,9 +981,9 @@ class ParticleApplier(ParticleModifier):
                 cuboid_dimensions=cuboid_dimensions,
                 ignore_objs=[self.obj],
                 hit_proportion=0.0,             # We want all hits
-                cuboid_bottom_padding=system.particle_radius if issubclass(system, PhysicalParticleSystem) else
-                macros.utils.sampling_utils.DEFAULT_CUBOID_BOTTOM_PADDING,
-                undo_cuboid_bottom_padding=issubclass(system, VisualParticleSystem),      # micro particles have zero cuboid dimensions so we need to maintain padding
+                cuboid_bottom_padding=macros.utils.sampling_utils.DEFAULT_CUBOID_BOTTOM_PADDING if
+                is_visual else system.particle_radius,
+                undo_cuboid_bottom_padding=is_visual,      # micro particles have zero cuboid dimensions so we need to maintain padding
                 verify_cuboid_empty=False,
             )
 
@@ -802,22 +1001,24 @@ class ParticleApplier(ParticleModifier):
         the results with a valid hit
 
         Args:
-            system (ParticleSystem): System to apply particles from
+            system (BaseSystem): System to apply particles from
             hits (list of dict): Valid hit results from a batched raycast representing locations for sampling particles
             scales (list of numpy arrays or None): None or scales of the particles that should be sampled, same length as hits
         """
         assert system.name in self.conditions, f"System {system.name} is not defined in the conditions."
         # Check the system
-        if issubclass(system, VisualParticleSystem):
+        n_modified_particles = self.obj.states[ModifiedParticles].get_value(system)
+        if is_visual_particle_system(system_name=system.name):
             assert scales is not None, "applying visual particles at raycast hits requires scales."
             assert len(hits) == len(scales), "length of hits and scales are different when spawning visual particles."
             # Sample potential application points
             z_up = np.zeros(3)
             z_up[-1] = 1.0
-            n_particles = min(len(hits), m.VISUAL_PARTICLES_APPLICATION_LIMIT - self.modified_particle_count[system.name])
+            n_particles = min(len(hits), m.VISUAL_PARTICLES_APPLICATION_LIMIT - n_modified_particles)
             # Generate particle info -- maps group name to particle info for that group,
             # i.e.: positions, orientations, and link_prim_paths
             particles_info = defaultdict(lambda: defaultdict(lambda: []))
+            modifier_avg_scale = np.cbrt(np.product(self.obj.scale))
             for hit, scale in zip(hits[:n_particles], scales[:n_particles]):
                 # Infer which object was hit
                 hit_obj = og.sim.scene.object_registry("prim_path", "/".join(hit[3].split("/")[:-1]), None)
@@ -829,7 +1030,11 @@ class ParticleApplier(ParticleModifier):
                     # Add to info
                     particles_info[group]["positions"].append(hit[0])
                     particles_info[group]["orientations"].append(hit[2])
-                    particles_info[group]["scales"].append(scale)
+                    # Since particles' scales are sampled with respect to the modifier object, but are being placed
+                    # (in the USD hierarchy) underneath the in_contact object, we need to compensate for the relative
+                    # scale differences between the two objects, so that "moving" the particle to the new object won't
+                    # cause it to unexpectedly shrink / grow based on that parent's (potentially) different scale
+                    particles_info[group]["scales"].append(scale * modifier_avg_scale / np.cbrt(np.product(hit_obj.scale)))
                     particles_info[group]["link_prim_paths"].append(hit[3])
             # Generate all the particles for each group
             for group, particle_info in particles_info.items():
@@ -842,20 +1047,21 @@ class ParticleApplier(ParticleModifier):
                     link_prim_paths=particle_info["link_prim_paths"],
                 )
                 # Update our particle count
-                self.modified_particle_count[system.name] += len(particle_info["link_prim_paths"])
+                self.obj.states[ModifiedParticles].set_value(system, n_modified_particles + len(particle_info["link_prim_paths"]))
 
-        elif issubclass(system, PhysicalParticleSystem):
+        # Physical system
+        else:
             # Compile the particle poses to generate and sample the particles
-            n_particles = min(len(hits), m.PHYSICAL_PARTICLES_APPLICATION_LIMIT - self.modified_particle_count[system.name])
+            n_particles = min(len(hits), m.PHYSICAL_PARTICLES_APPLICATION_LIMIT - n_modified_particles)
             # Generate particles
             if n_particles > 0:
                 velocities = None if self._initial_speed == 0 else -self._initial_speed * np.array([hit[1] for hit in hits[:n_particles]])
-                system.default_particle_instancer.add_particles(
+                system.generate_particles(
                     positions=np.array([hit[0] for hit in hits[:n_particles]]),
                     velocities=velocities,
                 )
                 # Update our particle count
-                self.modified_particle_count[system.name] += n_particles
+                self.obj.states[ModifiedParticles].set_value(system, n_modified_particles + n_particles)
 
     def _apply_particles_in_projection_volume(self, system):
         """
@@ -866,11 +1072,11 @@ class ParticleApplier(ParticleModifier):
         should have been asserted during this ParticleApplier's initialize() call
 
         Args:
-            system (ParticleSystem): System to apply particles from
+            system (BaseSystem): System to apply particles from
         """
         assert self.method == ParticleModifyMethod.PROJECTION, \
             "Can only apply particles within projection volume if ParticleModifyMethod.PROJECTION method is used!"
-        assert issubclass(system, PhysicalParticleSystem), \
+        assert is_physical_particle_system(system_name=system.name), \
             "Can only apply particles within projection volume if system is PhysicalParticleSystem!"
 
         # Transform pre-cached particle positions into the world frame
@@ -884,23 +1090,24 @@ class ParticleApplier(ParticleModifier):
         directions = self._in_mesh_local_particle_directions @ T.quat2mat(quat).T
 
         # Compile the particle poses to generate and sample the particles
-        n_particles = min(len(points), m.PHYSICAL_PARTICLES_APPLICATION_LIMIT - self.modified_particle_count[system.name])
+        n_modified_particles = self.obj.states[ModifiedParticles].get_value(system)
+        n_particles = min(len(points), m.PHYSICAL_PARTICLES_APPLICATION_LIMIT - n_modified_particles)
         # Generate particles
         if n_particles > 0:
             velocities = None if self._initial_speed == 0 else self._initial_speed * directions[:n_particles]
-            system.default_particle_instancer.add_particles(
+            system.generate_particles(
                 positions=points[:n_particles],
                 velocities=velocities,
             )
             # Update our particle count
-            self.modified_particle_count[system.name] += n_particles
+            self.obj.states[ModifiedParticles].set_value(system, n_modified_particles + n_particles)
 
     def _sample_particle_locations_from_projection_volume(self, system):
         """
         Helper function for generating potential particle locations from projection volume
 
         Args:
-            system (ParticleSystem): System to sample potential particle positions for
+            system (BaseSystem): System to sample potential particle positions for
 
         Returns:
             2-tuple:
@@ -949,7 +1156,7 @@ class ParticleApplier(ParticleModifier):
         Helper function for generating potential particle locations from adjacency area
 
         Args:
-            system (ParticleSystem): System to sample potential particle positions for
+            system (BaseSystem): System to sample potential particle positions for
 
         Returns:
             2-tuple:
@@ -977,22 +1184,45 @@ class ParticleApplier(ParticleModifier):
         Helper function for grabbing the maximum particle limit per step
 
         Args:
-            system (ParticleSystem): System for which to get max particle limit per step
+            system (BaseSystem): System for which to get max particle limit per step
 
         Returns:
             int: Maximum particles to apply per step for the given system @system
         """
         assert system.name in self.conditions, f"System {system.name} is not defined in the conditions."
-        # Check the system
-        if issubclass(system, VisualParticleSystem):
-            val = m.MAX_VISUAL_PARTICLES_APPLIED_PER_STEP
-        elif issubclass(system, PhysicalParticleSystem):
-            val = m.MAX_PHYSICAL_PARTICLES_APPLIED_PER_STEP
-        return val
+        return m.MAX_VISUAL_PARTICLES_APPLIED_PER_STEP if is_visual_particle_system(system_name=system.name) else \
+            m.MAX_PHYSICAL_PARTICLES_APPLIED_PER_STEP
+
+    @property
+    def visualize(self):
+        """
+        Returns:
+            bool: Whether this Applier should be visualized or not
+        """
+        # Visualize if projection method is used
+        return self.method == ParticleModifyMethod.PROJECTION
 
     @classproperty
     def metalink_prefix(cls):
         return m.APPLICATION_LINK_PREFIX
+
+    @classmethod
+    def requires_metalink(cls, **kwargs):
+        # No metalink required for adjacency
+        return kwargs.get("method", ParticleModifyMethod.ADJACENCY) != ParticleModifyMethod.ADJACENCY
+
+    @classmethod
+    def is_compatible(cls, obj, **kwargs):
+        # Run super first
+        compatible, reason = super().is_compatible(obj, **kwargs)
+        if not compatible:
+            return compatible, reason
+
+        # Check whether GPU dynamics are enabled (necessary for this object state)
+        if not gm.USE_GPU_DYNAMICS:
+            return False, f"gm.USE_GPU_DYNAMICS must be True in order to use object state {cls.__name__}."
+
+        return True, None
 
     @property
     def _default_link(self):

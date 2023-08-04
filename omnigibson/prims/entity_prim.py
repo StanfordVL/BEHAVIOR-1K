@@ -8,16 +8,19 @@ from omni.isaac.core.utils.stage import get_current_stage
 from pxr import Gf, Usd, UsdGeom, UsdPhysics, PhysxSchema
 import omni
 
-from omni.isaac.core.utils.prims import get_prim_property, set_prim_property, \
-    get_prim_parent, get_prim_at_path
+from omni.isaac.core.utils.prims import get_prim_property, set_prim_property, get_prim_parent, get_prim_at_path
 
 import omnigibson as og
+import omnigibson.utils.transform_utils as T
+
 from omnigibson.prims.cloth_prim import ClothPrim
 from omnigibson.prims.joint_prim import JointPrim
 from omnigibson.prims.rigid_prim import RigidPrim
 from omnigibson.prims.xform_prim import XFormPrim
-from omnigibson.utils.constants import PrimType, GEOM_TYPES
+from omnigibson.utils.constants import PrimType, GEOM_TYPES, JointType, JointAxis
 from omnigibson.utils.ui_utils import suppress_omni_log
+from omnigibson.utils.usd_utils import BoundingBoxAPI
+
 from omnigibson.macros import gm
 
 
@@ -59,6 +62,7 @@ class EntityPrim(XFormPrim):
 
         # This needs to be initialized to be used for _load() of PrimitiveObject
         self._prim_type = load_config["prim_type"] if "prim_type" in load_config else PrimType.RIGID
+        assert self._prim_type in iter(PrimType), f"Unknown prim type {self._prim_type}!"
 
         # Run super init
         super().__init__(
@@ -74,7 +78,7 @@ class EntityPrim(XFormPrim):
         # Force populate inputs and outputs of the shaders of all materials
         # We suppress errors from omni.hydra if we're using encrypted assets, because we're loading from tmp location,
         # not the original location
-        with suppress_omni_log(channels=["omni.hydra"] if gm.USE_ENCRYPTED_ASSETS else []):
+        with suppress_omni_log(channels=["omni.hydra"]):
             for material in self.materials:
                 material.shader_force_populate(render=False)
 
@@ -95,8 +99,33 @@ class EntityPrim(XFormPrim):
         raise NotImplementedError("By default, an entity prim cannot be created from scratch.")
 
     def _post_load(self):
+        # If this is a cloth, delete the root link and replace it with the single nested mesh
+        if self._prim_type == PrimType.CLOTH:
+            # Verify only a single link and a single mesh exists
+            old_link_prim = None
+            cloth_mesh_prim = None
+            for prim in self._prim.GetChildren():
+                if prim.GetPrimTypeInfo().GetTypeName() == "Xform":
+                    assert old_link_prim is None, "Found multiple XForm links for a Cloth entity prim! Expected: 1"
+                    old_link_prim = prim
+                    for child in prim.GetChildren():
+                        if child.GetPrimTypeInfo().GetTypeName() == "Mesh" and not child.HasAPI(UsdPhysics.CollisionAPI):
+                            assert cloth_mesh_prim is None, "Found multiple meshes for a Cloth entity prim! Expected: 1"
+                            cloth_mesh_prim = child
+
+            # Move mesh prim one level up via copy, then delete the original link
+            # NOTE: We copy because we cannot directly move the prim because it is ancestral
+            # NOTE: We use this specific delete method because alternative methods (eg: "delete_prim") fail beacuse
+            # the prim is ancestral. Note that because it is non-destructive, the original link prim path is still
+            # tracked by omni, so we have to utilize a new unique prim path for the copied cloth mesh
+            # See omni.kit.context_menu module for reference
+            new_path = f"{self._prim_path}/{old_link_prim.GetName()}_cloth"
+            omni.kit.commands.execute("CopyPrim", path_from=cloth_mesh_prim.GetPath(), path_to=new_path)
+            omni.kit.commands.execute("DeletePrims", paths=[old_link_prim.GetPath()], destructive=False)
+
         # Setup links info FIRST before running any other post loading behavior
-        self.update_links()
+        # We pass in scale explicitly so that the generated links can leverage the desired entity scale
+        self.update_links(load_config=dict(scale=self._load_config.get("scale", None)))
 
         # Set visual only flag
         # This automatically handles setting collisions / gravity appropriately per-link
@@ -131,10 +160,14 @@ class EntityPrim(XFormPrim):
 
         self._materials = materials
 
-    def update_links(self):
+    def update_links(self, load_config=None):
         """
         Helper function to refresh owned joints. Useful for synchronizing internal data if
         additional bodies are added manually
+
+        Args:
+            load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
+            loading each of the link's rigid prims
         """
         # Make sure to clean up all pre-existing names for all links
         if self._links is not None:
@@ -146,14 +179,11 @@ class EntityPrim(XFormPrim):
         self._links = dict()
         joint_children = set()
         for prim in self._prim.GetChildren():
-            link = None
+            link_cls = None
             link_name = prim.GetName()
             if self._prim_type == PrimType.RIGID and prim.GetPrimTypeInfo().GetTypeName() == "Xform":
                 # For rigid body object, process prims that are Xforms (e.g. rigid links)
-                link = RigidPrim(
-                    prim_path=prim.GetPrimPath().__str__(),
-                    name=f"{self._name}:{link_name}",
-                )
+                link_cls = RigidPrim
                 # Also iterate through all children to infer joints and determine the children of those joints
                 # We will use this info to infer which link is the base link!
                 for child_prim in prim.GetChildren():
@@ -164,15 +194,16 @@ class EntityPrim(XFormPrim):
                         if len(relationships["physics:body0"].GetTargets()) > 0:
                             joint_children.add(relationships["physics:body1"].GetTargets()[0].pathString.split("/")[-1])
 
-            if self._prim_type == PrimType.CLOTH and prim.GetPrimTypeInfo().GetTypeName() in GEOM_TYPES:
-                # For cloth object, process prims that belong to any of the GEOM_TYPES (e.g. Cube, Mesh, etc)
-                link = ClothPrim(
+            elif self._prim_type == PrimType.CLOTH and prim.GetPrimTypeInfo().GetTypeName() == "Mesh":
+                # For cloth object, process prims that are Meshes
+                link_cls = ClothPrim
+
+            if link_cls is not None:
+                self._links[link_name] = link_cls(
                     prim_path=prim.GetPrimPath().__str__(),
                     name=f"{self._name}:{link_name}",
+                    load_config=load_config,
                 )
-
-            if link is not None:
-                self._links[link_name] = link
 
         # Infer the correct root link name -- this corresponds to whatever link does not have any joint existing
         # in the children joints
@@ -242,6 +273,57 @@ class EntityPrim(XFormPrim):
 
         # Store values internally
         self._n_dof = n_dof
+        self._update_joint_limits()
+
+    def _update_joint_limits(self):
+        """
+        Helper function to update internal joint limits for prismatic joints based on the object's scale
+        """
+        # If the scale is [1, 1, 1], we can skip this step
+        if np.allclose(self.scale, np.ones(3)):
+            return
+
+        prismatic_joints = {j_name: j for j_name, j in self._joints.items() if j.joint_type == JointType.JOINT_PRISMATIC}
+
+        # If there are no prismatic joints, we can skip this step
+        if len(prismatic_joints) == 0:
+            return
+
+        uniform_scale = np.allclose(self.scale, self.scale[0])
+
+        for joint_name, joint in prismatic_joints.items():
+            if uniform_scale:
+                scale_along_axis = self.scale[0]
+            else:
+                assert not self.initialized, \
+                    "Cannot update joint limits for a non-uniformly scaled object when already initialized."
+                for link_name, link in self.links.items():
+                    if joint.parent_name == link_name:
+                        # Find the parent link frame orientation in the object frame
+                        _, link_local_orn = link.get_local_pose()
+
+                        # Find the joint frame orientation in the parent link frame
+                        joint_local_orn = gf_quat_to_np_array(joint.get_attribute("physics:localRot0"))[[1, 2, 3, 0]]
+
+                        # Compute the joint frame orientation in the object frame
+                        joint_orn = T.quat_multiply(quaternion1=joint_local_orn, quaternion0=link_local_orn)
+
+                        # assert T.check_quat_right_angle(joint_orn), \
+                        #     f"Objects that are NOT uniformly scaled requires all joints to have orientations that " \
+                        #     f"are factors of 90 degrees! Got orn: {joint_orn} for object {self.name}"
+
+                        # Find the joint axis unit vector (e.g. [1, 0, 0] for "X", [0, 1, 0] for "Y", etc.)
+                        axis_in_joint_frame = np.zeros(3)
+                        axis_in_joint_frame[JointAxis.index(joint.axis)] = 1.0
+
+                        # Compute the joint axis unit vector in the object frame
+                        axis_in_obj_frame = T.quat2mat(joint_orn) @ axis_in_joint_frame
+
+                        # Find the correct scale along the joint axis direction
+                        scale_along_axis = self.scale[np.argmax(np.abs(axis_in_obj_frame))]
+
+            joint.lower_limit = joint.lower_limit * scale_along_axis
+            joint.upper_limit = joint.upper_limit * scale_along_axis
 
     @property
     def prim_type(self):
@@ -281,7 +363,7 @@ class EntityPrim(XFormPrim):
     def root_link(self):
         """
         Returns:
-            RigidPrim: Root link of this object prim
+            RigidPrim or ClothPrim: Root link of this object prim
         """
         return self._links[self.root_link_name]
 
@@ -489,6 +571,7 @@ class EntityPrim(XFormPrim):
         dof_states["pos"] = new_positions
         if not drive:
             self._dc.set_articulation_dof_states(self._handle, dof_states, _dynamic_control.STATE_POS)
+            BoundingBoxAPI.clear()
 
         # Also set the target
         self._dc.set_articulation_dof_position_targets(self._handle, new_positions.astype(np.float32))
@@ -817,6 +900,8 @@ class EntityPrim(XFormPrim):
             else:
                 super().set_position_orientation(position=position, orientation=orientation)
 
+        BoundingBoxAPI.clear()
+
     def get_position_orientation(self):
         if self._prim_type == PrimType.CLOTH:
             if self._dc is not None and self._dc.is_simulating():
@@ -872,6 +957,7 @@ class EntityPrim(XFormPrim):
                 self._set_local_pose_when_simulating(translation=translation, orientation=orientation)
             else:
                 super().set_local_pose(translation=translation, orientation=orientation)
+        BoundingBoxAPI.clear()
 
     def _get_local_pose_when_simulating(self):
         """
@@ -1161,6 +1247,21 @@ class EntityPrim(XFormPrim):
                 for more information
         """
         self.root_link.kinematic_only = val
+
+    @property
+    def aabb(self):
+        # If we're a cloth prim type, we compute the bounding box from the limits of the particles. Otherwise, use the
+        # normal method for computing bounding box
+        if self._prim_type == PrimType.CLOTH:
+            particle_contact_offset = self.root_link.cloth_system.particle_contact_offset
+            particle_positions = self.root_link.compute_particle_positions()
+            aabb_lo, aabb_hi = np.min(particle_positions, axis=0) - particle_contact_offset, \
+                               np.max(particle_positions, axis=0) + particle_contact_offset
+        else:
+            aabb_lo, aabb_hi = super().aabb
+            aabb_lo, aabb_hi = np.array(aabb_lo), np.array(aabb_hi)
+
+        return aabb_lo, aabb_hi
 
     def wake(self):
         """

@@ -1,4 +1,4 @@
-from omnigibson.macros import create_module_macros
+from omnigibson.macros import create_module_macros, macros
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.inside import Inside
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
@@ -81,9 +81,42 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin):
         # we record that for use in the heat transfer process.
         self.requires_inside = requires_inside
 
+    @classmethod
+    def is_compatible(cls, obj, **kwargs):
+        # Run super first
+        compatible, reason = super().is_compatible(obj, **kwargs)
+        if not compatible:
+            return compatible, reason
+
+        # Check whether this state has toggledon if required or open if required
+        for kwarg, state_type in zip(("requires_toggled_on", "requires_closed"), (ToggledOn, Open)):
+            if kwargs.get(kwarg, False) and state_type not in obj.states:
+                return False, f"{cls.__name__} has {kwarg} but obj has no {state_type.__name__} state!"
+
+        return True, None
+
+    @classmethod
+    def is_compatible_asset(cls, prim, **kwargs):
+        # Run super first
+        compatible, reason = super().is_compatible_asset(prim, **kwargs)
+        if not compatible:
+            return compatible, reason
+
+        # Check whether this state has toggledon if required or open if required
+        for kwarg, state_type in zip(("requires_toggled_on", "requires_closed"), (ToggledOn, Open)):
+            if kwargs.get(kwarg, False) and not state_type.is_compatible_asset(prim=prim, **kwargs)[0]:
+                return False, f"{cls.__name__} has {kwarg} but obj has no {state_type.__name__} state!"
+
+        return True, None
+
     @classproperty
     def metalink_prefix(cls):
         return m.HEATSOURCE_LINK_PREFIX
+
+    @classmethod
+    def requires_metalink(cls, **kwargs):
+        # No metalink required if inside
+        return not kwargs.get("requires_inside", False)
 
     @property
     def _default_link(self):
@@ -106,13 +139,17 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin):
         """
         return self._temperature
 
-    @staticmethod
-    def get_dependencies():
-        return AbsoluteObjectState.get_dependencies() + [AABB, Inside]
+    @classmethod
+    def get_dependencies(cls):
+        deps = super().get_dependencies()
+        deps.update({AABB, Inside})
+        return deps
 
-    @staticmethod
-    def get_optional_dependencies():
-        return AbsoluteObjectState.get_optional_dependencies() + [ToggledOn, Open]
+    @classmethod
+    def get_optional_dependencies(cls):
+        deps = super().get_optional_dependencies()
+        deps.update({ToggledOn, Open})
+        return deps
 
     def _initialize(self):
         # Run super first
@@ -129,9 +166,6 @@ class HeatSourceOrSink(AbsoluteObjectState, LinkBasedStateMixin):
             return False
 
         return True
-
-    def _set_value(self, new_value):
-        raise NotImplementedError("Setting heat source capability is not supported.")
 
     def affects_obj(self, obj):
         """

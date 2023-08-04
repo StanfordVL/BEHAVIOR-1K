@@ -382,11 +382,11 @@ class ManipulationRobot(BaseRobot):
         for arm in self.arm_names:
             if self._ag_obj_in_hand[arm] is not None:
                 self._release_grasp(arm=arm)
+                self._ag_release_counter[arm] = int(np.ceil(m.RELEASE_WINDOW / og.sim.get_rendering_dt()))
+                self._handle_release_window(arm=arm)
                 # TODO: Verify not needed!
                 # for finger_link in self.finger_links[arm]:
                 #     finger_link.remove_filtered_collision_pair(prim=self._ag_obj_in_hand[arm])
-                self._ag_obj_in_hand[arm] = None
-                self._ag_release_counter[arm] = None
 
     def get_control_dict(self):
         # In addition to super method, add in EEF states
@@ -729,7 +729,7 @@ class ManipulationRobot(BaseRobot):
             candidates_set, robot_contact_links = self._find_gripper_contacts(arm=arm)
             # If we're using assisted grasping, we further filter candidates via ray-casting
             if self.grasping_mode == "assisted":
-                raise NotImplementedError("Not assisted grasp avaialble yet in OmnOmniGibson!")
+                raise NotImplementedError("Assisted grasp not yet available in OmniGibson!")
         else:
             raise ValueError("Invalid grasping mode for calculating in hand object: {}".format(self.grasping_mode))
 
@@ -751,7 +751,6 @@ class ManipulationRobot(BaseRobot):
             candidate_data.append((prim_path, dist))
 
         candidate_data = sorted(candidate_data, key=lambda x: x[-1])
-
         ag_prim_path, _ = candidate_data[0]
 
         # Make sure the ag_prim_path is not a self collision
@@ -762,17 +761,16 @@ class ManipulationRobot(BaseRobot):
         touching_at_least_two_fingers = len({link.prim_path for link in self.finger_links[arm]}.intersection(robot_contacts)) >= 2
 
         # TODO: Better heuristic, hacky, we assume the parent object prim path is the prim_path minus the last "/" item
-        ag_obj_prim_path = "/".join(prim_path.split("/")[:-1])
-        ag_obj_link_name = prim_path.split("/")[-1]
+        ag_obj_prim_path = "/".join(ag_prim_path.split("/")[:-1])
+        ag_obj_link_name = ag_prim_path.split("/")[-1]
         ag_obj = og.sim.scene.object_registry("prim_path", ag_obj_prim_path)
-        ag_obj_link = ag_obj.links[ag_obj_link_name]
 
         # Return None if object cannot be assisted grasped or not touching at least two fingers
         if ag_obj is None or (not can_assisted_grasp(ag_obj)) or (not touching_at_least_two_fingers):
             return None
 
         # Get object and its contacted link
-        return ag_obj, ag_obj_link
+        return ag_obj, ag_obj.links[ag_obj_link_name]
 
     def _handle_release_window(self, arm="default"):
         """
@@ -937,7 +935,9 @@ class ManipulationRobot(BaseRobot):
             dic[arm] = {
                 "name": "NullJointController",
                 "control_freq": self._control_freq,
+                "motor_type": "velocity",
                 "control_limits": self.control_limits,
+                "dof_idx": self.gripper_control_idx[arm],
             }
         return dic
 
@@ -1070,16 +1070,14 @@ class ManipulationRobot(BaseRobot):
         # Loop over all arms
         for arm in self.arm_names:
             # Make sure gripper action dimension is only 1
-            assert (
-                self._controllers["gripper_{}".format(arm)].command_dim == 1
-            ), "Gripper {} controller command dim must be 1 to use assisted grasping, got: {}".format(
-                arm, self._controllers["gripper_{}".format(arm)].command_dim
-            )
+            cmd_dim = self._controllers[f"gripper_{arm}"].command_dim
+            assert cmd_dim == 1, \
+                f"Gripper {arm} controller command dim must be 1 to use assisted grasping, got: {cmd_dim}."
 
             # TODO: Why are we separately checking for complementary conditions?
-            threshold = np.mean(self._controllers["gripper_{}".format(arm)].command_input_limits)
-            applying_grasp = action[self.controller_action_idx["gripper_{}".format(arm)]] < threshold
-            releasing_grasp = action[self.controller_action_idx["gripper_{}".format(arm)]] > threshold
+            threshold = np.mean(self._controllers[f"gripper_{arm}"].command_input_limits)
+            applying_grasp = action[self.controller_action_idx[f"gripper_{arm}"][0]] < threshold
+            releasing_grasp = action[self.controller_action_idx[f"gripper_{arm}"][0]] > threshold
 
             # Execute gradual release of object
             if self._ag_obj_in_hand[arm]:
@@ -1286,15 +1284,6 @@ class ManipulationRobot(BaseRobot):
 
         # TODO AG
         return state_dict, idx
-
-    def can_toggle(self, toggle_position, toggle_distance_threshold):
-        # Calculate for any fingers in any arm
-        for arm in self.arm_names:
-            for link in self.finger_links[arm]:
-                link_pos = link.get_position()
-                if np.linalg.norm(np.array(link_pos) - np.array(toggle_position)) < toggle_distance_threshold:
-                    return True
-        return False
 
     @classproperty
     def _do_not_register_classes(cls):

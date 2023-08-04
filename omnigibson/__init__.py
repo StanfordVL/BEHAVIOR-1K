@@ -74,15 +74,29 @@ def create_app():
     from omni.isaac.kit import SimulationApp
     # If multi_gpu is used, og.sim.render() will cause a segfault when called during on_contact callbacks,
     # e.g. when an attachment joint is being created due to contacts (create_joint calls og.sim.render() internally).
-    app = SimulationApp({"headless": gm.HEADLESS, "multi_gpu": False})
+    gpu_id = None if gm.GPU_ID is None else int(gm.GPU_ID)
+    config_kwargs = {"headless":  gm.HEADLESS, "multi_gpu": False}
+    if gpu_id is not None:
+        config_kwargs["active_gpu"] = gpu_id
+        config_kwargs["physics_gpu"] = gpu_id
+    app = SimulationApp(config_kwargs)
     import omni
 
     # Enable additional extensions we need
     from omni.isaac.core.utils.extensions import enable_extension
     enable_extension("omni.flowusd")
     enable_extension("omni.particle.system.bundle")
-    enable_extension("omni.kit.window.viewport")    # This is needed for windows
 
+    # Additional import for windows
+    if os.name == "nt":
+        enable_extension("omni.kit.window.viewport")
+
+    # If we're headless, suppress all warnings about GLFW
+    if gm.HEADLESS:
+        import omni.log
+        log = omni.log.get_log()
+        log.set_channel_enabled("carb.windowing-glfw.plugin", False, omni.log.SettingBehavior.OVERRIDE)
+        
     # Globally suppress certain logging modules (unless we're in debug mode) since they produce spurious warnings
     if not gm.DEBUG:
         import omni.log

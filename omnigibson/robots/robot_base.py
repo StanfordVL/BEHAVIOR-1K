@@ -171,7 +171,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
                     self._sensors[sensor.name] = sensor
 
         # Since proprioception isn't an actual sensor, we need to possibly manually add it here as well
-        if self._obs_modalities == "all":
+        if self._obs_modalities == "all" or "proprio" in self._obs_modalities:
             obs_modalities.add("proprio")
 
         # Update our overall obs modalities
@@ -196,23 +196,6 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         Run any needed sanity checks to make sure this robot was created correctly.
         """
         pass
-
-    def can_toggle(self, toggle_position, toggle_distance_threshold):
-        """
-        Returns True if the part of the robot that can toggle a toggleable is within the given range of a
-        point corresponding to a toggle marker
-        by default, we assume robot cannot toggle toggle markers
-
-        Args:
-            toggle_position (3-array): (x,y,z) cartesian position values as a reference point for evaluating
-                whether a toggle can occur
-            toggle_distance_threshold (float): distance value below which a toggle is allowed
-
-        Returns:
-            bool: True if the part of the robot that can toggle a toggleable is within the given range of a
-                point corresponding to a toggle marker. By default, we assume robot cannot toggle toggle markers
-        """
-        return False
 
     def get_obs(self):
         """
@@ -280,7 +263,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
 
         # Have to handle proprio separately since it's not an actual sensor
         if "proprio" in self._obs_modalities:
-            obs_space["proprio"] = self._build_obs_box_space(shape=(self.proprioception_dim,), low=-np.inf, high=np.inf)
+            obs_space["proprio"] = self._build_obs_box_space(shape=(self.proprioception_dim,), low=-np.inf, high=np.inf, dtype=np.float64)
 
         return obs_space
 

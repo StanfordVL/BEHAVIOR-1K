@@ -51,7 +51,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     )
 
     modification_metalink = {
-        "particleApplier": "particleapplication_link",
+        "particleApplier": "particleapplier_link",
         "particleRemover": "particleremover_link",
     }
 
@@ -74,7 +74,6 @@ def main(random_selection=False, headless=False, short_exec=False):
             "type": "Cone",
             # Size of the cone
             "extents": np.array([0.1875, 0.1875, 0.375]),
-            "visualize": True,
         },
     }
 
@@ -117,7 +116,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         name="table",
         category="breakfast_table",
         model="kwmfdg",
-        scale=[4.0, 4.0, 4.0],
+        bounding_box=[3.402, 1.745, 1.175],
         position=[0, 0, 0.98],
     )
 
@@ -150,7 +149,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         name="modifier",
         category="dishtowel",
         model="dtfspn",
-        scale=np.ones(3) * 2.0,
+        bounding_box=[0.341, 0.466, 0.07],
         visual_only=method_type == "Projection",  # Non-fluid adjacency requires the object to have collision geoms active
         abilities=abilities,
     )

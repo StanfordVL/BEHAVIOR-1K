@@ -3,6 +3,10 @@ import json
 import os
 import subprocess
 import tempfile
+import contextlib
+import inspect
+from copy import deepcopy
+from pathlib import Path
 from cryptography.fernet import Fernet
 from collections import defaultdict
 from urllib.request import urlretrieve
@@ -11,6 +15,8 @@ import progressbar
 import omnigibson as og
 from omnigibson.macros import gm
 from omnigibson.utils.ui_utils import create_module_logger
+if os.getenv("OMNIGIBSON_NO_OMNIVERSE", default=0) != "1":
+    from pxr import Usd
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -159,36 +165,18 @@ def get_og_model_path(category_name, model_name):
     return os.path.join(og_category_path, model_name)
 
 
-def get_object_models_of_category(category_name, filter_method=None):
+def get_all_system_categories():
     """
-    Get OmniGibson all object models of a given category
-
-    # TODO: Make this less ugly -- filter_method is a single hard-coded check
-
-    Args:
-        category_name (str): object category
-        filter_method (str): Method to use for filtering object models
+    Get OmniGibson all system categories
 
     Returns:
-        list: all object models of a given category
+        list: all system categories
     """
-    models = []
-    og_category_path = get_og_category_path(category_name)
-    for model_name in os.listdir(og_category_path):
-        if filter_method is None:
-            models.append(model_name)
-        elif filter_method in ["sliceable_part", "sliceable_whole"]:
-            model_path = get_og_model_path(category_name, model_name)
-            metadata_json = os.path.join(model_path, "misc", "metadata.json")
-            with open(metadata_json) as f:
-                metadata = json.load(f)
-            if (filter_method == "sliceable_part" and "object_parts" not in metadata) or (
-                filter_method == "sliceable_whole" and "object_parts" in metadata
-            ):
-                models.append(model_name)
-        else:
-            raise Exception("Unknown filter method: {}".format(filter_method))
-    return sorted(models)
+    og_dataset_path = gm.DATASET_PATH
+    og_categories_path = os.path.join(og_dataset_path, "systems")
+
+    categories =[f for f in os.listdir(og_categories_path) if not is_dot_file(f)]
+    return sorted(categories)
 
 
 def get_all_object_categories():
@@ -225,6 +213,85 @@ def get_all_object_models():
         ]
         models.extend([os.path.join(og_categories_path, category, item) for item in category_models])
     return sorted(models)
+
+
+def get_all_object_category_models(category):
+    """
+    Get all object models from @category
+
+    Args:
+        category (str): Object category name
+
+    Returns:
+        list of str: all object models belonging to @category
+    """
+    og_dataset_path = gm.DATASET_PATH
+    og_categories_path = os.path.join(og_dataset_path, "objects", category)
+    return sorted(os.listdir(og_categories_path)) if os.path.exists(og_categories_path) else []
+
+
+def get_all_object_category_models_with_abilities(category, abilities):
+    """
+    Get all object models from @category whose assets are properly annotated with necessary metalinks to support
+    abilities @abilities
+
+    Args:
+        category (str): Object category name
+        abilities (dict): Dictionary mapping requested abilities to keyword arguments to pass to the corresponding
+            object state constructors. The abilities' required annotations will be guaranteed for the returned
+            models
+
+    Returns:
+        list of str: all object models belonging to @category which are properly annotated with necessary metalinks
+            to support the requested list of @abilities
+    """
+    # Avoid circular imports
+    from omnigibson.objects.dataset_object import DatasetObject
+    from omnigibson.object_states.factory import get_states_for_ability
+    from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
+
+    # Get all valid models
+    all_models = get_all_object_category_models(category=category)
+
+    # Generate all object states required per object given the requested set of abilities
+    state_types_and_params = [(state_type, params) for ability, params in abilities.items()
+                              for state_type in get_states_for_ability(ability)]
+    for state_type, _ in state_types_and_params:
+        # Add each state's dependencies, too. Note that only required dependencies are added.
+        for dependency in state_type.get_dependencies():
+            if all(other_state != dependency for other_state, _ in state_types_and_params):
+                state_types_and_params.append((dependency, dict()))
+
+    # Get mapping for class init kwargs
+    state_init_default_kwargs = dict()
+    for state_type, _ in state_types_and_params:
+        default_kwargs = inspect.signature(state_type.__init__).parameters
+        state_init_default_kwargs[state_type] = \
+            {kwarg: val.default for kwarg, val in default_kwargs.items()
+             if kwarg != "self" and val.default != inspect._empty}
+
+    # Iterate over all models and sanity check each one, making sure they satisfy all the requested @abilities
+    valid_models = []
+
+    def supports_state_types(states_and_params, obj_prim):
+        # Check all link states
+        for state_type, params in states_and_params:
+            kwargs = deepcopy(state_init_default_kwargs[state_type])
+            kwargs.update(params)
+            if not state_type.is_compatible_asset(prim=obj_prim, **kwargs)[0]:
+                return False
+        return True
+
+    for model in all_models:
+        usd_path = DatasetObject.get_usd_path(category=category, model=model)
+        usd_path = usd_path.replace(".usd", ".encrypted.usd")
+        with decrypted(usd_path) as fpath:
+            stage = Usd.Stage.Open(fpath)
+            prim = stage.GetDefaultPrim()
+            if supports_state_types(state_types_and_params, prim):
+                valid_models.append(model)
+
+    return valid_models
 
 
 def get_og_assets_version():
@@ -418,6 +485,15 @@ def encrypt_file(original_filename, encrypted_filename=None, encrypted_file=None
     else:
         with open(encrypted_filename, "wb") as encrypted_file:
             encrypted_file.write(encrypted)
+
+
+@contextlib.contextmanager
+def decrypted(encrypted_filename):
+    fpath = Path(encrypted_filename)
+    decrypted_filename = f"{fpath.stem}.tmp{fpath.suffix}"
+    decrypt_file(encrypted_filename=encrypted_filename, decrypted_filename=decrypted_filename)
+    yield decrypted_filename
+    os.remove(decrypted_filename)
 
 
 if __name__ == "__main__":

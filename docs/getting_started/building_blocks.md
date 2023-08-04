@@ -11,9 +11,9 @@ icon: octicons/package-16
 
 ??? question annotate "Why macros?"
 
-    Macros enforce global behavior that is consistent within an individual python process but can differ between processes. This is useful because globally enabling all of **`OmniGibson`**'s features can cause unecessary slowdowns (1), and so configuring the macros for your specific use case can optimize performance.
+    Macros enforce global behavior that is consistent within an individual python process but can differ between processes. This is useful because globally enabling all of **`OmniGibson`**'s features can cause unecessary slowdowns, and so configuring the macros for your specific use case can optimize performance.
 
-1.  For example, Omniverse provides a so-called `flatcache` feature which provides significant performance boosts, but cannot be used when fluids or soft bodies are present. So, we ideally should always have `gm.USE_FLATCACHE=True` unless we have fluids or soft bodies in our environment.
+    For example, Omniverse provides a so-called `flatcache` feature which provides significant performance boosts, but cannot be used when fluids or soft bodies are present. So, we ideally should always have `gm.USE_FLATCACHE=True` unless we have fluids or soft bodies in our environment.
 
 `macros` define a globally available set of magic numbers or flags set throughout **`OmniGibson`**. These can either be directly set in `omnigibson.macros.py`, or can be programmatically modified at runtime via:
 
@@ -209,11 +209,11 @@ This demo loads the Rs_int scene and highlights windows on/off repeatedly.
 ### **Draw Object Bounding Box Demo**
 !!! abstract annotate "This demo is useful for..."
 
-    * Understanding how to access observations from a `GymObservable` object (1)
+    * Understanding how to access observations from a `GymObservable` object
     * Understanding how to access objects' bounding box information
     * Understanding how to dynamically modify vision modalities
 
-1. [`Environment`](../reference/envs/env_base.md), all sensors extending from [`BaseSensor`](../reference/sensors/sensor_base.md), and all objects extending from [`BaseObject`](../reference/objects/object_base.md) (which includes all robots extending from [`BaseRobot`](../reference/robots/robot_base.md)!) are [`GymObservable`](../reference/utils/gym_utils.md#utils.gym_utils.GymObservable) objects!
+*[GymObservable]: [`Environment`](../reference/envs/env_base.md), all sensors extending from [`BaseSensor`](../reference/sensors/sensor_base.md), and all objects extending from [`BaseObject`](../reference/objects/object_base.md) (which includes all robots extending from [`BaseRobot`](../reference/robots/robot_base.md)!) are [`GymObservable`](../reference/utils/gym_utils.md#utils.gym_utils.GymObservable) objects!
 
 ```{.python .annotate}
 python -m omnigibson.examples.objects.draw_bounding_box
@@ -277,10 +277,7 @@ This demo loads an apple and a knife, and showcases how apple can be diced into 
 python -m omnigibson.examples.object_states.folded_unfolded_state_demo
 ```
 
-This demo loads in three different cloth objects, and allows you to manipulate them (1) while printing out their `Folded` state status in real-time.
-{ .annotate }
-
-1. Manipulate the object by holding down **`Shift`** and then **`Left-click + Drag`**!
+This demo loads in three different cloth objects, and allows you to manipulate them while printing out their `Folded` state status in real-time. Try manipulating the object by holding down **`Shift`** and then **`Left-click + Drag`**!
 
 ??? code "folded_unfolded_state_demo.py"
 
@@ -371,10 +368,7 @@ This demo loads in a stove (toggled on) and two apples. The first apple will be 
 python -m omnigibson.examples.object_states.overlaid_demo
 ```
 
-This demo loads in a carpet on top of a table. The demo allows you to manipulate the carpet (1) while printing out their `Overlaid` state status in real-time.
-{ .annotate }
-
-1. Manipulate the object by holding down **`Shift`** and then **`Left-click + Drag`**!
+This demo loads in a carpet on top of a table. The demo allows you to manipulate the carpet while printing out their `Overlaid` state status in real-time. Try manipulating the object by holding down **`Shift`** and then **`Left-click + Drag`**!
 
 ??? code "overlaid_demo.py"
 
@@ -544,16 +538,14 @@ This demo lets you choose a robot and the set of controllers to control the robo
 ### **Robot Grasping Demo**
 !!! abstract annotate "This demo is useful for..."
 
-    * Understanding the difference between `physical` and `sticky` (1) grasping
+    * Understanding the difference between `physical` and `sticky` grasping
     * Understanding how to teleoperate a robot through external commands
-
-1. `physical` means natural friction is required to hold objects, `sticky` means that objects are constrained to the robot's gripper once contact is made
 
 ```{.python .annotate}
 python -m omnigibson.examples.robots.grasping_mode_example
 ```
 
-This demo lets you choose a grasping mode and then loads a `Fetch` robot and a cube on a table. You can then teleoperate the robot to grasp the cube, observing the difference is grasping behavior based on the grasping mode chosen.
+This demo lets you choose a grasping mode and then loads a `Fetch` robot and a cube on a table. You can then teleoperate the robot to grasp the cube, observing the difference is grasping behavior based on the grasping mode chosen. Here, `physical` means natural friction is required to hold objects, while `sticky` means that objects are constrained to the robot's gripper once contact is made. 
 
 ??? code "grasping_mode_example.py"
 

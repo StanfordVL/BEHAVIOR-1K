@@ -1,69 +1,31 @@
 import networkx as nx
 
+from omnigibson.object_states.kinematics_mixin import KinematicsMixin
 from omnigibson.object_states import *
-from omnigibson.object_states.object_state_base import BaseObjectState
-
-_ALL_STATES = frozenset(
-    [
-        AABB,
-        Burnt,
-        ContactBodies,
-        ContactParticles,
-        Cooked,
-        Covered,
-        Heated,
-        AttachedTo,
-        Frozen,
-        HeatSourceOrSink,
-        HorizontalAdjacency,
-        Inside,
-        MaxTemperature,
-        NextTo,
-        OnFire,
-        OnTop,
-        Open,
-        Overlaid,
-        ParticleApplier,
-        ParticleRemover,
-        ParticleSink,
-        ParticleSource,
-        Pose,
-        Saturated,
-        Sliced,
-        Slicer,
-        Temperature,
-        ToggledOn,
-        Touching,
-        Under,
-        VerticalAdjacency,
-        Filled,
-        Folded,
-        Unfolded,
-    ]
-)
 
 _ABILITY_TO_STATE_MAPPING = {
     "attachable": [AttachedTo],
-    "burnable": [Burnt],
+    "blender": [],
     "particleApplier": [ParticleApplier],
     "particleRemover": [ParticleRemover],
     "particleSource": [ParticleSource],
     "particleSink": [ParticleSink],
     "coldSource": [HeatSourceOrSink],
-    "cookable": [Cooked],
+    "cookable": [Cooked, Burnt],
     "coverable": [Covered],
     "freezable": [Frozen],
     "heatable": [Heated],
     "heatSource": [HeatSourceOrSink],
+    "meltable": [],
+    "mixingTool": [],
     "openable": [Open],
     "flammable": [OnFire],
     "saturable": [Saturated],
-    "sliceable": [Sliced],
-    "slicer": [Slicer],
+    "sliceable": [],
+    "slicer": [],
     "toggleable": [ToggledOn],
-    "fillable": [Filled],
-    "foldable": [Folded],
-    "unfoldable": [Unfolded],
+    "cloth": [Folded, Unfolded, Overlaid, Draped],
+    "fillable": [Filled, Contains],
 }
 
 _DEFAULT_STATE_SET = frozenset(
@@ -71,11 +33,14 @@ _DEFAULT_STATE_SET = frozenset(
         Inside,
         NextTo,
         OnTop,
-        Overlaid,
         Touching,
         Under,
         Covered,
     ]
+)
+
+_KINEMATIC_STATE_SET = frozenset(
+    [state for state in REGISTERED_OBJECT_STATES.values() if issubclass(state, KinematicsMixin)]
 )
 
 _FIRE_STATE_SET = frozenset(
@@ -136,17 +101,9 @@ def get_default_states():
     return _DEFAULT_STATE_SET
 
 
-def get_all_states():
-    return _ALL_STATES
-
-
 def get_state_name(state):
     # Get the name of the class.
     return state.__name__
-
-
-def get_state_from_name(name):
-    return next(state for state in _ALL_STATES if get_state_name(state) == name)
 
 
 def get_states_for_ability(ability):
@@ -155,42 +112,27 @@ def get_states_for_ability(ability):
     return _ABILITY_TO_STATE_MAPPING[ability]
 
 
-def get_object_state_instance(state_class, obj, params=None):
+def get_state_dependency_graph(states=None):
     """
-    Create an BaseObjectState child class instance for a given object & state.
-
-    The parameters passed in as a dictionary through params are passed as
-    kwargs to the object state class constructor.
-
     Args:
-        state_class (BaseObjectState): The state name from the state name dictionary.
-        obj (StatefulObject): The object for which the state is being constructed.
-        params (dict): Dictionary of {param: value} corresponding to the state's params.
+        states (None or Iterable): If specified, specific state(s) to sort. Otherwise, will generate dependency graph
+            over all states
 
-    Returns:
-        BaseObjectState: The constructed state object
-    """
-    if not issubclass(state_class, BaseObjectState):
-        assert False, "unknown state class: {}".format(state_class)
-
-    if params is None:
-        params = {}
-
-    return state_class(obj, **params)
-
-
-def get_state_dependency_graph():
-    """
     Returns:
         nx.DiGraph: State dependency graph of supported object states
     """
-    dependencies = {state: state.get_dependencies() + state.get_optional_dependencies() for state in get_all_states()}
+    states = REGISTERED_OBJECT_STATES.values() if states is None else states
+    dependencies = {state: set.union(state.get_dependencies(), state.get_optional_dependencies()) for state in states}
     return nx.DiGraph(dependencies)
 
 
-def get_states_by_dependency_order():
+def get_states_by_dependency_order(states=None):
     """
+    Args:
+        states (None or Iterable): If specified, specific state(s) to sort. Otherwise, will generate dependency graph
+            over all states
+
     Returns:
         list: all states in topological order of dependency
     """
-    return list(reversed(list(nx.algorithms.topological_sort(get_state_dependency_graph()))))
+    return list(reversed(list(nx.algorithms.topological_sort(get_state_dependency_graph(states)))))

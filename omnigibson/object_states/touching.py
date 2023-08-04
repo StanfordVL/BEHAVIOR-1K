@@ -1,11 +1,11 @@
 from omnigibson.object_states.contact_bodies import ContactBodies
-from omnigibson.object_states.kinematics import KinematicsMixin
-from omnigibson.object_states.object_state_base import BooleanState, RelativeObjectState
+from omnigibson.object_states.kinematics_mixin import KinematicsMixin
+from omnigibson.object_states.object_state_base import BooleanStateMixin, RelativeObjectState
 from omnigibson.utils.constants import PrimType
+from omnigibson.utils.usd_utils import RigidContactAPI
 
-class Touching(KinematicsMixin, RelativeObjectState, BooleanState):
-    def _set_value(self, other, new_value):
-        raise NotImplementedError()
+
+class Touching(KinematicsMixin, RelativeObjectState, BooleanStateMixin):
 
     @staticmethod
     def _check_contact(obj_a, obj_b):
@@ -20,5 +20,11 @@ class Touching(KinematicsMixin, RelativeObjectState, BooleanState):
             return self._check_contact(other, self.obj)
         elif other.prim_type == PrimType.CLOTH:
             return self._check_contact(self.obj, other)
+        elif not self.obj.kinematic_only and not other.kinematic_only:
+            # Use optimized check for rigid bodies
+            return RigidContactAPI.in_contact(
+                prim_paths_a=[link.prim_path for link in self.obj.links.values()],
+                prim_paths_b=[link.prim_path for link in other.links.values()],
+            )
         else:
             return self._check_contact(other, self.obj) and self._check_contact(self.obj, other)
