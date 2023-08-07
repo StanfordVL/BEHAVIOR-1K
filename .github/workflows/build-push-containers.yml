@@ -8,17 +8,10 @@ on:
       - 'main'
       - 'og-develop'
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.head_ref || github.sha }}
-  cancel-in-progress: true
-
 jobs:
   docker:
     runs-on: [self-hosted, linux, gpu]
     steps:
-      -
-        name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
       -
         name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
@@ -63,6 +56,8 @@ jobs:
           tags: ${{ steps.meta-dev.outputs.tags }}
           labels: ${{ steps.meta-dev.outputs.labels }}
           file: docker/dev.Dockerfile
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
       -
         name: Build and push prod image
         uses: docker/build-push-action@v4
