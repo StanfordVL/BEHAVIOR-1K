@@ -48,7 +48,6 @@ def plan_base_motion(
             return state
         
         def checkMotion(self, s1, s2):
-            # from IPython import embed; embed()
             if not si.isValid(s2):
                 return False
             
@@ -56,7 +55,6 @@ def plan_base_motion(
             goal = np.array([s2.getX(), s2.getY(), s2.getYaw()])
             segment = goal[:2] - start[:2]
             segment_theta = np.arctan2(segment[1], segment[0])
-            from IPython import embed; embed()
             # Start rotation
             diff = T.wrap_angle(segment_theta - start[2])
             direction = np.sign(diff)
@@ -65,7 +63,8 @@ def plan_base_motion(
             nav_angle = np.linspace(0.0, diff, num_points) * direction
             angles = nav_angle + start[2]
             for i in range(num_points):
-                if not si.isValid(self.create_state(start[0], start[1], angles[i])()):
+                state = self.create_state(start[0], start[1], angles[i])
+                if not si.isValid(state()):
                     return False
 
             # Navigation
@@ -74,7 +73,8 @@ def plan_base_motion(
             nav_x = np.linspace(start[0], goal[0], num_points).tolist()
             nav_y = np.linspace(start[1], goal[1], num_points).tolist()
             for i in range(num_points):
-                if not si.isValid(self.create_state(nav_x[i], nav_y[i], segment_theta)()):
+                state = self.create_state(nav_x[i], nav_y[i], segment_theta)
+                if not si.isValid(state()):
                     return False
                 
             # Goal rotation
@@ -85,8 +85,10 @@ def plan_base_motion(
             nav_angle = np.linspace(0.0, diff, num_points) * direction
             angles = nav_angle + segment_theta
             for i in range(num_points):
-                if not si.isValid(self.create_state(goal[0], goal[1], angles[i])()):
+                state = self.create_state(goal[0], goal[1], angles[i])
+                if not si.isValid(state()):
                     return False
+                
             return True
 
     def state_valid_fn(q):
