@@ -10,4 +10,4 @@ SHELL ["micromamba", "run", "-n", "omnigibson", "/bin/bash", "--login", "-c"]
 RUN micromamba run -n omnigibson pip install -e .
 
 # Add setup to be executed on bash launch
-RUN echo "OMNIGIBSON_NO_OMNIVERSE=1 python -m omnigibson.scripts.setup" >> /root/.bashrc
+RUN echo "OMNIGIBSON_NO_OMNIVERSE=1 python scripts/download_datasets.py" >> /root/.bashrc
