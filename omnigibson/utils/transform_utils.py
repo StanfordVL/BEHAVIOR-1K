@@ -616,6 +616,20 @@ def pose_transform(pos1, quat1, pos0, quat0):
     # Multiply and convert back to pos, quat
     return mat2pose(mat1 @ mat0)
 
+def invert_pose_transform(pos, quat):
+    """
+    Inverts a pose transform
+
+    Args:
+        pos: (x,y,z) position to transform
+        quat: (x,y,z,w) orientation to transform
+    """
+    # Get pose
+    mat = pose2mat((pos, quat))
+
+    # Invert pose and convert back to pos, quat
+    return mat2pose(pose_inv(mat))
+
 
 def relative_pose_transform(pos1, quat1, pos0, quat0):
     """
