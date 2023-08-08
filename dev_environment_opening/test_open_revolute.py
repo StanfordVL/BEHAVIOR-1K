@@ -284,7 +284,7 @@ def main():
     grasp_position = center_of_selected_surface_along_push_axis + lateral_pos_wrt_surface_center
     # Get the appropriate rotation
 
-    grasp_quat_in_bbox_frame = get_quaternion_between_vectors([1, 0, 0], canonical_open_direction * open_axis_closer_side_sign)
+    grasp_quat_in_bbox_frame = get_quaternion_between_vectors([1, 0, 0], canonical_open_direction * open_axis_closer_side_sign * -1)
 
     # Now apply the grasp offset.
     offset_in_bbox_frame = canonical_open_direction * open_axis_closer_side_sign * 0.2
