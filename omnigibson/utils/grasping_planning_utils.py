@@ -266,7 +266,7 @@ def grasp_position_for_open_on_revolute_joint(robot, target_obj, relevant_joint,
     grasp_position = center_of_selected_surface_along_push_axis + lateral_pos_wrt_surface_center
     # Get the appropriate rotation
 
-    grasp_quat_in_bbox_frame = get_quaternion_between_vectors([1, 0, 0], canonical_open_direction * open_axis_closer_side_sign)
+    grasp_quat_in_bbox_frame = get_quaternion_between_vectors([1, 0, 0], canonical_open_direction * open_axis_closer_side_sign * -1)
 
     # Now apply the grasp offset.
     offset_in_bbox_frame = canonical_open_direction * open_axis_closer_side_sign * 0.2
@@ -329,10 +329,7 @@ def get_quaternion_between_vectors(v1, v2):
     return np.array(q) / np.linalg.norm(q)
 
 def rotate_point_around_axis(point_wrt_arbitrary_frame, arbitrary_frame_wrt_origin, joint_axis, yaw_change):
-    # rotation_to_joint = get_quaternion_between_vectors([1, 0, 0], joint_axis)
-    # rotation = T.quat_multiply(rotation_to_joint, T.euler2quat([yaw_change, 0, 0]))
-    # rotation = T.quat_multiply(rotation, T.quat_inverse(rotation_to_joint))
-    rotation = R.from_rotvec(joint_axis * yaw_change).apply([1, 0, 0])
+    rotation = R.from_rotvec(joint_axis * yaw_change).as_quat()
     origin_wrt_arbitrary_frame = T.invert_pose_transform(*arbitrary_frame_wrt_origin)
 
     pose_in_origin_frame = T.pose_transform(*arbitrary_frame_wrt_origin, *point_wrt_arbitrary_frame)

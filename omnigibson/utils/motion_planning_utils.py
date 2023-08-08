@@ -163,6 +163,9 @@ def plan_arm_motion(
         goal[i] = float(end_conf[i])
     ss.setStartAndGoalStates(start, goal)
 
+    if not state_valid_fn(start) or not state_valid_fn(goal):
+        return
+
     # this will automatically choose a default planner with
     # default parameters
     solved = ss.solve(planning_time)
