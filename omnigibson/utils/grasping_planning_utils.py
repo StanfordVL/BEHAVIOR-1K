@@ -329,9 +329,10 @@ def get_quaternion_between_vectors(v1, v2):
     return np.array(q) / np.linalg.norm(q)
 
 def rotate_point_around_axis(point_wrt_arbitrary_frame, arbitrary_frame_wrt_origin, joint_axis, yaw_change):
-    rotation_to_joint = get_quaternion_between_vectors([1, 0, 0], joint_axis)
-    rotation = T.quat_multiply(rotation_to_joint, T.euler2quat([yaw_change, 0, 0]))
-    rotation = T.quat_multiply(rotation, T.quat_inverse(rotation_to_joint))
+    # rotation_to_joint = get_quaternion_between_vectors([1, 0, 0], joint_axis)
+    # rotation = T.quat_multiply(rotation_to_joint, T.euler2quat([yaw_change, 0, 0]))
+    # rotation = T.quat_multiply(rotation, T.quat_inverse(rotation_to_joint))
+    rotation = R.from_rotvec(joint_axis * yaw_change).apply([1, 0, 0])
     origin_wrt_arbitrary_frame = T.invert_pose_transform(*arbitrary_frame_wrt_origin)
 
     pose_in_origin_frame = T.pose_transform(*arbitrary_frame_wrt_origin, *point_wrt_arbitrary_frame)
