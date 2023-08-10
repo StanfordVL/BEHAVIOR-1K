@@ -1,6 +1,6 @@
 import numpy as np
 import random
-from scipy.spatial.transform import Rotation as R
+from scipy.spatial.transform import Rotation as R, Slerp
 from math import ceil
 
 import omnigibson.utils.transform_utils as T
@@ -180,7 +180,7 @@ def grasp_position_for_open_on_prismatic_joint(robot, target_obj, relevant_joint
     required_pos_change = target_joint_pos - current_joint_pos
     push_vector_in_bbox_frame = canonical_push_direction * required_pos_change
     target_hand_pos_in_bbox_frame = grasp_position_in_bbox_frame + push_vector_in_bbox_frame
-    target_hand_pos_in_world_frame = T.pose_transform(
+    target_hand_pose_in_world_frame = T.pose_transform(
         bbox_center_in_world, bbox_quat_in_world, target_hand_pos_in_bbox_frame, grasp_quat_in_bbox_frame
     )
 
@@ -189,14 +189,28 @@ def grasp_position_for_open_on_prismatic_joint(robot, target_obj, relevant_joint
 
     # Decide whether a grasp is required. If approach direction and displacement are similar, no need to grasp.
     grasp_required = np.dot(push_vector_in_bbox_frame, canonical_push_axis * -push_axis_closer_side_sign) < 0
-
+    # from IPython import embed; embed()
+    waypoints = interpolate_waypoints(offset_grasp_pose_in_world_frame, target_hand_pose_in_world_frame)
     return (
         offset_grasp_pose_in_world_frame,
-        [target_hand_pos_in_world_frame],
+        waypoints,
         approach_direction_in_world_frame,
         relevant_joint,
         grasp_required,
     )
+
+def interpolate_waypoints(start_pose, end_pose):
+    start_pos, start_orn = start_pose
+    travel_distance = np.linalg.norm(end_pose[0] - start_pos)
+    num_poses = np.max([2, int(travel_distance / 0.01) + 1])
+    pos_waypoints = np.linspace(start_pos, end_pose[0], num_poses)
+
+    # Also interpolate the rotations
+    combined_rotation = R.from_quat(np.array([start_orn, end_pose[1]]))
+    slerp = Slerp([0, 1], combined_rotation)
+    orn_waypoints = slerp(np.linspace(0, 1, num_poses))
+    quat_waypoints = [x.as_quat() for x in orn_waypoints]
+    return [waypoint for waypoint in zip(pos_waypoints, quat_waypoints)]
 
 def grasp_position_for_open_on_revolute_joint(robot, target_obj, relevant_joint, should_open):
     link_name = relevant_joint.body1.split("/")[-1]

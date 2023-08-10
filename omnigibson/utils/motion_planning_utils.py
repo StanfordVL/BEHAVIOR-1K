@@ -9,7 +9,7 @@ def plan_base_motion(
     robot,
     end_conf,
     context,
-    planning_time = 100.0,
+    planning_time = 15.0,
     **kwargs
 ):
     """
@@ -72,6 +72,8 @@ def plan_base_motion(
     print(goal)
 
     ss.setStartAndGoalStates(start, goal)
+    if not state_valid_fn(start()) or not state_valid_fn(goal()):
+        return
 
     # this will automatically choose a default planner with
     # default parameters
@@ -95,7 +97,7 @@ def plan_arm_motion(
     robot,
     end_conf,
     context,
-    planning_time = 100.0,
+    planning_time = 15.0,
     **kwargs
 ):
     """
@@ -258,6 +260,12 @@ def detect_robot_collision(context):
         nonlocal mesh_path
 
         valid_hit = hit.rigid_body not in context.disabled_collision_pairs_dict[mesh_path]
+        if valid_hit:
+            print(mesh_path)
+            print(hit.rigid_body)
+            # if mesh_path == "/World/robot_copy/arm_right_3_link" and hit.rigid_body == "/World/robot_copy/base_link":
+            #     from IPython import embed; embed()
+            print("--------")
 
         return not valid_hit
 
