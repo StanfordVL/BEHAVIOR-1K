@@ -832,7 +832,7 @@ def get_mesh_volume_and_com(mesh_prim):
     return is_volume, volume, com
 
 
-def create_primitive_mesh(prim_path, primitive_type, extents=1.0, u_patches=None, v_patches=None):
+def create_primitive_mesh(prim_path, primitive_type, extents=1.0, u_patches=None, v_patches=None, stage=None):
     """
     Helper function that generates a UsdGeom.Mesh prim at specified @prim_path of type @primitive_type.
 
@@ -849,13 +849,15 @@ def create_primitive_mesh(prim_path, primitive_type, extents=1.0, u_patches=None
         v_patches (int or None): If specified, should be an integer that represents how many segments to create in the
             v-direction. E.g. 10 means 10 segments (and therefore 11 vertices) will be created.
             Both u_patches and v_patches need to be specified for them to be effective.
+        stage (None or Usd.Stage): If specified, stage on which the primitive mesh should be generated. If None, will
+            use og.sim.stage
 
     Returns:
         UsdGeom.Mesh: Generated primitive mesh as a prim on the active stage
     """
     assert_valid_key(key=primitive_type, valid_keys=PRIMITIVE_MESH_TYPES, name="primitive mesh type")
     create_mesh_prim_with_default_xform(primitive_type, prim_path, u_patches=u_patches, v_patches=v_patches)
-    mesh = UsdGeom.Mesh.Define(og.sim.stage, prim_path)
+    mesh = UsdGeom.Mesh.Define(og.sim.stage if stage is None else stage, prim_path)
 
     # Modify the points and normals attributes so that total extents is the desired
     # This means multiplying omni's default by extents * 50.0, as the native mesh generated has extents [-0.01, 0.01]
