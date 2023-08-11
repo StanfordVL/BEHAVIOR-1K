@@ -213,19 +213,16 @@ class ParticleSink(ParticleRemover):
             default_visual_conditions=default_visual_conditions,
         )
 
-    def _initialize(self):
-        # Run super first
-        super()._initialize()
-
-        # Override check overlap such that it always returns True (since we are ignoring overlaps and directly
-        # removing particles
-        self._check_overlap = lambda: True
-
     def _get_max_particles_limit_per_step(self, system):
         # Check the system
         assert is_physical_particle_system(system_name=system.name), \
             "ParticleSink only supports PhysicalParticleSystem"
         return m.MAX_PHYSICAL_PARTICLES_SOURCED_PER_STEP
+
+    @property
+    def requires_overlap(self):
+        # Not required, always sink particles
+        return False
 
     @classmethod
     def requires_metalink(cls, **kwargs):

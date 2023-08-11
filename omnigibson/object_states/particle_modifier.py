@@ -261,6 +261,13 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
         # Run link initialization
         self.initialize_link_mixin()
 
+        # Sanity check scale if requested
+        if self.requires_overlap:
+            # Run sanity check to make sure compatibility with omniverse physx
+            if self.method == ParticleModifyMethod.PROJECTION and self.obj.scale.max() != self.obj.scale.min():
+                raise ValueError(f"{self.__class__.__name__} for obj {self.obj.name} using PROJECTION method cannot be "
+                                 f"created with non-uniform scale and sample_with_raycast! Got scale: {self.obj.scale}")
+
         # Initialize internal variables
         self._current_step = 0
 
@@ -515,7 +522,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
             FlatcacheAPI.sync_raw_object_transforms_in_usd(prim=self.obj)
 
         # Check if there's any overlap and if we're at the correct step
-        if self._current_step == 0 and self._check_overlap():
+        if self._current_step == 0 and (not self.requires_overlap or self._check_overlap()):
             # Iterate over all owned systems for this particle modifier
             for system_name, conditions in self.conditions.items():
                 # Check if the system is active (for ParticleApplier, the system is always active)
@@ -542,6 +549,14 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
         deps = super().get_optional_dependencies()
         deps.update({Covered, ToggledOn, ContactBodies, ContactParticles})
         return deps
+
+    @classproperty
+    def requires_overlap(self):
+        """
+        Returns:
+            bool: Whether overlap checks should be executed as a guard condition against modifying particles
+        """
+        return True
 
     @classproperty
     def supported_active_systems(cls):
@@ -880,9 +895,6 @@ class ParticleApplier(ParticleModifier):
                 "If not sampling with raycast, ParticleApplier only supports PhysicalParticleSystems!"
             assert self.method == ParticleModifyMethod.PROJECTION, \
                 "If not sampling with raycast, ParticleApplier only supports ParticleModifyMethod.PROJECTION method!"
-            # Override the check overlap function -- this now always returns True because we don't require contact with
-            # anything in order to generate particles
-            self._check_overlap = lambda: True
             # Compute particle spawning information once
             self._compute_particle_spawn_information(system=system)
 
@@ -1192,6 +1204,11 @@ class ParticleApplier(ParticleModifier):
         assert system.name in self.conditions, f"System {system.name} is not defined in the conditions."
         return m.MAX_VISUAL_PARTICLES_APPLIED_PER_STEP if is_visual_particle_system(system_name=system.name) else \
             m.MAX_PHYSICAL_PARTICLES_APPLIED_PER_STEP
+
+    @property
+    def requires_overlap(self):
+        # Overlap required only if sampling with raycast
+        return self._sample_with_raycast
 
     @property
     def visualize(self):
