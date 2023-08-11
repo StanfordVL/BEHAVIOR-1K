@@ -990,8 +990,7 @@ class ManipulationRobot(BaseRobot):
 
         # Create a p2p joint if it's a child link of a fixed URDF that is connected by a revolute or prismatic joint
         joint_type = "FixedJoint"
-        # from IPython import embed; embed()
-        if True:
+        if ag_obj.fixed_base or ag_obj.root_link.name != ag_link.name:
             # We search up the tree path from the ag_link until we encounter the root (joint == 0) or a non fixed
             # joint (e.g.: revolute or fixed)
             link_handle = ag_link.handle
@@ -1000,7 +999,6 @@ class ManipulationRobot(BaseRobot):
                 # If this joint type is not fixed, we've encountered a valid moving joint
                 # So we create a spherical joint rather than fixed joint
                 if self._dc.get_joint_type(joint_handle) != JointType.JOINT_FIXED:
-                    print("hello")
                     joint_type = "SphericalJoint"
                     break
                 # Grab the parent link and its parent joint for the link

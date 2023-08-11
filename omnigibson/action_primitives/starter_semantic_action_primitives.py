@@ -420,8 +420,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         yield from self._execute_release()
 
         for _ in range(MAX_ATTEMPTS_FOR_OPEN_CLOSE):
-            if should_open == obj.states[object_states.Open].get_value():
-                return
+            # if should_open == obj.states[object_states.Open].get_value():
+            #     return
             
             try:
                 print("attempt")
@@ -453,6 +453,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 indented_print("Performing grasp approach for open")
 
                 yield from self._navigate_if_needed(obj, pose_on_obj=approach_pose)  #, check_joint=check_joint)
+                self.counter = 0
+                self.set_marker(approach_pose)
                 yield from self._move_hand_direct_cartesian(approach_pose, ignore_failure=False, stop_on_contact=True)
 
                 # Step once to update
@@ -466,12 +468,13 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 #             {"target object": obj.name},
                 #         )
                 # from IPython import embed; embed()
-                self.counter = 0
+                
                 for target_pose in target_poses:
                     print(target_pose)
                     self.set_marker(target_pose)
                     # from IPython import embed; embed()
                     yield from self._move_hand_direct_cartesian(target_pose, ignore_failure=False)
+                # from IPython import embed; embed()
 
                 # Moving to target pose often fails. Let's get the hand to apply the correct actions for its current pos
                 # This prevents the hand from jerking into its desired position when we do a release.

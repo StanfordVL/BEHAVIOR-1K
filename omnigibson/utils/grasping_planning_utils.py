@@ -15,7 +15,7 @@ REVOLUTE_JOINT_FRACTION_ACROSS_SURFACE_AXIS_BOUNDS = (0.4, 0.6)
 PRISMATIC_JOINT_FRACTION_ACROSS_SURFACE_AXIS_BOUNDS = (0.2, 0.8)
 GRASP_OFFSET = np.array([0, 0.05, -0.08])
 OPEN_GRASP_OFFSET = np.array([0, 0.05, -0.12])  # 5cm back and 12cm up.
-ROTATION_ARC_SEGMENT_LENGTHS = 0.1 # 10 cm
+ROTATION_ARC_SEGMENT_LENGTHS = 0.01 # 10 cm
 
 def get_grasp_poses_for_object_sticky(target_obj):
     bbox_center_in_world, bbox_quat_in_world, bbox_extent_in_base_frame, _ = target_obj.get_base_aligned_bbox(
@@ -222,7 +222,7 @@ def grasp_position_for_open_on_revolute_joint(robot, target_obj, relevant_joint,
         bbox_quat_in_world,
         bbox_extent_in_link_frame,
         bbox_center_in_obj_frame
-    ) = target_obj.get_base_aligned_bbox(link_name=link_name, visual=False)
+    ) = target_obj.get_base_aligned_bbox(link_name=link_name, visual=False, link_bbox_type="oriented")
 
     bbox_center_in_world_frame = T.pose_transform(*target_obj.get_position_orientation(), bbox_center_in_obj_frame, [0, 0, 0, 1])[0]
     bbox_wrt_origin = T.relative_pose_transform(bbox_center_in_world_frame, bbox_quat_in_world, *link.get_position_orientation())
@@ -302,10 +302,11 @@ def grasp_position_for_open_on_revolute_joint(robot, target_obj, relevant_joint,
     arc_length = abs(required_yaw_change) * np.linalg.norm(grasp_pose_in_origin_frame[0])
     turn_steps = int(ceil(arc_length / ROTATION_ARC_SEGMENT_LENGTHS))
     targets = []
+    start_pose_rotation_in_bbox_frame = (grasp_position + canonical_open_direction * open_axis_closer_side_sign * 0.1, grasp_quat_in_bbox_frame)
     for i in range(turn_steps):
         partial_yaw_change = (i + 1) / turn_steps * required_yaw_change
         rotated_grasp_pose_in_bbox_frame = rotate_point_around_axis(
-            grasp_pose_in_bbox_frame, bbox_wrt_origin, joint_axis, partial_yaw_change
+            start_pose_rotation_in_bbox_frame, bbox_wrt_origin, joint_axis, partial_yaw_change
         )
         rotated_grasp_pose_in_world_frame = T.pose_transform(
             bbox_center_in_world, bbox_quat_in_world, *rotated_grasp_pose_in_bbox_frame
