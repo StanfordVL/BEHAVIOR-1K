@@ -224,6 +224,8 @@ def grasp_position_for_open_on_revolute_joint(robot, target_obj, relevant_joint,
         bbox_center_in_obj_frame
     ) = target_obj.get_base_aligned_bbox(link_name=link_name, visual=False, link_bbox_type="oriented")
 
+    from IPython import embed; embed()
+
     bbox_center_in_world_frame = T.pose_transform(*target_obj.get_position_orientation(), bbox_center_in_obj_frame, [0, 0, 0, 1])[0]
     bbox_wrt_origin = T.relative_pose_transform(bbox_center_in_world_frame, bbox_quat_in_world, *link.get_position_orientation())
     origin_wrt_bbox = T.invert_pose_transform(*bbox_wrt_origin)
@@ -235,6 +237,8 @@ def grasp_position_for_open_on_revolute_joint(robot, target_obj, relevant_joint,
     open_direction = np.cross(joint_axis, origin_towards_bbox)
     open_direction /= np.linalg.norm(open_direction)
     lateral_axis = np.cross(open_direction, joint_axis)
+
+    from IPython import embed; embed()
 
     # Match the axes to the canonical axes of the link bb.
     lateral_axis_idx = np.argmax(np.abs(lateral_axis))
