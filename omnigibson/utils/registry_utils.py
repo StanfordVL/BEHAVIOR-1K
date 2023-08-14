@@ -3,7 +3,7 @@ A set of utility functions for registering and tracking objects
 """
 from inspect import isclass
 import numpy as np
-from collections import Iterable
+from collections.abc import Iterable
 from omnigibson.macros import create_module_macros
 from omnigibson.utils.python_utils import Serializable, SerializableNonInstance, UniquelyNamed
 from omnigibson.utils.ui_utils import create_module_logger
