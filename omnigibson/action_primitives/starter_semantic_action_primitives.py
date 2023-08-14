@@ -132,7 +132,8 @@ class UndoableContext(object):
         link_poses = self.fk_solver.get_link_poses(joint_pos, arm_links)
 
         # Set position of robot copy root prim
-        self._set_prim_pose(self.robot_copy.prims[self.robot_copy_type], self.robot.get_position_orientation())
+        # self._set_prim_pose(self.robot_copy.prims[self.robot_copy_type], self.robot.get_position_orientation())
+        self._set_prim_pose(self.robot_copy.prims[self.robot_copy_type], ([0, 0, 0], [0, 0, 0, 1]))
         # Assemble robot meshes
         for link_name, meshes in self.robot_copy.meshes[self.robot_copy_type].items():
             for mesh_name, copy_mesh in meshes.items():
@@ -170,7 +171,7 @@ class UndoableContext(object):
                     self.disabled_collision_pairs_dict[mesh.GetPrimPath().pathString] += [m.GetPrimPath().pathString for m in robot_meshes_copy[link_1].values()]
         
         # Filter out colliders all robot copy meshes should ignore
-        disabled_colliders = ["/World/fridge/link_0"]
+        disabled_colliders = []
 
         # Disable original robot colliders so copy can't collide with it
         disabled_colliders += [link.prim_path for link in self.robot.links.values()]
@@ -409,6 +410,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         yield from self._open_or_close(obj, False)
 
     def _open_or_close(self, obj, should_open):
+        reset_eef_pose = None
+
         if self._get_obj_in_hand():
             raise ActionPrimitiveError(
                 ActionPrimitiveError.Reason.PRE_CONDITION_ERROR,
@@ -420,11 +423,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         yield from self._execute_release()
 
         for _ in range(MAX_ATTEMPTS_FOR_OPEN_CLOSE):
-            # if should_open == obj.states[object_states.Open].get_value():
-            #     return
-            
             try:
                 print("attempt")
+                self.counter = 0
                 grasp_data = get_grasp_position_for_open(self.robot, obj, should_open)
                 if grasp_data is None:
                     # We were trying to do something but didn't have the data.
@@ -434,11 +435,21 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                         {"target object": obj.name},
                     )
 
-                grasp_pose, target_poses, object_direction, joint_info, grasp_required = grasp_data
+                grasp_pose, target_poses, object_direction, joint_info, grasp_required, yaw_change = grasp_data
+                if yaw_change < 0.1:
+                    return
 
                 # Prepare data for the approach later.
                 approach_pos = grasp_pose[0] + object_direction * OPEN_GRASP_APPROACH_DISTANCE
                 approach_pose = (approach_pos, grasp_pose[1])
+
+                # self.set_marker(grasp_pose)
+                # self.set_marker(approach_pose)
+                # for target_pose in target_poses:
+                #     print(target_pose)
+                #     self.set_marker(target_pose)
+                # for i in range(10000):
+                #     og.sim.step()
 
                 # If the grasp pose is too far, navigate
                 yield from self._navigate_if_needed(obj, pose_on_obj=grasp_pose)
@@ -453,7 +464,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 indented_print("Performing grasp approach for open")
 
                 yield from self._navigate_if_needed(obj, pose_on_obj=approach_pose)  #, check_joint=check_joint)
-                self.counter = 0
+                
                 self.set_marker(approach_pose)
                 yield from self._move_hand_direct_cartesian(approach_pose, ignore_failure=False, stop_on_contact=True)
 
@@ -469,9 +480,11 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 #         )
                 # from IPython import embed; embed()
                 
-                for target_pose in target_poses:
-                    print(target_pose)
-                    self.set_marker(target_pose)
+                for i, target_pose in enumerate(target_poses):
+                    # print(target_pose)
+                    reset_eef_pose = target_poses[i+1]
+
+                    # self.set_marker(target_pose)
                     # from IPython import embed; embed()
                     yield from self._move_hand_direct_cartesian(target_pose, ignore_failure=False)
                 # from IPython import embed; embed()
@@ -486,6 +499,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 print(e)
                 # Let go - we do not want to be holding anything after return of primitive.
                 yield from self._execute_release()
+                if reset_eef_pose is not None:
+                    yield from self._move_hand_direct_cartesian(reset_eef_pose, ignore_failure=True)
 
 
         if obj.states[object_states.Open].get_value() != should_open:

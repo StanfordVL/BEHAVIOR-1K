@@ -122,11 +122,13 @@ def plan_arm_motion(
         joint_combined_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx["combined"]])
         initial_joint_pos = np.array(robot.get_joint_positions()[joint_combined_idx])
         control_idx_in_joint_pos = np.where(np.in1d(joint_combined_idx, joint_control_idx))[0]
+        from IPython import embed; embed()
     else:
         initial_joint_pos = np.array(robot.get_joint_positions()[joint_control_idx])
         control_idx_in_joint_pos = np.arange(dim)
 
     def state_valid_fn(q):
+        from IPython import embed; embed()
         joint_pos = initial_joint_pos
         joint_pos[control_idx_in_joint_pos] = [q[i] for i in range(dim)]
         return not set_arm_and_detect_collision(context, joint_pos)
@@ -260,12 +262,12 @@ def detect_robot_collision(context):
         nonlocal mesh_path
 
         valid_hit = hit.rigid_body not in context.disabled_collision_pairs_dict[mesh_path]
-        if valid_hit:
-            print(mesh_path)
-            print(hit.rigid_body)
-            # if mesh_path == "/World/robot_copy/arm_right_3_link" and hit.rigid_body == "/World/robot_copy/base_link":
-            #     from IPython import embed; embed()
-            print("--------")
+        # if valid_hit:
+        #     print(mesh_path)
+        #     print(hit.rigid_body)
+        #     # if mesh_path == "/World/robot_copy/arm_right_3_link" and hit.rigid_body == "/World/robot_copy/base_link":
+        #     #     from IPython import embed; embed()
+        #     print("--------")
 
         return not valid_hit
 

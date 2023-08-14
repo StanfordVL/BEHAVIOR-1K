@@ -119,7 +119,11 @@ def main():
         markers.append(marker)
         og.sim.import_object(marker)
     
+    from omnigibson.object_states.open import _get_relevant_joints
     controller.markers = markers
+    # j = _get_relevant_joints(open_obj)[1][0]
+    # j.set_pos(0.5)
+    # pause(2)
     test_open()
     return
 

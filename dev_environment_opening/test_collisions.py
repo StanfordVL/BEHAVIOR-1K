@@ -16,7 +16,7 @@ import argparse
 
 def pause(time):
     for _ in range(int(time*100)):
-        og.sim.step()
+        og.sim.render()
 
 def main():
     # Load the config
@@ -74,6 +74,17 @@ def main():
     # joint_combined_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx["combined"]])
     # initial_joint_pos = np.array(robot.get_joint_positions()[joint_combined_idx])
 
+    def get_random_joint_position():
+        import random
+        joint_positions = []
+        joint_control_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
+        joints = np.array([joint for joint in robot.joints.values()])
+        arm_joints = joints[joint_control_idx]
+        for i, joint in enumerate(arm_joints):
+            val = random.uniform(joint.lower_limit, joint.upper_limit)
+            joint_positions.append(val)
+        return joint_positions, joint_control_idx
+
     pose_2d = [-0.762831, -0.377231, 2.72892]
     pose = controller._get_robot_pose_from_2d_pose(pose_2d)
     robot.set_position_orientation(*pose)
@@ -83,15 +94,21 @@ def main():
     joint_combined_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx["combined"]])
     initial_joint_pos = np.array(robot.get_joint_positions()[joint_combined_idx])
     control_idx_in_joint_pos = np.where(np.in1d(joint_combined_idx, joint_control_idx))[0]
-    joint_pos = initial_joint_pos
+    # joint_pos = initial_joint_pos
     # joint_pos[control_idx_in_joint_pos] = [0.0133727 ,0.216775 ,0.683931 ,2.04371 ,1.88204 ,0.720747 ,1.23276 ,1.72251]
-    from IPython import embed; embed()
+    # from IPython import embed; embed()
 
-    with UndoableContext(controller.robot, controller.robot_copy, "original") as context:
-        print(set_arm_and_detect_collision(context, joint_pos))
-        print("--------------------")
-        for i in range(10000):
-            og.sim.render()
+    while True:
+        joint_pos, joint_control_idx = get_random_joint_position()
+
+        with UndoableContext(controller.robot, controller.robot_copy, "original") as context:
+            initial_joint_pos[control_idx_in_joint_pos] = joint_pos
+            print(set_arm_and_detect_collision(context, initial_joint_pos))
+            print("--------------------")
+            from IPython import embed; embed()
+            robot.set_joint_positions(joint_pos, joint_control_idx)
+            og.sim.step()
+            from IPython import embed; embed()
 
 
     pause(1)
