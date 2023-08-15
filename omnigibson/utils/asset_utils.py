@@ -490,10 +490,9 @@ def encrypt_file(original_filename, encrypted_filename=None, encrypted_file=None
 @contextlib.contextmanager
 def decrypted(encrypted_filename):
     fpath = Path(encrypted_filename)
-    decrypted_filename = f"{fpath.stem}.tmp{fpath.suffix}"
+    decrypted_filename = os.path.join(og.tempdir, f"{fpath.stem}.tmp{fpath.suffix}")
     decrypt_file(encrypted_filename=encrypted_filename, decrypted_filename=decrypted_filename)
     yield decrypted_filename
-    os.remove(decrypted_filename)
 
 
 if __name__ == "__main__":
