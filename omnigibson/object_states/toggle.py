@@ -53,6 +53,8 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
         # Create a primitive mesh if it doesn't already exist
         if not pre_existing_mesh:
             self.radius = m.DEFAULT_RADIUS if self.radius is None else self.radius
+            # Note: We have to create a mesh (instead of a sphere shape) because physx complains about non-uniform
+            # scaling for non-meshes
             mesh = create_primitive_mesh(
                 prim_path=mesh_prim_path,
                 primitive_type="Sphere",
