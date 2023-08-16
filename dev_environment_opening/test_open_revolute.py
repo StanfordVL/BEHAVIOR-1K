@@ -51,19 +51,19 @@ def main():
 
     controller = StarterSemanticActionPrimitives(None, scene, robot)
 
-    open_obj = DatasetObject(
-        name="fridge",
-        category="fridge",
-        model="dszchb",
-        scale=0.7
-    )
-
     # open_obj = DatasetObject(
-    #     name="bottom_cabinet",
-    #     category="bottom_cabinet",
-    #     model="bamfsz",
+    #     name="fridge",
+    #     category="fridge",
+    #     model="dszchb",
     #     scale=0.7
     # )
+
+    open_obj = DatasetObject(
+        name="bottom_cabinet",
+        category="bottom_cabinet",
+        model="bamfsz",
+        scale=0.7
+    )
 
     og.sim.import_object(open_obj)
     open_obj.set_position_orientation([-1.2, -0.4, 0.5], T.euler2quat([0, 0, np.pi/2]))
@@ -93,12 +93,12 @@ def main():
 
     def test_open():
         set_start_pose()
-        pose_2d = [-0.231071, -0.272773, 2.55196]
+        # pose_2d = [-0.231071, -0.272773, 2.55196]
 
-        # pose_2d = [-0.282843, 0.297682, -3.07804]
-        pose = controller._get_robot_pose_from_2d_pose(pose_2d)
-        robot.set_position_orientation(*pose)
-        og.sim.step()
+        # # pose_2d = [-0.282843, 0.297682, -3.07804]
+        # pose = controller._get_robot_pose_from_2d_pose(pose_2d)
+        # robot.set_position_orientation(*pose)
+        # og.sim.step()
 
         # joint_pos = [0.0133727 ,0.216775 ,0.683931 ,2.04371 ,1.88204 ,0.720747 ,1.23276 ,1.72251]
         # control_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx["left"]])

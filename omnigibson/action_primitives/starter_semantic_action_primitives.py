@@ -411,6 +411,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
     def _open_or_close(self, obj, should_open):
         reset_eef_pose = None
+        relevant_joint = None
 
         if self._get_obj_in_hand():
             raise ActionPrimitiveError(
@@ -424,9 +425,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         for _ in range(MAX_ATTEMPTS_FOR_OPEN_CLOSE):
             try:
-                print("attempt")
                 self.counter = 0
-                grasp_data = get_grasp_position_for_open(self.robot, obj, should_open)
+                grasp_data = get_grasp_position_for_open(self.robot, obj, should_open, relevant_joint)
                 if grasp_data is None:
                     # We were trying to do something but didn't have the data.
                     raise ActionPrimitiveError(
@@ -435,21 +435,13 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                         {"target object": obj.name},
                     )
 
-                grasp_pose, target_poses, object_direction, joint_info, grasp_required, yaw_change = grasp_data
+                grasp_pose, target_poses, object_direction, relevant_joint, grasp_required, yaw_change = grasp_data
                 if yaw_change < 0.1:
                     return
 
                 # Prepare data for the approach later.
                 approach_pos = grasp_pose[0] + object_direction * OPEN_GRASP_APPROACH_DISTANCE
                 approach_pose = (approach_pos, grasp_pose[1])
-
-                # self.set_marker(grasp_pose)
-                # self.set_marker(approach_pose)
-                # for target_pose in target_poses:
-                #     print(target_pose)
-                #     self.set_marker(target_pose)
-                # for i in range(10000):
-                #     og.sim.step()
 
                 # If the grasp pose is too far, navigate
                 yield from self._navigate_if_needed(obj, pose_on_obj=grasp_pose)
@@ -478,16 +470,10 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 #             "Could not grasp the target object to open or close. Try again",
                 #             {"target object": obj.name},
                 #         )
-                # from IPython import embed; embed()
                 
                 for i, target_pose in enumerate(target_poses):
-                    # print(target_pose)
                     reset_eef_pose = target_poses[i+1]
-
-                    # self.set_marker(target_pose)
-                    # from IPython import embed; embed()
                     yield from self._move_hand_direct_cartesian(target_pose, ignore_failure=False)
-                # from IPython import embed; embed()
 
                 # Moving to target pose often fails. Let's get the hand to apply the correct actions for its current pos
                 # This prevents the hand from jerking into its desired position when we do a release.
@@ -495,7 +481,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     self.robot.eef_links[self.arm].get_position_orientation(), ignore_failure=True
                 )
             except ActionPrimitiveError as e:
-                # print(_)
                 print(e)
                 # Let go - we do not want to be holding anything after return of primitive.
                 yield from self._execute_release()
@@ -840,11 +825,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         for i in range(max_steps_for_hand_move):
             current_joint_pos = self.robot.get_joint_positions()[control_idx]
             diff_joint_pos = np.absolute(np.array(current_joint_pos) - np.array(joint_pos))
-            print(max(diff_joint_pos))
-            val = 0.005
-            # if ignore_failure:
-            #     val = 0.02
-            if max(diff_joint_pos) < val:
+            if max(diff_joint_pos) < 0.005:
                 return
             if stop_on_contact and detect_robot_collision_in_sim(self.robot, ignore_obj_in_hand=False):
                 return

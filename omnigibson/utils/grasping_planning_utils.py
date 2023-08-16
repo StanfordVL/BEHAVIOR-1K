@@ -79,14 +79,9 @@ def get_grasp_poses_for_object_sticky(target_obj):
 
 #     return grasp_candidate
 
-def get_grasp_position_for_open(robot, target_obj, should_open, link_id=None):
+def get_grasp_position_for_open(robot, target_obj, should_open, relevant_joint=None):
     # Pick a moving link of the object.
-    relevant_joints_full = _get_relevant_joints(target_obj)
-    relevant_joints = relevant_joints_full[1]
-
-    # If a particular link ID was specified, filter our candidates down to that one.
-    # if link_id is not None:
-    #     relevant_joints = [ji for ji in relevant_joints if ji.jointIndex == link_id]
+    relevant_joints = [relevant_joint] if relevant_joint is not None else _get_relevant_joints(target_obj)[1]
 
     if len(relevant_joints) == 0:
         raise ValueError("Cannot open/close object without relevant joints.")
@@ -189,7 +184,6 @@ def grasp_position_for_open_on_prismatic_joint(robot, target_obj, relevant_joint
 
     # Decide whether a grasp is required. If approach direction and displacement are similar, no need to grasp.
     grasp_required = np.dot(push_vector_in_bbox_frame, canonical_push_axis * -push_axis_closer_side_sign) < 0
-    # from IPython import embed; embed()
     waypoints = interpolate_waypoints(offset_grasp_pose_in_world_frame, target_hand_pose_in_world_frame)
     return (
         offset_grasp_pose_in_world_frame,
@@ -225,11 +219,8 @@ def grasp_position_for_open_on_revolute_joint(robot, target_obj, relevant_joint,
         bbox_center_in_obj_frame
     ) = target_obj.get_base_aligned_bbox(link_name=link_name, visual=False)
 
-    # from IPython import embed; embed()
-
     bbox_quat_in_world = link.get_orientation()
     bbox_extent_in_link_frame = np.array(target_obj.native_link_bboxes[link_name]['collision']['axis_aligned']['extent'])
-    # from IPython import embed; embed()
     bbox_wrt_origin = T.relative_pose_transform(bbox_center_in_world, bbox_quat_in_world, *link.get_position_orientation())
     origin_wrt_bbox = T.invert_pose_transform(*bbox_wrt_origin)
 
@@ -240,8 +231,6 @@ def grasp_position_for_open_on_revolute_joint(robot, target_obj, relevant_joint,
     open_direction = np.cross(joint_axis, origin_towards_bbox)
     open_direction /= np.linalg.norm(open_direction)
     lateral_axis = np.cross(open_direction, joint_axis)
-
-    # from IPython import embed; embed()
 
     # Match the axes to the canonical axes of the link bb.
     lateral_axis_idx = np.argmax(np.abs(lateral_axis))
@@ -309,7 +298,7 @@ def grasp_position_for_open_on_revolute_joint(robot, target_obj, relevant_joint,
     arc_length = abs(required_yaw_change) * np.linalg.norm(grasp_pose_in_origin_frame[0])
     turn_steps = int(ceil(arc_length / ROTATION_ARC_SEGMENT_LENGTHS))
     targets = []
-    # start_pose_rotation_in_bbox_frame = (grasp_position + canonical_open_direction * open_axis_closer_side_sign * 0.1, grasp_quat_in_bbox_frame)
+
     for i in range(turn_steps):
         partial_yaw_change = (i + 1) / turn_steps * required_yaw_change
         rotated_grasp_pose_in_bbox_frame = rotate_point_around_axis(
