@@ -185,8 +185,10 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             )
             og.sim.import_object(self._skybox, register=False)
             light_prim = self._skybox.light_link.prim
-            light_prim.GetAttribute("color").Set(Gf.Vec3f(1.07, 0.85, 0.61))
-            light_prim.GetAttribute("texture:file").Set(Sdf.AssetPath(m.DEFAULT_SKYBOX_TEXTURE))
+            color_key = "color" if "color" in light_prim.GetPropertyNames() else "inputs:color"
+            light_prim.GetAttribute(color_key).Set(Gf.Vec3f(1.07, 0.85, 0.61))
+            texture_key = "texture:file" if "texture:file" in light_prim.GetPropertyNames() else "inputs:texture:file"
+            light_prim.GetAttribute(texture_key).Set(Sdf.AssetPath(m.DEFAULT_SKYBOX_TEXTURE))
 
     def _load_objects_from_scene_file(self):
         """
