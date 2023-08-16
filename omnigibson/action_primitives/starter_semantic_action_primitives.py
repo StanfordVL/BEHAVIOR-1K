@@ -132,8 +132,8 @@ class UndoableContext(object):
         link_poses = self.fk_solver.get_link_poses(joint_pos, arm_links)
 
         # Set position of robot copy root prim
-        # self._set_prim_pose(self.robot_copy.prims[self.robot_copy_type], self.robot.get_position_orientation())
-        self._set_prim_pose(self.robot_copy.prims[self.robot_copy_type], ([0, 0, 0], [0, 0, 0, 1]))
+        self._set_prim_pose(self.robot_copy.prims[self.robot_copy_type], self.robot.get_position_orientation())
+
         # Assemble robot meshes
         for link_name, meshes in self.robot_copy.meshes[self.robot_copy_type].items():
             for mesh_name, copy_mesh in meshes.items():
@@ -817,14 +817,13 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         action[self.robot.controller_action_idx[controller_name]] = joint_pos
         action = self._overwrite_head_action(action, self._tracking_object) if self._tracking_object is not None else action
 
-        for i in range(max_steps_for_hand_move):
+        for _ in range(max_steps_for_hand_move):
             current_joint_pos = self.robot.get_joint_positions()[control_idx]
             diff_joint_pos = np.absolute(np.array(current_joint_pos) - np.array(joint_pos))
             if max(diff_joint_pos) < 0.005:
                 return
             if stop_on_contact and detect_robot_collision_in_sim(self.robot, ignore_obj_in_hand=False):
                 return
-            print(i)
             yield action
 
         if not ignore_failure:

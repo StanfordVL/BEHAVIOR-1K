@@ -1036,7 +1036,6 @@ class ManipulationRobot(BaseRobot):
             joint_frame_in_child_frame_pos=child_frame_pos / ag_obj.scale,
             joint_frame_in_child_frame_quat=child_frame_orn,
         )
-        print(joint_type)
         print("Created AG joint to ", ag_obj.name)
 
         # Save a reference to this joint prim
