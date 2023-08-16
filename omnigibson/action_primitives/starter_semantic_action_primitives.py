@@ -457,7 +457,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
                 yield from self._navigate_if_needed(obj, pose_on_obj=approach_pose)  #, check_joint=check_joint)
                 
-                self.set_marker(approach_pose)
                 yield from self._move_hand_direct_cartesian(approach_pose, ignore_failure=False, stop_on_contact=True)
 
                 # Step once to update
@@ -481,7 +480,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     self.robot.eef_links[self.arm].get_position_orientation(), ignore_failure=True
                 )
             except ActionPrimitiveError as e:
-                print(e)
+                indented_print(e)
                 # Let go - we do not want to be holding anything after return of primitive.
                 yield from self._execute_release()
                 if reset_eef_pose is not None:
@@ -494,10 +493,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 "Despite executing the planned trajectory, the object did not open or close as expected. Maybe try again",
                 {"target object": obj.name, "is it currently open": obj.states[object_states.Open].get_value()},
             )
-        
-    def set_marker(self, pose):
-        self.markers[self.counter].set_position_orientation(*pose)
-        self.counter += 1
 
     def _grasp(self, obj):
         """

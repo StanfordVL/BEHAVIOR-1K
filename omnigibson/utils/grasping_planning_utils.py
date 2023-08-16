@@ -276,7 +276,8 @@ def grasp_position_for_open_on_revolute_joint(robot, target_obj, relevant_joint,
     grasp_position = center_of_selected_surface_along_push_axis + lateral_pos_wrt_surface_center
     # Get the appropriate rotation
 
-    grasp_quat_in_bbox_frame = get_quaternion_between_vectors([1, 0, 0], canonical_open_direction * open_axis_closer_side_sign * -1)
+    # grasp_quat_in_bbox_frame = get_quaternion_between_vectors([1, 0, 0], canonical_open_direction * open_axis_closer_side_sign * -1)
+    grasp_quat_in_bbox_frame = get_orientation_facing_vector_with_random_yaw(canonical_open_direction * open_axis_closer_side_sign * -1)
 
     # Now apply the grasp offset.
     offset_in_bbox_frame = canonical_open_direction * open_axis_closer_side_sign * 0.1
@@ -325,20 +326,16 @@ def grasp_position_for_open_on_revolute_joint(robot, target_obj, relevant_joint,
         required_yaw_change,
     )
 
-def get_quaternion_between_vectors(v1, v2):
-    """
-    Get the quaternion between two vectors.
-
-    Args:
-        v1: The first vector.
-        v2: The second vector.
-
-    Returns:
-        The quaternion between the two vectors.
-    """
-    q = np.cross(v1, v2).tolist()
-    q.append(np.sqrt((np.linalg.norm(v1) ** 2) * (np.linalg.norm(v2) ** 2)) + np.dot(v1, v2))
-    return np.array(q) / np.linalg.norm(q)
+def get_orientation_facing_vector_with_random_yaw(vector):
+    forward = vector / np.linalg.norm(vector)
+    rand_vec = np.random.rand(3)
+    rand_vec /= np.linalg.norm(3)
+    side = np.cross(rand_vec, forward)
+    side /= np.linalg.norm(3)
+    up = np.cross(forward, side)
+    assert np.isclose(np.linalg.norm(up), 1)
+    rotmat = np.array([forward, side, up]).T
+    return R.from_matrix(rotmat).as_quat()
 
 def rotate_point_around_axis(point_wrt_arbitrary_frame, arbitrary_frame_wrt_origin, joint_axis, yaw_change):
     rotation = R.from_rotvec(joint_axis * yaw_change).as_quat()
