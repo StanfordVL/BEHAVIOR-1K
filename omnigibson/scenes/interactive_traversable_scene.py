@@ -179,7 +179,7 @@ class InteractiveTraversableScene(TraversableScene):
         valid_room = self.load_room_instances is None or len(set(self.load_room_instances) & set(in_rooms)) > 0
 
         # Check whether this is an agent and we allow agents
-        agent_ok = self.include_robots or (category != robot_macros.ROBOT_CATEGORY and obj_info["class_name"] not in REGISTERED_ROBOTS)
+        agent_ok = self.include_robots or obj_info["class_name"] not in REGISTERED_ROBOTS
 
         # We only load this model if all the above conditions are met
         return not_blacklisted and whitelisted and valid_room and agent_ok
