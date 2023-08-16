@@ -17,13 +17,13 @@ from pxr import PhysicsSchemaTools, UsdGeom, Sdf, Gf, Vt
 m = create_module_macros(module_path=__file__)
 
 m.TOGGLE_LINK_PREFIX = "togglebutton"
-m.DEFAULT_RADIUS = 0.05
+m.DEFAULT_SCALE = 0.1
 m.CAN_TOGGLE_STEPS = 5
 
 
 class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, UpdateStateMixin):
-    def __init__(self, obj, radius=None):
-        self.radius = radius
+    def __init__(self, obj, scale=None):
+        self.scale = scale
         self.value = False
         self.robot_can_toggle_steps = 0
         self.visual_marker = None
@@ -52,7 +52,7 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
         pre_existing_mesh = get_prim_at_path(mesh_prim_path)
         # Create a primitive mesh if it doesn't already exist
         if not pre_existing_mesh:
-            self.radius = m.DEFAULT_RADIUS if self.radius is None else self.radius
+            self.scale = m.DEFAULT_SCALE if self.scale is None else self.scale
             # Note: We have to create a mesh (instead of a sphere shape) because physx complains about non-uniform
             # scaling for non-meshes
             mesh = create_primitive_mesh(
@@ -63,12 +63,11 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
         else:
             # Infer radius from mesh if not specified as an input
             recompute_extents(prim=pre_existing_mesh)
-            scale = np.array(pre_existing_mesh.GetAttribute("xformOp:scale").Get())
-            self.radius = np.cbrt(np.product(scale)) / 2.0 if self.radius is None else self.radius
+            self.scale = np.array(pre_existing_mesh.GetAttribute("xformOp:scale").Get())
 
         # Create the visual geom instance referencing the generated mesh prim
         self.visual_marker = VisualGeomPrim(prim_path=mesh_prim_path, name=f"{self.obj.name}_visual_marker")
-        self.visual_marker.scale = self.radius * 2.0
+        self.visual_marker.scale = self.scale
         self.visual_marker.initialize()
 
         # Make sure the marker isn't translated at all
