@@ -394,12 +394,6 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
         # Store check overlap function
         self._check_overlap = check_overlap
 
-        # Set saturation limits
-        for system_name in self.conditions.keys():
-            system = get_system(system_name, force_active=False)
-            self.obj.states[Saturated].set_limit(system=system, limit=self.visual_particle_modification_limit if
-            is_visual_particle_system(system_name=system.name) else self.physical_particle_modification_limit)
-
     def _generate_condition(self, condition_type, value):
         """
         Generates a valid condition function given @condition_type and its corresponding @value
@@ -530,8 +524,15 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
                     # Check if all conditions are met
                     if np.all([condition(self.obj) for condition in conditions]):
                         system = get_system(system_name)
+                        # Update saturation limit if it's not the desired one
+                        limit = self.visual_particle_modification_limit \
+                            if is_visual_particle_system(system_name=system.name) \
+                            else self.physical_particle_modification_limit
+                        if limit != self.obj.states[Saturated].get_limit(system=system):
+                            self.obj.states[Saturated].set_limit(system=system, limit=limit)
                         # Sanity check for oversaturation
-                        self.obj.states[Saturated].get_value(system=system)
+                        if self.obj.states[Saturated].get_value(system=system):
+                            continue
                         # Potentially modify particles within the volume
                         self._modify_particles(system=system)
 
@@ -702,10 +703,6 @@ class ParticleRemover(ParticleModifier):
         return all_conditions
 
     def _modify_particles(self, system):
-        # If at the limit, return
-        if self.obj.states[Saturated].get_value(system=system):
-            return
-
         # If the system has no particles, return
         if system.n_particles == 0:
             return
@@ -963,10 +960,6 @@ class ParticleApplier(ParticleModifier):
             delete_prim(self.projection_system.GetPrimPath().pathString)
 
     def _modify_particles(self, system):
-        # If at the limit, don't modify anything
-        if self.obj.states[Saturated].get_value(system=system):
-            return
-
         if self._sample_with_raycast:
             # Sample potential locations to apply particles, and then apply them
             start_points, end_points = self._sample_particle_locations(system=system)
