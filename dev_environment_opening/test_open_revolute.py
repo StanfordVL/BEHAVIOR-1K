@@ -14,7 +14,8 @@ import cProfile, pstats, io
 import time
 import os
 import argparse
-    
+
+gm.DEBUG = True
 
 def pause(time):
     for _ in range(int(time*100)):
