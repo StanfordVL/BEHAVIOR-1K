@@ -23,6 +23,7 @@ import trimesh
 import omnigibson as og
 from omnigibson.macros import gm
 from omnigibson.utils.constants import JointType, PRIMITIVE_MESH_TYPES, PrimType, GEOM_TYPES
+from omnigibson.utils.deprecated_utils import CreateMeshPrimWithDefaultXformCommand
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.ui_utils import suppress_omni_log
 
@@ -661,7 +662,7 @@ def clear():
     BoundingBoxAPI.clear()
 
 
-def create_mesh_prim_with_default_xform(primitive_type, prim_path, u_patches=None, v_patches=None):
+def create_mesh_prim_with_default_xform(primitive_type, prim_path, u_patches=None, v_patches=None, stage=None):
     """
     Creates a mesh prim of the specified @primitive_type at the specified @prim_path
 
@@ -673,6 +674,8 @@ def create_mesh_prim_with_default_xform(primitive_type, prim_path, u_patches=Non
         v_patches (int or None): If specified, should be an integer that represents how many segments to create in the
             v-direction. E.g. 10 means 10 segments (and therefore 11 vertices) will be created.
             Both u_patches and v_patches need to be specified for them to be effective.
+        stage (None or Usd.Stage): If specified, stage on which the primitive mesh should be generated. If None, will
+            use og.sim.stage
     """
 
     assert primitive_type in PRIMITIVE_MESH_TYPES, "Invalid primitive mesh type: {primitive_type}"
@@ -682,25 +685,18 @@ def create_mesh_prim_with_default_xform(primitive_type, prim_path, u_patches=Non
     hs_backup = carb.settings.get_settings().get(evaluator.SETTING_OBJECT_HALF_SCALE)
     carb.settings.get_settings().set(evaluator.SETTING_U_SCALE, 1)
     carb.settings.get_settings().set(evaluator.SETTING_V_SCALE, 1)
+    stage = og.sim.stage if stage is None else stage
 
     # Default half_scale (i.e. half-extent, half_height, radius) is 1.
     # TODO (eric): change it to 0.5 once the mesh generator API accepts floating-number HALF_SCALE
     #  (currently it only accepts integer-number and floors 0.5 into 0).
     carb.settings.get_settings().set(evaluator.SETTING_OBJECT_HALF_SCALE, 1)
+    kwargs = dict(prim_type=primitive_type, prim_path=prim_path, stage=stage)
     if u_patches is not None and v_patches is not None:
-        omni.kit.commands.execute(
-            "CreateMeshPrimWithDefaultXform",
-            prim_type=primitive_type,
-            prim_path=prim_path,
-            u_patches=u_patches,
-            v_patches=v_patches,
-        )
-    else:
-        omni.kit.commands.execute(
-            "CreateMeshPrimWithDefaultXform",
-            prim_type=primitive_type,
-            prim_path=prim_path,
-        )
+        kwargs["u_patches"] = u_patches
+        kwargs["v_patches"] = v_patches
+
+    CreateMeshPrimWithDefaultXformCommand(**kwargs).do()
 
     carb.settings.get_settings().set(evaluator.SETTING_U_SCALE, u_backup)
     carb.settings.get_settings().set(evaluator.SETTING_V_SCALE, v_backup)
@@ -832,7 +828,7 @@ def get_mesh_volume_and_com(mesh_prim):
     return is_volume, volume, com
 
 
-def create_primitive_mesh(prim_path, primitive_type, extents=1.0, u_patches=None, v_patches=None):
+def create_primitive_mesh(prim_path, primitive_type, extents=1.0, u_patches=None, v_patches=None, stage=None):
     """
     Helper function that generates a UsdGeom.Mesh prim at specified @prim_path of type @primitive_type.
 
@@ -849,13 +845,15 @@ def create_primitive_mesh(prim_path, primitive_type, extents=1.0, u_patches=None
         v_patches (int or None): If specified, should be an integer that represents how many segments to create in the
             v-direction. E.g. 10 means 10 segments (and therefore 11 vertices) will be created.
             Both u_patches and v_patches need to be specified for them to be effective.
+        stage (None or Usd.Stage): If specified, stage on which the primitive mesh should be generated. If None, will
+            use og.sim.stage
 
     Returns:
         UsdGeom.Mesh: Generated primitive mesh as a prim on the active stage
     """
     assert_valid_key(key=primitive_type, valid_keys=PRIMITIVE_MESH_TYPES, name="primitive mesh type")
-    create_mesh_prim_with_default_xform(primitive_type, prim_path, u_patches=u_patches, v_patches=v_patches)
-    mesh = UsdGeom.Mesh.Define(og.sim.stage, prim_path)
+    create_mesh_prim_with_default_xform(primitive_type, prim_path, u_patches=u_patches, v_patches=v_patches, stage=stage)
+    mesh = UsdGeom.Mesh.Define(og.sim.stage if stage is None else stage, prim_path)
 
     # Modify the points and normals attributes so that total extents is the desired
     # This means multiplying omni's default by extents * 50.0, as the native mesh generated has extents [-0.01, 0.01]

@@ -5,7 +5,6 @@ import numpy as np
 import omnigibson as og
 from omnigibson.macros import gm, create_module_macros
 from omnigibson.object_states import ContactBodies
-from omnigibson.utils.asset_utils import get_assisted_grasping_categories
 import omnigibson.utils.transform_utils as T
 from omnigibson.controllers import (
     IsGraspingState,
@@ -29,7 +28,6 @@ m = create_module_macros(module_path=__file__)
 
 # Assisted grasping parameters
 m.ASSIST_FRACTION = 1.0
-m.ASSIST_GRASP_OBJ_CATEGORIES = get_assisted_grasping_categories()
 m.ASSIST_GRASP_MASS_THRESHOLD = 10.0
 m.ARTICULATED_ASSIST_FRACTION = 0.7
 m.MIN_ASSIST_FORCE = 0
@@ -57,15 +55,10 @@ def can_assisted_grasp(obj):
     Returns:
         bool: Whether or not this object can be grasped
     """
-
-    if isinstance(obj, DatasetObject) and obj.category != "object":
-        # Use manually defined allowlist
-        return obj.category in m.ASSIST_GRASP_OBJ_CATEGORIES
-    else:
-        # Use fallback based on mass
-        mass = obj.mass
-        print(f"Mass for AG: obj: {mass}, max mass: {m.ASSIST_GRASP_MASS_THRESHOLD}, obj: {obj.name}")
-        return mass <= m.ASSIST_GRASP_MASS_THRESHOLD
+    # Use fallback based on mass
+    mass = obj.mass
+    print(f"Mass for AG: obj: {mass}, max mass: {m.ASSIST_GRASP_MASS_THRESHOLD}, obj: {obj.name}")
+    return mass <= m.ASSIST_GRASP_MASS_THRESHOLD
 
 
 class ManipulationRobot(BaseRobot):
