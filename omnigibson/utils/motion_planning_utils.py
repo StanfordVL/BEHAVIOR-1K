@@ -31,28 +31,69 @@ def plan_base_motion(
     ANGLE_DIFF = 0.3
     DIST_DIFF = 0.1
 
-    class CustomStateSpace(ob.RealVectorStateSpace):
+    # class CustomState(ob.State):
+    #     def __init__(self, space):
+    #         super(CustomState, self).__init__(space)
 
-        def __init__(self, dim):
-            super(CustomStateSpace, self).__init__(dim)
+    #     def getX(self):
+    #         return self[0]
 
-        def getX(self):
-            return self[0]
-        
-        def setX(self, x):
-            self[0] = float(x)
+    #     def setX(self, x):
+    #         self[0] = float(x)
 
-        def getY(self):
-            return self[1]
-        
-        def setY(self, y):
-            self[1] = float(y)
+    #     def getY(self):
+    #         return self[1]
 
-        def getYaw(self):
-            return self.yaw
+    #     def setY(self, y):
+    #         self[1] = float(y)
 
-        def setYaw(self, yaw):
-            self.yaw = float(yaw)
+    #     def getYaw(self):
+    #         return self.yaw
+
+    #     def setYaw(self, yaw):
+    #         self.yaw = float(yaw)
+
+    # class CustomStateSpace(ob.RealVectorStateSpace):
+
+    #     def __init__(self, dim):
+    #         super(CustomStateSpace, self).__init__(dim)
+
+    #     def getX(self):
+    #         return self[0]
+
+    #     def setX(self, x):
+    #         self[0] = float(x)
+
+    #     def getY(self):
+    #         return self[1]
+
+    #     def setY(self, y):
+    #         self[1] = float(y)
+
+    #     def getYaw(self):
+    #         return self.yaw
+
+    #     def setYaw(self, yaw):
+    #         self.yaw = float(yaw)
+
+    yaw_dict = {}
+
+    def add_yaw(state, yaw):
+        yaw_dict[get_key(state)] = float(yaw)
+
+    def remove_yaw(state):
+        yaw_dict.pop(get_key(state))
+
+    def get_yaw(state):
+        if get_key(state) not in yaw_dict:
+            return 0.0
+        else:
+            return yaw_dict[get_key(state)]
+    
+    def get_key(state):
+        x = round(state[0], 4)
+        y = round(state[1], 4)
+        return (x, y)
 
     class CustomMotionValidator(ob.MotionValidator):
         """
@@ -61,23 +102,25 @@ def plan_base_motion(
 
         def __init__(self, si, space):
             super(CustomMotionValidator, self).__init__(si)
+            self.si = si
             self.space = space
 
         def create_state(self, x, y, yaw):
             state = ob.State(self.space)
-            state.getSpace().setX(x)
-            state.getSpace().setY(y)
-            state.getSpace().setYaw(yaw)
+            state[0] = float(x)
+            state[1] = float(y)
+            add_yaw(state, yaw)
             return state
         
         def checkMotion(self, s1, s2):
-            if not si.isValid(s2):
-                return False
+            # from IPython import embed; embed()
+            # if not self.si.isValid(s2):
+            #     return False
             
-            start = np.array([s1.getSpace().getX(), s1.getSpace().getY(), s1.getSpace().getYaw()])
-            goal = np.array([s2.getSpace().getX(), s2.getSpace().getY(), s2.getSpace().getYaw()])
-            segment = goal[:2] - start[:2]
+            segment = [s2[0] - s1[0], s2[1] - s1[1]]
             segment_theta = np.arctan2(segment[1], segment[0])
+            start = np.array([s1[0], s1[1], get_yaw(s1)])
+            goal = np.array([s2[0], s2[1], segment_theta])
 
             # Start rotation
             diff = T.wrap_angle(segment_theta - start[2])
@@ -88,8 +131,10 @@ def plan_base_motion(
             angles = nav_angle + start[2]
             for i in range(num_points):
                 state = self.create_state(start[0], start[1], angles[i])
-                if not si.isValid(state()):
+                if not self.si.isValid(state()):
+                    remove_yaw(state)
                     return False
+                remove_yaw(state)
 
             # Navigation
             dist = np.linalg.norm(segment)
@@ -98,8 +143,10 @@ def plan_base_motion(
             nav_y = np.linspace(start[1], goal[1], num_points).tolist()
             for i in range(num_points):
                 state = self.create_state(nav_x[i], nav_y[i], segment_theta)
-                if not si.isValid(state()):
+                if not self.si.isValid(state()):
+                    remove_yaw(state)
                     return False
+                remove_yaw(state)
                 
             # Goal rotation
             # diff = T.wrap_angle(goal[2] - segment_theta)
@@ -113,13 +160,13 @@ def plan_base_motion(
             #     if not si.isValid(state()):
             #         return False
                 
-            s2().setYaw(T.wrap_angle(segment_theta))
+            add_yaw(s2, T.wrap_angle(segment_theta))
             return True
 
     def state_valid_fn(q):
-        x = q.getSpace().getX()
-        y = q.getSpace().getY()
-        yaw = q.getSpace().getYaw()
+        x = q[0]
+        y = q[1]
+        yaw = get_yaw(q)
         pose = ([x, y, 0.0], T.euler2quat((0, 0, yaw)))
         return not set_base_and_detect_collision(context, pose)
 
@@ -129,7 +176,7 @@ def plan_base_motion(
 
     # create an R2 state space
     dim = 2
-    space = CustomStateSpace(dim)
+    space = ob.RealVectorStateSpace(dim)
 
     # set lower and upper bounds
     bbox_vals = []
@@ -151,16 +198,16 @@ def plan_base_motion(
     ss.setPlanner(planner)
 
     start = ob.State(space)
-    from IPython import embed; embed()
-    start.getSpace().setX(start_conf[0])
-    start.getSpace().setY(start_conf[1])
-    start.getSpace().setYaw(T.wrap_angle(start_conf[2]))
+    # from IPython import embed; embed()
+    start[0] = float(start_conf[0])
+    start[1] = float(start_conf[1])
+    add_yaw(start, start_conf[2])
     print(start)
 
     goal = ob.State(space)
-    goal.getSpace().setX(end_conf[0])
-    goal.getSpace().setY(end_conf[1])
-    goal.getSpace().setYaw(T.wrap_angle(end_conf[2]))
+    goal[0] = float(end_conf[0])
+    goal[1] = float(end_conf[1])
+    add_yaw(goal, end_conf[2])
     print(goal)
 
     ss.setStartAndGoalStates(start, goal)
@@ -176,17 +223,11 @@ def plan_base_motion(
         sol_path = ss.getSolutionPath()
         return_path = []
 
-        # for i in range(sol_path.getStateCount()):
-        #     point = [sol_path.getState(i)[j] for j in range(dim)]
-        #     point.append(sol_path.getState(i).yaw)
-        #     return_path.append(point)
-        # return return_path
-    
         for i in range(sol_path.getStateCount()):
-            x = sol_path.getState(i).getX()
-            y = sol_path.getState(i).getY()
-            yaw = sol_path.getState(i).getYaw()
-            return_path.append([x, y, yaw])
+            current_state = sol_path.getState(i)
+            point = [current_state[j] for j in range(dim)]
+            point.append(get_yaw(current_state))
+            return_path.append(point)
         return return_path
     return None
 
