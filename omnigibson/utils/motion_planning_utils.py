@@ -44,15 +44,14 @@ def plan_base_motion(
 
             start = np.array([s1.getX(), s1.getY(), s1.getYaw()])
             goal = np.array([s2.getX(), s2.getY(), s2.getYaw()])
-            segment = goal[:2] - start[:2]
-            segment_theta = np.arctan2(segment[1], segment[0])
+            segment_theta = self.get_angle_between_poses(start, goal)
 
             # Start rotation                
             if not self.is_valid_rotation(self.si, start, segment_theta):
                 return False
 
             # Navigation
-            dist = np.linalg.norm(segment)
+            dist = np.linalg.norm(goal[:2] - start[:2])
             num_points = ceil(dist / DIST_DIFF) + 1
             nav_x = np.linspace(start[0], goal[0], num_points).tolist()
             nav_y = np.linspace(start[1], goal[1], num_points).tolist()
@@ -100,6 +99,40 @@ def plan_base_motion(
         yaw = q.getYaw()
         pose = ([x, y, 0.0], T.euler2quat((0, 0, yaw)))
         return not set_base_and_detect_collision(context, pose)
+    
+    def remove_unnecessary_rotations(path):
+        """
+        Removes unnecessary rotations from a path when possible for the base where the yaw for each pose in the path is in the direction of the
+        the position of the next pose in the path
+
+        Args:
+            path (Array of arrays): Array of 2d poses
+        
+        Returns:
+            Array of numpy arrays: Array of 2d poses with unnecessary rotations removed
+        """
+        # Start at the same starting pose
+        new_path = [path[0]]
+
+        # Process every intermediate waypoint
+        for i in range(1, len(path) - 1):
+            # compute the yaw you'd be at when arriving into path[i] and departing from it
+            arriving_yaw = CustomMotionValidator.get_angle_between_poses(path[i-1], path[i])
+            departing_yaw = CustomMotionValidator.get_angle_between_poses(path[i], path[i+1])
+
+            # check if you are able to make that rotation directly. 
+            arriving_state = (path[i][0], path[i][1], arriving_yaw)
+            if CustomMotionValidator.is_valid_rotation(si, arriving_state, departing_yaw):
+                # Then use the arriving yaw directly
+                new_path.append(arriving_state)
+            else:
+                # Otherwise, keep the waypoint
+                new_path.append(path[i])
+
+        # Don't forget to add back the same ending pose
+        new_path.append(path[-1])
+
+        return new_path
 
     pos = robot.get_position()
     yaw = T.quat2euler(robot.get_orientation())[2]
@@ -147,24 +180,7 @@ def plan_base_motion(
             y = sol_path.getState(i).getY()
             yaw = sol_path.getState(i).getYaw()
             return_path.append([x, y, yaw])
-        return_path = remove_unnecessary_rotations(return_path)
-
-        # Validate return path
-        for i, pose in enumerate(return_path):
-            if i == 0:
-                final_ori =  CustomMotionValidator.get_angle_between_poses(pose, return_path[i+1])
-                if not CustomMotionValidator.is_valid_rotation(si, pose, final_ori):
-                    return None
-            elif i == len(return_path) - 1:
-                start_ori =  CustomMotionValidator.get_angle_between_poses(return_path[i-1], pose)
-                if not CustomMotionValidator.is_valid_rotation(si, [pose[0], pose[1], start_ori], pose[2]):
-                    return None
-            else:
-                start_ori =  CustomMotionValidator.get_angle_between_poses(return_path[i-1], pose)
-                final_ori =  CustomMotionValidator.get_angle_between_poses(pose, return_path[i+1])
-                if not CustomMotionValidator.is_valid_rotation(si, [pose[0], pose[1], start_ori], final_ori):
-                    return None
-        return return_path
+        return remove_unnecessary_rotations(return_path)
     return None
 
 def plan_arm_motion(   
@@ -374,23 +390,3 @@ def detect_robot_collision_in_sim(robot, filter_objs=[], ignore_obj_in_hand=True
         if col_obj.category in filter_categories:
             collision_prims.remove(col_prim)
     return len(collision_prims) > 0
-    
-
-def remove_unnecessary_rotations(path):
-    """
-    Removes unnecessary rotations from a path for the base where the yaw for each pose in the path is in the direction of the
-    the position of the next pose in the path
-
-    Args:
-        path (Array of arrays): Array of 2d poses
-    
-    Returns:
-        Array of numpy arrays: Array of 2d poses with unnecessary rotations removed
-    """
-    for start_idx in range(len(path) - 1):
-        start = np.array(path[start_idx][:2])
-        end = np.array(path[start_idx + 1][:2])
-        segment = end - start
-        theta = np.arctan2(segment[1], segment[0])
-        path[start_idx] = np.array([start[0], start[1], theta])
-    return path
