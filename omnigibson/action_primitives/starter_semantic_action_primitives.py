@@ -22,7 +22,7 @@ from pxr import PhysxSchema
 
 import omnigibson as og
 from omnigibson import object_states
-from omnigibson.action_primitives.action_primitive_set_base import ActionPrimitiveError, ActionPrimitiveErrorGroup, BaseActionPrimitiveGenerator
+from omnigibson.action_primitives.action_primitive_set_base import ActionPrimitiveError, ActionPrimitiveErrorGroup, BaseActionPrimitiveSet
 from omnigibson.utils.object_state_utils import sample_cuboid_for_predicate
 from omnigibson.object_states.utils import get_center_extent
 from omnigibson.objects.object_base import BaseObject
@@ -197,7 +197,7 @@ class StarterSemanticActionPrimitiveSet(IntEnum):
     RELEASE = 6  # For reorienting grasp
 
 
-class StarterSemanticActionPrimitiveGenerator(BaseActionPrimitiveGenerator):
+class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
     def __init__(self, task, scene, robot, teleport=False):
         logger.warning(
             "The StarterSemanticActionPrimitive is a work-in-progress and is only provided as an example. "

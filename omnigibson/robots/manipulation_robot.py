@@ -112,6 +112,7 @@ class ManipulationRobot(BaseRobot):
 
         # Unique to ManipulationRobot
         grasping_mode="physical",
+        disable_grasp_handling=False,
 
         **kwargs,
     ):
@@ -156,12 +157,15 @@ class ManipulationRobot(BaseRobot):
                 If "physical", no assistive grasping will be applied (relies on contact friction + finger force).
                 If "assisted", will magnetize any object touching and within the gripper's fingers.
                 If "sticky", will magnetize any object touching the gripper's fingers.
+            disable_grasp_handling (bool): If True, the robot will not automatically handle assisted or sticky grasps.
+                Instead, you will need to call the grasp handling methods yourself.
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
                 for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
         """
         # Store relevant internal vars
         assert_valid_key(key=grasping_mode, valid_keys=AG_MODES, name="grasping_mode")
         self._grasping_mode = grasping_mode
+        self._disable_grasp_handling = disable_grasp_handling
 
         # Initialize other variables used for assistive grasping
         self._ag_data = {arm: None for arm in self.arm_names}
@@ -339,8 +343,8 @@ class ManipulationRobot(BaseRobot):
         super().apply_action(action)
 
         # Then run assisted grasping
-        # if self.grasping_mode != "physical":
-        #     self._handle_assisted_grasping(action=action)
+        if self.grasping_mode != "physical" and not self._disable_grasp_handling:
+            self._handle_assisted_grasping(action=action)
 
         # Potentially freeze gripper joints
         for arm in self.arm_names:

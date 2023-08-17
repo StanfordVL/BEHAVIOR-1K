@@ -22,7 +22,7 @@ from pxr import PhysxSchema
 
 import omnigibson as og
 from omnigibson import object_states
-from omnigibson.action_primitives.action_primitive_set_base import ActionPrimitiveError, ActionPrimitiveErrorGroup, BaseActionPrimitiveGenerator
+from omnigibson.action_primitives.action_primitive_set_base import ActionPrimitiveError, ActionPrimitiveErrorGroup, BaseActionPrimitiveSet
 from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitiveGenerator, UndoableContext
 from omnigibson.utils.object_state_utils import sample_cuboid_for_predicate
 from omnigibson.object_states.utils import get_center_extent
@@ -76,41 +76,41 @@ logger = logging.getLogger(__name__)
 def indented_print(msg, *args, **kwargs):
     print("  " * len(inspect.stack()) + str(msg), *args, **kwargs)
 
-class SymbolicSemanticActionPrimitiveGenerator(BaseActionPrimitiveGenerator):
-    class PrimitiveSet(IntEnum):
-      _init_ = 'value __doc__'
-      GRASP = auto(), "Grasp an object"
-      PLACE_ON_TOP = auto(), "Place the currently grasped object on top of another object"
-      PLACE_INSIDE = auto(), "Place the currently grasped object inside another object"
-      OPEN = auto(), "Open an object"
-      CLOSE = auto(), "Close an object"
-      TOGGLE_ON = auto(), "Toggle an object on"
-      TOGGLE_OFF = auto(), "Toggle an object off"
-      SOAK_UNDER = auto(), "Soak the currently grasped object under a fluid source."
-      SOAK_INSIDE = auto(), "Soak the currently grasped object inside the fluid within a container."
-      WIPE = auto(), "Wipe the given object with the currently grasped object."
-      SLICE = auto(), "Slice the given object with the currently grasped object."
-      PLACE_NEAR_HEATING_ELEMENT = auto(), "Place the currently grasped object near the heating element of another object."
-      NAVIGATE_TO = auto(), "Navigate to an object"
-      RELEASE = auto(), "Release an object, letting it fall to the ground. You can then grasp it again, as a way of reorienting your grasp of the object."
+class SymbolicSemanticActionPrimitiveSet(IntEnum):
+    _init_ = 'value __doc__'
+    GRASP = auto(), "Grasp an object"
+    PLACE_ON_TOP = auto(), "Place the currently grasped object on top of another object"
+    PLACE_INSIDE = auto(), "Place the currently grasped object inside another object"
+    OPEN = auto(), "Open an object"
+    CLOSE = auto(), "Close an object"
+    TOGGLE_ON = auto(), "Toggle an object on"
+    TOGGLE_OFF = auto(), "Toggle an object off"
+    SOAK_UNDER = auto(), "Soak the currently grasped object under a fluid source."
+    SOAK_INSIDE = auto(), "Soak the currently grasped object inside the fluid within a container."
+    WIPE = auto(), "Wipe the given object with the currently grasped object."
+    SLICE = auto(), "Slice the given object with the currently grasped object."
+    PLACE_NEAR_HEATING_ELEMENT = auto(), "Place the currently grasped object near the heating element of another object."
+    NAVIGATE_TO = auto(), "Navigate to an object"
+    RELEASE = auto(), "Release an object, letting it fall to the ground. You can then grasp it again, as a way of reorienting your grasp of the object."
 
+class SymbolicSemanticActionPrimitives(BaseActionPrimitiveSet):
     def __init__(self, task, scene, robot):
         super().__init__(task, scene, robot)
         self.controller_functions = {
-          self.PrimitiveSet.GRASP: self._grasp,
-          self.PrimitiveSet.PLACE_ON_TOP: self._place_on_top,
-          self.PrimitiveSet.PLACE_INSIDE: self._place_inside,
-          self.PrimitiveSet.OPEN: self._open,
-          self.PrimitiveSet.CLOSE: self._close,
-          self.PrimitiveSet.TOGGLE_ON: self._toggle_on,
-          self.PrimitiveSet.TOGGLE_OFF: self._toggle_off,
-          self.PrimitiveSet.SOAK_UNDER: self._soak_under,
-          self.PrimitiveSet.SOAK_INSIDE: self._soak_inside,
-          self.PrimitiveSet.WIPE: self._wipe,
-          self.PrimitiveSet.SLICE: self._slice,
-          self.PrimitiveSet.PLACE_NEAR_HEATING_ELEMENT: self._place_near_heating_element,
-          self.PrimitiveSet.NAVIGATE_TO: self._navigate_to_obj,
-          self.PrimitiveSet.RELEASE: self._release,
+          SymbolicSemanticActionPrimitiveSet.GRASP: self._grasp,
+          SymbolicSemanticActionPrimitiveSet.PLACE_ON_TOP: self._place_on_top,
+          SymbolicSemanticActionPrimitiveSet.PLACE_INSIDE: self._place_inside,
+          SymbolicSemanticActionPrimitiveSet.OPEN: self._open,
+          SymbolicSemanticActionPrimitiveSet.CLOSE: self._close,
+          SymbolicSemanticActionPrimitiveSet.TOGGLE_ON: self._toggle_on,
+          SymbolicSemanticActionPrimitiveSet.TOGGLE_OFF: self._toggle_off,
+          SymbolicSemanticActionPrimitiveSet.SOAK_UNDER: self._soak_under,
+          SymbolicSemanticActionPrimitiveSet.SOAK_INSIDE: self._soak_inside,
+          SymbolicSemanticActionPrimitiveSet.WIPE: self._wipe,
+          SymbolicSemanticActionPrimitiveSet.SLICE: self._slice,
+          SymbolicSemanticActionPrimitiveSet.PLACE_NEAR_HEATING_ELEMENT: self._place_near_heating_element,
+          SymbolicSemanticActionPrimitiveSet.NAVIGATE_TO: self._navigate_to_obj,
+          SymbolicSemanticActionPrimitiveSet.RELEASE: self._release,
         }
         self.arm = self.robot.default_arm
         self.robot_model = self.robot.model_name
@@ -140,7 +140,7 @@ class SymbolicSemanticActionPrimitiveGenerator(BaseActionPrimitiveGenerator):
 
         self.num_objects = len(self.addressable_objects)
         return gym.spaces.Tuple(
-            [gym.spaces.Discrete(self.num_objects), gym.spaces.Discrete(len(self.PrimitiveSet))]
+            [gym.spaces.Discrete(self.num_objects), gym.spaces.Discrete(len(SymbolicSemanticActionPrimitiveSet))]
         )
 
     def get_action_from_primitive_and_object(self, primitive: PrimitiveSet, obj: BaseObject):
@@ -166,7 +166,7 @@ class SymbolicSemanticActionPrimitiveGenerator(BaseActionPrimitiveGenerator):
         target_obj = self.addressable_objects[obj_idx]
 
         # Find the appropriate action generator.
-        action = self.PrimitiveSet(action_idx)
+        action = SymbolicSemanticActionPrimitiveSet(action_idx)
         return self.controller_functions[action](target_obj)
     
     def apply_ref(self, prim, *args, attempts=3):
