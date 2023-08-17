@@ -64,7 +64,7 @@ MAX_STEPS_FOR_HAND_MOVE_WHEN_OPENING = 30
 MAX_STEPS_FOR_GRASP_OR_RELEASE = 30
 MAX_WAIT_FOR_GRASP_OR_RELEASE = 10
 MAX_STEPS_FOR_WAYPOINT_NAVIGATION = 200
-MAX_ATTEMPTS_FOR_OPEN_CLOSE = 5
+MAX_ATTEMPTS_FOR_OPEN_CLOSE = 20
 
 MAX_ATTEMPTS_FOR_SAMPLING_POSE_WITH_OBJECT_AND_PREDICATE = 20
 MAX_ATTEMPTS_FOR_SAMPLING_POSE_NEAR_OBJECT = 200
@@ -133,6 +133,7 @@ class UndoableContext(object):
 
         # Set position of robot copy root prim
         self._set_prim_pose(self.robot_copy.prims[self.robot_copy_type], self.robot.get_position_orientation())
+
         # Assemble robot meshes
         for link_name, meshes in self.robot_copy.meshes[self.robot_copy_type].items():
             for mesh_name, copy_mesh in meshes.items():
@@ -409,6 +410,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         yield from self._open_or_close(obj, False)
 
     def _open_or_close(self, obj, should_open):
+        reset_eef_pose = None
+        relevant_joint = None
+
         if self._get_obj_in_hand():
             raise ActionPrimitiveError(
                 ActionPrimitiveError.Reason.PRE_CONDITION_ERROR,
@@ -420,11 +424,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         yield from self._execute_release()
 
         for _ in range(MAX_ATTEMPTS_FOR_OPEN_CLOSE):
-            if should_open == obj.states[object_states.Open].get_value():
-                return
-            
             try:
-                grasp_data = get_grasp_position_for_open(self.robot, obj, should_open)
+                self.counter = 0
+                grasp_data = get_grasp_position_for_open(self.robot, obj, should_open, relevant_joint)
                 if grasp_data is None:
                     # We were trying to do something but didn't have the data.
                     raise ActionPrimitiveError(
@@ -433,14 +435,16 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                         {"target object": obj.name},
                     )
 
-                grasp_pose, target_poses, object_direction, joint_info, grasp_required = grasp_data
+                grasp_pose, target_poses, object_direction, relevant_joint, grasp_required, yaw_change = grasp_data
+                if yaw_change < 0.1:
+                    return
 
                 # Prepare data for the approach later.
                 approach_pos = grasp_pose[0] + object_direction * OPEN_GRASP_APPROACH_DISTANCE
                 approach_pose = (approach_pos, grasp_pose[1])
 
                 # If the grasp pose is too far, navigate
-                yield from self._navigate_if_needed(obj, pose_on_obj=grasp_pose)  #, check_joint=check_joint)
+                yield from self._navigate_if_needed(obj, pose_on_obj=grasp_pose)
 
                 yield from self._move_hand(grasp_pose)
 
@@ -450,8 +454,10 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 # Since the grasp pose is slightly off the object, we want to move towards the object, around 5cm.
                 # It's okay if we can't go all the way because we run into the object.
                 indented_print("Performing grasp approach for open")
+
+                yield from self._navigate_if_needed(obj, pose_on_obj=approach_pose)  #, check_joint=check_joint)
                 
-                yield from self._move_hand_direct_cartesian(approach_pose, ignore_failure=True, stop_on_contact=True)
+                yield from self._move_hand_direct_cartesian(approach_pose, ignore_failure=False, stop_on_contact=True)
 
                 # Step once to update
                 yield self._empty_action()
@@ -463,19 +469,22 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 #             "Could not grasp the target object to open or close. Try again",
                 #             {"target object": obj.name},
                 #         )
-
-                for target_pose in target_poses:
-                    yield from self._move_hand_direct_cartesian(target_pose, ignore_failure=True)
+                
+                for i, target_pose in enumerate(target_poses):
+                    reset_eef_pose = target_poses[i+1]
+                    yield from self._move_hand_direct_cartesian(target_pose, ignore_failure=False)
 
                 # Moving to target pose often fails. Let's get the hand to apply the correct actions for its current pos
                 # This prevents the hand from jerking into its desired position when we do a release.
                 yield from self._move_hand_direct_cartesian(
                     self.robot.eef_links[self.arm].get_position_orientation(), ignore_failure=True
                 )
-            except ActionPrimitiveError:
+            except ActionPrimitiveError as e:
+                indented_print(e)
                 # Let go - we do not want to be holding anything after return of primitive.
                 yield from self._execute_release()
-                raise
+                if reset_eef_pose is not None:
+                    yield from self._move_hand_direct_cartesian(reset_eef_pose, ignore_failure=True)
 
 
         if obj.states[object_states.Open].get_value() != should_open:
@@ -870,7 +879,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 )
 
             # Otherwise, move the joint
-            yield from self._move_hand_direct_joint(joint_pos, control_idx, stop_on_contact=stop_on_contact, ignore_failure=True)
+            yield from self._move_hand_direct_joint(joint_pos, control_idx, stop_on_contact=stop_on_contact, ignore_failure=ignore_failure)
 
             # Also decide if we can stop early.
             current_pos, current_orn = self.robot.eef_links[self.arm].get_position_orientation()
@@ -988,7 +997,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         for name, controller in self.robot._controllers.items():
             joint_idx = controller.dof_idx
             action_idx = self.robot.controller_action_idx[name]
-            if controller.control_type == ControlType.POSITION and len(joint_idx) == len(action_idx):
+            if controller.control_type == ControlType.POSITION and len(joint_idx) == len(action_idx) and not controller.use_delta_commands:
                 action[action_idx] = self.robot.get_joint_positions()[joint_idx]
 
         return action
