@@ -417,7 +417,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             raise ActionPrimitiveError(
                 ActionPrimitiveError.Reason.PRE_CONDITION_ERROR,
                 "Cannot open or close an object while holding an object",
-                {"object in hand": self._get_obj_in_hand()},
+                {"object in hand": self._get_obj_in_hand().name},
             )
 
         # Open the hand first

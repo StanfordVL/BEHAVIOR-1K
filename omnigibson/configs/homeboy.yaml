@@ -7,7 +7,7 @@ render:
 
 scene:
   type: InteractiveTraversableScene
-  scene_model: Rs_int
+  scene_model: grocery_store_cafe
   trav_map_resolution: 0.1
   trav_map_erosion: 2
   trav_map_with_objects: true
@@ -60,7 +60,7 @@ objects: []
 
 task:
   type: BehaviorTask
-  activity_name: make_a_military_care_package
+  activity_name: buy_a_good_avocado
   activity_definition_id: 0
   activity_instance_id: 0
   online_object_sampling: false

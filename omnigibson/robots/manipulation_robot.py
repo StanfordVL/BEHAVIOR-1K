@@ -112,6 +112,7 @@ class ManipulationRobot(BaseRobot):
 
         # Unique to ManipulationRobot
         grasping_mode="physical",
+        disable_grasp_handling=False,
 
         **kwargs,
     ):
@@ -156,12 +157,15 @@ class ManipulationRobot(BaseRobot):
                 If "physical", no assistive grasping will be applied (relies on contact friction + finger force).
                 If "assisted", will magnetize any object touching and within the gripper's fingers.
                 If "sticky", will magnetize any object touching the gripper's fingers.
+            disable_grasp_handling (bool): If True, the robot will not automatically handle assisted or sticky grasps.
+                Instead, you will need to call the grasp handling methods yourself.
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
                 for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
         """
         # Store relevant internal vars
         assert_valid_key(key=grasping_mode, valid_keys=AG_MODES, name="grasping_mode")
         self._grasping_mode = grasping_mode
+        self._disable_grasp_handling = disable_grasp_handling
 
         # Initialize other variables used for assistive grasping
         self._ag_data = {arm: None for arm in self.arm_names}
@@ -339,7 +343,7 @@ class ManipulationRobot(BaseRobot):
         super().apply_action(action)
 
         # Then run assisted grasping
-        if self.grasping_mode != "physical":
+        if self.grasping_mode != "physical" and not self._disable_grasp_handling:
             self._handle_assisted_grasping(action=action)
 
         # Potentially freeze gripper joints
@@ -368,9 +372,7 @@ class ManipulationRobot(BaseRobot):
 
         # Remove joint and filtered collision restraints
         og.sim.stage.RemovePrim(self._ag_obj_constraint_params[arm]["ag_joint_prim_path"])
-        print("Removed AG joint to ", self._ag_data[arm][0].name)
         self._ag_data[arm] = None
-        print("Removed AG data.")
         self._ag_obj_constraints[arm] = None
         self._ag_obj_constraint_params[arm] = {}
         self._ag_freeze_gripper[arm] = False
@@ -386,6 +388,7 @@ class ManipulationRobot(BaseRobot):
                 self._release_grasp(arm=arm)
                 self._ag_release_counter[arm] = int(np.ceil(m.RELEASE_WINDOW / og.sim.get_rendering_dt()))
                 self._handle_release_window(arm=arm)
+                assert not self._ag_obj_in_hand[arm], "Object still in ag list after release!"
                 # TODO: Verify not needed!
                 # for finger_link in self.finger_links[arm]:
                 #     finger_link.remove_filtered_collision_pair(prim=self._ag_obj_in_hand[arm])
@@ -1036,7 +1039,6 @@ class ManipulationRobot(BaseRobot):
             joint_frame_in_child_frame_pos=child_frame_pos / ag_obj.scale,
             joint_frame_in_child_frame_quat=child_frame_orn,
         )
-        print("Created AG joint to ", ag_obj.name)
 
         # Save a reference to this joint prim
         self._ag_obj_constraints[arm] = joint_prim
@@ -1097,12 +1099,7 @@ class ManipulationRobot(BaseRobot):
                         self._release_grasp(arm=arm)
 
             elif applying_grasp:
-                pre_obj = self._ag_data[arm][0] if self._ag_data[arm] is not None else None
                 self._ag_data[arm] = self._calculate_in_hand_object(arm=arm)
-                post_obj = self._ag_data[arm][0] if self._ag_data[arm] is not None else None
-                if post_obj != pre_obj:
-                    name = post_obj.name if post_obj is not None else None
-                    print("Set AG data to", name)
                 self._establish_grasp(arm=arm, ag_data=self._ag_data[arm])
 
     def _update_constraint_cloth(self, arm="default"):
