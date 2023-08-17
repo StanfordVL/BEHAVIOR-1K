@@ -31,110 +31,25 @@ def plan_base_motion(
     ANGLE_DIFF = 0.3
     DIST_DIFF = 0.1
 
-    # class CustomState(ob.State):
-    #     def __init__(self, space):
-    #         super(CustomState, self).__init__(space)
-
-    #     def getX(self):
-    #         return self[0]
-
-    #     def setX(self, x):
-    #         self[0] = float(x)
-
-    #     def getY(self):
-    #         return self[1]
-
-    #     def setY(self, y):
-    #         self[1] = float(y)
-
-    #     def getYaw(self):
-    #         return self.yaw
-
-    #     def setYaw(self, yaw):
-    #         self.yaw = float(yaw)
-
-    # class CustomStateSpace(ob.RealVectorStateSpace):
-
-    #     def __init__(self, dim):
-    #         super(CustomStateSpace, self).__init__(dim)
-
-    #     def getX(self):
-    #         return self[0]
-
-    #     def setX(self, x):
-    #         self[0] = float(x)
-
-    #     def getY(self):
-    #         return self[1]
-
-    #     def setY(self, y):
-    #         self[1] = float(y)
-
-    #     def getYaw(self):
-    #         return self.yaw
-
-    #     def setYaw(self, yaw):
-    #         self.yaw = float(yaw)
-
-    yaw_dict = {}
-
-    def add_yaw(state, yaw):
-        yaw_dict[get_key(state)] = float(yaw)
-
-    def remove_yaw(state):
-        yaw_dict.pop(get_key(state))
-
-    def get_yaw(state):
-        if get_key(state) not in yaw_dict:
-            return 0.0
-        else:
-            return yaw_dict[get_key(state)]
-    
-    def get_key(state):
-        x = round(state[0], 4)
-        y = round(state[1], 4)
-        return (x, y)
-
     class CustomMotionValidator(ob.MotionValidator):
-        """
-        Rotate towards goal position, then move in a straight line and rotate to goal orientation
-        """
 
         def __init__(self, si, space):
             super(CustomMotionValidator, self).__init__(si)
             self.si = si
             self.space = space
 
-        def create_state(self, x, y, yaw):
-            state = ob.State(self.space)
-            state[0] = float(x)
-            state[1] = float(y)
-            add_yaw(state, yaw)
-            return state
-        
         def checkMotion(self, s1, s2):
-            # from IPython import embed; embed()
-            # if not self.si.isValid(s2):
-            #     return False
-            
-            segment = [s2[0] - s1[0], s2[1] - s1[1]]
-            segment_theta = np.arctan2(segment[1], segment[0])
-            start = np.array([s1[0], s1[1], get_yaw(s1)])
-            goal = np.array([s2[0], s2[1], segment_theta])
+            if not self.si.isValid(s2):
+                return False
 
-            # Start rotation
-            diff = T.wrap_angle(segment_theta - start[2])
-            direction = np.sign(diff)
-            diff = abs(diff)
-            num_points = ceil(diff / ANGLE_DIFF) + 1
-            nav_angle = np.linspace(0.0, diff, num_points) * direction
-            angles = nav_angle + start[2]
-            for i in range(num_points):
-                state = self.create_state(start[0], start[1], angles[i])
-                if not self.si.isValid(state()):
-                    remove_yaw(state)
-                    return False
-                remove_yaw(state)
+            start = np.array([s1.getX(), s1.getY(), s1.getYaw()])
+            goal = np.array([s2.getX(), s2.getY(), s2.getYaw()])
+            segment = goal[:2] - start[:2]
+            segment_theta = np.arctan2(segment[1], segment[0])
+
+            # Start rotation                
+            if not self.is_valid_rotation(self.si, start, segment_theta):
+                return False
 
             # Navigation
             dist = np.linalg.norm(segment)
@@ -142,31 +57,47 @@ def plan_base_motion(
             nav_x = np.linspace(start[0], goal[0], num_points).tolist()
             nav_y = np.linspace(start[1], goal[1], num_points).tolist()
             for i in range(num_points):
-                state = self.create_state(nav_x[i], nav_y[i], segment_theta)
+                state = create_state(self.si, nav_x[i], nav_y[i], segment_theta)
                 if not self.si.isValid(state()):
-                    remove_yaw(state)
                     return False
-                remove_yaw(state)
                 
             # Goal rotation
-            # diff = T.wrap_angle(goal[2] - segment_theta)
-            # direction = np.sign(diff)
-            # diff = abs(diff)
-            # num_points = ceil(diff / ANGLE_DIFF) + 1
-            # nav_angle = np.linspace(0.0, diff, num_points) * direction
-            # angles = nav_angle + segment_theta
-            # for i in range(num_points):
-            #     state = self.create_state(goal[0], goal[1], angles[i])
-            #     if not si.isValid(state()):
-            #         return False
-                
-            add_yaw(s2, T.wrap_angle(segment_theta))
-            return True
+            if not self.is_valid_rotation(self.si, [goal[0], goal[1], segment_theta], goal[2]):
+                return False
 
+            return True
+        
+        @staticmethod
+        def is_valid_rotation(si, start_conf, final_orientation):
+            diff = T.wrap_angle(final_orientation - start_conf[2])
+            direction = np.sign(diff)
+            diff = abs(diff)
+            num_points = ceil(diff / ANGLE_DIFF) + 1
+            nav_angle = np.linspace(0.0, diff, num_points) * direction
+            angles = nav_angle + final_orientation
+            for i in range(num_points):
+                state = create_state(si.getStateSpace(), start_conf[0], start_conf[1], angles[i])
+                if not si.isValid(state()):
+                    return False
+            return True
+        
+        @staticmethod
+        # Get angle between 2d robot poses
+        def get_angle_between_poses(p1, p2):
+            segment = p2[:2] - p1[:2]
+            return np.arctan2(segment[1], segment[0])
+    
+    def create_state(space, x, y, yaw):
+        state = ob.State(space)
+        state().setX(x)
+        state().setY(y)
+        state().setYaw(T.wrap_angle(yaw))
+        return state
+    
     def state_valid_fn(q):
-        x = q[0]
-        y = q[1]
-        yaw = get_yaw(q)
+        x = q.getX()
+        y = q.getY()
+        yaw = q.getYaw()
         pose = ([x, y, 0.0], T.euler2quat((0, 0, yaw)))
         return not set_base_and_detect_collision(context, pose)
 
@@ -174,16 +105,15 @@ def plan_base_motion(
     yaw = T.quat2euler(robot.get_orientation())[2]
     start_conf = (pos[0], pos[1], yaw)
 
-    # create an R2 state space
-    dim = 2
-    space = ob.RealVectorStateSpace(dim)
+    # create an SE(2) state space
+    space = ob.SE2StateSpace()
 
     # set lower and upper bounds
     bbox_vals = []
     for floor in filter(lambda o: o.category == "floors", og.sim.scene.objects):
         bbox_vals += floor.aabb[0][:2].tolist()
         bbox_vals += floor.aabb[1][:2].tolist()
-    bounds = ob.RealVectorBounds(dim)
+    bounds = ob.RealVectorBounds(2)
     bounds.setLow(min(bbox_vals))
     bounds.setHigh(max(bbox_vals))
     space.setBounds(bounds)
@@ -197,42 +127,47 @@ def plan_base_motion(
     planner = ompl_geo.RRTConnect(si)
     ss.setPlanner(planner)
 
-    start = ob.State(space)
-    # from IPython import embed; embed()
-    start[0] = float(start_conf[0])
-    start[1] = float(start_conf[1])
-    add_yaw(start, start_conf[2])
+    start = create_state(space, start_conf[0], start_conf[1], T.wrap_angle(start_conf[2]))
     print(start)
 
-    goal = ob.State(space)
-    goal[0] = float(end_conf[0])
-    goal[1] = float(end_conf[1])
-    add_yaw(goal, end_conf[2])
+    goal = create_state(space, end_conf[0], end_conf[1], T.wrap_angle(end_conf[2]))
     print(goal)
 
     ss.setStartAndGoalStates(start, goal)
-
-    # this will automatically choose a default planner with
-    # default parameters
     solved = ss.solve(planning_time)
 
     if solved:
         # try to shorten the path
         ss.simplifySolution()
-        # print the simplified path
         sol_path = ss.getSolutionPath()
         return_path = []
 
         for i in range(sol_path.getStateCount()):
-            current_state = sol_path.getState(i)
-            point = [current_state[j] for j in range(dim)]
-            point.append(get_yaw(current_state))
-            return_path.append(point)
+            x = sol_path.getState(i).getX()
+            y = sol_path.getState(i).getY()
+            yaw = sol_path.getState(i).getYaw()
+            return_path.append([x, y, yaw])
+        return_path = remove_unnecessary_rotations(return_path)
+
+        # Validate return path
+        for i, pose in enumerate(return_path):
+            if i == 0:
+                final_ori =  CustomMotionValidator.get_angle_between_poses(pose, return_path[i+1])
+                if not CustomMotionValidator.is_valid_rotation(si, pose, final_ori):
+                    return None
+            elif i == len(return_path) - 1:
+                start_ori =  CustomMotionValidator.get_angle_between_poses(return_path[i-1], pose)
+                if not CustomMotionValidator.is_valid_rotation(si, [pose[0], pose[1], start_ori], pose[2]):
+                    return None
+            else:
+                start_ori =  CustomMotionValidator.get_angle_between_poses(return_path[i-1], pose)
+                final_ori =  CustomMotionValidator.get_angle_between_poses(pose, return_path[i+1])
+                if not CustomMotionValidator.is_valid_rotation(si, [pose[0], pose[1], start_ori], final_ori):
+                    return None
         return return_path
     return None
 
-def plan_arm_motion(
-        
+def plan_arm_motion(   
     robot,
     end_conf,
     context,
@@ -450,12 +385,12 @@ def remove_unnecessary_rotations(path):
         path (Array of arrays): Array of 2d poses
     
     Returns:
-        Array of arrays: Array of 2d poses with unnecessary rotations removed
+        Array of numpy arrays: Array of 2d poses with unnecessary rotations removed
     """
     for start_idx in range(len(path) - 1):
         start = np.array(path[start_idx][:2])
         end = np.array(path[start_idx + 1][:2])
         segment = end - start
         theta = np.arctan2(segment[1], segment[0])
-        path[start_idx] = (start[0], start[1], theta)
+        path[start_idx] = np.array([start[0], start[1], theta])
     return path
