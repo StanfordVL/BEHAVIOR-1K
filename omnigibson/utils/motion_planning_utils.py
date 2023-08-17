@@ -1,4 +1,5 @@
 import numpy as np
+from math import ceil
 
 import omnigibson as og
 from omnigibson.object_states import ContactBodies
@@ -27,18 +28,117 @@ def plan_base_motion(
     from ompl import base as ob
     from ompl import geometric as ompl_geo
 
+    ANGLE_DIFF = 0.3
+    DIST_DIFF = 0.1
+
+    class CustomMotionValidator(ob.MotionValidator):
+
+        def __init__(self, si, space):
+            super(CustomMotionValidator, self).__init__(si)
+            self.si = si
+            self.space = space
+
+        def checkMotion(self, s1, s2):
+            if not self.si.isValid(s2):
+                return False
+
+            start = np.array([s1.getX(), s1.getY(), s1.getYaw()])
+            goal = np.array([s2.getX(), s2.getY(), s2.getYaw()])
+            segment_theta = self.get_angle_between_poses(start, goal)
+
+            # Start rotation                
+            if not self.is_valid_rotation(self.si, start, segment_theta):
+                return False
+
+            # Navigation
+            dist = np.linalg.norm(goal[:2] - start[:2])
+            num_points = ceil(dist / DIST_DIFF) + 1
+            nav_x = np.linspace(start[0], goal[0], num_points).tolist()
+            nav_y = np.linspace(start[1], goal[1], num_points).tolist()
+            for i in range(num_points):
+                state = create_state(self.si, nav_x[i], nav_y[i], segment_theta)
+                if not self.si.isValid(state()):
+                    return False
+                
+            # Goal rotation
+            if not self.is_valid_rotation(self.si, [goal[0], goal[1], segment_theta], goal[2]):
+                return False
+
+            return True
+        
+        @staticmethod
+        def is_valid_rotation(si, start_conf, final_orientation):
+            diff = T.wrap_angle(final_orientation - start_conf[2])
+            direction = np.sign(diff)
+            diff = abs(diff)
+            num_points = ceil(diff / ANGLE_DIFF) + 1
+            nav_angle = np.linspace(0.0, diff, num_points) * direction
+            angles = nav_angle + final_orientation
+            for i in range(num_points):
+                state = create_state(si.getStateSpace(), start_conf[0], start_conf[1], angles[i])
+                if not si.isValid(state()):
+                    return False
+            return True
+        
+        @staticmethod
+        # Get angle between 2d robot poses
+        def get_angle_between_poses(p1, p2):
+            segment = p2[:2] - p1[:2]
+            return np.arctan2(segment[1], segment[0])
+    
+    def create_state(space, x, y, yaw):
+        state = ob.State(space)
+        state().setX(x)
+        state().setY(y)
+        state().setYaw(T.wrap_angle(yaw))
+        return state
+    
     def state_valid_fn(q):
         x = q.getX()
         y = q.getY()
         yaw = q.getYaw()
         pose = ([x, y, 0.0], T.euler2quat((0, 0, yaw)))
         return not set_base_and_detect_collision(context, pose)
+    
+    def remove_unnecessary_rotations(path):
+        """
+        Removes unnecessary rotations from a path when possible for the base where the yaw for each pose in the path is in the direction of the
+        the position of the next pose in the path
+
+        Args:
+            path (Array of arrays): Array of 2d poses
+        
+        Returns:
+            Array of numpy arrays: Array of 2d poses with unnecessary rotations removed
+        """
+        # Start at the same starting pose
+        new_path = [path[0]]
+
+        # Process every intermediate waypoint
+        for i in range(1, len(path) - 1):
+            # compute the yaw you'd be at when arriving into path[i] and departing from it
+            arriving_yaw = CustomMotionValidator.get_angle_between_poses(path[i-1], path[i])
+            departing_yaw = CustomMotionValidator.get_angle_between_poses(path[i], path[i+1])
+
+            # check if you are able to make that rotation directly. 
+            arriving_state = (path[i][0], path[i][1], arriving_yaw)
+            if CustomMotionValidator.is_valid_rotation(si, arriving_state, departing_yaw):
+                # Then use the arriving yaw directly
+                new_path.append(arriving_state)
+            else:
+                # Otherwise, keep the waypoint
+                new_path.append(path[i])
+
+        # Don't forget to add back the same ending pose
+        new_path.append(path[-1])
+
+        return new_path
 
     pos = robot.get_position()
     yaw = T.quat2euler(robot.get_orientation())[2]
     start_conf = (pos[0], pos[1], yaw)
 
-    # create an SE2 state space
+    # create an SE(2) state space
     space = ob.SE2StateSpace()
 
     # set lower and upper bounds
@@ -56,35 +156,28 @@ def plan_base_motion(
     ss.setStateValidityChecker(ob.StateValidityCheckerFn(state_valid_fn))
 
     si = ss.getSpaceInformation()
+    si.setMotionValidator(CustomMotionValidator(si, space))
     planner = ompl_geo.RRTConnect(si)
     ss.setPlanner(planner)
 
-    start = ob.State(space)
-    start().setX(start_conf[0])
-    start().setY(start_conf[1])
-    start().setYaw(T.wrap_angle(start_conf[2]))
+    start = create_state(space, start_conf[0], start_conf[1], T.wrap_angle(start_conf[2]))
     print(start)
 
-    goal = ob.State(space)
-    goal().setX(end_conf[0])
-    goal().setY(end_conf[1])
-    goal().setYaw(T.wrap_angle(end_conf[2]))
+    goal = create_state(space, end_conf[0], end_conf[1], T.wrap_angle(end_conf[2]))
     print(goal)
 
     ss.setStartAndGoalStates(start, goal)
     if not state_valid_fn(start()) or not state_valid_fn(goal()):
         return
-
-    # this will automatically choose a default planner with
-    # default parameters
+      
     solved = ss.solve(planning_time)
 
     if solved:
         # try to shorten the path
         ss.simplifySolution()
-        # print the simplified path
         sol_path = ss.getSolutionPath()
         return_path = []
+
         for i in range(sol_path.getStateCount()):
             x = sol_path.getState(i).getX()
             y = sol_path.getState(i).getY()
@@ -93,7 +186,7 @@ def plan_base_motion(
         return remove_unnecessary_rotations(return_path)
     return None
 
-def plan_arm_motion(
+def plan_arm_motion(   
     robot,
     end_conf,
     context,
@@ -303,23 +396,3 @@ def detect_robot_collision_in_sim(robot, filter_objs=[], ignore_obj_in_hand=True
         if col_obj.category in filter_categories:
             collision_prims.remove(col_prim)
     return len(collision_prims) > 0
-    
-
-def remove_unnecessary_rotations(path):
-    """
-    Removes unnecessary rotations from a path for the base where the yaw for each pose in the path is in the direction of the
-    the position of the next pose in the path
-
-    Args:
-        path (Array of arrays): Array of 2d poses
-    
-    Returns:
-        Array of arrays: Array of 2d poses with unnecessary rotations removed
-    """
-    for start_idx in range(len(path) - 1):
-        start = np.array(path[start_idx][:2])
-        end = np.array(path[start_idx + 1][:2])
-        segment = end - start
-        theta = np.arctan2(segment[1], segment[0])
-        path[start_idx] = (start[0], start[1], theta)
-    return path
