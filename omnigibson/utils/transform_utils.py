@@ -371,7 +371,6 @@ def mat2pose(hmat):
 
     Returns:
         2-tuple:
-
             - (np.array) (x,y,z) position array in cartesian coordinates
             - (np.array) (x,y,z,w) orientation array in quaternion form
     """
@@ -608,6 +607,11 @@ def pose_transform(pos1, quat1, pos0, quat0):
         quat1: (x,y,z,w) orientation to transform
         pos0: (x,y,z) initial position
         quat0: (x,y,z,w) initial orientation
+
+    Returns:
+        2-tuple:
+            - (np.array) (x,y,z) position array in cartesian coordinates
+            - (np.array) (x,y,z,w) orientation array in quaternion form
     """
     # Get poses
     mat0 = pose2mat((pos0, quat0))
@@ -615,6 +619,25 @@ def pose_transform(pos1, quat1, pos0, quat0):
 
     # Multiply and convert back to pos, quat
     return mat2pose(mat1 @ mat0)
+
+def invert_pose_transform(pos, quat):
+    """
+    Inverts a pose transform
+
+    Args:
+        pos: (x,y,z) position to transform
+        quat: (x,y,z,w) orientation to transform
+
+    Returns:
+        2-tuple:
+            - (np.array) (x,y,z) position array in cartesian coordinates
+            - (np.array) (x,y,z,w) orientation array in quaternion form
+    """
+    # Get pose
+    mat = pose2mat((pos, quat))
+
+    # Invert pose and convert back to pos, quat
+    return mat2pose(pose_inv(mat))
 
 
 def relative_pose_transform(pos1, quat1, pos0, quat0):
@@ -628,6 +651,11 @@ def relative_pose_transform(pos1, quat1, pos0, quat0):
         quat1: (x,y,z,w) orientation to transform
         pos0: (x,y,z) initial position
         quat0: (x,y,z,w) initial orientation
+
+    Returns:
+        2-tuple:
+            - (np.array) (x,y,z) position array in cartesian coordinates
+            - (np.array) (x,y,z,w) orientation array in quaternion form
     """
     # Get poses
     mat0 = pose2mat((pos0, quat0))
