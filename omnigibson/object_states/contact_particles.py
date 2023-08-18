@@ -1,11 +1,8 @@
-from collections import defaultdict
-import inspect
-
 import omnigibson as og
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.object_state_base import RelativeObjectState
 from omnigibson.object_states.aabb import AABB
-from omnigibson.object_states.kinematics import KinematicsMixin
+from omnigibson.object_states.kinematics_mixin import KinematicsMixin
 from omnigibson.systems.system_base import PhysicalParticleSystem, is_physical_particle_system
 
 # Create settings for this module

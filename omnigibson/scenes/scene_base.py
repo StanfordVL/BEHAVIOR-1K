@@ -213,7 +213,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # accordingly
         for obj_name, obj_info in init_info.items():
             # Check whether we should load the object or not
-            if not self._should_load_object(obj_info=obj_info, task_metadata=task_metadata) or obj_name == "skybox":
+            if not self._should_load_object(obj_info=obj_info, task_metadata=task_metadata):
                 continue
             # Create object class instance
             obj = create_object_from_init_info(obj_info)

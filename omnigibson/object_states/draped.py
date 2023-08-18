@@ -1,25 +1,19 @@
-from omnigibson.object_states.kinematics import KinematicsMixin
-from omnigibson.object_states.object_state_base import BooleanState, RelativeObjectState
+from omnigibson.object_states.kinematics_mixin import KinematicsMixin
+from omnigibson.object_states.object_state_base import BooleanStateMixin, RelativeObjectState
 from omnigibson.object_states.contact_bodies import ContactBodies
-from omnigibson.object_states.cloth import ClothState
+from omnigibson.object_states.cloth_mixin import ClothStateMixin
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.object_state_utils import sample_cloth_on_rigid
-import omnigibson.utils.transform_utils as T
-from omnigibson.macros import create_module_macros
-
 import omnigibson as og
-
-from scipy.spatial import ConvexHull, HalfspaceIntersection
-from scipy.spatial.qhull import QhullError
 import numpy as np
-import trimesh
-import itertools
 
 
-class Draped(KinematicsMixin, RelativeObjectState, BooleanState, ClothState):
-    @staticmethod
-    def get_dependencies():
-        return KinematicsMixin.get_dependencies() + RelativeObjectState.get_dependencies() + [ContactBodies]
+class Draped(RelativeObjectState, KinematicsMixin, BooleanStateMixin, ClothStateMixin):
+    @classmethod
+    def get_dependencies(cls):
+        deps = super().get_dependencies()
+        deps.add(ContactBodies)
+        return deps
 
     def _set_value(self, other, new_value):
         if not new_value:
@@ -30,11 +24,10 @@ class Draped(KinematicsMixin, RelativeObjectState, BooleanState, ClothState):
 
         state = og.sim.dump_state(serialized=False)
 
-        for _ in range(10):
-            if sample_cloth_on_rigid(self.obj, other, randomize_xy=True) and self.get_value(other):
-                return True
-            else:
-                og.sim.load_state(state, serialized=False)
+        if sample_cloth_on_rigid(self.obj, other, randomize_xy=True) and self.get_value(other):
+            return True
+        else:
+            og.sim.load_state(state, serialized=False)
 
         return False
 

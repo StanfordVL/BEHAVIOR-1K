@@ -206,3 +206,7 @@ python -m omnigibson.examples.robots.robot_control_example # (1)!
 ??? question "OmniGibson is stuck at shader compilation upon startup"
 
     The process could take up to 5 minutes. This is expected behavior, and should only occur once when you import OmniGibson for the first time.
+
+??? question "OmniGibson is stuck at `HydraEngine rtx failed creating scene renderer.`"
+
+    `OmniGibson` is likely using an unsupported GPU (default is id 0). Run `nvidia-smi` to see the active list of GPUs, and select an NVIDIA-supported GPU and set its corresponding ID when running `OmniGibson` with `export OMNIGIBSON_GPU_ID=<ID NUMBER>`.

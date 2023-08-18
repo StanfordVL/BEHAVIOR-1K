@@ -11,9 +11,11 @@ class KinematicsMixin(BaseObjectState):
     on the default kinematics states.
     """
 
-    @staticmethod
-    def get_dependencies():
-        return BaseObjectState.get_dependencies() + [Pose, AABB, ContactBodies]
+    @classmethod
+    def get_dependencies(cls):
+        deps = super().get_dependencies()
+        deps.update({Pose, AABB, ContactBodies})
+        return deps
 
     def cache_info(self, get_value_args):
         # Import here to avoid circular imports

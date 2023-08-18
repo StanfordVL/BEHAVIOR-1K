@@ -1,0 +1,70 @@
+name: build-push-containers
+
+on:
+  release:
+    types: [published]
+  push:
+    branches:
+      - 'main'
+      - 'og-develop'
+
+jobs:
+  docker:
+    runs-on: [self-hosted, linux, gpu]
+    steps:
+      -
+        name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      -
+        name: Login to NVCR
+        uses: docker/login-action@v2
+        with:
+          registry: nvcr.io
+          username: ${{ secrets.NVCR_USERNAME }}
+          password: ${{ secrets.NVCR_PASSWORD }}   
+      -
+        name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_PASSWORD }}
+      -
+        name: Metadata for dev Image
+        id: meta-dev
+        uses: docker/metadata-action@v4
+        with:
+          images: |
+            stanfordvl/omnigibson-dev
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+      -
+        name: Metadata for prod Image
+        id: meta-prod
+        uses: docker/metadata-action@v4
+        with:
+          images: |
+            stanfordvl/omnigibson
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+      -
+        name: Build and push dev image
+        uses: docker/build-push-action@v4
+        with:
+          push: true
+          tags: ${{ steps.meta-dev.outputs.tags }}
+          labels: ${{ steps.meta-dev.outputs.labels }}
+          file: docker/dev.Dockerfile
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      -
+        name: Build and push prod image
+        uses: docker/build-push-action@v4
+        with:
+          push: true
+          tags: ${{ steps.meta-prod.outputs.tags }}
+          labels: ${{ steps.meta-prod.outputs.labels }}
+          file: docker/prod.Dockerfile
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

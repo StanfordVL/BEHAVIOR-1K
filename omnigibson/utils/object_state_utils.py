@@ -18,24 +18,25 @@ import omnigibson.utils.transform_utils as T
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
+m.DEFAULT_SAMPLING_ATTEMPTS = 100
 m.ON_TOP_RAY_CASTING_SAMPLING_PARAMS = Dict({
     "bimodal_stdev_fraction": 1e-6,
     "bimodal_mean_fraction": 1.0,
-    "aabb_offset": 0.01,
+    "aabb_offset_fraction": 0.02,
     "max_sampling_attempts": 50,
 })
 
 m.INSIDE_RAY_CASTING_SAMPLING_PARAMS = Dict({
     "bimodal_stdev_fraction": 0.4,
     "bimodal_mean_fraction": 0.5,
-    "aabb_offset": 0.0,
+    "aabb_offset_fraction": -0.02,
     "max_sampling_attempts": 100,
 })
 
 m.UNDER_RAY_CASTING_SAMPLING_PARAMS = Dict({
     "bimodal_stdev_fraction": 1e-6,
     "bimodal_mean_fraction": 0.5,
-    "aabb_offset": 0.01,
+    "aabb_offset_fraction": 0.02,
     "max_sampling_attempts": 50,
 })
 
@@ -86,7 +87,7 @@ def sample_kinematics(
     predicate,
     objA,
     objB,
-    max_trials=10,
+    max_trials=m.DEFAULT_SAMPLING_ATTEMPTS,
     z_offset=0.05,
     skip_falling=False,
 ):
@@ -176,18 +177,6 @@ def sample_kinematics(
             rotated_diff = additional_rotation.apply(diff)
             pos = sampled_vector + rotated_diff
 
-        elif predicate == "onTop":
-            # Place objA at center of objB's AABB, offset in z direction such that their AABBs are "stacked"
-            aabb_lower_a, aabb_upper_a = objA.states[AABB].get_value()
-            aabb_lower_b, aabb_upper_b = objB.states[AABB].get_value()
-            bbox_to_obj = objA.get_position() - (aabb_lower_a + aabb_upper_a) / 2.0
-            desired_bbox_pos = (aabb_lower_b + aabb_upper_b) / 2.0
-            desired_bbox_pos[2] = aabb_upper_b[2] + (aabb_upper_a[2] - aabb_lower_a[2]) / 2.0
-            pos = desired_bbox_pos + bbox_to_obj
-
-        # if "chicken" in objA.name:
-        #     from IPython import embed; embed()
-
         if pos is None:
             success = False
         else:
@@ -207,24 +196,39 @@ def sample_kinematics(
         else:
             og.sim.load_state(state)
 
+    # If we didn't succeed, try last-ditch effort
+    if not success and predicate in {"onTop", "inside"}:
+        og.sim.step_physics()
+        # Place objA at center of objB's AABB, offset in z direction such that their AABBs are "stacked", and let fall
+        # until it settles
+        aabb_lower_a, aabb_upper_a = objA.states[AABB].get_value()
+        aabb_lower_b, aabb_upper_b = objB.states[AABB].get_value()
+        bbox_to_obj = objA.get_position() - (aabb_lower_a + aabb_upper_a) / 2.0
+        desired_bbox_pos = (aabb_lower_b + aabb_upper_b) / 2.0
+        desired_bbox_pos[2] = aabb_upper_b[2] + (aabb_upper_a[2] - aabb_lower_a[2]) / 2.0
+        pos = desired_bbox_pos + bbox_to_obj
+        success = True
+
     if success and not skip_falling:
         objA.set_position_orientation(pos, orientation)
         objA.keep_still()
 
-        # Let it fall for 0.2 second
-        for _ in range(int(0.2 / og.sim.get_physics_dt())):
+        # Step until either (a) max steps is reached (total of 0.5 second in sim time) or (b) contact is made, then
+        # step until (a) max steps is reached (restarted from 0) or (b) velocity is below some threshold
+        n_steps_max = int(0.5 / og.sim.get_physics_dt())
+        i = 0
+        while len(objA.states[ContactBodies].get_value()) == 0 and i < n_steps_max:
             og.sim.step_physics()
-            if len(objA.states[ContactBodies].get_value()) > 0:
-                break
-
+            i += 1
         objA.keep_still()
         objB.keep_still()
-
-        # Take extra step for depenetration, then break
-        og.sim.step_physics()
-
-        # Take extra step for depenetration, then break
-        og.sim.step_physics()
+        # Step a few times so velocity can become non-zero if the objects are moving
+        for i in range(5):
+            og.sim.step_physics()
+        i = 0
+        while np.linalg.norm(objA.get_linear_velocity()) > 1e-3 and i < n_steps_max:
+            og.sim.step_physics()
+            i += 1
 
         # Render at the end
         og.sim.render()
@@ -232,7 +236,7 @@ def sample_kinematics(
     return success
 
 
-def sample_cloth_on_rigid(obj, other, max_trials=10, z_offset=0.05, randomize_xy=True):
+def sample_cloth_on_rigid(obj, other, max_trials=40, z_offset=0.05, randomize_xy=True):
     """
     Samples the cloth object @obj on the rigid object @other
 

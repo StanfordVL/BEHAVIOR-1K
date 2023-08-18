@@ -32,12 +32,12 @@ def main():
                 "name": "cabinet",
                 "category": "bottom_cabinet",
                 "model": "zuwvdo",
+                "bounding_box": [1.595, 0.537, 1.14],
                 "abilities": {
                     "freezable": {},
                     "cookable": {},
                     "burnable": {},
                     "saturable": {},
-                    "toggleable": {},
                     "particleRemover": {
                         "method": ParticleModifyMethod.ADJACENCY,
                         "conditions": {
@@ -76,7 +76,6 @@ def main():
     assert object_states.Cooked in obj.states
     assert object_states.Burnt in obj.states
     assert object_states.Saturated in obj.states
-    assert object_states.ToggledOn in obj.states
 
     def report_states():
         # Make sure states are propagated before printing
@@ -89,7 +88,6 @@ def main():
         print("obj is cooked:", obj.states[object_states.Cooked].get_value())
         print("obj is burnt:", obj.states[object_states.Burnt].get_value())
         print("obj is soaked:", obj.states[object_states.Saturated].get_value(get_system("water")))
-        print("obj is toggledon:", obj.states[object_states.ToggledOn].get_value())
         print("obj textures:", obj.get_textures())
 
     # Report default states
@@ -125,16 +123,6 @@ def main():
     # Notify user that we're about to unsoak the object, and then unsoak the object
     input("\nObject will be unsaturated with water. Press ENTER to continue.")
     obj.states[object_states.Saturated].set_value(get_system("water"), False)
-    report_states()
-
-    # Notify user that we're about to toggle on the object, and then toggle on the object
-    input("\nObject will be toggled on. Press ENTER to continue.")
-    obj.states[object_states.ToggledOn].set_value(True)
-    report_states()
-
-    # Notify user that we're about to toggle off the object, and then toggle off the object
-    input("\nObject will be toggled off. Press ENTER to continue.")
-    obj.states[object_states.ToggledOn].set_value(False)
     report_states()
 
     # Close environment at the end

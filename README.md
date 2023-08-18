@@ -7,6 +7,8 @@
 -------
 
 ## Latest Updates
+- [08/04/23] **v0.2.0**: More assets! 600 pre-sampled tasks, 7 new scenes, and many new objects 📈 [[release notes]](https://github.com/StanfordVL/OmniGibson/releases/tag/v0.2.0)
+
 - [04/10/22] **v0.1.0**: Significantly improved stability, performance, and ease of installation :wrench: [[release notes]](https://github.com/StanfordVL/OmniGibson/releases/tag/v0.1.0)
 
 -------
@@ -20,7 +22,7 @@
 * 🤖 Mobile Manipulator Robots with Modular ⚙️ Controllers
 * 🌎 OpenAI Gym Interface
 
-Check out [**`OmniGibson`**'s documentation](https://behavior.stanford.edu/omnigibson/getting_started/installation.html) to get started!
+Check out [**`OmniGibson`**'s documentation](https://stanfordvl.github.io/OmniGibson/getting_started/installation.html) to get started!
 
 ### Citation
 If you use **`OmniGibson`** or its assets and models, please cite:

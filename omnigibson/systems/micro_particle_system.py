@@ -250,9 +250,10 @@ class PhysxParticleInstancer(BasePrim):
         """
         assert quat.shape[0] == self._n_particles, \
             f"Got mismatch in particle setting size: {quat.shape[0]}, vs. number of particles {self._n_particles}!"
-        # Swap w position, since Quath takes (w,x,y,z)
+        # If the number of particles is nonzero, swap w position, since Quath takes (w,x,y,z)
         quat = quat.astype(float)
-        quat = quat[:, [3, 0, 1, 2]]
+        if self._n_particles > 0:
+            quat = quat[:, [3, 0, 1, 2]]
         self.set_attribute(attr="orientations", val=Vt.QuathArray.FromNumpy(quat))
 
     @property
@@ -428,20 +429,20 @@ class MicroParticleSystem(BaseSystem):
             f"Cannot use flatcache with MicroParticleSystem {cls.name} when no isosurface is used!"
 
         cls.system_prim = cls._create_particle_system()
-        # # Create material
-        # cls._material = MicroParticleSystem._create_particle_material_template() #cls._create_particle_material_template()
-        # # Load the material if not already loaded
-        # # TODO: Remove this if statement once clearing system completely removes prims from stage
-        # if not cls._material.loaded:
-        #     cls._material.load()
-        # # Bind the material to the particle system (for isosurface) and the prototypes (for non-isosurface)
-        # cls._material.bind(cls.system_prim_path)
-        # # Also apply physics to this material
-        # particleUtils.add_pbd_particle_material(og.sim.stage, cls.mat_path, **cls._pbd_material_kwargs)
-        # # Force populate inputs and outputs of the shader
-        # cls._material.shader_force_populate()
-        # # Potentially modify the material
-        # cls._customize_particle_material()
+        # Create material
+        cls._material = cls._create_particle_material_template()
+        # Load the material if not already loaded
+        # TODO: Remove this if statement once clearing system completely removes prims from stage
+        if not cls._material.loaded:
+            cls._material.load()
+        # Bind the material to the particle system (for isosurface) and the prototypes (for non-isosurface)
+        cls._material.bind(cls.system_prim_path)
+        # Also apply physics to this material
+        particleUtils.add_pbd_particle_material(og.sim.stage, cls.mat_path, **cls._pbd_material_kwargs)
+        # Force populate inputs and outputs of the shader
+        cls._material.shader_force_populate()
+        # Potentially modify the material
+        cls._customize_particle_material()
 
     @classproperty
     def particle_radius(cls):
@@ -457,7 +458,7 @@ class MicroParticleSystem(BaseSystem):
             None or 3-array: If @cls._material exists, this will be its corresponding RGB color. Otherwise,
                 will return None
         """
-        return np.ones(3) if cls._color is None else cls._color
+        return cls._color
 
     @classproperty
     def material(cls):
@@ -1235,40 +1236,40 @@ class FluidSystem(MicroPhysicalParticleSystem):
     texture. Individual particles are composed of spheres.
     """
 
-    # @classmethod
-    # def initialize(cls):
-    #     # Run super first
-    #     super().initialize()
-    #
-    #     # Bind the material to the particle system (for isosurface) and the prototypes (for non-isosurface)
-    #     cls._material.bind(cls.system_prim_path)
-    #     for prototype in cls.particle_prototypes:
-    #         cls._material.bind(prototype.prim_path)
-    #     # Apply the physical material preset based on whether or not this fluid is viscous
-    #     apply_mat_physics = particleUtils.AddPBDMaterialViscous if cls.is_viscous else particleUtils.AddPBDMaterialWater
-    #     apply_mat_physics(p=cls._material.prim)
-    #
-    #     # Compute the overall color of the fluid system
-    #     base_color_weight = cls._material.diffuse_reflection_weight
-    #     transmission_weight = cls._material.enable_specular_transmission * cls._material.specular_transmission_weight
-    #     total_weight = base_color_weight + transmission_weight
-    #     if total_weight == 0.0:
-    #         # If the fluid doesn't have any color, we add a "blue" tint by default
-    #         color = np.array([0.0, 0.0, 1.0])
-    #     else:
-    #         base_color_weight /= total_weight
-    #         transmission_weight /= total_weight
-    #         # Weighted sum of base color and transmission color
-    #         color = base_color_weight * cls._material.diffuse_reflection_color + \
-    #                 transmission_weight * (0.5 * cls._material.specular_transmission_color + \
-    #                                        0.5 * cls._material.specular_transmission_scattering_color)
-    #     cls._color = color
-    #
-    #     # Set custom isosurface rendering settings if we are using high-quality rendering
-    #     if gm.ENABLE_HQ_RENDERING:
-    #         set_carb_settings_for_fluid_isosurface()
-    #         # We also modify the grid smoothing radius to avoid "blobby" appearances
-    #         cls.system_prim.GetAttribute("physxParticleIsosurface:gridSmoothingRadius").Set(0.0001)
+    @classmethod
+    def initialize(cls):
+        # Run super first
+        super().initialize()
+
+        # Bind the material to the particle system (for isosurface) and the prototypes (for non-isosurface)
+        cls._material.bind(cls.system_prim_path)
+        for prototype in cls.particle_prototypes:
+            cls._material.bind(prototype.prim_path)
+        # Apply the physical material preset based on whether or not this fluid is viscous
+        apply_mat_physics = particleUtils.AddPBDMaterialViscous if cls.is_viscous else particleUtils.AddPBDMaterialWater
+        apply_mat_physics(p=cls._material.prim)
+
+        # Compute the overall color of the fluid system
+        base_color_weight = cls._material.diffuse_reflection_weight
+        transmission_weight = cls._material.enable_specular_transmission * cls._material.specular_transmission_weight
+        total_weight = base_color_weight + transmission_weight
+        if total_weight == 0.0:
+            # If the fluid doesn't have any color, we add a "blue" tint by default
+            color = np.array([0.0, 0.0, 1.0])
+        else:
+            base_color_weight /= total_weight
+            transmission_weight /= total_weight
+            # Weighted sum of base color and transmission color
+            color = base_color_weight * cls._material.diffuse_reflection_color + \
+                    transmission_weight * (0.5 * cls._material.specular_transmission_color + \
+                                           0.5 * cls._material.specular_transmission_scattering_color)
+        cls._color = color
+
+        # Set custom isosurface rendering settings if we are using high-quality rendering
+        if gm.ENABLE_HQ_RENDERING:
+            set_carb_settings_for_fluid_isosurface()
+            # We also modify the grid smoothing radius to avoid "blobby" appearances
+            cls.system_prim.GetAttribute("physxParticleIsosurface:gridSmoothingRadius").Set(0.0001)
 
     @classproperty
     def is_fluid(cls):
@@ -1564,6 +1565,7 @@ GranularSystem.create(
         fixed_base=False,
         visual_only=True,
         include_default_states=False,
+        abilities={},
     )
 )
 

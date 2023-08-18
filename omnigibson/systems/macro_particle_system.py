@@ -604,7 +604,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
             # If we're a cloth, store the face_id as well
             if obj.prim_type == PrimType.CLOTH:
                 for particle_name, face_id in zip(cls._group_particles[group].keys(), cls._cloth_face_ids[group]):
-                    cls._particles_info[particle_name]["face_id"] = face_id
+                    cls._particles_info[particle_name]["face_id"] = int(face_id)
 
         return success
 
@@ -928,7 +928,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                 cls._particles_info[particle.name] = dict(obj=obj)
                 # Add face_id if is_cloth, otherwise, add link
                 if is_cloth:
-                    cls._particles_info[particle.name]["face_id"] = reference
+                    cls._particles_info[particle.name]["face_id"] = int(reference)
                 else:
                     cls._particles_info[particle.name]["link"] = obj.links[reference]
 
@@ -1052,7 +1052,7 @@ class MacroVisualParticleSystem(MacroParticleSystem, VisualParticleSystem):
                 [group_dict["particle_attached_obj_uuid"]],
                 [group_dict["n_particles"]],
                 group_dict["particle_idns"],
-                ([reference for reference in group_dict["particle_attached_references"]] if is_cloth else
+                (group_dict["particle_attached_references"] if is_cloth else
                  [group_obj_link2id[reference] for reference in group_dict["particle_attached_references"]]),
             ]
 
@@ -1488,6 +1488,7 @@ MacroVisualParticleSystem.create(
         fixed_base=False,
         visual_only=True,
         include_default_states=False,
+        abilities={},
     )
 )
 
@@ -1504,6 +1505,7 @@ MacroVisualParticleSystem.create(
         fixed_base=False,
         visual_only=True,
         include_default_states=False,
+        abilities={},
     ),
 )
 
@@ -1521,6 +1523,7 @@ MacroPhysicalParticleSystem.create(
         include_default_states=False,
         category="raspberry",
         model="spkers",
+        abilities={},
     ),
     scale=np.ones(3) * 5.0,
 )

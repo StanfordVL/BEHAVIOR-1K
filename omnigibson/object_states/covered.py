@@ -1,13 +1,10 @@
-import omnigibson as og
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states import AABB
-from omnigibson.object_states.object_state_base import RelativeObjectState, BooleanState
+from omnigibson.object_states.object_state_base import RelativeObjectState, BooleanStateMixin
 from omnigibson.object_states.contact_particles import ContactParticles
-from omnigibson.systems.system_base import VisualParticleSystem, PhysicalParticleSystem, \
-    is_visual_particle_system, is_physical_particle_system
-from omnigibson.systems import get_system
-from omnigibson.utils.python_utils import classproperty
-import numpy as np
+from omnigibson.systems.system_base import VisualParticleSystem, is_visual_particle_system, is_physical_particle_system
+from omnigibson.utils.constants import PrimType
+
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -25,7 +22,7 @@ m.PHYSICAL_PARTICLE_THRESHOLD = 1
 m.MAX_PHYSICAL_PARTICLES = 5000
 
 
-class Covered(RelativeObjectState, BooleanState):
+class Covered(RelativeObjectState, BooleanStateMixin):
     def __init__(self, obj):
         # Run super first
         super().__init__(obj)
@@ -33,10 +30,11 @@ class Covered(RelativeObjectState, BooleanState):
         # Set internal values
         self._visual_particle_group = None
 
-    @staticmethod
-    def get_dependencies():
-        # AABB needed for sampling visual particles on an object
-        return RelativeObjectState.get_dependencies() + [AABB, ContactParticles]
+    @classmethod
+    def get_dependencies(cls):
+        deps = super().get_dependencies()
+        deps.update({AABB, ContactParticles})
+        return deps
 
     def remove(self):
         if self._initialized:
@@ -66,6 +64,9 @@ class Covered(RelativeObjectState, BooleanState):
                     # check whether the current number of particles assigned to the group is greater than the threshold
                     value = system.num_group_particles(group=self._visual_particle_group) >= m.VISUAL_PARTICLE_THRESHOLD
             elif is_physical_particle_system(system_name=system.name):
+                # Make sure we're not cloth -- not supported yet
+                assert self.obj.prim_type != PrimType.CLOTH, \
+                    "Cloth objects currently cannot be Covered by physical particles!"
                 # We've already cached particle contacts, so we merely search through them to see if any particles are
                 # touching the object and are visible (the non-visible ones are considered already "removed")
                 n_near_particles = len(self.obj.states[ContactParticles].get_value(system))
@@ -101,6 +102,9 @@ class Covered(RelativeObjectState, BooleanState):
                     system.remove_all_group_particles(group=self._visual_particle_group)
 
         elif is_physical_particle_system(system_name=system.name):
+            # Make sure we're not cloth -- not supported yet
+            assert self.obj.prim_type != PrimType.CLOTH, \
+                "Cloth objects currently cannot be Covered by physical particles!"
             # Check current state and only do something if we're changing state
             if self.get_value(system) != new_value:
                 if new_value:

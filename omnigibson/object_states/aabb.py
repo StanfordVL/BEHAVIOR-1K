@@ -5,7 +5,4 @@ class AABB(AbsoluteObjectState):
     def _get_value(self):
         return self.obj.aabb
 
-    def _set_value(self, new_value):
-        raise NotImplementedError("AABB state currently does not support setting.")
-
     # Nothing needs to be done to save/load AABB since it will happen due to pose caching.

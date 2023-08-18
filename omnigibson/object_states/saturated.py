@@ -1,6 +1,6 @@
 import numpy as np
 from omnigibson.macros import create_module_macros
-from omnigibson.object_states.object_state_base import RelativeObjectState, BooleanState
+from omnigibson.object_states.object_state_base import RelativeObjectState, BooleanStateMixin
 from omnigibson.systems.system_base import UUID_TO_SYSTEMS, REGISTERED_SYSTEMS
 from omnigibson.utils.python_utils import get_uuid
 
@@ -34,7 +34,12 @@ class ModifiedParticles(RelativeObjectState):
         return self.particle_counts.get(system, 0)
 
     def _set_value(self, system, new_value):
-        self.particle_counts[system] = new_value
+        assert new_value >= 0, "Cannot set ModifiedParticles value to be less than 0!"
+        # Remove the value from the dictionary if we're setting it to zero (save memory)
+        if new_value == 0 and system in self.particle_counts:
+            self.particle_counts.pop(system)
+        else:
+            self.particle_counts[system] = new_value
 
     def _sync_systems(self, systems):
         """
@@ -87,7 +92,7 @@ class ModifiedParticles(RelativeObjectState):
         return state_dict, n_systems * 2 + 1
 
 
-class Saturated(RelativeObjectState, BooleanState):
+class Saturated(RelativeObjectState, BooleanStateMixin):
     def __init__(self, obj, default_limit=m.DEFAULT_SATURATION_LIMIT):
         # Run super first
         super().__init__(obj=obj)
@@ -123,9 +128,6 @@ class Saturated(RelativeObjectState, BooleanState):
             limit (int): Number of particles representing limit for the given @system
         """
         self._limits[system] = limit
-        # Make sure the modified particles is populated as well
-        if system not in self.obj.states[ModifiedParticles].particle_counts:
-            self.obj.states[ModifiedParticles].set_value(system, 0)
 
     def _get_value(self, system):
         limit = self.get_limit(system=system)
@@ -139,7 +141,7 @@ class Saturated(RelativeObjectState, BooleanState):
     def _set_value(self, system, new_value):
         # Only set the value if it's different than what currently exists
         if new_value != self.get_value(system):
-            self.obj.states[ModifiedParticles].set_value(system, self.get_limit(system=system))
+            self.obj.states[ModifiedParticles].set_value(system, self.get_limit(system=system) if new_value else 0)
         return True
 
     def get_texture_change_params(self):
@@ -165,9 +167,11 @@ class Saturated(RelativeObjectState, BooleanState):
 
         return albedo_add, diffuse_tint
 
-    @staticmethod
-    def get_dependencies():
-        return RelativeObjectState.get_dependencies() + [ModifiedParticles]
+    @classmethod
+    def get_dependencies(cls):
+        deps = super().get_dependencies()
+        deps.add(ModifiedParticles)
+        return deps
 
     def _sync_systems(self, systems):
         """

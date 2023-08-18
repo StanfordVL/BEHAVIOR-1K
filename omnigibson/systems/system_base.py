@@ -1166,7 +1166,7 @@ def _create_system_from_metadata(system_name):
         if system_type == "macro_visual_particle":
             system_kwargs["create_particle_template"] = generate_particle_template_fcn()
             system_kwargs["scale_relative_to_parent"] = metadata["relative_particle_scaling"]
-        elif system_type == "micro_physical_particle" or system_type == "macro_physical_particle":
+        elif system_type == "granular" or system_type == "macro_physical_particle":
             system_kwargs["create_particle_template"] = generate_particle_template_fcn()
             system_kwargs["particle_density"] = metadata["particle_density"]
         elif system_type == "fluid":
@@ -1177,14 +1177,11 @@ def _create_system_from_metadata(system_name):
             system_kwargs["customize_particle_material"] = \
                 generate_customize_particle_material_fcn(mat_kwargs=metadata["customize_material_kwargs"])
         else:
-            raise ValueError(f"{system_name} system's type {system_type} is invalid! "
-                             f"Must be one of {{ 'macro_visual_particle', 'micro_physical_particle', 'macro_physical_particle', or 'fluid' }}")
+            raise ValueError(f"{system_name} system's type {system_type} is invalid! Must be one of "
+                             f"{{ 'macro_visual_particle', 'macro_physical_particle', 'granular', or 'fluid' }}")
 
         # Generate the requested system
         system_cls = "".join([st.capitalize() for st in system_type.split("_")])
-        # MicroPhysicalParticle --> Granular
-        if system_cls == "MicroPhysicalParticle":
-            system_cls = "Granular"
         return systems.__dict__[f"{system_cls}System"].create(**system_kwargs)
 
 

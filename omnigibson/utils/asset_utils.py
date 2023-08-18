@@ -68,21 +68,6 @@ def get_og_avg_category_specs():
         return dict()
 
 
-def get_assisted_grasping_categories():
-    """
-    Generate a list of categories that can be grasped using assisted grasping,
-    using labels provided in average category specs file.
-
-    Returns:
-        list of str: Object category allowlist for assisted grasping
-    """
-    assisted_grasp_category_allow_list = set()
-    avg_category_spec = get_og_avg_category_specs()
-    for k, v in avg_category_spec.items():
-        assisted_grasp_category_allow_list.add(k)
-    return assisted_grasp_category_allow_list
-
-
 def get_og_category_ids():
     """
     Get OmniGibson object categories
@@ -261,9 +246,6 @@ def get_all_object_category_models_with_abilities(category, abilities):
         for dependency in state_type.get_dependencies():
             if all(other_state != dependency for other_state, _ in state_types_and_params):
                 state_types_and_params.append((dependency, dict()))
-    # Prune so that only the link-based states remain
-    state_types_and_params = [state_type_and_params for state_type_and_params in state_types_and_params
-                              if issubclass(state_type_and_params[0], LinkBasedStateMixin)]
 
     # Get mapping for class init kwargs
     state_init_default_kwargs = dict()
@@ -277,99 +259,13 @@ def get_all_object_category_models_with_abilities(category, abilities):
     valid_models = []
 
     def supports_state_types(states_and_params, obj_prim):
-        child_prim_names = [child.GetName() for child in obj_prim.GetChildren()]
         # Check all link states
         for state_type, params in states_and_params:
             kwargs = deepcopy(state_init_default_kwargs[state_type])
             kwargs.update(params)
-            if not state_compatible(state_type, kwargs, child_prim_names):
+            if not state_type.is_compatible_asset(prim=obj_prim, **kwargs)[0]:
                 return False
         return True
-
-    def state_compatible(state_type, state_params, child_names):
-        if not state_type.requires_metalink(**state_params):
-            return True
-        metalink_prefix = state_type.metalink_prefix
-        for child_name in child_names:
-            if metalink_prefix in child_name:
-                return True
-        return False
-
-    for model in all_models:
-        usd_path = DatasetObject.get_usd_path(category=category, model=model)
-        usd_path = usd_path.replace(".usd", ".encrypted.usd")
-        with decrypted(usd_path) as fpath:
-            stage = Usd.Stage.Open(fpath)
-            prim = stage.GetDefaultPrim()
-            if supports_state_types(state_types_and_params, prim):
-                valid_models.append(model, category)
-    return os.listdir(og_categories_path) if os.path.exists(og_categories_path) else []
-
-
-def get_all_object_category_models_with_abilities(category, abilities):
-    """
-    Get all object models from @category whose assets are properly annotated with necessary metalinks to support
-    abilities @abilities
-
-    Args:
-        category (str): Object category name
-        abilities (dict): Dictionary mapping requested abilities to keyword arguments to pass to the corresponding
-            object state constructors. The abilities' required annotations will be guaranteed for the returned
-            models
-
-    Returns:
-        list of str: all object models belonging to @category which are properly annotated with necessary metalinks
-            to support the requested list of @abilities
-    """
-    # Avoid circular imports
-    from omnigibson.objects.dataset_object import DatasetObject
-    from omnigibson.object_states.factory import get_states_for_ability
-    from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
-
-    # Get all valid models
-    all_models = get_all_object_category_models(category=category)
-
-    # Generate all object states required per object given the requested set of abilities
-    state_types_and_params = [(state_type, params) for ability, params in abilities.items()
-                              for state_type in get_states_for_ability(ability)]
-    for state_type, _ in state_types_and_params:
-        # Add each state's dependencies, too. Note that only required dependencies are added.
-        for dependency in state_type.get_dependencies():
-            if all(other_state != dependency for other_state, _ in state_types_and_params):
-                state_types_and_params.append((dependency, dict()))
-    # Prune so that only the link-based states remain
-    state_types_and_params = [state_type_and_params for state_type_and_params in state_types_and_params
-                              if issubclass(state_type_and_params[0], LinkBasedStateMixin)]
-
-    # Get mapping for class init kwargs
-    state_init_default_kwargs = dict()
-    for state_type, _ in state_types_and_params:
-        default_kwargs = inspect.signature(state_type.__init__).parameters
-        state_init_default_kwargs[state_type] = \
-            {kwarg: val.default for kwarg, val in default_kwargs.items()
-             if kwarg != "self" and val.default != inspect._empty}
-
-    # Iterate over all models and sanity check each one, making sure they satisfy all the requested @abilities
-    valid_models = []
-
-    def supports_state_types(states_and_params, obj_prim):
-        child_prim_names = [child.GetName() for child in obj_prim.GetChildren()]
-        # Check all link states
-        for state_type, params in states_and_params:
-            kwargs = deepcopy(state_init_default_kwargs[state_type])
-            kwargs.update(params)
-            if not state_compatible(state_type, kwargs, child_prim_names):
-                return False
-        return True
-
-    def state_compatible(state_type, state_params, child_names):
-        if not state_type.requires_metalink(**state_params):
-            return True
-        metalink_prefix = state_type.metalink_prefix
-        for child_name in child_names:
-            if metalink_prefix in child_name:
-                return True
-        return False
 
     for model in all_models:
         usd_path = DatasetObject.get_usd_path(category=category, model=model)
@@ -579,10 +475,9 @@ def encrypt_file(original_filename, encrypted_filename=None, encrypted_file=None
 @contextlib.contextmanager
 def decrypted(encrypted_filename):
     fpath = Path(encrypted_filename)
-    decrypted_filename = f"{fpath.stem}.tmp{fpath.suffix}"
+    decrypted_filename = os.path.join(og.tempdir, f"{fpath.stem}.tmp{fpath.suffix}")
     decrypt_file(encrypted_filename=encrypted_filename, decrypted_filename=decrypted_filename)
     yield decrypted_filename
-    os.remove(decrypted_filename)
 
 
 if __name__ == "__main__":

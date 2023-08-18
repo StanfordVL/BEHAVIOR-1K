@@ -436,8 +436,8 @@ class Simulator(SimulationContext, Serializable):
                 # Re-initialize the physics view because the number of objects has changed
                 RigidContactAPI.initialize_view()
 
-                # # Also refresh the transition rules that are currently active
-                # TransitionRuleAPI.refresh_all_rules()
+                # Also refresh the transition rules that are currently active
+                TransitionRuleAPI.refresh_all_rules()
 
             # Update any system-related state
             for system in self.scene.systems:
@@ -452,9 +452,14 @@ class Simulator(SimulationContext, Serializable):
                         if obj.initialized:
                             obj.states[state_type].update()
 
-            # # Possibly run transition rule step
-            # if gm.ENABLE_TRANSITION_RULES:
-            #     TransitionRuleAPI.step()
+                for obj in self.scene.objects:
+                    # Only update visuals for objects that have been initialized so far
+                    if isinstance(obj, StatefulObject) and obj.initialized:
+                        obj.update_visuals()
+
+            # Possibly run transition rule step
+            if gm.ENABLE_TRANSITION_RULES:
+                TransitionRuleAPI.step()
 
     def _omni_update_step(self):
         """
@@ -473,9 +478,16 @@ class Simulator(SimulationContext, Serializable):
             # We suppress warnings from omni.usd because it complains about values set in the native USD
             # These warnings occur because the native USD file has some type mismatch in the `scale` property,
             # where the property expects a double but for whatever reason the USD interprets its values as floats
+            # We supperss omni.physicsschema.plugin when kinematic_only objects are placed with scale ~1.0, to suppress
+            # the following error:
+            # [omni.physicsschema.plugin] ScaleOrientation is not supported for rigid bodies, prim path: [...] You may
+            #   ignore this if the scale is close to uniform.
             # We also need to suppress the following error when flat cache is used:
             # [omni.physx.plugin] Transformation change on non-root links is not supported.
-            with suppress_omni_log(channels=["omni.usd", "omni.physx.plugin"] if gm.ENABLE_FLATCACHE else ["omni.usd"]):
+            channels = ["omni.usd", "omni.physicsschema.plugin"]
+            if gm.ENABLE_FLATCACHE:
+                channels.append("omni.physx.plugin")
+            with suppress_omni_log(channels=channels):
                 super().play()
 
             # Take a render step -- this is needed so that certain (unknown, maybe omni internal state?) is populated

@@ -315,6 +315,33 @@ def snake_case_to_camel_case(snake_case_text):
     return ''.join(item.title() for item in snake_case_text.split('_'))
 
 
+def meets_minimum_version(test_version, minimum_version):
+    """
+    Verify that @test_version meets the @minimum_version
+
+    Args:
+        test_version (str): Python package version. Should be, e.g., 0.26.1
+        minimum_version (str): Python package version to test against. Should be, e.g., 0.27.2
+
+    Returns:
+        bool: Whether @test_version meets @minimum_version
+    """
+    test_nums = [int(num) for num in test_version.split(".")]
+    minimum_nums = [int(num) for num in minimum_version.split(".")]
+    assert len(test_nums) == 3
+    assert len(minimum_nums) == 3
+
+    for test_num, minimum_num in zip(test_nums, minimum_nums):
+        if test_num > minimum_num:
+            return True
+        elif test_num < minimum_num:
+            return False
+        # Otherwise, we continue through all sub-versions
+
+    # If we get here, that means test_version == threshold_version, so this is a success
+    return True
+
+
 class UniquelyNamed:
     """
     Simple class that implements a name property, that must be implemented by a subclass. Note that any @Named
@@ -768,6 +795,13 @@ class Wrapper:
 
     # this method is a fallback option on any methods the original env might support
     def __getattr__(self, attr):
+        # If we're querying wrapped_obj, raise an error
+        if attr == "wrapped_obj":
+            raise AttributeError("wrapped_obj attribute not initialized yet!")
+
+        # Sanity check to make sure wrapped obj is not None -- if so, raise error
+        assert self.wrapped_obj is not None, f"Cannot access attribute {attr} since wrapped_obj is None!"
+
         # using getattr ensures that both __getattribute__ and __getattr__ (fallback) get called
         # (see https://stackoverflow.com/questions/3278077/difference-between-getattr-vs-getattribute)
         orig_attr = getattr(self.wrapped_obj, attr)
@@ -781,6 +815,13 @@ class Wrapper:
             return hooked
         else:
             return orig_attr
+
+    def __setattr__(self, key, value):
+        # Call setattr on wrapped obj if it has the attribute, otherwise, operate on this object
+        if hasattr(self, "wrapped_obj") and self.wrapped_obj is not None and hasattr(self.wrapped_obj, key):
+            setattr(self.wrapped_obj, key, value)
+        else:
+            super().__setattr__(key, value)
 
 
 def clear():

@@ -65,9 +65,11 @@ class OnFire(HeatSourceOrSink, UpdateStateMixin):
         # Fallback to root link
         return self.obj.root_link
 
-    @staticmethod
-    def get_dependencies():
-        return HeatSourceOrSink.get_dependencies() + [Temperature]
+    @classmethod
+    def get_dependencies(cls):
+        deps = super().get_dependencies()
+        deps.add(Temperature)
+        return deps
 
     def _update(self):
         # If it's on fire, maintain the fire temperature

@@ -19,6 +19,7 @@ def main():
                 "name": "stove",
                 "category": "stove",
                 "model": "qbjiva",
+                "bounding_box": [1.611, 0.769, 1.147],
                 "abilities": {
                     "heatSource": {"requires_toggled_on": True},
                     "toggleable": {},

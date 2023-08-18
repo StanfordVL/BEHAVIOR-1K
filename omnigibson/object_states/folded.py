@@ -3,8 +3,8 @@ from collections import namedtuple
 from scipy.spatial import ConvexHull, distance_matrix
 
 from omnigibson.macros import create_module_macros
-from omnigibson.object_states.object_state_base import BooleanState, AbsoluteObjectState
-from omnigibson.object_states.cloth import ClothState
+from omnigibson.object_states.object_state_base import BooleanStateMixin, AbsoluteObjectState
+from omnigibson.object_states.cloth_mixin import ClothStateMixin
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -34,7 +34,8 @@ FoldedLevelData contains the following fields:
 """
 FoldedLevelData = namedtuple("FoldedLevelData", ("smoothness", "area", "diagonal"))
 
-class FoldedLevel(AbsoluteObjectState, ClothState):
+
+class FoldedLevel(AbsoluteObjectState, ClothStateMixin):
     """
     State representing the object's folded level.
     Value is a FoldedLevelData object.
@@ -49,15 +50,12 @@ class FoldedLevel(AbsoluteObjectState, ClothState):
         area, diagonal = self.calculate_projection_area_and_diagonal([0, 1])
         return FoldedLevelData(smoothness, area / self.area_unfolded, diagonal / self.diagonal_unfolded)
 
-    def _set_value(self, new_value):
-        raise NotImplementedError("FoldedLevel state currently does not support setting.")
-
     def calculate_smoothness(self):
         """
         Calculate the percantage of surface normals that are sufficiently close to the z-axis.
         """
         cloth = self.obj.root_link
-        normals = cloth.compute_face_normals(face_ids=cloth.keyfaces)
+        normals = cloth.compute_face_normals(face_ids=cloth.keyface_idx)
 
         # projection onto the z-axis
         proj = np.abs(np.dot(normals, np.array([0.0, 0.0, 1.0])))
@@ -121,10 +119,13 @@ class FoldedLevel(AbsoluteObjectState, ClothState):
 
         return area, diagonal
 
-class Folded(AbsoluteObjectState, BooleanState, ClothState):
-    @staticmethod
-    def get_dependencies():
-        return AbsoluteObjectState.get_dependencies() + [FoldedLevel]
+
+class Folded(AbsoluteObjectState, BooleanStateMixin, ClothStateMixin):
+    @classmethod
+    def get_dependencies(cls):
+        deps = super().get_dependencies()
+        deps.add(FoldedLevel)
+        return deps
 
     def _get_value(self):
         # Check the smoothness of the cloth
@@ -142,7 +143,14 @@ class Folded(AbsoluteObjectState, BooleanState, ClothState):
 
     # We don't need to dump / load anything since the cloth objects should handle it themselves
 
-class Unfolded(AbsoluteObjectState, BooleanState, ClothState):
+
+class Unfolded(AbsoluteObjectState, BooleanStateMixin, ClothStateMixin):
+    @classmethod
+    def get_dependencies(cls):
+        deps = super().get_dependencies()
+        deps.add(FoldedLevel)
+        return deps
+
     def _get_value(self):
         # Check the smoothness of the cloth
         folded_level = self.obj.states[FoldedLevel].get_value()
@@ -155,5 +163,7 @@ class Unfolded(AbsoluteObjectState, BooleanState, ClothState):
             raise NotImplementedError("Unfolded does not support set_value(False)")
 
         self.obj.root_link.reset()
+
+        return True
 
     # We don't need to dump / load anything since the cloth objects should handle it themselves

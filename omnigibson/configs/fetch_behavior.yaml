@@ -50,7 +50,7 @@ objects: []
 
 task:
   type: BehaviorTask
-  activity_name: assembling_gift_baskets
+  activity_name: prepare_sea_salt_soak
   activity_definition_id: 0
   activity_instance_id: 0
   predefined_problem: null

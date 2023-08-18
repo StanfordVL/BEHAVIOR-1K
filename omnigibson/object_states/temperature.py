@@ -19,15 +19,17 @@ m.TEMPERATURE_DECAY_SPEED = 0.02  # per second. We'll do the conversion to steps
 
 
 class Temperature(AbsoluteObjectState, UpdateStateMixin):
-    @staticmethod
-    def get_dependencies():
-        return AbsoluteObjectState.get_dependencies() + [AABB]
+    @classmethod
+    def get_dependencies(cls):
+        deps = super().get_dependencies()
+        deps.add(AABB)
+        return deps
 
-    @staticmethod
-    def get_optional_dependencies():
-        # Note that we don't include OnFire as the optional dependency because OnFire also depends on Temperature.
-        # As a result, the temperature effect of objects that are on fire will have one step delay.
-        return AbsoluteObjectState.get_optional_dependencies() + [HeatSourceOrSink]
+    @classmethod
+    def get_optional_dependencies(cls):
+        deps = super().get_optional_dependencies()
+        deps.add(HeatSourceOrSink)
+        return deps
 
     def __init__(self, obj):
         super(Temperature, self).__init__(obj)
