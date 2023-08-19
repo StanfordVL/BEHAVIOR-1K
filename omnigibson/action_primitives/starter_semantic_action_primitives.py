@@ -132,7 +132,10 @@ class UndoableContext(object):
         link_poses = self.fk_solver.get_link_poses(joint_pos, arm_links)
 
         # Set position of robot copy root prim
-        self._set_prim_pose(self.robot_copy.prims[self.robot_copy_type], self.robot.get_position_orientation())
+        # self._set_prim_pose(self.robot_copy.prims[self.robot_copy_type], self.robot.get_position_orientation())
+        # from IPython import embed; embed()
+        self._set_prim_pose(self.robot_copy.prims[self.robot_copy_type], ([0, 0, 0], [0, 0, 0, 1]))
+        # from IPython import embed; embed()
 
         # Assemble robot meshes
         for link_name, meshes in self.robot_copy.meshes[self.robot_copy_type].items():
@@ -144,6 +147,14 @@ class UndoableContext(object):
                 link_pose = link_poses[link_name] if link_name in arm_links else self.robot_copy.links_relative_poses[self.robot_copy_type][link_name]
                 mesh_copy_pose = T.pose_transform(*link_pose, *self.robot_copy.relative_poses[self.robot_copy_type][link_name][mesh_name])
                 self._set_prim_pose(copy_mesh, mesh_copy_pose)
+
+                if link_name in ["arm_right_1_link", "arm_left_2_link"]:
+                    print(link_name)
+                    m_pose = self.robot_copy.relative_poses[self.robot_copy_type][link_name][mesh_name]
+                    print(m_pose[0], T.quat2euler(m_pose[1]))
+                    print(link_pose[0], T.quat2euler(link_pose[1]))
+                    print("++++++++++++")
+        from IPython import embed; embed()
 
     def _set_prim_pose(self, prim, pose):
         translation = Gf.Vec3d(*np.array(pose[0], dtype=float))
@@ -244,13 +255,13 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 "copy_path": "/World/robot_copy"
             }
         }
-        if hasattr(robot, 'simplified_mesh_usd_path'):
-            simplified_robot = { 
-                "robot": USDObject("simplified_copy", robot.simplified_mesh_usd_path),
-                "copy_path": "/World/simplified_robot_copy"         
-            }
-            robots_to_copy['simplified'] = simplified_robot
-
+        # if hasattr(robot, 'simplified_mesh_usd_path'):
+        #     simplified_robot = { 
+        #         "robot": USDObject("simplified_copy", robot.simplified_mesh_usd_path),
+        #         "copy_path": "/World/simplified_robot_copy"         
+        #     }
+        #     robots_to_copy['simplified'] = simplified_robot
+        og.sim.stop()
         for robot_type, rc in robots_to_copy.items():
             copy_robot = None
             copy_robot_meshes = {}
@@ -286,6 +297,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     copy_mesh_path += f"_{split_path[-1]}" if split_path[-1] != "collisions" else ""
                     CopyPrimCommand(mesh.prim_path, path_to=copy_mesh_path).do()
                     copy_mesh = get_prim_at_path(copy_mesh_path)
+                    scale = Gf.Vec3d(*np.array([1.0, 1.0, 1.0], dtype=float))
+                    # copy_mesh.GetAttribute("xformOp:scale").Set(scale)
                     relative_pose = T.relative_pose_transform(*mesh.get_position_orientation(), *link.get_position_orientation())
                     if link_name not in copy_robot_meshes.keys():
                         copy_robot_meshes[link_name] = {mesh_name: copy_mesh}
@@ -294,8 +307,15 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                         copy_robot_meshes[link_name][mesh_name] = copy_mesh
                         copy_robot_meshes_relative_poses[link_name][mesh_name] = relative_pose
 
+                    if link_name in ["arm_right_1_link", "arm_left_2_link"]:
+                        print(link_name)
+                        pose = T.relative_pose_transform(*link.get_position_orientation(), *robot.get_position_orientation())
+                        print(relative_pose[0], T.quat2euler(relative_pose[1]))
+                        print(pose[0], T.quat2euler(pose[1]))
+                        print("-------")
+
                 copy_robot_links_relative_poses[link_name] = T.relative_pose_transform(*link.get_position_orientation(), *robot.get_position_orientation())
-            
+            from IPython import embed; embed()
             if robot_type == "simplified":
                 og.sim.remove_object(robot_to_copy)
 
@@ -303,7 +323,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             robot_copy.meshes[robot_type] = copy_robot_meshes
             robot_copy.relative_poses[robot_type] = copy_robot_meshes_relative_poses
             robot_copy.links_relative_poses[robot_type] = copy_robot_links_relative_poses
-
+        og.sim.play()
         og.sim.step()
         return robot_copy
 
