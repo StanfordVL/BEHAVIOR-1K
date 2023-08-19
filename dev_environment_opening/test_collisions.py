@@ -115,7 +115,7 @@ def main():
                     print("-------")
     while True:
         joint_pos, joint_control_idx = get_random_joint_position()
-        # robot.set_joint_positions(joint_pos, joint_control_idx)
+        robot.set_joint_positions(joint_pos, joint_control_idx)
         pause_step(2)
         # print_link()
         # from IPython import embed; embed()
@@ -123,7 +123,7 @@ def main():
             # from IPython import embed; embed()
             initial_joint_pos[control_idx_in_joint_pos] = joint_pos
             # initial_joint_pos = np.array(robot.get_joint_positions()[joint_combined_idx])
-            # print(set_arm_and_detect_collision(context, initial_joint_pos))
+            print(set_arm_and_detect_collision(context, initial_joint_pos))
             print("--------------------")
             from IPython import embed; embed()
 

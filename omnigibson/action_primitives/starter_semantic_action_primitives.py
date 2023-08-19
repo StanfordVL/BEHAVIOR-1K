@@ -154,7 +154,7 @@ class UndoableContext(object):
                     print(m_pose[0], T.quat2euler(m_pose[1]))
                     print(link_pose[0], T.quat2euler(link_pose[1]))
                     print("++++++++++++")
-        from IPython import embed; embed()
+        # from IPython import embed; embed()
 
     def _set_prim_pose(self, prim, pose):
         translation = Gf.Vec3d(*np.array(pose[0], dtype=float))
@@ -261,7 +261,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         #         "copy_path": "/World/simplified_robot_copy"         
         #     }
         #     robots_to_copy['simplified'] = simplified_robot
-        og.sim.stop()
         for robot_type, rc in robots_to_copy.items():
             copy_robot = None
             copy_robot_meshes = {}
@@ -300,6 +299,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     scale = Gf.Vec3d(*np.array([1.0, 1.0, 1.0], dtype=float))
                     # copy_mesh.GetAttribute("xformOp:scale").Set(scale)
                     relative_pose = T.relative_pose_transform(*mesh.get_position_orientation(), *link.get_position_orientation())
+                    relative_pose = (relative_pose[0], np.array([0, 0, 0, 1]))
                     if link_name not in copy_robot_meshes.keys():
                         copy_robot_meshes[link_name] = {mesh_name: copy_mesh}
                         copy_robot_meshes_relative_poses[link_name] = {mesh_name: relative_pose}
@@ -315,7 +315,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                         print("-------")
 
                 copy_robot_links_relative_poses[link_name] = T.relative_pose_transform(*link.get_position_orientation(), *robot.get_position_orientation())
-            from IPython import embed; embed()
             if robot_type == "simplified":
                 og.sim.remove_object(robot_to_copy)
 
@@ -323,7 +322,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             robot_copy.meshes[robot_type] = copy_robot_meshes
             robot_copy.relative_poses[robot_type] = copy_robot_meshes_relative_poses
             robot_copy.links_relative_poses[robot_type] = copy_robot_links_relative_poses
-        og.sim.play()
         og.sim.step()
         return robot_copy
 
