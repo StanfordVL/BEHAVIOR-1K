@@ -138,7 +138,6 @@ def sample_kinematics(
         og.sim.step_physics()
 
         # This would slightly change because of the step_physics call.
-        # old_pos, orientation = objA.get_position_orientation()
 
         # Run import here to avoid circular imports
         from omnigibson.objects.dataset_object import DatasetObject

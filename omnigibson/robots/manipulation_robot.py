@@ -763,7 +763,7 @@ class ManipulationRobot(BaseRobot):
 
         # Make sure at least two fingers are in contact with this object
         robot_contacts = robot_contact_links[ag_prim_path]
-        touching_at_least_two_fingers = True # len({link.prim_path for link in self.finger_links[arm]}.intersection(robot_contacts)) >= 2
+        touching_at_least_two_fingers = True if self.grasping_mode == "sticky" else len({link.prim_path for link in self.finger_links[arm]}.intersection(robot_contacts)) >= 2
 
         # TODO: Better heuristic, hacky, we assume the parent object prim path is the prim_path minus the last "/" item
         ag_obj_prim_path = "/".join(ag_prim_path.split("/")[:-1])
@@ -1081,7 +1081,6 @@ class ManipulationRobot(BaseRobot):
             assert cmd_dim == 1, \
                 f"Gripper {arm} controller command dim must be 1 to use assisted grasping, got: {cmd_dim}."
 
-            # TODO: Why are we separately checking for complementary conditions?
             controller = self._controllers[f"gripper_{arm}"]
             controlled_joints = controller.dof_idx
             threshold = np.mean(np.array(self.control_limits["position"])[:, controlled_joints], axis=0)

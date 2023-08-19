@@ -19,14 +19,6 @@ m.DEFAULT_SOURCE_RADIUS = 0.0125
 m.DEFAULT_SOURCE_HEIGHT = 0.05
 m.DEFAULT_SINK_RADIUS = 0.05
 m.DEFAULT_SINK_HEIGHT = 0.05
-m.SOURCE_LINK_PREFIX = "particlesource"
-m.SINK_LINK_PREFIX = "particlesink"
-
-# Default radius and height
-m.DEFAULT_SOURCE_RADIUS = 0.0125
-m.DEFAULT_SOURCE_HEIGHT = 0.05
-m.DEFAULT_SINK_RADIUS = 0.05
-m.DEFAULT_SINK_HEIGHT = 0.05
 
 # Maximum number of particles that can be sourced / sunk per step
 m.MAX_SOURCE_PARTICLES_PER_STEP = 1000
