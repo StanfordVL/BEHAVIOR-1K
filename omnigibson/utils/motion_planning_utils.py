@@ -83,7 +83,9 @@ def plan_base_motion(
         @staticmethod
         # Get angle between 2d robot poses
         def get_angle_between_poses(p1, p2):
-            segment = p2[:2] - p1[:2]
+            segment = []
+            segment.append(p2[0] - p1[0])
+            segment.append(p2[1] - p1[1])
             return np.arctan2(segment[1], segment[0])
     
     def create_state(space, x, y, yaw):
@@ -183,7 +185,10 @@ def plan_base_motion(
             y = sol_path.getState(i).getY()
             yaw = sol_path.getState(i).getYaw()
             return_path.append([x, y, yaw])
-        return remove_unnecessary_rotations(return_path)
+        print(return_path)
+        path = remove_unnecessary_rotations(return_path)
+        print(path)
+        return path
     return None
 
 def plan_arm_motion(   

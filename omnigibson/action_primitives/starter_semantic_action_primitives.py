@@ -132,8 +132,8 @@ class UndoableContext(object):
         link_poses = self.fk_solver.get_link_poses(joint_pos, arm_links)
 
         # Set position of robot copy root prim
-        self._set_prim_pose(self.robot_copy.prims[self.robot_copy_type], self.robot.get_position_orientation())
-        # self._set_prim_pose(self.robot_copy.prims[self.robot_copy_type], ([0, 0, 0], [0, 0, 0, 1]))
+        # self._set_prim_pose(self.robot_copy.prims[self.robot_copy_type], self.robot.get_position_orientation())
+        self._set_prim_pose(self.robot_copy.prims[self.robot_copy_type], ([0, 0, 0], [0, 0, 0, 1]))
 
         # Assemble robot meshes
         for link_name, meshes in self.robot_copy.meshes[self.robot_copy_type].items():

@@ -32,6 +32,7 @@ robots:
     grasping_mode: sticky
     rigid_trunk: false
     default_arm_pose: diagonal30
+    default_trunk_offset: 0.365
     controller_config:
       base:
         name: JointController

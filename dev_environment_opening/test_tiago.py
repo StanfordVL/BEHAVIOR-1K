@@ -115,6 +115,7 @@ def main():
         # Need to set start pose to reset_hand because default tuck pose for Tiago collides with itself
         # execute_controller(controller._reset_hand(), env)
         set_start_pose()
+        # pause(2)
         execute_controller(controller._grasp(grasp_obj), env)
 
     def test_place():
