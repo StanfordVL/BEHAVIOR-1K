@@ -324,15 +324,11 @@ def set_arm_and_detect_collision(context, joint_pos):
         if link in robot_copy.meshes[robot_copy_type].keys():
             for mesh_name, mesh in robot_copy.meshes[robot_copy_type][link].items():
                 relative_pose = robot_copy.relative_poses[robot_copy_type][link][mesh_name]
-            # for mesh, relative_pose in zip(robot_copy.meshes[robot_copy_type][link].values(), robot_copy.relative_poses[robot_copy_type][link].values()):
                 mesh_pose = T.pose_transform(*pose, *relative_pose)
                 translation = Gf.Vec3d(*np.array(mesh_pose[0], dtype=float))
                 mesh.GetAttribute("xformOp:translate").Set(translation)
                 orientation = np.array(mesh_pose[1], dtype=float)[[3, 0, 1, 2]]
                 mesh.GetAttribute("xformOp:orient").Set(Gf.Quatd(*orientation))
-                if link == "arm_right_1_link":
-                    print(pose[0], T.quat2euler(pose[1]))
-                    print('++++++++')
 
 
     return detect_robot_collision(context)
@@ -359,6 +355,10 @@ def detect_robot_collision(context):
         nonlocal mesh_path
 
         valid_hit = hit.rigid_body not in context.disabled_collision_pairs_dict[mesh_path]
+        # if valid_hit:
+        #     print(hit.rigid_body)
+        #     print(mesh_path)
+        #     print('------------')
 
         return not valid_hit
 

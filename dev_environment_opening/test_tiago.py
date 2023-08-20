@@ -48,20 +48,20 @@ def main():
     # Allow user to move camera more easily
     og.sim.enable_viewer_camera_teleoperation()
 
-    table = DatasetObject(
-        name="table",
-        category="breakfast_table",
-        model="rjgmmy",
-        scale = 0.3
-    )
-    og.sim.import_object(table)
-    table.set_position([-0.7, 0.5, 0.2])
+    # table = DatasetObject(
+    #     name="table",
+    #     category="breakfast_table",
+    #     model="rjgmmy",
+    #     scale = 0.3
+    # )
+    # og.sim.import_object(table)
+    # table.set_position([-0.7, 0.5, 0.2])
 
     grasp_obj = DatasetObject(
         name="cologne",
         category="cologne",
         model="lyipur",
-        scale=0.01
+        scale=[0.01, 0.01, 0.01]
     )
     og.sim.import_object(grasp_obj)
     grasp_obj.set_position([-0.3, -0.8, 0.5])
@@ -81,7 +81,7 @@ def main():
 
 
     # robot.set_position([-2.0, 0.0, 0.0])
-    # pause(2)
+    pause(2)
     controller = StarterSemanticActionPrimitives(None, scene, robot)
 
     def set_start_pose():
@@ -164,7 +164,8 @@ def main():
     #     pass
     
 
-    test_grasp_no_navigation()
+    # test_grasp_no_navigation()
+    test_grasp()
 
     # test_grasp_no_navigation()
     # set_start_pose()
