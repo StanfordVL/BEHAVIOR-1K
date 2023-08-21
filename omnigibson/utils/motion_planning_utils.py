@@ -113,8 +113,9 @@ def plan_base_motion(
         Returns:
             Array of numpy arrays: Array of 2d poses with unnecessary rotations removed
         """
-        # Start at the same starting pose
-        new_path = [path[0]]
+        # Starting pose must face towards next point
+        start = (path[0][0], path[0][1], CustomMotionValidator.get_angle_between_poses(path[0], path[1]))
+        new_path = [start]
 
         # Process every intermediate waypoint
         for i in range(1, len(path) - 1):
@@ -159,7 +160,7 @@ def plan_base_motion(
 
     si = ss.getSpaceInformation()
     si.setMotionValidator(CustomMotionValidator(si, space))
-    planner = ompl_geo.RRTConnect(si)
+    planner = ompl_geo.RRT(si)
     ss.setPlanner(planner)
 
     start = create_state(space, start_conf[0], start_conf[1], T.wrap_angle(start_conf[2]))
