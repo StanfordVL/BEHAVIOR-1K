@@ -4,10 +4,12 @@ from collections.abc import Iterable
 
 import omnigibson as og
 from omnigibson.macros import gm
+from omnigibson.utils import python_utils
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.usd_utils import BoundingBoxAPI
 from omni.physx import get_physx_simulation_interface
 from omni.isaac.core.utils.prims import is_prim_ancestral, get_prim_type_name, is_prim_no_delete
+from omni.isaac.version import get_version
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
@@ -352,3 +354,7 @@ def land_object(obj, pos, quat=None, z_offset=None):
         log.warning(f"Object {obj.name} failed to land.")
 
     obj.keep_still()
+
+
+def meets_minimum_isaac_version(minimum_version):
+    return python_utils.meets_minimum_version(get_version()[0], minimum_version)

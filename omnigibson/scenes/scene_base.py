@@ -14,7 +14,6 @@ from omnigibson.objects.object_base import BaseObject
 from omnigibson.systems.system_base import SYSTEM_REGISTRY, clear_all_systems, get_system
 from omnigibson.objects.light_object import LightObject
 from omnigibson.robots.robot_base import m as robot_macros
-from pxr import Sdf, Gf
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -184,11 +183,8 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
                 fixed_base=True,
             )
             og.sim.import_object(self._skybox, register=False)
-            light_prim = self._skybox.light_link.prim
-            color_key = "color" if "color" in light_prim.GetPropertyNames() else "inputs:color"
-            light_prim.GetAttribute(color_key).Set(Gf.Vec3f(1.07, 0.85, 0.61))
-            texture_key = "texture:file" if "texture:file" in light_prim.GetPropertyNames() else "inputs:texture:file"
-            light_prim.GetAttribute(texture_key).Set(Sdf.AssetPath(m.DEFAULT_SKYBOX_TEXTURE))
+            self._skybox.color = (1.07, 0.85, 0.61)
+            self._skybox.texture_file_path = m.DEFAULT_SKYBOX_TEXTURE
 
     def _load_objects_from_scene_file(self):
         """

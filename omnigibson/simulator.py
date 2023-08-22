@@ -23,6 +23,7 @@ from omnigibson.macros import gm, create_module_macros
 from omnigibson.utils.constants import LightingMode
 from omnigibson.utils.config_utils import NumpyEncoder
 from omnigibson.utils.python_utils import clear as clear_pu, create_object_from_init_info, Serializable
+from omnigibson.utils.sim_utils import meets_minimum_isaac_version
 from omnigibson.utils.usd_utils import clear as clear_uu, BoundingBoxAPI, FlatcacheAPI, RigidContactAPI
 from omnigibson.utils.ui_utils import CameraMover, disclaimer, create_module_logger, suppress_omni_log
 from omnigibson.scenes import Scene
@@ -203,12 +204,10 @@ class Simulator(SimulationContext, Serializable):
         self._physics_context.set_invert_collision_group_filter(True)
         self._physics_context.enable_ccd(gm.ENABLE_CCD)
 
-        if hasattr(self._physics_context, "enable_fabric"):
+        if meets_minimum_isaac_version("2023.0.0"):
             self._physics_context.enable_fabric(gm.ENABLE_FLATCACHE)
-        elif hasattr(self._physics_context, "enable_flatcache"):
-            self._physics_context.enable_flatcache(gm.ENABLE_FLATCACHE)
         else:
-            raise NotImplementedError("Cannot find API for enabling/disabling flatcache in current Isaac Sim version.")
+            self._physics_context.enable_flatcache(gm.ENABLE_FLATCACHE)
 
         # Enable GPU dynamics based on whether we need omni particles feature
         if gm.USE_GPU_DYNAMICS:
