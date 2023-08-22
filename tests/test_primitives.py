@@ -118,6 +118,25 @@ def primitive_tester(load_object_categories, objects, primitives, primitives_arg
     og.sim.clear()
     return True
 
+def test_navigate():
+    categories = ["floors", "ceilings", "walls", "coffee_table"]
+
+    objects = []
+    obj_1 = {
+        "object": DatasetObject(
+                name="table",
+                category="breakfast_table",
+                model="rjgmmy",
+                scale=[0.3, 0.3, 0.3]
+            ),
+        "position": [-0.7, -2.0, 0.2]
+    }
+    objects.append(obj_1)
+
+    primitives = [StarterSemanticActionPrimitiveSet.NAVIGATE_TO]
+    primitives_args = [(obj_1['object'],)]    
+
+    assert primitive_tester(categories, objects, primitives, primitives_args)
 
 def test_grasp():
     categories = ["floors", "ceilings", "walls", "coffee_table"]
@@ -148,3 +167,33 @@ def test_grasp():
     primitives_args = [(obj_2['object'],)]    
 
     assert primitive_tester(categories, objects, primitives, primitives_args)
+
+# def test_place():
+#     categories = ["floors", "ceilings", "walls", "coffee_table"]
+
+#     objects = []
+#     obj_1 = {
+#         "object": DatasetObject(
+#                 name="table",
+#                 category="breakfast_table",
+#                 model="rjgmmy",
+#                 scale=[0.3, 0.3, 0.3]
+#             ),
+#         "position": [-0.7, 0.5, 0.2]
+#     }
+#     obj_2 = {
+#         "object": DatasetObject(
+#             name="cologne",
+#             category="cologne",
+#             model="lyipur",
+#             scale=[0.01, 0.01, 0.01]
+#         ),
+#         "position": [-0.3, -0.8, 0.5]
+#     }
+#     objects.append(obj_1)
+#     objects.append(obj_2)
+
+#     primitives = [StarterSemanticActionPrimitiveSet.GRASP]
+#     primitives_args = [(obj_2['object'],)]    
+
+#     assert primitive_tester(categories, objects, primitives, primitives_args)

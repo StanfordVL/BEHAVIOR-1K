@@ -114,8 +114,8 @@ def plan_base_motion(
             Array of numpy arrays: Array of 2d poses with unnecessary rotations removed
         """
         # Starting pose must face towards next point
-        start = (path[0][0], path[0][1], CustomMotionValidator.get_angle_between_poses(path[0], path[1]))
-        new_path = [start]
+        # start = (path[0][0], path[0][1], CustomMotionValidator.get_angle_between_poses(path[0], path[1]))
+        new_path = [path[0]]
 
         # Process every intermediate waypoint
         for i in range(1, len(path) - 1):
@@ -186,10 +186,7 @@ def plan_base_motion(
             y = sol_path.getState(i).getY()
             yaw = sol_path.getState(i).getYaw()
             return_path.append([x, y, yaw])
-        print(return_path)
-        path = remove_unnecessary_rotations(return_path)
-        print(path)
-        return path
+        return remove_unnecessary_rotations(return_path)
     return None
 
 def plan_arm_motion(   
@@ -226,6 +223,7 @@ def plan_arm_motion(
         control_idx_in_joint_pos = np.arange(dim)
 
     def state_valid_fn(q):
+        # print(q)
         joint_pos = initial_joint_pos
         joint_pos[control_idx_in_joint_pos] = [q[i] for i in range(dim)]
         return not set_arm_and_detect_collision(context, joint_pos)
@@ -276,11 +274,18 @@ def plan_arm_motion(
         # ss.simplifySolution()
 
         sol_path = ss.getSolutionPath()
+        test = []
+        for i in range(sol_path.getStateCount()):
+            joint_pos = [sol_path.getState(i)[j] for j in range(dim)]
+            test.append(joint_pos)
+        print(test)
+        sol_path.interpolate(20)
         return_path = []
         for i in range(sol_path.getStateCount()):
             joint_pos = [sol_path.getState(i)[j] for j in range(dim)]
             return_path.append(joint_pos)
-        return return_path
+        print(return_path)
+        return test
     return None
 
 def set_base_and_detect_collision(context, pose):
@@ -365,6 +370,7 @@ def detect_robot_collision(context):
         #     print(hit.rigid_body)
         #     print(mesh_path)
         #     print('------------')
+            # from IPython import embed; embed()
 
         return not valid_hit
 

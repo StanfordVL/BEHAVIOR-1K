@@ -65,9 +65,8 @@ def main():
 
     def test_grasp_no_navigation():
         # Need to set start pose to reset_hand because default tuck pose for Tiago collides with itself
-        # -2.96118
         set_start_pose()
-        pose = controller._get_robot_pose_from_2d_pose([-0.433881, -0.210183, -1.87])
+        pose = controller._get_robot_pose_from_2d_pose([-0.433881, -0.230183, -1.87])
         robot.set_position_orientation(*pose)
         og.sim.step()
         execute_controller(controller._grasp(grasp_obj), env)

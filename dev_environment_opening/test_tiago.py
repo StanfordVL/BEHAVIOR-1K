@@ -52,9 +52,10 @@ def main():
     #     name="table",
     #     category="breakfast_table",
     #     model="rjgmmy",
-    #     scale = 0.3
+    #     scale = [0.3, 0.3, 0.3]
     # )
     # og.sim.import_object(table)
+    # table.set_position([-0.7, -2.0, 0.2])
     # table.set_position([-0.7, 0.5, 0.2])
 
     grasp_obj = DatasetObject(
@@ -99,7 +100,8 @@ def main():
 
     def test_navigate_to_obj():
         # Need to set start pose to reset_hand because default tuck pose for Tiago collides with itself
-        execute_controller(controller._reset_hand(), env)
+        # execute_controller(controller._reset_hand(), env)
+        set_start_pose()
         execute_controller(controller._navigate_to_obj(table), env)
 
     def test_grasp_no_navigation():
@@ -166,7 +168,8 @@ def main():
     
 
     # test_grasp_no_navigation()
-    test_grasp()
+    # test_grasp()
+    # test_navigate_to_obj()
 
     # test_grasp_no_navigation()
     # set_start_pose()
@@ -186,7 +189,8 @@ def main():
     # replay_controller(env, "./replays/tiago_grasp.yaml")
     # execute_controller(controller.place_on_top(table), env)
     # from IPython import embed; embed()
-    # execute_controller(controller._navigate_to_pose([-0.3, -2.3, 0.0]), env)
+    set_start_pose()
+    execute_controller(controller._navigate_to_pose([-0.3, -2.3, 0.0]), env)
     # execute_controller(controller._navigate_to_pose(pose_2d), env)
 
     # pause(100)
