@@ -138,37 +138,7 @@ def test_navigate():
 
     assert primitive_tester(categories, objects, primitives, primitives_args)
 
-def test_grasp():
-    categories = ["floors", "ceilings", "walls", "coffee_table"]
-
-    objects = []
-    obj_1 = {
-        "object": DatasetObject(
-                name="table",
-                category="breakfast_table",
-                model="rjgmmy",
-                scale=[0.3, 0.3, 0.3]
-            ),
-        "position": [-0.7, 0.5, 0.2]
-    }
-    obj_2 = {
-        "object": DatasetObject(
-            name="cologne",
-            category="cologne",
-            model="lyipur",
-            scale=[0.01, 0.01, 0.01]
-        ),
-        "position": [-0.3, -0.8, 0.5]
-    }
-    objects.append(obj_1)
-    objects.append(obj_2)
-
-    primitives = [StarterSemanticActionPrimitiveSet.GRASP]
-    primitives_args = [(obj_2['object'],)]    
-
-    assert primitive_tester(categories, objects, primitives, primitives_args)
-
-# def test_place():
+# def test_grasp():
 #     categories = ["floors", "ceilings", "walls", "coffee_table"]
 
 #     objects = []
@@ -197,3 +167,33 @@ def test_grasp():
 #     primitives_args = [(obj_2['object'],)]    
 
 #     assert primitive_tester(categories, objects, primitives, primitives_args)
+
+def test_place():
+    categories = ["floors", "ceilings", "walls", "coffee_table"]
+
+    objects = []
+    obj_1 = {
+        "object": DatasetObject(
+                name="table",
+                category="breakfast_table",
+                model="rjgmmy",
+                scale=[0.3, 0.3, 0.3]
+            ),
+        "position": [-0.7, 0.5, 0.2]
+    }
+    obj_2 = {
+        "object": DatasetObject(
+            name="cologne",
+            category="cologne",
+            model="lyipur",
+            scale=[0.01, 0.01, 0.01]
+        ),
+        "position": [-0.3, -0.8, 0.5]
+    }
+    objects.append(obj_1)
+    objects.append(obj_2)
+
+    primitives = [StarterSemanticActionPrimitiveSet.GRASP, StarterSemanticActionPrimitiveSet.PLACE_ON_TOP]
+    primitives_args = [(obj_2['object'],), (obj_1['object'],)]    
+
+    assert primitive_tester(categories, objects, primitives, primitives_args)

@@ -48,14 +48,15 @@ def main():
     # Allow user to move camera more easily
     og.sim.enable_viewer_camera_teleoperation()
 
-    # table = DatasetObject(
-    #     name="table",
-    #     category="breakfast_table",
-    #     model="rjgmmy",
-    #     scale = [0.3, 0.3, 0.3]
-    # )
-    # og.sim.import_object(table)
-    # table.set_position([-0.7, -2.0, 0.2])
+    table = DatasetObject(
+        name="table",
+        category="breakfast_table",
+        model="rjgmmy",
+        scale = [0.3, 0.3, 0.3]
+    )
+    og.sim.import_object(table)
+    table.set_position([-0.7, -2.0, 0.2])
+    og.sim.step()
     # table.set_position([-0.7, 0.5, 0.2])
 
     grasp_obj = DatasetObject(
@@ -82,7 +83,7 @@ def main():
 
 
     # robot.set_position([-2.0, 0.0, 0.0])
-    pause(2)
+    # pause(2)
     controller = StarterSemanticActionPrimitives(None, scene, robot)
 
     def set_start_pose():
@@ -169,7 +170,7 @@ def main():
 
     # test_grasp_no_navigation()
     # test_grasp()
-    # test_navigate_to_obj()
+    test_navigate_to_obj()
 
     # test_grasp_no_navigation()
     # set_start_pose()
@@ -189,9 +190,11 @@ def main():
     # replay_controller(env, "./replays/tiago_grasp.yaml")
     # execute_controller(controller.place_on_top(table), env)
     # from IPython import embed; embed()
-    set_start_pose()
-    execute_controller(controller._navigate_to_pose([-0.3, -2.3, 0.0]), env)
+    # set_start_pose()
+    # execute_controller(controller._navigate_to_pose([-0.3, -2.3, 0.0]), env)
     # execute_controller(controller._navigate_to_pose(pose_2d), env)
+    # test_place()
+    # test_grasp_no_navigation()
 
     # pause(100)
 

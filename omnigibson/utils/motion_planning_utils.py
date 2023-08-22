@@ -165,6 +165,7 @@ def plan_base_motion(
 
     start = create_state(space, start_conf[0], start_conf[1], T.wrap_angle(start_conf[2]))
     print(start)
+    from IPython import embed; embed()
 
     goal = create_state(space, end_conf[0], end_conf[1], T.wrap_angle(end_conf[2]))
     print(goal)
@@ -180,13 +181,24 @@ def plan_base_motion(
         ss.simplifySolution()
         sol_path = ss.getSolutionPath()
         return_path = []
-
         for i in range(sol_path.getStateCount()):
             x = sol_path.getState(i).getX()
             y = sol_path.getState(i).getY()
             yaw = sol_path.getState(i).getYaw()
             return_path.append([x, y, yaw])
-        return remove_unnecessary_rotations(return_path)
+        print(return_path)
+        print('-------')
+        sol_path.interpolate(20)
+        test = []
+        for i in range(sol_path.getStateCount()):
+            x = sol_path.getState(i).getX()
+            y = sol_path.getState(i).getY()
+            yaw = sol_path.getState(i).getYaw()
+            test.append([x, y, yaw])
+        print(test)
+        print('--------')
+        print(remove_unnecessary_rotations(return_path))
+        return return_path
     return None
 
 def plan_arm_motion(   
@@ -274,17 +286,19 @@ def plan_arm_motion(
         # ss.simplifySolution()
 
         sol_path = ss.getSolutionPath()
+        # sol_path.interpolate(20)
         test = []
         for i in range(sol_path.getStateCount()):
             joint_pos = [sol_path.getState(i)[j] for j in range(dim)]
             test.append(joint_pos)
+        # print(test)
+        # sol_path.interpolate(20)
+        # return_path = []
+        # for i in range(sol_path.getStateCount()):
+        #     joint_pos = [sol_path.getState(i)[j] for j in range(dim)]
+        #     return_path.append(joint_pos)
+        # print(return_path)
         print(test)
-        sol_path.interpolate(20)
-        return_path = []
-        for i in range(sol_path.getStateCount()):
-            joint_pos = [sol_path.getState(i)[j] for j in range(dim)]
-            return_path.append(joint_pos)
-        print(return_path)
         return test
     return None
 
