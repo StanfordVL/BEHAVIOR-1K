@@ -102,6 +102,9 @@ def main():
     joint_combined_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx["combined"]])
     initial_joint_pos = np.array(robot.get_joint_positions()[joint_combined_idx])
     control_idx_in_joint_pos = np.where(np.in1d(joint_combined_idx, joint_control_idx))[0]
+
+
+
     # joint_pos = initial_joint_pos
     # joint_pos[control_idx_in_joint_pos] = [0.0133727 ,0.216775 ,0.683931 ,2.04371 ,1.88204 ,0.720747 ,1.23276 ,1.72251]
     # from IPython import embed; embed()
@@ -140,15 +143,66 @@ def main():
     #         pause(0.1)
     #         from IPython import embed; embed()
 
+    # move_path = [[-0.00017805075913202018, 3.202066363883205e-05, 0.0002361552458696181], [0.02343988658739001, -0.18208819000753182, -0.05332718383977012], [0.047057823933912044, -0.36420840067870247, -0.10689052292540986], [0.07067576128043407, -0.5463286113498731, -0.16045386201104958], [0.09429369862695611, -0.7284488220210438, -0.21401720109668934], [0.11791163597347813, -0.9105690326922143, -0.2675805401823291], [0.14152957332000016, -1.092689243363385, -0.3211438792679688], [0.1651475106665222, -1.2748094540345556, -0.37470721835360854], [0.18876544801304423, -1.4569296647057264, -0.4282705574392483], [0.21238338535956627, -1.6390498753768972, -0.481833896524888], [0.23600132270608828, -1.8211700860480675, -0.5353972356105278], [0.2596192600526103, -2.0032902967192383, -0.5889605746961675], [0.1313322452447971, -2.1147419038982056, -0.5567734369234738], [0.0030452304369839034, -2.2261935110771733, -0.5245862991507801], [-0.12524178437082933, -2.3376451182561406, -0.4923991613780865], [-0.2535287991786425, -2.4490967254351084, -0.4602120236053928], [-0.38181581398645575, -2.5605483326140757, -0.42802488583269915], [-0.6515587727066181, -2.54553348876709, -0.43195654044347825], [-0.9213017314267804, -2.5305186449201047, -0.4358881950542574], [-1.191044690146943, -2.515503801073119, -0.4398198496650365]]
+    # for p in move_path:
+    #     with UndoableContext(controller.robot, controller.robot_copy, "original") as context:
+    #         # from IPython import embed; embed()
+    #         pose = [p[0], p[1], 0.0], T.euler2quat((0, 0, p[2]))
+    #         print(set_base_and_detect_collision(context, pose))
+    #         print("--------------------")
+    #         pause(0.1)
+    #         from IPython import embed; embed()
+
+    from math import ceil
+    ANGLE_DIFF = 0.3
+    DIST_DIFF = 0.1
+
     move_path = [[-0.00017805075913202018, 3.202066363883205e-05, 0.0002361552458696181], [0.02343988658739001, -0.18208819000753182, -0.05332718383977012], [0.047057823933912044, -0.36420840067870247, -0.10689052292540986], [0.07067576128043407, -0.5463286113498731, -0.16045386201104958], [0.09429369862695611, -0.7284488220210438, -0.21401720109668934], [0.11791163597347813, -0.9105690326922143, -0.2675805401823291], [0.14152957332000016, -1.092689243363385, -0.3211438792679688], [0.1651475106665222, -1.2748094540345556, -0.37470721835360854], [0.18876544801304423, -1.4569296647057264, -0.4282705574392483], [0.21238338535956627, -1.6390498753768972, -0.481833896524888], [0.23600132270608828, -1.8211700860480675, -0.5353972356105278], [0.2596192600526103, -2.0032902967192383, -0.5889605746961675], [0.1313322452447971, -2.1147419038982056, -0.5567734369234738], [0.0030452304369839034, -2.2261935110771733, -0.5245862991507801], [-0.12524178437082933, -2.3376451182561406, -0.4923991613780865], [-0.2535287991786425, -2.4490967254351084, -0.4602120236053928], [-0.38181581398645575, -2.5605483326140757, -0.42802488583269915], [-0.6515587727066181, -2.54553348876709, -0.43195654044347825], [-0.9213017314267804, -2.5305186449201047, -0.4358881950542574], [-1.191044690146943, -2.515503801073119, -0.4398198496650365]]
-    for p in move_path:
+
+    for i in range(len(move_path) - 1):
         with UndoableContext(controller.robot, controller.robot_copy, "original") as context:
-            # from IPython import embed; embed()
-            pose = [p[0], p[1], 0.0], T.euler2quat((0, 0, p[2]))
+            checkMotion(context, move_path[i], move_path[i+1])
+
+    def checkMotion(context, start, goal):
+        segment_theta = get_angle_between_poses(start, goal)
+
+        # Start rotation                
+        is_valid_rotation(context, start, segment_theta)
+
+        # Navigation
+        dist = np.linalg.norm(goal[:2] - start[:2])
+        num_points = ceil(dist / DIST_DIFF) + 1
+        nav_x = np.linspace(start[0], goal[0], num_points).tolist()
+        nav_y = np.linspace(start[1], goal[1], num_points).tolist()
+        for i in range(num_points):
+            pose = [nav_x[0], nav_y[1], 0.0], T.euler2quat((0, 0, segment_theta))
             print(set_base_and_detect_collision(context, pose))
             print("--------------------")
             pause(0.1)
             from IPython import embed; embed()
+            
+        # Goal rotation
+        is_valid_rotation([goal[0], goal[1], segment_theta], goal[2])
+            
+    def is_valid_rotation(context, start_conf, final_orientation):
+        diff = T.wrap_angle(final_orientation - start_conf[2])
+        direction = np.sign(diff)
+        diff = abs(diff)
+        num_points = ceil(diff / ANGLE_DIFF) + 1
+        nav_angle = np.linspace(0.0, diff, num_points) * direction
+        angles = nav_angle + final_orientation
+        for i in range(num_points):
+            pose = [start_conf[0], start_conf[1], 0.0], T.euler2quat((0, 0, angles[i]))
+            print(set_base_and_detect_collision(context, pose))
+            print("--------------------")
+            pause(0.1)
+            from IPython import embed; embed()
+
+    def get_angle_between_poses(p1, p2):
+        segment = []
+        segment.append(p2[0] - p1[0])
+        segment.append(p2[1] - p1[1])
+        return np.arctan2(segment[1], segment[0])
 
     pause(1)
 
