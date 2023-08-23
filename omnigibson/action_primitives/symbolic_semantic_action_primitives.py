@@ -388,34 +388,141 @@ class SymbolicSemanticActionPrimitives(BaseActionPrimitiveSet):
                 {"dropped object": obj_in_hand.name, "target object": obj.name}
             )
         
-    def _soak_under():
-        # Check that the current object is soakable
+    def _soak_under(self, obj):
+        # Check that our current object is a particle remover
+        obj_in_hand = self._get_obj_in_hand()
+        if obj_in_hand is None:
+            raise ActionPrimitiveError(
+                ActionPrimitiveError.Reason.PRE_CONDITION_ERROR, "You need to be grasping a soakable object first."
+            )
+        
+        # Check that the target object is a particle source
+        if object_states.ParticleSource not in obj.states:
+            raise ActionPrimitiveError(
+                ActionPrimitiveError.Reason.PRE_CONDITION_ERROR,
+                "The target object is not a particle source, so you can not soak anything under it.",
+                {"target object": obj.name}
+            )
 
-        # Check that the target object is a particlesource
+        # Check if the target object has any particles in it
+        producing_systems = {ps for ps in self.scene.systems if obj.states[object_states.ParticleSource].check_conditions_for_system(ps)}
+        if not producing_systems:
+            raise ActionPrimitiveError(
+                ActionPrimitiveError.Reason.PRE_CONDITION_ERROR,
+                "The target object currently is not producing any particles - try toggling it on.",
+                {"target object": obj.name}
+            )
 
-        # Check that the particlesource is currently emitting particles
+        # Check that the current object can remove those particles
+        if object_states.Saturated not in obj_in_hand.states:
+            raise ActionPrimitiveError(
+                ActionPrimitiveError.Reason.PRE_CONDITION_ERROR,
+                "The currently grasped object cannot soak particles.",
+                {"object in hand": obj_in_hand.name}
+            )
+        
+        supported_systems = {
+            x for x in producing_systems if obj_in_hand.states[object_states.ParticleRemover].supports_system(x)
+        }
+        if not supported_systems:
+            raise ActionPrimitiveError(
+                ActionPrimitiveError.Reason.PRE_CONDITION_ERROR,
+                "The target object only contains particles that this object cannot soak.",
+                {
+                    "target object": obj.name,
+                    "cleaning tool": obj_in_hand.name,
+                    "particles the target object is producing": sorted(x.name for x in producing_systems),
+                    "particles the grasped object can remove": sorted([x for x in obj_in_hand.states[object_states.ParticleRemover].conditions.keys()])
+                }
+            )
+        
+        currently_removable_systems = {
+            x for x in supported_systems if obj_in_hand.states[object_states.ParticleRemover].check_conditions_for_system(x)
+        }
+        if not currently_removable_systems:
+            # TODO: This needs to be far more descriptive.
+            raise ActionPrimitiveError(
+                ActionPrimitiveError.Reason.PRE_CONDITION_ERROR,
+                "The target object is covered by some particles that this object can normally soak, but needs to be in a different state to do so (e.g. toggled on, soaked by another fluid first, etc.).",
+                {
+                    "target object": obj.name,
+                    "cleaning tool": obj_in_hand.name,
+                    "particles the target object is producing": sorted(x.name for x in producing_systems),
+                }
+            )
 
-        # Check that the current object can 
-
-        # Check that it is currently not saturated
-
-        # Saturate it
-
-        pass
+        # If so, remove the particles.
+        for system in currently_removable_systems:
+            obj_in_hand.states[object_states.Saturated].set_value(system, True)
 
 
-    def _soak_inside():
-        # Check that the current object is soakable
+    def _soak_inside(self, obj):
+        # Check that our current object is a particle remover
+        obj_in_hand = self._get_obj_in_hand()
+        if obj_in_hand is None:
+            raise ActionPrimitiveError(
+                ActionPrimitiveError.Reason.PRE_CONDITION_ERROR, "You need to be grasping a soakable object first."
+            )
+        
+        # Check that the target object is fillable
+        if object_states.Contains not in obj.states:
+            raise ActionPrimitiveError(
+                ActionPrimitiveError.Reason.PRE_CONDITION_ERROR,
+                "The target object is not fillable by particles, so you can not soak anything in it.",
+                {"target object": obj.name}
+            )
 
-        # Check that the target object is a fillable
+        # Check if the target object has any particles in it
+        contained_systems = {ps for ps in self.scene.systems if obj.states[object_states.Contains].get_value(ps.states)}
+        if not contained_systems:
+            raise ActionPrimitiveError(
+                ActionPrimitiveError.Reason.PRE_CONDITION_ERROR,
+                "The target object currently does not contain any particles.",
+                {"target object": obj.name}
+            )
 
-        # Check that it contains some fluid
+        # Check that the current object can remove those particles
+        if object_states.Saturated not in obj_in_hand.states:
+            raise ActionPrimitiveError(
+                ActionPrimitiveError.Reason.PRE_CONDITION_ERROR,
+                "The currently grasped object cannot soak particles.",
+                {"object in hand": obj_in_hand.name}
+            )
+        
+        supported_systems = {
+            x for x in contained_systems if obj_in_hand.states[object_states.ParticleRemover].supports_system(x)
+        }
+        if not supported_systems:
+            raise ActionPrimitiveError(
+                ActionPrimitiveError.Reason.PRE_CONDITION_ERROR,
+                "The target object only contains particles that this object cannot soak.",
+                {
+                    "target object": obj.name,
+                    "cleaning tool": obj_in_hand.name,
+                    "particles the target object contains": sorted(x.name for x in contained_systems),
+                    "particles the grasped object can remove": sorted([x for x in obj_in_hand.states[object_states.ParticleRemover].conditions.keys()])
+                }
+            )
+        
+        currently_removable_systems = {
+            x for x in supported_systems if obj_in_hand.states[object_states.ParticleRemover].check_conditions_for_system(x)
+        }
+        if not currently_removable_systems:
+            # TODO: This needs to be far more descriptive.
+            raise ActionPrimitiveError(
+                ActionPrimitiveError.Reason.PRE_CONDITION_ERROR,
+                "The target object is covered by some particles that this object can normally soak, but needs to be in a different state to do so (e.g. toggled on, soaked by another fluid first, etc.).",
+                {
+                    "target object": obj.name,
+                    "cleaning tool": obj_in_hand.name,
+                    "particles the target object contains": sorted(x.name for x in contained_systems),
+                }
+            )
 
-        # For each fluid that it contains, check that our current object can soak it
+        # If so, remove the particles.
+        for system in currently_removable_systems:
+            obj_in_hand.states[object_states.Saturated].set_value(system, True)
 
-        # If so, soak our current object with it.
-
-        pass
 
     def _wipe(self, obj):
         # Check that our current object is a particle remover
@@ -456,7 +563,7 @@ class SymbolicSemanticActionPrimitives(BaseActionPrimitiveSet):
         if not supported_systems:
             raise ActionPrimitiveError(
                 ActionPrimitiveError.Reason.PRE_CONDITION_ERROR,
-                "The target object is covered by some particles that this cleaning tool cannot remove.",
+                "The target object is covered only by particles that this cleaning tool cannot remove.",
                 {
                     "target object": obj.name,
                     "cleaning tool": obj_in_hand.name,
