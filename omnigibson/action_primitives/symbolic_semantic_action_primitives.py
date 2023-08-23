@@ -23,7 +23,7 @@ from pxr import PhysxSchema
 import omnigibson as og
 from omnigibson import object_states
 from omnigibson.action_primitives.action_primitive_set_base import ActionPrimitiveError, ActionPrimitiveErrorGroup, BaseActionPrimitiveSet
-from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitiveGenerator, UndoableContext
+from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitives, UndoableContext
 from omnigibson.utils.object_state_utils import sample_cuboid_for_predicate
 from omnigibson.object_states.utils import get_center_extent
 from omnigibson.objects import BaseObject, DatasetObject
@@ -117,7 +117,7 @@ class SymbolicSemanticActionPrimitives(BaseActionPrimitiveSet):
         self.robot_model = self.robot.model_name
         self.robot_base_mass = self.robot._links["base_link"].mass
 
-        self.robot_copy = StarterSemanticActionPrimitiveGenerator._load_robot_copy(robot)
+        self.robot_copy = StarterSemanticActionPrimitives._load_robot_copy(robot)
 
         if self.robot_model == "Tiago":
             self._setup_tiago()
@@ -175,7 +175,7 @@ class SymbolicSemanticActionPrimitives(BaseActionPrimitiveSet):
         Yields action for robot to execute the primitive with the given arguments.
 
         Args:
-            prim (SymbolicSemanticActionPrimitiveGenerator.PrimitiveSet): Primitive to execute
+            prim (SymbolicSemanticActionPrimitiveSet): Primitive to execute
             args: Arguments for the primitive
             attempts (int): Number of attempts to make before raising an error
         
