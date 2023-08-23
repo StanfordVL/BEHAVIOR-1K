@@ -5,7 +5,6 @@ import numpy as np
 import omnigibson as og
 from omnigibson.objects import REGISTERED_OBJECTS
 from omnigibson.robots import REGISTERED_ROBOTS
-from omnigibson.scene_graphs.graph_builder import SceneGraphBuilder
 from omnigibson.tasks import REGISTERED_TASKS
 from omnigibson.scenes import REGISTERED_SCENES
 from omnigibson.utils.gym_utils import GymObservable, recursively_generate_flat_dict
@@ -326,6 +325,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         # Load the scene graph builder
         self._scene_graph_builder = None
         if "scene_graph" in self.config and self.config["scene_graph"] is not None:
+            from omnigibson.scene_graphs.graph_builder import SceneGraphBuilder
             self._scene_graph_builder = SceneGraphBuilder(**self.config["scene_graph"])
             # Here we can directly start it because we have already loaded everything & played
             self._scene_graph_builder.start(self.scene)
