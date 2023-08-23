@@ -1,4 +1,4 @@
-from collections import Iterable
+from collections.abc import Iterable
 from pxr import Gf, Usd, Sdf, UsdGeom, UsdShade, UsdPhysics, PhysxSchema
 from omni.isaac.dynamic_control import _dynamic_control
 from omni.isaac.core.utils.rotations import gf_quat_to_np_array

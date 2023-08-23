@@ -29,8 +29,12 @@ echo:
 echo Using [4m%conda_name%[0m as the conda environment name
 echo:
 
-:: Create a conda environment with python 3.7
-call conda create -y -n %conda_name% python=3.7 || goto :error
+:: Get Python version from Isaac Sim
+FOR /F "tokens=*" %%g IN ('%ISAAC_SIM_PATH%\python.bat -c "import platform; print(platform.python_version())"') do (SET ISAAC_PYTHON_VERSION=%%g)
+echo Using Python version [4m%ISAAC_PYTHON_VERSION%[0m matching your current Isaac Sim version
+
+:: Create a conda environment with the appropriate python version
+call conda create -y -n %conda_name% python=%ISAAC_PYTHON_VERSION% || goto :error
 call conda activate %conda_name% || goto :error
 
 :: We add some preprocessing information so that the Isaac Sim paths are linked to this environment upon startup
