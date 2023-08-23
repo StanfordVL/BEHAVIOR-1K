@@ -73,7 +73,7 @@ def plan_base_motion(
             diff = abs(diff)
             num_points = ceil(diff / ANGLE_DIFF) + 1
             nav_angle = np.linspace(0.0, diff, num_points) * direction
-            angles = nav_angle + final_orientation
+            angles = nav_angle + start_conf[2]
             for i in range(num_points):
                 state = create_state(si.getStateSpace(), start_conf[0], start_conf[1], angles[i])
                 if not si.isValid(state()):
@@ -165,7 +165,7 @@ def plan_base_motion(
 
     start = create_state(space, start_conf[0], start_conf[1], T.wrap_angle(start_conf[2]))
     print(start)
-    from IPython import embed; embed()
+    # from IPython import embed; embed()
 
     goal = create_state(space, end_conf[0], end_conf[1], T.wrap_angle(end_conf[2]))
     print(goal)
@@ -198,7 +198,7 @@ def plan_base_motion(
         print(test)
         print('--------')
         print(remove_unnecessary_rotations(return_path))
-        return return_path
+        return remove_unnecessary_rotations(return_path)
     return None
 
 def plan_arm_motion(   
@@ -378,7 +378,9 @@ def detect_robot_collision(context):
     def overlap_callback(hit):
         nonlocal valid_hit
         nonlocal mesh_path
-
+        
+        # print(hit.rigid_body)
+        # print(mesh_path)
         valid_hit = hit.rigid_body not in context.disabled_collision_pairs_dict[mesh_path]
         # if valid_hit:
         #     print(hit.rigid_body)

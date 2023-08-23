@@ -160,16 +160,23 @@ class UndoableContext(object):
             for mesh in meshes.values():
                 self.disabled_collision_pairs_dict[mesh.GetPrimPath().pathString] = [m.GetPrimPath().pathString for m in meshes.values()]
 
+        # Filter out all self-collision
+        if self.robot_copy_type == "simplified":
+            for 
+            for link in self.robot.links.values():
+                for mesh in link.collision_meshes.values():
+                    self.disabled_collision_pairs_dict[mesh.prim_path] += [m.prim_path for m in link.collision_meshes.values()]
         # Filter out collision pairs of meshes part of disabled collision pairs
-        for pair in self.robot.primitive_disabled_collision_pairs:
-            link_1 = pair[0]
-            link_2 = pair[1]
-            if link_1 in robot_meshes_copy.keys() and link_2 in robot_meshes_copy.keys():
-                for mesh in robot_meshes_copy[link_1].values():
-                    self.disabled_collision_pairs_dict[mesh.GetPrimPath().pathString] += [m.GetPrimPath().pathString for m in robot_meshes_copy[link_2].values()]
+        else:
+            for pair in self.robot.primitive_disabled_collision_pairs:
+                link_1 = pair[0]
+                link_2 = pair[1]
+                if link_1 in robot_meshes_copy.keys() and link_2 in robot_meshes_copy.keys():
+                    for mesh in robot_meshes_copy[link_1].values():
+                        self.disabled_collision_pairs_dict[mesh.GetPrimPath().pathString] += [m.GetPrimPath().pathString for m in robot_meshes_copy[link_2].values()]
 
-                for mesh in robot_meshes_copy[link_2].values():
-                    self.disabled_collision_pairs_dict[mesh.GetPrimPath().pathString] += [m.GetPrimPath().pathString for m in robot_meshes_copy[link_1].values()]
+                    for mesh in robot_meshes_copy[link_2].values():
+                        self.disabled_collision_pairs_dict[mesh.GetPrimPath().pathString] += [m.GetPrimPath().pathString for m in robot_meshes_copy[link_1].values()]
         
         # Filter out colliders all robot copy meshes should ignore
         disabled_colliders = []
@@ -1119,12 +1126,14 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             self.robot.set_position_orientation(*robot_pose)
             yield from self._settle_robot()
         else:
-            with UndoableContext(self.robot, self.robot_copy, "original") as context:
-                plan = plan_base_motion(
-                    robot=self.robot,
-                    end_conf=pose_2d,
-                    context=context,
-                )
+            # with UndoableContext(self.robot, self.robot_copy, "original") as context:
+            #     plan = plan_base_motion(
+            #         robot=self.robot,
+            #         end_conf=pose_2d,
+            #         context=context,
+            #     )
+
+            plan = [[-0.00017803270020522177, 3.201387153239921e-05, 0.00023598666193169748], (-1.1167034268072273, -0.6603483567393302, -2.6074760565062323), (-1.4364447586070876, -2.1578042124791095, -1.781160358496523), [-0.494043711296063, -2.727928917138556, 0.36954198879575983]]
 
             if plan is None:
                 # TODO: Would be great to produce a more informative error.
@@ -1139,7 +1148,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             for i, pose_2d in enumerate(plan):
                 indented_print("Executing navigation plan step %d/%d", i + 1, len(plan))
                 low_precision = True if i < len(plan) - 1 else False
-                yield from self._navigate_to_pose_direct(pose_2d, low_precision=low_precision)
+                yield from self._navigate_to_pose_direct(pose_2d, low_precision=False)
 
     def _draw_plan(self, plan):
         SEARCHED = []
