@@ -1,4 +1,4 @@
-import collections
+import collections.abc
 import json
 import os
 import numpy as np
@@ -19,7 +19,7 @@ def parse_config(config):
     Returns:
         dict: Parsed config
     """
-    if isinstance(config, collections.Mapping):
+    if isinstance(config, collections.abc.Mapping):
         return config
     else:
         assert isinstance(config, str)
