@@ -113,7 +113,7 @@ def plan_base_motion(
         Returns:
             Array of numpy arrays: Array of 2d poses with unnecessary rotations removed
         """
-        # Starting pose must face towards next point
+        # Start at the same starting pose
         new_path = [path[0]]
 
         # Process every intermediate waypoint
@@ -159,6 +159,8 @@ def plan_base_motion(
 
     si = ss.getSpaceInformation()
     si.setMotionValidator(CustomMotionValidator(si, space))
+    # TODO: Try changing to RRTConnect in the future. Currently using RRT because movement is not direction invariant. Can change to RRTConnect
+    # possibly if hasSymmetricInterpolate is set to False for the state space. Doc here https://ompl.kavrakilab.org/classompl_1_1base_1_1StateSpace.html
     planner = ompl_geo.RRT(si)
     ss.setPlanner(planner)
 
@@ -221,7 +223,6 @@ def plan_arm_motion(
         control_idx_in_joint_pos = np.arange(dim)
 
     def state_valid_fn(q):
-        # print(q)
         joint_pos = initial_joint_pos
         joint_pos[control_idx_in_joint_pos] = [q[i] for i in range(dim)]
         return not set_arm_and_detect_collision(context, joint_pos)

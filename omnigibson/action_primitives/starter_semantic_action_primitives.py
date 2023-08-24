@@ -133,7 +133,6 @@ class UndoableContext(object):
 
         # Set position of robot copy root prim
         self._set_prim_pose(self.robot_copy.prims[self.robot_copy_type], self.robot.get_position_orientation())
-        # self._set_prim_pose(self.robot_copy.prims[self.robot_copy_type], ([0, 0, 0], [0, 0, 0, 1]))
 
         # Assemble robot meshes
         for link_name, meshes in self.robot_copy.meshes[self.robot_copy_type].items():
@@ -312,7 +311,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             robot_copy.meshes[robot_type] = copy_robot_meshes
             robot_copy.relative_poses[robot_type] = copy_robot_meshes_relative_poses
             robot_copy.links_relative_poses[robot_type] = copy_robot_links_relative_poses
-            
+
         og.sim.step()
         return robot_copy
 
@@ -774,7 +773,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     end_conf=joint_pos,
                     context=context
                 )
-                
+
             # plan = self._add_linearly_interpolated_waypoints(plan, 0.1)
             if plan is None:
                 raise ActionPrimitiveError(
@@ -1130,8 +1129,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     end_conf=pose_2d,
                     context=context,
                 )
-
-            # plan = [[-0.00017803270020522177, 3.201387153239921e-05, 0.00023598666193169748], (-1.1167034268072273, -0.6603483567393302, -2.6074760565062323), (-1.4364447586070876, -2.1578042124791095, -1.781160358496523), [-0.494043711296063, -2.727928917138556, 0.36954198879575983]]
 
             if plan is None:
                 # TODO: Would be great to produce a more informative error.
