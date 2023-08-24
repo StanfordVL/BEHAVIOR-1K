@@ -1,6 +1,6 @@
 from abc import ABCMeta
 import numpy as np
-from collections import Iterable
+from collections.abc import Iterable
 
 import omnigibson as og
 from omnigibson.macros import create_module_macros, gm

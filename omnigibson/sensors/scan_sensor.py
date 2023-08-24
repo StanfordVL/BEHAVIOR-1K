@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from collections import Iterable
+from collections.abc import Iterable
 
 from transforms3d.quaternions import quat2mat
 

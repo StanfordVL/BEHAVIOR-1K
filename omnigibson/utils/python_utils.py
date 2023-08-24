@@ -5,7 +5,7 @@ import inspect
 import re
 from abc import ABCMeta
 from copy import deepcopy
-from collections import Iterable
+from collections.abc import Iterable
 from functools import wraps
 from importlib import import_module
 
