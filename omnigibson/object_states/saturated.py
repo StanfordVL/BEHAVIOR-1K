@@ -34,7 +34,12 @@ class ModifiedParticles(RelativeObjectState):
         return self.particle_counts.get(system, 0)
 
     def _set_value(self, system, new_value):
-        self.particle_counts[system] = new_value
+        assert new_value >= 0, "Cannot set ModifiedParticles value to be less than 0!"
+        # Remove the value from the dictionary if we're setting it to zero (save memory)
+        if new_value == 0 and system in self.particle_counts:
+            self.particle_counts.pop(system)
+        else:
+            self.particle_counts[system] = new_value
 
     def _sync_systems(self, systems):
         """
@@ -123,9 +128,6 @@ class Saturated(RelativeObjectState, BooleanStateMixin):
             limit (int): Number of particles representing limit for the given @system
         """
         self._limits[system] = limit
-        # Make sure the modified particles is populated as well
-        if system not in self.obj.states[ModifiedParticles].particle_counts:
-            self.obj.states[ModifiedParticles].set_value(system, 0)
 
     def _get_value(self, system):
         limit = self.get_limit(system=system)
@@ -139,7 +141,7 @@ class Saturated(RelativeObjectState, BooleanStateMixin):
     def _set_value(self, system, new_value):
         # Only set the value if it's different than what currently exists
         if new_value != self.get_value(system):
-            self.obj.states[ModifiedParticles].set_value(system, self.get_limit(system=system))
+            self.obj.states[ModifiedParticles].set_value(system, self.get_limit(system=system) if new_value else 0)
         return True
 
     def get_texture_change_params(self):

@@ -154,7 +154,7 @@ def check_points_in_sphere(size, pos, quat, scale, particle_positions):
         size (float): radius dimensions of the sphere
         pos (3-array): (x,y,z) local location of the sphere
         quat (4-array): (x,y,z,w) local orientation of the sphere
-        scale (3-array): (x,y,z) local scale of the cube, specified in its local frame
+        scale (3-array): (x,y,z) local scale of the sphere, specified in its local frame
         particle_positions ((N, 3) array): positions to check for whether it is in the sphere
 
     Returns:

@@ -7,7 +7,63 @@ import omni.usd as ou
 from omni.particle.system.core.scripts.core import Core as OmniCore
 from omni.particle.system.core.scripts.utils import Utils as OmniUtils
 from pxr import Sdf, UsdShade
+import omni
 import omni.graph.core as ogc
+from omni.kit.primitive.mesh.command import _get_all_evaluators
+from omni.kit.primitive.mesh.command import CreateMeshPrimWithDefaultXformCommand as CMPWDXC
+
+
+class CreateMeshPrimWithDefaultXformCommand(CMPWDXC):
+    def __init__(self, prim_type: str, **kwargs):
+        """
+        Creates primitive.
+
+        Args:
+            prim_type (str): It supports Plane/Sphere/Cone/Cylinder/Disk/Torus/Cube.
+
+        kwargs:
+            object_origin (Gf.Vec3f): Position of mesh center.
+
+            u_patches (int): The number of patches to tessellate U direction.
+
+            v_patches (int): The number of patches to tessellate V direction.
+
+            w_patches (int): The number of patches to tessellate W direction.
+                             It only works for Cone/Cylinder/Cube.
+
+            half_scale (float): Half size of mesh. Default None.
+
+            u_verts_scale (int): Tessellation Level of U. It's a multiplier of u_patches.
+
+            v_verts_scale (int): Tessellation Level of V. It's a multiplier of v_patches.
+
+            w_verts_scale (int): Tessellation Level of W. It's a multiplier of w_patches.
+                                 It only works for Cone/Cylinder/Cube.
+                                 For Cone/Cylinder, it's to tessellate the caps.
+                                 For Cube, it's to tessellate along z-axis.
+
+            stage (Usd.Stage): If specified, stage to create prim on
+        """
+        self._prim_type = prim_type[0:1].upper() + prim_type[1:].lower()
+        self._usd_context = omni.usd.get_context()
+        self._selection = self._usd_context.get_selection()
+        self._stage = kwargs.get("stage", self._usd_context.get_stage())
+        self._settings = carb.settings.get_settings()
+        self._prim_path = None
+        self._default_path = None
+        self._prepend_default_prim = True
+        if "prim_path" in kwargs and kwargs["prim_path"]:
+            self._default_path = Sdf.Path(kwargs["prim_path"])
+        self._select_new_prim = True
+        if "select_new_prim" in kwargs:
+            self._select_new_prim = bool(kwargs["select_new_prim"])
+        if "prepend_default_prim" in kwargs:
+            self._prepend_default_prim = bool(kwargs["prepend_default_prim"])
+
+        self._attributes = {**kwargs}
+        # Supported mesh types should have an associated evaluator class
+        self._evaluator_class = _get_all_evaluators()[prim_type]
+        assert isinstance(self._evaluator_class, type)
 
 
 class Utils(OmniUtils):
