@@ -114,7 +114,6 @@ def plan_base_motion(
             Array of numpy arrays: Array of 2d poses with unnecessary rotations removed
         """
         # Starting pose must face towards next point
-        # start = (path[0][0], path[0][1], CustomMotionValidator.get_angle_between_poses(path[0], path[1]))
         new_path = [path[0]]
 
         # Process every intermediate waypoint
@@ -165,7 +164,6 @@ def plan_base_motion(
 
     start = create_state(space, start_conf[0], start_conf[1], T.wrap_angle(start_conf[2]))
     print(start)
-    # from IPython import embed; embed()
 
     goal = create_state(space, end_conf[0], end_conf[1], T.wrap_angle(end_conf[2]))
     print(goal)
@@ -186,18 +184,6 @@ def plan_base_motion(
             y = sol_path.getState(i).getY()
             yaw = sol_path.getState(i).getYaw()
             return_path.append([x, y, yaw])
-        print(return_path)
-        print('-------')
-        sol_path.interpolate(20)
-        test = []
-        for i in range(sol_path.getStateCount()):
-            x = sol_path.getState(i).getX()
-            y = sol_path.getState(i).getY()
-            yaw = sol_path.getState(i).getYaw()
-            test.append([x, y, yaw])
-        print(test)
-        print('--------')
-        print(remove_unnecessary_rotations(return_path))
         return remove_unnecessary_rotations(return_path)
     return None
 
@@ -286,20 +272,11 @@ def plan_arm_motion(
         # ss.simplifySolution()
 
         sol_path = ss.getSolutionPath()
-        # sol_path.interpolate(20)
-        test = []
+        return_path = []
         for i in range(sol_path.getStateCount()):
             joint_pos = [sol_path.getState(i)[j] for j in range(dim)]
-            test.append(joint_pos)
-        # print(test)
-        # sol_path.interpolate(20)
-        # return_path = []
-        # for i in range(sol_path.getStateCount()):
-        #     joint_pos = [sol_path.getState(i)[j] for j in range(dim)]
-        #     return_path.append(joint_pos)
-        # print(return_path)
-        print(test)
-        return test
+            return_path.append(joint_pos)
+        return return_path
     return None
 
 def set_base_and_detect_collision(context, pose):
@@ -379,14 +356,7 @@ def detect_robot_collision(context):
         nonlocal valid_hit
         nonlocal mesh_path
         
-        # print(hit.rigid_body)
-        # print(mesh_path)
         valid_hit = hit.rigid_body not in context.disabled_collision_pairs_dict[mesh_path]
-        # if valid_hit:
-        #     print(hit.rigid_body)
-        #     print(mesh_path)
-        #     print('------------')
-            # from IPython import embed; embed()
 
         return not valid_hit
 
