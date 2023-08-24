@@ -144,7 +144,7 @@ class SymbolicSemanticActionPrimitives(BaseActionPrimitiveSet):
             [gym.spaces.Discrete(self.num_objects), gym.spaces.Discrete(len(SymbolicSemanticActionPrimitiveSet))]
         )
 
-    def get_action_from_primitive_and_object(self, primitive: PrimitiveSet, obj: BaseObject):
+    def get_action_from_primitive_and_object(self, primitive: SymbolicSemanticActionPrimitiveSet, obj: BaseObject):
         assert obj in self.addressable_objects
         primitive_int = int(primitive)
         return primitive_int, self.addressable_objects.index(obj)

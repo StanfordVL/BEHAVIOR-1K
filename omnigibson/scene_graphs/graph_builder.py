@@ -9,7 +9,7 @@ from matplotlib import pyplot as plt
 from omnigibson import object_states
 from omnigibson.sensors import VisionSensor
 from omnigibson.object_states.factory import get_state_name
-from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanState, RelativeObjectState
+from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanStateMixin, RelativeObjectState
 from omnigibson.utils import transform_utils as T
 
 DRAW_EVERY = 1
@@ -38,7 +38,7 @@ def get_robot_to_world_transform(robot):
 def get_unary_states(obj, only_true=False):
     states = {}
     for state_type, state_inst in obj.states.items():
-        if not issubclass(state_type, BooleanState) or not issubclass(state_type, AbsoluteObjectState):
+        if not issubclass(state_type, BooleanStateMixin) or not issubclass(state_type, AbsoluteObjectState):
             continue
 
         value = state_inst.get_value()
@@ -58,7 +58,7 @@ def get_all_binary_states(objs, only_true=False):
                 continue
 
             for state_type, state_inst in obj1.states.items():
-                if not issubclass(state_type, BooleanState) or not issubclass(state_type, RelativeObjectState):
+                if not issubclass(state_type, BooleanStateMixin) or not issubclass(state_type, RelativeObjectState):
                     continue
 
                 if state_type in (object_states.NextTo, object_states.Touching):
