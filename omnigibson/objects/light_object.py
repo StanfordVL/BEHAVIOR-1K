@@ -6,6 +6,7 @@ from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.ui_utils import create_module_logger
+import numpy as np
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -135,6 +136,12 @@ class LightObject(StatefulObject):
 
         # Initialize light link
         self._light_link.initialize()
+
+    @property
+    def aabb(self):
+        # This is a virtual object, so no AABB
+        return np.ones(3) * -0.001, np.ones(3) * 0.001
+
 
     @property
     def light_link(self):
