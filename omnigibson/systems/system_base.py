@@ -31,6 +31,10 @@ _CALLBACKS_ON_SYSTEM_INIT = dict()
 _CALLBACKS_ON_SYSTEM_CLEAR = dict()
 
 
+# Modifiers denoting a semantic difference in the system
+SYSTEM_PREFIXES = {"diced", "cooked"}
+
+
 class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
     """
     Base class for all systems. These are non-instance objects that should be used globally for a given environment.
@@ -52,7 +56,11 @@ class BaseSystem(SerializableNonInstance, UniquelyNamedNonInstance):
 
     def __init_subclass__(cls, **kwargs):
         # While class names are camel case, we convert them to snake case to be consistent with object categories.
-        cls._snake_case_name = camel_case_to_snake_case(cls.__name__)
+        name = camel_case_to_snake_case(cls.__name__)
+        # Make sure prefixes preserve their double underscore
+        for prefix in SYSTEM_PREFIXES:
+            name = name.replace(f"{prefix}_", f"{prefix}__")
+        cls._snake_case_name = name
         cls.min_scale = np.ones(3)
         cls.max_scale = np.ones(3)
 
@@ -1120,12 +1128,19 @@ def _create_system_from_metadata(system_name):
         system_type = metadata["type"]
         system_kwargs = dict(name=system_name)
 
-        asset_path = os.path.join(system_dir, f"{system_name}.usd")
-        has_asset = os.path.exists(asset_path)
+        particle_assets = set(os.listdir(system_dir))
+        particle_assets.remove("metadata.json")
+        has_asset = len(particle_assets) > 0
+        if has_asset:
+            model = sorted(particle_assets)[0]
+            asset_path = os.path.join(system_dir, model, "usd", f"{model}.usd")
+        else:
+            asset_path = None
+
         if not has_asset:
             if system_type == "macro_visual_particle":
                 # Fallback to stain asset
-                asset_path = os.path.join(gm.ASSET_PATH, "models", "stain", "stain.usd")
+                asset_path = os.path.join(gm.DATASET_PATH, "systems", "stain", "ahkjul", "usd", "stain.usd")
                 has_asset = True
         if has_asset:
             def generate_particle_template_fcn():
@@ -1134,6 +1149,7 @@ def _create_system_from_metadata(system_name):
                         prim_path=prim_path,
                         name=name,
                         usd_path=asset_path,
+                        encrypted=True,
                         category=system_name,
                         visible=False,
                         fixed_base=False,
@@ -1190,7 +1206,7 @@ def import_og_systems():
     if os.path.exists(system_dir):
         system_names = os.listdir(system_dir)
         for system_name in system_names:
-            if system_name.replace("__", "_") not in REGISTERED_SYSTEMS:
+            if system_name not in REGISTERED_SYSTEMS:
                 _create_system_from_metadata(system_name=system_name)
 
 
