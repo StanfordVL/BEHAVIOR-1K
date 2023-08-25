@@ -1,7 +1,6 @@
 import itertools
 import math
 import os
-import tempfile
 import stat
 import cv2
 import numpy as np
@@ -16,7 +15,7 @@ from omnigibson.objects.usd_object import USDObject
 from omnigibson.utils.constants import AVERAGE_CATEGORY_SPECS, DEFAULT_JOINT_FRICTION, SPECIAL_JOINT_FRICTIONS, JointType
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.usd_utils import BoundingBoxAPI
-from omnigibson.utils.asset_utils import decrypt_file, get_all_object_category_models
+from omnigibson.utils.asset_utils import get_all_object_category_models
 from omnigibson.utils.constants import PrimType
 from omnigibson.macros import gm, create_module_macros
 from omnigibson.utils.ui_utils import create_module_logger
@@ -128,6 +127,7 @@ class DatasetObject(USDObject):
         super().__init__(
             prim_path=prim_path,
             usd_path=usd_path,
+            encrypted=True,
             name=name,
             category=category,
             class_id=class_id,
@@ -216,21 +216,6 @@ class DatasetObject(USDObject):
         for joint in self._joints.values():
             if joint.joint_type != JointType.JOINT_FIXED:
                 joint.friction = friction
-
-    def _load(self):
-        # Create a temporary file to store the decrytped asset, load it, and then delete it.
-        original_usd_path = self._usd_path
-        encrypted_filename = original_usd_path.replace(".usd", ".encrypted.usd")
-        decrypted_fd, decrypted_filename = tempfile.mkstemp(os.path.basename(original_usd_path), dir=og.tempdir)
-        decrypt_file(encrypted_filename, decrypted_filename)
-        self._usd_path = decrypted_filename
-        prim = super()._load()
-        os.close(decrypted_fd)
-        # On Windows, Isaac Sim won't let go of the file until the prim is removed, so we can't delete it.
-        if os.name == "posix":
-            os.remove(decrypted_filename)
-        self._usd_path = original_usd_path
-        return prim
 
     def _post_load(self):
         # We run this post loading first before any others because we're modifying the load config that will be used
@@ -323,7 +308,9 @@ class DatasetObject(USDObject):
             # else:
             #     print(f"Warning: DatasetObject [{self.prim_path}] does not have texture map: "
             #           f"[{target_texture_path}]. Falling back to directly updating albedo value.")
-            self._update_albedo_value(object_state, material)
+
+            if not material.is_glass:
+                self._update_albedo_value(object_state, material)
 
     def set_bbox_center_position_orientation(self, position=None, orientation=None):
         """
