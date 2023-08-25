@@ -34,7 +34,7 @@ class Filled(RelativeObjectState, BooleanStateMixin):
         return value
 
     def _set_value(self, system, new_value):
-        # Sanity check to manke sure system is valid
+        # Sanity check to make sure system is valid
         assert is_physical_particle_system(system_name=system.name), \
             "Can only set Filled state with a valid PhysicalParticleSystem!"
 
@@ -52,8 +52,8 @@ class Filled(RelativeObjectState, BooleanStateMixin):
                     check_contact=True,
                 )
             else:
-                # Going from True --> False, remove all particles inside the volume
-                system.remove_particles(idxs=contained_particles_state.get_value(system).in_volume.nonzero()[0])
+                # Cannot set False
+                raise NotImplementedError(f"{self.__class__.__name__} does not support set_value(system, False)")
 
         return True
 
