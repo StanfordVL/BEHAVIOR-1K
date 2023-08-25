@@ -4,6 +4,7 @@ from omnigibson.object_states.adjacency import VerticalAdjacency
 from omnigibson.object_states.object_state_base import BooleanStateMixin, RelativeObjectState
 from omnigibson.object_states.touching import Touching
 from omnigibson.utils.object_state_utils import sample_kinematics
+from omnigibson.utils.object_state_utils import m as os_m
 
 
 class OnTop(KinematicsMixin, RelativeObjectState, BooleanStateMixin):
@@ -20,10 +21,11 @@ class OnTop(KinematicsMixin, RelativeObjectState, BooleanStateMixin):
 
         state = og.sim.dump_state(serialized=False)
 
-        if sample_kinematics("onTop", self.obj, other) and self.get_value(other):
-            return True
-        else:
-            og.sim.load_state(state, serialized=False)
+        for _ in range(os_m.DEFAULT_HIGH_LEVEL_SAMPLING_ATTEMPTS):
+            if sample_kinematics("onTop", self.obj, other) and self.get_value(other):
+                return True
+            else:
+                og.sim.load_state(state, serialized=False)
 
         return False
 
