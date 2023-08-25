@@ -138,6 +138,10 @@ class EntityPrim(XFormPrim):
             if gm.AG_CLOTH:
                 self.create_attachment_point_link()
 
+        # Globally disable any requested collision links
+        for link_name in self.disabled_collision_link_names:
+            self._links[link_name].disable_collisions()
+
         # Disable any requested collision pairs
         for a_name, b_name in self.disabled_collision_pairs:
             link_a, link_b = self._links[a_name], self._links[b_name]
@@ -1091,6 +1095,14 @@ class EntityPrim(XFormPrim):
             n-array: n-DOF length array specifying whether joint has a limit or not
         """
         return np.array([j.has_limit for j in self._joints.values()])
+
+    @property
+    def disabled_collision_link_names(self):
+        """
+        Returns:
+            list of str: List of link names for this entity whose collisions should be globally disabled
+        """
+        return []
 
     @property
     def disabled_collision_pairs(self):
