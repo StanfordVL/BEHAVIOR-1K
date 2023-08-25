@@ -758,7 +758,7 @@ def test_particle_source():
 
     # Cannot set this state
     with pytest.raises(NotImplementedError):
-        sink.states[ParticleSource].set_value(water_system, True)
+        sink.states[ParticleSource].set_value(True)
 
 
 @og_test
@@ -785,7 +785,7 @@ def test_particle_sink():
 
     # Cannot set this state
     with pytest.raises(NotImplementedError):
-        sink.states[ParticleSink].set_value(water_system, True)
+        sink.states[ParticleSink].set_value(True)
 
 
 @og_test
@@ -844,7 +844,7 @@ def test_particle_applier():
 
     # Cannot set this state
     with pytest.raises(NotImplementedError):
-        spray_bottle.states[ParticleApplier].set_value(water_system, True)
+        spray_bottle.states[ParticleApplier].set_value(True)
 
 
 @og_test
@@ -903,7 +903,7 @@ def test_particle_remover():
 
     # Cannot set this state
     with pytest.raises(NotImplementedError):
-        vacuum.states[ParticleRemover].set_value(water_system, True)
+        vacuum.states[ParticleRemover].set_value(True)
 
 
 @og_test
@@ -1071,7 +1071,11 @@ def test_filled():
             og.sim.step()
 
         assert stockpot.states[Filled].get_value(system)
-        stockpot.states[Filled].set_value(system, False)
+
+        # Cannot set Filled state False
+        with pytest.raises(NotImplementedError):
+            stockpot.states[Filled].set_value(system, False)
+        system.remove_all_particles()
 
         for _ in range(5):
             og.sim.step()
@@ -1088,7 +1092,7 @@ def test_contains():
         get_system("water"),
         get_system("stain"),
         get_system("raspberry"),
-        get_system("diced_apple"),
+        get_system("diced__apple"),
     )
     for system in systems:
         stockpot.set_position_orientation(position=np.ones(3) * 50.0, orientation=[0, 0, 0, 1.0])
@@ -1115,7 +1119,7 @@ def test_contains():
         assert stockpot.states[Contains].get_value(system)
 
         # Remove all particles and make sure contains returns False
-        system.remove_all_particles()
+        stockpot.states[Contains].set_value(system, False)
         og.sim.step()
         assert not stockpot.states[Contains].get_value(system)
 
@@ -1134,7 +1138,7 @@ def test_covered():
         get_system("water"),
         get_system("stain"),
         get_system("raspberry"),
-        get_system("diced_apple"),
+        get_system("diced__apple"),
     )
     for obj in (bracelet, oyster, breakfast_table):
         for system in systems:
