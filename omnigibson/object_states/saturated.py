@@ -107,6 +107,14 @@ class Saturated(RelativeObjectState, BooleanStateMixin):
         # Set internal variables
         self._limits = dict()
 
+    @property
+    def limits(self):
+        """
+        Returns:
+            dict: Maps system to limit count for that system, if it exists
+        """
+        return self._limits
+
     def get_limit(self, system):
         """
         Grabs the internal particle limit for @system
