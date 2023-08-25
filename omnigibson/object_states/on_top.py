@@ -35,4 +35,5 @@ class OnTop(KinematicsMixin, RelativeObjectState, BooleanStateMixin):
             return False
 
         adjacency = self.obj.states[VerticalAdjacency].get_value()
-        return other in adjacency.negative_neighbors and other not in adjacency.positive_neighbors
+        other_adjacency = other.states[VerticalAdjacency].get_value()
+        return other in adjacency.negative_neighbors and other not in adjacency.positive_neighbors and self.obj not in other_adjacency.negative_neighbors
