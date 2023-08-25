@@ -1291,6 +1291,8 @@ class EntityPrim(XFormPrim):
         self.set_angular_velocity(velocity=np.zeros(3))
         for joint in self._joints.values():
             joint.keep_still()
+        # Make sure object is awake
+        self.wake()
 
     def create_attachment_point_link(self):
         """
@@ -1360,6 +1362,9 @@ class EntityPrim(XFormPrim):
         self.root_link._load_state(state=state["root_link"])
         for joint_name, joint_state in state["joints"].items():
             self._joints[joint_name]._load_state(state=joint_state)
+
+        # Make sure this object is awake
+        self.wake()
 
     def _serialize(self, state):
         # We serialize by first flattening the root link state and then iterating over all joints and
