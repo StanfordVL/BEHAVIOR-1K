@@ -82,7 +82,6 @@ def get_grasp_poses_for_object_sticky(target_obj):
 def get_grasp_position_for_open(robot, target_obj, should_open, relevant_joint=None):
     # Pick a moving link of the object.
     relevant_joints = [relevant_joint] if relevant_joint is not None else _get_relevant_joints(target_obj)[1]
-
     if len(relevant_joints) == 0:
         raise ValueError("Cannot open/close object without relevant joints.")
 

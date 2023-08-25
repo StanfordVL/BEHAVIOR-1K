@@ -102,7 +102,7 @@ def primitive_tester(load_object_categories, objects, primitives, primitives_arg
 
     for obj in objects:
         og.sim.import_object(obj['object'])
-        obj['object'].set_position(obj['position'])
+        obj['object'].set_position_orientation(obj['position'], obj['orientation'])
         og.sim.step()
 
     controller = StarterSemanticActionPrimitives(None, scene, robot)
@@ -118,85 +118,90 @@ def primitive_tester(load_object_categories, objects, primitives, primitives_arg
     og.sim.clear()
     return True
 
-# def test_navigate():
-#     categories = ["floors", "ceilings", "walls", "coffee_table"]
+def test_navigate():
+    categories = ["floors", "ceilings", "walls", "coffee_table"]
 
-#     objects = []
-#     obj_1 = {
-#         "object": DatasetObject(
-#                 name="table",
-#                 category="breakfast_table",
-#                 model="rjgmmy",
-#                 scale=[0.3, 0.3, 0.3]
-#             ),
-#         "position": [-0.7, -2.0, 0.2]
-#     }
-#     objects.append(obj_1)
+    objects = []
+    obj_1 = {
+        "object": DatasetObject(
+                name="table",
+                category="breakfast_table",
+                model="rjgmmy",
+                scale=[0.3, 0.3, 0.3]
+            ),
+        "position": [-0.7, -2.0, 0.2],
+        "orientation": [0, 0, 0, 1]
+    }
+    objects.append(obj_1)
 
-#     primitives = [StarterSemanticActionPrimitiveSet.NAVIGATE_TO]
-#     primitives_args = [(obj_1['object'],)]    
+    primitives = [StarterSemanticActionPrimitiveSet.NAVIGATE_TO]
+    primitives_args = [(obj_1['object'],)]    
 
-#     assert primitive_tester(categories, objects, primitives, primitives_args)
+    assert primitive_tester(categories, objects, primitives, primitives_args)
 
-# def test_grasp():
-#     categories = ["floors", "ceilings", "walls", "coffee_table"]
+def test_grasp():
+    categories = ["floors", "ceilings", "walls", "coffee_table"]
 
-#     objects = []
-#     obj_1 = {
-#         "object": DatasetObject(
-#                 name="table",
-#                 category="breakfast_table",
-#                 model="rjgmmy",
-#                 scale=[0.3, 0.3, 0.3]
-#             ),
-#         "position": [-0.7, 0.5, 0.2]
-#     }
-#     obj_2 = {
-#         "object": DatasetObject(
-#             name="cologne",
-#             category="cologne",
-#             model="lyipur",
-#             scale=[0.01, 0.01, 0.01]
-#         ),
-#         "position": [-0.3, -0.8, 0.5]
-#     }
-#     objects.append(obj_1)
-#     objects.append(obj_2)
+    objects = []
+    obj_1 = {
+        "object": DatasetObject(
+                name="table",
+                category="breakfast_table",
+                model="rjgmmy",
+                scale=[0.3, 0.3, 0.3]
+            ),
+        "position": [-0.7, 0.5, 0.2],
+        "oreintation": [0, 0, 0, 1]
+    }
+    obj_2 = {
+        "object": DatasetObject(
+            name="cologne",
+            category="cologne",
+            model="lyipur",
+            scale=[0.01, 0.01, 0.01]
+        ),
+        "position": [-0.3, -0.8, 0.5],
+        "orientation": [0, 0, 0, 1]
+    }
+    objects.append(obj_1)
+    objects.append(obj_2)
 
-#     primitives = [StarterSemanticActionPrimitiveSet.GRASP]
-#     primitives_args = [(obj_2['object'],)]    
+    primitives = [StarterSemanticActionPrimitiveSet.GRASP]
+    primitives_args = [(obj_2['object'],)]    
 
-#     assert primitive_tester(categories, objects, primitives, primitives_args)
+    assert primitive_tester(categories, objects, primitives, primitives_args)
 
-# def test_place():
-#     categories = ["floors", "ceilings", "walls", "coffee_table"]
+def test_place():
+    categories = ["floors", "ceilings", "walls", "coffee_table"]
 
-#     objects = []
-#     obj_1 = {
-#         "object": DatasetObject(
-#                 name="table",
-#                 category="breakfast_table",
-#                 model="rjgmmy",
-#                 scale=[0.3, 0.3, 0.3]
-#             ),
-#         "position": [-0.7, 0.5, 0.2]
-#     }
-#     obj_2 = {
-#         "object": DatasetObject(
-#             name="cologne",
-#             category="cologne",
-#             model="lyipur",
-#             scale=[0.01, 0.01, 0.01]
-#         ),
-#         "position": [-0.3, -0.8, 0.5]
-#     }
-#     objects.append(obj_1)
-#     objects.append(obj_2)
+    objects = []
+    obj_1 = {
+        "object": DatasetObject(
+                name="table",
+                category="breakfast_table",
+                model="rjgmmy",
+                scale=[0.3, 0.3, 0.3]
+            ),
+        "position": [-0.7, 0.5, 0.2],
+        "orientation": [0, 0, 0, 1]
+    }
+    obj_2 = {
+        "object": DatasetObject(
+            name="cologne",
+            category="cologne",
+            model="lyipur",
+            scale=[0.01, 0.01, 0.01]
+        ),
+        "position": [-0.3, -0.8, 0.5],
+        "orientation": [0, 0, 0, 1]
+    }
+    objects.append(obj_1)
+    objects.append(obj_2)
 
-#     primitives = [StarterSemanticActionPrimitiveSet.GRASP, StarterSemanticActionPrimitiveSet.PLACE_ON_TOP]
-#     primitives_args = [(obj_2['object'],), (obj_1['object'],)]    
+    primitives = [StarterSemanticActionPrimitiveSet.GRASP, StarterSemanticActionPrimitiveSet.PLACE_ON_TOP]
+    primitives_args = [(obj_2['object'],), (obj_1['object'],)]    
 
-#     assert primitive_tester(categories, objects, primitives, primitives_args)
+    assert primitive_tester(categories, objects, primitives, primitives_args)
 
 def test_open_prismatic():
     categories = ["floors"]
@@ -209,7 +214,8 @@ def test_open_prismatic():
             model="bamfsz",
             scale=[0.7, 0.7, 0.7]
         ),
-        "position": [-1.2, -0.4, 0.5]
+        "position": [-1.2, -0.4, 0.5],
+        "orientation": [0, 0, 0, 1]
     }
     objects.append(obj_1)
 
@@ -229,7 +235,8 @@ def test_open_revolute():
             model="dszchb",
             scale=[0.7, 0.7, 0.7]
         ),
-        "position": [-1.2, -0.4, 0.5]
+        "position": [-1.2, -0.4, 0.5],
+        "orientation": [0, 0, 0, 1]
     }
     objects.append(obj_1)
 
@@ -237,3 +244,4 @@ def test_open_revolute():
     primitives_args = [(obj_1['object'],)]    
 
     assert primitive_tester(categories, objects, primitives, primitives_args)
+

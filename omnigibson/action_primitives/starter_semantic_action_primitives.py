@@ -203,6 +203,8 @@ class StarterSemanticActionPrimitiveSet(IntEnum):
     CLOSE = 4
     NAVIGATE_TO = 5  # For mostly debugging purposes.
     RELEASE = 6  # For reorienting grasp
+    TOGGLE_ON = 7
+    TOGGLE_OFF = 8
 
 
 class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
@@ -222,6 +224,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             StarterSemanticActionPrimitiveSet.CLOSE: self._close,
             StarterSemanticActionPrimitiveSet.NAVIGATE_TO: self._navigate_to_obj,
             StarterSemanticActionPrimitiveSet.RELEASE: self._execute_release,
+            StarterSemanticActionPrimitiveSet.TOGGLE_ON: self._toggle_on,
+            StarterSemanticActionPrimitiveSet.TOGGLE_OFF: self._toggle_off,
         }
         self.arm = self.robot.default_arm
         self.robot_model = self.robot.model_name
@@ -433,7 +437,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         for _ in range(MAX_ATTEMPTS_FOR_OPEN_CLOSE):
             try:
-                self.counter = 0
                 grasp_data = get_grasp_position_for_open(self.robot, obj, should_open, relevant_joint)
                 if grasp_data is None:
                     # We were trying to do something but didn't have the data.
@@ -444,7 +447,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     )
 
                 grasp_pose, target_poses, object_direction, relevant_joint, grasp_required, yaw_change = grasp_data
-                if yaw_change < 0.1:
+                if abs(yaw_change) < 0.1:
                     return
 
                 # Prepare data for the approach later.
@@ -598,6 +601,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         yield from self._toggle(obj, False)
 
     def _toggle(self, obj, value):
+        from IPython import embed; embed()
         if obj.states[object_states.ToggledOn].get_value() == value:
             return
 
