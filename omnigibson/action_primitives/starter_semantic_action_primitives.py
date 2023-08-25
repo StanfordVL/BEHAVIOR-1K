@@ -601,7 +601,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         yield from self._toggle(obj, False)
 
     def _toggle(self, obj, value):
-        from IPython import embed; embed()
         if obj.states[object_states.ToggledOn].get_value() == value:
             return
 

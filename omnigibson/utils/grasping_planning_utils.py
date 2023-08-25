@@ -332,7 +332,7 @@ def get_orientation_facing_vector_with_random_yaw(vector):
     side = np.cross(rand_vec, forward)
     side /= np.linalg.norm(3)
     up = np.cross(forward, side)
-    # assert np.isclose(np.linalg.norm(up), 1)
+    assert np.isclose(np.linalg.norm(up), 1, atol=1e-3)
     rotmat = np.array([forward, side, up]).T
     return R.from_matrix(rotmat).as_quat()
 
