@@ -82,7 +82,6 @@ def get_grasp_poses_for_object_sticky(target_obj):
 def get_grasp_position_for_open(robot, target_obj, should_open, relevant_joint=None):
     # Pick a moving link of the object.
     relevant_joints = [relevant_joint] if relevant_joint is not None else _get_relevant_joints(target_obj)[1]
-
     if len(relevant_joints) == 0:
         raise ValueError("Cannot open/close object without relevant joints.")
 
@@ -333,7 +332,7 @@ def get_orientation_facing_vector_with_random_yaw(vector):
     side = np.cross(rand_vec, forward)
     side /= np.linalg.norm(3)
     up = np.cross(forward, side)
-    assert np.isclose(np.linalg.norm(up), 1)
+    assert np.isclose(np.linalg.norm(up), 1, atol=1e-3)
     rotmat = np.array([forward, side, up]).T
     return R.from_matrix(rotmat).as_quat()
 

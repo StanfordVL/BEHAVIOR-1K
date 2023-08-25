@@ -159,16 +159,23 @@ class UndoableContext(object):
             for mesh in meshes.values():
                 self.disabled_collision_pairs_dict[mesh.GetPrimPath().pathString] = [m.GetPrimPath().pathString for m in meshes.values()]
 
+        # Filter out all self-collisions
+        if self.robot_copy_type == "simplified":
+            all_meshes = [mesh.GetPrimPath().pathString for link in robot_meshes_copy.keys() for mesh in robot_meshes_copy[link].values()]
+            for link in robot_meshes_copy.keys():
+                for mesh in robot_meshes_copy[link].values():
+                    self.disabled_collision_pairs_dict[mesh.GetPrimPath().pathString] += all_meshes
         # Filter out collision pairs of meshes part of disabled collision pairs
-        for pair in self.robot.primitive_disabled_collision_pairs:
-            link_1 = pair[0]
-            link_2 = pair[1]
-            if link_1 in robot_meshes_copy.keys() and link_2 in robot_meshes_copy.keys():
-                for mesh in robot_meshes_copy[link_1].values():
-                    self.disabled_collision_pairs_dict[mesh.GetPrimPath().pathString] += [m.GetPrimPath().pathString for m in robot_meshes_copy[link_2].values()]
+        else:
+            for pair in self.robot.primitive_disabled_collision_pairs:
+                link_1 = pair[0]
+                link_2 = pair[1]
+                if link_1 in robot_meshes_copy.keys() and link_2 in robot_meshes_copy.keys():
+                    for mesh in robot_meshes_copy[link_1].values():
+                        self.disabled_collision_pairs_dict[mesh.GetPrimPath().pathString] += [m.GetPrimPath().pathString for m in robot_meshes_copy[link_2].values()]
 
-                for mesh in robot_meshes_copy[link_2].values():
-                    self.disabled_collision_pairs_dict[mesh.GetPrimPath().pathString] += [m.GetPrimPath().pathString for m in robot_meshes_copy[link_1].values()]
+                    for mesh in robot_meshes_copy[link_2].values():
+                        self.disabled_collision_pairs_dict[mesh.GetPrimPath().pathString] += [m.GetPrimPath().pathString for m in robot_meshes_copy[link_1].values()]
         
         # Filter out colliders all robot copy meshes should ignore
         disabled_colliders = []
@@ -196,6 +203,8 @@ class StarterSemanticActionPrimitiveSet(IntEnum):
     CLOSE = 4
     NAVIGATE_TO = 5  # For mostly debugging purposes.
     RELEASE = 6  # For reorienting grasp
+    TOGGLE_ON = 7
+    TOGGLE_OFF = 8
 
 
 class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
@@ -215,6 +224,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             StarterSemanticActionPrimitiveSet.CLOSE: self._close,
             StarterSemanticActionPrimitiveSet.NAVIGATE_TO: self._navigate_to_obj,
             StarterSemanticActionPrimitiveSet.RELEASE: self._execute_release,
+            StarterSemanticActionPrimitiveSet.TOGGLE_ON: self._toggle_on,
+            StarterSemanticActionPrimitiveSet.TOGGLE_OFF: self._toggle_off,
         }
         self.arm = self.robot.default_arm
         self.robot_model = self.robot.model_name
@@ -287,6 +298,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     CopyPrimCommand(mesh.prim_path, path_to=copy_mesh_path).do()
                     copy_mesh = get_prim_at_path(copy_mesh_path)
                     relative_pose = T.relative_pose_transform(*mesh.get_position_orientation(), *link.get_position_orientation())
+                    relative_pose = (relative_pose[0], np.array([0, 0, 0, 1]))
                     if link_name not in copy_robot_meshes.keys():
                         copy_robot_meshes[link_name] = {mesh_name: copy_mesh}
                         copy_robot_meshes_relative_poses[link_name] = {mesh_name: relative_pose}
@@ -425,7 +437,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         for _ in range(MAX_ATTEMPTS_FOR_OPEN_CLOSE):
             try:
-                self.counter = 0
                 grasp_data = get_grasp_position_for_open(self.robot, obj, should_open, relevant_joint)
                 if grasp_data is None:
                     # We were trying to do something but didn't have the data.
@@ -436,7 +447,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     )
 
                 grasp_pose, target_poses, object_direction, relevant_joint, grasp_required, yaw_change = grasp_data
-                if yaw_change < 0.1:
+                if abs(yaw_change) < 0.1:
                     return
 
                 # Prepare data for the approach later.
@@ -765,6 +776,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     end_conf=joint_pos,
                     context=context
                 )
+
             # plan = self._add_linearly_interpolated_waypoints(plan, 0.1)
             if plan is None:
                 raise ActionPrimitiveError(
@@ -1114,7 +1126,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             self.robot.set_position_orientation(*robot_pose)
             yield from self._settle_robot()
         else:
-            with UndoableContext(self.robot, self.robot_copy, "original") as context:
+            with UndoableContext(self.robot, self.robot_copy, "simplified") as context:
                 plan = plan_base_motion(
                     robot=self.robot,
                     end_conf=pose_2d,
@@ -1211,25 +1223,23 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         body_target_pose = self._get_pose_in_robot_frame(end_pose)
         
         while np.linalg.norm(body_target_pose[0][:2]) > dist_threshold:
-            if self.robot_model == "Tiago":
-                action = self._empty_action()
-                direction_vec = body_target_pose[0][:2] / (np.linalg.norm(body_target_pose[0][:2]) * 5)
-                base_action = [direction_vec[0], direction_vec[1], 0.0]
-                action[self.robot.controller_action_idx["base"]] = base_action
-                action = self._overwrite_head_action(action, self._tracking_object) if self._tracking_object is not None else action
-                yield action
+            diff_pos = end_pose[0] - self.robot.get_position()
+            intermediate_pose = (end_pose[0], T.euler2quat([0, 0, np.arctan2(diff_pos[1], diff_pos[0])]))
+            body_intermediate_pose = self._get_pose_in_robot_frame(intermediate_pose)
+            diff_yaw = T.wrap_angle(T.quat2euler(body_intermediate_pose[1])[2])
+            if abs(diff_yaw) > DEFAULT_ANGLE_THRESHOLD:
+                yield from self._rotate_in_place(intermediate_pose, angle_threshold=DEFAULT_ANGLE_THRESHOLD)
             else:
-                diff_pos = end_pose[0] - self.robot.get_position()
-                intermediate_pose = (end_pose[0], T.euler2quat([0, 0, np.arctan2(diff_pos[1], diff_pos[0])]))
-                body_intermediate_pose = self._get_pose_in_robot_frame(intermediate_pose)
-                diff_yaw = T.wrap_angle(T.quat2euler(body_intermediate_pose[1])[2])
-                if abs(diff_yaw) > DEFAULT_ANGLE_THRESHOLD:
-                    yield from self._rotate_in_place(intermediate_pose, angle_threshold=DEFAULT_ANGLE_THRESHOLD)
+                action = self._empty_action()
+                if self.robot_model == "Tiago":
+                    direction_vec = body_target_pose[0][:2] / (np.linalg.norm(body_target_pose[0][:2]) * 5)
+                    base_action = [direction_vec[0], direction_vec[1], 0.0]
+                    action[self.robot.controller_action_idx["base"]] = base_action
+                    action = self._overwrite_head_action(action, self._tracking_object) if self._tracking_object is not None else action
                 else:
-                    action = self._empty_action()
                     base_action = [KP_LIN_VEL, 0.0]
                     action[self.robot.controller_action_idx["base"]] = base_action
-                    yield action
+                yield action
 
             body_target_pose = self._get_pose_in_robot_frame(end_pose)
 
@@ -1283,7 +1293,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             pos_on_obj = self._sample_position_on_aabb_face(obj)
             pose_on_obj = np.array([pos_on_obj, [0, 0, 0, 1]])
 
-        with UndoableContext(self.robot, self.robot_copy, "original") as context:
+        with UndoableContext(self.robot, self.robot_copy, "simplified") as context:
             obj_rooms = obj.in_rooms if obj.in_rooms else [self.scene._seg_map.get_room_instance_by_point(pose_on_obj[0][:2])]
             for _ in range(MAX_ATTEMPTS_FOR_SAMPLING_POSE_NEAR_OBJECT):
                 distance = np.random.uniform(0.0, 1.0)
