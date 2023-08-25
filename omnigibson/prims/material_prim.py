@@ -154,6 +154,14 @@ class MaterialPrim(BasePrim):
         self._shader.GetInput(inp).Set(val)
 
     @property
+    def is_glass(self):
+        """
+        Returns:
+            bool: Whether this material is a glass material or not
+        """
+        return "glass_color" in self.shader_input_names
+
+    @property
     def shader(self):
         """
         Returns:
