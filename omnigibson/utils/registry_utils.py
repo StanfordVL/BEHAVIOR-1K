@@ -4,6 +4,7 @@ A set of utility functions for registering and tracking objects
 from inspect import isclass
 import numpy as np
 from collections import Iterable
+import omnigibson as og
 from omnigibson.macros import create_module_macros
 from omnigibson.utils.python_utils import Serializable, SerializableNonInstance, UniquelyNamed
 from omnigibson.utils.ui_utils import create_module_logger
@@ -139,9 +140,7 @@ class Registry(UniquelyNamed):
                     if attr in mapping:
                         log.warning(f"Instance identifier '{k}' should be unique for adding to this registry mapping! Existing {k}: {attr}")
                         # Special case for "name" attribute, which should ALWAYS be unique
-                        if k == "name":
-                            log.error(f"For name attribute, objects MUST be unique. Exiting.")
-                            exit(-1)
+                        assert k != "name", "For name attribute, objects MUST be unique."
                     mapping[attr] = obj
                 else:
                     # Not unique case

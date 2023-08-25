@@ -299,13 +299,13 @@ def generate_points_in_volume_checker_function(obj, volume_link, use_visual_mesh
     # If the object doesn't uniform scale, we make sure the volume link has no relative orientation w.r.t to
     # the object (root link) frame
     # TODO: Can we remove this restriction in the future? The current paradigm of how scale operates makes this difficult
-    if (obj.scale.max() - obj.scale.min()) > 1e-3:
+    if (obj.scale.max() - obj.scale.min()) > 5e-3:
         volume_link_quat = volume_link.get_orientation()
         object_quat = obj.get_orientation()
         quat_distance = T.quat_distance(volume_link_quat, object_quat)
-        assert np.isclose(quat_distance[3], 1, atol=1e-3), \
-            f"Volume link must have no relative orientation w.r.t the root link! (i.e.: quat distance [0, 0, 0, 1])! " \
-            f"Got quat distance: {quat_distance}"
+        assert np.isclose(quat_distance[3], 1, atol=5e-3), \
+            f"Volume link at prim_path {volume_link.prim_path} must have no relative orientation w.r.t the root link! " \
+            f"(i.e.: quat distance [0, 0, 0, 1])! Got quat distance: {quat_distance}"
     # Iterate through all visual meshes and keep track of any that are prefixed with container
     container_meshes = []
     meshes = volume_link.visual_meshes if use_visual_meshes else volume_link.collision_meshes
