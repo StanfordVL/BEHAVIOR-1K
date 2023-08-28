@@ -29,4 +29,4 @@ class Under(RelativeObjectState, KinematicsMixin, BooleanStateMixin):
 
     def _get_value(self, other):
         adjacency = self.obj.states[VerticalAdjacency].get_value()
-        return other not in adjacency.negative_neighbors and other in adjacency.positive_neighbors
+        return other not in adjacency.negative_neighbors and other in adjacency.positive_neighbors and self.obj not in other.positive_neighbors
