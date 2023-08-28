@@ -511,6 +511,8 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
     @property
     def disabled_collision_link_names(self):
+        # These should NEVER have collisions in the first place (i.e.: these are poorly modeled geoms from the source
+        # asset) -- they are strictly engulfed within ANOTHER collision mesh from a DIFFERENT link
         return [name for arm in self.arm_names for name in [f"arm_{arm}_tool_link", f"wrist_{arm}_ft_link", f"wrist_{arm}_ft_tool_link"]]
 
     @property
