@@ -139,7 +139,8 @@ class LightObject(StatefulObject):
 
     @property
     def aabb(self):
-        # This is a virtual object, so no AABB
+        # This is a virtual object (with no associated visual mesh), so omni returns an invalid AABB.
+        # Therefore we instead return a hardcoded small value
         return np.ones(3) * -0.001, np.ones(3) * 0.001
 
 
