@@ -309,8 +309,7 @@ class DatasetObject(USDObject):
             #     print(f"Warning: DatasetObject [{self.prim_path}] does not have texture map: "
             #           f"[{target_texture_path}]. Falling back to directly updating albedo value.")
 
-            if not material.is_glass:
-                self._update_albedo_value(object_state, material)
+            self._update_albedo_value(object_state, material)
 
     def set_bbox_center_position_orientation(self, position=None, orientation=None):
         """
