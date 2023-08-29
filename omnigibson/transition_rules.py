@@ -1649,7 +1649,11 @@ class CookingRule(RecipeRule):
 def import_recipes():
     # Wrap bddl here so it's only imported if necessary
     import bddl
-    with open(f"{os.path.dirname(bddl.__file__)}/generated_data/transition_rule_recipes.json", "r") as f:
+    recipe_fpath = f"{os.path.dirname(bddl.__file__)}/generated_data/transition_rule_recipes.json"
+    if not os.path.exists(recipe_fpath):
+        log.warning(f"Cannot find recipe file at {recipe_fpath}. Skipping importing recipes.")
+        return
+    with open(recipe_fpath, "r") as f:
         rule_recipes = json.load(f)
     for rule_name, recipes in rule_recipes.items():
         rule = REGISTERED_RULES[rule_name]
@@ -1661,4 +1665,4 @@ try:
     import_recipes()
 
 except ImportError:
-    print("BDDL could not be imported - rule recipes will be unavailable.", file=sys.stderr)
+    log.warning("BDDL could not be imported - rule recipes will be unavailable.")
