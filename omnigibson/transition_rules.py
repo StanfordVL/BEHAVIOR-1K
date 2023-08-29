@@ -1287,7 +1287,7 @@ class RecipeRule(BaseTransitionRule):
             models = get_all_object_category_models(category=category)
             for i in range(n_instances):
                 obj = DatasetObject(
-                    name=f"{category}_{n_category_objs + i + 1}",
+                    name=f"{category}_{n_category_objs + i}",
                     category=category,
                     model=np.random.choice(models),
                 )
