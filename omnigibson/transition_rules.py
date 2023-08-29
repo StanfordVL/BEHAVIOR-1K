@@ -1004,11 +1004,9 @@ class RecipeRule(BaseTransitionRule):
         Returns:
             bool: True if none of the non-relevant objects are contained
         """
-        if len(recipe["input_objects"]) == 0:
-            return True
-
-        idxs = np.concatenate([cls._CATEGORY_IDXS[obj_category] for obj_category in recipe["input_objects"].keys()])
-        return not np.any(np.delete(in_volume, idxs))
+        nonrecipe_objects_in_volume = in_volume if len(recipe["input_objects"]) == 0 else \
+            np.delete(in_volume, np.concatenate([cls._CATEGORY_IDXS[obj_category] for obj_category in recipe["input_objects"].keys()]))
+        return not np.any(nonrecipe_objects_in_volume)
 
     @classmethod
     def _validate_recipe_systems_exist(cls, recipe):
