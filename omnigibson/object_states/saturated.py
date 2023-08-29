@@ -64,7 +64,7 @@ class ModifiedParticles(RelativeObjectState):
         return state
 
     def _load_state(self, state):
-        self.particle_counts = {REGISTERED_SYSTEMS[system_name]: val for system_name, val in state.items() if system_name != "n_systems"}
+        self.particle_counts = {REGISTERED_SYSTEMS[system_name]: val for system_name, val in state.items() if system_name != "n_systems" and val > 0}
 
     def _serialize(self, state):
         state_flat = np.array([state["n_systems"]], dtype=float)
@@ -210,7 +210,8 @@ class Saturated(RelativeObjectState, BooleanStateMixin):
                 continue
             elif k == "default_limit":
                 self._default_limit = v
-            else:
+            # TODO: Make this an else once fresh round of sampling occurs (i.e.: no more outdated systems stored)
+            elif k in REGISTERED_SYSTEMS:
                 self._limits[REGISTERED_SYSTEMS[k]] = v
 
     def _serialize(self, state):
