@@ -139,9 +139,7 @@ class Registry(UniquelyNamed):
                     if attr in mapping:
                         log.warning(f"Instance identifier '{k}' should be unique for adding to this registry mapping! Existing {k}: {attr}")
                         # Special case for "name" attribute, which should ALWAYS be unique
-                        if k == "name":
-                            log.error(f"For name attribute, objects MUST be unique. Exiting.")
-                            exit(-1)
+                        assert k != "name", "For name attribute, objects MUST be unique."
                     mapping[attr] = obj
                 else:
                     # Not unique case

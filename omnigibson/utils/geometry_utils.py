@@ -296,30 +296,19 @@ def generate_points_in_volume_checker_function(obj, volume_link, use_visual_mesh
             where @vol is the total volume being checked (expressed in global scale) aggregated across
             all container sub-volumes
     """
-    # If the object doesn't uniform scale, we make sure the volume link has no relative orientation w.r.t to
-    # the object (root link) frame
-    # TODO: Can we remove this restriction in the future? The current paradigm of how scale operates makes this difficult
-    if (obj.scale.max() - obj.scale.min()) > 1e-3:
-        volume_link_quat = volume_link.get_orientation()
-        object_quat = obj.get_orientation()
-        quat_distance = T.quat_distance(volume_link_quat, object_quat)
-        assert np.isclose(quat_distance[3], 1, atol=1e-3), \
-            f"Volume link must have no relative orientation w.r.t the root link! (i.e.: quat distance [0, 0, 0, 1])! " \
-            f"Got quat distance: {quat_distance}"
     # Iterate through all visual meshes and keep track of any that are prefixed with container
     container_meshes = []
     meshes = volume_link.visual_meshes if use_visual_meshes else volume_link.collision_meshes
     for container_mesh_name, container_mesh in meshes.items():
         if mesh_name_prefixes is None or mesh_name_prefixes in container_mesh_name:
-            container_meshes.append(container_mesh.prim)
+            container_meshes.append(container_mesh)
 
     # Programmatically define the volume checker functions based on each container found
     volume_checker_fcns = []
-    volume_calc_fcns = []
     for sub_container_mesh in container_meshes:
-        mesh_type = sub_container_mesh.GetTypeName()
+        mesh_type = sub_container_mesh.prim.GetTypeName()
         if mesh_type == "Mesh":
-            fcn, vol_fcn = _generate_convex_hull_volume_checker_functions(convex_hull_mesh=sub_container_mesh)
+            fcn, vol_fcn = _generate_convex_hull_volume_checker_functions(convex_hull_mesh=sub_container_mesh.prim)
         elif mesh_type == "Sphere":
             fcn = lambda mesh, particle_positions: check_points_in_sphere(
                 size=mesh.GetAttribute("radius").Get(),
@@ -328,7 +317,6 @@ def generate_points_in_volume_checker_function(obj, volume_link, use_visual_mesh
                 scale=np.array(mesh.GetAttribute("xformOp:scale").Get()),
                 particle_positions=particle_positions,
             )
-            vol_fcn = lambda mesh: 4 / 3 * np.pi * (mesh.GetAttribute("radius").Get() ** 3)
         elif mesh_type == "Cylinder":
             fcn = lambda mesh, particle_positions: check_points_in_cylinder(
                 size=[mesh.GetAttribute("radius").Get(), mesh.GetAttribute("height").Get()],
@@ -337,7 +325,6 @@ def generate_points_in_volume_checker_function(obj, volume_link, use_visual_mesh
                 scale=np.array(mesh.GetAttribute("xformOp:scale").Get()),
                 particle_positions=particle_positions,
             )
-            vol_fcn = lambda mesh: np.pi * (mesh.GetAttribute("radius").Get() ** 2) * mesh.GetAttribute("height").Get()
         elif mesh_type == "Cone":
             fcn = lambda mesh, particle_positions: check_points_in_cone(
                 size=[mesh.GetAttribute("radius").Get(), mesh.GetAttribute("height").Get()],
@@ -346,7 +333,6 @@ def generate_points_in_volume_checker_function(obj, volume_link, use_visual_mesh
                 scale=np.array(mesh.GetAttribute("xformOp:scale").Get()),
                 particle_positions=particle_positions,
             )
-            vol_fcn = lambda mesh: np.pi * (mesh.GetAttribute("radius").Get() ** 2) * mesh.GetAttribute("height").Get() / 3.0
         elif mesh_type == "Cube":
             fcn = lambda mesh, particle_positions: check_points_in_cube(
                 size=mesh.GetAttribute("size").Get(),
@@ -355,12 +341,10 @@ def generate_points_in_volume_checker_function(obj, volume_link, use_visual_mesh
                 scale=np.array(mesh.GetAttribute("xformOp:scale").Get()),
                 particle_positions=particle_positions,
             )
-            vol_fcn = lambda mesh: mesh.GetAttribute("size").Get() ** 3
         else:
             raise ValueError(f"Cannot create volume checker function for mesh of type: {mesh_type}")
 
         volume_checker_fcns.append(fcn)
-        volume_calc_fcns.append(vol_fcn)
 
     # Define the actual volume checker function
     def check_points_in_volumes(particle_positions):
@@ -383,19 +367,40 @@ def generate_points_in_volume_checker_function(obj, volume_link, use_visual_mesh
 
         in_volumes = np.zeros(n_particles).astype(bool)
         for checker_fcn, mesh in zip(volume_checker_fcns, container_meshes):
-            in_volumes |= checker_fcn(mesh, particle_positions)
+            in_volumes |= checker_fcn(mesh.prim, particle_positions)
 
         return in_volumes
 
     # Define the actual volume calculator function
-    def calculate_volume():
-        # Aggregate values across all subvolumes
-        # NOTE: Assumes all volumes are strictly disjointed (becuase we sum over all subvolumes to calculate
-        # total raw volume)
-        # TODO: Is there a way we can explicitly check if disjointed?
-        vols = [calc_fcn(mesh) * np.product(mesh.GetAttribute("xformOp:scale").Get())
-                for calc_fcn, mesh in zip(volume_calc_fcns, container_meshes)]
-        # Aggregate over all volumes and scale by the link's global scale
-        return np.sum(vols) * np.product(volume_link.get_world_scale())
+    def calculate_volume(precision=1e-5):
+        # We use monte-carlo sampling to approximate the voluem up to @precision
+        # NOTE: precision defines the RELATIVE precision of the volume computation -- i.e.: the relative error with
+        # respect to the volume link's global AABB
+
+        # Convert precision to minimum number of particles to sample
+        min_n_particles = int(np.ceil(1. / precision))
+
+        # Make sure container meshes are visible so AABB computation is correct
+        for mesh in container_meshes:
+            mesh.visible = True
+
+        # Determine equally-spaced sampling distance to achieve this minimum particle count
+        aabb_volume = np.product(volume_link.aabb_extent)
+        sampling_distance = np.cbrt(aabb_volume / min_n_particles)
+        low, high = volume_link.aabb
+        n_particles_per_axis = ((high - low) / sampling_distance).astype(int) + 1
+        assert np.all(n_particles_per_axis), "Must increase precision for calculate_volume -- too coarse for sampling!"
+        # 1e-10 is added because the extent might be an exact multiple of particle radius
+        arrs = [np.arange(lo, hi, sampling_distance)
+                for lo, hi, n in zip(low, high, n_particles_per_axis)]
+        # Generate 3D-rectangular grid of points, and only keep the ones inside the mesh
+        points = np.stack([arr.flatten() for arr in np.meshgrid(*arrs)]).T
+
+        # Re-hide container meshes
+        for mesh in container_meshes:
+            mesh.visible = False
+
+        # Return the fraction of the link AABB's volume based on fraction of points enclosed within it
+        return aabb_volume * np.mean(check_points_in_volumes(points))
 
     return check_points_in_volumes, calculate_volume

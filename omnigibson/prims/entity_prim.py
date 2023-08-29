@@ -61,7 +61,7 @@ class EntityPrim(XFormPrim):
         self._visual_only = None
 
         # This needs to be initialized to be used for _load() of PrimitiveObject
-        self._prim_type = load_config["prim_type"] if "prim_type" in load_config else PrimType.RIGID
+        self._prim_type = load_config["prim_type"] if load_config is not None and "prim_type" in load_config else PrimType.RIGID
         assert self._prim_type in iter(PrimType), f"Unknown prim type {self._prim_type}!"
 
         # Run super init
@@ -137,6 +137,10 @@ class EntityPrim(XFormPrim):
             assert len(self._links) == 1, f"Cloth entity prim can only have one link; got: {len(self._links)}"
             if gm.AG_CLOTH:
                 self.create_attachment_point_link()
+
+        # Globally disable any requested collision links
+        for link_name in self.disabled_collision_link_names:
+            self._links[link_name].disable_collisions()
 
         # Disable any requested collision pairs
         for a_name, b_name in self.disabled_collision_pairs:
@@ -1093,6 +1097,14 @@ class EntityPrim(XFormPrim):
         return np.array([j.has_limit for j in self._joints.values()])
 
     @property
+    def disabled_collision_link_names(self):
+        """
+        Returns:
+            list of str: List of link names for this entity whose collisions should be globally disabled
+        """
+        return []
+
+    @property
     def disabled_collision_pairs(self):
         """
         Returns:
@@ -1291,6 +1303,8 @@ class EntityPrim(XFormPrim):
         self.set_angular_velocity(velocity=np.zeros(3))
         for joint in self._joints.values():
             joint.keep_still()
+        # Make sure object is awake
+        self.wake()
 
     def create_attachment_point_link(self):
         """
@@ -1360,6 +1374,9 @@ class EntityPrim(XFormPrim):
         self.root_link._load_state(state=state["root_link"])
         for joint_name, joint_state in state["joints"].items():
             self._joints[joint_name]._load_state(state=joint_state)
+
+        # Make sure this object is awake
+        self.wake()
 
     def _serialize(self, state):
         # We serialize by first flattening the root link state and then iterating over all joints and
