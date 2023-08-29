@@ -1,4 +1,5 @@
-from pxr import UsdLux
+from omnigibson.utils.sim_utils import meets_minimum_isaac_version
+from pxr import UsdLux, Sdf, Gf
 import omnigibson as og
 from omni.isaac.core.utils.stage import get_current_stage
 from omnigibson.objects.stateful_object import StatefulObject
@@ -175,22 +176,72 @@ class LightObject(StatefulObject):
     @property
     def intensity(self):
         """
-        Gets this joint's intensity
+        Gets this light's intensity
 
         Returns:
             float: intensity for this light
         """
-        return self._light_link.get_attribute("intensity")
+        return self._light_link.get_attribute(
+            "inputs:intensity" if meets_minimum_isaac_version("2023.0.0") else "intensity")
 
     @intensity.setter
     def intensity(self, intensity):
         """
-        Sets this joint's intensity
+        Sets this light's intensity
 
         Args:
             intensity (float): intensity to set
         """
-        self._light_link.set_attribute("intensity", intensity)
+        self._light_link.set_attribute(
+            "inputs:intensity" if meets_minimum_isaac_version("2023.0.0") else "intensity",
+            intensity)
+        
+    @property
+    def color(self):
+        """
+        Gets this light's color
+
+        Returns:
+            float: color for this light
+        """
+        return tuple(float(x) for x in self._light_link.get_attribute(
+            "inputs:color" if meets_minimum_isaac_version("2023.0.0") else "color"))
+
+    @color.setter
+    def color(self, color):
+        """
+        Sets this light's color
+
+        Args:
+            color ([float, float, float]): color to set, each value in range [0, 1]
+        """
+        self._light_link.set_attribute(
+            "inputs:color" if meets_minimum_isaac_version("2023.0.0") else "color",
+            Gf.Vec3f(color))
+
+    @property
+    def texture_file_path(self):
+        """
+        Gets this light's texture file path. Only valid for dome lights.
+
+        Returns:
+            str: texture file path for this light
+        """
+        return str(self._light_link.get_attribute(
+            "inputs:texture:file" if meets_minimum_isaac_version("2023.0.0") else "texture:file"))
+
+    @texture_file_path.setter
+    def texture_file_path(self, texture_file_path):
+        """
+        Sets this light's texture file path. Only valid for dome lights.
+
+        Args:
+            texture_file_path (str): path of texture file that should be used for this light
+        """
+        self._light_link.set_attribute(
+            "inputs:texture:file" if meets_minimum_isaac_version("2023.0.0") else "texture:file",
+            Sdf.AssetPath(texture_file_path))
+
 
     def _create_prim_with_same_kwargs(self, prim_path, name, load_config):
         # Add additional kwargs (fit_avg_dim_volume and bounding_box are already captured in load_config)

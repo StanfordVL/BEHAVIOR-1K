@@ -1,5 +1,5 @@
 import math
-from collections import Iterable
+from collections.abc import Iterable
 import os
 
 import omni.usd
