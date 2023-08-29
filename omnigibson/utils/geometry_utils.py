@@ -301,14 +301,14 @@ def generate_points_in_volume_checker_function(obj, volume_link, use_visual_mesh
     meshes = volume_link.visual_meshes if use_visual_meshes else volume_link.collision_meshes
     for container_mesh_name, container_mesh in meshes.items():
         if mesh_name_prefixes is None or mesh_name_prefixes in container_mesh_name:
-            container_meshes.append(container_mesh.prim)
+            container_meshes.append(container_mesh)
 
     # Programmatically define the volume checker functions based on each container found
     volume_checker_fcns = []
     for sub_container_mesh in container_meshes:
-        mesh_type = sub_container_mesh.GetTypeName()
+        mesh_type = sub_container_mesh.prim.GetTypeName()
         if mesh_type == "Mesh":
-            fcn, vol_fcn = _generate_convex_hull_volume_checker_functions(convex_hull_mesh=sub_container_mesh)
+            fcn, vol_fcn = _generate_convex_hull_volume_checker_functions(convex_hull_mesh=sub_container_mesh.prim)
         elif mesh_type == "Sphere":
             fcn = lambda mesh, particle_positions: check_points_in_sphere(
                 size=mesh.GetAttribute("radius").Get(),
@@ -367,7 +367,7 @@ def generate_points_in_volume_checker_function(obj, volume_link, use_visual_mesh
 
         in_volumes = np.zeros(n_particles).astype(bool)
         for checker_fcn, mesh in zip(volume_checker_fcns, container_meshes):
-            in_volumes |= checker_fcn(mesh, particle_positions)
+            in_volumes |= checker_fcn(mesh.prim, particle_positions)
 
         return in_volumes
 
@@ -380,6 +380,10 @@ def generate_points_in_volume_checker_function(obj, volume_link, use_visual_mesh
         # Convert precision to minimum number of particles to sample
         min_n_particles = int(np.ceil(1. / precision))
 
+        # Make sure container meshes are visible so AABB computation is correct
+        for mesh in container_meshes:
+            mesh.visible = True
+
         # Determine equally-spaced sampling distance to achieve this minimum particle count
         aabb_volume = np.product(volume_link.aabb_extent)
         sampling_distance = np.cbrt(aabb_volume / min_n_particles)
@@ -391,6 +395,10 @@ def generate_points_in_volume_checker_function(obj, volume_link, use_visual_mesh
                 for lo, hi, n in zip(low, high, n_particles_per_axis)]
         # Generate 3D-rectangular grid of points, and only keep the ones inside the mesh
         points = np.stack([arr.flatten() for arr in np.meshgrid(*arrs)]).T
+
+        # Re-hide container meshes
+        for mesh in container_meshes:
+            mesh.visible = False
 
         # Return the fraction of the link AABB's volume based on fraction of points enclosed within it
         return aabb_volume * np.mean(check_points_in_volumes(points))
