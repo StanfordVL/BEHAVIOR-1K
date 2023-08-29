@@ -61,7 +61,7 @@ class EntityPrim(XFormPrim):
         self._visual_only = None
 
         # This needs to be initialized to be used for _load() of PrimitiveObject
-        self._prim_type = load_config["prim_type"] if "prim_type" in load_config else PrimType.RIGID
+        self._prim_type = load_config["prim_type"] if load_config is not None and "prim_type" in load_config else PrimType.RIGID
         assert self._prim_type in iter(PrimType), f"Unknown prim type {self._prim_type}!"
 
         # Run super init
