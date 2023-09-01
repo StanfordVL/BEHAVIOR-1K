@@ -505,7 +505,7 @@ class BoundingBoxAPI:
 
         # Sanity check values
         if np.any(aabb[3:] < aabb[:3]):
-            raise ValueError(f"Got invalid aabb values: low={aabb[:3]}, high={aabb[3:]}")
+            raise ValueError(f"Got invalid aabb values for prim: {prim_path}: low={aabb[:3]}, high={aabb[3:]}")
 
         return aabb[:3], aabb[3:]
 

@@ -444,11 +444,16 @@ class StatefulObject(BaseObject):
             # Query the object state for the parameters
             albedo_add, diffuse_tint = object_state.get_texture_change_params()
 
-        if material.albedo_add != albedo_add:
-            material.albedo_add = albedo_add
+        if material.is_glass:
+            if not np.allclose(material.glass_color, diffuse_tint):
+                material.glass_color = diffuse_tint
 
-        if not np.allclose(material.diffuse_tint, diffuse_tint):
-            material.diffuse_tint = diffuse_tint
+        else:
+            if material.albedo_add != albedo_add:
+                material.albedo_add = albedo_add
+
+            if not np.allclose(material.diffuse_tint, diffuse_tint):
+                material.diffuse_tint = diffuse_tint
 
     def remove(self):
         """

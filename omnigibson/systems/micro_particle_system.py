@@ -1510,65 +1510,6 @@ class GranularSystem(MicroPhysicalParticleSystem):
             **kwargs,
         )
 
-FluidSystem.create(
-    name="water",
-    particle_contact_offset=0.012,
-    particle_density=500.0,
-    is_viscous=False,
-    material_mtl_name="DeepWater",
-)
-
-FluidSystem.create(
-    name="milk",
-    particle_contact_offset=0.008,
-    particle_density=500.0,
-    is_viscous=False,
-    material_mtl_name="WholeMilk",
-)
-
-FluidSystem.create(
-    name="strawberry_smoothie",
-    particle_contact_offset=0.008,
-    particle_density=500.0,
-    is_viscous=True,
-    material_mtl_name="SkimMilk",
-    customize_particle_material=customize_particle_material_factory("specular_reflection_color", [1.0, 0.64, 0.64]),
-)
-
-GranularSystem.create(
-    name="diced_apple",
-    particle_density=500.0,
-    create_particle_template=lambda prim_path, name: og.objects.DatasetObject(
-        prim_path=prim_path,
-        name=name,
-        category="apple",
-        model="agveuv",
-        visible=False,
-        fixed_base=False,
-        visual_only=True,
-        include_default_states=False,
-        abilities={},
-    ),
-    scale=np.ones(3) * 0.3,
-)
-
-GranularSystem.create(
-    name="dango",
-    particle_density=500.0,
-    create_particle_template=lambda prim_path, name: og.objects.PrimitiveObject(
-        prim_path=prim_path,
-        name=name,
-        primitive_type="Sphere",
-        radius=0.015,
-        rgba=[1.0, 1.0, 1.0, 1.0],
-        visible=False,
-        fixed_base=False,
-        visual_only=True,
-        include_default_states=False,
-        abilities={},
-    )
-)
-
 
 class Cloth(MicroParticleSystem):
     """

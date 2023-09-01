@@ -22,6 +22,7 @@ class Touching(KinematicsMixin, RelativeObjectState, BooleanStateMixin):
             return self._check_contact(self.obj, other)
         # elif not self.obj.kinematic_only and not other.kinematic_only:
         #     # Use optimized check for rigid bodies
+        #     # TODO: Use once NVIDIA fixes their absolutely broken API
         #     return RigidContactAPI.in_contact(
         #         prim_paths_a=[link.prim_path for link in self.obj.links.values()],
         #         prim_paths_b=[link.prim_path for link in other.links.values()],

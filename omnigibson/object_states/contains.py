@@ -109,6 +109,16 @@ class Contains(RelativeObjectState, BooleanStateMixin):
         # Grab value from Contains state; True if value is greater than 0
         return self.obj.states[ContainedParticles].get_value(system=system).n_in_volume > 0
 
+    def _set_value(self, system, new_value):
+        if new_value:
+            # Cannot set contains = True, only False
+            raise NotImplementedError(f"{self.__class__.__name__} does not support set_value(system, True)")
+        else:
+            # Remove all particles from inside the volume
+            system.remove_particles(idxs=self.obj.states[ContainedParticles].get_value(system).in_volume.nonzero()[0])
+
+        return True
+
     @classmethod
     def get_dependencies(cls):
         deps = super().get_dependencies()

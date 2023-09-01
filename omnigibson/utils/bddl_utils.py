@@ -244,9 +244,9 @@ class BDDLEntity(Wrapper):
             **kwargs (dict): Any keyword arguments to pass to getter, in order
 
         Returns:
-            None or any: Returned value(s) from @state if self.wrapped_obj exists (i.e.: not None), else None
+            any: Returned value(s) from @state if self.wrapped_obj exists (i.e.: not None), else False
         """
-        return self.wrapped_obj.states[state].get_value(*args, **kwargs) if self.exists else None
+        return self.wrapped_obj.states[state].get_value(*args, **kwargs) if self.exists else False
 
     def set_state(self, state, *args, **kwargs):
         """
