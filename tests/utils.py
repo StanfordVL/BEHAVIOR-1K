@@ -20,18 +20,19 @@ def og_test(func):
 
 num_objs = 0
 
-def get_obj_cfg(name, category, model, prim_type=PrimType.RIGID, scale=None, abilities=None, visual_only=False):
+def get_obj_cfg(name, category, model, prim_type=PrimType.RIGID, scale=None, bounding_box=None, abilities=None, visual_only=False):
     global num_objs
     num_objs += 1
     return {
         "type": "DatasetObject",
-        "fit_avg_dim_volume": scale is None,
+        "fit_avg_dim_volume": scale is None and bounding_box is None,
         "name": name,
         "category": category,
         "model": model,
         "prim_type": prim_type,
-        "position": [150, 150, num_objs * 5],
+        "position": [150, 150, 150 + num_objs * 5],
         "scale": scale,
+        "bounding_box": bounding_box,
         "abilities": abilities,
         "visual_only": visual_only,
     }
@@ -65,11 +66,15 @@ def assert_test_scene():
                 get_obj_cfg("remover_dishtowel", "dishtowel", "dtfspn", abilities={"particleRemover": {"method": ParticleModifyMethod.ADJACENCY, "conditions": {"water": []}}}),
                 get_obj_cfg("spray_bottle", "spray_bottle", "asztxi", visual_only=True, abilities={"toggleable": {}, "particleApplier": {"method": ParticleModifyMethod.PROJECTION, "conditions": {"water": [(ParticleModifyCondition.TOGGLEDON, True)]}}}),
                 get_obj_cfg("vacuum", "vacuum", "bdmsbr", visual_only=True, abilities={"toggleable": {}, "particleRemover": {"method": ParticleModifyMethod.PROJECTION, "conditions": {"water": [(ParticleModifyCondition.TOGGLEDON, True)]}}}),
+                get_obj_cfg("blender", "blender", "cwkvib", bounding_box=[0.316, 0.318, 0.649], abilities={"fillable": {}, "blender": {}, "toggleable": {}}),
+                get_obj_cfg("oven", "oven", "cgtaer", bounding_box=[0.943, 0.837, 1.297]),
             ],
             "robots": [
                 {
                     "type": "Fetch",
                     "obs_modalities": [],
+                    "position": [150, 150, 100],
+                    "orientation": [0, 0, 0, 1],
                 }
             ]
         }
@@ -84,10 +89,6 @@ def assert_test_scene():
 
         # Create the environment
         env = og.Environment(configs=cfg, action_timestep=1 / 60., physics_timestep=1 / 60.)
-
-        env.robots[0].set_position_orientation([150, 150, 0], [0, 0, 0, 1])
-        og.sim.step()
-        og.sim.scene.update_initial_state()
 
 
 def get_random_pose(pos_low=10.0, pos_hi=20.0):

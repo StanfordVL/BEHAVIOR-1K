@@ -73,7 +73,7 @@ def plan_base_motion(
             diff = abs(diff)
             num_points = ceil(diff / ANGLE_DIFF) + 1
             nav_angle = np.linspace(0.0, diff, num_points) * direction
-            angles = nav_angle + final_orientation
+            angles = nav_angle + start_conf[2]
             for i in range(num_points):
                 state = create_state(si.getStateSpace(), start_conf[0], start_conf[1], angles[i])
                 if not si.isValid(state()):
@@ -83,7 +83,9 @@ def plan_base_motion(
         @staticmethod
         # Get angle between 2d robot poses
         def get_angle_between_poses(p1, p2):
-            segment = p2[:2] - p1[:2]
+            segment = []
+            segment.append(p2[0] - p1[0])
+            segment.append(p2[1] - p1[1])
             return np.arctan2(segment[1], segment[0])
     
     def create_state(space, x, y, yaw):
@@ -157,7 +159,9 @@ def plan_base_motion(
 
     si = ss.getSpaceInformation()
     si.setMotionValidator(CustomMotionValidator(si, space))
-    planner = ompl_geo.RRTConnect(si)
+    # TODO: Try changing to RRTConnect in the future. Currently using RRT because movement is not direction invariant. Can change to RRTConnect
+    # possibly if hasSymmetricInterpolate is set to False for the state space. Doc here https://ompl.kavrakilab.org/classompl_1_1base_1_1StateSpace.html
+    planner = ompl_geo.RRT(si)
     ss.setPlanner(planner)
 
     start = create_state(space, start_conf[0], start_conf[1], T.wrap_angle(start_conf[2]))
@@ -177,7 +181,6 @@ def plan_base_motion(
         ss.simplifySolution()
         sol_path = ss.getSolutionPath()
         return_path = []
-
         for i in range(sol_path.getStateCount()):
             x = sol_path.getState(i).getX()
             y = sol_path.getState(i).getY()
@@ -322,12 +325,14 @@ def set_arm_and_detect_collision(context, joint_pos):
     for link in arm_links:
         pose = link_poses[link]
         if link in robot_copy.meshes[robot_copy_type].keys():
-            for mesh, relative_pose in zip(robot_copy.meshes[robot_copy_type][link].values(), robot_copy.relative_poses[robot_copy_type][link].values()):
+            for mesh_name, mesh in robot_copy.meshes[robot_copy_type][link].items():
+                relative_pose = robot_copy.relative_poses[robot_copy_type][link][mesh_name]
                 mesh_pose = T.pose_transform(*pose, *relative_pose)
                 translation = Gf.Vec3d(*np.array(mesh_pose[0], dtype=float))
                 mesh.GetAttribute("xformOp:translate").Set(translation)
                 orientation = np.array(mesh_pose[1], dtype=float)[[3, 0, 1, 2]]
                 mesh.GetAttribute("xformOp:orient").Set(Gf.Quatd(*orientation))
+
 
     return detect_robot_collision(context)
 
@@ -351,7 +356,7 @@ def detect_robot_collision(context):
     def overlap_callback(hit):
         nonlocal valid_hit
         nonlocal mesh_path
-
+        
         valid_hit = hit.rigid_body not in context.disabled_collision_pairs_dict[mesh_path]
 
         return not valid_hit

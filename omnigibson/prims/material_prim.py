@@ -154,6 +154,14 @@ class MaterialPrim(BasePrim):
         self._shader.GetInput(inp).Set(val)
 
     @property
+    def is_glass(self):
+        """
+        Returns:
+            bool: Whether this material is a glass material or not
+        """
+        return "glass_color" in self.shader_input_names
+
+    @property
     def shader(self):
         """
         Returns:
@@ -1044,3 +1052,23 @@ class MaterialPrim(BasePrim):
              val (bool): this material's applied enable_diffuse_transmission
         """
         self.set_input(inp="enable_diffuse_transmission", val=val)
+
+    @property
+    def glass_color(self):
+        """
+        Returns:
+            3-array: this material's applied (R,G,B) glass color (only applicable to OmniGlass materials)
+        """
+        assert self.is_glass, f"Tried to query glass_color shader input, " \
+                              f"but material at {self.prim_path} is not an OmniGlass material!"
+        return np.array(self.get_input(inp="glass_color"))
+
+    @glass_color.setter
+    def glass_color(self, color):
+        """
+        Args:
+             color (3-array): this material's applied (R,G,B) glass color (only applicable to OmniGlass materials)
+        """
+        assert self.is_glass, f"Tried to set glass_color shader input, " \
+                              f"but material at {self.prim_path} is not an OmniGlass material!"
+        self.set_input(inp="glass_color", val=Gf.Vec3f(*np.array(color, dtype=float)))

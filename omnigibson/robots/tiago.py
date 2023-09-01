@@ -512,6 +512,12 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         return {arm: 0.12 for arm in self.arm_names}
 
     @property
+    def disabled_collision_link_names(self):
+        # These should NEVER have collisions in the first place (i.e.: these are poorly modeled geoms from the source
+        # asset) -- they are strictly engulfed within ANOTHER collision mesh from a DIFFERENT link
+        return [name for arm in self.arm_names for name in [f"arm_{arm}_tool_link", f"wrist_{arm}_ft_link", f"wrist_{arm}_ft_tool_link"]]
+
+    @property
     def disabled_collision_pairs(self):
         return [
             ["arm_left_1_link", "arm_left_2_link"],
@@ -579,6 +585,10 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             ['base_link', 'arm_right_5_link'],
             ['base_link', 'arm_left_4_link'],
             ['base_link', 'arm_left_5_link'],
+            ['wrist_left_ft_tool_link', 'arm_left_5_link'],
+            ['wrist_right_ft_tool_link', 'arm_right_5_link'],
+            ['arm_left_tool_link', 'wrist_left_ft_tool_link'],
+            ['arm_right_tool_link', 'wrist_right_ft_tool_link']
         ]
 
     @property

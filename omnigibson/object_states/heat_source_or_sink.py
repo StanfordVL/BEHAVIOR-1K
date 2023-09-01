@@ -3,7 +3,7 @@ from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.inside import Inside
 from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
 from omnigibson.object_states.object_state_base import AbsoluteObjectState
-from omnigibson.object_states.open import Open
+from omnigibson.object_states.open_state import Open
 from omnigibson.object_states.toggle import ToggledOn
 from omnigibson.utils.python_utils import classproperty
 import omnigibson.utils.transform_utils as T
