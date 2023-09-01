@@ -509,6 +509,36 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
 
         return condition
 
+    def supports_system(self, system_name):
+        """
+        Checks whether this particle modifier supports adding/removing a particle from the specified
+        system, e.g. whether there exists any configuration (toggled on, etc.) in which this modifier
+        can be used to interact with any particles of this system.
+
+        Args:
+            system_name (str): Name of the particle system to check
+
+        Returns:
+            bool: Whether this particle modifier can add or remove a particle from the specified system
+        """
+        return system_name in self.conditions
+
+    def check_conditions_for_system(self, system_name):
+        """
+        Checks whether this particle modifier can add or remove a particle from the specified system
+        in its current configuration, e.g. all of the conditions for addition/removal other than
+        physical position are met.
+
+        Args:
+            system_name (str): Name of the particle system to check
+
+        Returns:
+            bool: Whether this particle modifier can add or remove a particle from the specified system
+        """
+        if not self.supports_system(system_name):
+            return False
+        return all(condition(self.obj) for condition in self.conditions[system_name])
+
     def _update(self):
         # If we're using projection method and flatcache, we need to manually update this object's transforms on the USD
         # so the corresponding visualization and overlap meshes are updated properly
@@ -518,11 +548,11 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
         # Check if there's any overlap and if we're at the correct step
         if self._current_step == 0 and (not self.requires_overlap or self._check_overlap()):
             # Iterate over all owned systems for this particle modifier
-            for system_name, conditions in self.conditions.items():
+            for system_name in self.conditions.keys():
                 # Check if the system is active (for ParticleApplier, the system is always active)
                 if is_system_active(system_name):
                     # Check if all conditions are met
-                    if np.all([condition(self.obj) for condition in conditions]):
+                    if self.check_conditions_for_system(system_name):
                         system = get_system(system_name)
                         # Update saturation limit if it's not specified yet
                         limit = self.visual_particle_modification_limit \

@@ -23,7 +23,7 @@ from pxr import PhysxSchema
 import omnigibson as og
 from omnigibson import object_states
 from omnigibson.action_primitives.action_primitive_set_base import ActionPrimitiveError, ActionPrimitiveErrorGroup, BaseActionPrimitiveSet
-from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitiveGenerator, UndoableContext
+from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitives, UndoableContext
 from omnigibson.utils.object_state_utils import sample_cuboid_for_predicate
 from omnigibson.object_states.utils import get_center_extent
 from omnigibson.objects import BaseObject, DatasetObject
@@ -64,6 +64,7 @@ MAX_WAIT_FOR_GRASP_OR_RELEASE = 10
 
 MAX_ATTEMPTS_FOR_SAMPLING_POSE_WITH_OBJECT_AND_PREDICATE = 20
 MAX_ATTEMPTS_FOR_SAMPLING_POSE_NEAR_OBJECT = 200
+MAX_ATTEMPTS_FOR_SAMPLING_POSE_NEAR_HEAT_SOURCE = 20
 MAX_ATTEMPTS_FOR_SAMPLING_POSE_IN_ROOM = 60
 
 PREDICATE_SAMPLING_Z_OFFSET = 0.02
@@ -88,7 +89,7 @@ class SymbolicSemanticActionPrimitiveSet(IntEnum):
     SOAK_UNDER = auto(), "Soak the currently grasped object under a fluid source."
     SOAK_INSIDE = auto(), "Soak the currently grasped object inside the fluid within a container."
     WIPE = auto(), "Wipe the given object with the currently grasped object."
-    SLICE = auto(), "Slice the given object with the currently grasped object."
+    CUT = auto(), "Cut (slice or dice) the given object with the currently grasped object."
     PLACE_NEAR_HEATING_ELEMENT = auto(), "Place the currently grasped object near the heating element of another object."
     NAVIGATE_TO = auto(), "Navigate to an object"
     RELEASE = auto(), "Release an object, letting it fall to the ground. You can then grasp it again, as a way of reorienting your grasp of the object."
@@ -107,7 +108,7 @@ class SymbolicSemanticActionPrimitives(BaseActionPrimitiveSet):
           SymbolicSemanticActionPrimitiveSet.SOAK_UNDER: self._soak_under,
           SymbolicSemanticActionPrimitiveSet.SOAK_INSIDE: self._soak_inside,
           SymbolicSemanticActionPrimitiveSet.WIPE: self._wipe,
-          SymbolicSemanticActionPrimitiveSet.SLICE: self._slice,
+          SymbolicSemanticActionPrimitiveSet.CUT: self._cut,
           SymbolicSemanticActionPrimitiveSet.PLACE_NEAR_HEATING_ELEMENT: self._place_near_heating_element,
           SymbolicSemanticActionPrimitiveSet.NAVIGATE_TO: self._navigate_to_obj,
           SymbolicSemanticActionPrimitiveSet.RELEASE: self._release,
@@ -116,7 +117,7 @@ class SymbolicSemanticActionPrimitives(BaseActionPrimitiveSet):
         self.robot_model = self.robot.model_name
         self.robot_base_mass = self.robot._links["base_link"].mass
 
-        self.robot_copy = StarterSemanticActionPrimitiveGenerator._load_robot_copy(robot)
+        self.robot_copy = StarterSemanticActionPrimitives._load_robot_copy(robot)
 
         if self.robot_model == "Tiago":
             self._setup_tiago()
@@ -143,7 +144,7 @@ class SymbolicSemanticActionPrimitives(BaseActionPrimitiveSet):
             [gym.spaces.Discrete(self.num_objects), gym.spaces.Discrete(len(SymbolicSemanticActionPrimitiveSet))]
         )
 
-    def get_action_from_primitive_and_object(self, primitive: PrimitiveSet, obj: BaseObject):
+    def get_action_from_primitive_and_object(self, primitive: SymbolicSemanticActionPrimitiveSet, obj: BaseObject):
         assert obj in self.addressable_objects
         primitive_int = int(primitive)
         return primitive_int, self.addressable_objects.index(obj)
@@ -174,7 +175,7 @@ class SymbolicSemanticActionPrimitives(BaseActionPrimitiveSet):
         Yields action for robot to execute the primitive with the given arguments.
 
         Args:
-            prim (SymbolicSemanticActionPrimitiveGenerator.PrimitiveSet): Primitive to execute
+            prim (SymbolicSemanticActionPrimitiveSet): Primitive to execute
             args: Arguments for the primitive
             attempts (int): Number of attempts to make before raising an error
         
@@ -352,7 +353,7 @@ class SymbolicSemanticActionPrimitives(BaseActionPrimitiveSet):
                 {"target object": obj.name, "is it currently toggled on": obj.states[object_states.ToggledOn].get_value()}
             )
 
-    def _place_with_predicate(self, obj, predicate):
+    def _place_with_predicate(self, obj, predicate, near_poses=None, near_poses_threshold=None):
         """
         Yields action for the robot to navigate to the object if needed, then to place it
 
@@ -370,7 +371,7 @@ class SymbolicSemanticActionPrimitives(BaseActionPrimitiveSet):
             )
         
         # Find a spot to put it
-        obj_pose = self._sample_pose_with_object_and_predicate(predicate, obj_in_hand, obj)
+        obj_pose = self._sample_pose_with_object_and_predicate(predicate, obj_in_hand, obj, near_poses=[], near_poses_threshold=None)
 
         # Get close, release the object.
         yield from self._navigate_if_needed(obj, pose_on_obj=obj_pose)
@@ -387,18 +388,287 @@ class SymbolicSemanticActionPrimitives(BaseActionPrimitiveSet):
                 {"dropped object": obj_in_hand.name, "target object": obj.name}
             )
         
-    def _soak_under():
+    def _soak_under(self, obj):
+        # Check that our current object is a particle remover
+        obj_in_hand = self._get_obj_in_hand()
+        if obj_in_hand is None:
+            raise ActionPrimitiveError(
+                ActionPrimitiveError.Reason.PRE_CONDITION_ERROR, "You need to be grasping a soakable object first."
+            )
+        
+        # Check that the target object is a particle source
+        if object_states.ParticleSource not in obj.states:
+            raise ActionPrimitiveError(
+                ActionPrimitiveError.Reason.PRE_CONDITION_ERROR,
+                "The target object is not a particle source, so you can not soak anything under it.",
+                {"target object": obj.name}
+            )
+
+        # Check if the target object has any particles in it
+        producing_systems = {ps for ps in self.scene.systems if obj.states[object_states.ParticleSource].check_conditions_for_system(ps)}
+        if not producing_systems:
+            raise ActionPrimitiveError(
+                ActionPrimitiveError.Reason.PRE_CONDITION_ERROR,
+                "The target object currently is not producing any particles - try toggling it on.",
+                {"target object": obj.name}
+            )
+
+        # Check that the current object can remove those particles
+        if object_states.Saturated not in obj_in_hand.states:
+            raise ActionPrimitiveError(
+                ActionPrimitiveError.Reason.PRE_CONDITION_ERROR,
+                "The currently grasped object cannot soak particles.",
+                {"object in hand": obj_in_hand.name}
+            )
+        
+        supported_systems = {
+            x for x in producing_systems if obj_in_hand.states[object_states.ParticleRemover].supports_system(x)
+        }
+        if not supported_systems:
+            raise ActionPrimitiveError(
+                ActionPrimitiveError.Reason.PRE_CONDITION_ERROR,
+                "The target object only contains particles that this object cannot soak.",
+                {
+                    "target object": obj.name,
+                    "cleaning tool": obj_in_hand.name,
+                    "particles the target object is producing": sorted(x.name for x in producing_systems),
+                    "particles the grasped object can remove": sorted([x for x in obj_in_hand.states[object_states.ParticleRemover].conditions.keys()])
+                }
+            )
+        
+        currently_removable_systems = {
+            x for x in supported_systems if obj_in_hand.states[object_states.ParticleRemover].check_conditions_for_system(x)
+        }
+        if not currently_removable_systems:
+            # TODO: This needs to be far more descriptive.
+            raise ActionPrimitiveError(
+                ActionPrimitiveError.Reason.PRE_CONDITION_ERROR,
+                "The target object is covered by some particles that this object can normally soak, but needs to be in a different state to do so (e.g. toggled on, soaked by another fluid first, etc.).",
+                {
+                    "target object": obj.name,
+                    "cleaning tool": obj_in_hand.name,
+                    "particles the target object is producing": sorted(x.name for x in producing_systems),
+                }
+            )
+
+        # If so, remove the particles.
+        for system in currently_removable_systems:
+            obj_in_hand.states[object_states.Saturated].set_value(system, True)
+
+
+    def _soak_inside(self, obj):
+        # Check that our current object is a particle remover
+        obj_in_hand = self._get_obj_in_hand()
+        if obj_in_hand is None:
+            raise ActionPrimitiveError(
+                ActionPrimitiveError.Reason.PRE_CONDITION_ERROR, "You need to be grasping a soakable object first."
+            )
+        
+        # Check that the target object is fillable
+        if object_states.Contains not in obj.states:
+            raise ActionPrimitiveError(
+                ActionPrimitiveError.Reason.PRE_CONDITION_ERROR,
+                "The target object is not fillable by particles, so you can not soak anything in it.",
+                {"target object": obj.name}
+            )
+
+        # Check if the target object has any particles in it
+        contained_systems = {ps for ps in self.scene.systems if obj.states[object_states.Contains].get_value(ps.states)}
+        if not contained_systems:
+            raise ActionPrimitiveError(
+                ActionPrimitiveError.Reason.PRE_CONDITION_ERROR,
+                "The target object currently does not contain any particles.",
+                {"target object": obj.name}
+            )
+
+        # Check that the current object can remove those particles
+        if object_states.Saturated not in obj_in_hand.states:
+            raise ActionPrimitiveError(
+                ActionPrimitiveError.Reason.PRE_CONDITION_ERROR,
+                "The currently grasped object cannot soak particles.",
+                {"object in hand": obj_in_hand.name}
+            )
+        
+        supported_systems = {
+            x for x in contained_systems if obj_in_hand.states[object_states.ParticleRemover].supports_system(x)
+        }
+        if not supported_systems:
+            raise ActionPrimitiveError(
+                ActionPrimitiveError.Reason.PRE_CONDITION_ERROR,
+                "The target object only contains particles that this object cannot soak.",
+                {
+                    "target object": obj.name,
+                    "cleaning tool": obj_in_hand.name,
+                    "particles the target object contains": sorted(x.name for x in contained_systems),
+                    "particles the grasped object can remove": sorted([x for x in obj_in_hand.states[object_states.ParticleRemover].conditions.keys()])
+                }
+            )
+        
+        currently_removable_systems = {
+            x for x in supported_systems if obj_in_hand.states[object_states.ParticleRemover].check_conditions_for_system(x)
+        }
+        if not currently_removable_systems:
+            # TODO: This needs to be far more descriptive.
+            raise ActionPrimitiveError(
+                ActionPrimitiveError.Reason.PRE_CONDITION_ERROR,
+                "The target object is covered by some particles that this object can normally soak, but needs to be in a different state to do so (e.g. toggled on, soaked by another fluid first, etc.).",
+                {
+                    "target object": obj.name,
+                    "cleaning tool": obj_in_hand.name,
+                    "particles the target object contains": sorted(x.name for x in contained_systems),
+                }
+            )
+
+        # If so, remove the particles.
+        for system in currently_removable_systems:
+            obj_in_hand.states[object_states.Saturated].set_value(system, True)
+
+
+    def _wipe(self, obj):
+        # Check that our current object is a particle remover
+        obj_in_hand = self._get_obj_in_hand()
+        if obj_in_hand is None:
+            raise ActionPrimitiveError(
+                ActionPrimitiveError.Reason.PRE_CONDITION_ERROR, "You need to be grasping a wiping tool (particle remover) first to wipe an object."
+            )
+        
+        # Check that the target object is coverable
+        if object_states.Covered not in obj.states:
+            raise ActionPrimitiveError(
+                ActionPrimitiveError.Reason.PRE_CONDITION_ERROR,
+                "The target object is not coverable by any particles, so there is no need to wipe it.",
+                {"target object": obj.name}
+            )
+
+        # Check if the target object has any particles on it
+        covering_systems = {ps for ps in self.scene.systems if obj.states[object_states.Covered].get_value(ps.states)}
+        if not covering_systems:
+            raise ActionPrimitiveError(
+                ActionPrimitiveError.Reason.PRE_CONDITION_ERROR,
+                "The target object is not covered by any particles.",
+                {"target object": obj.name}
+            )
+
+        # Check that the current object can remove those particles
+        if object_states.ParticleRemover not in obj_in_hand.states:
+            raise ActionPrimitiveError(
+                ActionPrimitiveError.Reason.PRE_CONDITION_ERROR,
+                "The currently grasped object is not a particle remover.",
+                {"object in hand": obj_in_hand.name}
+            )
+        
+        supported_systems = {
+            x for x in covering_systems if obj_in_hand.states[object_states.ParticleRemover].supports_system(x)
+        }
+        if not supported_systems:
+            raise ActionPrimitiveError(
+                ActionPrimitiveError.Reason.PRE_CONDITION_ERROR,
+                "The target object is covered only by particles that this cleaning tool cannot remove.",
+                {
+                    "target object": obj.name,
+                    "cleaning tool": obj_in_hand.name,
+                    "particles the target object is covered by": sorted(x.name for x in covering_systems),
+                    "particles the grasped object can remove": sorted([x for x in obj_in_hand.states[object_states.ParticleRemover].conditions.keys()])
+                }
+            )
+        
+        currently_removable_systems = {
+            x for x in supported_systems if obj_in_hand.states[object_states.ParticleRemover].check_conditions_for_system(x)
+        }
+        if not currently_removable_systems:
+            # TODO: This needs to be far more descriptive.
+            raise ActionPrimitiveError(
+                ActionPrimitiveError.Reason.PRE_CONDITION_ERROR,
+                "The target object is covered by some particles that this cleaning tool can normally remove, but needs to be in a different state to do so (e.g. toggled on, soaked by another fluid first, etc.).",
+                {
+                    "target object": obj.name,
+                    "cleaning tool": obj_in_hand.name,
+                    "particles the target object is covered by": sorted(x.name for x in covering_systems),
+                }
+            )
+
+        # If so, remove the particles.
+        for system in currently_removable_systems:
+            obj_in_hand.states[object_states.Covered].set_value(system, False)
+
+    def _cut(self, obj):
+        # Check that our current object is a slicer
+        obj_in_hand = self._get_obj_in_hand()
+        if obj_in_hand is None:
+            raise ActionPrimitiveError(
+                ActionPrimitiveError.Reason.PRE_CONDITION_ERROR, "You need to be grasping a cutting tool first to slice an object."
+            )
+        
+        if "slicer" not in obj_in_hand._abilities:
+            raise ActionPrimitiveError(
+                ActionPrimitiveError.Reason.PRE_CONDITION_ERROR,
+                "The current object is not a cutting tool.",
+                {"object in hand": obj_in_hand.name}
+            )
+
+        # Check that the target object is sliceable
+        if "sliceable" not in obj._abilities and "diceable" not in obj._abilities:
+            raise ActionPrimitiveError(
+                ActionPrimitiveError.Reason.PRE_CONDITION_ERROR,
+                "The target object is not sliceable or diceable.",
+                {"target object": obj.name}
+            )
+
+        # TODO: Trigger the slicing rule manually.
+
+
         pass
-    def _soak_inside():
-        pass
-    def _wipe():
-        pass
-    def _slice():
-        pass
-    def _place_near_heating_element():
-        pass
-    def _wait_for_cooked():
-        pass
+
+
+    def _place_near_heating_element(self, heat_source_obj):
+        obj_in_hand = self._get_obj_in_hand()
+        if obj_in_hand is None:
+            raise ActionPrimitiveError(
+                ActionPrimitiveError.Reason.PRE_CONDITION_ERROR, "You need to be grasping an object first to place it somewhere."
+            )
+        
+        if object_states.HeatSourceOrSink not in heat_source_obj.states:
+            raise ActionPrimitiveError(
+                ActionPrimitiveError.Reason.PRE_CONDITION_ERROR, "The target object is not a heat source or sink.", {"target object": heat_source_obj.name}
+            )
+        
+        if heat_source_obj.states[object_states.HeatSourceOrSink].requires_inside:
+            raise ActionPrimitiveError(
+                ActionPrimitiveError.Reason.PRE_CONDITION_ERROR,
+                "The heat source object has no explicit heating element, it just requires the cookable object to be placed inside it.",
+                {"target object": heat_source_obj.name}
+            )
+
+        # Get the position of the heat source on the thing we're placing near
+        heating_element_positions = np.array([link.get_position() for link in heat_source_obj.states[object_states.HeatSourceOrSink].links.values()])
+        heating_distance_threshold = heat_source_obj.states[object_states.HeatSourceOrSink].distance_threshold
+
+        # Call place-with-predicate
+        yield from self._place_with_predicate(heat_source_obj, object_states.OnTop, near_poses=heating_element_positions, near_poses_threshold=heating_distance_threshold)
+
+    def _wait_for_cooked(self, obj):
+        # Check that the current object is cookable
+        if object_states.Cooked not in obj.states:
+            raise ActionPrimitiveError(
+                ActionPrimitiveError.Reason.PRE_CONDITION_ERROR, "Target object is not cookable.",
+                {"target object": obj.name}
+            )
+        
+        # Keep waiting as long as the thing is warming up.
+        prev_temp = obj.states[object_states.Temperature].get_value()
+        while not obj.states[object_states.Cooked].get_value():
+            # Pass some time
+            for _ in range(10):
+                yield from self._empty_action()
+
+            # Check that we are still heating up
+            new_temp = obj.states[object_states.Temperature].get_value()
+            if new_temp - prev_temp < 1e-2:
+                raise ActionPrimitiveError(
+                    ActionPrimitiveError.PRE_CONDITION_ERROR,
+                    "Target object is not currently heating up.",
+                    {"target object": obj.name}
+                )
   
     def _target_in_reach_of_robot(self, target_pose):
         """
@@ -578,7 +848,7 @@ class SymbolicSemanticActionPrimitives(BaseActionPrimitiveSet):
             {"room": room}
         )
 
-    def _sample_pose_with_object_and_predicate(self, predicate, held_obj, target_obj):
+    def _sample_pose_with_object_and_predicate(self, predicate, held_obj, target_obj, near_poses=None, near_poses_threshold=None):
         """
         Returns a pose for the held object relative to the target object that satisfies the predicate
 
@@ -594,6 +864,9 @@ class SymbolicSemanticActionPrimitives(BaseActionPrimitiveSet):
         """
         pred_map = {object_states.OnTop: "onTop", object_states.Inside: "inside"}
 
+        if near_poses:
+            assert near_poses_threshold, "A near-pose distance threshold must be provided if near_poses is provided."
+
         for _ in range(MAX_ATTEMPTS_FOR_SAMPLING_POSE_WITH_OBJECT_AND_PREDICATE):
             _, _, bb_extents, bb_center_in_base = held_obj.get_base_aligned_bbox()
             sampling_results = sample_cuboid_for_predicate(pred_map[predicate], target_obj, bb_extents)
@@ -604,6 +877,12 @@ class SymbolicSemanticActionPrimitives(BaseActionPrimitiveSet):
 
             # Get the object pose by subtracting the offset
             sampled_obj_pose = T.pose2mat((sampled_bb_center, sampled_bb_orn)) @ T.pose_inv(T.pose2mat((bb_center_in_base, [0, 0, 0, 1])))
+
+            # Check that the pose is near one of the poses in the near_poses list if provided.
+            if near_poses:
+                sampled_pos = np.array([sampled_obj_pose[0]])
+                if not np.any(np.linalg.norm(near_poses - sampled_pos, axis=1) < near_poses_threshold):
+                    continue
 
             # Return the pose
             return T.mat2pose(sampled_obj_pose)
