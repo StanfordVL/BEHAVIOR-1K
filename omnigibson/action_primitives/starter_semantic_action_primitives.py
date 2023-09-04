@@ -88,6 +88,9 @@ DEFAULT_ANGLE_THRESHOLD = 0.05
 LOW_PRECISION_DIST_THRESHOLD = 0.1
 LOW_PRECISION_ANGLE_THRESHOLD = 0.2
 
+TORSO_FIXED = False
+JOINT_POS_DIFF_THRESHOLD = 0.005
+
 logger = logging.getLogger(__name__)
 
 
@@ -809,6 +812,23 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             interpolated_plan += np.linspace(plan[i], plan[i+1], num_intervals, endpoint=False).tolist()
         interpolated_plan.append(plan[-1].tolist())
         return interpolated_plan
+    
+    def _compute_delta_command(self, controller_name, diff_joint_pos, gain=1.0, min_action=0.0):
+        controller = self.robot._controllers[controller_name]
+        control_limits = controller._control_limits[controller.control_type]
+        gain = 1.0
+        min_action = 0.0
+        # for joints not within thresh, set a minimum action value
+        # for joints within thres, set action to zero
+        delta_action = gain * diff_joint_pos
+        delta_action[abs(delta_action) < min_action] = np.sign(delta_action[abs(delta_action) < min_action]) * min_action
+        delta_action[abs(diff_joint_pos) < JOINT_POS_DIFF_THRESHOLD] = 0.0
+        # TODO - this is temporary
+        if TORSO_FIXED:
+            delta_action = np.concatenate([np.zeros(1), delta_action])
+        
+        return delta_action
+        
 
     def _move_hand_direct_joint(self, joint_pos, control_idx, stop_on_contact=False, max_steps_for_hand_move=MAX_STEPS_FOR_HAND_MOVE, ignore_failure=False):
         """
@@ -824,18 +844,25 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Returns:
             np.array or None: Action array for one step for the robot to move arm or None if its at the joint positions
         """
+        controller_name = f"arm_{self.arm}"
+        use_delta = self.robot._controllers[controller_name].use_delta_commands
+
         action = self._empty_action()
         controller_name = "arm_{}".format(self.arm)
-        action[self.robot.controller_action_idx[controller_name]] = joint_pos
-        action = self._overwrite_head_action(action, self._tracking_object) if self._tracking_object is not None else action
 
         for _ in range(max_steps_for_hand_move):
             current_joint_pos = self.robot.get_joint_positions()[control_idx]
             diff_joint_pos = np.absolute(np.array(current_joint_pos) - np.array(joint_pos))
-            if max(diff_joint_pos) < 0.005:
+            if max(diff_joint_pos) < JOINT_POS_DIFF_THRESHOLD:
                 return
             if stop_on_contact and detect_robot_collision_in_sim(self.robot, ignore_obj_in_hand=False):
                 return
+            
+            if use_delta:
+                action[self.robot.controller_action_idx[controller_name]] = self._compute_delta_command(controller_name, diff_joint_pos)
+            else:
+                action[self.robot.controller_action_idx[controller_name]] = joint_pos
+            action = self._overwrite_head_action(action, self._tracking_object) if self._tracking_object is not None else action
             yield action, "manip:move_hand_direct_joint"
 
         if not ignore_failure:
@@ -953,7 +980,18 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         assert self.robot_model == "Tiago", "Tracking object with camera is currently only supported for Tiago"
         head_q = self._get_head_goal_q(obj)
         head_idx = self.robot.controller_action_idx["camera"]
-        action[head_idx] = head_q
+        
+        config = self.robot._controller_config["camera"]
+        assert config["name"] == "JointController", "Camera controller must be JointController"
+        assert config["motor_type"] == "position", "Camera controller must be in position control mode"
+        use_delta = config["use_delta_commands"]
+
+        if use_delta:
+            cur_head_q = self.robot.get_joint_positions()[self.robot.camera_control_idx]
+            head_action = head_q - cur_head_q
+        else:
+            head_action = head_q
+        action[head_idx] = head_action
         return action
 
     def _get_head_goal_q(self, obj):
