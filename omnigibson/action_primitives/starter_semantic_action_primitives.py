@@ -471,7 +471,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 yield from self._move_hand_direct_cartesian(approach_pose, ignore_failure=False, stop_on_contact=True)
 
                 # Step once to update
-                yield self._empty_action()
+                yield self._empty_action(), "manip:empty_action"
 
                 # if grasp_required:
                 #     if self._get_obj_in_hand() is None:
@@ -552,7 +552,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             yield from self._move_hand_direct_cartesian(approach_pose, stop_on_contact=True)
 
             # Step once to update
-            yield self._empty_action()
+            yield self._empty_action(), "manip:empty_action"
 
             if self._get_obj_in_hand() is None:
                 raise ActionPrimitiveError(
@@ -836,7 +836,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 return
             if stop_on_contact and detect_robot_collision_in_sim(self.robot, ignore_obj_in_hand=False):
                 return
-            yield action
+            yield action, "manip:move_hand_direct_joint"
 
         if not ignore_failure:
             raise ActionPrimitiveError(
@@ -921,11 +921,11 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         controller_name = "gripper_{}".format(self.arm)
         action[self.robot.controller_action_idx[controller_name]] = -1.0
         for _ in range(MAX_STEPS_FOR_GRASP_OR_RELEASE):
-            yield action
+            yield action, "manip:execute_grasp"
 
         # Do nothing for a bit so that AG can trigger.
         # for _ in range(MAX_WAIT_FOR_GRASP_OR_RELEASE):
-        #     yield self._empty_action()
+        #     yield self._empty_action(), "manip:execute_grasp"
 
     def _execute_release(self):
         """
@@ -940,7 +940,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         action[self.robot.controller_action_idx[controller_name]] = 1.0
         for _ in range(MAX_STEPS_FOR_GRASP_OR_RELEASE):
             # Otherwise, keep applying the action!
-            yield action
+            yield action, "manip:execute_release"
 
         if self._get_obj_in_hand() is not None:
             raise ActionPrimitiveError(
@@ -1239,7 +1239,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 else:
                     base_action = [KP_LIN_VEL, 0.0]
                     action[self.robot.controller_action_idx["base"]] = base_action
-                yield action
+                yield action, "nav:navigate_to_pose_direct"
 
             body_target_pose = self._get_pose_in_robot_frame(end_pose)
 
@@ -1269,12 +1269,12 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             action[self.robot.controller_action_idx["base"]] = base_action
             
             action = self._overwrite_head_action(action, self._tracking_object) if self._tracking_object is not None else action
-            yield action
+            yield action, "nav:rotate_in_place"
 
             body_target_pose = self._get_pose_in_robot_frame(end_pose)
             diff_yaw = T.wrap_angle(T.quat2euler(body_target_pose[1])[2])
             
-        yield self._empty_action()
+        yield self._empty_action(), "nav:rotate_in_place"
             
     def _sample_pose_near_object(self, obj, pose_on_obj=None, **kwargs):
         """
@@ -1493,4 +1493,4 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         """
         yield from [self._empty_action() for _ in range(10)]
         while np.linalg.norm(self.robot.get_linear_velocity()) > 0.01:
-            yield self._empty_action()
+            yield self._empty_action(), "nav:settle_robot"
