@@ -1529,6 +1529,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Returns:
             np.array or None: Action array for one step for the robot to do nothing
         """
-        yield from [self._empty_action() for _ in range(10)]
+        yield from [(self._empty_action(), "nav:settle_robot") for _ in range(10)]
         while np.linalg.norm(self.robot.get_linear_velocity()) > 0.01:
             yield self._empty_action(), "nav:settle_robot"
