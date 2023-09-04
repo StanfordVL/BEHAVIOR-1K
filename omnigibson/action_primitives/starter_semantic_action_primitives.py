@@ -124,14 +124,23 @@ class UndoableContext(object):
         self._set_prim_pose(self.robot_copy.prims[self.robot_copy_type], self.robot_copy.reset_pose[self.robot_copy_type])
 
     def _assemble_robot_copy(self):
-        fk_descriptor = "combined" if "combined" in self.robot.robot_arm_descriptor_yamls else self.robot.default_arm
+        if TORSO_FIXED:
+            fk_descriptor = "left_fixed"
+        else:
+            fk_descriptor = "combined" if "combined" in self.robot.robot_arm_descriptor_yamls else self.robot.default_arm
         self.fk_solver = FKSolver(
             robot_description_path=self.robot.robot_arm_descriptor_yamls[fk_descriptor],
             robot_urdf_path=self.robot.urdf_path,
         )
         arm_links = self.robot.manipulation_link_names
-        joint_combined_idx = np.concatenate([self.robot.trunk_control_idx, self.robot.arm_control_idx[fk_descriptor]])
-        joint_pos = np.array(self.robot.get_joint_positions()[joint_combined_idx])
+
+        if TORSO_FIXED:
+            assert self.arm == "left", "Fixed torso mode only supports left arm!"
+            joint_control_idx = self.robot.arm_cotnrol_idx["left"]
+            joint_pos = np.array(self.robot.get_joint_positions()[joint_control_idx])
+        else:
+            joint_combined_idx = np.concatenate([self.robot.trunk_control_idx, self.robot.arm_control_idx[fk_descriptor]])
+            joint_pos = np.array(self.robot.get_joint_positions()[joint_combined_idx])
         link_poses = self.fk_solver.get_link_poses(joint_pos, arm_links)
 
         # Set position of robot copy root prim
@@ -722,9 +731,16 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 - np.array or None: Joint positions to reach target pose or None if impossible to reach the target pose
                 - np.array: Indices for joints in the robot
         """
-        control_idx = np.concatenate([self.robot.trunk_control_idx, self.robot.arm_control_idx[self.arm]])
+        if TORSO_FIXED:
+            assert self.arm == "left", "Fixed torso mode only supports left arm!"
+            control_idx = self.robot.arm_control_idx["left"]
+            robot_description_path = self.robot.robot_arm_descriptor_yamls["left_fixed"]
+        else:
+            control_idx = np.concatenate([self.robot.trunk_control_idx, self.robot.arm_control_idx[self.arm]])
+            robot_description_path = self.robot.robot_arm_descriptor_yamls[self.arm]
+
         ik_solver = IKSolver(
-            robot_description_path=self.robot.robot_arm_descriptor_yamls[self.arm],
+            robot_description_path=robot_description_path,
             robot_urdf_path=self.robot.urdf_path,
             default_joint_pos=self.robot.get_joint_positions()[control_idx],
             eef_name=self.robot.eef_link_names[self.arm],
@@ -777,7 +793,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 plan = plan_arm_motion(
                     robot=self.robot,
                     end_conf=joint_pos,
-                    context=context
+                    context=context,
+                    torso_fixed=TORSO_FIXED,
                 )
 
             # plan = self._add_linearly_interpolated_waypoints(plan, 0.1)
@@ -1059,7 +1076,10 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Returns:
             np.array or None: Action array for one step for the robot to reset its hand or None if it is done resetting
         """
-        control_idx = np.concatenate([self.robot.trunk_control_idx, self.robot.arm_control_idx[self.arm]])
+        if TORSO_FIXED:
+            control_idx = self.robot.arm_control_idx[self.arm]
+        else:
+            control_idx = np.concatenate([self.robot.trunk_control_idx, self.robot.arm_control_idx[self.arm]])
         reset_pose = self._get_reset_joint_pos()[control_idx]
         indented_print("Resetting hand")
         try:
