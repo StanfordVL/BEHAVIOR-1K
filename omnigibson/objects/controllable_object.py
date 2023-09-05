@@ -436,8 +436,8 @@ class ControllableObject(BaseObject):
             elif ctrl_type == ControlType.POSITION:
                 joint.set_pos(ctrl, normalized=norm, drive=True)
             elif ctrl_type == ControlType.NONE:
-                # Do nothing
-                pass
+                # Set zero efforts
+                joint.set_effort(0, normalized=False)
             else:
                 raise ValueError("Invalid control type specified: {}".format(ctrl_type))
 
