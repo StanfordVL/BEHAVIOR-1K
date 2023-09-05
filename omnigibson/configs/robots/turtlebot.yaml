@@ -10,6 +10,15 @@ robot:
   base_name: null
   scale: 1.0
   self_collision: false
+  sensor_config:
+    VisionSensor:
+      sensor_kwargs:
+        image_height: 128
+        image_width: 128
+    ScanSensor:
+        sensor_kwargs:
+          min_range: 0.05
+          max_range: 10.0
   controller_config:
     base:
       name: DifferentialDriveController
