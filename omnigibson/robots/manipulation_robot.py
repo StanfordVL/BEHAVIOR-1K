@@ -112,7 +112,7 @@ class ManipulationRobot(BaseRobot):
 
         # Unique to ManipulationRobot
         grasping_mode="physical",
-        disable_grasp_handling=False,
+        disable_grasp_handling=True,  # TODO: revert to False. This is for debugging purposes
 
         **kwargs,
     ):

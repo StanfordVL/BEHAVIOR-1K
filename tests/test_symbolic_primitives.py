@@ -34,6 +34,7 @@ def start_env():
         "action_normalize": False,
         "action_type": "continuous",
         "grasping_mode": "sticky",
+        "disable_grasp_handling": True,
         "rigid_trunk": False,
         "default_trunk_offset": 0.365,
         "default_arm_pose": "diagonal30",
@@ -74,6 +75,13 @@ def start_env():
           "category": "frying_pan",
           "model": "mhndon",
           "position": [5.31, 10.75, 1.],
+      },
+      {
+          "type": "DatasetObject",
+          "name": "knife",
+          "category": "carving_knife",
+          "model": "awvoox",
+          "position": [5.31, 10.75, 1.2],
       },
       {
           "type": "DatasetObject",
@@ -130,6 +138,10 @@ def steak(env):
 def sponge(env):
   return next(iter(env.scene.object_registry("category", "sponge")))
 
+@pytest.fixture
+def knife(env):
+  return next(iter(env.scene.object_registry("category", "carving_knife")))
+
 # def test_navigate():
 #    pass
 
@@ -177,8 +189,13 @@ def test_place_inside(env, prim_gen, steak, fridge):
 # def test_wipe():
 #    pass
 
-# def test_cut():
-#    pass
+def test_cut(env, prim_gen, steak, knife):
+  # assert not steak.states[object_states.Cut].get_value(knife)
+  for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.GRASP, knife):
+    env.step(action)
+  for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.CUT, steak):
+    env.step(action)
+  # assert steak.states[object_states.Sliced].get_value(knife)
 
 # def test_place_near_heating_element():
 #    pass
@@ -192,14 +209,14 @@ def main():
   robot = env.robots[0]
   prim_gen = SymbolicSemanticActionPrimitives(None, scene, robot)
   steak = next(iter(env.scene.object_registry("category", "steak")))
-  fridge = next(iter(env.scene.object_registry("category", "fridge")))
+  knife = next(iter(env.scene.object_registry("category", "carving_knife")))
 
   try:
-    test_place_inside(env, prim_gen, steak, fridge)
+    test_cut(env, prim_gen, steak, knife)
   except:
     pass
   while True:
-    og.sim.render()
+    og.sim.step()
 
 if __name__ == "__main__":
   main()

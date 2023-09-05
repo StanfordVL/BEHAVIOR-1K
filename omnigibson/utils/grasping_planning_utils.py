@@ -4,7 +4,7 @@ from scipy.spatial.transform import Rotation as R, Slerp
 from math import ceil
 
 import omnigibson.utils.transform_utils as T
-from omnigibson.object_states.open import _get_relevant_joints
+from omnigibson.object_states.open_state import _get_relevant_joints
 from omnigibson.utils.constants import JointType, JointAxis
 from omni.isaac.core.utils.rotations import gf_quat_to_np_array
 
