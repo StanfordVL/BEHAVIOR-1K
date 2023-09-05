@@ -4,7 +4,7 @@
 # used in constructor are generated automatically at runtime)
 robot:
   sensor_config:
-    VisionSensor:
+    ScanSensor:
       modalities: [scan, occupancy_grid]  # if specified, this will override the values in robots_config["obs_modalities"]
       enabled: true
       noise_type: null
