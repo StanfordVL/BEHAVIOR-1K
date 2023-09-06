@@ -389,6 +389,8 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 action_dim = robot.action_dim
                 action_dict[robot.name] = action[idx: idx + action_dim]
                 idx += action_dim
+            # Make sure idx matches the length of the action
+            assert idx == len(action), f"Got mismatch in inputted action. Expected length {len(action)}, got: {idx}"
         else:
             # Our inputted action is the action dictionary
             action_dict = action
