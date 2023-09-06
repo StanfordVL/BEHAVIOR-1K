@@ -169,9 +169,11 @@ class JointPrim(BasePrim):
                 dof_props = self._dc.get_dof_properties(dof_handle)
                 self._dof_handles.append(dof_handle)
                 self._dof_properties.append(dof_props)
-                # Infer control type based on whether kp and kd are 0 or not
+                # Infer control type based on whether kp and kd are 0 or not, as well as whether this joint is driven or not
                 kp, kd = dof_props.stiffness, dof_props.damping
-                if kp == 0.0:
+                if not self._driven:
+                    control_type = ControlType.NONE
+                elif kp == 0.0:
                     control_type = ControlType.EFFORT if kd == 0.0 else ControlType.VELOCITY
                 else:
                     control_type = ControlType.POSITION
