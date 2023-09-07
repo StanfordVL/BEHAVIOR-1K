@@ -245,6 +245,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             joint_qvel=joint_velocities,
             joint_qeffort=joint_efforts,
             robot_pos=pos,
+            robot_pose=np.append(pos[:2], ori[2]),
             robot_ori_cos=np.cos(ori),
             robot_ori_sin=np.sin(ori),
             robot_lin_vel=self.get_linear_velocity(),
