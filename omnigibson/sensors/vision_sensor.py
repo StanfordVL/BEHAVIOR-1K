@@ -368,6 +368,29 @@ class VisionSensor(BaseSensor):
         self.set_attribute("focalLength", length)
 
     @property
+    def intrinsic_matrix(self):
+        """
+        Returns:
+            n-array: (3, 3) camera intrinsic matrix. Transforming point p (x,y,z) in the camera frame via K * p will
+                produce p' (x', y', w) - the point in the image plane. To get pixel coordiantes, divide x' and y' by w
+        """
+        params = get_camera_params(viewport=self._viewport.viewport_api)
+        h, w = self.image_height, self.image_width
+        horizontal_fov = params["fov"]
+        vertical_fov = horizontal_fov * h / w
+
+        f_x = (w / 2.0) / np.tan(horizontal_fov / 2.0)
+        f_y = (h / 2.0) / np.tan(vertical_fov / 2.0)
+
+        K = np.array([
+            [f_x, 0.0, w / 2.0],
+            [0.0, f_y, h / 2.0],
+            [0.0, 0.0, 1.0]
+        ])
+
+        return K
+
+    @property
     def _obs_space_mapping(self):
         # Generate the complex space types for special modalities:
         # {"bbox_2d_tight", "bbox_2d_loose", "bbox_3d", "camera"}
