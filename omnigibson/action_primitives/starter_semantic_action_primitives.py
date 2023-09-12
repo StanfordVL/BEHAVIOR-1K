@@ -31,6 +31,7 @@ from omnigibson.tasks.behavior_task import BehaviorTask
 from omnigibson.utils.motion_planning_utils import (
     plan_base_motion,
     plan_arm_motion,
+    plan_arm_motion_ik,
     set_base_and_detect_collision,
     detect_robot_collision_in_sim
 )
@@ -544,7 +545,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             approach_pose = (approach_pos, grasp_pose[1])
             # If the grasp pose is too far, navigate.
             yield from self._navigate_if_needed(obj, pose_on_obj=grasp_pose)
-            yield from self._move_hand_direct_cartesian(grasp_pose, ignore_failure=True)
+            
+            # yield from self._move_hand_direct_cartesian(grasp_pose, ignore_failure=True)
+            yield from self._move_hand(grasp_pose)
 
             # We can pre-grasp in sticky grasping mode.
             yield from self._execute_grasp()
@@ -828,8 +831,13 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             np.array or None: Action array for one step for the robot to move hand or None if its at the target pose
         """
         yield from self._settle_robot()
-        joint_pos, control_idx = self._convert_cartesian_to_joint_space(target_pose)
-        yield from self._move_hand_joint(joint_pos, control_idx)
+        controller_config = self.robot._controller_config["arm_" + self.arm]
+        if controller_config["name"] == "InverseKinematicsController":
+            target_pose_relative = self._get_pose_in_robot_frame(target_pose)
+            yield from self._move_hand_ik(target_pose_relative)
+        else:
+            joint_pos, control_idx = self._convert_cartesian_to_joint_space(target_pose)
+            yield from self._move_hand_joint(joint_pos, control_idx)
 
     def _move_hand_joint(self, joint_pos, control_idx):
         """
@@ -868,46 +876,46 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             indented_print("Plan has %d steps", len(plan))
             for i, joint_pos in enumerate(plan):
                 indented_print("Executing grasp plan step %d/%d", i + 1, len(plan))
-                yield from self._move_hand_direct_joint(joint_pos, control_idx)
+                yield from self._move_hand_direct_joint(joint_pos, control_idx, ignore_failure=True)
 
-    def _move_hand_ik(self, eef_pos):
+    def _move_hand_ik(self, eef_pose):
         """
-        Yields action for the robot to move arm to reach the specified joint positions using the planner
+        Yields action for the robot to move arm to reach the specified eef positions using the planner
 
         Args:
-            joint_pos (np.array): Joint positions for the arm
-            control_idx (np.array): Indices of the joints to move
+            eef_pose (np.array): End Effector pose for the arm
         
         Returns:
             np.array or None: Action array for one step for the robot to move arm or None if its at the joint positions
         """
-        if self.teleport:
-            # Teleport the robot to the joint state
-            self.robot.set_joint_positions(joint_pos, control_idx)
+        assert self.teleport == False, "Teleport is currently only supported for Joint Controller"
 
-            # Yield a bunch of no-ops to give the robot time to settle.
-            yield from self._settle_robot()
-        else:
-            with UndoableContext(self.robot, self.robot_copy, "original") as context:
-                plan = plan_arm_motion(
-                    robot=self.robot,
-                    end_conf=joint_pos,
-                    context=context,
-                    torso_fixed=TORSO_FIXED,
-                )
+        eef_pos = eef_pose[0]
+        eef_ori = T.quat2axisangle(eef_pose[1])
+        end_conf = np.append(eef_pos, eef_ori)
 
-            # plan = self._add_linearly_interpolated_waypoints(plan, 0.1)
-            if plan is None:
-                raise ActionPrimitiveError(
-                    ActionPrimitiveError.Reason.PLANNING_ERROR,
-                    "There is no accessible path from where you are to the desired joint position. Try again"
-                )
-            
-            # Follow the plan to navigate.
-            indented_print("Plan has %d steps", len(plan))
-            for i, joint_pos in enumerate(plan):
-                indented_print("Executing grasp plan step %d/%d", i + 1, len(plan))
-                yield from self._move_hand_direct_joint(joint_pos, control_idx)
+        with UndoableContext(self.robot, self.robot_copy, "original") as context:
+            plan = plan_arm_motion_ik(
+                robot=self.robot,
+                end_conf=end_conf,
+                context=context,
+                torso_fixed=TORSO_FIXED,
+            )
+
+        # plan = self._add_linearly_interpolated_waypoints(plan, 0.1)
+        if plan is None:
+            raise ActionPrimitiveError(
+                ActionPrimitiveError.Reason.PLANNING_ERROR,
+                "There is no accessible path from where you are to the desired joint position. Try again"
+            )
+        
+        # Follow the plan to navigate.
+        indented_print("Plan has %d steps", len(plan))
+        for i, target_pose in enumerate(plan):
+            target_pos = target_pose[:3]
+            target_quat = T.axisangle2quat(target_pose[3:])
+            indented_print("Executing grasp plan step %d/%d", i + 1, len(plan))
+            yield from self._move_hand_direct_ik((target_pos, target_quat), ignore_failure=True, in_world_frame=False)
 
     def _add_linearly_interpolated_waypoints(self, plan, max_inter_dist):
         """
@@ -987,14 +995,15 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 "Your hand was obstructed from moving to the desired joint position"
             )
 
-    def _move_hand_direct_ik(self, target_pose, stop_on_contact=False, ignore_failure=False, pos_thresh=0.05, ori_thresh=0.5):
+    def _move_hand_direct_ik(self, target_pose, stop_on_contact=False, ignore_failure=False, pos_thresh=0.05, ori_thresh=0.5, in_world_frame=True):
         # make sure controller is InverseKinematicsController and in expected mode
         controller_config = self.robot._controller_config["arm_" + self.arm]
         assert controller_config["name"] == "InverseKinematicsController", "Controller must be InverseKinematicsController"
         assert controller_config["motor_type"] == "velocity", "Controller must be in velocity mode"
         assert controller_config["mode"] == "pose_absolute_ori", "Controller must be in pose_delta_ori mode"
         # target pose = (position, quat) IN WORLD FRAME
-        target_pose = self._get_pose_in_robot_frame(target_pose)
+        if in_world_frame:
+            target_pose = self._get_pose_in_robot_frame(target_pose)
         target_pos = target_pose[0]
         target_ori = T.quat2axisangle(target_pose[1])
         action = self._empty_action()

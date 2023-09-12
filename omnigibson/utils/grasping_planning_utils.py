@@ -22,7 +22,7 @@ def get_grasp_poses_for_object_sticky(target_obj):
         visual=False
     )
 
-    grasp_center_pos = bbox_center_in_world + np.array([0, 0, np.max(bbox_extent_in_base_frame) + 0.05])
+    grasp_center_pos = bbox_center_in_world + np.array([0, 0, np.max(bbox_extent_in_base_frame) + 0.1])
     towards_object_in_world_frame = bbox_center_in_world - grasp_center_pos
     towards_object_in_world_frame /= np.linalg.norm(towards_object_in_world_frame)
 
