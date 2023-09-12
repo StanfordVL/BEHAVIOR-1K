@@ -153,6 +153,10 @@ class TransitionRuleAPI:
                 added_obj_attrs += output.add
                 removed_objs += output.remove
 
+        cls.execute_transition(added_obj_attrs=added_obj_attrs, removed_objs=removed_objs)
+
+    @classmethod
+    def execute_transition(cls, added_obj_attrs, removed_objs):
         # Process all transition results
         if len(removed_objs) > 0:
             disclaimer(
