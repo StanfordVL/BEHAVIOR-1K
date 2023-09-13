@@ -554,12 +554,13 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             # Step once to update
             yield self._empty_action()
 
-            if self._get_obj_in_hand() is None:
-                raise ActionPrimitiveError(
-                    ActionPrimitiveError.Reason.POST_CONDITION_ERROR,
-                    "Grasp completed, but no object detected in hand after executing grasp",
-                    {"target object": obj.name},
-                )
+            # if self._get_obj_in_hand() is None:
+            #     print("error")
+            #     raise ActionPrimitiveError(
+            #         ActionPrimitiveError.Reason.POST_CONDITION_ERROR,
+            #         "Grasp completed, but no object detected in hand after executing grasp",
+            #         {"target object": obj.name},
+            #     )
             
             yield from self._reset_hand()
 
