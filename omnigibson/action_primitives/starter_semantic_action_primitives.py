@@ -567,11 +567,11 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     {"target object": obj.name},
                 )
             
-            temp_reset_pos = grasp_pose[0] + np.array([0.0, 0.0, 0.1])
-            temp_reset_pose = (temp_reset_pos, grasp_pose[1])
+            # temp_reset_pos = grasp_pose[0] + np.array([0.0, 0.0, 0.1])
+            # temp_reset_pose = (temp_reset_pos, grasp_pose[1])
             
-            yield from self._move_hand_direct_cartesian(temp_reset_pose, ignore_failure=True)
-            # yield from self._reset_hand()
+            # yield from self._move_hand_direct_cartesian(temp_reset_pose, ignore_failure=True)
+            yield from self._reset_hand()
 
         if self._get_obj_in_hand() != obj:
             raise ActionPrimitiveError(
@@ -1024,9 +1024,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             
             action[control_idx] = np.concatenate([delta_pos, target_ori])
             action = self._overwrite_head_action(action, self._tracking_object) if self._tracking_object is not None else action
-            print("action", action[control_idx])
-            print("pos_error", delta_pos)
-            print("ori_error", delta_ori)
             yield action, "manip:move_hand_direct_ik"
 
         if not ignore_failure:
@@ -1266,15 +1263,16 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         controller_config = self.robot._controller_config["arm_" + self.arm]
         if controller_config["name"] == "InverseKinematicsController":
+            indented_print("Resetting hand")
             reset_eef_pose = self._get_reset_eef_pose()
             try:
-                yield from self._move_hand_direct_ik(reset_eef_pose, ignore_failure=True)
+                yield from self._move_hand_ik(reset_eef_pose)
             except ActionPrimitiveError:
                 indented_print("Could not do a planned reset of the hand - probably obj_in_hand collides with body")
-                yield from self._move_hand_direct_ik(reset_eef_pose, ignore_failure=True)
+                yield from self._move_hand_direct_ik(reset_eef_pose, ignore_failure=True, in_world_frame=False)
         else:
-            reset_pose = self._get_reset_joint_pos()[control_idx]
             indented_print("Resetting hand")
+            reset_pose = self._get_reset_joint_pos()[control_idx]
             try:
                 yield from self._move_hand_joint(reset_pose, control_idx)
             except ActionPrimitiveError:
