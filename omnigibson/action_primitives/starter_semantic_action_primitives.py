@@ -471,8 +471,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 yield from self._move_hand_direct_cartesian(approach_pose, ignore_failure=False, stop_on_contact=True)
 
                 # Step once to update
-                for i in range(MAX_STEPS_FOR_GRASP_OR_RELEASE):
-                    yield self._empty_action()
+                yield self._empty_action()
 
                 # if grasp_required:
                 #     if self._get_obj_in_hand() is None:

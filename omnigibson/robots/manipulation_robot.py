@@ -769,6 +769,7 @@ class ManipulationRobot(BaseRobot):
         ag_obj_prim_path = "/".join(ag_prim_path.split("/")[:-1])
         ag_obj_link_name = ag_prim_path.split("/")[-1]
         ag_obj = og.sim.scene.object_registry("prim_path", ag_obj_prim_path)
+        
         # Return None if object cannot be assisted grasped or not touching at least two fingers
         if ag_obj is None or (not can_assisted_grasp(ag_obj, ag_obj_link_name)) or (not touching_at_least_two_fingers):
             return None
