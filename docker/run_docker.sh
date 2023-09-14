@@ -117,9 +117,6 @@ docker run \
     -e DISPLAY=${DOCKER_DISPLAY} \
     -e OMNIGIBSON_HEADLESS=${OMNIGIBSON_HEADLESS} \
     -v $DATA_PATH/datasets:/data \
-    -v ${ICD_PATH}:/etc/vulkan/icd.d/nvidia_icd.json \
-    -v ${LAYERS_PATH}:/etc/vulkan/implicit_layer.d/nvidia_layers.json \
-    -v ${EGL_VENDOR_PATH}:/usr/share/glvnd/egl_vendor.d/10_nvidia.json \
     -v $DATA_PATH/isaac-sim/cache/kit:/isaac-sim/kit/cache/Kit:rw \
     -v $DATA_PATH/isaac-sim/cache/ov:/root/.cache/ov:rw \
     -v $DATA_PATH/isaac-sim/cache/pip:/root/.cache/pip:rw \
