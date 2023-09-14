@@ -36,7 +36,7 @@ class GraspReward(BaseRewardFunction):
         reward = None
 
         if not self.prev_grasping and not current_grasping:
-            eef_pos = robot.get_eef_position(robot.arm)
+            eef_pos = robot.get_eef_position(robot.default_arm)
             obj_pos = self.obj.get_position()
             reward = T.l2_distance(eef_pos, obj_pos) * self.dist_coeff
 

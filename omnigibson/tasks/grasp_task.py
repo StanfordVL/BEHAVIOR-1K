@@ -23,25 +23,20 @@ class GraspTask(BaseTask):
         reward_config=None,
     ):
         self.obj_name = obj_name
-    
         super().__init__(termination_config=termination_config, reward_config=reward_config)
         
-
     def _load(self, env):
         # Do nothing here
         pass  
 
     def _create_termination_conditions(self):
-        # Run super first
-        terminations = super()._create_termination_conditions()
-
+        terminations = dict()
         terminations["graspgoal"] = GraspGoal(
             self.obj_name
         )
         terminations["timeout"] = Timeout(max_steps=self._termination_config["max_steps"])
 
         return terminations
-
 
     def _create_reward_functions(self):
         rewards = dict()
@@ -67,8 +62,9 @@ class GraspTask(BaseTask):
 
     @classproperty
     def default_termination_config(cls):
-        # Empty dict
-        return {}
+        return {
+            "max_steps": 100000
+        }
 
     @classproperty
     def default_reward_config(cls):

@@ -550,7 +550,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             # It's okay if we can't go all the way because we run into the object.
             indented_print("Performing grasp approach")
             yield from self._move_hand_direct_cartesian(approach_pose, stop_on_contact=True)
-
+            print("touched")
             # Step once to update
             yield self._empty_action()
 
