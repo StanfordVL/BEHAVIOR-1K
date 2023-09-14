@@ -273,7 +273,8 @@ class ManipulationRobot(BaseRobot):
                 is_grasping = len(candidate_obj.states[ContactBodies].get_value().intersection(finger_links)) > 0
 
         if arm == self.default_arm:
-            print("GRASPING:", is_grasping)
+            pass
+            # print("GRASPING:", is_grasping)
         return is_grasping
 
     def _find_gripper_contacts(self, arm="default", return_contact_positions=False):

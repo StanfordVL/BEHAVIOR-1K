@@ -723,6 +723,11 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             super().set_position_orientation(position, orientation)
             # Move the joint frame for the world_base_joint
             if self._world_base_fixed_joint_prim is not None:
+                # Position and orientation are lists when restoring scene from json. Cast them to np.array
+                if isinstance(position, list):
+                    position = np.array(position)
+                if isinstance(orientation, list):
+                    orientation = np.array(orientation)
                 self._world_base_fixed_joint_prim.GetAttribute("physics:localPos0").Set(tuple(position))
                 self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(Gf.Quatf(*orientation[[3, 0, 1, 2]]))
 
