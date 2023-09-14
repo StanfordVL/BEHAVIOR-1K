@@ -471,7 +471,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 yield from self._move_hand_direct_cartesian(approach_pose, ignore_failure=False, stop_on_contact=True)
 
                 # Step once to update
-                yield self._empty_action()
+                for i in range(MAX_STEPS_FOR_GRASP_OR_RELEASE):
+                    yield self._empty_action()
 
                 # if grasp_required:
                 #     if self._get_obj_in_hand() is None:
@@ -550,17 +551,16 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             # It's okay if we can't go all the way because we run into the object.
             indented_print("Performing grasp approach")
             yield from self._move_hand_direct_cartesian(approach_pose, stop_on_contact=True)
-            print("touched")
+
             # Step once to update
             yield self._empty_action()
 
-            # if self._get_obj_in_hand() is None:
-            #     print("error")
-            #     raise ActionPrimitiveError(
-            #         ActionPrimitiveError.Reason.POST_CONDITION_ERROR,
-            #         "Grasp completed, but no object detected in hand after executing grasp",
-            #         {"target object": obj.name},
-            #     )
+            if self._get_obj_in_hand() is None:
+                raise ActionPrimitiveError(
+                    ActionPrimitiveError.Reason.POST_CONDITION_ERROR,
+                    "Grasp completed, but no object detected in hand after executing grasp",
+                    {"target object": obj.name},
+                )
             
             yield from self._reset_hand()
 
@@ -1110,6 +1110,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             4.50000000e-02,  
             4.50000000e-02
         ])
+
         return reset_pose_tiago if self.robot_model == "Tiago" else reset_pose_fetch
     
     def _navigate_to_pose(self, pose_2d):

@@ -1,3 +1,4 @@
+import math
 import numpy as np
 import omnigibson as og
 from omnigibson.macros import gm
@@ -28,7 +29,7 @@ def execute_controller(ctrl_gen, env):
 
 def test_grasp_reward():
     DIST_COEFF = 0.1
-    GRASP_REWARD = 1.0
+    GRASP_REWARD = 0.3
 
     cfg = {
         "scene": {
@@ -139,7 +140,10 @@ def test_grasp_reward():
 
     # Check reward going from not grasping to not grasping
     _, reward, _, _ = env.step(next(ctrl_gen))
-    # assert reward == 10
+    eef_pos = robot.get_eef_position(robot.default_arm)
+    obj_center = obj.aabb_center
+    expected_reward = math.exp(T.l2_distance(eef_pos, obj_center)) * DIST_COEFF
+    assert math.isclose(reward, expected_reward, abs_tol=0.01)
 
     for action in ctrl_gen:
         prev_obj_in_hand = robot._ag_obj_in_hand[robot.default_arm]
@@ -147,12 +151,14 @@ def test_grasp_reward():
         obj_in_hand = robot._ag_obj_in_hand[robot.default_arm]
         if prev_obj_in_hand is None and obj_in_hand is not None:
             # Check reward going from not grapsing to after grasping
-            print(reward)
             assert reward == GRASP_REWARD
         elif prev_obj_in_hand is not None and obj_in_hand is not None:
             # Check reward going from grasping to grasping
-            # assert reward > GRASP_REWARD
+            expected_reward = math.exp(T.l2_distance(robot.aabb_center, obj_center)) * DIST_COEFF
+            assert math.isclose(reward, expected_reward, abs_tol=0.01)
             break
+
+    ctrl_gen = controller.apply_ref(StarterSemanticActionPrimitiveSet.RELEASE)
 
     for action in ctrl_gen:
         prev_obj_in_hand = robot._ag_obj_in_hand[robot.default_arm]
@@ -161,7 +167,5 @@ def test_grasp_reward():
         if prev_obj_in_hand is not None and obj_in_hand is None:
             # Check reward going from grapsing to not grasping
             assert reward == -GRASP_REWARD
-            print(reward)
-
 
 test_grasp_reward()

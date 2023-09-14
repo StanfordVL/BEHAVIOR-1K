@@ -1,3 +1,4 @@
+import math
 from omnigibson.reward_functions.reward_function_base import BaseRewardFunction
 import omnigibson.utils.transform_utils as T
 
@@ -37,8 +38,9 @@ class GraspReward(BaseRewardFunction):
 
         if not self.prev_grasping and not current_grasping:
             eef_pos = robot.get_eef_position(robot.default_arm)
-            obj_pos = self.obj.get_position()
-            reward = T.l2_distance(eef_pos, obj_pos) * self.dist_coeff
+            obj_center = self.obj.aabb_center
+            dist = T.l2_distance(eef_pos, obj_center)
+            reward =  math.exp(dist) * self.dist_coeff
 
         elif not self.prev_grasping and current_grasping:
             reward = self.grasp_reward
@@ -47,8 +49,10 @@ class GraspReward(BaseRewardFunction):
             reward = -self.grasp_reward
         
         elif self.prev_grasping and current_grasping:
-            # Need to finish
-            reward = 0
+            robot_center = robot.aabb_center
+            obj_center = self.obj.aabb_center
+            dist = T.l2_distance(robot_center, obj_center)
+            reward =  math.exp(dist) * self.dist_coeff
 
         self.prev_grasping = current_grasping
         return reward, {}
