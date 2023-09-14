@@ -1109,7 +1109,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             4.50000000e-02,  
             4.50000000e-02
         ])
-
         return reset_pose_tiago if self.robot_model == "Tiago" else reset_pose_fetch
     
     def _navigate_to_pose(self, pose_2d):
