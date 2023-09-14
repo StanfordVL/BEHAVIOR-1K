@@ -1,10 +1,12 @@
 import math
 import numpy as np
+import matplotlib.pyplot as plt
 import omnigibson as og
 from omnigibson.macros import gm
 from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitives, StarterSemanticActionPrimitiveSet
 import omnigibson.utils.transform_utils as T
 from omnigibson.objects.dataset_object import DatasetObject
+
 
 def set_start_pose(robot):
     reset_pose_tiago = np.array([
@@ -138,23 +140,30 @@ def test_grasp_reward():
 
     ctrl_gen = controller.apply_ref(StarterSemanticActionPrimitiveSet.GRASP, obj)
 
+    # rewards = [0]
+    # total_rewards = [0]
+
     # Check reward going from not grasping to not grasping
     _, reward, _, _ = env.step(next(ctrl_gen))
+    # rewards.append(reward)
+    # total_rewards.append(total_rewards[-1] + reward)
     eef_pos = robot.get_eef_position(robot.default_arm)
     obj_center = obj.aabb_center
-    expected_reward = math.exp(T.l2_distance(eef_pos, obj_center)) * DIST_COEFF
+    expected_reward = math.exp(-T.l2_distance(eef_pos, obj_center)) * DIST_COEFF
     assert math.isclose(reward, expected_reward, abs_tol=0.01)
 
     for action in ctrl_gen:
         prev_obj_in_hand = robot._ag_obj_in_hand[robot.default_arm]
         _, reward, _, _ = env.step(action)
+        # rewards.append(reward)
+        # total_rewards.append(total_rewards[-1] + reward)
         obj_in_hand = robot._ag_obj_in_hand[robot.default_arm]
         if prev_obj_in_hand is None and obj_in_hand is not None:
             # Check reward going from not grapsing to after grasping
             assert reward == GRASP_REWARD
         elif prev_obj_in_hand is not None and obj_in_hand is not None:
             # Check reward going from grasping to grasping
-            expected_reward = math.exp(T.l2_distance(robot.aabb_center, obj_center)) * DIST_COEFF
+            expected_reward = math.exp(-T.l2_distance(robot.aabb_center, obj_center)) * DIST_COEFF
             assert math.isclose(reward, expected_reward, abs_tol=0.01)
             break
 
@@ -163,9 +172,18 @@ def test_grasp_reward():
     for action in ctrl_gen:
         prev_obj_in_hand = robot._ag_obj_in_hand[robot.default_arm]
         _, reward, _, _ = env.step(action)
+        # rewards.append(reward)
+        # total_rewards.append(total_rewards[-1] + reward)
         obj_in_hand = robot._ag_obj_in_hand[robot.default_arm]
         if prev_obj_in_hand is not None and obj_in_hand is None:
             # Check reward going from grapsing to not grasping
             assert reward == -GRASP_REWARD
+
+    # plt.figure(1)
+    # plt.subplot(211)
+    # plt.plot(rewards)
+    # plt.subplot(212)
+    # plt.plot(total_rewards)
+    # plt.show()
 
 test_grasp_reward()
