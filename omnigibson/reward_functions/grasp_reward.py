@@ -29,10 +29,10 @@ class GraspReward(BaseRewardFunction):
         # Reward varying based on combination of whether the robot was previously grasping the desired and object
         # and is currently grasping the desired object
 
-        # not grasping -> not grasping = Distance reward
-        # not grasping -> grasping = Large reward
-        # grapsing -> not grapsing = Large negative reward
-        # grasping -> grasping = Minimizing moment of inertia
+        # not grasping -> not grasping = Distance between eef and obj reward
+        # not grasping -> grasping = Minimizing MOI + grasp reward
+        # grapsing -> not grapsing = Distance between eef and obj reward
+        # grasping -> grasping = Minimizing MOI + grasp reward
 
         reward = None
 
@@ -40,19 +40,27 @@ class GraspReward(BaseRewardFunction):
             eef_pos = robot.get_eef_position(robot.default_arm)
             obj_center = self.obj.aabb_center
             dist = T.l2_distance(eef_pos, obj_center)
-            reward =  math.exp(dist) * self.dist_coeff
+            reward =  math.exp(-dist) * self.dist_coeff
 
         elif not self.prev_grasping and current_grasping:
-            reward = self.grasp_reward
+            robot_center = robot.aabb_center
+            obj_center = self.obj.aabb_center
+            dist = T.l2_distance(robot_center, obj_center)
+            dist_reward =  math.exp(-dist) * self.dist_coeff
+            reward = dist_reward + self.grasp_reward
         
         elif self.prev_grasping and not current_grasping:
-            reward = -self.grasp_reward
+            eef_pos = robot.get_eef_position(robot.default_arm)
+            obj_center = self.obj.aabb_center
+            dist = T.l2_distance(eef_pos, obj_center)
+            reward =  math.exp(-dist) * self.dist_coeff
         
         elif self.prev_grasping and current_grasping:
             robot_center = robot.aabb_center
             obj_center = self.obj.aabb_center
             dist = T.l2_distance(robot_center, obj_center)
-            reward =  math.exp(dist) * self.dist_coeff
+            dist_reward =  math.exp(-dist) * self.dist_coeff
+            reward = dist_reward + self.grasp_reward
 
         self.prev_grasping = current_grasping
         return reward, {}
