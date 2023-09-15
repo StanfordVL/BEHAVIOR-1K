@@ -554,12 +554,12 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             # Step once to update
             yield self._empty_action()
 
-            # if self._get_obj_in_hand() is None:
-            #     raise ActionPrimitiveError(
-            #         ActionPrimitiveError.Reason.POST_CONDITION_ERROR,
-            #         "Grasp completed, but no object detected in hand after executing grasp",
-            #         {"target object": obj.name},
-            #     )
+            if self._get_obj_in_hand() is None:
+                raise ActionPrimitiveError(
+                    ActionPrimitiveError.Reason.POST_CONDITION_ERROR,
+                    "Grasp completed, but no object detected in hand after executing grasp",
+                    {"target object": obj.name},
+                )
             
             yield from self._reset_hand()
 
@@ -1050,65 +1050,65 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             ]
         )
 
-        reset_pose_tiago = np.array([
-            -1.78029833e-04,  
-            3.20231302e-05, 
-            -1.85759447e-07, 
-            -1.16488536e-07,
-            4.55182843e-08,  
-            2.36128806e-04,  
-            0.15,  
-            0.94,
-            -1.1,  
-            0.0, 
-            -0.9,  
-            1.47,
-            0.0,  
-            2.1,  
-            2.71,  
-            1.5,
-            1.71,  
-            1.3, 
-            -1.57, 
-            -1.4,
-            1.39,  
-            0.0,  
-            0.0,  
-            0.045,
-            0.045,
-            0.045,
-            0.045,
-        ])
-        
         # reset_pose_tiago = np.array([
         #     -1.78029833e-04,  
         #     3.20231302e-05, 
-        #     -1.85759447e-07,
+        #     -1.85759447e-07, 
+        #     -1.16488536e-07,
+        #     4.55182843e-08,  
+        #     2.36128806e-04,  
+        #     0.15,  
+        #     0.94,
+        #     -1.1,  
         #     0.0, 
-        #     -0.2,
+        #     -0.9,  
+        #     1.47,
         #     0.0,  
-        #     0.1, 
-        #     -6.10000000e-01,
-        #     -1.10000000e+00,  
-        #     0.00000000e+00, 
-        #     -1.10000000e+00,  
-        #     1.47000000e+00,
-        #     0.00000000e+00,  
-        #     8.70000000e-01,  
-        #     2.71000000e+00,  
-        #     1.50000000e+00,
-        #     1.71000000e+00, 
-        #     -1.50000000e+00, 
-        #     -1.57000000e+00,  
-        #     4.50000000e-01,
-        #     1.39000000e+00,  
-        #     0.00000000e+00,  
-        #     0.00000000e+00,  
-        #     4.50000000e-02,
-        #     4.50000000e-02,  
-        #     4.50000000e-02,  
-        #     4.50000000e-02
+        #     2.1,  
+        #     2.71,  
+        #     1.5,
+        #     1.71,  
+        #     1.3, 
+        #     -1.57, 
+        #     -1.4,
+        #     1.39,  
+        #     0.0,  
+        #     0.0,  
+        #     0.045,
+        #     0.045,
+        #     0.045,
+        #     0.045,
         # ])
+        
+        reset_pose_tiago = np.array([
+            -1.78029833e-04,  
+            3.20231302e-05, 
+            -1.85759447e-07,
+            0.0, 
+            -0.2,
+            0.0,  
+            0.1, 
+            -6.10000000e-01,
+            -1.10000000e+00,  
+            0.00000000e+00, 
+            -1.10000000e+00,  
+            1.47000000e+00,
+            0.00000000e+00,  
+            8.70000000e-01,  
+            2.71000000e+00,  
+            1.50000000e+00,
+            1.71000000e+00, 
+            -1.50000000e+00, 
+            -1.57000000e+00,  
+            4.50000000e-01,
+            1.39000000e+00,  
+            0.00000000e+00,  
+            0.00000000e+00,  
+            4.50000000e-02,
+            4.50000000e-02,  
+            4.50000000e-02,  
+            4.50000000e-02
+        ])
         return reset_pose_tiago if self.robot_model == "Tiago" else reset_pose_fetch
     
     def _navigate_to_pose(self, pose_2d):
