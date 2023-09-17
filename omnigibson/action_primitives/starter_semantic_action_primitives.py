@@ -388,7 +388,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 yield from ctrl(*args)
                 success = True
             except ActionPrimitiveError as e:
-                print(e)
                 errors.append(e)
 
             try:
