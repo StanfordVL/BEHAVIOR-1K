@@ -53,31 +53,54 @@ class GraspTask(BaseTask):
         return rewards
     
     def _reset_agent(self, env):
-        robot = env.robots[0]
-        # # Randomize the robots joint positions
-        # # @TODO: SHOULD WORK, BUT NEED TO TEST
-        # # joint_control_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
-        # # joint_combined_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx["combined"]])
-        # # initial_joint_pos = np.array(robot.get_joint_positions()[joint_combined_idx])
-        # # control_idx_in_joint_pos = np.where(np.in1d(joint_combined_idx, joint_control_idx))[0]
+        # from IPython import embed; embed()
+        if hasattr(self, 'primitive_controller'):
+            robot = env.robots[0]
+            # Randomize the robots joint positions
+            joint_control_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
+            joint_combined_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx["combined"]])
+            initial_joint_pos = np.array(robot.get_joint_positions()[joint_combined_idx])
+            control_idx_in_joint_pos = np.where(np.in1d(joint_combined_idx, joint_control_idx))[0]
 
-        # # with UndoableContext(self.primitive_controller.robot, self.primitive_controller.robot_copy, "original") as context:
-        # #     for _ in range(MAX_JOINT_RANDOMIZATION_ATTEMPTS):
-        # #         joint_pos, joint_control_idx = self._get_random_joint_position(robot)
-        # #         initial_joint_pos[control_idx_in_joint_pos] = joint_pos
-        # #         if not set_arm_and_detect_collision(context, initial_joint_pos):
-        # #             robot.set_joint_positions(joint_pos, joint_control_idx)
-        # #             og.sim.step()
-        # #             break
+            with UndoableContext(self.primitive_controller.robot, self.primitive_controller.robot_copy, "original") as context:
+                for _ in range(MAX_JOINT_RANDOMIZATION_ATTEMPTS):
+                    joint_pos, joint_control_idx = self._get_random_joint_position(robot)
+                    initial_joint_pos[control_idx_in_joint_pos] = joint_pos
+                    if not set_arm_and_detect_collision(context, initial_joint_pos):
+                        robot.set_joint_positions(joint_pos, joint_control_idx)
+                        og.sim.step()
+                        break
 
-        # Randomize the robot's 2d pose
-        obj = env.scene.object_registry("name", self.obj_name)
-        if obj is not None:  
+            # Randomize the robot's 2d pose
+            obj = env.scene.object_registry("name", self.obj_name)
             grasp_poses = get_grasp_poses_for_object_sticky(obj)
             grasp_pose, _ = random.choice(grasp_poses)
             sampled_pose_2d = self.primitive_controller._sample_pose_near_object(obj, pose_on_obj=grasp_pose)
             robot_pose = self.primitive_controller._get_robot_pose_from_2d_pose(sampled_pose_2d)
             robot.set_position_orientation(*robot_pose)
+
+    # Overwrite reset by only removeing reset scene
+    def reset(self, env):
+        """
+        Resets this task in the environment
+
+        Args:
+            env (Environment): environment instance to reset
+        """
+        # Reset the scene, agent, and variables
+        # self._reset_scene(env)
+        self._reset_agent(env)
+        self._reset_variables(env)
+
+        # Also reset all termination conditions and reward functions
+        for termination_condition in self._termination_conditions.values():
+            termination_condition.reset(self, env)
+        for reward_function in self._reward_functions.values():
+            reward_function.reset(self, env)
+
+        # Fill in low dim obs dim so we can use this to create the observation space later
+        self._low_dim_obs_dim = len(self.get_obs(env=env, flatten_low_dim=True)["low_dim"])
+
 
     def _get_random_joint_position(self, robot):
         joint_positions = []

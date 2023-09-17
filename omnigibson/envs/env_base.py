@@ -458,7 +458,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         # Reset internal variables
         self._reset_variables()
 
-        # Run a single simulator step to make sure we can grab updated observations
+        # # Run a single simulator step to make sure we can grab updated observations
         og.sim.step()
 
         # Grab and return observations

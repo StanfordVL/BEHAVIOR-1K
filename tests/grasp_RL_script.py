@@ -29,6 +29,13 @@ def execute_controller(ctrl_gen, env):
     for action in ctrl_gen:
         env.step(action)
 
+def reset_env(env, initial_poses):
+    objs = ["cologne", "coffee_table_fqluyq_0", "robot0"]
+    for o in objs:
+        env.scene.object_registry("name", o).set_position_orientation(*initial_poses[o])
+    env.reset()
+    og.sim.step()
+
 DIST_COEFF = 0.1
 GRASP_REWARD = 0.3
 RL_ITERATIONS = 10
@@ -104,38 +111,53 @@ cfg = {
             "r_dist_coeff": DIST_COEFF,
             "r_grasp": GRASP_REWARD
         }
-    }
+    },
+    "objects": [
+        {
+          "type": "DatasetObject",
+          "name": "cologne",
+          "category": "bottle_of_cologne",
+          "model": "lyipur",
+          "position": [-0.3, -0.8, 0.5],
+        },
+    ]
 }
 
 # Create the environment
 env = og.Environment(configs=cfg, action_timestep=1 / 60., physics_timestep=1 / 60.)
 scene = env.scene
 robot = env.robots[0]
+og.sim.step()
+# og.sim.stop()
+# og.sim.play()
 
 # Place object in scene
-obj = DatasetObject(
-    name="cologne",
-    category="bottle_of_cologne",
-    model="lyipur"
-)
-og.sim.import_object(obj)
-obj.set_position([-0.3, -0.8, 0.5])
-set_start_pose(robot)
-og.sim.step()
-env.scene.update_initial_state()
+# obj = DatasetObject(
+#     name="cologne",
+#     category="bottle_of_cologne",
+#     model="lyipur"
+# )
+# og.sim.import_object(obj)
+# obj.set_position([-0.3, -0.8, 0.5])
+# set_start_pose(robot)
+# og.sim.step()
+# env.scene.update_initial_state()
 
 controller = StarterSemanticActionPrimitives(None, scene, robot)
 env.task.add_primitive_controller(controller)
-
-ctrl_gen = controller.apply_ref(StarterSemanticActionPrimitiveSet.GRASP, obj)
+initial_poses = {}
+for o in env.scene.objects:
+    initial_poses[o.name] = o.get_position_orientation()
+obj = env.scene.object_registry("name", "cologne")
 
 for i in range(RL_ITERATIONS):
-    env.reset()
     try:
-        for action in ctrl_gen:
+        reset_env(env, initial_poses)
+        for action in controller.apply_ref(StarterSemanticActionPrimitiveSet.GRASP, obj):
             state, reward, done, info = env.step(action)
             if done:
+                for action in controller._execute_release():
+                    state, reward, done, info = env.step(action)
                 break
-    except Exception as e:
-        print(e)
+    except:
         print("Error in iteration", i)
