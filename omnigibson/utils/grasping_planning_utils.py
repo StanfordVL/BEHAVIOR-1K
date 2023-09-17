@@ -194,9 +194,10 @@ def grasp_position_for_open_on_prismatic_joint(robot, target_obj, relevant_joint
     grasp_required = np.dot(push_vector_in_bbox_frame, canonical_push_axis * -push_axis_closer_side_sign) < 0
     # TODO: Need to find a better of getting the predicted position of eef for start point of interpolating waypoints. Maybe
     # break this into another function that called after the grasp is executed, so we know the eef position?
-    waypoint_start_offset = 0.05 if should_open else -0.05
+    waypoint_start_offset = -0.05 * approach_direction_in_world_frame if should_open else 0.05 * approach_direction_in_world_frame
     waypoint_start_pose = (grasp_pose_in_world_frame[0] + -1 * approach_direction_in_world_frame * (robot.finger_lengths[robot.default_arm] + waypoint_start_offset), grasp_pose_in_world_frame[1])
-    waypoints = interpolate_waypoints(waypoint_start_pose, target_hand_pose_in_world_frame)
+    waypoint_end_pose = (target_hand_pose_in_world_frame[0] + -1 * approach_direction_in_world_frame * (robot.finger_lengths[robot.default_arm]), target_hand_pose_in_world_frame[1])
+    waypoints = interpolate_waypoints(waypoint_start_pose, waypoint_end_pose)
 
     return (
         offset_grasp_pose_in_world_frame,
@@ -212,7 +213,7 @@ def interpolate_waypoints(start_pose, end_pose):
     start_pos, start_orn = start_pose
     travel_distance = np.linalg.norm(end_pose[0] - start_pos)
     num_poses = np.max([2, int(travel_distance / 0.01) + 1])
-    num_poses = 2
+    num_poses = 5
     pos_waypoints = np.linspace(start_pos, end_pose[0], num_poses)
 
     # Also interpolate the rotations
@@ -295,7 +296,8 @@ def grasp_position_for_open_on_revolute_joint(robot, target_obj, relevant_joint,
     grasp_quat_in_bbox_frame = get_orientation_facing_vector_with_random_yaw(canonical_open_direction * open_axis_closer_side_sign * -1)
 
     # Now apply the grasp offset.
-    offset_in_bbox_frame = canonical_open_direction * open_axis_closer_side_sign * 0.1
+    dist_from_grasp_pos = robot.finger_lengths[robot.default_arm] + 0.05
+    offset_in_bbox_frame = canonical_open_direction * open_axis_closer_side_sign * dist_from_grasp_pos
     offset_grasp_pose_in_bbox_frame = (grasp_position + offset_in_bbox_frame, grasp_quat_in_bbox_frame)
     offset_grasp_pose_in_world_frame = T.pose_transform(
         bbox_center_in_world, bbox_quat_in_world, *offset_grasp_pose_in_bbox_frame
@@ -303,7 +305,7 @@ def grasp_position_for_open_on_revolute_joint(robot, target_obj, relevant_joint,
 
     # To compute the rotation position, we want to decide how far along the rotation axis we'll go.
     desired_yaw = relevant_joint.upper_limit if should_open else relevant_joint.lower_limit
-    required_yaw_change = 0.7 * desired_yaw - current_yaw
+    required_yaw_change = desired_yaw - current_yaw
 
     # Now we'll rotate the grasp position around the origin by the desired rotation.
     # Note that we use the non-offset position here since the joint can't be pulled all the way to the offset.
@@ -318,7 +320,7 @@ def grasp_position_for_open_on_revolute_joint(robot, target_obj, relevant_joint,
     for i in range(turn_steps):
         partial_yaw_change = (i + 1) / turn_steps * required_yaw_change
         rotated_grasp_pose_in_bbox_frame = rotate_point_around_axis(
-            (grasp_position, grasp_quat_in_bbox_frame), bbox_wrt_origin, joint_axis, partial_yaw_change
+            (offset_grasp_pose_in_bbox_frame[0], offset_grasp_pose_in_bbox_frame[1]), bbox_wrt_origin, joint_axis, partial_yaw_change
         )
         rotated_grasp_pose_in_world_frame = T.pose_transform(
             bbox_center_in_world, bbox_quat_in_world, *rotated_grasp_pose_in_bbox_frame

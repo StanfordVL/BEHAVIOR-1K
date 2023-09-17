@@ -452,15 +452,16 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             try:
                 grasp_data = get_grasp_position_for_open(self.robot, obj, should_open, relevant_joint)
                 if grasp_data is None:
-                    # We were trying to do something but didn't have the data.
-                    raise ActionPrimitiveError(
-                        ActionPrimitiveError.Reason.SAMPLING_ERROR,
-                        "Could not sample grasp position for target object",
-                        {"target object": obj.name},
-                    )
+                    # # We were trying to do something but didn't have the data.
+                    # raise ActionPrimitiveError(
+                    #     ActionPrimitiveError.Reason.SAMPLING_ERROR,
+                    #     "Could not sample grasp position for target object",
+                    #     {"target object": obj.name},
+                    # )
+                    return
 
                 grasp_pose, target_poses, object_direction, relevant_joint, grasp_required, pos_change = grasp_data
-                if abs(pos_change) < 0.05:
+                if abs(pos_change) < 0.1:
                     print("Yaw change is small and done,", pos_change)
                     return
 
@@ -468,10 +469,12 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 approach_pos = grasp_pose[0] + object_direction * OPEN_GRASP_APPROACH_DISTANCE
                 approach_pose = (approach_pos, grasp_pose[1])
 
-                # self.markers[0].set_position_orientation(*grasp_pose)
-                self.markers[1].set_position_orientation(*approach_pose)
+                self.markers[0].set_position_orientation(*grasp_pose)
+                # self.markers[1].set_position_orientation(*approach_pose)
                 self.markers[2].set_position_orientation(*target_poses[0])
                 self.markers[3].set_position_orientation(*target_poses[1])
+                self.markers[4].set_position_orientation(*target_poses[2])
+                self.markers[5].set_position_orientation(*target_poses[3])
                 # self.markers[4].set_position_orientation(*target_poses[2])
                 # og.sim.step()
                 # from IPython import embed; embed()
@@ -490,7 +493,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 yield from self._navigate_if_needed(obj, pose_on_obj=approach_pose)  #, check_joint=check_joint)
                 
                 if should_open:
-                    yield from self._move_hand_direct_cartesian(approach_pose, ignore_failure=False, stop_on_contact=True, max_stuck_steps=50)
+                    yield from self._move_hand_direct_cartesian(approach_pose, ignore_failure=False, stop_on_contact=True)
                 else:
                     yield from self._move_hand_direct_cartesian(approach_pose, ignore_failure=False)
             
@@ -506,7 +509,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 #         )
                 for i, target_pose in enumerate(target_poses):
                     yield from self._move_hand_direct_cartesian(target_pose, ignore_failure=False)
-                    # yield from self._move_hand_direct_cartesian(target_pose, ignore_failure=False, max_stuck_steps=50)
 
                 # Moving to target pose often fails. Let's get the hand to apply the correct actions for its current pos
                 # This prevents the hand from jerking into its desired position when we do a release.
@@ -518,6 +520,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 # yield from self._move_base_backward()
 
             except ActionPrimitiveError as e:
+                print(e)
                 yield from self._execute_release()
                 yield from self._move_base_backward()
 
@@ -1035,6 +1038,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         target_ori = T.quat2axisangle(target_pose[1])
         action = self._empty_action()
         control_idx = self.robot.controller_action_idx["arm_" + self.arm]
+        prev_eef_pos = [0.0, 0.0, 0.0]
 
         for _ in range(MAX_STEPS_FOR_HAND_MOVE_IK):
             current_pose = self._get_pose_in_robot_frame((self.robot.get_eef_position(), self.robot.get_eef_orientation()))
@@ -1049,6 +1053,13 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             if stop_on_contact and detect_robot_collision_in_sim(self.robot, ignore_obj_in_hand=False):
                 return
             
+            if max(np.abs(np.array(self.robot.get_eef_position(self.arm) - prev_eef_pos))) < 0.0001:
+                raise ActionPrimitiveError(
+                        ActionPrimitiveError.Reason.EXECUTION_ERROR,
+                        f"Hand is stuck"
+                    )
+            
+            prev_eef_pos = self.robot.get_eef_position(self.arm)
             action[control_idx] = np.concatenate([delta_pos, target_ori])
             action = self._overwrite_head_action(action, self._tracking_object) if self._tracking_object is not None else action
             yield action, "manip:move_hand_direct_ik"
