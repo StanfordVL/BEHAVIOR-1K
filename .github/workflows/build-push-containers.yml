@@ -12,6 +12,13 @@ on:
 jobs:
   docker:
     runs-on: [self-hosted, linux, gpu]
+    strategy:
+      matrix:
+        include:
+          - dockerfile: docker/dev.Dockerfile
+            image: ghcr.io/stanfordvl/omnigibson-dev
+          - dockerfile: docker/prod.Dockerfile
+            image: ghcr.io/stanfordvl/omnigibson
     steps:
       -
         name: Set up Docker Buildx
@@ -30,42 +37,21 @@ jobs:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_PASSWORD }}
       -
-        name: Metadata for dev Image
-        id: meta-dev
+        name: Metadata
+        id: meta
         uses: docker/metadata-action@v4
         with:
-          images: |
-            stanfordvl/omnigibson-dev
+          images: ${{ matrix.image }}
           tags: |
             type=ref,event=branch
             type=semver,pattern={{version}}
-      -
-        name: Metadata for prod Image
-        id: meta-prod
-        uses: docker/metadata-action@v4
-        with:
-          images: |
-            stanfordvl/omnigibson
-          tags: |
-            type=ref,event=branch
-            type=semver,pattern={{version}}
-      -
-        name: Build and push dev image
-        uses: docker/build-push-action@v4
-        with:
-          push: true
-          tags: ${{ steps.meta-dev.outputs.tags }}
-          labels: ${{ steps.meta-dev.outputs.labels }}
-          file: docker/dev.Dockerfile
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
       -
         name: Build and push prod image
         uses: docker/build-push-action@v4
         with:
           push: true
-          tags: ${{ steps.meta-prod.outputs.tags }}
-          labels: ${{ steps.meta-prod.outputs.labels }}
-          file: docker/prod.Dockerfile
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          file: ${{ matrix.dockerfile }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
