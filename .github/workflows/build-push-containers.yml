@@ -16,9 +16,9 @@ jobs:
       matrix:
         include:
           - dockerfile: docker/dev.Dockerfile
-            image: ghcr.io/stanfordvl/omnigibson-dev
+            image: stanfordvl/omnigibson-dev
           - dockerfile: docker/prod.Dockerfile
-            image: ghcr.io/stanfordvl/omnigibson
+            image: stanfordvl/omnigibson
     steps:
       -
         name: Set up Docker Buildx
