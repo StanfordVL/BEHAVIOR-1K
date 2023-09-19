@@ -1,3 +1,4 @@
+from datetime import datetime
 import math
 import numpy as np
 import matplotlib.pyplot as plt
@@ -6,6 +7,7 @@ from omnigibson.macros import gm
 from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitives, StarterSemanticActionPrimitiveSet
 import omnigibson.utils.transform_utils as T
 from omnigibson.objects.dataset_object import DatasetObject
+import h5py
 
 
 def set_start_pose(robot):
@@ -38,7 +40,7 @@ def reset_env(env, initial_poses):
 
 DIST_COEFF = 0.1
 GRASP_REWARD = 0.3
-RL_ITERATIONS = 10
+RL_ITERATIONS = 2
 
 cfg = {
     "scene": {
@@ -49,7 +51,7 @@ cfg = {
     "robots": [
         {
             "type": "Tiago",
-            "obs_modalities": ["scan", "rgb", "depth"],
+            "obs_modalities": ["rgb", "depth"],
             "scale": 1.0,
             "self_collisions": True,
             "action_normalize": False,
@@ -123,6 +125,34 @@ cfg = {
     ]
 }
 
+class Recorder():
+    def __init__(self):
+        self.filename = "./RL_data.h5"
+        self.state_keys = ["robot0:eyes_Camera_sensor_rgb", "robot0:eyes_Camera_sensor_depth"]
+        self.reset()
+
+    def add(self, state, action, reward):
+        for k in self.state_keys:
+            self.states[k].append(state['robot0'][k])
+        self.actions.append(action)
+        self.rewards.append(reward)
+
+    def reset(self):
+        self.states = {}
+        for k in self.state_keys:
+            self.states[k] = []
+        self.actions = []
+        self.rewards = []
+
+    def save(self, group_name):
+        h5file = h5py.File(self.filename, 'a')
+        group = h5file.create_group(group_name)
+        for k in self.state_keys:
+            group.create_dataset(k[k.find(":") + 1:], data=np.array(self.states[k]))
+        group.create_dataset("actions", data=np.array(self.actions))
+        group.create_dataset("rewards", data=np.array(self.rewards))
+        h5file.close()
+
 # Create the environment
 env = og.Environment(configs=cfg, action_timestep=1 / 60., physics_timestep=1 / 60.)
 scene = env.scene
@@ -149,15 +179,20 @@ initial_poses = {}
 for o in env.scene.objects:
     initial_poses[o.name] = o.get_position_orientation()
 obj = env.scene.object_registry("name", "cologne")
+recorder = Recorder()
 
 for i in range(RL_ITERATIONS):
     try:
         reset_env(env, initial_poses)
         for action in controller.apply_ref(StarterSemanticActionPrimitiveSet.GRASP, obj):
             state, reward, done, info = env.step(action)
+            recorder.add(state, action, reward)
             if done:
                 for action in controller._execute_release():
                     state, reward, done, info = env.step(action)
+                    recorder.add(state, action, reward)
                 break
     except:
-        print("Error in iteration", i)
+        print("Error in iteration: ", i)
+
+recorder.save(datetime.now().strftime('%Y-%m-%d_%H-%M-%S'))
