@@ -63,7 +63,7 @@ jobs:
 
       - name: Update prod image Dockerfile with dev image tag
         run: |
-          sed -i "s/omnigibson-dev:latest/omnigibson-dev@${{ steps.build-dev.outputs.digest }}/g" docker/prod.Dockerfile
+          sed -i "s/omnigibson-dev:latest/omnigibson-dev@${{ steps.build-dev.outputs.digest }}/g" docker/prod.Dockerfile && cat docker/prod.Dockerfile
       -
         name: Build and push prod image
         uses: docker/build-push-action@v4
