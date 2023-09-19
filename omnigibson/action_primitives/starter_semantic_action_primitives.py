@@ -469,12 +469,12 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 approach_pos = grasp_pose[0] + object_direction * OPEN_GRASP_APPROACH_DISTANCE
                 approach_pose = (approach_pos, grasp_pose[1])
 
-                self.markers[0].set_position_orientation(*grasp_pose)
+                # self.markers[0].set_position_orientation(*grasp_pose)
                 # self.markers[1].set_position_orientation(*approach_pose)
-                self.markers[2].set_position_orientation(*target_poses[0])
-                self.markers[3].set_position_orientation(*target_poses[1])
-                self.markers[4].set_position_orientation(*target_poses[2])
-                self.markers[5].set_position_orientation(*target_poses[3])
+                # self.markers[2].set_position_orientation(*target_poses[0])
+                # self.markers[3].set_position_orientation(*target_poses[1])
+                # self.markers[4].set_position_orientation(*target_poses[2])
+                # self.markers[5].set_position_orientation(*target_poses[3])
                 # self.markers[4].set_position_orientation(*target_poses[2])
                 # og.sim.step()
                 # from IPython import embed; embed()
@@ -517,12 +517,16 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 )
 
                 yield from self._execute_release()
-                # yield from self._move_base_backward()
+                if should_open:
+                    yield from self._move_base_backward()
 
             except ActionPrimitiveError as e:
                 print(e)
                 yield from self._execute_release()
-                yield from self._move_base_backward()
+                if should_open: 
+                    yield from self._move_base_backward()
+                else:
+                    yield from self._move_hand_backward()
 
 
         if obj.states[object_states.Open].get_value() != should_open:
@@ -544,9 +548,24 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         """
         for _ in range(steps):
             action = self._empty_action()
-            controller_name = "gripper_{}".format(self.arm)
-            action[self.robot.controller_action_idx[controller_name]] = 1.0
+            action[self.robot.controller_action_idx["gripper_{}".format(self.arm)]] = 1.0
             action[self.robot.base_control_idx[0]] = -speed
+            yield action, "nav:move_base_backward"
+
+    def _move_hand_backward(self, steps=10, speed=0.05):
+        """
+        Yields action for the robot to move hand so the eef is in the target pose using the planner
+
+        Args:
+            offset (Iterable of array): Position and orientation arrays in an iterable for pose
+
+        Returns:
+            np.array or None: Action array for one step for the robot to move hand or None if its at the target pose
+        """
+        for _ in range(steps):
+            action = self._empty_action()
+            action[self.robot.controller_action_idx["gripper_{}".format(self.arm)]] = 1.0
+            action[self.robot.controller_action_idx["arm_{}".format(self.arm)][1]] = -speed
             yield action, "nav:move_base_backward"
 
     def _grasp_ik(self, obj): 
@@ -763,6 +782,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 "Failed to place object at the desired place (probably dropped). The object was still released, so you need to grasp it again to continue",
                 {"dropped object": obj_in_hand.name, "target object": obj.name}
             )
+        
+        yield from self._reset_hand()
 
     def _convert_cartesian_to_joint_space(self, target_pose):
         """
