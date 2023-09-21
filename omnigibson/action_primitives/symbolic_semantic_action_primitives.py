@@ -16,6 +16,7 @@ from matplotlib import pyplot as plt
 
 import gym
 import numpy as np
+from omnigibson.transition_rules import REGISTERED_RULES, TransitionRuleAPI
 from scipy.spatial.transform import Rotation, Slerp
 from omnigibson.utils.constants import JointType
 from pxr import PhysxSchema
@@ -270,6 +271,9 @@ class SymbolicSemanticActionPrimitives(BaseActionPrimitiveSet):
                     {"target object": obj.name, "object currently in hand": obj_in_hand.name},
                 )
             
+        # Get close
+        yield from self._navigate_if_needed(obj)
+
         # Perform forced assisted grasp
         obj.set_position(self.robot.get_eef_position(self.arm))
         self.robot._ag_data[self.arm] = (obj, obj.root_link)
@@ -613,12 +617,18 @@ class SymbolicSemanticActionPrimitives(BaseActionPrimitiveSet):
                 "The target object is not sliceable or diceable.",
                 {"target object": obj.name}
             )
+        
+        # Get close
+        yield from self._navigate_if_needed(obj)
 
-        # TODO: Trigger the slicing rule manually.
+        # TODO: Do some more validation
+        added_obj_attrs = []
+        removed_objs = []
+        output = REGISTERED_RULES["SlicingRule"].transition({"sliceable": [obj]})
+        added_obj_attrs += output.add
+        removed_objs += output.remove
 
-
-        pass
-
+        TransitionRuleAPI.execute_transition(added_obj_attrs=added_obj_attrs, removed_objs=removed_objs)
 
     def _place_near_heating_element(self, heat_source_obj):
         obj_in_hand = self._get_obj_in_hand()

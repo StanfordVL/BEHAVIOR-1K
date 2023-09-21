@@ -2,9 +2,17 @@ import os
 import pytest
 import yaml
 
+import omnigibson.macros as gm
+gm.USE_GPU_DYNAMICS = True
+gm.USE_FLATCACHE = True
+
+
 import omnigibson as og
 from omnigibson import object_states
 from omnigibson.action_primitives.symbolic_semantic_action_primitives import SymbolicSemanticActionPrimitiveSet, SymbolicSemanticActionPrimitives
+
+
+
 
 def start_env():
   config = {
@@ -85,18 +93,19 @@ def start_env():
       },
       {
           "type": "DatasetObject",
-          "name": "steak",
-          "category": "steak",
-          "model": "ppykkp",
-          "position": [5.31, 10.28, 1.],
-      },
-      {
-          "type": "DatasetObject",
-          "name": "sponge",
-          "category": "sponge",
-          "model": "qewotb",
+          "name": "apple",
+          "category": "apple",
+          "model": "agveuv",
           "position": [4.75, 10.75, 1.],
+          "bounding_box": [0.098, 0.098, 0.115]
       },
+      # {
+      #     "type": "DatasetObject",
+      #     "name": "sponge",
+      #     "category": "sponge",
+      #     "model": "qewotb",
+      #     "position": [4.75, 10.75, 1.],
+      # },
     ]
   }
 
@@ -189,11 +198,18 @@ def test_place_inside(env, prim_gen, steak, fridge):
 # def test_wipe():
 #    pass
 
-def test_cut(env, prim_gen, steak, knife):
+def test_cut(env, prim_gen, steak, knife, countertop):
   # assert not steak.states[object_states.Cut].get_value(knife)
+  print("Grasping knife")
   for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.GRASP, knife):
     env.step(action)
+  for _ in range(60): og.sim.step()
+  print("Cutting steak")
   for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.CUT, steak):
+    env.step(action)
+  for _ in range(60): og.sim.step()
+  print("Putting knife back on countertop")
+  for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.PLACE_ON_TOP, countertop):
     env.step(action)
   # assert steak.states[object_states.Sliced].get_value(knife)
 
@@ -208,13 +224,17 @@ def main():
   scene = env.scene
   robot = env.robots[0]
   prim_gen = SymbolicSemanticActionPrimitives(None, scene, robot)
-  steak = next(iter(env.scene.object_registry("category", "steak")))
+  steak = next(iter(env.scene.object_registry("category", "apple")))
   knife = next(iter(env.scene.object_registry("category", "carving_knife")))
+  countertop = next(iter(env.scene.object_registry("category", "countertop")))
+
+  print("Will start in 3 seconds")
+  for _ in range(120): og.sim.step()
 
   try:
-    test_cut(env, prim_gen, steak, knife)
+    test_cut(env, prim_gen, steak, knife, countertop)
   except:
-    pass
+    raise
   while True:
     og.sim.step()
 
