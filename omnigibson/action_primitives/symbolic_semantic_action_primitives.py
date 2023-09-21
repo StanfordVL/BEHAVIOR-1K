@@ -784,7 +784,7 @@ class SymbolicSemanticActionPrimitives(BaseActionPrimitiveSet):
         """
         if pose_on_obj is None:
             pos_on_obj = self._sample_position_on_aabb_face(obj)
-            pose_on_obj = np.array([pos_on_obj, [0, 0, 0, 1]])
+            pose_on_obj = [pos_on_obj, np.array([0, 0, 0, 1])]
 
         with UndoableContext(self.robot, self.robot_copy, "simplified") as context:
             obj_rooms = obj.in_rooms if obj.in_rooms else [self.scene._seg_map.get_room_instance_by_point(pose_on_obj[0][:2])]

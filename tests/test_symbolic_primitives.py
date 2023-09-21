@@ -2,17 +2,13 @@ import os
 import pytest
 import yaml
 
-import omnigibson.macros as gm
-gm.USE_GPU_DYNAMICS = True
-gm.USE_FLATCACHE = True
-
-
 import omnigibson as og
+from omnigibson.macros import gm
 from omnigibson import object_states
 from omnigibson.action_primitives.symbolic_semantic_action_primitives import SymbolicSemanticActionPrimitiveSet, SymbolicSemanticActionPrimitives
 
-
-
+gm.USE_GPU_DYNAMICS = True
+gm.USE_FLATCACHE = True
 
 def start_env():
   config = {
