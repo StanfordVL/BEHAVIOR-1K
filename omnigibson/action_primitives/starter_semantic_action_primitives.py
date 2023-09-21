@@ -450,7 +450,11 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         for _ in range(MAX_ATTEMPTS_FOR_OPEN_CLOSE):
             try:
-                grasp_data = get_grasp_position_for_open(self.robot, obj, should_open, relevant_joint)
+                if should_open:
+                    grasp_data = get_grasp_position_for_open(self.robot, obj, should_open, relevant_joint)
+                else:
+                    grasp_data = get_grasp_position_for_open(self.robot, obj, should_open, relevant_joint, num_waypoints=3)
+                
                 if grasp_data is None:
                     # # We were trying to do something but didn't have the data.
                     # raise ActionPrimitiveError(
@@ -856,7 +860,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         ik_solver = IKSolver(
             robot_description_path=robot_description_path,
             robot_urdf_path=self.robot.urdf_path,
-            default_joint_pos=self.robot.get_joint_positions()[control_idx],
+            # default_joint_pos=self.robot.get_joint_positions()[control_idx],
+            default_joint_pos=self.robot.default_joint_pos[control_idx],
             eef_name=self.robot.eef_link_names[self.arm],
         )
         # Grab the joint positions in order to reach the desired pose target
@@ -1046,7 +1051,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 "Your hand was obstructed from moving to the desired joint position"
             )
 
-    def _move_hand_direct_ik(self, target_pose, stop_on_contact=False, ignore_failure=False, pos_thresh=0.04, ori_thresh=0.4, in_world_frame=True):
+    def _move_hand_direct_ik(self, target_pose, stop_on_contact=False, ignore_failure=False, pos_thresh=0.03, ori_thresh=0.3, in_world_frame=True):
         # make sure controller is InverseKinematicsController and in expected mode
         controller_config = self.robot._controller_config["arm_" + self.arm]
         assert controller_config["name"] == "InverseKinematicsController", "Controller must be InverseKinematicsController"
@@ -1074,11 +1079,11 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             if stop_on_contact and detect_robot_collision_in_sim(self.robot, ignore_obj_in_hand=False):
                 return
             
-            if max(np.abs(np.array(self.robot.get_eef_position(self.arm) - prev_eef_pos))) < 0.0001:
+            if max(np.abs(np.array(self.robot.get_eef_position(self.arm) - prev_eef_pos))) < 0.0002:
                 raise ActionPrimitiveError(
-                        ActionPrimitiveError.Reason.EXECUTION_ERROR,
-                        f"Hand is stuck"
-                    )
+                    ActionPrimitiveError.Reason.EXECUTION_ERROR,
+                    f"Hand is stuck"
+                )
             
             prev_eef_pos = self.robot.get_eef_position(self.arm)
             action[control_idx] = np.concatenate([delta_pos, target_ori])
@@ -1134,7 +1139,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 if stop_on_contact and detect_robot_collision_in_sim(self.robot, ignore_obj_in_hand=False):
                     return
             
-            yield from self._move_hand_direct_ik(waypoints[-1], stop_on_contact=stop_on_contact, ignore_failure=ignore_failure, pos_thresh=0.02, ori_thresh=0.2)
+            yield from self._move_hand_direct_ik(waypoints[-1], stop_on_contact=stop_on_contact, ignore_failure=ignore_failure, pos_thresh=0.01, ori_thresh=0.1)
 
             # Also decide if we can stop early.
             current_pos, current_orn = self.robot.eef_links[self.arm].get_position_orientation()

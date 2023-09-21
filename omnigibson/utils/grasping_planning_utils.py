@@ -76,7 +76,7 @@ def get_grasp_poses_for_object_sticky(target_obj):
 
 #     return grasp_candidate
 
-def get_grasp_position_for_open(robot, target_obj, should_open, relevant_joint=None):
+def get_grasp_position_for_open(robot, target_obj, should_open, relevant_joint=None, num_waypoints="default"):
     # Pick a moving link of the object.
     relevant_joints = [relevant_joint] if relevant_joint is not None else _get_relevant_joints(target_obj)[1]
     if len(relevant_joints) == 0:
@@ -106,14 +106,14 @@ def get_grasp_position_for_open(robot, target_obj, should_open, relevant_joint=N
         return None
 
     if selected_joint.joint_type == JointType.JOINT_REVOLUTE:
-        return grasp_position_for_open_on_revolute_joint(robot, target_obj, selected_joint, should_open)
+        return grasp_position_for_open_on_revolute_joint(robot, target_obj, selected_joint, should_open, num_waypoints=num_waypoints)
     elif selected_joint.joint_type == JointType.JOINT_PRISMATIC:
-        return grasp_position_for_open_on_prismatic_joint(robot, target_obj, selected_joint, should_open)
+        return grasp_position_for_open_on_prismatic_joint(robot, target_obj, selected_joint, should_open, num_waypoints=num_waypoints)
     else:
         raise ValueError("Unknown joint type encountered while generating joint position.")
     
 
-def grasp_position_for_open_on_prismatic_joint(robot, target_obj, relevant_joint, should_open):
+def grasp_position_for_open_on_prismatic_joint(robot, target_obj, relevant_joint, should_open, num_waypoints="default"):
     link_name = relevant_joint.body1.split("/")[-1]
     
     # Get the bounding box of the child link.
@@ -197,7 +197,7 @@ def grasp_position_for_open_on_prismatic_joint(robot, target_obj, relevant_joint
     waypoint_start_offset = -0.05 * approach_direction_in_world_frame if should_open else 0.05 * approach_direction_in_world_frame
     waypoint_start_pose = (grasp_pose_in_world_frame[0] + -1 * approach_direction_in_world_frame * (robot.finger_lengths[robot.default_arm] + waypoint_start_offset), grasp_pose_in_world_frame[1])
     waypoint_end_pose = (target_hand_pose_in_world_frame[0] + -1 * approach_direction_in_world_frame * (robot.finger_lengths[robot.default_arm]), target_hand_pose_in_world_frame[1])
-    waypoints = interpolate_waypoints(waypoint_start_pose, waypoint_end_pose)
+    waypoints = interpolate_waypoints(waypoint_start_pose, waypoint_end_pose, num_waypoints=num_waypoints)
 
     return (
         offset_grasp_pose_in_world_frame,
@@ -209,17 +209,18 @@ def grasp_position_for_open_on_prismatic_joint(robot, target_obj, relevant_joint
     )
 
 
-def interpolate_waypoints(start_pose, end_pose):
+def interpolate_waypoints(start_pose, end_pose, num_waypoints="default"):
     start_pos, start_orn = start_pose
     travel_distance = np.linalg.norm(end_pose[0] - start_pos)
-    num_poses = np.max([2, int(travel_distance / 0.01) + 1])
-    num_poses = 5
-    pos_waypoints = np.linspace(start_pos, end_pose[0], num_poses)
+
+    if num_waypoints == "default":
+        num_waypoints = np.max([2, int(travel_distance / 0.01) + 1])
+    pos_waypoints = np.linspace(start_pos, end_pose[0], num_waypoints)
 
     # Also interpolate the rotations
     combined_rotation = R.from_quat(np.array([start_orn, end_pose[1]]))
     slerp = Slerp([0, 1], combined_rotation)
-    orn_waypoints = slerp(np.linspace(0, 1, num_poses))
+    orn_waypoints = slerp(np.linspace(0, 1, num_waypoints))
     quat_waypoints = [x.as_quat() for x in orn_waypoints]
     return [waypoint for waypoint in zip(pos_waypoints, quat_waypoints)]
 
