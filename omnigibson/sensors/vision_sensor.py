@@ -350,10 +350,28 @@ class VisionSensor(BaseSensor):
         self.visible = True
 
     @property
+    def horizontal_aperture(self):
+        """
+        Returns:
+            float: horizontal aperture of this sensor, in mm
+        """
+        return self.get_attribute("horizontalAperture")
+
+    @horizontal_aperture.setter
+    def horizontal_aperture(self, length):
+        """
+        Sets the focal length @length for this sensor
+
+        Args:
+            length (float): horizontal aperture of this sensor, in meters
+        """
+        self.set_attribute("horizontalAperture", length)
+
+    @property
     def focal_length(self):
         """
         Returns:
-            float: focal length of this sensor, in meters
+            float: focal length of this sensor, in mm
         """
         return self.get_attribute("focalLength")
 
@@ -363,7 +381,7 @@ class VisionSensor(BaseSensor):
         Sets the focal length @length for this sensor
 
         Args:
-            length (float): focal length of this sensor, in meters
+            length (float): focal length of this sensor, in mm
         """
         self.set_attribute("focalLength", length)
 
