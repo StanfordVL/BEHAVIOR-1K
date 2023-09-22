@@ -782,14 +782,14 @@ class SymbolicSemanticActionPrimitives(BaseActionPrimitiveSet):
                 - 3-array: (x,y,z) Position in the world frame
                 - 4-array: (x,y,z,w) Quaternion orientation in the world frame
         """
-        if pose_on_obj is None:
-            pos_on_obj = self._sample_position_on_aabb_face(obj)
-            pose_on_obj = [pos_on_obj, np.array([0, 0, 0, 1])]
-
         with UndoableContext(self.robot, self.robot_copy, "simplified") as context:
             obj_rooms = obj.in_rooms if obj.in_rooms else [self.scene._seg_map.get_room_instance_by_point(pose_on_obj[0][:2])]
             for _ in range(MAX_ATTEMPTS_FOR_SAMPLING_POSE_NEAR_OBJECT):
-                distance = np.random.uniform(0.0, 1.0)
+                if pose_on_obj is None:
+                    pos_on_obj = self._sample_position_on_aabb_face(obj)
+                    pose_on_obj = [pos_on_obj, np.array([0, 0, 0, 1])]
+
+                distance = np.random.uniform(0.0, 3.0)
                 yaw = np.random.uniform(-np.pi, np.pi)
                 pose_2d = np.array(
                     [pose_on_obj[0][0] + distance * np.cos(yaw), pose_on_obj[0][1] + distance * np.sin(yaw), yaw + np.pi]
@@ -806,7 +806,8 @@ class SymbolicSemanticActionPrimitives(BaseActionPrimitiveSet):
                 return pose_2d
 
             raise ActionPrimitiveError(
-                ActionPrimitiveError.Reason.SAMPLING_ERROR, "Could not find valid position near object."
+                ActionPrimitiveError.Reason.SAMPLING_ERROR, "Could not find valid position near object.",
+                {"target object": obj.name, "target pos": obj.get_position(), "pose on target": pose_on_obj}
             )
 
     @staticmethod

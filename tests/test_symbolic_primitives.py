@@ -109,9 +109,16 @@ def start_env():
   
   return env
 
-@pytest.fixture
-def env():
+@pytest.fixture(scope="module")
+def shared_env():
+  """Load the environment just once using module scope."""
   return start_env()
+
+@pytest.fixture(scope="function")
+def env(shared_env):
+  """Reset the environment before each test function."""
+  og.sim.scene.reset()
+  return shared_env
 
 @pytest.fixture
 def prim_gen(env):
@@ -133,11 +140,12 @@ def sink(env):
 
 @pytest.fixture
 def pan(env):
-  return next(iter(env.scene.object_registry("category", "pan")))
+  return next(iter(env.scene.object_registry("category", "frying_pan")))
 
 @pytest.fixture
 def steak(env):
-  return next(iter(env.scene.object_registry("category", "steak")))
+  # TODO: Why apple? Use steak.
+  return next(iter(env.scene.object_registry("category", "apple")))
 
 @pytest.fixture
 def sponge(env):
@@ -150,18 +158,18 @@ def knife(env):
 # def test_navigate():
 #    pass
 
-# def test_open(env, prim_gen, fridge):
-#   assert not fridge.states[object_states.Open].get_value()
-#   for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.OPEN, fridge):
-#     env.step(action)
-#   assert fridge.states[object_states.Open].get_value()
+def test_open(env, prim_gen, fridge):
+  assert not fridge.states[object_states.Open].get_value()
+  for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.OPEN, fridge):
+    env.step(action)
+  assert fridge.states[object_states.Open].get_value()
 
-# def test_close(env, prim_gen, fridge):
-#   fridge.states[object_states.Open].set_value(True)
-#   assert fridge.states[object_states.Open].get_value()
-#   for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.CLOSE, fridge):
-#     env.step(action)
-#   assert not fridge.states[object_states.Open].get_value()
+def test_close(env, prim_gen, fridge):
+  fridge.states[object_states.Open].set_value(True)
+  assert fridge.states[object_states.Open].get_value()
+  for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.CLOSE, fridge):
+    env.step(action)
+  assert not fridge.states[object_states.Open].get_value()
 
 def test_place_inside(env, prim_gen, steak, fridge):
   assert not steak.states[object_states.Inside].get_value(fridge)
@@ -174,16 +182,20 @@ def test_place_inside(env, prim_gen, steak, fridge):
     env.step(action)
   assert steak.states[object_states.Inside].get_value(fridge)
 
-# def test_place_ontop(env, prim_gen, steak, pan):
-#   assert not steak.states[object_states.OnTop].get_value(pan)
-#   for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.GRASP, steak):
-#     env.step(action)
-#   for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.PLACE_ON_TOP, pan):
-#     env.step(action)
-#   assert steak.states[object_states.OnTop].get_value(pan)
+def test_place_ontop(env, prim_gen, steak, pan):
+  assert not steak.states[object_states.OnTop].get_value(pan)
+  for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.GRASP, steak):
+    env.step(action)
+  for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.PLACE_ON_TOP, pan):
+    env.step(action)
+  assert steak.states[object_states.OnTop].get_value(pan)
 
-# def test_toggle_on():
-#    pass
+def test_toggle_on(env, prim_gen, stove):
+    assert not stove.states[object_states.ToggledOn].get_value()
+    for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.TOGGLE_ON, stove):
+      env.step(action)
+    assert stove.states[object_states.ToggledOn].get_value()
+
 
 # def test_soak_under():
 #    pass
@@ -194,6 +206,7 @@ def test_place_inside(env, prim_gen, steak, fridge):
 # def test_wipe():
 #    pass
 
+@pytest.mark.skip(reason="A bug with object addition causes the robot to crash after slicing.")
 def test_cut(env, prim_gen, steak, knife, countertop):
   # assert not steak.states[object_states.Cut].get_value(knife)
   print("Grasping knife")
@@ -207,7 +220,6 @@ def test_cut(env, prim_gen, steak, knife, countertop):
   print("Putting knife back on countertop")
   for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.PLACE_ON_TOP, countertop):
     env.step(action)
-  # assert steak.states[object_states.Sliced].get_value(knife)
 
 # def test_place_near_heating_element():
 #    pass
