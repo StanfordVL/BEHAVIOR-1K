@@ -19,6 +19,7 @@ def create_sensor(
         prim_path,
         name,
         modalities="all",
+        enabled=True,
         sensor_kwargs=None,
         noise_type=None,
         noise_kwargs=None
@@ -35,6 +36,7 @@ def create_sensor(
         name (str): Name for the sensor. Names need to be unique per scene.
         modalities (str or list of str): Modality(s) supported by this sensor. Valid options are part of
             sensor.all_modalities. Default is "all", which corresponds to all modalities being used
+        enabled (bool): Whether this sensor should be enabled or not
         sensor_kwargs (dict): Any keyword kwargs to pass to the constructor
         noise_type (str): Type of sensor to create. Should be one of REGISTERED_SENSOR_NOISES
             (i.e.: the string name of the desired class to create)
@@ -64,6 +66,13 @@ def create_sensor(
 
     # Create the sensor
     sensor_kwargs = dict() if sensor_kwargs is None else sensor_kwargs
-    sensor = sensor_cls(prim_path=prim_path, name=name, modalities=modalities, noise=noise, **sensor_kwargs)
+    sensor = sensor_cls(
+        prim_path=prim_path,
+        name=name,
+        modalities=modalities,
+        enabled=enabled,
+        noise=noise,
+        **sensor_kwargs,
+    )
 
     return sensor

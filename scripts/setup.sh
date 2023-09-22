@@ -27,7 +27,7 @@ conda_name=${conda_name:-omnigibson}
 echo -e "\nUsing [4m$conda_name[0m as the conda environment name\n"
 
 # Get Python version from Isaac Sim
-ISAAC_PYTHON_VERSION=$(${ISAAC_SIM_PATH}/python -c "import platform; print(platform.python_version())")
+ISAAC_PYTHON_VERSION=$(${ISAAC_SIM_PATH}/python.sh -c "import platform; print(platform.python_version())")
 echo Using Python version [4m$ISAAC_PYTHON_VERSION[0m matching your current Isaac Sim version
 
 # Create a conda environment with the appropriate python version
