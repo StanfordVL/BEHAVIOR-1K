@@ -139,6 +139,7 @@ def test_grasp_reward():
     og.sim.step()
 
     ctrl_gen = controller.apply_ref(StarterSemanticActionPrimitiveSet.GRASP, obj)
+    
 
     rewards = [0]
     total_rewards = [0]

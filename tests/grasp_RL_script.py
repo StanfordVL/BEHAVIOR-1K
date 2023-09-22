@@ -1,10 +1,13 @@
 from datetime import datetime
 import math
+import uuid
 import numpy as np
 import matplotlib.pyplot as plt
 import omnigibson as og
 from omnigibson.macros import gm
 from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitives, StarterSemanticActionPrimitiveSet
+from omnigibson.sensors.scan_sensor import ScanSensor
+from omnigibson.sensors.vision_sensor import VisionSensor
 import omnigibson.utils.transform_utils as T
 from omnigibson.objects.dataset_object import DatasetObject
 import h5py
@@ -41,6 +44,7 @@ def reset_env(env, initial_poses):
 DIST_COEFF = 0.1
 GRASP_REWARD = 0.3
 RL_ITERATIONS = 2
+h5py.get_config().track_order = True
 
 cfg = {
     "scene": {
@@ -60,6 +64,15 @@ cfg = {
             "rigid_trunk": False,
             "default_arm_pose": "diagonal30",
             "default_trunk_offset": 0.365,
+            "sensor_config": {
+                "VisionSensor": {
+                    "modalities": ["rgb", "depth"],
+                    "sensor_kwargs": {
+                        "image_width": 224,
+                        "image_height": 224
+                    }
+                }
+            },
             "controller_config": {
                 "base": {
                     "name": "JointController",
@@ -136,6 +149,7 @@ class Recorder():
             self.states[k].append(state['robot0'][k])
         self.actions.append(action)
         self.rewards.append(reward)
+        self.ids.append(self.episode_id)
 
     def reset(self):
         self.states = {}
@@ -143,14 +157,29 @@ class Recorder():
             self.states[k] = []
         self.actions = []
         self.rewards = []
+        self.ids = []
+        self.episode_id = str(uuid.uuid4())
+
+    def _add_to_dataset(self, group, name, data):
+        if name in group:
+            dset_len = len(group[name])
+            dset = group[name]
+            dset.resize(len(dset) + len(data), 0)
+            dset[dset_len:] = data
+        else:
+            if isinstance(data[0], np.ndarray):
+                group.create_dataset(name, data=data, maxshape=(None, *data[0].shape))
+            else:
+                group.create_dataset(name, data=data, maxshape=(None,))
 
     def save(self, group_name):
         h5file = h5py.File(self.filename, 'a')
-        group = h5file.create_group(group_name)
+        group = h5file[group_name] if group_name in h5file else h5file.create_group(group_name)
         for k in self.state_keys:
-            group.create_dataset(k[k.find(":") + 1:], data=np.array(self.states[k]))
-        group.create_dataset("actions", data=np.array(self.actions))
-        group.create_dataset("rewards", data=np.array(self.rewards))
+            self._add_to_dataset(group, k[k.find(":") + 1:], self.states[k])
+        self._add_to_dataset(group, "actions", self.actions)
+        self._add_to_dataset(group, "rewards", self.rewards)
+        self._add_to_dataset(group, "ids", self.ids)
         h5file.close()
 
 # Create the environment
@@ -158,8 +187,6 @@ env = og.Environment(configs=cfg, action_timestep=1 / 60., physics_timestep=1 / 
 scene = env.scene
 robot = env.robots[0]
 og.sim.step()
-# og.sim.stop()
-# og.sim.play()
 
 # Place object in scene
 # obj = DatasetObject(
@@ -174,12 +201,13 @@ og.sim.step()
 # env.scene.update_initial_state()
 
 controller = StarterSemanticActionPrimitives(None, scene, robot)
-env.task.add_primitive_controller(controller)
+env._primitive_controller = controller
 initial_poses = {}
 for o in env.scene.objects:
     initial_poses[o.name] = o.get_position_orientation()
 obj = env.scene.object_registry("name", "cologne")
 recorder = Recorder()
+group_name = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
 
 for i in range(RL_ITERATIONS):
     try:
@@ -194,5 +222,5 @@ for i in range(RL_ITERATIONS):
                 break
     except:
         print("Error in iteration: ", i)
-
-recorder.save(datetime.now().strftime('%Y-%m-%d_%H-%M-%S'))
+    recorder.save(group_name)
+    recorder.reset()

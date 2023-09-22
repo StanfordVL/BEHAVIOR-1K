@@ -54,7 +54,7 @@ class GraspTask(BaseTask):
     
     def _reset_agent(self, env):
         # from IPython import embed; embed()
-        if hasattr(self, 'primitive_controller'):
+        if hasattr(env, '_primitive_controller'):
             robot = env.robots[0]
             # Randomize the robots joint positions
             joint_control_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
@@ -62,7 +62,7 @@ class GraspTask(BaseTask):
             initial_joint_pos = np.array(robot.get_joint_positions()[joint_combined_idx])
             control_idx_in_joint_pos = np.where(np.in1d(joint_combined_idx, joint_control_idx))[0]
 
-            with UndoableContext(self.primitive_controller.robot, self.primitive_controller.robot_copy, "original") as context:
+            with UndoableContext(env._primitive_controller.robot, env._primitive_controller.robot_copy, "original") as context:
                 for _ in range(MAX_JOINT_RANDOMIZATION_ATTEMPTS):
                     joint_pos, joint_control_idx = self._get_random_joint_position(robot)
                     initial_joint_pos[control_idx_in_joint_pos] = joint_pos
@@ -75,8 +75,8 @@ class GraspTask(BaseTask):
             obj = env.scene.object_registry("name", self.obj_name)
             grasp_poses = get_grasp_poses_for_object_sticky(obj)
             grasp_pose, _ = random.choice(grasp_poses)
-            sampled_pose_2d = self.primitive_controller._sample_pose_near_object(obj, pose_on_obj=grasp_pose)
-            robot_pose = self.primitive_controller._get_robot_pose_from_2d_pose(sampled_pose_2d)
+            sampled_pose_2d = env._primitive_controller._sample_pose_near_object(obj, pose_on_obj=grasp_pose)
+            robot_pose = env._primitive_controller._get_robot_pose_from_2d_pose(sampled_pose_2d)
             robot.set_position_orientation(*robot_pose)
 
     # Overwrite reset by only removeing reset scene
@@ -119,9 +119,6 @@ class GraspTask(BaseTask):
     def _load_non_low_dim_observation_space(self):
         # No non-low dim observations so we return an empty dict
         return dict()
-    
-    def add_primitive_controller(self, controller):
-        self.primitive_controller = controller
 
     @classproperty
     def valid_scene_types(cls):

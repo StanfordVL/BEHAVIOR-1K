@@ -1,5 +1,6 @@
 import math
 from omnigibson.reward_functions.reward_function_base import BaseRewardFunction
+from omnigibson.utils.motion_planning_utils import detect_robot_collision_in_sim
 import omnigibson.utils.transform_utils as T
 
 
@@ -61,6 +62,11 @@ class GraspReward(BaseRewardFunction):
             dist = T.l2_distance(robot_center, obj_center)
             dist_reward =  math.exp(-dist) * self.dist_coeff
             reward = dist_reward + self.grasp_reward
+
+        # Overwrite reward if robot is in collision
+        # The one step where it grasps the object, it is in collision and this triggers
+        if detect_robot_collision_in_sim(robot, ignore_obj_in_hand=True):
+            reward = -10
 
         self.prev_grasping = current_grasping
         return reward, {}
