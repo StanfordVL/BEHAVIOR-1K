@@ -220,9 +220,8 @@ class StarterSemanticActionPrimitiveSet(IntEnum):
     TOGGLE_ON = 7
     TOGGLE_OFF = 8
 
-
 class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
-    def __init__(self, task, scene, robot, teleport=False):
+    def __init__(self, task, scene, robot, teleport=False, add_context=True):
         logger.warning(
             "The StarterSemanticActionPrimitive is a work-in-progress and is only provided as an example. "
             "It currently only works with BehaviorRobot with its JointControllers set to absolute mode. "
@@ -245,12 +244,34 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         self.robot_model = self.robot.model_name
         self.robot_base_mass = self.robot._links["base_link"].mass
         self.teleport = teleport
+        self.add_context = add_context
         self._tracking_object = None
+
+        self.skill_functions = ["_grasp", "_place_on_top", "_place_or_top", "_open_or_close"]
 
         self.robot_copy = self._load_robot_copy(robot)
 
         if self.robot_model == "Tiago":
             self._setup_tiago()
+
+    def with_context(self, action):
+        if not self.add_context:
+            return action
+        
+        stack = inspect.stack()
+        action_type = "manip:"
+        context_function = stack[1].function
+
+        for frame_info in stack[1:]:
+            function_name = frame_info.function
+            if function_name in self.skill_functions:
+                break
+            if "nav" in function_name:
+                action_type = "nav"
+            
+        context = action_type + context_function
+        print(context)
+        return action, context
 
     # Disable grasping frame for Tiago robot (Should be cleaned up in the future)
     def _setup_tiago(self):
@@ -486,6 +507,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 # If the grasp pose is too far, navigate
                 yield from self._navigate_if_needed(obj, pose_on_obj=grasp_pose)
 
+                print("MOVE HAND")
                 yield from self._move_hand(grasp_pose, stop_if_stuck=True)
 
                 # We can pre-grasp in sticky grasping mode only for opening
@@ -499,12 +521,15 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 if should_open:
                     yield from self._move_hand_direct_cartesian(approach_pose, ignore_failure=False, stop_on_contact=True, stop_if_stuck=True)
                 else:
+                    print("go to approach pose")
                     yield from self._move_hand_direct_cartesian(approach_pose, ignore_failure=False, stop_if_stuck=True)
             
                 # Step once to update
-                yield self._empty_action(), "manip:empty_action"
+                empty_action = self._empty_action()
+                yield self.with_context(empty_action)
 
                 for i, target_pose in enumerate(target_poses):
+                    print(f"go to target pose {i}")
                     yield from self._move_hand_direct_cartesian(target_pose, ignore_failure=False, stop_if_stuck=True)
 
                 # Moving to target pose often fails. Let's get the hand to apply the correct actions for its current pos
@@ -515,14 +540,14 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     stop_if_stuck=True
                 )
 
-                yield from self._execute_release()
                 if should_open:
+                    yield from self._execute_release()
                     yield from self._move_base_backward()
 
             except ActionPrimitiveError as e:
                 print(e)
-                yield from self._execute_release()
-                if should_open: 
+                if should_open:
+                    yield from self._execute_release() 
                     yield from self._move_base_backward()
                 else:
                     yield from self._move_hand_backward()
@@ -549,9 +574,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             action = self._empty_action()
             action[self.robot.controller_action_idx["gripper_{}".format(self.arm)]] = 1.0
             action[self.robot.base_control_idx[0]] = -speed
-            yield action, "nav:move_base_backward"
+            yield self.with_context(action)
 
-    def _move_hand_backward(self, steps=5, speed=0.3):
+    def _move_hand_backward(self, steps=10, speed=0.1):
         """
         Yields action for the robot to move hand so the eef is in the target pose using the planner
 
@@ -566,7 +591,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             action = self._empty_action()
             action[self.robot.controller_action_idx["gripper_{}".format(self.arm)]] = 1.0
             action[self.robot.controller_action_idx["arm_{}".format(self.arm)][0]] = -speed
-            yield action, "nav:move_base_backward"
+            yield self.with_context(action)
         print("moving hand backward done")
 
     def _grasp(self, obj):
@@ -616,7 +641,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             yield from self._move_hand_direct_cartesian(approach_pose, stop_on_contact=True)
 
             # Step once to update
-            yield self._empty_action(), "manip:empty_action"
+            empty_action = self._empty_action()
+            yield self.with_context(empty_action)
 
             if self._get_obj_in_hand() is None:
                 raise ActionPrimitiveError(
@@ -979,7 +1005,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             else:
                 action[self.robot.controller_action_idx[controller_name]] = joint_pos
             action = self._overwrite_head_action(action, self._tracking_object) if self._tracking_object is not None else action
-            yield action, "manip:move_hand_direct_joint"
+            yield self.with_context(action)
 
         if not ignore_failure:
             raise ActionPrimitiveError(
@@ -1011,17 +1037,19 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             delta_pos = target_pos - current_pos
             target_pos_diff = np.linalg.norm(delta_pos)
             target_orn_diff = (Rotation.from_quat(target_orn) * Rotation.from_quat(current_orn).inv()).magnitude() 
-            reached_goal = target_pos_diff < pos_thresh and target_orn_diff < np.deg2rad(ori_thresh)
+            reached_goal = target_pos_diff < pos_thresh and target_orn_diff < ori_thresh
             if reached_goal:
                 return
             
             if stop_on_contact and detect_robot_collision_in_sim(self.robot, ignore_obj_in_hand=False):
                 return
             
-            if i > 0 and stop_if_stuck and detect_robot_collision_in_sim(self.robot, ignore_obj_in_hand=False):
+            # if i > 0 and stop_if_stuck and detect_robot_collision_in_sim(self.robot, ignore_obj_in_hand=False):
+            if i > 0 and stop_if_stuck:
                 pos_diff = np.linalg.norm(prev_pos - current_pos)
                 orn_diff = (Rotation.from_quat(prev_orn) * Rotation.from_quat(current_orn).inv()).magnitude() 
-                if pos_diff < 0.0004 and orn_diff < np.deg2rad(0.04):
+                print(pos_diff, orn_diff)
+                if pos_diff < 0.0003 and orn_diff < 0.01:
                     raise ActionPrimitiveError(
                         ActionPrimitiveError.Reason.EXECUTION_ERROR,
                         f"Hand is stuck"
@@ -1032,7 +1060,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
             action[control_idx] = np.concatenate([delta_pos, target_orn_axisangle])
             action = self._overwrite_head_action(action, self._tracking_object) if self._tracking_object is not None else action
-            yield action, "manip:move_hand_direct_ik"
+            yield self.with_context(action)
 
         if not ignore_failure:
             raise ActionPrimitiveError(
@@ -1083,7 +1111,13 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 if stop_on_contact and detect_robot_collision_in_sim(self.robot, ignore_obj_in_hand=False):
                     return
             
-            yield from self._move_hand_direct_ik(waypoints[-1], stop_on_contact=stop_on_contact, ignore_failure=ignore_failure, pos_thresh=0.01, ori_thresh=0.1)
+            yield from self._move_hand_direct_ik(
+                waypoints[-1], 
+                pos_thresh=0.01, ori_thresh=0.1,
+                stop_on_contact=stop_on_contact, 
+                ignore_failure=ignore_failure, 
+                stop_if_stuck=stop_if_stuck
+            )
 
             # Also decide if we can stop early.
             current_pos, current_orn = self.robot.eef_links[self.arm].get_position_orientation()
@@ -1152,7 +1186,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             action = self._overwrite_head_action(action, self._tracking_object) if self._tracking_object is not None else action
             controller_name = "gripper_{}".format(self.arm)
             action[self.robot.controller_action_idx[controller_name]] = -1.0
-            yield action, "manip:execute_grasp"
+            yield self.with_context(action)
 
     def _execute_release(self):
         """
@@ -1167,7 +1201,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             action = self._overwrite_head_action(action, self._tracking_object) if self._tracking_object is not None else action
             controller_name = "gripper_{}".format(self.arm)
             action[self.robot.controller_action_idx[controller_name]] = 1.0
-            yield action, "manip:execute_release"
+            yield self.with_context(action)
 
         if self._get_obj_in_hand() is not None:
             raise ActionPrimitiveError(
@@ -1510,7 +1544,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 else:
                     base_action = [KP_LIN_VEL, 0.0]
                     action[self.robot.controller_action_idx["base"]] = base_action
-                yield action, "nav:navigate_to_pose_direct"
+                yield self.with_context(action)
 
             body_target_pose = self._get_pose_in_robot_frame(end_pose)
 
@@ -1540,12 +1574,13 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             action[self.robot.controller_action_idx["base"]] = base_action
             
             action = self._overwrite_head_action(action, self._tracking_object) if self._tracking_object is not None else action
-            yield action, "nav:rotate_in_place"
+            yield self.with_context(action)
 
             body_target_pose = self._get_pose_in_robot_frame(end_pose)
             diff_yaw = T.wrap_angle(T.quat2euler(body_target_pose[1])[2])
-            
-        yield self._empty_action(), "nav:rotate_in_place"
+        
+        empty_action = self._empty_action()
+        yield self.with_context(empty_action)
             
     def _sample_pose_near_object(self, obj, pose_on_obj=None, **kwargs):
         """
@@ -1762,6 +1797,11 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Returns:
             np.array or None: Action array for one step for the robot to do nothing
         """
-        yield from [(self._empty_action(), "nav:settle_robot") for _ in range(10)]
+        # return
+        for _ in range(10):
+            empty_action = self._empty_action()
+            yield self.with_context(empty_action)
+
         while np.linalg.norm(self.robot.get_linear_velocity()) > 0.01:
-            yield self._empty_action(), "nav:settle_robot"
+            empty_action = self._empty_action()
+            yield self.with_context(empty_action)
