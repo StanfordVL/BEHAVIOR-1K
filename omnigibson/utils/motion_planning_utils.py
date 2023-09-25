@@ -239,8 +239,12 @@ def plan_arm_motion(
             end_conf[i] = joint.upper_limit
         if end_conf[i] < joint.lower_limit:
             end_conf[i] = joint.lower_limit
-        bounds.setLow(i, float(joint.lower_limit))
-        bounds.setHigh(i, float(joint.upper_limit))
+        if joint.upper_limit - joint.lower_limit > 2 * np.pi:
+            bounds.setLow(i, 0.0)
+            bounds.setHigh(i, 2 * np.pi)
+        else:
+            bounds.setLow(i, float(joint.lower_limit))
+            bounds.setHigh(i, float(joint.upper_limit))
     space.setBounds(bounds)
 
     # create a simple setup object

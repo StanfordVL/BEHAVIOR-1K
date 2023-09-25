@@ -828,6 +828,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         controller_name = "arm_{}".format(self.arm)
         action[self.robot.controller_action_idx[controller_name]] = joint_pos
         action = self._overwrite_head_action(action, self._tracking_object) if self._tracking_object is not None else action
+        prev_eef_pos = [0.0, 0.0, 0.0]
 
         for _ in range(max_steps_for_hand_move):
             current_joint_pos = self.robot.get_joint_positions()[control_idx]
@@ -836,6 +837,14 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 return
             if stop_on_contact and detect_robot_collision_in_sim(self.robot, ignore_obj_in_hand=False):
                 return
+            
+            if max(np.abs(np.array(self.robot.get_eef_position(self.arm) - prev_eef_pos))) < 0.0001:
+                raise ActionPrimitiveError(
+                        ActionPrimitiveError.Reason.EXECUTION_ERROR,
+                        f"Hand is stuck"
+                    )
+            
+            prev_eef_pos = self.robot.get_eef_position(self.arm)
             yield action
 
         if not ignore_failure:
