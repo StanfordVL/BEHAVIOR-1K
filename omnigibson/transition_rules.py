@@ -153,6 +153,10 @@ class TransitionRuleAPI:
                 added_obj_attrs += output.add
                 removed_objs += output.remove
 
+        cls.execute_transition(added_obj_attrs=added_obj_attrs, removed_objs=removed_objs)
+
+    @classmethod
+    def execute_transition(cls, added_obj_attrs, removed_objs):
         # Process all transition results
         if len(removed_objs) > 0:
             disclaimer(
@@ -1266,10 +1270,13 @@ class RecipeRule(BaseTransitionRule):
                 system.remove_all_group_particles(group=group_name)
 
         # Remove either all objects or only the recipe-relevant objects inside the container
-        objs_to_remove.extend(np.concatenate([
-            cls._OBJECTS[np.where(in_volume[cls._CATEGORY_IDXS[obj_category]])[0]]
-            for obj_category in recipe["input_objects"].keys()
-        ]) if cls.ignore_nonrecipe_objects else cls._OBJECTS[np.where(in_volume)[0]])
+        object_mask = in_volume.copy()
+        if cls.ignore_nonrecipe_objects:
+            object_category_mask = np.zeros_like(object_mask, dtype=bool)
+            for obj_category in recipe["input_objects"].keys():
+                object_category_mask[cls._CATEGORY_IDXS[obj_category]] = True
+            object_mask &= object_category_mask
+        objs_to_remove.extend(cls._OBJECTS[object_mask])
         volume += sum(obj.volume for obj in objs_to_remove)
 
         # Define callback for spawning new objects inside container
