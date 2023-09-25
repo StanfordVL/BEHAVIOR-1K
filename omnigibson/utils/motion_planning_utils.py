@@ -4,13 +4,14 @@ from math import ceil
 import omnigibson as og
 from omnigibson.object_states import ContactBodies
 import omnigibson.utils.transform_utils as T
+from omnigibson.utils.control_utils import IKSolver
 from pxr import PhysicsSchemaTools, Gf
 
 def plan_base_motion(
     robot,
     end_conf,
     context,
-    planning_time = 15.0,
+    planning_time=15.0,
     **kwargs
 ):
     """
@@ -193,7 +194,8 @@ def plan_arm_motion(
     robot,
     end_conf,
     context,
-    planning_time = 15.0,
+    planning_time=15.0,
+    torso_fixed=True,
     **kwargs
 ):
     """
@@ -211,16 +213,21 @@ def plan_arm_motion(
     from ompl import base as ob
     from ompl import geometric as ompl_geo
 
-    joint_control_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
-    dim = len(joint_control_idx)
-
-    if "combined" in robot.robot_arm_descriptor_yamls:
-        joint_combined_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx["combined"]])
-        initial_joint_pos = np.array(robot.get_joint_positions()[joint_combined_idx])
-        control_idx_in_joint_pos = np.where(np.in1d(joint_combined_idx, joint_control_idx))[0]
-    else:
+    if torso_fixed:
+        joint_control_idx = robot.arm_control_idx[robot.default_arm]
+        dim = len(joint_control_idx)
         initial_joint_pos = np.array(robot.get_joint_positions()[joint_control_idx])
         control_idx_in_joint_pos = np.arange(dim)
+    else:
+        joint_control_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
+        dim = len(joint_control_idx)
+        if "combined" in robot.robot_arm_descriptor_yamls:
+            joint_combined_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx["combined"]])
+            initial_joint_pos = np.array(robot.get_joint_positions()[joint_combined_idx])
+            control_idx_in_joint_pos = np.where(np.in1d(joint_combined_idx, joint_control_idx))[0]
+        else:
+            initial_joint_pos = np.array(robot.get_joint_positions()[joint_control_idx])
+            control_idx_in_joint_pos = np.arange(dim)
 
     def state_valid_fn(q):
         joint_pos = initial_joint_pos
@@ -281,6 +288,135 @@ def plan_arm_motion(
         for i in range(sol_path.getStateCount()):
             joint_pos = [sol_path.getState(i)[j] for j in range(dim)]
             return_path.append(joint_pos)
+        return return_path
+    return None
+
+def plan_arm_motion_ik(   
+    robot,
+    end_conf,
+    context,
+    planning_time=15.0,
+    torso_fixed=True,
+    **kwargs
+):
+    """
+    Plans an arm motion to a final end effector pose
+
+    Args:
+        robot (BaseRobot): Robot object to plan for
+        end_conf (Iterable): Final end effector pose to plan to
+        context (UndoableContext): Context to plan in that includes the robot copy
+        planning_time (float): Time to plan for
+    
+    Returns:
+        Array of arrays: Array of end effector pose that the robot should navigate to
+    """
+    from ompl import base as ob
+    from ompl import geometric as ompl_geo
+
+    DOF = 6
+
+    if torso_fixed:
+        joint_control_idx = robot.arm_control_idx[robot.default_arm]
+        dim = len(joint_control_idx)
+        initial_joint_pos = np.array(robot.get_joint_positions()[joint_control_idx])
+        control_idx_in_joint_pos = np.arange(dim)
+        robot_description_path = robot.robot_arm_descriptor_yamls["left_fixed"]
+    else:
+        joint_control_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
+        dim = len(joint_control_idx)
+        if "combined" in robot.robot_arm_descriptor_yamls:
+            joint_combined_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx["combined"]])
+            initial_joint_pos = np.array(robot.get_joint_positions()[joint_combined_idx])
+            control_idx_in_joint_pos = np.where(np.in1d(joint_combined_idx, joint_control_idx))[0]
+        else:
+            initial_joint_pos = np.array(robot.get_joint_positions()[joint_control_idx])
+            control_idx_in_joint_pos = np.arange(dim)  
+        robot_description_path = robot.robot_arm_descriptor_yamls[robot.default_arm]
+
+    ik_solver = IKSolver(
+        robot_description_path=robot_description_path,
+        robot_urdf_path=robot.urdf_path,
+        # default_joint_pos=robot.get_joint_positions()[joint_control_idx],
+        default_joint_pos=robot.default_joint_pos[joint_control_idx],
+        eef_name=robot.eef_link_names[robot.default_arm],
+    )
+
+    def state_valid_fn(q):
+        joint_pos = initial_joint_pos
+        eef_pose = [q[i] for i in range(6)]
+        control_joint_pos = ik_solver.solve(
+            target_pos=eef_pose[:3],
+            target_quat=T.axisangle2quat(eef_pose[3:]),
+            max_iterations=1000,
+        )
+# ik_solver.solve(
+#     target_pos=eef_pose[:3],
+#     target_quat=T.axisangle2quat(eef_pose[3:]),
+#     max_iterations=1000,
+# )
+        if control_joint_pos is None:
+            return False
+        joint_pos[control_idx_in_joint_pos] = control_joint_pos
+        return not set_arm_and_detect_collision(context, joint_pos)
+    
+    # create an SE2 state space
+    space = ob.RealVectorStateSpace(DOF)
+
+    # set lower and upper bounds for eef position
+    bounds = ob.RealVectorBounds(DOF)
+
+    EEF_X_LIM = [-0.8, 0.8]
+    EEF_Y_LIM = [-0.8, 0.8]
+    EEF_Z_LIM = [-2.0, 2.0]
+    bounds.setLow(0, EEF_X_LIM[0])
+    bounds.setHigh(0, EEF_X_LIM[1])
+    bounds.setLow(1, EEF_Y_LIM[0])
+    bounds.setHigh(1, EEF_Y_LIM[1])
+    bounds.setLow(2, EEF_Z_LIM[0])
+    bounds.setHigh(2, EEF_Z_LIM[1])
+    
+    # # set lower and upper bounds for eef orientation (axis angle bounds)
+    for i in range(3, 6):
+        bounds.setLow(i, -np.pi)
+        bounds.setHigh(i, np.pi)
+    space.setBounds(bounds)
+
+    # create a simple setup object
+    ss = ompl_geo.SimpleSetup(space)
+    ss.setStateValidityChecker(ob.StateValidityCheckerFn(state_valid_fn))
+
+    si = ss.getSpaceInformation()
+    planner = ompl_geo.BITstar(si)
+    ss.setPlanner(planner)
+
+    start_conf = np.append(robot.get_relative_eef_position(), T.quat2axisangle(robot.get_relative_eef_orientation()))
+    # do fk
+    start = ob.State(space)
+    for i in range(DOF):
+        start[i] = float(start_conf[i])
+
+    goal = ob.State(space)
+    for i in range(DOF):
+        goal[i] = float(end_conf[i])
+    ss.setStartAndGoalStates(start, goal)
+
+    if not state_valid_fn(start) or not state_valid_fn(goal):
+        return
+
+    # this will automatically choose a default planner with
+    # default parameters
+    solved = ss.solve(planning_time)
+
+    if solved:
+        # try to shorten the path
+        # ss.simplifySolution()
+
+        sol_path = ss.getSolutionPath()
+        return_path = []
+        for i in range(sol_path.getStateCount()):
+            eef_pose = [sol_path.getState(i)[j] for j in range(DOF)]
+            return_path.append(eef_pose)
         return return_path
     return None
 

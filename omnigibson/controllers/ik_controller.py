@@ -123,7 +123,7 @@ class InverseKinematicsController(ManipulationController):
             robot_description_path=robot_description_path,
             robot_urdf_path=robot_urdf_path,
             eef_name=eef_name,
-            default_joint_pos=default_joint_pos,
+            default_joint_pos=self.default_joint_pos,
         )
 
         # Other variables that will be filled in at runtime
@@ -270,7 +270,10 @@ class InverseKinematicsController(ManipulationController):
         target_joint_pos = self.solver.solve(
             target_pos=target_pos,
             target_quat=target_quat,
-            initial_joint_pos=current_joint_pos,
+            tolerance_pos=0.002,
+            weight_pos=20.0,
+            max_iterations=2000,
+            # initial_joint_pos=current_joint_pos,
         )
 
         if target_joint_pos is None:

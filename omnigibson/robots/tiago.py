@@ -665,6 +665,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
     @property
     def usd_path(self):
+        # return os.path.join(gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford/tiago_dual_omnidirectional_stanford_33_with_wrist_cam.usd")
         return os.path.join(gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford/tiago_dual_omnidirectional_stanford_33.usd")
 
     @property
@@ -674,6 +675,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
     @property
     def robot_arm_descriptor_yamls(self):
         return {"left": os.path.join(gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford_left_arm_descriptor.yaml"),
+                "left_fixed": os.path.join(gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford_left_arm_fixed_trunk_descriptor.yaml"),
                 "right": os.path.join(gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford_right_arm_fixed_trunk_descriptor.yaml"),
                 "combined": os.path.join(gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford.yaml")}
 
@@ -727,6 +729,11 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             super().set_position_orientation(position, orientation)
             # Move the joint frame for the world_base_joint
             if self._world_base_fixed_joint_prim is not None:
+                # Position and orientation are lists when restoring scene from json. Cast them to np.array
+                if isinstance(position, list):
+                    position = np.array(position)
+                if isinstance(orientation, list):
+                    orientation = np.array(orientation)
                 self._world_base_fixed_joint_prim.GetAttribute("physics:localPos0").Set(tuple(position))
                 self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(Gf.Quatf(*orientation[[3, 0, 1, 2]]))
 

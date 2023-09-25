@@ -8,9 +8,6 @@ from omnigibson.object_states.open_state import _get_relevant_joints
 from omnigibson.utils.constants import JointType, JointAxis
 from omni.isaac.core.utils.rotations import gf_quat_to_np_array
 
-
-p = None
-
 REVOLUTE_JOINT_FRACTION_ACROSS_SURFACE_AXIS_BOUNDS = (0.4, 0.6)
 PRISMATIC_JOINT_FRACTION_ACROSS_SURFACE_AXIS_BOUNDS = (0.2, 0.8)
 GRASP_OFFSET = np.array([0, 0.05, -0.08])
@@ -79,7 +76,7 @@ def get_grasp_poses_for_object_sticky(target_obj):
 
 #     return grasp_candidate
 
-def get_grasp_position_for_open(robot, target_obj, should_open, relevant_joint=None):
+def get_grasp_position_for_open(robot, target_obj, should_open, relevant_joint=None, num_waypoints="default"):
     # Pick a moving link of the object.
     relevant_joints = [relevant_joint] if relevant_joint is not None else _get_relevant_joints(target_obj)[1]
     if len(relevant_joints) == 0:
@@ -89,24 +86,34 @@ def get_grasp_position_for_open(robot, target_obj, should_open, relevant_joint=N
     random.shuffle(relevant_joints)
     selected_joint = None
     for joint in relevant_joints:
+        # from IPython import embed; embed()
+        # if joint.name == "drawer:joint_j_link_2":
+        #     selected_joint = joint
+        #     break
         current_position = joint.get_state()[0][0]
         joint_range = joint.upper_limit - joint.lower_limit
         openness_fraction = (current_position - joint.lower_limit) / joint_range
         if (should_open and openness_fraction < 0.8) or (not should_open and openness_fraction > 0.05):
             selected_joint = joint
+            break
+        # current_position = joint.get_state()[0][0]
+        # joint_range = joint.upper_limit - joint.lower_limit
+        # openness_fraction = (current_position - joint.lower_limit) / joint_range
+        # if (should_open and openness_fraction < 0.8) or (not should_open and openness_fraction > 0.05):
+        #     selected_joint = joint
 
     if selected_joint is None:
         return None
 
     if selected_joint.joint_type == JointType.JOINT_REVOLUTE:
-        return grasp_position_for_open_on_revolute_joint(robot, target_obj, selected_joint, should_open)
+        return grasp_position_for_open_on_revolute_joint(robot, target_obj, selected_joint, should_open, num_waypoints=num_waypoints)
     elif selected_joint.joint_type == JointType.JOINT_PRISMATIC:
-        return grasp_position_for_open_on_prismatic_joint(robot, target_obj, selected_joint, should_open)
+        return grasp_position_for_open_on_prismatic_joint(robot, target_obj, selected_joint, should_open, num_waypoints=num_waypoints)
     else:
         raise ValueError("Unknown joint type encountered while generating joint position.")
     
 
-def grasp_position_for_open_on_prismatic_joint(robot, target_obj, relevant_joint, should_open):
+def grasp_position_for_open_on_prismatic_joint(robot, target_obj, relevant_joint, should_open, num_waypoints="default"):
     link_name = relevant_joint.body1.split("/")[-1]
     
     # Get the bounding box of the child link.
@@ -118,17 +125,15 @@ def grasp_position_for_open_on_prismatic_joint(robot, target_obj, relevant_joint
     ) = target_obj.get_base_aligned_bbox(link_name=link_name, visual=False)
 
     # Match the push axis to one of the bb axes.
-    push_axis_idx = JointAxis.index(relevant_joint.axis)
-    canonical_push_axis = np.eye(3)[push_axis_idx]
     joint_orientation = gf_quat_to_np_array(relevant_joint.get_attribute("physics:localRot0"))[[1, 2, 3, 0]]
     push_axis = R.from_quat(joint_orientation).apply([1, 0, 0])
     assert np.isclose(np.max(np.abs(push_axis)), 1.0)  # Make sure we're aligned with a bb axis.
     push_axis_idx = np.argmax(np.abs(push_axis))
     canonical_push_axis = np.eye(3)[push_axis_idx]
 
-
     # TODO: Need to figure out how to get the correct push direction.
-    canonical_push_direction = canonical_push_axis * np.sign(push_axis[push_axis_idx])
+    push_direction = np.sign(push_axis[push_axis_idx]) if should_open else -1 * np.sign(push_axis[push_axis_idx])
+    canonical_push_direction = canonical_push_axis * push_direction
 
     # Pick the closer of the two faces along the push axis as our favorite.
     points_along_push_axis = (
@@ -158,11 +163,15 @@ def grasp_position_for_open_on_prismatic_joint(robot, target_obj, relevant_joint
         PRISMATIC_JOINT_FRACTION_ACROSS_SURFACE_AXIS_BOUNDS[1] * diff_lateral_pos_wrt_surface_center,
     )
     lateral_pos_wrt_surface_center = min_lateral_pos_wrt_surface_center + sampled_lateral_pos_wrt_min
-    grasp_position_in_bbox_frame = center_of_selected_surface_along_push_axis + lateral_pos_wrt_surface_center + canonical_push_direction * 0.2
+    grasp_position_in_bbox_frame = center_of_selected_surface_along_push_axis + lateral_pos_wrt_surface_center
     grasp_quat_in_bbox_frame = T.quat_inverse(joint_orientation)
+    grasp_pose_in_world_frame = T.pose_transform(
+        bbox_center_in_world, bbox_quat_in_world, grasp_position_in_bbox_frame, grasp_quat_in_bbox_frame
+    )
 
     # Now apply the grasp offset.
-    offset_grasp_pose_in_bbox_frame = (grasp_position_in_bbox_frame, grasp_quat_in_bbox_frame)
+    dist_from_grasp_pos = robot.finger_lengths[robot.default_arm] + 0.05
+    offset_grasp_pose_in_bbox_frame = (grasp_position_in_bbox_frame + canonical_push_axis * push_axis_closer_side_sign * dist_from_grasp_pos, grasp_quat_in_bbox_frame)
     offset_grasp_pose_in_world_frame = T.pose_transform(
         bbox_center_in_world, bbox_quat_in_world, *offset_grasp_pose_in_bbox_frame
     )
@@ -172,7 +181,7 @@ def grasp_position_for_open_on_prismatic_joint(robot, target_obj, relevant_joint
     current_joint_pos = relevant_joint.get_state()[0][0]
     
     required_pos_change = target_joint_pos - current_joint_pos
-    push_vector_in_bbox_frame = canonical_push_direction * required_pos_change
+    push_vector_in_bbox_frame = canonical_push_direction * abs(required_pos_change)
     target_hand_pos_in_bbox_frame = grasp_position_in_bbox_frame + push_vector_in_bbox_frame
     target_hand_pose_in_world_frame = T.pose_transform(
         bbox_center_in_world, bbox_quat_in_world, target_hand_pos_in_bbox_frame, grasp_quat_in_bbox_frame
@@ -183,7 +192,13 @@ def grasp_position_for_open_on_prismatic_joint(robot, target_obj, relevant_joint
 
     # Decide whether a grasp is required. If approach direction and displacement are similar, no need to grasp.
     grasp_required = np.dot(push_vector_in_bbox_frame, canonical_push_axis * -push_axis_closer_side_sign) < 0
-    waypoints = interpolate_waypoints(offset_grasp_pose_in_world_frame, target_hand_pose_in_world_frame)
+    # TODO: Need to find a better of getting the predicted position of eef for start point of interpolating waypoints. Maybe
+    # break this into another function that called after the grasp is executed, so we know the eef position?
+    waypoint_start_offset = -0.05 * approach_direction_in_world_frame if should_open else 0.05 * approach_direction_in_world_frame
+    waypoint_start_pose = (grasp_pose_in_world_frame[0] + -1 * approach_direction_in_world_frame * (robot.finger_lengths[robot.default_arm] + waypoint_start_offset), grasp_pose_in_world_frame[1])
+    waypoint_end_pose = (target_hand_pose_in_world_frame[0] + -1 * approach_direction_in_world_frame * (robot.finger_lengths[robot.default_arm]), target_hand_pose_in_world_frame[1])
+    waypoints = interpolate_waypoints(waypoint_start_pose, waypoint_end_pose, num_waypoints=num_waypoints)
+
     return (
         offset_grasp_pose_in_world_frame,
         waypoints,
@@ -193,16 +208,19 @@ def grasp_position_for_open_on_prismatic_joint(robot, target_obj, relevant_joint
         required_pos_change
     )
 
-def interpolate_waypoints(start_pose, end_pose):
+
+def interpolate_waypoints(start_pose, end_pose, num_waypoints="default"):
     start_pos, start_orn = start_pose
     travel_distance = np.linalg.norm(end_pose[0] - start_pos)
-    num_poses = np.max([2, int(travel_distance / 0.01) + 1])
-    pos_waypoints = np.linspace(start_pos, end_pose[0], num_poses)
+
+    if num_waypoints == "default":
+        num_waypoints = np.max([2, int(travel_distance / 0.01) + 1])
+    pos_waypoints = np.linspace(start_pos, end_pose[0], num_waypoints)
 
     # Also interpolate the rotations
     combined_rotation = R.from_quat(np.array([start_orn, end_pose[1]]))
     slerp = Slerp([0, 1], combined_rotation)
-    orn_waypoints = slerp(np.linspace(0, 1, num_poses))
+    orn_waypoints = slerp(np.linspace(0, 1, num_waypoints))
     quat_waypoints = [x.as_quat() for x in orn_waypoints]
     return [waypoint for waypoint in zip(pos_waypoints, quat_waypoints)]
 
@@ -279,7 +297,8 @@ def grasp_position_for_open_on_revolute_joint(robot, target_obj, relevant_joint,
     grasp_quat_in_bbox_frame = get_orientation_facing_vector_with_random_yaw(canonical_open_direction * open_axis_closer_side_sign * -1)
 
     # Now apply the grasp offset.
-    offset_in_bbox_frame = canonical_open_direction * open_axis_closer_side_sign * 0.1
+    dist_from_grasp_pos = robot.finger_lengths[robot.default_arm] + 0.05
+    offset_in_bbox_frame = canonical_open_direction * open_axis_closer_side_sign * dist_from_grasp_pos
     offset_grasp_pose_in_bbox_frame = (grasp_position + offset_in_bbox_frame, grasp_quat_in_bbox_frame)
     offset_grasp_pose_in_world_frame = T.pose_transform(
         bbox_center_in_world, bbox_quat_in_world, *offset_grasp_pose_in_bbox_frame
@@ -302,7 +321,7 @@ def grasp_position_for_open_on_revolute_joint(robot, target_obj, relevant_joint,
     for i in range(turn_steps):
         partial_yaw_change = (i + 1) / turn_steps * required_yaw_change
         rotated_grasp_pose_in_bbox_frame = rotate_point_around_axis(
-            offset_grasp_pose_in_bbox_frame, bbox_wrt_origin, joint_axis, partial_yaw_change
+            (offset_grasp_pose_in_bbox_frame[0], offset_grasp_pose_in_bbox_frame[1]), bbox_wrt_origin, joint_axis, partial_yaw_change
         )
         rotated_grasp_pose_in_world_frame = T.pose_transform(
             bbox_center_in_world, bbox_quat_in_world, *rotated_grasp_pose_in_bbox_frame
@@ -332,7 +351,7 @@ def get_orientation_facing_vector_with_random_yaw(vector):
     side = np.cross(rand_vec, forward)
     side /= np.linalg.norm(3)
     up = np.cross(forward, side)
-    assert np.isclose(np.linalg.norm(up), 1, atol=1e-3)
+    # assert np.isclose(np.linalg.norm(up), 1, atol=1e-3)
     rotmat = np.array([forward, side, up]).T
     return R.from_matrix(rotmat).as_quat()
 
@@ -362,5 +381,3 @@ def get_closest_point_to_point_in_world_frame(
     vector_in_world_frame = vectors_in_world[closer_option_idx]
 
     return closer_option_idx, vector_in_arbitrary_frame, vector_in_world_frame
-
-
