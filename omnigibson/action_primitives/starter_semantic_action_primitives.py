@@ -386,7 +386,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         # Find the appropriate action generator.
         action = StarterSemanticActionPrimitiveSet(action_idx)
-        return self.controller_functions[action](target_obj)
+        return self.apply_ref(action, target_obj)
     
     def apply_ref(self, prim, *args, track_object=False, attempts=3):
         """
