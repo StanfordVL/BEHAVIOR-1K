@@ -12,7 +12,7 @@ import numpy as np
 from omnigibson.transition_rules import REGISTERED_RULES, TransitionRuleAPI
 
 from omnigibson import object_states
-from omnigibson.action_primitives.action_primitive_set_base import ActionPrimitiveError
+from omnigibson.action_primitives.action_primitive_set_base import ActionPrimitiveError, ActionPrimitiveErrorGroup
 from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitives
 from omnigibson.objects import DatasetObject
 
@@ -53,6 +53,46 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
           SymbolicSemanticActionPrimitiveSet.NAVIGATE_TO: self._navigate_to_obj,
           SymbolicSemanticActionPrimitiveSet.RELEASE: self._release,
         }
+
+    def apply_ref(self, prim, *args, attempts=3):
+        """
+        Yields action for robot to execute the primitive with the given arguments.
+
+        Args:
+            prim (SymbolicSemanticActionPrimitiveSet): Primitive to execute
+            args: Arguments for the primitive
+            attempts (int): Number of attempts to make before raising an error
+        
+        Returns:
+            np.array or None: Action array for one step for the robot tto execute the primitve or None if primitive completed
+        
+        Raises:
+            ActionPrimitiveError: If primitive fails to execute
+        """
+        assert attempts > 0, "Must make at least one attempt"
+        ctrl = self.controller_functions[prim]
+
+        errors = []
+        for _ in range(attempts):
+            # Attempt
+            success = False
+            try:
+                yield from ctrl(*args)
+                success = True
+            except ActionPrimitiveError as e:
+                errors.append(e)
+
+            try:
+                # Settle before returning.
+                yield from self._settle_robot()
+            except ActionPrimitiveError:
+                pass
+
+            # Stop on success
+            if success:
+                return
+
+        raise ActionPrimitiveErrorGroup(errors)
 
     def _open_or_close(self, obj, should_open):
         if self._get_obj_in_hand():
