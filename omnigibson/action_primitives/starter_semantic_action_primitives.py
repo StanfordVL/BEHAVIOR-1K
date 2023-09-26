@@ -215,7 +215,7 @@ class StarterSemanticActionPrimitiveSet(IntEnum):
     TOGGLE_OFF = 8
 
 class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
-    def __init__(self, task, scene, robot, teleport=False, add_context=False):
+    def __init__(self, task, scene, robot, add_context=False):
         logger.warning(
             "The StarterSemanticActionPrimitive is a work-in-progress and is only provided as an example. "
             "It currently only works with BehaviorRobot with its JointControllers set to absolute mode. "
@@ -237,7 +237,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         self.arm = self.robot.default_arm
         self.robot_model = self.robot.model_name
         self.robot_base_mass = self.robot._links["base_link"].mass
-        self.teleport = teleport
         self.add_context = add_context
         self._tracking_object = None
 
@@ -862,33 +861,26 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Returns:
             np.array or None: Action array for one step for the robot to move arm or None if its at the joint positions
         """
-        if self.teleport:
-            # Teleport the robot to the joint state
-            self.robot.set_joint_positions(joint_pos, control_idx)
+        with UndoableContext(self.robot, self.robot_copy, "original") as context:
+            plan = plan_arm_motion(
+                robot=self.robot,
+                end_conf=joint_pos,
+                context=context,
+                torso_fixed=TORSO_FIXED,
+            )
 
-            # Yield a bunch of no-ops to give the robot time to settle.
-            yield from self._settle_robot()
-        else:
-            with UndoableContext(self.robot, self.robot_copy, "original") as context:
-                plan = plan_arm_motion(
-                    robot=self.robot,
-                    end_conf=joint_pos,
-                    context=context,
-                    torso_fixed=TORSO_FIXED,
-                )
-
-            # plan = self._add_linearly_interpolated_waypoints(plan, 0.1)
-            if plan is None:
-                raise ActionPrimitiveError(
-                    ActionPrimitiveError.Reason.PLANNING_ERROR,
-                    "There is no accessible path from where you are to the desired joint position. Try again"
-                )
-            
-            # Follow the plan to navigate.
-            indented_print("Plan has %d steps", len(plan))
-            for i, joint_pos in enumerate(plan):
-                indented_print("Executing grasp plan step %d/%d", i + 1, len(plan))
-                yield from self._move_hand_direct_joint(joint_pos, control_idx, ignore_failure=True)
+        # plan = self._add_linearly_interpolated_waypoints(plan, 0.1)
+        if plan is None:
+            raise ActionPrimitiveError(
+                ActionPrimitiveError.Reason.PLANNING_ERROR,
+                "There is no accessible path from where you are to the desired joint position. Try again"
+            )
+        
+        # Follow the plan to navigate.
+        indented_print("Plan has %d steps", len(plan))
+        for i, joint_pos in enumerate(plan):
+            indented_print("Executing grasp plan step %d/%d", i + 1, len(plan))
+            yield from self._move_hand_direct_joint(joint_pos, control_idx, ignore_failure=True)
 
     def _move_hand_ik(self, eef_pose, stop_if_stuck=False):
         """
@@ -900,8 +892,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Returns:
             np.array or None: Action array for one step for the robot to move arm or None if its at the joint positions
         """
-        assert self.teleport == False, "Teleport is currently only supported for Joint Controller"
-
         eef_pos = eef_pose[0]
         eef_ori = T.quat2axisangle(eef_pose[1])
         end_conf = np.append(eef_pos, eef_ori)
@@ -1428,32 +1418,27 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Returns:
             np.array or None: Action array for one step for the robot to navigate or None if it is done navigating
         """
-        if self.teleport:
-            robot_pose = self._get_robot_pose_from_2d_pose(pose_2d)
-            self.robot.set_position_orientation(*robot_pose)
-            yield from self._settle_robot()
-        else:
-            with UndoableContext(self.robot, self.robot_copy, "simplified") as context:
-                plan = plan_base_motion(
-                    robot=self.robot,
-                    end_conf=pose_2d,
-                    context=context,
-                )
+        with UndoableContext(self.robot, self.robot_copy, "simplified") as context:
+            plan = plan_base_motion(
+                robot=self.robot,
+                end_conf=pose_2d,
+                context=context,
+            )
 
-            if plan is None:
-                # TODO: Would be great to produce a more informative error.
-                raise ActionPrimitiveError(
-                    ActionPrimitiveError.Reason.PLANNING_ERROR,
-                    "Could not make a navigation plan to get to the target position"
-                )
+        if plan is None:
+            # TODO: Would be great to produce a more informative error.
+            raise ActionPrimitiveError(
+                ActionPrimitiveError.Reason.PLANNING_ERROR,
+                "Could not make a navigation plan to get to the target position"
+            )
 
-            # self._draw_plan(plan)
-            # Follow the plan to navigate.
-            indented_print("Plan has %d steps", len(plan))
-            for i, pose_2d in enumerate(plan):
-                indented_print("Executing navigation plan step %d/%d", i + 1, len(plan))
-                low_precision = True if i < len(plan) - 1 else False
-                yield from self._navigate_to_pose_direct(pose_2d, low_precision=low_precision)
+        # self._draw_plan(plan)
+        # Follow the plan to navigate.
+        indented_print("Plan has %d steps", len(plan))
+        for i, pose_2d in enumerate(plan):
+            indented_print("Executing navigation plan step %d/%d", i + 1, len(plan))
+            low_precision = True if i < len(plan) - 1 else False
+            yield from self._navigate_to_pose_direct(pose_2d, low_precision=low_precision)
 
     def _draw_plan(self, plan):
         SEARCHED = []
