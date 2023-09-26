@@ -572,16 +572,6 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
     def set_position_orientation(self, position=None, orientation=None):
         current_position, current_orientation = self.get_position_orientation()
-        if position is None:
-            position = current_position
-        if orientation is None:
-            orientation = current_orientation
-        
-        # Position and orientation are lists when restoring scene from json. Cast to np.array
-        if isinstance(position, list):
-            position = np.array(position)
-        if isinstance(orientation, list):
-            orientation = np.array(orientation)
         
         # If the simulator is playing, set the 6 base joints to achieve the desired pose of base_footprint link frame
         if self._dc is not None and self._dc.is_simulating():

@@ -1263,15 +1263,13 @@ class ManipulationRobot(BaseRobot):
             return
 
         # Include AG_state
-        # TODO: currently doese not take care of cloth objects
-        self._ag_obj_constraint_params = state["ag_obj_constraint_params"]
-        for arm in self._ag_obj_constraint_params.keys():
-            if len(self._ag_obj_constraint_params[arm]) > 0:
-                data = self._ag_obj_constraint_params[arm]
+        # TODO: currently does not take care of cloth objects
+        for arm in state["ag_obj_constraint_params"].keys():
+            if len(state["ag_obj_constraint_params"][arm]) > 0:
+                data = state["ag_obj_constraint_params"][arm]
                 obj = og.sim.scene.object_registry("prim_path", data["ag_obj_prim_path"])
                 link = obj.links[data["ag_link_prim_path"].split("/")[-1]]
                 self._ag_data[arm] = (obj, link)
-                self._ag_obj_in_hand[arm] = obj
                 self._establish_grasp(arm=arm, ag_data=self._ag_data[arm], contact_pos=data["contact_pos"])
 
     def _serialize(self, state):
