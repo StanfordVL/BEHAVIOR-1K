@@ -5,7 +5,6 @@ It currently only works with BehaviorRobot with its JointControllers set to abso
 See provided behavior_robot_mp_behavior_task.yaml config file for an example. See examples/action_primitives for
 runnable examples.
 """
-import copy
 import inspect
 import logging
 import random
@@ -17,8 +16,6 @@ from matplotlib import pyplot as plt
 import gym
 import numpy as np
 from scipy.spatial.transform import Rotation, Slerp
-from omnigibson.utils.constants import JointType
-from pxr import PhysxSchema
 
 import omnigibson as og
 from omnigibson import object_states
@@ -43,15 +40,12 @@ from omnigibson.utils.grasping_planning_utils import (
     get_grasp_position_for_open
 )
 from omnigibson.controllers.controller_base import ControlType
-from omnigibson.prims import CollisionGeomPrim
 from omnigibson.utils.control_utils import FKSolver
 
 from omni.usd.commands import CopyPrimCommand, CreatePrimCommand
 from omni.isaac.core.utils.prims import get_prim_at_path
 from pxr import Gf
 
-import os
-from omnigibson.macros import gm
 from omnigibson.objects.usd_object import USDObject
 
 DEFAULT_BODY_OFFSET_FROM_FLOOR = 0.05
@@ -221,7 +215,7 @@ class StarterSemanticActionPrimitiveSet(IntEnum):
     TOGGLE_OFF = 8
 
 class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
-    def __init__(self, task, scene, robot, teleport=False, add_context=True):
+    def __init__(self, task, scene, robot, teleport=False, add_context=False):
         logger.warning(
             "The StarterSemanticActionPrimitive is a work-in-progress and is only provided as an example. "
             "It currently only works with BehaviorRobot with its JointControllers set to absolute mode. "
@@ -1604,7 +1598,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 - 4-array: (x,y,z,w) Quaternion orientation in the world frame
         """
         with UndoableContext(self.robot, self.robot_copy, "simplified") as context:
-            obj_rooms = obj.in_rooms if obj.in_rooms else [self.scene._seg_map.get_room_instance_by_point(pose_on_obj[0][:2])]
             for _ in range(MAX_ATTEMPTS_FOR_SAMPLING_POSE_NEAR_OBJECT):
                 if pose_on_obj is None:
                     pos_on_obj = self._sample_position_on_aabb_face(obj)
@@ -1617,6 +1610,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     [pose_on_obj[0][0] + distance * np.cos(yaw), pose_on_obj[0][1] + distance * np.sin(yaw), yaw + np.pi - avg_arm_workspace_range]
                 )
                 # Check room
+                obj_rooms = obj.in_rooms if obj.in_rooms else [self.scene._seg_map.get_room_instance_by_point(pose_on_obj[0][:2])]
                 if self.scene._seg_map.get_room_instance_by_point(pose_2d[:2]) not in obj_rooms:
                     indented_print("Candidate position is in the wrong room.")
                     continue
