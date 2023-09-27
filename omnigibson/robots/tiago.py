@@ -572,7 +572,11 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
     def set_position_orientation(self, position=None, orientation=None):
         current_position, current_orientation = self.get_position_orientation()
-        
+        if position is None:
+            position = current_position
+        if orientation is None:
+            orientation = current_orientation
+            
         # If the simulator is playing, set the 6 base joints to achieve the desired pose of base_footprint link frame
         if self._dc is not None and self._dc.is_simulating():
             # Find the relative transformation from base_footprint_link ("base_footprint") frame to root_link
