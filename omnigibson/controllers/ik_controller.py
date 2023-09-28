@@ -272,7 +272,7 @@ class InverseKinematicsController(ManipulationController):
             target_quat=target_quat,
             tolerance_pos=0.002,
             weight_pos=20.0,
-            max_iterations=2000,
+            max_iterations=100,
             # initial_joint_pos=current_joint_pos,
         )
 
