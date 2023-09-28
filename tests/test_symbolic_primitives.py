@@ -27,49 +27,57 @@ def start_env():
     },
     "robots": [
       {
-        "type": "Fetch",
-        "obs_modalities": [
-          "scan",
-          "rgb",
-          "depth"
-        ],
-        "scale": 1,
-        "self_collisions": True,
-        "action_normalize": False,
-        "action_type": "continuous",
-        "grasping_mode": "sticky",
-        "disable_grasp_handling": True,
-        "rigid_trunk": False,
-        "default_trunk_offset": 0.365,
-        "default_arm_pose": "diagonal30",
-        "reset_joint_pos": "tuck",
-        "controller_config": {
-          "base": {
-            "name": "DifferentialDriveController"
-          },
-          "arm_0": {
-            "name": "JointController",
-            "motor_type": "position",
-            "command_input_limits": None,
-            "command_output_limits": None,
-            "use_delta_commands": False
-          },
-          "gripper_0": {
-            "name": "JointController",
-            "motor_type": "position",
-            "command_input_limits": [
-              -1,
-              1
-            ],
-            "command_output_limits": None,
-            "use_delta_commands": True,
-            "use_single_command": True
-          },
-          "camera": {
-            "name": "JointController",
-            "use_delta_commands": False
+          "type": "Tiago",
+          "obs_modalities": ["scan", "rgb", "depth"],
+          "scale": 1.0,
+          "self_collisions": True,
+          "action_normalize": False,
+          "action_type": "continuous",
+          "grasping_mode": "sticky",
+          "rigid_trunk": False,
+          "default_arm_pose": "diagonal30",
+          "default_trunk_offset": 0.365,
+          "controller_config": {
+              "base": {
+                  "name": "JointController",
+                  "motor_type": "velocity"
+              },
+              "arm_left": {
+                  "name": "JointController",
+                  "motor_type": "position",
+                  "command_input_limits": None,
+                  "command_output_limits": None, 
+                  "use_delta_commands": False
+              },
+              "arm_right": {
+                  "name": "JointController",
+                  "motor_type": "position",
+                  "command_input_limits": None,
+                  "command_output_limits": None, 
+                  "use_delta_commands": False
+              },
+              "gripper_left": {
+                  "name": "JointController",
+                  "motor_type": "position",
+                  "command_input_limits": [-1, 1],
+                  "command_output_limits": None,
+                  "use_delta_commands": True,
+                  "use_single_command": True
+              },
+              "gripper_right": {
+                  "name": "JointController",
+                  "motor_type": "position",
+                  "command_input_limits": [-1, 1],
+                  "command_output_limits": None,
+                  "use_delta_commands": True,
+                  "use_single_command": True
+              },
+              "camera": {
+                  "name": "JointController",
+                  "motor_type": "velocity",
+                  "use_delta_commands": False
+              }
           }
-        }
       }
     ],
     "objects": [

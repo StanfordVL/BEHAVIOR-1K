@@ -247,9 +247,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         self.robot_copy = self._load_robot_copy(robot)
 
-        if self.robot_model == "Tiago":
-            self._setup_tiago()
-
     def with_context(self, action):
         if not self.add_context:
             return action
@@ -268,13 +265,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         context = action_type + context_function
         # print(context)
         return action, context
-
-    # Disable grasping frame for Tiago robot (Should be cleaned up in the future)
-    def _setup_tiago(self):
-        for link in self.robot.links.values():
-            for mesh in link.collision_meshes.values():
-                if "grasping_frame" in link.prim_path:
-                    mesh.collision_enabled = False
 
     @staticmethod
     def _load_robot_copy(robot):
