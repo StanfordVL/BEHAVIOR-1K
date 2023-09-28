@@ -21,10 +21,10 @@ scene:
   load_task_relevant_only: true
   seg_map_resolution: 0.1
   scene_source: OG
-  include_robots: true
+  include_robots: false
 
 robots:
-  - type: Fetch
+  - type: Tiago
     obs_modalities: [scan, rgb, depth]
     scale: 1.0
     self_collisions: true
@@ -32,21 +32,34 @@ robots:
     action_normalize: false
     action_type: continuous
     grasping_mode: sticky
-    disable_grasp_handling: True
+    disable_grasp_handling: true
     rigid_trunk: false
     default_trunk_offset: 0.365
     default_arm_pose: diagonal30
-    reset_joint_pos: tuck
     controller_config:
       base:
-        name: DifferentialDriveController
-      arm_0:
+        name: JointController
+        motor_type: "velocity"
+      arm_left:
         name: JointController
         motor_type: position
         command_input_limits: null
         command_output_limits: null
         use_delta_commands: false
-      gripper_0:
+      arm_right:
+        name: JointController
+        motor_type: position
+        command_input_limits: null
+        command_output_limits: null
+        use_delta_commands: false
+      gripper_left:
+        name: JointController
+        motor_type: position
+        command_input_limits: [-1, 1]
+        command_output_limits: null
+        use_delta_commands: true
+        use_single_command: true
+      gripper_right:
         name: JointController
         motor_type: position
         command_input_limits: [-1, 1]
@@ -55,6 +68,7 @@ robots:
         use_single_command: true
       camera:
         name: JointController
+        motor_type: "velocity"
         use_delta_commands: false
 
 objects: []
