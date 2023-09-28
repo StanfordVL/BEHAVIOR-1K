@@ -34,6 +34,7 @@ class InteractiveTraversableScene(TraversableScene):
         load_task_relevant_only=False,
         seg_map_resolution=0.1,
         include_robots=True,
+        override_robot_config=None
     ):
         """
         Args:
@@ -55,6 +56,7 @@ class InteractiveTraversableScene(TraversableScene):
             load_task_relevant_only (bool): Whether only task relevant objects (and building structure) should be loaded
             seg_map_resolution (float): room segmentation map resolution
             include_robots (bool): whether to also include the robot(s) defined in the scene
+            override_robot_config (None or dict): if specified, this will override the robot config defined in the scene
         """
 
         # Store attributes from inputs
@@ -95,6 +97,7 @@ class InteractiveTraversableScene(TraversableScene):
             num_waypoints=num_waypoints,
             waypoint_resolution=waypoint_resolution,
             use_floor_plane=False,
+            override_robot_config=override_robot_config,
         )
 
     def get_scene_loading_info(self, scene_model, scene_instance=None):

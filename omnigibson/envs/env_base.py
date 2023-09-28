@@ -538,7 +538,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         Returns:
             dict: Scene-specific configuration kwargs
         """
-        return self.config["scene"]
+        return dict(self.config["scene"], robot_config_override=self.config["robots"])
 
     @property
     def robots_config(self):

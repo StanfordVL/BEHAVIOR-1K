@@ -40,6 +40,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             floor_plane_visible=True,
             use_skybox=True,
             floor_plane_color=(1.0, 1.0, 1.0),
+            override_robot_config=None,
     ):
         """
         Args:
@@ -49,6 +50,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             floor_plane_visible (bool): whether to render the additionally added floor plane
             floor_plane_color (3-array): if @floor_plane_visible is True, this determines the (R,G,B) color assigned
                 to the generated floor plane
+            override_robot_config (None or dict): if specified, this will override the robot config defined in the scene
         """
         # Store internal variables
         self.scene_file = scene_file
@@ -61,6 +63,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         self._use_floor_plane = use_floor_plane
         self._floor_plane_visible = floor_plane_visible
         self._floor_plane_color = floor_plane_color
+        self._override_robot_config = override_robot_config
         self._floor_plane = None
         self._use_skybox = use_skybox
         self._skybox = None
