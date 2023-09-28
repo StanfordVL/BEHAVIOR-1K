@@ -75,6 +75,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
         # Unique to ManipulationRobot
         grasping_mode="physical",
+        disable_grasp_handling=False,
 
         # Unique to Tiago
         rigid_trunk=False,
@@ -129,6 +130,8 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
                 If "physical", no assistive grasping will be applied (relies on contact friction + finger force).
                 If "assisted", will magnetize any object touching and within the gripper's fingers.
                 If "sticky", will magnetize any object touching the gripper's fingers.
+            disable_grasp_handling (bool): If True, will disable all grasp handling for this object. This means that
+                sticky and assisted grasp modes will not work unless the connection/release methodsare manually called.
             rigid_trunk (bool) if True, will prevent the trunk from moving during execution.
             default_trunk_offset (float): sets the default height of the robot's trunk
             default_arm_pose (str): Default pose for the robot arm. Should be one of:
@@ -176,6 +179,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             proprio_obs=proprio_obs,
             sensor_config=sensor_config,
             grasping_mode=grasping_mode,
+            disable_grasp_handling=disable_grasp_handling,
             **kwargs,
         )
 

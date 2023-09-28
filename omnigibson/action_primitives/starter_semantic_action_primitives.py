@@ -1643,7 +1643,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     pos_on_obj = self._sample_position_on_aabb_face(obj)
                     pose_on_obj = [pos_on_obj, np.array([0, 0, 0, 1])]
 
-                distance = np.random.uniform(0.0, 1.0)
+                distance = np.random.uniform(0.0, 5.0)
                 yaw = np.random.uniform(-np.pi, np.pi)
                 avg_arm_workspace_range = np.mean(self.robot.arm_workspace_range[self.arm])
                 pose_2d = np.array(
