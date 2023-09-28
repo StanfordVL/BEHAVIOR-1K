@@ -131,25 +131,18 @@ class Recreatable(metaclass=RecreatableAbcMeta):
         return self._init_info
 
 
-def create_object_from_init_info(init_info, override_robot_config=None):
+def create_object_from_init_info(init_info):
     """
     Create a new object based on given init info.
 
     Args:
         init_info (dict): Nested dictionary that contains an object's init information.
-        override_robot_config (None or dict): If specified, will override the robot config specified in @init_info
 
     Returns:
         any: Newly created object.
     """
-    from omnigibson.robots.robot_base import BaseRobot
-
     module = import_module(init_info["class_module"])
     cls = getattr(module, init_info["class_name"])
-
-    if issubclass(cls, BaseRobot) and override_robot_config:
-        return cls(**override_robot_config)
-
     return cls(**init_info["args"], **init_info.get("kwargs", {}))
 
 

@@ -25,7 +25,6 @@ class TraversableScene(Scene):
         use_floor_plane=True,
         floor_plane_visible=True,
         floor_plane_color=(1.0, 1.0, 1.0),
-        override_robot_config=None
     ):
         """
         Args:
@@ -42,7 +41,6 @@ class TraversableScene(Scene):
             floor_plane_visible (bool): whether to render the additionally added floor plane
             floor_plane_color (3-array): if @floor_plane_visible is True, this determines the (R,G,B) color assigned
                 to the generated floor plane
-            override_robot_config (None or dict): if specified, this will override the robot config defined in the scene
         """
         log.info("TraversableScene model: {}".format(scene_model))
         self.scene_model = scene_model
@@ -62,7 +60,6 @@ class TraversableScene(Scene):
             use_floor_plane=use_floor_plane,
             floor_plane_visible=floor_plane_visible,
             floor_plane_color=floor_plane_color,
-            override_robot_config=override_robot_config
         )
 
     @property
