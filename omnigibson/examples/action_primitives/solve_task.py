@@ -27,7 +27,7 @@ def execute_controller(ctrl_gen, env):
 
 def main(keyboard_control=False):
     # Load the config
-    config_filename = os.path.join(og.example_config_path, "homeboy.yaml")
+    config_filename = os.path.join(og.example_config_path, "tiago_primitives.yaml")
     config = yaml.load(open(config_filename, "r"), Loader=yaml.FullLoader)
     if keyboard_control:
         config["robots"][0]["action_normalize"] = True
