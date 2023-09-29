@@ -12,7 +12,13 @@ to be installed on your SLURM cluster by an administrator.
 
 With enroot installed, you can follow the below steps to run OmniGibson on SLURM: 
 
-1. Download the dataset to a location that is accessible by cluster nodes. To do this 
+1. Download the dataset to a location that is accessible by cluster nodes. To do this, you can use
+the download_dataset.py script inside OmniGibson's scripts directory, and move it to the right spot
+later. **This step is already done for SVL and Viscam nodes**
+```{.shell .annotate}
+OMNIGIBSON_NO_OMNIVERSE=1 python scripts/download_dataset.py
+mv omnigibson/data /cvgl/group/Gibson/og-data-0-2-1
+```
 
 2. (Optional) Distribute the dataset to the individual nodes.
 This will make load times much better than reading from a network drive.
@@ -30,7 +36,7 @@ sinfo -p svl -o "%N,%n" -h | \
 
 3. Download your desired image to a location that is accessible by the cluster nodes. (Replace the path with your own path, and feel free to replace `latest` with your desired branch tag). You have the option to mount code (meaning you don't need the container to come with all the code you want to run, just the right dependencies / environment setup)
 ```{.shell .annotate}
-enroot import --output /cvgl2/u/cgokmen/omnigibson.sqsh docker://stanfordvl/omnigibson:latest
+enroot import --output /cvgl2/u/cgokmen/omnigibson.sqsh docker://stanfordvl/omnigibson:action-primitives
 ```
 
 4. (Optional) If you intend to mount code onto the container, make it available at a location that is accessible by the cluster nodes. You can mount arbitrary code, and you can also mount a custom version of OmniGibson (for the latter, you need to make sure you mount your copy of OmniGibson at /omnigibson-src inside the container). For example:
