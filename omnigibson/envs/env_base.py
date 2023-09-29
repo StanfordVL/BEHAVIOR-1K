@@ -204,7 +204,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
             for i, robot_config in enumerate(self.robots_config):
                 # Add a name for the robot if necessary
                 if "name" not in robot_config:
-                    robot_config["name"] = f"newrobot{i}"
+                    robot_config["name"] = f"robot{i}"
 
                 position, orientation = robot_config.pop("position", None), robot_config.pop("orientation", None)
                 # Make sure robot exists, grab its corresponding kwargs, and create / import the robot
