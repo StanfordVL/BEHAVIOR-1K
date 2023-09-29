@@ -1714,7 +1714,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             {"room": room}
         )
 
-    def _sample_pose_with_object_and_predicate(self, predicate, held_obj, target_obj):
+    def _sample_pose_with_object_and_predicate(self, predicate, held_obj, target_obj, near_poses=None, near_poses_threshold=None):
         """
         Returns a pose for the held object relative to the target object that satisfies the predicate
 
@@ -1722,7 +1722,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             predicate (object_states.OnTop or object_states.Inside): Relation between held object and the target object
             held_obj (StatefulObject): Object held by the robot
             target_obj (StatefulObject): Object to sample a pose relative to
-
+            near_poses (Iterable of arrays): Poses in the world frame to sample near
+            near_poses_threshold (float): The distance threshold to check if the sampled pose is near the poses in near_poses
+            
         Returns:
             2-tuple:
                 - 3-array: (x,y,z) Position in the world frame
@@ -1738,6 +1740,12 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
             # Get the object pose by subtracting the offset
             sampled_obj_pose = T.pose2mat((sampled_bb_center, sampled_bb_orn)) @ T.pose_inv(T.pose2mat((bb_center_in_base, [0, 0, 0, 1])))
+
+            # Check that the pose is near one of the poses in the near_poses list if provided.
+            if near_poses:
+                sampled_pos = np.array([sampled_obj_pose[0]])
+                if not np.any(np.linalg.norm(near_poses - sampled_pos, axis=1) < near_poses_threshold):
+                    continue
 
             # Return the pose
             return T.mat2pose(sampled_obj_pose)

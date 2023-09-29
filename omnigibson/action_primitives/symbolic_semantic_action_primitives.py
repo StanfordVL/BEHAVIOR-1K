@@ -231,7 +231,7 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
             )
         
         # Find a spot to put it
-        obj_pose = self._sample_pose_with_object_and_predicate(predicate, obj_in_hand, obj, near_poses=[], near_poses_threshold=None)
+        obj_pose = self._sample_pose_with_object_and_predicate(predicate, obj_in_hand, obj, near_poses=near_poses, near_poses_threshold=near_poses_threshold)
 
         # Get close, release the object.
         # yield from self._navigate_if_needed(obj, pose_on_obj=obj_pose)
