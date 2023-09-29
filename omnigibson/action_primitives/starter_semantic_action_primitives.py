@@ -1735,6 +1735,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         for _ in range(MAX_ATTEMPTS_FOR_SAMPLING_POSE_WITH_OBJECT_AND_PREDICATE):
             _, _, bb_extents, bb_center_in_base = held_obj.get_base_aligned_bbox()
             sampling_results = sample_cuboid_for_predicate(pred_map[predicate], target_obj, bb_extents)
+            if sampling_results[0][0] is None:
+                continue
             sampled_bb_center = sampling_results[0][0] + np.array([0, 0, PREDICATE_SAMPLING_Z_OFFSET])
             sampled_bb_orn = sampling_results[0][2]
 
