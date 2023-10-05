@@ -270,15 +270,15 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 action_type = "nav"
             
         context = action_type + context_function
-        print(context)
         return action, context
 
     # Disable grasping frame for Tiago robot (Should be cleaned up in the future)
     def _setup_tiago(self):
-        for link in self.robot.links.values():
-            for mesh in link.collision_meshes.values():
-                if "grasping_frame" in link.prim_path:
-                    mesh.collision_enabled = False
+        # for link in self.robot.links.values():
+        #     for mesh in link.collision_meshes.values():
+        #         if "grasping_frame" in link.prim_path:
+        #             mesh.collision_enabled = False
+        pass
 
     @staticmethod
     def _load_robot_copy(robot):

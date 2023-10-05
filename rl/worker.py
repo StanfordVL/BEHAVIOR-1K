@@ -33,7 +33,7 @@ def step_sim(time):
 
 def execute_controller(ctrl_gen, env):
     for action in ctrl_gen:
-        env.step(action)
+        env.step(action[0])
 
 def reset_env(env, initial_poses):
     objs = ["cologne", "coffee_table_fqluyq_0", "robot0"]
@@ -65,16 +65,17 @@ class Recorder():
         self.episode_id = str(uuid.uuid4())
 
     def _add_to_dataset(self, group, name, data):
-        if name in group:
-            dset_len = len(group[name])
-            dset = group[name]
-            dset.resize(len(dset) + len(data), 0)
-            dset[dset_len:] = data
-        else:
-            if isinstance(data[0], np.ndarray):
-                group.create_dataset(name, data=data, maxshape=(None, *data[0].shape))
+        if len(data) > 0:
+            if name in group:
+                dset_len = len(group[name])
+                dset = group[name]
+                dset.resize(len(dset) + len(data), 0)
+                dset[dset_len:] = data
             else:
-                group.create_dataset(name, data=data, maxshape=(None,))
+                if isinstance(data[0], np.ndarray):
+                    group.create_dataset(name, data=data, maxshape=(None, *data[0].shape))
+                else:
+                    group.create_dataset(name, data=data, maxshape=(None,))
 
     def save(self, group_name):
         h5file = h5py.File(self.filepath, 'a')
@@ -174,11 +175,11 @@ def main(policy_path, rollouts_path, iterations):
         },
         "objects": [
             {
-            "type": "DatasetObject",
-            "name": "cologne",
-            "category": "bottle_of_cologne",
-            "model": "lyipur",
-            "position": [-0.3, -0.8, 0.5],
+                "type": "DatasetObject",
+                "name": "cologne",
+                "category": "bottle_of_cologne",
+                "model": "lyipur",
+                "position": [-0.3, -0.8, 0.5],
             },
         ]
     }
@@ -190,8 +191,8 @@ def main(policy_path, rollouts_path, iterations):
     og.sim.step()
 
     # load policy
-    with open(policy_path, 'wb') as f:
-        pass
+    # with open(policy_path, 'wb') as f:
+    #     pass
 
     controller = StarterSemanticActionPrimitives(None, scene, robot)
     env._primitive_controller = controller
@@ -202,10 +203,11 @@ def main(policy_path, rollouts_path, iterations):
     recorder = Recorder(rollouts_path)
     group_name = datetime.now().strftime('rl_results')
 
-    for i in range(iterations):
+    for i in range(int(iterations)):
         try:
             reset_env(env, initial_poses)
             for action in controller.apply_ref(StarterSemanticActionPrimitiveSet.GRASP, obj):
+                action = action[0]
                 state, reward, done, info = env.step(action)
                 recorder.add(state, action, reward)
                 if done:
