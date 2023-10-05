@@ -22,7 +22,7 @@ class CreateMeshPrimWithDefaultXformCommand(CMPWDXC):
             prim_type (str): It supports Plane/Sphere/Cone/Cylinder/Disk/Torus/Cube.
 
         kwargs:
-            object_origin (Gf.Vec3f): Position of mesh center.
+            object_origin (Gf.Vec3f): Position of mesh center in stage units.
 
             u_patches (int): The number of patches to tessellate U direction.
 
@@ -31,7 +31,7 @@ class CreateMeshPrimWithDefaultXformCommand(CMPWDXC):
             w_patches (int): The number of patches to tessellate W direction.
                              It only works for Cone/Cylinder/Cube.
 
-            half_scale (float): Half size of mesh. Default None.
+            half_scale (float): Half size of mesh in centimeters. Default is None, which means it's controlled by settings.
 
             u_verts_scale (int): Tessellation Level of U. It's a multiplier of u_patches.
 
@@ -42,23 +42,22 @@ class CreateMeshPrimWithDefaultXformCommand(CMPWDXC):
                                  For Cone/Cylinder, it's to tessellate the caps.
                                  For Cube, it's to tessellate along z-axis.
 
+            above_ground (bool): It will offset the center of mesh above the ground plane if it's True,
+                False otherwise. It's False by default. This param only works when param object_origin is not given.
+                Otherwise, it will be ignored.
+
             stage (Usd.Stage): If specified, stage to create prim on
         """
+
         self._prim_type = prim_type[0:1].upper() + prim_type[1:].lower()
         self._usd_context = omni.usd.get_context()
         self._selection = self._usd_context.get_selection()
         self._stage = kwargs.get("stage", self._usd_context.get_stage())
         self._settings = carb.settings.get_settings()
-        self._prim_path = None
-        self._default_path = None
-        self._prepend_default_prim = True
-        if "prim_path" in kwargs and kwargs["prim_path"]:
-            self._default_path = Sdf.Path(kwargs["prim_path"])
-        self._select_new_prim = True
-        if "select_new_prim" in kwargs:
-            self._select_new_prim = bool(kwargs["select_new_prim"])
-        if "prepend_default_prim" in kwargs:
-            self._prepend_default_prim = bool(kwargs["prepend_default_prim"])
+        self._default_path = kwargs.get("prim_path", None)
+        self._select_new_prim = kwargs.get("select_new_prim", True)
+        self._prepend_default_prim = kwargs.get("prepend_default_prim", True)
+        self._above_round = kwargs.get("above_ground", False)
 
         self._attributes = {**kwargs}
         # Supported mesh types should have an associated evaluator class
