@@ -205,6 +205,9 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
         # Call the setter
         obj.states[object_states.ToggledOn].set_value(value)
 
+        # Yield some actions
+        yield from self._settle_robot()
+
         # Check that it actually happened
         if obj.states[object_states.ToggledOn].get_value() != value:
             raise ActionPrimitiveError(
