@@ -53,6 +53,8 @@ DEFAULT_BODY_OFFSET_FROM_FLOOR = 0.05
 KP_LIN_VEL = 0.3
 KP_ANGLE_VEL = 0.2
 
+MAX_STEPS_FOR_SETTLING = 500
+
 MAX_CARTESIAN_HAND_STEP = 0.002
 MAX_STEPS_FOR_HAND_MOVE = 500
 MAX_STEPS_FOR_HAND_MOVE_IK = 10000
@@ -1855,6 +1857,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             empty_action = self._empty_action(arm_pose_to_keep=initial_eef_pos)
             yield self.with_context(empty_action)
 
-        while np.linalg.norm(self.robot.get_linear_velocity()) > 0.01:
+        for _ in range(MAX_STEPS_FOR_SETTLING):
+            if np.linalg.norm(self.robot.get_linear_velocity()) < 0.01:
+                break
             empty_action = self._empty_action(arm_pose_to_keep=initial_eef_pos)
             yield self.with_context(empty_action)
