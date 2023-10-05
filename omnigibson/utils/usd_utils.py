@@ -23,6 +23,7 @@ import trimesh
 import omnigibson as og
 from omnigibson.macros import gm
 from omnigibson.utils.constants import JointType, PRIMITIVE_MESH_TYPES, PrimType, GEOM_TYPES
+from omnigibson.utils.deprecated_utils import CreateMeshPrimWithDefaultXformCommand
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.ui_utils import suppress_omni_log
 
@@ -695,12 +696,6 @@ def create_mesh_prim_with_default_xform(primitive_type, prim_path, u_patches=Non
         kwargs["u_patches"] = u_patches
         kwargs["v_patches"] = v_patches
 
-    # Take care of some version-specific imports and a possible circular import.
-    from omnigibson.utils.sim_utils import meets_minimum_isaac_version
-    if meets_minimum_isaac_version("2023.0.0"):
-        from omni.kit.primitive.mesh.command import CreateMeshPrimWithDefaultXformCommand
-    else:
-        from omnigibson.utils.deprecated_utils import CreateMeshPrimWithDefaultXformCommand
     CreateMeshPrimWithDefaultXformCommand(**kwargs).do()
 
     carb.settings.get_settings().set(evaluator.SETTING_U_SCALE, u_backup)
