@@ -1,6 +1,7 @@
 import argparse
 from datetime import datetime
 import math
+import os
 import uuid
 import numpy as np
 import matplotlib.pyplot as plt
@@ -32,16 +33,16 @@ def reset_env(env, initial_poses):
     env.reset()
 
 class Recorder():
-    def __init__(self, folder, h5filename):
-        # if os
-        self.filepath = filepath
-        self.state_keys = ["robot0:eyes_Camera_sensor_rgb", "robot0:eyes_Camera_sensor_depth"]
+    def __init__(self, folder):
+        self.folderpath = f'./rollouts/{folder}'
+        # self.state_keys = ["robot0:eyes_Camera_sensor_rgb", "robot0:eyes_Camera_sensor_depth", "robot0:eyes_Camera_sensor_seg_instance", "robot0:eyes_Camera_sensor_seg_semantic"]
+        self.state_keys = ["robot0:eyes_Camera_sensor_rgb"]
         self.reset()
 
     def add(self, state, action, reward):
         for k in self.state_keys:
-            self.states[k].append(state['robot0'][k])
-        self.actions.append(action)
+            self.states[k].append(state['robot0'][k].copy())
+        self.actions.append(action.copy())
         self.rewards.append(reward)
         self.ids.append(self.episode_id)
 
@@ -67,19 +68,25 @@ class Recorder():
                 else:
                     group.create_dataset(name, data=data, maxshape=(None,))
 
-    def save(self, group_name):
-        h5file = h5py.File(self.filepath, 'a')
-        group = h5file[group_name] if group_name in h5file else h5file.create_group(group_name)
+    def save(self, group_name='data_group'):
+        os.makedirs(self.folderpath, exist_ok=True)
         for k in self.state_keys:
-            self._add_to_dataset(group, k[k.find(":") + 1:], self.states[k])
+            state_folder = k[k.find(":") + 1:]
+            os.makedirs(f'{self.folderpath}/{state_folder}', exist_ok=True)
+            for i, state in enumerate(self.states[k]):
+                img = Image.fromarray(state)
+                if state.shape[-1] == 4:
+                    img.convert('RGB').save(f'{self.folderpath}/{state_folder}/{self.episode_id}_{i}.jpeg')
+                else:
+                    img.save(f'{self.folderpath}/{state_folder}/{self.episode_id}_{i}.jpeg')
+        h5file = h5py.File(f'{self.folderpath}/data.h5', 'a')
+        group = h5file[group_name] if group_name in h5file else h5file.create_group(group_name)
         self._add_to_dataset(group, "actions", self.actions)
         self._add_to_dataset(group, "rewards", self.rewards)
         self._add_to_dataset(group, "ids", self.ids)
         h5file.close()
 
-
-
-def main(rollouts_path, iterations):
+def main(folder, iterations):
     DIST_COEFF = 0.1
     GRASP_REWARD = 0.3
     h5py.get_config().track_order = True
@@ -104,7 +111,7 @@ def main(rollouts_path, iterations):
                 "default_trunk_offset": 0.365,
                 "sensor_config": {
                     "VisionSensor": {
-                        "modalities": ["rgb", "depth", "depth_linear", "seg_instance", "seg_semantic"],
+                        "modalities": ["rgb", "depth", "seg_instance", "seg_semantic"],
                         "sensor_kwargs": {
                             "image_width": 224,
                             "image_height": 224
@@ -199,8 +206,7 @@ def main(rollouts_path, iterations):
     for o in env.scene.objects:
         initial_poses[o.name] = o.get_position_orientation()
     obj = env.scene.object_registry("name", "cologne")
-    recorder = Recorder(rollouts_path)
-    group_name = 'rl_results'
+    recorder = Recorder(folder)
 
     for i in range(int(iterations)):
         try:
@@ -208,7 +214,6 @@ def main(rollouts_path, iterations):
             for action in controller.apply_ref(StarterSemanticActionPrimitiveSet.GRASP, obj, track_object=True):
                 action = action[0]
                 state, reward, done, info = env.step(action)
-                from IPython import embed; embed()
                 recorder.add(state, action, reward)
                 if done:
                     for action in controller._execute_release():
@@ -218,13 +223,18 @@ def main(rollouts_path, iterations):
                     break
         except Exception as e:
             print("Error in iteration: ", i)
-        # recorder.save(group_name)
+        recorder.save()
         recorder.reset()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run worker")
-    parser.add_argument("rollouts_path")
+    parser.add_argument("folder")
     parser.add_argument("iterations")
     
     args = parser.parse_args()
-    main(args.rollouts_path, args.iterations)
+    main(args.folder, args.iterations)
+
+    # seg semantic - 224 x 224
+    # seg instance - 224 x 224
+    # depth - 224 x 224
+    # rgb - 224 x 224 x 4
