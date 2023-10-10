@@ -426,6 +426,10 @@ class Environment(gym.Env, GymObservable, Recreatable):
         # Grab observations
         obs = self.get_obs()
 
+        # Step the scene graph builder if necessary
+        if self._scene_graph_builder is not None:
+            self._scene_graph_builder.step(self.scene)
+
         # Grab reward, done, and info, and populate with internal info
         reward, done, info = self.task.step(self, action)
         self._populate_info(info)
