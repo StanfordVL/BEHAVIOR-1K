@@ -123,21 +123,21 @@ def main(folder, iterations):
                         "name": "JointController",
                         "motor_type": "velocity"
                     },
-                    # "arm_left": {
-                    #     "name": "InverseKinematicsController",
-                    #     "motor_type": "velocity",
-                    #     "command_input_limits": None,
-                    #     "command_output_limits": None,
-                    #     "mode": "pose_absolute_ori", 
-                    #     "kv": 3.0
-                    # },
                     "arm_left": {
-                        "name": "JointController",
-                        "motor_type": "position",
+                        "name": "InverseKinematicsController",
+                        "motor_type": "velocity",
                         "command_input_limits": None,
-                        "command_output_limits": None, 
-                        "use_delta_commands": False
+                        "command_output_limits": None,
+                        "mode": "pose_absolute_ori", 
+                        "kv": 3.0
                     },
+                    # "arm_left": {
+                    #     "name": "JointController",
+                    #     "motor_type": "position",
+                    #     "command_input_limits": None,
+                    #     "command_output_limits": None, 
+                    #     "use_delta_commands": False
+                    # },
                     "arm_right": {
                         "name": "JointController",
                         "motor_type": "position",
@@ -194,7 +194,7 @@ def main(folder, iterations):
     }
 
     # Create the environment
-    env = og.Environment(configs=cfg, action_timestep=1 / 60., physics_timestep=1 / 60.)
+    env = og.Environment(configs=cfg, action_timestep=1 / 10., physics_timestep=1 / 60.)
     scene = env.scene
     robot = env.robots[0]
     og.sim.step()
