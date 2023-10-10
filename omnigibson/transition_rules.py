@@ -726,6 +726,10 @@ class SlicingRule(BaseTransitionRule):
             # Object parts offset annotation are w.r.t the base link of the whole object.
             pos, orn = sliceable_obj.get_position_orientation()
 
+            # If it has no parts, silently fail
+            if not sliceable_obj.metadata["object_parts"]:
+                continue
+
             # Load object parts
             for i, part in enumerate(sliceable_obj.metadata["object_parts"].values()):
                 # List of dicts gets replaced by {'0':dict, '1':dict, ...}
