@@ -6,6 +6,7 @@ from typing import Callable
 import omni.usd as ou
 from omni.particle.system.core.scripts.core import Core as OmniCore
 from omni.particle.system.core.scripts.utils import Utils as OmniUtils
+from omnigibson.utils.sim_utils import meets_minimum_isaac_version
 from pxr import Sdf, UsdShade
 import omni
 import omni.graph.core as ogc
@@ -65,13 +66,79 @@ class CreateMeshPrimWithDefaultXformCommand(CMPWDXC):
         assert isinstance(self._evaluator_class, type)
 
 
+class Utils2022(OmniUtils):
+    """
+    Subclass that overrides a specific function within Omni's Utils class to fix a bug
+    """
+    def create_material(self, name):
+        # TODO: THIS IS THE ONLY LINE WE CHANGE! "/" SHOULD BE ""
+        material_path = ""
+        default_prim = self.stage.GetDefaultPrim()
+        if default_prim:
+            material_path = default_prim.GetPath().pathString
+
+        if not self.stage.GetPrimAtPath(material_path + "/Looks"):
+            self.stage.DefinePrim(material_path + "/Looks", "Scope")
+        material_path += "/Looks/" + name
+        material_path = ou.get_stage_next_free_path(
+            self.stage, material_path, False
+        )
+        material = UsdShade.Material.Define(self.stage, material_path)
+
+        shader_path = material_path + "/Shader"
+        shader = UsdShade.Shader.Define(self.stage, shader_path)
+
+        # Update Neuraylib MDL search paths
+        import omni.particle.system.core as core
+        core.update_mdl_search_paths()
+
+        shader.SetSourceAsset(name + ".mdl", "mdl")
+        shader.SetSourceAssetSubIdentifier(name, "mdl")
+        shader.GetImplementationSourceAttr().Set(UsdShade.Tokens.sourceAsset)
+        shader.CreateOutput("out", Sdf.ValueTypeNames.Token)
+        material.CreateSurfaceOutput().ConnectToSource(shader, "out")
+
+        return [material_path]
+
+
+class Utils2023(OmniUtils):
+    def create_material(self, name):
+        material_url = carb.settings.get_settings().get("/exts/omni.particle.system.core/material")
+
+        # TODO: THIS IS THE ONLY LINE WE CHANGE! "/" SHOULD BE ""
+        material_path = ""
+        default_prim = self.stage.GetDefaultPrim()
+        if default_prim:
+            material_path = default_prim.GetPath().pathString
+
+        if not self.stage.GetPrimAtPath(material_path + "/Looks"):
+            self.stage.DefinePrim(material_path + "/Looks", "Scope")
+        material_path += "/Looks/" + name
+        material_path = ou.get_stage_next_free_path(
+            self.stage, material_path, False
+        )
+        prim = self.stage.DefinePrim(material_path, "Material")
+        if material_url:
+            prim.GetReferences().AddReference(material_url)
+        else:
+            carb.log_error("Failed to find material URL in settings")
+
+        return [material_path]
+
+
 class Core(OmniCore):
     """
     Subclass that overrides a specific function within Omni's Core class to fix a bug
     """
     def __init__(self, popup_callback: Callable[[str], None], particle_system_name: str):
-        super().__init__(popup_callback=popup_callback)
+        self._popup_callback = popup_callback
+        self.utils = Utils2023() if meets_minimum_isaac_version("2023.0.0") else Utils2022()
+        self.context = ou.get_context()
+        self.stage = self.context.get_stage()
+        self.selection = self.context.get_selection()
         self.particle_system_name = particle_system_name
+        self.sub_stage_update = self.context.get_stage_event_stream().create_subscription_to_pop(self.on_stage_update)
+        self.on_stage_update()
 
     def get_compute_graph(self, selected_paths, create_new_graph=True, created_paths=None):
         """
