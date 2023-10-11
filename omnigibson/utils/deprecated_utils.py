@@ -6,7 +6,6 @@ from typing import Callable
 import omni.usd as ou
 from omni.particle.system.core.scripts.core import Core as OmniCore
 from omni.particle.system.core.scripts.utils import Utils as OmniUtils
-from omnigibson.utils.sim_utils import meets_minimum_isaac_version
 from pxr import Sdf, UsdShade
 import omni
 import omni.graph.core as ogc
@@ -132,6 +131,7 @@ class Core(OmniCore):
     """
     def __init__(self, popup_callback: Callable[[str], None], particle_system_name: str):
         self._popup_callback = popup_callback
+        from omnigibson.utils.sim_utils import meets_minimum_isaac_version
         self.utils = Utils2023() if meets_minimum_isaac_version("2023.0.0") else Utils2022()
         self.context = ou.get_context()
         self.stage = self.context.get_stage()
