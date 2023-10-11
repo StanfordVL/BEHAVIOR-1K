@@ -483,7 +483,6 @@ class DatasetObject(USDObject):
                 - 3-array: (x,y,z) bbox extent in desired frame
                 - 3-array: (x,y,z) bbox center in desired frame
         """
-        assert self.prim_type == PrimType.RIGID, "get_base_aligned_bbox is only supported for rigid objects."
         bbox_type = "visual" if visual else "collision"
 
         # Get the base position transform.
@@ -505,7 +504,7 @@ class DatasetObject(USDObject):
                 continue
 
             # If the link has a bounding box annotation.
-            if self.native_link_bboxes is not None and link_name in self.native_link_bboxes:
+            if self.native_link_bboxes is not None and link_name in self.native_link_bboxes and self.prim_type == PrimType.RIGID:
                 # Check if the annotation is still missing.
                 if bbox_type not in self.native_link_bboxes[link_name]:
                     raise ValueError(f"Could not find {bbox_type} bounding box for object {self.name} link {link_name}")
@@ -534,7 +533,7 @@ class DatasetObject(USDObject):
 
                 # Add the points to our collection of points.
                 points.extend(trimesh.transformations.transform_points(vertices_in_base_frame, bbox_center_in_base_frame))
-            elif fallback_to_aabb:
+            elif fallback_to_aabb or self.prim_type == PrimType.CLOTH:  # always default to AABB for cloth
                 # If we're visual and the mesh is not visible, there is no fallback so continue
                 if bbox_type == "visual" and not np.all(tuple(mesh.visible for mesh in meshes.values())):
                     continue
