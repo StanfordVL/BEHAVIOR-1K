@@ -188,7 +188,7 @@ def sample_kinematics(
             objA.keep_still()
             success = len(objA.states[ContactBodies].get_value()) == 0
 
-        if gm.DEBUG:
+        if macros.utils.sampling_utils.DEBUG:
             debug_breakpoint(f"sample_kinematics: {success}")
 
         if success:
