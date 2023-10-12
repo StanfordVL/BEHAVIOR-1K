@@ -9,6 +9,7 @@ runnable examples.
 from aenum import IntEnum, auto
 
 import numpy as np
+from omnigibson.robots.robot_base import BaseRobot
 from omnigibson.transition_rules import REGISTERED_RULES, TransitionRuleAPI
 
 from omnigibson import object_states
@@ -71,6 +72,14 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
         """
         assert attempts > 0, "Must make at least one attempt"
         ctrl = self.controller_functions[prim]
+
+        if any(isinstance(arg, BaseRobot) for arg in args):
+            raise ActionPrimitiveErrorGroup([
+                ActionPrimitiveError(
+                    ActionPrimitiveError.Reason.PRE_CONDITION_ERROR,
+                    "Cannot call a symbolic semantic action primitive with a robot as an argument."
+                )
+            ])
 
         errors = []
         for _ in range(attempts):
