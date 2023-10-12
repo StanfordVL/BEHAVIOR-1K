@@ -159,6 +159,12 @@ def sponge(env):
 def knife(env):
   return next(iter(env.scene.object_registry("category", "carving_knife")))
 
+def test_in_hand_state(env, prim_gen, steak):
+  assert not steak.states[object_states.InHandOfRobot].get_value()
+  for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.GRASP, steak):
+    env.step(action)
+  assert steak.states[object_states.InHandOfRobot].get_value()
+
 # def test_navigate():
 #    pass
 

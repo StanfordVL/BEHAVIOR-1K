@@ -36,6 +36,7 @@ _DEFAULT_STATE_SET = frozenset(
         Touching,
         Under,
         Covered,
+        InHandOfRobot,
     ]
 )
 
