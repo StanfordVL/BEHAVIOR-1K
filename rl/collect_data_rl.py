@@ -234,11 +234,12 @@ def main(folder, iterations):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run worker")
-    parser.add_argument("folder")
+    # parser.add_argument("folder")
     parser.add_argument("iterations")
     
     args = parser.parse_args()
-    main(args.folder, args.iterations)
+    folder_name = str(uuid.uuid4())
+    main(folder_name, args.iterations)
 
     # seg semantic - 224 x 224
     # seg instance - 224 x 224
