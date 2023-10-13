@@ -35,8 +35,8 @@ def reset_env(env, initial_poses):
 class Recorder():
     def __init__(self, folder):
         self.folderpath = f'./rollouts/{folder}'
-        # self.state_keys = ["robot0:eyes_Camera_sensor_rgb", "robot0:eyes_Camera_sensor_depth", "robot0:eyes_Camera_sensor_seg_instance", "robot0:eyes_Camera_sensor_seg_semantic"]
-        self.state_keys = ["robot0:eyes_Camera_sensor_rgb"]
+        self.state_keys = ["robot0:eyes_Camera_sensor_rgb", "robot0:eyes_Camera_sensor_depth_linear", "robot0:eyes_Camera_sensor_seg_instance", "robot0:eyes_Camera_sensor_seg_semantic"]
+        # self.state_keys = ["robot0:eyes_Camera_sensor_rgb", "robot0:eyes_Camera_sensor_seg_instance"]
         self.reset()
 
     def add(self, state, action, reward):
@@ -75,10 +75,14 @@ class Recorder():
             os.makedirs(f'{self.folderpath}/{state_folder}', exist_ok=True)
             for i, state in enumerate(self.states[k]):
                 img = Image.fromarray(state)
-                if state.shape[-1] == 4:
+                if k == "robot0:eyes_Camera_sensor_rgb":
                     img.convert('RGB').save(f'{self.folderpath}/{state_folder}/{self.episode_id}_{i}.jpeg')
+                elif k == "robot0:eyes_Camera_sensor_depth_linear":
+                    img = np.array(img) * 1000
+                    img = Image.fromarray(img.astype(np.int32))
+                    img.save(f'{self.folderpath}/{state_folder}/{self.episode_id}_{i}.png')
                 else:
-                    img.save(f'{self.folderpath}/{state_folder}/{self.episode_id}_{i}.jpeg')
+                    img.save(f'{self.folderpath}/{state_folder}/{self.episode_id}_{i}.png')
         h5file = h5py.File(f'{self.folderpath}/data.h5', 'a')
         group = h5file[group_name] if group_name in h5file else h5file.create_group(group_name)
         self._add_to_dataset(group, "actions", self.actions)
@@ -100,7 +104,7 @@ def main(folder, iterations):
         "robots": [
             {
                 "type": "Tiago",
-                "obs_modalities": ["rgb", "depth", "depth_linear", "seg_instance", "seg_semantic"],
+                "obs_modalities": ["rgb", "depth_linear", "seg_instance", "seg_semantic"],
                 "scale": 1.0,
                 "self_collisions": True,
                 "action_normalize": False,
@@ -111,7 +115,7 @@ def main(folder, iterations):
                 "default_trunk_offset": 0.365,
                 "sensor_config": {
                     "VisionSensor": {
-                        "modalities": ["rgb", "depth", "seg_instance", "seg_semantic"],
+                        "modalities": ["rgb", "depth_linear", "seg_instance", "seg_semantic"],
                         "sensor_kwargs": {
                             "image_width": 224,
                             "image_height": 224
@@ -223,6 +227,8 @@ def main(folder, iterations):
                     break
         except Exception as e:
             print("Error in iteration: ", i)
+            print(e)
+            print('--------------------')
         recorder.save()
         recorder.reset()
 
