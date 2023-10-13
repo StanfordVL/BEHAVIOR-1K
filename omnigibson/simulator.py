@@ -70,7 +70,7 @@ class Simulator(SimulationContext, Serializable):
     def __init__(
             self,
             gravity=9.81,
-            physics_dt=1.0 / 240.0,
+            physics_dt=1.0 / 60.0,
             rendering_dt=1.0 / 60.0,
             stage_units_in_meters=1.0,
             viewer_width=gm.DEFAULT_VIEWER_WIDTH,
