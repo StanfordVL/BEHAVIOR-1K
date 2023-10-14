@@ -1268,6 +1268,9 @@ class ManipulationRobot(BaseRobot):
         return state
 
     def _load_state(self, state):
+        # If there is an existing AG object, remove it
+        self.release_grasp_immediately()
+
         super()._load_state(state=state)
 
         # No additional loading needed if we're using physical grasping

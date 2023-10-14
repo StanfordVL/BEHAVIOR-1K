@@ -497,6 +497,7 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
         removed_objs += output.remove
 
         TransitionRuleAPI.execute_transition(added_obj_attrs=added_obj_attrs, removed_objs=removed_objs)
+        yield from self._settle_robot()
 
     def _place_near_heating_element(self, heat_source_obj):
         obj_in_hand = self._get_obj_in_hand()

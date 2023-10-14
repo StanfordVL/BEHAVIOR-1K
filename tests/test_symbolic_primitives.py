@@ -95,13 +95,13 @@ def start_env():
           "position": [4.75, 10.75, 1.],
           "bounding_box": [0.098, 0.098, 0.115]
       },
-      # {
-      #     "type": "DatasetObject",
-      #     "name": "sponge",
-      #     "category": "sponge",
-      #     "model": "qewotb",
-      #     "position": [4.75, 10.75, 1.],
-      # },
+      {
+          "type": "DatasetObject",
+          "name": "sponge",
+          "category": "sponge",
+          "model": "qewotb",
+          "position": [4.75, 10.75, 1.],
+      },
     ]
   }
 
@@ -201,22 +201,65 @@ def test_place_ontop(env, prim_gen, steak, pan):
   assert steak.states[object_states.OnTop].get_value(pan)
 
 def test_toggle_on(env, prim_gen, stove):
-    assert not stove.states[object_states.ToggledOn].get_value()
-    for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.TOGGLE_ON, stove):
-      env.step(action)
-    assert stove.states[object_states.ToggledOn].get_value()
+  assert not stove.states[object_states.ToggledOn].get_value()
+  for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.TOGGLE_ON, stove):
+    env.step(action)
+  assert stove.states[object_states.ToggledOn].get_value()
 
+def test_soak_under(env, prim_gen, sponge, sink):
+  water_system = env.scene.system_registry("name", "water")
+  assert not sponge.states[object_states.Saturated].get_value(water_system)
+  assert not sink.states[object_states.ToggledOn].get_value()
 
-# def test_soak_under():
-#    pass
+  # First toggle on the sink
+  for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.TOGGLE_ON, sink):
+    env.step(action)
+  assert sink.states[object_states.ToggledOn].get_value()
+
+  # Then grasp the sponge
+  for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.GRASP, sponge):
+    env.step(action)
+  assert sponge.states[object_states.InHandOfRobot].get_value()
+
+  # Then soak the sponge under the water
+  for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.SOAK_UNDER, sink):
+    env.step(action)
+  assert sponge.states[object_states.Saturated].get_value(water_system)
 
 # def test_soak_inside():
 #    pass
 
-# def test_wipe():
-#    pass
+def test_wipe(env, prim_gen, sponge, sink, countertop):
+  # Some pre-assertions
+  water_system = env.scene.system_registry("name", "water")
+  assert not sponge.states[object_states.Saturated].get_value(water_system)
+  assert not sink.states[object_states.ToggledOn].get_value()
 
-# @pytest.mark.skip(reason="A bug with object addition causes the robot to crash after slicing.")
+  # Dirty the countertop as the setup
+  mud_system = env.scene.system_registry("name", "mud")
+  countertop.states[object_states.Covered].set_value(mud_system, True)
+  assert countertop.states[object_states.Covered].get_value(mud_system)
+
+  # First toggle on the sink
+  for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.TOGGLE_ON, sink):
+    env.step(action)
+  assert sink.states[object_states.ToggledOn].get_value()
+
+  # Then grasp the sponge
+  for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.GRASP, sponge):
+    env.step(action)
+  assert sponge.states[object_states.InHandOfRobot].get_value()
+
+  # Then soak the sponge under the water
+  for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.SOAK_UNDER, sink):
+    env.step(action)
+  assert sponge.states[object_states.Saturated].get_value(water_system)
+
+  # Wipe the countertop with the sponge
+  for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.WIPE, countertop):
+    env.step(action)
+  assert not countertop.states[object_states.Covered].get_value(mud_system)
+
 def test_cut(env, prim_gen, steak, knife, countertop):
   # assert not steak.states[object_states.Cut].get_value(knife)
   print("Grasping knife")
