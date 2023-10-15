@@ -215,11 +215,13 @@ def main(folder, iterations):
     for i in range(int(iterations)):
         try:
             reset_env(env, initial_poses)
+            counter = 0
             for action in controller.apply_ref(StarterSemanticActionPrimitiveSet.GRASP, obj, track_object=True):
                 action = action[0]
                 state, reward, done, info = env.step(action)
                 recorder.add(state, action, reward)
-                if done:
+                counter += 1
+                if done or counter >= 400:
                     for action in controller._execute_release():
                         action = action[0]
                         state, reward, done, info = env.step(action)
