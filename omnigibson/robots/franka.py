@@ -4,15 +4,16 @@ import numpy as np
 from omnigibson.macros import gm
 from omnigibson.robots.manipulation_robot import ManipulationRobot
 
+
 RESET_JOINT_OPTIONS = {
     "tuck",
     "untuck",
 }
 
 
-class FrankaAllegro(ManipulationRobot):
+class FrankaPanda(ManipulationRobot):
     """
-    Franka Robot with Allegro hand
+    The Franka Emika Panda robot
     """
 
     def __init__(
@@ -132,16 +133,15 @@ class FrankaAllegro(ManipulationRobot):
 
     @property
     def model_name(self):
-        return "FrankaAllegro"
+        return "FrankaPanda"
 
     @property
     def tucked_default_joint_pos(self):
-        return np.zeros(23)
+        return np.zeros(9)
 
     @property
     def untucked_default_joint_pos(self):
-        # position where the hand is parallel to the ground
-        return np.r_[[0.86, -0.27, -0.68, -1.52, -0.18, 1.29, 1.72], np.zeros(16)]
+        return np.array([0.00, -1.3, 0.00, -2.87, 0.00, 2.00, 0.75, 0.00, 0.00])
 
     @property
     def discrete_action_list(self):
@@ -166,14 +166,7 @@ class FrankaAllegro(ManipulationRobot):
 
     def update_controller_mode(self):
         super().update_controller_mode()
-        # overwrite joint params here
-        for i in range(7):
-            self.joints[f"panda_joint{i+1}"].damping = 1000
-            self.joints[f"panda_joint{i+1}"].stiffness = 1000
-        for i in range(16):
-            self.joints[f"joint_{i}_0"].damping = 100
-            self.joints[f"joint_{i}_0"].stiffness = 300
-            self.joints[f"joint_{i}_0"].max_effort = 15
+        # overwrite joint params (e.g. damping, stiffess, max_effort) here
 
     @property
     def controller_order(self):
@@ -183,6 +176,7 @@ class FrankaAllegro(ManipulationRobot):
     def _default_controllers(self):
         controllers = super()._default_controllers
         controllers["arm_{}".format(self.default_arm)] = "InverseKinematicsController"
+        controllers["gripper_{}".format(self.default_arm)] = "MultiFingerGripperController"
         return controllers
     
     @property
@@ -199,7 +193,7 @@ class FrankaAllegro(ManipulationRobot):
 
     @property
     def gripper_control_idx(self):
-        return {self.default_arm: np.arange(7, 23)}
+        return {self.default_arm: np.arange(7, 9)}
 
     @property
     def arm_link_names(self):
@@ -211,41 +205,25 @@ class FrankaAllegro(ManipulationRobot):
 
     @property
     def eef_link_names(self):
-        return {self.default_arm: "base_link"}
+        return {self.default_arm: "panda_hand"}
 
     @property
     def finger_link_names(self):
-        return {self.default_arm: [f"link_{i}_0" for i in range(16)]}
+        return {self.default_arm: ["panda_leftfinger", "panda_rightfinger"]}
 
     @property
     def finger_joint_names(self):
-        return {self.default_arm: [f"joint_{i}_0" for i in range(16)]}
+        return {self.default_arm: ["panda_finger_joint1", "panda_finger_joint2"]}
 
     @property
     def usd_path(self):
-        return os.path.join(gm.ASSET_PATH, "models/franka/franka_allegro.usd")
+        return os.path.join(gm.ASSET_PATH, "models/franka/franka_panda.usd")
     
     @property
     def robot_arm_descriptor_yamls(self):
-        return {self.default_arm: os.path.join(gm.ASSET_PATH, "models/franka/franka_allegro_description.yaml")}
+        return {self.default_arm: os.path.join(gm.ASSET_PATH, "models/franka/franka_panda_description.yaml")}
     
-    @property
-    def robot_gripper_descriptor_yamls(self):
-        return {
-            finger: os.path.join(gm.ASSET_PATH, f"models/franka/allegro_{finger}_description.yaml")
-            for finger in ["thumb", "index", "middle", "ring"]
-        }
-
     @property
     def urdf_path(self):
-        return os.path.join(gm.ASSET_PATH, "models/franka/franka_allegro.urdf")
+        return os.path.join(gm.ASSET_PATH, "models/franka/franka_panda.urdf")
     
-    @property
-    def gripper_urdf_path(self):
-        return os.path.join(gm.ASSET_PATH, "models/franka/allegro_hand.urdf")
-    
-    @property
-    def disabled_collision_pairs(self):
-        return [
-            ["link_12_0", "part_studio_link"],
-        ]
