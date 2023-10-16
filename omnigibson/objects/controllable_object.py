@@ -457,6 +457,9 @@ class ControllableObject(BaseObject):
                 - joint_effort: (n_dof,) joint efforts
                 - root_pos: (3,) (x,y,z) global cartesian position of the object's root link
                 - root_quat: (4,) (x,y,z,w) global cartesian orientation of ths object's root link
+                - mass_matrix: (n_dof, n_dof) mass matrix
+                - gravity_force: (n_dof,) per-joint generalized gravity forces
+                - cc_force: (n_dof,) per-joint centripetal and centrifugal forces
         """
         pos, ori = self.get_position_orientation()
         return dict(
@@ -465,6 +468,9 @@ class ControllableObject(BaseObject):
             joint_effort=self.get_joint_efforts(normalized=False),
             root_pos=pos,
             root_quat=ori,
+            mass_matrix=self.get_mass_matrix(),
+            gravity_force=self.get_generalized_gravity_forces(),
+            cc_force=self.get_coriolis_and_centrifugal_forces(),
         )
 
     def dump_action(self):

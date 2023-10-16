@@ -161,6 +161,9 @@ class ManipulationRobot(BaseRobot):
         assert_valid_key(key=grasping_mode, valid_keys=AG_MODES, name="grasping_mode")
         self._grasping_mode = grasping_mode
 
+        # Other internal variables initialized later
+        self._eef_link_idxs = {arm: None for arm in self.arm_names}
+
         # Initialize other variables used for assistive grasping
         self._ag_data = {arm: None for arm in self.arm_names}
         self._ag_freeze_joint_pos = {
@@ -226,6 +229,13 @@ class ManipulationRobot(BaseRobot):
 
     def _initialize(self):
         super()._initialize()
+
+        # Store index of EEF within link count
+        offset = -1 if self.fixed_base else 0
+        link_path_to_idx = {path: i for i, path in enumerate(self._physics_view.link_paths[0])}
+        for arm in self.arm_names:
+            self._eef_link_idxs[arm] = link_path_to_idx[self.eef_links[arm].prim_path] + offset
+
         if gm.AG_CLOTH:
             for arm in self.arm_names:
                 self._ag_check_in_volume[arm], self._ag_calculate_volume[arm] = \
@@ -392,8 +402,11 @@ class ManipulationRobot(BaseRobot):
         dic = super().get_control_dict()
 
         for arm in self.arm_names:
-            dic["eef_{}_pos_relative".format(arm)] = self.get_relative_eef_position(arm)
-            dic["eef_{}_quat_relative".format(arm)] = self.get_relative_eef_orientation(arm)
+            dic[f"eef_{arm}_pos_relative"] = self.get_relative_eef_position(arm)
+            dic[f"eef_{arm}_quat_relative"] = self.get_relative_eef_orientation(arm)
+            dic[f"eef_{arm}_lin_vel_relative"] = self.get_relative_eef_lin_vel(arm)
+            dic[f"eef_{arm}_ang_vel_relative"] = self.get_relative_eef_ang_vel(arm)
+            dic[f"eef_{arm}_jacobian"] = self.get_jacobian()[self._eef_link_idxs[arm], :, -self.n_joints:]
 
         return dic
 
@@ -707,6 +720,33 @@ class ManipulationRobot(BaseRobot):
         arm = self.default_arm if arm == "default" else arm
         return self.get_relative_eef_pose(arm=arm)[1]
 
+    def get_relative_eef_lin_vel(self, arm="default"):
+        """
+        Args:
+            arm (str): specific arm to grab relative eef linear velocity.
+                Default is "default" which corresponds to the first entry in self.arm_names
+
+
+        Returns:
+            3-array: (x,y,z) Linear velocity of end-effector relative to robot base frame
+        """
+        arm = self.default_arm if arm == "default" else arm
+        base_link_quat = self.get_orientation()
+        return T.quat2mat(base_link_quat) @ self.eef_links[arm].get_linear_velocity()
+
+    def get_relative_eef_ang_vel(self, arm="default"):
+        """
+        Args:
+            arm (str): specific arm to grab relative eef angular velocity.
+                Default is "default" which corresponds to the first entry in self.arm_names
+
+        Returns:
+            3-array: (ax,ay,az) angular velocity of end-effector relative to robot base frame
+        """
+        arm = self.default_arm if arm == "default" else arm
+        base_link_quat = self.get_orientation()
+        return T.quat2mat(base_link_quat) @ self.eef_links[arm].get_angular_velocity()
+
     def _calculate_in_hand_object_rigid(self, arm="default"):
         """
         Calculates which object to assisted-grasp for arm @arm. Returns an (object_id, link_id) tuple or None
@@ -864,6 +904,31 @@ class ManipulationRobot(BaseRobot):
         return dic
 
     @property
+    def _default_arm_osc_controller_configs(self):
+        """
+        Returns:
+            dict: Dictionary mapping arm appendage name to default controller config for an
+                operational space controller to control this robot's arm
+        """
+        dic = {}
+        for arm in self.arm_names:
+            dic[arm] = {
+                "name": "OperationalSpaceController",
+                "task_name": f"eef_{arm}",
+                "control_freq": self._control_freq,
+                "default_joint_pos": self.default_joint_pos,
+                "control_limits": self.control_limits,
+                "dof_idx": self.arm_control_idx[arm],
+                "command_output_limits": (
+                    np.array([-0.2, -0.2, -0.2, -0.5, -0.5, -0.5]),
+                    np.array([0.2, 0.2, 0.2, 0.5, 0.5, 0.5]),
+                ),
+                "mode": "pose_delta_ori",
+                "workspace_pose_limiter": None,
+            }
+        return dic
+
+    @property
     def _default_arm_null_joint_controller_configs(self):
         """
         Returns:
@@ -946,6 +1011,7 @@ class ManipulationRobot(BaseRobot):
         cfg = super()._default_controller_config
 
         arm_ik_configs = self._default_arm_ik_controller_configs
+        arm_osc_configs = self._default_arm_osc_controller_configs
         arm_joint_configs = self._default_arm_joint_controller_configs
         arm_null_joint_configs = self._default_arm_null_joint_controller_configs
         gripper_pj_configs = self._default_gripper_multi_finger_controller_configs
@@ -956,6 +1022,7 @@ class ManipulationRobot(BaseRobot):
         for arm in self.arm_names:
             cfg["arm_{}".format(arm)] = {
                 arm_ik_configs[arm]["name"]: arm_ik_configs[arm],
+                arm_osc_configs[arm]["name"]: arm_osc_configs[arm],
                 arm_joint_configs[arm]["name"]: arm_joint_configs[arm],
                 arm_null_joint_configs[arm]["name"]: arm_null_joint_configs[arm],
             }
