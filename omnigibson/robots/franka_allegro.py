@@ -3,7 +3,6 @@ import numpy as np
 
 from omnigibson.macros import gm
 from omnigibson.robots.manipulation_robot import ManipulationRobot
-from omnigibson.robots.active_camera_robot import ActiveCameraRobot
 
 from omni.isaac.core.utils.prims import get_prim_at_path
 
@@ -133,10 +132,6 @@ class FrankaAllegro(ManipulationRobot):
             **kwargs,
         )
 
-    def _post_load(self):
-        super()._post_load()
-        self._world_base_fixed_joint_prim = get_prim_at_path(f"{self._prim_path}/root_joint")
-
     @property
     def model_name(self):
         return "FrankaAllegro"
@@ -147,7 +142,7 @@ class FrankaAllegro(ManipulationRobot):
 
     @property
     def untucked_default_joint_pos(self):
-        # return np.r_[[0.012, -0.57, 0, -2.81, 0, 3.037, 0.741], np.zeros(16)]
+        # position where the hand is parallel to the ground
         return np.r_[[0.86, -0.27, -0.68, -1.52, -0.18, 1.29, 1.72], np.zeros(16)]
 
     @property
@@ -174,20 +169,6 @@ class FrankaAllegro(ManipulationRobot):
     def update_controller_mode(self):
         super().update_controller_mode()
         # overwrite joint params here
-        # self.joints[f"panda_joint1"].damping = 10472
-        # self.joints[f"panda_joint1"].stiffness = 104720
-        # self.joints[f"panda_joint2"].damping = 1047.2
-        # self.joints[f"panda_joint2"].stiffness = 10472
-        # self.joints[f"panda_joint3"].damping = 5236
-        # self.joints[f"panda_joint3"].stiffness = 104720
-        # self.joints[f"panda_joint4"].damping = 523.6
-        # self.joints[f"panda_joint4"].stiffness = 10472
-        # self.joints[f"panda_joint5"].damping = 52.36
-        # self.joints[f"panda_joint5"].stiffness = 436.3
-        # self.joints[f"panda_joint6"].damping = 52.36
-        # self.joints[f"panda_joint6"].stiffness = 261.8
-        # self.joints[f"panda_joint7"].damping = 52.36
-        # self.joints[f"panda_joint7"].stiffness = 872.66
         for i in range(7):
             self.joints[f"panda_joint{i+1}"].damping = 1000
             self.joints[f"panda_joint{i+1}"].stiffness = 1000
@@ -198,16 +179,12 @@ class FrankaAllegro(ManipulationRobot):
 
     @property
     def controller_order(self):
-        # Ordered by general robot kinematics chain
         return ["arm_{}".format(self.default_arm), "gripper_{}".format(self.default_arm)]
 
     @property
     def _default_controllers(self):
-        # Always call super first
         controllers = super()._default_controllers
         controllers["arm_{}".format(self.default_arm)] = "InverseKinematicsController"
-        controllers["gripper_{}".format(self.default_arm)] = "JointController"
-
         return controllers
     
     @property
@@ -228,28 +205,11 @@ class FrankaAllegro(ManipulationRobot):
 
     @property
     def arm_link_names(self):
-        return {self.default_arm: [
-            "panda_link0",
-            "panda_link1",
-            "panda_link2",
-            "panda_link3",
-            "panda_link4",
-            "panda_link5",
-            "panda_link6",
-            "panda_link7",
-        ]}
+        return {self.default_arm: [f"panda_link{i}" for i in range(8)]}
 
     @property
     def arm_joint_names(self):
-        return {self.default_arm: [
-            "panda_joint_1",
-            "panda_joint_2",
-            "panda_joint_3",
-            "panda_joint_4",
-            "panda_joint_5",
-            "panda_joint_6",
-            "panda_joint_7",
-        ]}
+        return {self.default_arm: [f"panda_joint_{i+1}" for i in range(7)]}
 
     @property
     def eef_link_names(self):
@@ -257,45 +217,11 @@ class FrankaAllegro(ManipulationRobot):
 
     @property
     def finger_link_names(self):
-        return {self.default_arm: [
-            "link_0_0",
-            "link_1_0",
-            "link_2_0",
-            "link_3_0",
-            "link_4_0",
-            "link_5_0",
-            "link_6_0",
-            "link_7_0",
-            "link_8_0",
-            "link_9_0",
-            "link_10_0",
-            "link_11_0",
-            "link_12_0",
-            "link_13_0",
-            "link_14_0",
-            "link_15_0",
-        ]}
+        return {self.default_arm: [f"link_{i}_0" for i in range(16)]}
 
     @property
     def finger_joint_names(self):
-        return {self.default_arm: [
-            "joint_0_0",
-            "joint_1_0",
-            "joint_2_0",
-            "joint_3_0",
-            "joint_4_0",
-            "joint_5_0",
-            "joint_6_0",
-            "joint_7_0",
-            "joint_8_0",
-            "joint_9_0",
-            "joint_10_0",
-            "joint_11_0",
-            "joint_12_0",
-            "joint_13_0",
-            "joint_14_0",
-            "joint_15_0",
-        ]}
+        return {self.default_arm: [f"joint_{i}_0" for i in range(16)]}
 
     @property
     def usd_path(self):
@@ -325,6 +251,3 @@ class FrankaAllegro(ManipulationRobot):
         return [
             ["link_12_0", "part_studio_link"],
         ]
-    
-    def set_position(self, position):
-        self._world_base_fixed_joint_prim.GetAttribute("physics:localPos0").Set(tuple(position))
