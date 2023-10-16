@@ -4,11 +4,6 @@ import numpy as np
 from omnigibson.macros import gm
 from omnigibson.robots.manipulation_robot import ManipulationRobot
 
-RESET_JOINT_OPTIONS = {
-    "tuck",
-    "untuck",
-}
-
 
 class FrankaAllegro(ManipulationRobot):
     """
@@ -96,14 +91,6 @@ class FrankaAllegro(ManipulationRobot):
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
                 for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
         """
-        # Parse reset joint pos if specifying special string
-        if isinstance(reset_joint_pos, str):
-            assert (
-                reset_joint_pos in RESET_JOINT_OPTIONS
-            ), "reset_joint_pos should be one of {} if using a string!".format(RESET_JOINT_OPTIONS)
-            reset_joint_pos = (
-                self.tucked_default_joint_pos if reset_joint_pos == "tuck" else self.untucked_default_joint_pos
-            )
 
         # Run super init
         super().__init__(
@@ -133,15 +120,6 @@ class FrankaAllegro(ManipulationRobot):
     @property
     def model_name(self):
         return "FrankaAllegro"
-
-    @property
-    def tucked_default_joint_pos(self):
-        return np.zeros(23)
-
-    @property
-    def untucked_default_joint_pos(self):
-        # position where the hand is parallel to the ground
-        return np.r_[[0.86, -0.27, -0.68, -1.52, -0.18, 1.29, 1.72], np.zeros(16)]
 
     @property
     def discrete_action_list(self):
@@ -187,7 +165,8 @@ class FrankaAllegro(ManipulationRobot):
     
     @property
     def default_joint_pos(self):
-        return self.untucked_default_joint_pos
+        # position where the hand is parallel to the ground
+        return np.r_[[0.86, -0.27, -0.68, -1.52, -0.18, 1.29, 1.72], np.zeros(16)]
 
     @property
     def finger_lengths(self):
