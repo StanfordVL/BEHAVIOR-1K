@@ -33,6 +33,15 @@ robots:
     default_trunk_offset: 0.365
     default_arm_pose: diagonal30
     reset_joint_pos: tuck
+    sensor_config:
+      VisionSensor:
+        sensor_kwargs:
+          image_height: 128
+          image_width: 128
+      ScanSensor:
+          sensor_kwargs:
+            min_range: 0.05
+            max_range: 10.0
     controller_config:
       base:
         name: DifferentialDriveController
