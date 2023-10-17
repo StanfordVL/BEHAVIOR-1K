@@ -15,6 +15,7 @@ from omnigibson.objects.dataset_object import DatasetObject
 import h5py
 
 from PIL import Image
+from tqdm import tqdm
 
 
 def step_sim(time):
@@ -36,12 +37,12 @@ class Recorder():
     def __init__(self, folder):
         self.folderpath = f'./rollouts/{folder}'
         self.state_keys = ["robot0:eyes_Camera_sensor_rgb", "robot0:eyes_Camera_sensor_depth_linear", "robot0:eyes_Camera_sensor_seg_instance", "robot0:eyes_Camera_sensor_seg_semantic"]
-        # self.state_keys = ["robot0:eyes_Camera_sensor_rgb", "robot0:eyes_Camera_sensor_seg_instance"]
         self.reset()
 
-    def add(self, state, action, reward):
+    def add(self, state, action, reward, proprio):
         for k in self.state_keys:
             self.states[k].append(state['robot0'][k].copy())
+        self.proprios.append(proprio.copy())
         self.actions.append(action.copy())
         self.rewards.append(reward)
         self.ids.append(self.episode_id)
@@ -50,6 +51,7 @@ class Recorder():
         self.states = {}
         for k in self.state_keys:
             self.states[k] = []
+        self.proprios = []
         self.actions = []
         self.rewards = []
         self.ids = []
@@ -85,6 +87,7 @@ class Recorder():
                     img.save(f'{self.folderpath}/{state_folder}/{self.episode_id}_{i}.png')
         h5file = h5py.File(f'{self.folderpath}/data.h5', 'a')
         group = h5file[group_name] if group_name in h5file else h5file.create_group(group_name)
+        self._add_to_dataset(group, "proprio", self.proprios)
         self._add_to_dataset(group, "actions", self.actions)
         self._add_to_dataset(group, "rewards", self.rewards)
         self._add_to_dataset(group, "ids", self.ids)
@@ -104,7 +107,8 @@ def main(folder, iterations):
         "robots": [
             {
                 "type": "Tiago",
-                "obs_modalities": ["rgb", "depth_linear", "seg_instance", "seg_semantic"],
+                "obs_modalities": ["rgb", "depth_linear", "seg_instance", "seg_semantic", "proprio"],
+                "proprio_obs": ["robot_pose", "joint_qpos", "joint_qvel", "eef_left_pos", "eef_left_quat", "grasp_left"],
                 "scale": 1.0,
                 "self_collisions": True,
                 "action_normalize": False,
@@ -212,20 +216,21 @@ def main(folder, iterations):
     obj = env.scene.object_registry("name", "cologne")
     recorder = Recorder(folder)
 
-    for i in range(int(iterations)):
+    for i in tqdm(range(int(iterations))):
         try:
             reset_env(env, initial_poses)
             counter = 0
             for action in controller.apply_ref(StarterSemanticActionPrimitiveSet.GRASP, obj, track_object=True):
                 action = action[0]
                 state, reward, done, info = env.step(action)
-                recorder.add(state, action, reward)
+                # from IPython import embed; embed()
+                recorder.add(state, action, reward, state['robot0']['proprio'])
                 counter += 1
                 if done or counter >= 400:
                     for action in controller._execute_release():
                         action = action[0]
                         state, reward, done, info = env.step(action)
-                        recorder.add(state, action, reward)
+                        recorder.add(state, action, reward, state['robot0']['proprio'])
                     break
         except Exception as e:
             print("Error in iteration: ", i)
