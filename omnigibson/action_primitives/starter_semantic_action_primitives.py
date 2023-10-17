@@ -57,7 +57,7 @@ MAX_STEPS_FOR_SETTLING = 500
 
 MAX_CARTESIAN_HAND_STEP = 0.002
 MAX_STEPS_FOR_HAND_MOVE = 500
-MAX_STEPS_FOR_HAND_MOVE_IK = 10000
+MAX_STEPS_FOR_HAND_MOVE_IK = 1000
 MAX_STEPS_FOR_HAND_MOVE_WHEN_OPENING = 30
 MAX_STEPS_FOR_GRASP_OR_RELEASE = 30
 MAX_WAIT_FOR_GRASP_OR_RELEASE = 10
@@ -217,7 +217,7 @@ class StarterSemanticActionPrimitiveSet(IntEnum):
     TOGGLE_OFF = 8
 
 class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
-    def __init__(self, task, scene, robot, add_context=False, enable_head_tracking=True):
+    def __init__(self, task, scene, robot, add_context=False, enable_head_tracking=True, always_track_eef=False):
         logger.warning(
             "The StarterSemanticActionPrimitive is a work-in-progress and is only provided as an example. "
             "It currently only works with BehaviorRobot with its JointControllers set to absolute mode. "
@@ -240,6 +240,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         self.robot_model = self.robot.model_name
         self.robot_base_mass = self.robot._links["base_link"].mass
         self.add_context = add_context
+
+        self._always_track_eef = always_track_eef
+
         # self._tracking_object = None
         self.enable_head_tracking = enable_head_tracking
         self._tracking_object_pose = None
@@ -559,15 +562,16 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         self._track_eef = False
 
 
-    def _move_base_backward(self, steps=10, speed=0.1):
+    def _move_base_backward(self, steps=5, speed=0.2):
         """
-        Yields action for the robot to move hand so the eef is in the target pose using the planner
+        Yields action for the robot to move base so the eef is in the target pose using the planner
 
         Args:
-            offset (Iterable of array): Position and orientation arrays in an iterable for pose
+            steps (int): steps to move base
+            speed (float): base speed
 
         Returns:
-            np.array or None: Action array for one step for the robot to move hand or None if its at the target pose
+            np.array or None: Action array for one step for the robot to move base or None if its at the target pose
         """
         initial_eef_pos = self.robot.get_eef_position()
         for _ in range(steps):
@@ -576,12 +580,13 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             action[self.robot.base_control_idx[0]] = -speed
             yield self.with_context(action)
 
-    def _move_hand_backward(self, steps=10, speed=0.1):
+    def _move_hand_backward(self, steps=5, speed=0.2):
         """
         Yields action for the robot to move hand so the eef is in the target pose using the planner
 
         Args:
-            offset (Iterable of array): Position and orientation arrays in an iterable for pose
+            steps (int): steps to move eef
+            speed (float): eef speed
 
         Returns:
             np.array or None: Action array for one step for the robot to move hand or None if its at the target pose
@@ -592,6 +597,26 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             action = self._empty_action(arm_pose_to_keep=initial_eef_pos)
             action[self.robot.controller_action_idx["gripper_{}".format(self.arm)]] = 1.0
             action[self.robot.controller_action_idx["arm_{}".format(self.arm)][0]] = -speed
+            yield self.with_context(action)
+        print("moving hand backward done")
+
+    def _move_hand_upward(self, steps=5, speed=0.1):
+        """
+        Yields action for the robot to move hand so the eef is in the target pose using the planner
+
+        Args:
+            steps (int): steps to move eef
+            speed (float): eef speed
+
+        Returns:
+            np.array or None: Action array for one step for the robot to move hand or None if its at the target pose
+        """
+        initial_eef_pos = self.robot.get_eef_position()
+        print("moving hand backward")
+        for _ in range(steps):
+            action = self._empty_action(arm_pose_to_keep=initial_eef_pos)
+            action[self.robot.controller_action_idx["gripper_{}".format(self.arm)]] = 1.0
+            action[self.robot.controller_action_idx["arm_{}".format(self.arm)][2]] = speed
             yield self.with_context(action)
         print("moving hand backward done")
 
@@ -738,6 +763,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         # Reset object to track
         self._tracking_object_pose = None
         self._track_eef = False
+        self._tracking_object = None
 
         obj_in_hand = self._get_obj_in_hand()
         if obj_in_hand is None:
@@ -751,12 +777,14 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         # Set object to track to the target object to place on
         if self.enable_head_tracking:
-            self._tracking_object_pose = obj.get_position_orientation()
+            # self._tracking_object_pose = obj.get_position_orientation()
+            # self._tracking_object
+            self._tracking_eef = True
         
         yield from self._navigate_if_needed(obj, pose_on_obj=hand_pose)
         yield from self._move_hand(hand_pose)
         yield from self._execute_release()
-        yield from self._settle_robot()
+        # yield from self._settle_robot()
 
         if self._get_obj_in_hand() is not None:
             raise ActionPrimitiveError(
@@ -776,6 +804,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         self._tracking_object_pose = None
         self._track_eef = False
 
+        yield from self._move_hand_upward()
         # yield from self._reset_hand()
 
     def _convert_cartesian_to_joint_space(self, target_pose):
@@ -1042,7 +1071,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         # make sure controller is InverseKinematicsController and in expected mode
         controller_config = self.robot._controller_config["arm_" + self.arm]
         assert controller_config["name"] == "InverseKinematicsController", "Controller must be InverseKinematicsController"
-        assert controller_config["motor_type"] == "velocity", "Controller must be in velocity mode"
+        # assert controller_config["motor_type"] == "velocity", "Controller must be in velocity mode"
         assert controller_config["mode"] == "pose_absolute_ori", "Controller must be in pose_delta_ori mode"
         # target pose = (position, quat) IN WORLD FRAME
         if in_world_frame:
@@ -1073,6 +1102,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             if i > 0 and stop_if_stuck:
                 pos_diff = np.linalg.norm(prev_pos - current_pos)
                 orn_diff = (Rotation.from_quat(prev_orn) * Rotation.from_quat(current_orn).inv()).magnitude() 
+                orn_diff = (Rotation.from_quat(prev_orn) * Rotation.from_quat(current_orn).inv()).magnitude() 
+                print(pos_diff, orn_diff)
+                orn_diff = (Rotation.from_quat(prev_orn) * Rotation.from_quat(current_orn).inv()).magnitude()
                 print(pos_diff, orn_diff)
                 if pos_diff < 0.0003 and orn_diff < 0.01:
                     raise ActionPrimitiveError(
@@ -1247,11 +1279,14 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         """
         assert self.robot_model == "Tiago", "Tracking object with camera is currently only supported for Tiago"
 
-        if not self._track_eef and target_obj_pose is None:
-            return action
-        
-        if self._track_eef:
+        if self._always_track_eef:
             target_obj_pose = (self.robot.get_eef_position(), self.robot.get_eef_orientation())
+        else:
+            if not self._track_eef and target_obj_pose is None:
+                return action
+            
+            if self._track_eef:
+                target_obj_pose = (self.robot.get_eef_position(), self.robot.get_eef_orientation())
         
         head_q = self._get_head_goal_q(target_obj_pose)
         head_idx = self.robot.controller_action_idx["camera"]
@@ -1333,7 +1368,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             elif self.robot._controller_config[name]["name"] == "InverseKinematicsController":
                 # overwrite the goal orientation, since it is in absolute frame.
                 controller_config = self.robot._controller_config["arm_" + self.arm]
-                assert controller_config["motor_type"] == "velocity", "Controller must be in velocity mode"
+                # assert controller_config["motor_type"] == "velocity", "Controller must be in velocity mode"
                 assert controller_config["mode"] == "pose_absolute_ori", "Controller must be in pose_delta_ori mode"
                 # current_pose = self._get_pose_in_robot_frame((self.robot.get_eef_position(), self.robot.get_eef_orientation()))
                 current_quat = self.robot.get_relative_eef_orientation()
@@ -1853,7 +1888,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             np.array or None: Action array for one step for the robot to do nothing
         """
         initial_eef_pos = self.robot.get_eef_position()
-        for _ in range(10):
+        for _ in range(5):
             empty_action = self._empty_action(arm_pose_to_keep=initial_eef_pos)
             yield self.with_context(empty_action)
 
