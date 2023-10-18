@@ -1,4 +1,4 @@
-FROM nvcr.io/nvidia/isaac-sim:2022.2.0
+FROM nvcr.io/nvidia/isaac-sim:2023.1.0
 
 # Set up all the prerequisites.
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
@@ -19,7 +19,7 @@ ENV OMNIGIBSON_KEY_PATH /data/omnigibson.key
 # Install Mamba (light conda alternative)
 RUN curl -Ls https://micro.mamba.pm/api/micromamba/linux-64/latest | tar -xvj -C / bin/micromamba
 ENV MAMBA_ROOT_PREFIX /micromamba
-RUN micromamba create -n omnigibson -c conda-forge python=3.7
+RUN micromamba create -n omnigibson -c conda-forge python=3.10
 RUN micromamba shell init --shell=bash --prefix=/micromamba
 
 # Make sure isaac gets properly sourced every time omnigibson gets called
@@ -45,8 +45,8 @@ RUN cd /ompl/build/Release && \
     micromamba run -n omnigibson cmake ../.. \
       -DCMAKE_INSTALL_PREFIX="$CONDA_PREFIX" \
       -DBOOST_ROOT="$CONDA_PREFIX" \
-      -DPYTHON_EXEC=/micromamba/envs/omnigibson/bin/python3.7 \
-      -DPYTHONPATH=/micromamba/envs/omnigibson/lib/python3.7/site-packages && \
+      -DPYTHON_EXEC=/micromamba/envs/omnigibson/bin/python3.10 \
+      -DPYTHONPATH=/micromamba/envs/omnigibson/lib/python3.10/site-packages && \
     micromamba run -n omnigibson make -j 4 update_bindings && \
     micromamba run -n omnigibson make -j 4 && \
     cd py-bindings && \
