@@ -12,6 +12,13 @@ jobs:
   docker:
     runs-on: ubuntu-latest
     steps:
+      - name: Maximize build space
+        uses: easimon/maximize-build-space@master
+        with:
+          remove-dotnet: 'true'
+          remove-android: 'true'
+          remove-haskell: 'true'
+          remove-codeql: 'true'
       -
         name: Checkout
         uses: actions/checkout@v4
@@ -59,6 +66,8 @@ jobs:
           tags: ${{ steps.meta-dev.outputs.tags }}
           labels: ${{ steps.meta-dev.outputs.labels }}
           file: docker/dev.Dockerfile
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
       -
         name: Build and push prod image
         uses: docker/build-push-action@v5
@@ -67,3 +76,5 @@ jobs:
           tags: ${{ steps.meta-prod.outputs.tags }}
           labels: ${{ steps.meta-prod.outputs.labels }}
           file: docker/prod.Dockerfile
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
