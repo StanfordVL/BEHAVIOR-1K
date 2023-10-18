@@ -807,9 +807,9 @@ class EntityPrim(XFormPrim):
         assert self._handle is not None, "handles are not initialized yet!"
         assert self.n_joints > 0, "Tried to call method not intended for entity prim with no joints!"
 
-        assert self._dc is not None, "Dynamic control interface is not initialized!"
+        assert self._dc is not None, f"Dynamic control interface is not initialized for {self._name}"
         joint_states = self._dc.get_articulation_dof_states(self._handle, _dynamic_control.STATE_POS)
-        assert joint_states is not None, "Failed to get joint states!"
+        assert joint_states is not None, f"Failed to get joint states for {self.name}"
         joint_positions = joint_states["pos"]
 
         # Possibly normalize values when returning
