@@ -11,31 +11,34 @@ on:
 
 jobs:
   docker:
-    runs-on: [self-hosted, linux, gpu]
+    runs-on: ubuntu-latest
     steps:
       -
         name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+      -
+        name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
       -
         name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
       -
         name: Login to NVCR
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           registry: nvcr.io
           username: ${{ secrets.NVCR_USERNAME }}
           password: ${{ secrets.NVCR_PASSWORD }}   
       -
         name: Login to Docker Hub
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_PASSWORD }}
       -
         name: Metadata for dev Image
         id: meta-dev
-        uses: docker/metadata-action@v4
+        uses: docker/metadata-action@v5
         with:
           images: |
             stanfordvl/omnigibson-dev
@@ -45,7 +48,7 @@ jobs:
       -
         name: Metadata for prod Image
         id: meta-prod
-        uses: docker/metadata-action@v4
+        uses: docker/metadata-action@v5
         with:
           images: |
             stanfordvl/omnigibson
@@ -54,8 +57,8 @@ jobs:
             type=semver,pattern={{version}}
       -
         name: Build and push dev image
-        uses: docker/build-push-action@v4
         id: build-dev
+        uses: docker/build-push-action@v5
         with:
           context: .
           push: true
@@ -70,7 +73,7 @@ jobs:
           sed -i "s/omnigibson-dev:latest/omnigibson-dev@${{ steps.build-dev.outputs.digest }}/g" docker/prod.Dockerfile && cat docker/prod.Dockerfile
       -
         name: Build and push prod image
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v5
         with:
           context: .
           push: true

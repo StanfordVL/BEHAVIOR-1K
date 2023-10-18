@@ -31,7 +31,7 @@ REGISTERED_SCENES = dict()
 class Scene(Serializable, Registerable, Recreatable, ABC):
     """
     Base class for all Scene objects.
-    Contains the base functionalities for an arbitary scene with an arbitrary set of added objects
+    Contains the base functionalities for an arbitrary scene with an arbitrary set of added objects
     """
     def __init__(
             self,
