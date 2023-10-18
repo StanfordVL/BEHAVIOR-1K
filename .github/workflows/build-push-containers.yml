@@ -10,7 +10,7 @@ on:
 
 jobs:
   docker:
-    runs-on: [self-hosted, linux, gpu]
+    runs-on: ubuntu-latest
     steps:
       -
         name: Checkout
