@@ -11,7 +11,6 @@ from omnigibson.utils.config_utils import parse_config
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.python_utils import assert_valid_key, merge_nested_dicts, create_class_from_registry_and_config,\
     Recreatable
-from omnigibson.sensors.vision_sensor import VisionSensor
 
 
 # Create module logger
@@ -31,8 +30,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
         automatic_reset=False,
         flatten_action_space=False,
         flatten_obs_space=False,
-        use_external_camera=False,
-        external_camera_pose=None,
     ):
         """
         Args:
@@ -45,8 +42,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
             automatic_reset (bool): whether to automatic reset after an episode finishes
             flatten_action_space (bool): whether to flatten the action space as a sinle 1D-array
             flatten_obs_space (bool): whether the observation space should be flattened when generated
-            use_external_camera (bool): whether to use external camera as additional modalities in observation.
-            external_camera_pose (iterable of lists or of n-arrays): desired position and orientation of external camera.
         """
         # Call super first
         super().__init__()
@@ -84,21 +79,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
         # Load this environment
         self.load()
-
-        # Set the initial camera if required.
-        self.use_external_camera = use_external_camera
-        if use_external_camera:
-            self.camera = VisionSensor(
-                prim_path="/World/viewer_camera",
-                name="camera",
-                modalities=["rgb", "depth"], # cfg is some customized config
-            )
-            self.camera.initialize()
-            if external_camera_pose is not None:
-                self.camera.set_position_orientation(
-                    external_camera_pose[0],
-                    external_camera_pose[1],
-                )
 
     def reload(self, configs, overwrite_old=True):
         """
@@ -365,9 +345,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
         # Add task observations
         obs["task"] = self._task.get_obs(env=self)
-
-        if self.use_external_camera:
-            obs["external"] = self.camera.get_obs()
 
         # Possibly flatten obs if requested
         if self._flatten_obs_space:
