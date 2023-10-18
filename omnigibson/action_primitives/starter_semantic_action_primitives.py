@@ -21,7 +21,6 @@ import omnigibson as og
 from omnigibson import object_states
 from omnigibson.action_primitives.action_primitive_set_base import ActionPrimitiveError, ActionPrimitiveErrorGroup, BaseActionPrimitiveSet
 from omnigibson.utils.object_state_utils import sample_cuboid_for_predicate
-from omnigibson.object_states.utils import get_center_extent
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.robots import BaseRobot
 from omnigibson.tasks.behavior_task import BehaviorTask
@@ -1713,7 +1712,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Returns:
             3-array: (x,y,z) Position in the world frame
         """
-        aabb_center, aabb_extent = get_center_extent(target_obj.states)
+        aabb_center, aabb_extent = target_obj.aabb_center, target_obj.aabb_extent
         # We want to sample only from the side-facing faces.
         face_normal_axis = random.choice([0, 1])
         face_normal_direction = random.choice([-1, 1])
