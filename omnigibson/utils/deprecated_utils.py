@@ -185,4 +185,3 @@ class Core(OmniCore):
             carb.log_info(f"No ComputeGraph selected. A new graph has been created at {graph.get_path_to_graph()}")
 
         return graph
-
