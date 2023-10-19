@@ -16,8 +16,8 @@ jobs:
         name: Checkout
         uses: actions/checkout@v4
       -
-        name: Make dummy docker config file
-        run: echo '{}' > /root/.docker/config.json
+        name: Remove docker configs
+        run: rm -rf /root/.docker
       -
         name: Login to NVCR
         uses: redhat-actions/podman-login@v1
