@@ -18,7 +18,7 @@ jobs:
       -
         name: Remove docker configs
         run: |
-          echo '{"auths": {}}' > /root/.docker/config.json
+          mkdir /root/.docker && echo '{"auths": {}}' > /root/.docker/config.json
       -
         name: Login to NVCR
         uses: redhat-actions/podman-login@v1
