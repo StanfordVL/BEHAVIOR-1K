@@ -10,7 +10,7 @@ on:
 
 jobs:
   docker:
-    runs-on: ubuntu-latest  # [self-hosted, linux]
+    runs-on: [self-hosted, linux]
     steps:
       -
         name: Checkout
@@ -19,6 +19,7 @@ jobs:
         name: Login to NVCR
         uses: redhat-actions/podman-login@v1
         with:
+          auth_file_path: /run/containers/0/auth.json
           registry: nvcr.io
           username: ${{ secrets.NVCR_USERNAME }}
           password: ${{ secrets.NVCR_PASSWORD }}   
@@ -26,6 +27,7 @@ jobs:
         name: Login to Docker Hub
         uses: redhat-actions/podman-login@v1
         with:
+          auth_file_path: /run/containers/0/auth.json
           registry: docker.io
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_PASSWORD }}
@@ -58,19 +60,15 @@ jobs:
           tags: ${{ steps.meta-dev.outputs.tags }}
           labels: ${{ steps.meta-dev.outputs.labels }}
           containerfiles: docker/dev.Dockerfile
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
       -
         name: Build prod image
         id: build-prod
         uses: docker/build-push-action@v5
         with:
-          push: true
+          image: stanfordvl/omnigibson
           tags: ${{ steps.meta-prod.outputs.tags }}
           labels: ${{ steps.meta-prod.outputs.labels }}
-          file: docker/prod.Dockerfile
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          containerfiles: docker/prod.Dockerfile
       - 
         name: Push dev image
         uses: redhat-actions/push-to-registry@v2
