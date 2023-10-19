@@ -16,8 +16,8 @@ jobs:
         name: Checkout
         uses: actions/checkout@v4
       -
-        name: Make docker dir
-        run: mkdir /root/.docker
+        name: Make dummy docker config file
+        run: touch /root/.docker/config.json
       -
         name: Login to NVCR
         uses: redhat-actions/podman-login@v1
