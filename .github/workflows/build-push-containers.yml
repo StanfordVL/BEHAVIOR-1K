@@ -52,17 +52,19 @@ jobs:
         name: Checkout
         uses: actions/checkout@v4
       -
+        name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      -
         name: Login to NVCR
-        uses: redhat-actions/podman-login@v1
+        uses: docker/login-action@v3
         with:
           registry: nvcr.io
           username: ${{ secrets.NVCR_USERNAME }}
           password: ${{ secrets.NVCR_PASSWORD }}   
       -
         name: Login to Docker Hub
-        uses: redhat-actions/podman-login@v1
+        uses: docker/login-action@v3
         with:
-          registry: docker.io
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_PASSWORD }}
       -
@@ -86,34 +88,22 @@ jobs:
             type=ref,event=branch
             type=semver,pattern={{version}}
       -
-        name: Build dev image
-        id: build-dev
-        uses: redhat-actions/buildah-build@v2
-        with:
-          image: stanfordvl/omnigibson-dev
-          tags: ${{ steps.meta-dev.outputs.tags }}
-          labels: ${{ steps.meta-dev.outputs.labels }}
-          containerfiles: docker/dev.Dockerfile
-      -
-        name: Build prod image
-        id: build-prod
+        name: Build and push dev image
         uses: docker/build-push-action@v5
         with:
-          image: stanfordvl/omnigibson
+          push: true
+          tags: ${{ steps.meta-dev.outputs.tags }}
+          labels: ${{ steps.meta-dev.outputs.labels }}
+          file: docker/dev.Dockerfile
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      -
+        name: Build and push prod image
+        uses: docker/build-push-action@v5
+        with:
+          push: true
           tags: ${{ steps.meta-prod.outputs.tags }}
           labels: ${{ steps.meta-prod.outputs.labels }}
-          containerfiles: docker/prod.Dockerfile
-      - 
-        name: Push dev image
-        uses: redhat-actions/push-to-registry@v2
-        with:
-          image: ${{ steps.build-dev.outputs.image }}
-          tags: ${{ steps.build-dev.outputs.tags }}
-          registry: docker.io
-      - 
-        name: Push prod image
-        uses: redhat-actions/push-to-registry@v2
-        with:
-          image: ${{ steps.build-prod.outputs.image }}
-          tags: ${{ steps.build-prod.outputs.tags }}
-          registry: docker.io
+          file: docker/prod.Dockerfile
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
