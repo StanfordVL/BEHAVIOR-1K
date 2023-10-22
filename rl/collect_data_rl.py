@@ -6,6 +6,7 @@ import uuid
 import numpy as np
 import matplotlib.pyplot as plt
 import omnigibson as og
+from omnigibson.envs.rl_env import RLEnv
 from omnigibson.macros import gm
 from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitives, StarterSemanticActionPrimitiveSet
 from omnigibson.sensors.scan_sensor import ScanSensor
@@ -31,7 +32,7 @@ def reset_env(env, initial_poses):
     for o in objs:
         env.scene.object_registry("name", o).set_position_orientation(*initial_poses[o])
     og.sim.step()
-    env.reset()
+    return env.reset()
 
 class Recorder():
     def __init__(self, folder):
@@ -39,22 +40,28 @@ class Recorder():
         self.state_keys = ["robot0:eyes_Camera_sensor_rgb", "robot0:eyes_Camera_sensor_depth_linear", "robot0:eyes_Camera_sensor_seg_instance", "robot0:eyes_Camera_sensor_seg_semantic"]
         self.reset()
 
-    def add(self, state, action, reward, proprio):
+    def add(self, timestep, obs, action, reward, done, truncated, proprio):
         for k in self.state_keys:
-            self.states[k].append(state['robot0'][k].copy())
+            self.states[k].append(obs['robot0'][k].copy())
         self.proprios.append(proprio.copy())
+        self.truncateds.append(truncated)
+        self.dones.append(done)
         self.actions.append(action.copy())
         self.rewards.append(reward)
         self.ids.append(self.episode_id)
+        self.timesteps.append(timestep)
 
     def reset(self):
         self.states = {}
         for k in self.state_keys:
             self.states[k] = []
         self.proprios = []
+        self.truncateds = []
+        self.dones = []
         self.actions = []
         self.rewards = []
         self.ids = []
+        self.timesteps = []
         self.episode_id = str(uuid.uuid4())
 
     def _add_to_dataset(self, group, name, data):
@@ -75,21 +82,24 @@ class Recorder():
         for k in self.state_keys:
             state_folder = k[k.find(":") + 1:]
             os.makedirs(f'{self.folderpath}/{state_folder}', exist_ok=True)
-            for i, state in enumerate(self.states[k]):
+            for t, state in zip(self.timesteps, self.states[k]):
                 img = Image.fromarray(state)
                 if k == "robot0:eyes_Camera_sensor_rgb":
-                    img.convert('RGB').save(f'{self.folderpath}/{state_folder}/{self.episode_id}_{i}.jpeg')
+                    img.convert('RGB').save(f'{self.folderpath}/{state_folder}/{self.episode_id}_{t}.jpeg')
                 elif k == "robot0:eyes_Camera_sensor_depth_linear":
                     img = np.array(img) * 1000
                     img = Image.fromarray(img.astype(np.int32))
-                    img.save(f'{self.folderpath}/{state_folder}/{self.episode_id}_{i}.png')
+                    img.save(f'{self.folderpath}/{state_folder}/{self.episode_id}_{t}.png')
                 else:
-                    img.save(f'{self.folderpath}/{state_folder}/{self.episode_id}_{i}.png')
+                    img.save(f'{self.folderpath}/{state_folder}/{self.episode_id}_{t}.png')
         h5file = h5py.File(f'{self.folderpath}/data.h5', 'a')
         group = h5file[group_name] if group_name in h5file else h5file.create_group(group_name)
         self._add_to_dataset(group, "proprio", self.proprios)
+        self._add_to_dataset(group, "truncated", self.truncateds)
+        self._add_to_dataset(group, "done", self.dones)
         self._add_to_dataset(group, "actions", self.actions)
         self._add_to_dataset(group, "rewards", self.rewards)
+        self._add_to_dataset(group, "timesteps", self.timesteps)
         self._add_to_dataset(group, "ids", self.ids)
         h5file.close()
 
@@ -201,36 +211,43 @@ def main(folder, iterations):
         ]
     }
 
-    # Create the environment
-    env = og.Environment(configs=cfg, action_timestep=1 / 10., physics_timestep=1 / 60.)
+    reset_positions =  {
+        'coffee_table_fqluyq_0': ([-0.4767243 , -1.219805  ,  0.25702515], [-3.69874935e-04, -9.39229270e-04,  7.08872199e-01,  7.05336273e-01]),
+        'cologne': ([-0.30000001, -0.80000001,  0.44277492],
+                    [0.        , 0.        , 0.        , 1.00000012])
+    }
+
+    env_config = {
+        "cfg": cfg,
+        "reset_positions": reset_positions,
+        "action_space_controllers": ["base", "camera", "arm_left", "gripper_left"]
+    }
+    env = RLEnv(env_config)
     scene = env.scene
-    robot = env.robots[0]
+    robot = env.env.robots[0]
     og.sim.step()
 
-
     controller = StarterSemanticActionPrimitives(None, scene, robot)
-    env._primitive_controller = controller
-    initial_poses = {}
-    for o in env.scene.objects:
-        initial_poses[o.name] = o.get_position_orientation()
+    env.env._primitive_controller = controller
+
     obj = env.scene.object_registry("name", "cologne")
     recorder = Recorder(folder)
 
     for i in tqdm(range(int(iterations))):
         try:
-            reset_env(env, initial_poses)
-            counter = 0
+            obs = env.reset()
+            recorder.add(-1, obs, np.zeros_like(env.action_space.sample()), 0, False, False, obs['robot0']['proprio'])
+            timestep = 0
             for action in controller.apply_ref(StarterSemanticActionPrimitiveSet.GRASP, obj, track_object=True):
                 action = action[0]
-                state, reward, done, info = env.step(action)
-                # from IPython import embed; embed()
-                recorder.add(state, action, reward, state['robot0']['proprio'])
-                counter += 1
-                if done or counter >= 400:
+                obs, reward, done, truncated, info = env.step(action)
+                truncated = True if timestep >= 400 else truncated
+                recorder.add(timestep, obs, env.transform_action(action), reward, done, truncated, obs['robot0']['proprio'])
+                timestep += 1
+                if done or timestep >= 400:
                     for action in controller._execute_release():
                         action = action[0]
-                        state, reward, done, info = env.step(action)
-                        recorder.add(state, action, reward, state['robot0']['proprio'])
+                        env.step(action)
                     break
         except Exception as e:
             print("Error in iteration: ", i)
