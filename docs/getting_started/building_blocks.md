@@ -11,7 +11,7 @@ icon: octicons/package-16
 
 ??? question annotate "Why macros?"
 
-    Macros enforce global behavior that is consistent within an individual python process but can differ between processes. This is useful because globally enabling all of **`OmniGibson`**'s features can cause unecessary slowdowns, and so configuring the macros for your specific use case can optimize performance.
+    Macros enforce global behavior that is consistent within an individual python process but can differ between processes. This is useful because globally enabling all of **`OmniGibson`**'s features can cause unnecessary slowdowns, and so configuring the macros for your specific use case can optimize performance.
 
     For example, Omniverse provides a so-called `flatcache` feature which provides significant performance boosts, but cannot be used when fluids or soft bodies are present. So, we ideally should always have `gm.USE_FLATCACHE=True` unless we have fluids or soft bodies in our environment.
 
@@ -407,7 +407,7 @@ python -m omnigibson.examples.object_states.particle_source_sink_demo
 
 This demo loads in a sink, which is enabled with both the ParticleSource and ParticleSink states. The sink's particle source is located at the faucet spout and spawns a continuous stream of water particles, which is then destroyed ("sunk") by the sink's particle sink located at the drain.
 
-??? note "Difference bewteen `ParticleApplier/Removers` and `ParticleSource/Sinks`"
+??? note "Difference between `ParticleApplier/Removers` and `ParticleSource/Sinks`"
     The key difference between `ParticleApplier/Removers` and `ParticleSource/Sinks` is that `Applier/Removers`
     requires contact (if using `ParticleProjectionMethod.ADJACENCY`) or overlap
     (if using `ParticleProjectionMethod.PROJECTION`) in order to spawn / remove particles, and generally only spawn
