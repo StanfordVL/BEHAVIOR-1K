@@ -18,6 +18,7 @@ class RLEnv(EnvironmentWrapper):
             obj = self.env.scene.object_registry("name", name)
             if obj is not None:
                 self.env.scene.object_registry("name", name).set_position_orientation(*position)
+        og.sim.step()
         return self.env.reset()
 
     def step(self, action):

@@ -214,7 +214,8 @@ def main(folder, iterations):
     reset_positions =  {
         'coffee_table_fqluyq_0': ([-0.4767243 , -1.219805  ,  0.25702515], [-3.69874935e-04, -9.39229270e-04,  7.08872199e-01,  7.05336273e-01]),
         'cologne': ([-0.30000001, -0.80000001,  0.44277492],
-                    [0.        , 0.        , 0.        , 1.00000012])
+                    [0.        , 0.        , 0.        , 1.000000]),
+        'robot0': ([0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0])
     }
 
     env_config = {
@@ -253,7 +254,7 @@ def main(folder, iterations):
             print("Error in iteration: ", i)
             print(e)
             print('--------------------')
-        recorder.save()
+        # recorder.save()
         recorder.reset()
 
 if __name__ == "__main__":
