@@ -254,7 +254,7 @@ def main(folder, iterations):
             print("Error in iteration: ", i)
             print(e)
             print('--------------------')
-        # recorder.save()
+        recorder.save()
         recorder.reset()
 
 if __name__ == "__main__":
