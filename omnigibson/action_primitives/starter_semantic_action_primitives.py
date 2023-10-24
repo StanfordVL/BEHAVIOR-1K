@@ -43,6 +43,7 @@ from omnigibson.utils.control_utils import FKSolver
 
 from omni.usd.commands import CopyPrimCommand, CreatePrimCommand
 from omni.isaac.core.utils.prims import get_prim_at_path
+from omnigibson.utils.ui_utils import create_module_log
 from pxr import Gf
 
 from omnigibson.objects.usd_object import USDObject
@@ -88,11 +89,11 @@ LOW_PRECISION_ANGLE_THRESHOLD = 0.2
 TORSO_FIXED = False
 JOINT_POS_DIFF_THRESHOLD = 0.005
 
-logger = logging.getLogger(__name__)
+log = create_module_log(module_name=__name__)
 
 
 def indented_print(msg, *args, **kwargs):
-    logger.debug("  " * len(inspect.stack()) + str(msg), *args, **kwargs)
+    log.debug("  " * len(inspect.stack()) + str(msg), *args, **kwargs)
 
 class RobotCopy:
     """A data structure for storing information about a robot copy, used for collision checking in planning."""
@@ -222,11 +223,9 @@ class StarterSemanticActionPrimitiveSet(IntEnum):
 
 class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
     def __init__(self, task, scene, robot, add_context=False, enable_head_tracking=True, always_track_eef=False):
-        logger.warning(
+        log.warning(
             "The StarterSemanticActionPrimitive is a work-in-progress and is only provided as an example. "
-            "It currently only works with BehaviorRobot with its JointControllers set to absolute mode. "
-            "See provided behavior_robot_mp_behavior_task.yaml config file for an example. "
-            "See examples/action_primitives for runnable examples."
+            "It currently only works with Fetch and Tiago with their JointControllers set to delta mode."
         )
         super().__init__(task, scene, robot)
         self.controller_functions = {
@@ -350,6 +349,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         return robot_copy
 
     def get_action_space(self):
+        # TODO: Figure out how to implement what happens when the set of objects in scene changes.
         if ACTIVITY_RELEVANT_OBJECTS_ONLY:
             assert isinstance(self.env.task, BehaviorTask), "Activity relevant objects can only be used for BEHAVIOR tasks"
             self.addressable_objects = sorted(set(self.env.task.object_scope.values()), key=lambda obj: obj.name)
@@ -534,8 +534,11 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     print(f"go to target pose {i}")
                     yield from self._move_hand_direct_cartesian(target_pose, ignore_failure=False, stop_if_stuck=True)
 
-                # Moving to target pose often fails. Let's get the hand to apply the correct actions for its current pos
-                # This prevents the hand from jerking into its desired position when we do a release.
+                # Moving to target pose often fails. This might leave the robot's motors with torques that
+                # try to get to a far-away position thus applying large torques, but unable to move due to
+                # the sticky grasp joint. Thus if we release the joint, the robot might suddenly launch in an
+                # arbitrary direction. To avoid this, we command the hand to apply torques with its current
+                # position as its target. This prevents the hand from jerking into some other position when we do a release.
                 yield from self._move_hand_direct_cartesian(
                     self.robot.eef_links[self.arm].get_position_orientation(), 
                     ignore_failure=True,
