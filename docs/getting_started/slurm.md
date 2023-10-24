@@ -14,7 +14,8 @@ With enroot installed, you can follow the below steps to run OmniGibson on SLURM
 
 1. Download the dataset to a location that is accessible by cluster nodes. To do this, you can use
 the download_dataset.py script inside OmniGibson's scripts directory, and move it to the right spot
-later. **This step is already done for SVL and Viscam nodes**
+later. In the below example, /cvgl/ is a networked drive that is accessible by the cluster nodes.
+**For Stanford users, this step is already done for SVL and Viscam nodes**
 ```{.shell .annotate}
 OMNIGIBSON_NO_OMNIVERSE=1 python scripts/download_dataset.py
 mv omnigibson/data /cvgl/group/Gibson/og-data-0-2-1

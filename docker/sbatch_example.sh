@@ -65,7 +65,7 @@ enroot start \
     ${ENV_KWARGS} \
     ${MOUNT_KWARGS} \
     ${CONTAINER_NAME} \
-    source /isaac-sim/setup_conda_env.sh && pytest tests/test_object_states.py
+    micromamba run -n omnigibson /bin/bash --login -c "source /isaac-sim/setup_conda_env.sh && pytest tests/test_object_states.py"
 
 # Clean up the image if possible.
 enroot remove -f ${CONTAINER_NAME}

@@ -1,14 +1,14 @@
 """
 WARNING!
 The StarterSemanticActionPrimitive is a work-in-progress and is only provided as an example.
-It currently only works with BehaviorRobot with its JointControllers set to absolute mode.
-See provided behavior_robot_mp_behavior_task.yaml config file for an example. See examples/action_primitives for
+It currently only works with Fetch and Tiago with their JointControllers set to delta mode.
+See provided tiago_primitives.yaml config file for an example. See examples/action_primitives for
 runnable examples.
 """
 import inspect
 import logging
 import random
-from enum import IntEnum
+from aenum import IntEnum, auto
 from math import ceil
 import cv2
 from matplotlib import pyplot as plt
@@ -94,7 +94,8 @@ logger = logging.getLogger(__name__)
 def indented_print(msg, *args, **kwargs):
     logger.debug("  " * len(inspect.stack()) + str(msg), *args, **kwargs)
 
-class RobotCopy():
+class RobotCopy:
+    """A data structure for storing information about a robot copy, used for collision checking in planning."""
     def __init__(self):
         self.prims = {}
         self.meshes = {}
@@ -105,7 +106,10 @@ class RobotCopy():
             "simplified": ([5, 0, -5.0], [0, 0, 0, 1]),
         }
 
-class UndoableContext(object):
+class PlanningContext(object):
+    """
+    A context manager that sets up a robot copy for collision checking in planning.
+    """
     def __init__(self, robot, robot_copy, robot_copy_type="original"):
         self.robot = robot
         self.robot_copy = robot_copy
@@ -205,15 +209,16 @@ class UndoableContext(object):
             colliders += disabled_colliders
 
 class StarterSemanticActionPrimitiveSet(IntEnum):
-    GRASP = 0
-    PLACE_ON_TOP = 1
-    PLACE_INSIDE = 2
-    OPEN = 3
-    CLOSE = 4
-    NAVIGATE_TO = 5  # For mostly debugging purposes.
-    RELEASE = 6  # For reorienting grasp
-    TOGGLE_ON = 7
-    TOGGLE_OFF = 8
+    _init_ = 'value __doc__'
+    GRASP = auto(), "Grasp an object"
+    PLACE_ON_TOP = auto(), "Place the currently grasped object on top of another object"
+    PLACE_INSIDE = auto(), "Place the currently grasped object inside another object"
+    OPEN = auto(), "Open an object"
+    CLOSE = auto(), "Close an object"
+    NAVIGATE_TO = auto(), "Navigate to an object (mostly for debugging purposes - other primitives also navigate first)"
+    RELEASE = auto(), "Release an object, letting it fall to the ground. You can then grasp it again, as a way of reorienting your grasp of the object."
+    TOGGLE_ON = auto(), "Toggle an object on"
+    TOGGLE_OFF = auto(), "Toggle an object off"
 
 class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
     def __init__(self, task, scene, robot, add_context=False, enable_head_tracking=True, always_track_eef=False):
@@ -346,10 +351,10 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
     def get_action_space(self):
         if ACTIVITY_RELEVANT_OBJECTS_ONLY:
-            assert isinstance(self.task, BehaviorTask), "Activity relevant objects can only be used for BEHAVIOR tasks"
-            self.addressable_objects = sorted(set(self.task.object_scope.values()), key=lambda obj: obj.name)
+            assert isinstance(self.env.task, BehaviorTask), "Activity relevant objects can only be used for BEHAVIOR tasks"
+            self.addressable_objects = sorted(set(self.env.task.object_scope.values()), key=lambda obj: obj.name)
         else:
-            self.addressable_objects = sorted(set(self.scene.objects_by_name.values()), key=lambda obj: obj.name)
+            self.addressable_objects = sorted(set(self.env.scene.objects_by_name.values()), key=lambda obj: obj.name)
 
         # Filter out the robots.
         self.addressable_objects = [obj for obj in self.addressable_objects if not isinstance(obj, BaseRobot)]
@@ -838,8 +843,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             bool: Whether eef can reach the target pose
         """
         relative_target_pose = self._get_pose_in_robot_frame(target_pose)
-        joint_pos, _ = self._ik_solver_cartesian_to_joint_space(relative_target_pose)
-        return False if joint_pos is None else True
+        return self._target_in_reach_of_robot_relative(relative_target_pose)
     
     def _target_in_reach_of_robot_relative(self, relative_target_pose):
         """
@@ -923,7 +927,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Returns:
             np.array or None: Action array for one step for the robot to move arm or None if its at the joint positions
         """
-        with UndoableContext(self.robot, self.robot_copy, "original") as context:
+        with PlanningContext(self.robot, self.robot_copy, "original") as context:
             plan = plan_arm_motion(
                 robot=self.robot,
                 end_conf=joint_pos,
@@ -958,7 +962,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         eef_ori = T.quat2axisangle(eef_pose[1])
         end_conf = np.append(eef_pos, eef_ori)
 
-        with UndoableContext(self.robot, self.robot_copy, "original") as context:
+        with PlanningContext(self.robot, self.robot_copy, "original") as context:
             plan = plan_arm_motion_ik(
                 robot=self.robot,
                 end_conf=end_conf,
@@ -1506,7 +1510,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Returns:
             np.array or None: Action array for one step for the robot to navigate or None if it is done navigating
         """
-        with UndoableContext(self.robot, self.robot_copy, "simplified") as context:
+        with PlanningContext(self.robot, self.robot_copy, "simplified") as context:
             plan = plan_base_motion(
                 robot=self.robot,
                 end_conf=pose_2d,
@@ -1530,7 +1534,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
     def _draw_plan(self, plan):
         SEARCHED = []
-        trav_map = self.scene._trav_map
+        trav_map = self.env.scene._trav_map
         for q in plan:
             # The below code is useful for plotting the RRT tree.
             SEARCHED.append(np.flip(trav_map.world_to_map((q[0], q[1]))))
@@ -1673,10 +1677,10 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 - 3-array: (x,y,z) Position in the world frame
                 - 4-array: (x,y,z,w) Quaternion orientation in the world frame
         """
-        with UndoableContext(self.robot, self.robot_copy, "simplified") as context:
+        with PlanningContext(self.robot, self.robot_copy, "simplified") as context:
             for _ in range(MAX_ATTEMPTS_FOR_SAMPLING_POSE_NEAR_OBJECT):
                 if pose_on_obj is None:
-                    pos_on_obj = self._sample_position_on_aabb_face(obj)
+                    pos_on_obj = self._sample_position_on_aabb_side(obj)
                     pose_on_obj = [pos_on_obj, np.array([0, 0, 0, 1])]
 
                 distance = np.random.uniform(0.0, 5.0)
@@ -1686,8 +1690,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     [pose_on_obj[0][0] + distance * np.cos(yaw), pose_on_obj[0][1] + distance * np.sin(yaw), yaw + np.pi - avg_arm_workspace_range]
                 )
                 # Check room
-                obj_rooms = obj.in_rooms if obj.in_rooms else [self.scene._seg_map.get_room_instance_by_point(pose_on_obj[0][:2])]
-                if self.scene._seg_map.get_room_instance_by_point(pose_2d[:2]) not in obj_rooms:
+                obj_rooms = obj.in_rooms if obj.in_rooms else [self.env.scene._seg_map.get_room_instance_by_point(pose_on_obj[0][:2])]
+                if self.env.scene._seg_map.get_room_instance_by_point(pose_2d[:2]) not in obj_rooms:
                     indented_print("Candidate position is in the wrong room.")
                     continue
 
@@ -1702,9 +1706,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             )
 
     @staticmethod
-    def _sample_position_on_aabb_face(target_obj):
+    def _sample_position_on_aabb_side(target_obj):
         """
-        Returns a position on the axis-aligned bounding box (AABB) faces of the target object.
+        Returns a position on one of the axis-aligned bounding box (AABB) side faces of the target object.
 
         Args:
             target_obj (StatefulObject): Object to sample a position on
@@ -1738,7 +1742,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         """
         # TODO(MP): Bias the sampling near the agent.
         for _ in range(MAX_ATTEMPTS_FOR_SAMPLING_POSE_IN_ROOM):
-            _, pos = self.scene.get_random_point_by_room_instance(room)
+            _, pos = self.env.scene.get_random_point_by_room_instance(room)
             yaw = np.random.uniform(-np.pi, np.pi)
             pose = (pos[0], pos[1], yaw)
             if self._test_pose(pose):

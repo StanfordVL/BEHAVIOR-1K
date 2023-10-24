@@ -1,7 +1,7 @@
 import random
 import numpy as np
 import omnigibson as og
-from omnigibson.action_primitives.starter_semantic_action_primitives import UndoableContext
+from omnigibson.action_primitives.starter_semantic_action_primitives import PlanningContext
 from omnigibson.reward_functions.grasp_reward import GraspReward
 
 from omnigibson.tasks.task_base import BaseTask
@@ -62,7 +62,7 @@ class GraspTask(BaseTask):
             initial_joint_pos = np.array(robot.get_joint_positions()[joint_combined_idx])
             control_idx_in_joint_pos = np.where(np.in1d(joint_combined_idx, joint_control_idx))[0]
 
-            with UndoableContext(env._primitive_controller.robot, env._primitive_controller.robot_copy, "original") as context:
+            with PlanningContext(env._primitive_controller.robot, env._primitive_controller.robot_copy, "original") as context:
                 for _ in range(MAX_JOINT_RANDOMIZATION_ATTEMPTS):
                     joint_pos, joint_control_idx = self._get_random_joint_position(robot)
                     initial_joint_pos[control_idx_in_joint_pos] = joint_pos

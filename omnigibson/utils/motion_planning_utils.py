@@ -20,7 +20,7 @@ def plan_base_motion(
     Args:
         robot (omnigibson.object_states.Robot): Robot object to plan for
         end_conf (Iterable): [x, y, yaw] 2d pose to plan to
-        context (UndoableContext): Context to plan in that includes the robot copy
+        context (PlanningContext): Context to plan in that includes the robot copy
         planning_time (float): Time to plan for
     
     Returns:
@@ -204,7 +204,7 @@ def plan_arm_motion(
     Args:
         robot (BaseRobot): Robot object to plan for
         end_conf (Iterable): Final joint position to plan to
-        context (UndoableContext): Context to plan in that includes the robot copy
+        context (PlanningContext): Context to plan in that includes the robot copy
         planning_time (float): Time to plan for
     
     Returns:
@@ -305,7 +305,7 @@ def plan_arm_motion_ik(
     Args:
         robot (BaseRobot): Robot object to plan for
         end_conf (Iterable): Final end effector pose to plan to
-        context (UndoableContext): Context to plan in that includes the robot copy
+        context (PlanningContext): Context to plan in that includes the robot copy
         planning_time (float): Time to plan for
     
     Returns:
@@ -425,7 +425,7 @@ def set_base_and_detect_collision(context, pose):
     Moves the robot and detects robot collisions with the environment and itself
 
     Args:
-        context (UndoableContext): Context to plan in that includes the robot copy
+        context (PlanningContext): Context to plan in that includes the robot copy
         pose (Array): Pose in the world frame to check for collisions at
     
     Returns:
@@ -450,7 +450,7 @@ def set_arm_and_detect_collision(context, joint_pos):
     Sets joint positions of the robot and detects robot collisions with the environment and itself
 
     Args:
-        context (UndoableContext): Context to plan in that includes the robot copy
+        context (PlanningContext): Context to plan in that includes the robot copy
         joint_pos (Array): Joint positions to set the robot to
     
     Returns:
@@ -481,7 +481,7 @@ def detect_robot_collision(context):
     Detects robot collisions
 
     Args:
-        context (UndoableContext): Context to plan in that includes the robot copy
+        context (PlanningContext): Context to plan in that includes the robot copy
     
     Returns:
         bool: Whether the robot is in collision
