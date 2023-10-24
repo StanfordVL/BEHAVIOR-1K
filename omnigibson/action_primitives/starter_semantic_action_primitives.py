@@ -1887,7 +1887,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             np.array or None: Action array for one step for the robot to do nothing
         """
         initial_eef_pos = self.robot.get_eef_position()
-        for _ in range(5):
+        for _ in range(30):
             empty_action = self._empty_action(arm_pose_to_keep=initial_eef_pos)
             yield self.with_context(empty_action)
 

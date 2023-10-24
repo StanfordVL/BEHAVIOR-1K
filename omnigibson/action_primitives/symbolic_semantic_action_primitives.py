@@ -10,6 +10,7 @@ from aenum import IntEnum, auto
 
 import numpy as np
 from omnigibson.robots.robot_base import BaseRobot
+from omnigibson.systems.system_base import REGISTERED_SYSTEMS
 from omnigibson.transition_rules import REGISTERED_RULES, TransitionRuleAPI
 
 from omnigibson import object_states
@@ -277,7 +278,7 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
             )
 
         # Check if the target object has any particles in it
-        producing_systems = {ps for ps in self.scene.systems if obj.states[object_states.ParticleSource].check_conditions_for_system(ps)}
+        producing_systems = {ps for ps in REGISTERED_SYSTEMS.values() if obj.states[object_states.ParticleSource].check_conditions_for_system(ps)}
         if not producing_systems:
             raise ActionPrimitiveError(
                 ActionPrimitiveError.Reason.PRE_CONDITION_ERROR,
@@ -345,7 +346,7 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
             )
 
         # Check if the target object has any particles in it
-        contained_systems = {ps for ps in self.scene.systems if obj.states[object_states.Contains].get_value(ps.states)}
+        contained_systems = {ps for ps in REGISTERED_SYSTEMS.values() if obj.states[object_states.Contains].get_value(ps.states)}
         if not contained_systems:
             raise ActionPrimitiveError(
                 ActionPrimitiveError.Reason.PRE_CONDITION_ERROR,
@@ -413,7 +414,7 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
             )
 
         # Check if the target object has any particles on it
-        covering_systems = {ps for ps in self.scene.systems if obj.states[object_states.Covered].get_value(ps.states)}
+        covering_systems = {ps for ps in REGISTERED_SYSTEMS.values() if obj.states[object_states.Covered].get_value(ps.states)}
         if not covering_systems:
             raise ActionPrimitiveError(
                 ActionPrimitiveError.Reason.PRE_CONDITION_ERROR,
