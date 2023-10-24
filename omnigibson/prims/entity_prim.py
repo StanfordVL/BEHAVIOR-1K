@@ -59,6 +59,7 @@ class EntityPrim(XFormPrim):
         self._joints = None
         self._materials = None
         self._visual_only = None
+        self._articulation_view = None
 
         # This needs to be initialized to be used for _load() of PrimitiveObject
         self._prim_type = load_config["prim_type"] if load_config is not None and "prim_type" in load_config else PrimType.RIGID
@@ -93,6 +94,10 @@ class EntityPrim(XFormPrim):
 
         # Update joint information
         self.update_joints()
+
+        # Construct physics view
+        if self.articulated:
+            self._articulation_view = og.sim.physics_sim_view.create_articulation_view(self.articulation_root_path)
 
     def _load(self):
         # By default, this prim cannot be instantiated from scratch!
@@ -763,6 +768,14 @@ class EntityPrim(XFormPrim):
         """
         return efforts * self.max_joint_efforts if indices is None else efforts * self.max_joint_efforts[indices]
 
+    def _verify_articulation_view_is_valid(self):
+        """
+        Helper function to make sure that the internal physics view is valid -- if not, will automatically refresh the
+        internal pointer
+        """
+        if not self._articulation_view.check():
+            self._articulation_view = og.sim.physics_sim_view.create_articulation_view(self.articulation_root_path)
+
     def update_handles(self):
         """
         Updates all internal handles for this prim, in case they change since initialization
@@ -807,7 +820,8 @@ class EntityPrim(XFormPrim):
         assert self._handle is not None, "handles are not initialized yet!"
         assert self.n_joints > 0, "Tried to call method not intended for entity prim with no joints!"
 
-        joint_positions = self._dc.get_articulation_dof_states(self._handle, _dynamic_control.STATE_POS)["pos"]
+        self._verify_articulation_view_is_valid()
+        joint_positions = self._articulation_view.get_dof_positions().reshape(self.n_dof)
 
         # Possibly normalize values when returning
         return self._normalize_positions(positions=joint_positions) if normalized else joint_positions
@@ -826,7 +840,8 @@ class EntityPrim(XFormPrim):
         assert self._handle is not None, "handles are not initialized yet!"
         assert self.n_joints > 0, "Tried to call method not intended for entity prim with no joints!"
 
-        joint_velocities = self._dc.get_articulation_dof_states(self._handle, _dynamic_control.STATE_VEL)["vel"]
+        self._verify_articulation_view_is_valid()
+        joint_velocities = self._articulation_view.get_dof_velocities().reshape(self.n_dof)
 
         # Possibly normalize values when returning
         return self._normalize_velocities(velocities=joint_velocities) if normalized else joint_velocities
@@ -845,7 +860,8 @@ class EntityPrim(XFormPrim):
         assert self._handle is not None, "handles are not initialized yet!"
         assert self.n_joints > 0, "Tried to call method not intended for entity prim with no joints!"
 
-        joint_efforts = self._dc.get_articulation_dof_states(self._handle, _dynamic_control.STATE_EFFORT)["effort"]
+        self._verify_articulation_view_is_valid()
+        joint_efforts = self._articulation_view.get_dof_actuation_forces().reshape(self.n_dof)
 
         # Possibly normalize values when returning
         return self._normalize_efforts(efforts=joint_efforts) if normalized else joint_efforts
