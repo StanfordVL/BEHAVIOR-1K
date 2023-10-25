@@ -250,7 +250,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         self._always_track_eef = always_track_eef
         self._tracking_object = None
 
-        self.robot_copy = self._load_robot_copy(robot)
+        self.robot_copy = self._load_robot_copy()
 
     def _postprocess_action(self, action):
         """Postprocesses action by applying head tracking and adding context if necessary."""
@@ -275,19 +275,19 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         # print(context)
         return action, context
 
-    @staticmethod
-    def _load_robot_copy(robot):
+    def _load_robot_copy(self):
+        """Loads a copy of the robot that can be manipulated into arbitrary configurations for collision checking in planning."""
         robot_copy = RobotCopy()
 
         robots_to_copy = {
             "original": {
-                "robot": robot,
+                "robot": self.robot,
                 "copy_path": "/World/robot_copy"
             }
         }
-        if hasattr(robot, 'simplified_mesh_usd_path'):
+        if hasattr(self.robot, 'simplified_mesh_usd_path'):
             simplified_robot = { 
-                "robot": USDObject("simplified_copy", robot.simplified_mesh_usd_path),
+                "robot": USDObject("simplified_copy", self.robot.simplified_mesh_usd_path),
                 "copy_path": "/World/simplified_robot_copy"         
             }
             robots_to_copy['simplified'] = simplified_robot
@@ -1316,19 +1316,13 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         """
         action = np.zeros(self.robot.action_dim)
         for name, controller in self.robot._controllers.items():
-            
             joint_idx = controller.dof_idx
             action_idx = self.robot.controller_action_idx[name]
             if controller.control_type == ControlType.POSITION and len(joint_idx) == len(action_idx) and not controller.use_delta_commands:
                 action[action_idx] = self.robot.get_joint_positions()[joint_idx]
-            
-            # InverseKinematicsController case
             elif self.robot._controller_config[name]["name"] == "InverseKinematicsController":
                 # overwrite the goal orientation, since it is in absolute frame.
-                controller_config = self.robot._controller_config["arm_" + self.arm]
-                # assert controller_config["motor_type"] == "velocity", "Controller must be in velocity mode"
-                assert controller_config["mode"] == "pose_absolute_ori", "Controller must be in pose_delta_ori mode"
-                # current_pose = self._get_pose_in_robot_frame((self.robot.get_eef_position(), self.robot.get_eef_orientation()))
+                assert self.robot._controller_config["arm_" + self.arm]["mode"] == "pose_absolute_ori", "Controller must be in pose_delta_ori mode"
                 current_quat = self.robot.get_relative_eef_orientation()
                 current_ori = T.quat2axisangle(current_quat)
                 control_idx = self.robot.controller_action_idx["arm_" + self.arm]
