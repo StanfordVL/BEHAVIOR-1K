@@ -332,7 +332,7 @@ cfg = {
 
 env_config = {
     "cfg": cfg,
-    "reset_positions": [],
+    "reset_positions": {},
     "action_space_controllers": ["base", "camera", "arm_left", "gripper_left"]
 }
 
@@ -344,7 +344,7 @@ register_env("my_env", lambda config: env)
 # created in the first place:
 algo = Algorithm.from_checkpoint("./checkpoints")
 obs = env.reset()
-del obs['robot0']['robot0:eyes_Camera_sensor_rgb']
+# del obs['robot0']['robot0:eyes_Camera_sensor_rgb']
 
 for i in range(100):
     # from IPython import embed; embed()
@@ -352,5 +352,6 @@ for i in range(100):
     # from IPython import embed; embed()
     action = algo.compute_single_action(obs['robot0'])
     action = env.transform_policy_action(action)
+    from IPython import embed; embed()
     obs, reward, done, truncated, info = env.step(action)
-    del obs['robot0']['robot0:eyes_Camera_sensor_rgb']
+    # del obs['robot0']['robot0:eyes_Camera_sensor_rgb']

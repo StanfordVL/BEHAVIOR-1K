@@ -2,6 +2,7 @@ import logging
 import math
 import gymnasium as gym
 import h5py
+import argparse
 
 import numpy as np
 import random
@@ -9,6 +10,7 @@ from typing import List, Optional, TYPE_CHECKING, Union
 from urllib.parse import urlparse
 
 from PIL import Image
+from tqdm import tqdm
 
 from omnigibson.envs.rl_env import RLEnv
 
@@ -132,6 +134,7 @@ class CustomReader(InputReader):
                 'proprio': proprio,   
             }
 
+            # from IPython import embed; embed()
 
             self.batch_builder.add_values(
                 t=t,
@@ -223,184 +226,200 @@ class CustomReader(InputReader):
         self.cur_file_path = path
         return h5py.File(path + "/data.h5", 'r')
 
-DIST_COEFF = 0.1
-GRASP_REWARD = 0.3
 
-cfg = {
-        "scene": {
-            "type": "InteractiveTraversableScene",
-            "scene_model": "Rs_int",
-            "load_object_categories": ["floors", "coffee_table"],
-        },
-        "robots": [
-            {
-                "type": "Tiago",
-                "obs_modalities": ["rgb", "depth_linear", "seg_instance", "seg_semantic", "proprio"],
-                "proprio_obs": ["robot_pose", "joint_qpos", "joint_qvel", "eef_left_pos", "eef_left_quat", "grasp_left"],
-                "scale": 1.0,
-                "self_collisions": True,
-                "action_normalize": False,
-                "action_type": "continuous",
-                "grasping_mode": "sticky",
-                "rigid_trunk": False,
-                "default_arm_pose": "diagonal30",
-                "default_trunk_offset": 0.365,
-                "sensor_config": {
-                    "VisionSensor": {
-                        "modalities": ["rgb", "depth_linear", "seg_instance", "seg_semantic"],
-                        "sensor_kwargs": {
-                            "image_width": 224,
-                            "image_height": 224
+def main(dirs):
+    DIST_COEFF = 0.1
+    GRASP_REWARD = 0.3
+
+    cfg = {
+            "scene": {
+                "type": "InteractiveTraversableScene",
+                "scene_model": "Rs_int",
+                "load_object_categories": ["floors", "coffee_table"],
+            },
+            "robots": [
+                {
+                    "type": "Tiago",
+                    "obs_modalities": ["rgb", "depth_linear", "seg_instance", "seg_semantic", "proprio"],
+                    "proprio_obs": ["robot_pose", "joint_qpos", "joint_qvel", "eef_left_pos", "eef_left_quat", "grasp_left"],
+                    "scale": 1.0,
+                    "self_collisions": True,
+                    "action_normalize": False,
+                    "action_type": "continuous",
+                    "grasping_mode": "sticky",
+                    "rigid_trunk": False,
+                    "default_arm_pose": "diagonal30",
+                    "default_trunk_offset": 0.365,
+                    "sensor_config": {
+                        "VisionSensor": {
+                            "modalities": ["rgb", "depth_linear", "seg_instance", "seg_semantic"],
+                            "sensor_kwargs": {
+                                "image_width": 224,
+                                "image_height": 224
+                            }
+                        }
+                    },
+                    "controller_config": {
+                        "base": {
+                            "name": "JointController",
+                            "motor_type": "velocity"
+                        },
+                        "arm_left": {
+                            "name": "InverseKinematicsController",
+                            "motor_type": "velocity",
+                            "command_input_limits": None,
+                            "command_output_limits": None,
+                            "mode": "pose_absolute_ori", 
+                            "kv": 3.0
+                        },
+                        # "arm_left": {
+                        #     "name": "JointController",
+                        #     "motor_type": "position",
+                        #     "command_input_limits": None,
+                        #     "command_output_limits": None, 
+                        #     "use_delta_commands": False
+                        # },
+                        "arm_right": {
+                            "name": "JointController",
+                            "motor_type": "position",
+                            "command_input_limits": None,
+                            "command_output_limits": None, 
+                            "use_delta_commands": False
+                        },
+                        "gripper_left": {
+                            "name": "JointController",
+                            "motor_type": "position",
+                            "command_input_limits": [-1, 1],
+                            "command_output_limits": None,
+                            "use_delta_commands": True,
+                            "use_single_command": True
+                        },
+                        "gripper_right": {
+                            "name": "JointController",
+                            "motor_type": "position",
+                            "command_input_limits": [-1, 1],
+                            "command_output_limits": None,
+                            "use_delta_commands": True,
+                            "use_single_command": True
+                        },
+                        "camera": {
+                            "name": "JointController",
+                            "motor_type": "position",
+                            "command_input_limits": None,
+                            "command_output_limits": None,
+                            "use_delta_commands": False
                         }
                     }
-                },
-                "controller_config": {
-                    "base": {
-                        "name": "JointController",
-                        "motor_type": "velocity"
-                    },
-                    "arm_left": {
-                        "name": "InverseKinematicsController",
-                        "motor_type": "velocity",
-                        "command_input_limits": None,
-                        "command_output_limits": None,
-                        "mode": "pose_absolute_ori", 
-                        "kv": 3.0
-                    },
-                    # "arm_left": {
-                    #     "name": "JointController",
-                    #     "motor_type": "position",
-                    #     "command_input_limits": None,
-                    #     "command_output_limits": None, 
-                    #     "use_delta_commands": False
-                    # },
-                    "arm_right": {
-                        "name": "JointController",
-                        "motor_type": "position",
-                        "command_input_limits": None,
-                        "command_output_limits": None, 
-                        "use_delta_commands": False
-                    },
-                    "gripper_left": {
-                        "name": "JointController",
-                        "motor_type": "position",
-                        "command_input_limits": [-1, 1],
-                        "command_output_limits": None,
-                        "use_delta_commands": True,
-                        "use_single_command": True
-                    },
-                    "gripper_right": {
-                        "name": "JointController",
-                        "motor_type": "position",
-                        "command_input_limits": [-1, 1],
-                        "command_output_limits": None,
-                        "use_delta_commands": True,
-                        "use_single_command": True
-                    },
-                    "camera": {
-                        "name": "JointController",
-                        "motor_type": "position",
-                        "command_input_limits": None,
-                        "command_output_limits": None,
-                        "use_delta_commands": False
-                    }
                 }
-            }
-        ],
-        "task": {
-            "type": "GraspTask",
-            "obj_name": "cologne",
-            "termination_config": {
-                "max_steps": 100000,
+            ],
+            "task": {
+                "type": "GraspTask",
+                "obj_name": "cologne",
+                "termination_config": {
+                    "max_steps": 100000,
+                },
+                "reward_config": {
+                    "r_dist_coeff": DIST_COEFF,
+                    "r_grasp": GRASP_REWARD
+                }
             },
-            "reward_config": {
-                "r_dist_coeff": DIST_COEFF,
-                "r_grasp": GRASP_REWARD
-            }
-        },
-        "objects": [
-            {
-                "type": "DatasetObject",
-                "name": "cologne",
-                "category": "bottle_of_cologne",
-                "model": "lyipur",
-                "position": [-0.3, -0.8, 0.5],
-            },
-        ]
+            "objects": [
+                {
+                    "type": "DatasetObject",
+                    "name": "cologne",
+                    "category": "bottle_of_cologne",
+                    "model": "lyipur",
+                    "position": [-0.3, -0.8, 0.5],
+                },
+            ]
+        }
+
+    env_config = {
+        "cfg": cfg,
+        "reset_positions": [],
+        "action_space_controllers": ["base", "camera", "arm_left", "gripper_left"]
     }
 
-env_config = {
-    "cfg": cfg,
-    "reset_positions": [],
-    "action_space_controllers": ["base", "camera", "arm_left", "gripper_left"]
-}
+    action_space = gym.spaces.Box(low=np.array([ -1.,  -1. , -1., -np.inf, -np.inf, -np.inf ,-np.inf ,-np.inf ,-np.inf ,-np.inf ,-np.inf , -1.]), high=np.array([ 1. , 1.,  1. ,np.inf , np.inf, np.inf , np.inf , np.inf , np.inf , np.inf, np.inf , 1.]), shape=(12,), dtype=np.float32)
+    observation_space = gym.spaces.Dict({
+        'proprio': gym.spaces.Box(-np.inf, np.inf, (65,), np.float64), 
+        'robot0:eyes_Camera_sensor_depth_linear': gym.spaces.Box(0.0, np.inf, (224, 224), np.float32), 
+        # 'robot0:eyes_Camera_sensor_rgb': gym.spaces.Box(0, 255, (224, 224, 3), np.uint8), 
+        'robot0:eyes_Camera_sensor_seg_instance': gym.spaces.Box(0, 1024, (224, 224), np.uint32), 
+        'robot0:eyes_Camera_sensor_seg_semantic': gym.spaces.Box(0, 4096, (224, 224), np.uint32)
+    })
 
-action_space = gym.spaces.Box(low=np.array([ -1.,  -1. , -1., -np.inf, -np.inf, -np.inf ,-np.inf ,-np.inf ,-np.inf ,-np.inf ,-np.inf , -1.]), high=np.array([ 1. , 1.,  1. ,np.inf , np.inf, np.inf , np.inf , np.inf , np.inf , np.inf, np.inf , 1.]), shape=(12,), dtype=np.float32)
-observation_space = gym.spaces.Dict({
-    'proprio': gym.spaces.Box(-np.inf, np.inf, (65,), np.float64), 
-    'robot0:eyes_Camera_sensor_depth_linear': gym.spaces.Box(0.0, np.inf, (224, 224), np.float32), 
-    # 'robot0:eyes_Camera_sensor_rgb': gym.spaces.Box(0, 255, (224, 224, 3), np.uint8), 
-    'robot0:eyes_Camera_sensor_seg_instance': gym.spaces.Box(0, 1024, (224, 224), np.uint32), 
-    'robot0:eyes_Camera_sensor_seg_semantic': gym.spaces.Box(0, 4096, (224, 224), np.uint32)
-})
-
-register_env("my_env", lambda config: RLEnv(config))
-config = (
-    SACConfig()
-    .environment(
-        env="my_env", 
-        env_config=env_config,
-        action_space=action_space,
-        observation_space=observation_space,
-        disable_env_checking=True
-    )
-    # .environment("CartPole-v1")
-    .framework("torch")
-    .offline_data(
-        # input_ = lambda ioctx: ShuffledInput(
-        #     JsonReader("~/rl/cartpole-out", ioctx)
-        # )
-        input_ = lambda ioctx: ShuffledInput(
-            CustomReader(["./rollouts/7b58a49b-493d-4aa4-a228-d8013e8a7d5e"], ioctx)
+    register_env("my_env", lambda config: RLEnv(config))
+    config = (
+        SACConfig()
+        .environment(
+            env="my_env", 
+            env_config=env_config,
+            action_space=action_space,
+            observation_space=observation_space,
+            disable_env_checking=True
         )
+        # .environment("CartPole-v1")
+        .framework("torch")
+        .offline_data(
+            # input_ = lambda ioctx: ShuffledInput(
+            #     JsonReader("~/rl/cartpole-out", ioctx)
+            # )
+            input_ = lambda ioctx: ShuffledInput(
+                CustomReader(dirs, ioctx)
+            )
+        )
+        .training(
+            replay_buffer_config={
+                "capacity": 1000
+            }
+        )
+        # .evaluation(
+        #     evaluation_interval=1,
+        #     evaluation_duration=10,
+        #     evaluation_num_workers=1,
+        #     evaluation_duration_unit="episodes",
+        #     evaluation_config={"input": "/tmp/cartpole-eval"},
+        #     off_policy_estimation_methods={
+        #         "is": {"type": ImportanceSampling},
+        #         "wis": {"type": WeightedImportanceSampling},
+        #         "dm_fqe": {
+        #             "type": DirectMethod,
+        #             "q_model_config": {"type": FQETorchModel, "polyak_coef": 0.05},
+        #         },
+        #         "dr_fqe": {
+        #             "type": DoublyRobust,
+        #             "q_model_config": {"type": FQETorchModel, "polyak_coef": 0.05},
+        #         },
+        #     },
+        # )
     )
-    .training(
-        replay_buffer_config={
-            "capacity": 1000
-        }
-    )
-#     .evaluation(
-#         evaluation_interval=1,
-#         evaluation_duration=10,
-#         evaluation_num_workers=1,
-#         evaluation_duration_unit="episodes",
-#         evaluation_config={"input": "/tmp/cartpole-eval"},
-#         off_policy_estimation_methods={
-#             "is": {"type": ImportanceSampling},
-#             "wis": {"type": WeightedImportanceSampling},
-#             "dm_fqe": {
-#                 "type": DirectMethod,
-#                 "q_model_config": {"type": FQETorchModel, "polyak_coef": 0.05},
-#             },
-#             "dr_fqe": {
-#                 "type": DoublyRobust,
-#                 "q_model_config": {"type": FQETorchModel, "polyak_coef": 0.05},
-#             },
-#         },
-#     )
-)
 
-algo = config.build()
-# Discrete(2)
-# Box([-4.8000002e+00 -3.4028235e+38 -4.1887903e-01 -3.4028235e+38], [4.8000002e+00 3.4028235e+38 4.1887903e-01 3.4028235e+38], (4,), float32)
+    algo = config.build()
+    # Discrete(2)
+    # Box([-4.8000002e+00 -3.4028235e+38 -4.1887903e-01 -3.4028235e+38], [4.8000002e+00 3.4028235e+38 4.1887903e-01 3.4028235e+38], (4,), float32)
 
-# from IPython import embed; embed()
-for _ in range(3):
-    result = algo.train()
-    print(pretty_print(result))
-save_result = algo.save("./checkpoints")
-path_to_checkpoint = save_result.checkpoint.path
-print(
-    "An Algorithm checkpoint has been created inside directory: "
-    f"'{path_to_checkpoint}'."
-)
+    for i in tqdm(range(1000)):
+        result = algo.train()
+        if i % 100 == 0:
+            print(pretty_print(result))
+            print('----------------------------------')
+            algo.save("./checkpoints")
+            # path_to_checkpoint = save_result.checkpoint.path
+
+
+# print(
+#     "An Algorithm checkpoint has been created inside directory: "
+#     f"'{path_to_checkpoint}'."
+# )
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Train a policy")
+    parser.add_argument('--dirs', action='store', type=str, nargs="+")
+    args = parser.parse_args()
+    dirs = [f'./rollouts/{f}' for f in args.dirs]
+    print(dirs)
+    main(dirs)
+    
+
+
