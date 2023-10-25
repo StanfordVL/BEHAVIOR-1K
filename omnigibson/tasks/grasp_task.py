@@ -53,23 +53,55 @@ class GraspTask(BaseTask):
         return rewards
     
     def _reset_agent(self, env):
-        # from IPython import embed; embed()
         if hasattr(env, '_primitive_controller'):
-            robot = env.robots[0]
-            # Randomize the robots joint positions
-            joint_control_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
-            joint_combined_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx["combined"]])
-            initial_joint_pos = np.array(robot.get_joint_positions()[joint_combined_idx])
-            control_idx_in_joint_pos = np.where(np.in1d(joint_combined_idx, joint_control_idx))[0]
+        #     robot = env.robots[0]
+        #     # Randomize the robots joint positions
+        #     joint_control_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
+        #     joint_combined_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx["combined"]])
+        #     initial_joint_pos = np.array(robot.get_joint_positions()[joint_combined_idx])
+        #     control_idx_in_joint_pos = np.where(np.in1d(joint_combined_idx, joint_control_idx))[0]
 
-            with UndoableContext(env._primitive_controller.robot, env._primitive_controller.robot_copy, "original") as context:
-                for _ in range(MAX_JOINT_RANDOMIZATION_ATTEMPTS):
-                    joint_pos, joint_control_idx = self._get_random_joint_position(robot)
-                    initial_joint_pos[control_idx_in_joint_pos] = joint_pos
-                    if not set_arm_and_detect_collision(context, initial_joint_pos):
-                        robot.set_joint_positions(joint_pos, joint_control_idx)
-                        og.sim.step()
-                        break
+        #     with UndoableContext(env._primitive_controller.robot, env._primitive_controller.robot_copy, "original") as context:
+        #         for _ in range(MAX_JOINT_RANDOMIZATION_ATTEMPTS):
+        #             joint_pos, joint_control_idx = self._get_random_joint_position(robot)
+        #             initial_joint_pos[control_idx_in_joint_pos] = joint_pos
+        #             if not set_arm_and_detect_collision(context, initial_joint_pos):
+        #                 robot.set_joint_positions(joint_pos, joint_control_idx)
+        #                 og.sim.step()
+        #                 break
+
+            reset_pose_tiago = np.array([
+                -1.78029833e-04,  
+                3.20231302e-05, 
+                -1.85759447e-07,
+                0.0, 
+                -0.2,
+                0.0,  
+                0.1, 
+                -6.10000000e-01,
+                -1.10000000e+00,  
+                0.00000000e+00, 
+                -1.10000000e+00,  
+                1.47000000e+00,
+                0.00000000e+00,  
+                8.70000000e-01,  
+                2.71000000e+00,  
+                1.50000000e+00,
+                1.71000000e+00, 
+                -1.50000000e+00, 
+                -1.57000000e+00,  
+                4.50000000e-01,
+                1.39000000e+00,  
+                0.00000000e+00,  
+                0.00000000e+00,  
+                4.50000000e-02,
+                4.50000000e-02,  
+                4.50000000e-02,  
+                4.50000000e-02
+            ])
+            robot = env.robots[0]
+            robot.set_joint_positions(reset_pose_tiago)
+            og.sim.step()
 
             # Randomize the robot's 2d pose
             obj = env.scene.object_registry("name", self.obj_name)
