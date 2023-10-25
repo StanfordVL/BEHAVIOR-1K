@@ -75,7 +75,6 @@ JOINT_CHECKING_RESOLUTION = np.pi / 18
 
 GRASP_APPROACH_DISTANCE = 0.2
 OPEN_GRASP_APPROACH_DISTANCE = 0.4
-# HAND_DISTANCE_THRESHOLD = 0.9 * behavior_robot.HAND_DISTANCE_THRESHOLD
 HAND_DISTANCE_THRESHOLD = 0.9
 
 ACTIVITY_RELEVANT_OBJECTS_ONLY = False
@@ -222,12 +221,15 @@ class StarterSemanticActionPrimitiveSet(IntEnum):
     TOGGLE_OFF = auto(), "Toggle an object off"
 
 class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
-    def __init__(self, task, scene, robot, add_context=False, enable_head_tracking=True, always_track_eef=False):
+    def __init__(self, env, add_context=False, enable_head_tracking=True, always_track_eef=False):
+        """
+        
+        """
         log.warning(
             "The StarterSemanticActionPrimitive is a work-in-progress and is only provided as an example. "
             "It currently only works with Fetch and Tiago with their JointControllers set to delta mode."
         )
-        super().__init__(task, scene, robot)
+        super().__init__(env)
         self.controller_functions = {
             StarterSemanticActionPrimitiveSet.GRASP: self._grasp,
             StarterSemanticActionPrimitiveSet.PLACE_ON_TOP: self._place_on_top,
@@ -244,17 +246,16 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         self.robot_base_mass = self.robot._links["base_link"].mass
         self.add_context = add_context
 
+        self._enable_head_tracking = enable_head_tracking
         self._always_track_eef = always_track_eef
-
-        self.enable_head_tracking = enable_head_tracking
-        self._tracking_object_pose = None
-        self._track_eef = False
-
-        self.skill_functions = ["_grasp", "_place_on_top", "_place_or_top", "_open_or_close"]
+        self._tracking_object = None
 
         self.robot_copy = self._load_robot_copy(robot)
 
-    def with_context(self, action):
+    def _postprocess_action(self, action):
+        """Postprocesses action by applying head tracking and adding context if necessary."""
+        action = self._overwrite_head_action(action)
+
         if not self.add_context:
             return action
         
@@ -264,7 +265,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         for frame_info in stack[1:]:
             function_name = frame_info.function
-            if function_name in self.skill_functions:
+            # TODO: Make this stop at apply_ref
+            if function_name in ["_grasp", "_place_on_top", "_place_or_top", "_open_or_close"]:
                 break
             if "nav" in function_name:
                 action_type = "nav"
@@ -389,14 +391,13 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         action = StarterSemanticActionPrimitiveSet(action_idx)
         return self.apply_ref(action, target_obj)
     
-    def apply_ref(self, prim, *args, camera_track_object=False, attempts=3):
+    def apply_ref(self, prim, *args, attempts=3):
         """
         Yields action for robot to execute the primitive with the given arguments.
 
         Args:
             prim (StarterSemanticActionPrimitiveSet): Primitive to execute
             args: Arguments for the primitive
-            camera_track_object (bool): Whether to track object with camera while executing the primitive
             attempts (int): Number of attempts to make before raising an error
         
         Yields:
@@ -413,7 +414,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             # Attempt
             success = False
             try:
-                self._tracking_object = args[0] if camera_track_object and args else None
                 yield from ctrl(*args)
                 success = True
             except ActionPrimitiveError as e:
@@ -451,12 +451,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         yield from self._open_or_close(obj, False)
 
     def _open_or_close(self, obj, should_open):
-        relevant_joint = None
+        # Update the tracking to track the eef.
+        self._tracking_object = self.robot
 
-        # Reset object to track
-        self._tracking_object_pose = None
-        self._track_eef = False
-        
         if self._get_obj_in_hand():
             raise ActionPrimitiveError(
                 ActionPrimitiveError.Reason.PRE_CONDITION_ERROR,
@@ -467,24 +464,21 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         # Open the hand first
         yield from self._execute_release()
 
-        # Let the head track the eef
-        self._track_eef = True
-
         for _ in range(MAX_ATTEMPTS_FOR_OPEN_CLOSE):
             try:
+                # TODO: This needs to be fixed. Many assumptions (None relevant joint, 3 waypoints, etc.)
                 if should_open:
-                    grasp_data = get_grasp_position_for_open(self.robot, obj, should_open, relevant_joint)
+                    grasp_data = get_grasp_position_for_open(self.robot, obj, should_open, None)
                 else:
-                    grasp_data = get_grasp_position_for_open(self.robot, obj, should_open, relevant_joint, num_waypoints=3)
+                    grasp_data = get_grasp_position_for_open(self.robot, obj, should_open, None, num_waypoints=3)
                 
                 if grasp_data is None:
-                    # # We were trying to do something but didn't have the data.
-                    # raise ActionPrimitiveError(
-                    #     ActionPrimitiveError.Reason.SAMPLING_ERROR,
-                    #     "Could not sample grasp position for target object",
-                    #     {"target object": obj.name},
-                    # )
-                    return
+                    # We were trying to do something but didn't have the data.
+                    raise ActionPrimitiveError(
+                        ActionPrimitiveError.Reason.SAMPLING_ERROR,
+                        "Could not sample grasp position for target object",
+                        {"target object": obj.name},
+                    )
 
                 grasp_pose, target_poses, object_direction, relevant_joint, grasp_required, pos_change = grasp_data
                 if abs(pos_change) < 0.1:
@@ -494,16 +488,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 # Prepare data for the approach later.
                 approach_pos = grasp_pose[0] + object_direction * OPEN_GRASP_APPROACH_DISTANCE
                 approach_pose = (approach_pos, grasp_pose[1])
-
-                # self.markers[0].set_position_orientation(*grasp_pose)
-                # self.markers[1].set_position_orientation(*approach_pose)
-                # self.markers[2].set_position_orientation(*target_poses[0])
-                # self.markers[3].set_position_orientation(*target_poses[1])
-                # self.markers[4].set_position_orientation(*target_poses[2])
-                # self.markers[5].set_position_orientation(*target_poses[3])
-                # self.markers[4].set_position_orientation(*target_poses[2])
-                # og.sim.step()
-                # from IPython import embed; embed()
 
                 # If the grasp pose is too far, navigate
                 yield from self._navigate_if_needed(obj, pose_on_obj=grasp_pose)
@@ -527,7 +511,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             
                 # Step once to update
                 empty_action = self._empty_action()
-                yield self.with_context(empty_action)
+                yield self._postprocess_action(empty_action)
 
                 for i, target_pose in enumerate(target_poses):
                     print(f"go to target pose {i}")
@@ -562,11 +546,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 "Despite executing the planned trajectory, the object did not open or close as expected. Maybe try again",
                 {"target object": obj.name, "is it currently open": obj.states[object_states.Open].get_value()},
             )
-        
-        # Reset object to track
-        self._tracking_object_pose = None
-        self._track_eef = False
-
 
     def _move_base_backward(self, steps=5, speed=0.2):
         """
@@ -584,7 +563,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             action = self._empty_action(arm_pose_to_keep=initial_eef_pos)
             action[self.robot.controller_action_idx["gripper_{}".format(self.arm)]] = 1.0
             action[self.robot.base_control_idx[0]] = -speed
-            yield self.with_context(action)
+            yield self._postprocess_action(action)
 
     def _move_hand_backward(self, steps=5, speed=0.2):
         """
@@ -603,7 +582,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             action = self._empty_action(arm_pose_to_keep=initial_eef_pos)
             action[self.robot.controller_action_idx["gripper_{}".format(self.arm)]] = 1.0
             action[self.robot.controller_action_idx["arm_{}".format(self.arm)][0]] = -speed
-            yield self.with_context(action)
+            yield self._postprocess_action(action)
         print("moving hand backward done")
 
     def _move_hand_upward(self, steps=5, speed=0.1):
@@ -623,7 +602,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             action = self._empty_action(arm_pose_to_keep=initial_eef_pos)
             action[self.robot.controller_action_idx["gripper_{}".format(self.arm)]] = 1.0
             action[self.robot.controller_action_idx["arm_{}".format(self.arm)][2]] = speed
-            yield self.with_context(action)
+            yield self._postprocess_action(action)
         print("moving hand backward done")
 
     def _grasp(self, obj):
@@ -636,9 +615,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Returns:
             np.array or None: Action array for one step for the robot to grasp or None if grasp completed
         """
-        # Reset object to track
-        self._tracking_object_pose = None
-        self._track_eef = False
+        # Update the tracking to track the object.
+        self._tracking_object = obj
 
         # Don't do anything if the object is already grasped.
         obj_in_hand = self._get_obj_in_hand()
@@ -652,50 +630,41 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     {"target object": obj.name, "object currently in hand": obj_in_hand.name},
                 )
             
-        if self._get_obj_in_hand() != obj:
-            # Open the hand first
-            yield from self._execute_release()
+        # Open the hand first
+        yield from self._execute_release()
 
-            # Allow grasping from suboptimal extents if we've tried enough times.
-            grasp_poses = get_grasp_poses_for_object_sticky(obj)
-            grasp_pose, object_direction = random.choice(grasp_poses)
+        # Allow grasping from suboptimal extents if we've tried enough times.
+        grasp_poses = get_grasp_poses_for_object_sticky(obj)
+        grasp_pose, object_direction = random.choice(grasp_poses)
 
-            # Prepare data for the approach later.
-            approach_pos = grasp_pose[0] + object_direction * GRASP_APPROACH_DISTANCE
-            approach_pose = (approach_pos, grasp_pose[1])
-            
-            # Set grasp object as object to track with camera
-            if self.enable_head_tracking:
-                self._tracking_object_pose = obj.get_position_orientation()
+        # Prepare data for the approach later.
+        approach_pos = grasp_pose[0] + object_direction * GRASP_APPROACH_DISTANCE
+        approach_pose = (approach_pos, grasp_pose[1])
+        
+        # If the grasp pose is too far, navigate.
+        yield from self._navigate_if_needed(obj, pose_on_obj=grasp_pose)
+        yield from self._move_hand(grasp_pose)
 
-            # If the grasp pose is too far, navigate.
-            yield from self._navigate_if_needed(obj, pose_on_obj=grasp_pose)
-            yield from self._move_hand(grasp_pose)
+        # We can pre-grasp in sticky grasping mode.
+        yield from self._execute_grasp()
 
-            # We can pre-grasp in sticky grasping mode.
-            yield from self._execute_grasp()
+        # Since the grasp pose is slightly off the object, we want to move towards the object, around 5cm.
+        # It's okay if we can't go all the way because we run into the object.
+        indented_print("Performing grasp approach")
+        yield from self._move_hand_direct_cartesian(approach_pose, stop_on_contact=True)
 
-            # Since the grasp pose is slightly off the object, we want to move towards the object, around 5cm.
-            # It's okay if we can't go all the way because we run into the object.
-            indented_print("Performing grasp approach")
-            yield from self._move_hand_direct_cartesian(approach_pose, stop_on_contact=True)
+        # Step once to update
+        empty_action = self._empty_action()
+        yield self._postprocess_action(empty_action)
 
-            # Step once to update
-            empty_action = self._empty_action()
-            yield self.with_context(empty_action)
-
-            if self._get_obj_in_hand() is None:
-                raise ActionPrimitiveError(
-                    ActionPrimitiveError.Reason.POST_CONDITION_ERROR,
-                    "Grasp completed, but no object detected in hand after executing grasp",
-                    {"target object": obj.name},
-                )
-            
-            # Reset object to track
-            self._tracking_object_pose = None
-            self._track_eef = False
-
-            yield from self._reset_hand()
+        if self._get_obj_in_hand() is None:
+            raise ActionPrimitiveError(
+                ActionPrimitiveError.Reason.POST_CONDITION_ERROR,
+                "Grasp completed, but no object detected in hand after executing grasp",
+                {"target object": obj.name},
+            )
+        
+        yield from self._reset_hand()
 
         if self._get_obj_in_hand() != obj:
             raise ActionPrimitiveError(
@@ -766,10 +735,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Returns:
             np.array or None: Action array for one step for the robot to place or None if place completed
         """
-        # Reset object to track
-        self._tracking_object_pose = None
-        self._track_eef = False
-        self._tracking_object = None
+        # Update the tracking to track the object.
+        self._tracking_object = obj
 
         obj_in_hand = self._get_obj_in_hand()
         if obj_in_hand is None:
@@ -780,17 +747,10 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         # Sample location to place object
         obj_pose = self._sample_pose_with_object_and_predicate(predicate, obj_in_hand, obj)
         hand_pose = self._get_hand_pose_for_object_pose(obj_pose)
-
-        # Set object to track to the target object to place on
-        if self.enable_head_tracking:
-            # self._tracking_object_pose = obj.get_position_orientation()
-            # self._tracking_object
-            self._tracking_eef = True
         
         yield from self._navigate_if_needed(obj, pose_on_obj=hand_pose)
         yield from self._move_hand(hand_pose)
         yield from self._execute_release()
-        # yield from self._settle_robot()
 
         if self._get_obj_in_hand() is not None:
             raise ActionPrimitiveError(
@@ -805,13 +765,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 "Failed to place object at the desired place (probably dropped). The object was still released, so you need to grasp it again to continue",
                 {"dropped object": obj_in_hand.name, "target object": obj.name}
             )
-        
-        # Reset object to track
-        self._tracking_object_pose = None
-        self._track_eef = False
 
         yield from self._move_hand_upward()
-        # yield from self._reset_hand()
 
     def _convert_cartesian_to_joint_space(self, target_pose):
         """
@@ -1061,10 +1016,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             
             if use_delta:
                 action[self.robot.controller_action_idx[controller_name]] = self._compute_delta_command(controller_name, diff_joint_pos)
-            action = self._overwrite_head_action(action, self._tracking_object_pose)
 
             prev_eef_pos = self.robot.get_eef_position(self.arm)
-            yield self.with_context(action)
+            yield self._postprocess_action(action)
 
         if not ignore_failure:
             raise ActionPrimitiveError(
@@ -1121,8 +1075,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             prev_orn = current_orn
 
             action[control_idx] = np.concatenate([delta_pos, target_orn_axisangle])
-            action = self._overwrite_head_action(action, self._tracking_object_pose)
-            yield self.with_context(action)
+            yield self._postprocess_action(action)
 
         if not ignore_failure:
             raise ActionPrimitiveError(
@@ -1246,10 +1199,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         initial_eef_pos = self.robot.get_eef_position()
         for _ in range(MAX_STEPS_FOR_GRASP_OR_RELEASE):
             action = self._empty_action(arm_pose_to_keep=initial_eef_pos)
-            action = self._overwrite_head_action(action, self._tracking_object_pose) 
             controller_name = "gripper_{}".format(self.arm)
             action[self.robot.controller_action_idx[controller_name]] = -1.0
-            yield self.with_context(action)
+            yield self._postprocess_action(action)
 
     def _execute_release(self):
         """
@@ -1261,10 +1213,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         initial_eef_pos = self.robot.get_eef_position()
         for _ in range(MAX_STEPS_FOR_GRASP_OR_RELEASE):
             action = self._empty_action(arm_pose_to_keep=initial_eef_pos)
-            action = self._overwrite_head_action(action, self._tracking_object_pose) 
             controller_name = "gripper_{}".format(self.arm)
             action[self.robot.controller_action_idx[controller_name]] = 1.0
-            yield self.with_context(action)
+            yield self._postprocess_action(action)
 
         if self._get_obj_in_hand() is not None:
             raise ActionPrimitiveError(
@@ -1273,26 +1224,28 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 {"object in hand": self._get_obj_in_hand().name},
             )
         
-    def _overwrite_head_action(self, action, target_obj_pose):
+    def _overwrite_head_action(self, action):
         """
         Overwrites camera control actions to track an object of interest.
-        If self._track_eef is True, target_obj_pose is ignored and the camera tracks the robot's end-effector.
+        If self._always_track_eef is true, always tracks the end effector of the robot.
+        Otherwise, tracks the object of interest or the end effector as specified by the primitive.
 
         Args:
             action (array) : action array to overwrite
-            target_obj_pose (tuple of arrays) : (position, quat) in world frame of object to track 
         """
-        assert self.robot_model == "Tiago", "Tracking object with camera is currently only supported for Tiago"
-
         if self._always_track_eef:
             target_obj_pose = (self.robot.get_eef_position(), self.robot.get_eef_orientation())
         else:
-            if not self._track_eef and target_obj_pose is None:
+            if self._tracking_object is None:
                 return action
             
-            if self._track_eef:
+            if self._tracking_object == self.robot:
                 target_obj_pose = (self.robot.get_eef_position(), self.robot.get_eef_orientation())
-        
+            else:
+                target_obj_pose = self._tracking_object.get_position_orientation()
+
+        assert self.robot_model == "Tiago", "Tracking object with camera is currently only supported for Tiago"
+
         head_q = self._get_head_goal_q(target_obj_pose)
         head_idx = self.robot.controller_action_idx["camera"]
         
@@ -1622,11 +1575,10 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     direction_vec = body_target_pose[0][:2] / (np.linalg.norm(body_target_pose[0][:2]) * 5)
                     base_action = [direction_vec[0], direction_vec[1], 0.0]
                     action[self.robot.controller_action_idx["base"]] = base_action
-                    action = self._overwrite_head_action(action, self._tracking_object_pose) 
                 else:
                     base_action = [KP_LIN_VEL, 0.0]
                     action[self.robot.controller_action_idx["base"]] = base_action
-                yield self.with_context(action)
+                yield self._postprocess_action(action)
 
             body_target_pose = self._get_pose_in_robot_frame(end_pose)
 
@@ -1656,15 +1608,13 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
             base_action = [0.0, 0.0, ang_vel] if self.robot_model == "Tiago" else [0.0, ang_vel]
             action[self.robot.controller_action_idx["base"]] = base_action
-            
-            action = self._overwrite_head_action(action, self._tracking_object_pose) 
-            yield self.with_context(action)
+            yield self._postprocess_action(action)
 
             body_target_pose = self._get_pose_in_robot_frame(end_pose)
             diff_yaw = T.wrap_angle(T.quat2euler(body_target_pose[1])[2])
         
         empty_action = self._empty_action(arm_pose_to_keep=initial_eef_pos)
-        yield self.with_context(empty_action)
+        yield self._postprocess_action(empty_action)
             
     def _sample_pose_near_object(self, obj, pose_on_obj=None, **kwargs):
         """
@@ -1895,10 +1845,10 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         initial_eef_pos = self.robot.get_eef_position()
         for _ in range(30):
             empty_action = self._empty_action(arm_pose_to_keep=initial_eef_pos)
-            yield self.with_context(empty_action)
+            yield self._postprocess_action(empty_action)
 
         for _ in range(MAX_STEPS_FOR_SETTLING):
             if np.linalg.norm(self.robot.get_linear_velocity()) < 0.01:
                 break
             empty_action = self._empty_action(arm_pose_to_keep=initial_eef_pos)
-            yield self.with_context(empty_action)
+            yield self._postprocess_action(empty_action)

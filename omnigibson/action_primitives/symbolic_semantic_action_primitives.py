@@ -37,8 +37,8 @@ class SymbolicSemanticActionPrimitiveSet(IntEnum):
     RELEASE = auto(), "Release an object, letting it fall to the ground. You can then grasp it again, as a way of reorienting your grasp of the object."
 
 class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
-    def __init__(self, task, scene, robot):
-        super().__init__(task, scene, robot)
+    def __init__(self, env):
+        super().__init__(env)
         self.controller_functions = {
           SymbolicSemanticActionPrimitiveSet.GRASP: self._grasp,
           SymbolicSemanticActionPrimitiveSet.PLACE_ON_TOP: self._place_on_top,

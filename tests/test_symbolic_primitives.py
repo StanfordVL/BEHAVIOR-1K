@@ -124,9 +124,7 @@ def env(shared_env):
 
 @pytest.fixture
 def prim_gen(env):
-  scene = env.scene
-  robot = env.robots[0]
-  return SymbolicSemanticActionPrimitives(None, scene, robot)
+  return SymbolicSemanticActionPrimitives(env)
 
 @pytest.fixture
 def countertop(env):
@@ -286,9 +284,7 @@ def test_cut(env, prim_gen, steak, knife, countertop):
 
 def main():
   env = start_env()
-  scene = env.scene
-  robot = env.robots[0]
-  prim_gen = SymbolicSemanticActionPrimitives(None, scene, robot)
+  prim_gen = SymbolicSemanticActionPrimitives(env)
   steak = next(iter(env.scene.object_registry("category", "apple")))
   knife = next(iter(env.scene.object_registry("category", "carving_knife")))
   countertop = next(iter(env.scene.object_registry("category", "countertop")))

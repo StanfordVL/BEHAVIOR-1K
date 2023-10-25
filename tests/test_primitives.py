@@ -96,7 +96,6 @@ def primitive_tester(load_object_categories, objects, primitives, primitives_arg
 
     # Create the environment
     env = og.Environment(configs=cfg, action_timestep=1 / 60., physics_timestep=1 / 60.)
-    scene = env.scene
     robot = env.robots[0]
     env.reset()
 
@@ -105,7 +104,7 @@ def primitive_tester(load_object_categories, objects, primitives, primitives_arg
         obj['object'].set_position_orientation(obj['position'], obj['orientation'])
         og.sim.step()
 
-    controller = StarterSemanticActionPrimitives(None, scene, robot)
+    controller = StarterSemanticActionPrimitives(env)
     for primitive, args in zip(primitives, primitives_args):
         try:
             set_start_pose(robot)

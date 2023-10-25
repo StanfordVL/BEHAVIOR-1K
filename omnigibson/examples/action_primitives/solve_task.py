@@ -49,7 +49,7 @@ def main(keyboard_control=False):
         for _ in range(10):
             env.step(action=action)
     else:
-        controller = SymbolicSemanticActionPrimitives(None, scene, robot)
+        controller = SymbolicSemanticActionPrimitives(env)
         # Grasp bottle of vodka
         grasp_obj, = scene.object_registry("category", "bottle_of_vodka")
         execute_controller(controller.apply_ref(SymbolicSemanticActionPrimitiveSet.GRASP, grasp_obj), env)
