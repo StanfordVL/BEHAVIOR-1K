@@ -246,7 +246,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         self._always_track_eef = always_track_eef
 
-        # self._tracking_object = None
         self.enable_head_tracking = enable_head_tracking
         self._tracking_object_pose = None
         self._track_eef = False
@@ -390,18 +389,18 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         action = StarterSemanticActionPrimitiveSet(action_idx)
         return self.apply_ref(action, target_obj)
     
-    def apply_ref(self, prim, *args, track_object=False, attempts=3):
+    def apply_ref(self, prim, *args, camera_track_object=False, attempts=3):
         """
         Yields action for robot to execute the primitive with the given arguments.
 
         Args:
             prim (StarterSemanticActionPrimitiveSet): Primitive to execute
             args: Arguments for the primitive
-            track_object (bool): Whether to track object while executing the primitive
+            camera_track_object (bool): Whether to track object with camera while executing the primitive
             attempts (int): Number of attempts to make before raising an error
         
-        Returns:
-            np.array or None: Action array for one step for the robot tto execute the primitve or None if primitive completed
+        Yields:
+            np.array or None: Action array for one step for the robot to execute the primitve or None if primitive completed
         
         Raises:
             ActionPrimitiveError: If primitive fails to execute
@@ -414,7 +413,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             # Attempt
             success = False
             try:
-                self._tracking_object = args[0] if track_object and args else None
+                self._tracking_object = args[0] if camera_track_object and args else None
                 yield from ctrl(*args)
                 success = True
             except ActionPrimitiveError as e:
