@@ -499,8 +499,11 @@ class DatasetObject(USDObject):
         if self.prim_type == PrimType.CLOTH:
             particle_contact_offset = self.root_link.cloth_system.particle_contact_offset
             particle_positions = self.root_link.compute_particle_positions()
-            points.extend(particle_positions - particle_contact_offset)
-            points.extend(particle_positions + particle_contact_offset)
+            particles_in_world_frame = np.concatenate([
+                particle_positions - particle_contact_offset,
+                particle_positions + particle_contact_offset
+            ], axis=0)
+            points.extend(trimesh.transformations.transform_points(particles_in_world_frame, world_to_base_frame))
         else:
             links = {link_name: self._links[link_name]} if link_name is not None else self._links
             for link_name, link in links.items():

@@ -88,6 +88,8 @@ LOW_PRECISION_ANGLE_THRESHOLD = 0.2
 TORSO_FIXED = False
 JOINT_POS_DIFF_THRESHOLD = 0.005
 
+MAX_ALLOWED_JOINT_ERROR_FOR_LINEAR_MOTION = np.deg2rad(45)
+
 log = create_module_log(module_name=__name__)
 
 
@@ -567,7 +569,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
     def _move_hand_backward(self, steps=5, speed=0.2):
         """
-        Yields action for the robot to move hand so the eef is in the target pose using the planner
+        Yields action for the robot to move its base backwards.
 
         Args:
             steps (int): steps to move eef
@@ -577,17 +579,15 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             np.array or None: Action array for one step for the robot to move hand or None if its at the target pose
         """
         initial_eef_pos = self.robot.get_eef_position()
-        print("moving hand backward")
         for _ in range(steps):
             action = self._empty_action(arm_pose_to_keep=initial_eef_pos)
             action[self.robot.controller_action_idx["gripper_{}".format(self.arm)]] = 1.0
             action[self.robot.controller_action_idx["arm_{}".format(self.arm)][0]] = -speed
             yield self._postprocess_action(action)
-        print("moving hand backward done")
 
     def _move_hand_upward(self, steps=5, speed=0.1):
         """
-        Yields action for the robot to move hand so the eef is in the target pose using the planner
+        Yields action for the robot to move hand upward.
 
         Args:
             steps (int): steps to move eef
@@ -596,14 +596,13 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Returns:
             np.array or None: Action array for one step for the robot to move hand or None if its at the target pose
         """
+        # TODO: Combine these movement functions.
         initial_eef_pos = self.robot.get_eef_position()
-        print("moving hand backward")
         for _ in range(steps):
             action = self._empty_action(arm_pose_to_keep=initial_eef_pos)
             action[self.robot.controller_action_idx["gripper_{}".format(self.arm)]] = 1.0
             action[self.robot.controller_action_idx["arm_{}".format(self.arm)][2]] = speed
             yield self._postprocess_action(action)
-        print("moving hand backward done")
 
     def _grasp(self, obj):
         """
@@ -1062,9 +1061,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 pos_diff = np.linalg.norm(prev_pos - current_pos)
                 orn_diff = (Rotation.from_quat(prev_orn) * Rotation.from_quat(current_orn).inv()).magnitude() 
                 orn_diff = (Rotation.from_quat(prev_orn) * Rotation.from_quat(current_orn).inv()).magnitude() 
-                print(pos_diff, orn_diff)
                 orn_diff = (Rotation.from_quat(prev_orn) * Rotation.from_quat(current_orn).inv()).magnitude()
-                print(pos_diff, orn_diff)
                 if pos_diff < 0.0003 and orn_diff < 0.01:
                     raise ActionPrimitiveError(
                         ActionPrimitiveError.Reason.EXECUTION_ERROR,
@@ -1113,8 +1110,17 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         if controller_config["name"] == "InverseKinematicsController":
             waypoints = list(zip(pos_waypoints, quat_waypoints))
             
-            for waypoint in waypoints[:-1]:
-                yield from self._move_hand_direct_ik(waypoint, stop_on_contact=stop_on_contact, ignore_failure=ignore_failure, stop_if_stuck=stop_if_stuck)
+            for i, waypoint in enumerate(waypoints):
+                if i < len(waypoints) - 1:
+                    yield from self._move_hand_direct_ik(waypoint, stop_on_contact=stop_on_contact, ignore_failure=ignore_failure, stop_if_stuck=stop_if_stuck)
+                else:
+                    yield from self._move_hand_direct_ik(
+                        waypoints[-1], 
+                        pos_thresh=0.01, ori_thresh=0.1,
+                        stop_on_contact=stop_on_contact, 
+                        ignore_failure=ignore_failure, 
+                        stop_if_stuck=stop_if_stuck
+                    )
 
                 # Also decide if we can stop early.
                 current_pos, current_orn = self.robot.eef_links[self.arm].get_position_orientation()
@@ -1125,24 +1131,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 
                 if stop_on_contact and detect_robot_collision_in_sim(self.robot, ignore_obj_in_hand=False):
                     return
-            
-            yield from self._move_hand_direct_ik(
-                waypoints[-1], 
-                pos_thresh=0.01, ori_thresh=0.1,
-                stop_on_contact=stop_on_contact, 
-                ignore_failure=ignore_failure, 
-                stop_if_stuck=stop_if_stuck
-            )
-
-            # Also decide if we can stop early.
-            current_pos, current_orn = self.robot.eef_links[self.arm].get_position_orientation()
-            pos_diff = np.linalg.norm(np.array(current_pos) - np.array(target_pose[0]))
-            orn_diff = (Rotation.from_quat(current_orn) * Rotation.from_quat(target_pose[1]).inv()).magnitude()
-            if pos_diff < 0.005 and orn_diff < np.deg2rad(0.1):
-                return
-            
-            if stop_on_contact and detect_robot_collision_in_sim(self.robot, ignore_obj_in_hand=False):
-                return
                 
             if not ignore_failure:
                 raise ActionPrimitiveError(
@@ -1160,7 +1148,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
                 failed_joints = []
                 for joint_idx, target_joint_pos, current_joint_pos in zip(control_idx, joint_pos, current_joint_positions):
-                    if np.abs(target_joint_pos - current_joint_pos) > np.rad2deg(45):
+                    if np.abs(target_joint_pos - current_joint_pos) > MAX_ALLOWED_JOINT_ERROR_FOR_LINEAR_MOTION:
                         failed_joints.append(joints[joint_idx].joint_name)
 
                 if failed_joints:
@@ -1296,7 +1284,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             if head2_joint_limits[0] < phi < head2_joint_limits[1]:
                 head2_joint_goal = phi
 
-        # if not possible to look at object, return default head joint positions
+        # if not possible to look at object, return current head joint positions
         else:
             default_head_pos = self._get_reset_joint_pos()[self.robot.controller_action_idx["camera"]]
             head1_joint_goal = default_head_pos[0]

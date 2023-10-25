@@ -1,4 +1,3 @@
-import copy
 import gym
 import numpy as np
 
@@ -329,7 +328,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
             self._scene_graph_builder = SceneGraphBuilder(**self.config["scene_graph"])
             # Here we can directly start it because we have already loaded everything & played
             self._scene_graph_builder.start(self.scene)
-            self._scene_graph_builder.step(self.scene) # let's take a step too.
+            self._scene_graph_builder.step(self.scene)  # let's take a step too.
 
         # Denote that the scene is loaded
         self._loaded = True

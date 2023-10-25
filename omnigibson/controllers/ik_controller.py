@@ -273,7 +273,6 @@ class InverseKinematicsController(ManipulationController):
             tolerance_pos=0.002,
             weight_pos=20.0,
             max_iterations=100,
-            # initial_joint_pos=current_joint_pos,
         )
 
         if target_joint_pos is None:

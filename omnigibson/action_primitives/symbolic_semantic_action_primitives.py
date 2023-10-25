@@ -1,9 +1,7 @@
 """
 WARNING!
-The StarterSemanticActionPrimitive is a work-in-progress and is only provided as an example.
-It currently only works with BehaviorRobot with its JointControllers set to absolute mode.
-See provided behavior_robot_mp_behavior_task.yaml config file for an example. See examples/action_primitives for
-runnable examples.
+A set of action primitives that work without executing low-level physics but instead teleporting
+objects directly into their post-condition states. Useful for learning high-level methods.
 """
 
 from aenum import IntEnum, auto
