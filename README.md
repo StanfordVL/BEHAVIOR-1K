@@ -22,7 +22,7 @@
 * 🤖 Mobile Manipulator Robots with Modular ⚙️ Controllers
 * 🌎 OpenAI Gym Interface
 
-Check out [**`OmniGibson`**'s documentation](https://stanfordvl.github.io/OmniGibson/getting_started/installation.html) to get started!
+Check out [**`OmniGibson`**'s documentation](https://behavior.stanford.edu/omnigibson/getting_started/installation.html) to get started!
 
 ### Citation
 If you use **`OmniGibson`** or its assets and models, please cite:
