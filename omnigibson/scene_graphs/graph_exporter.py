@@ -2,24 +2,19 @@ import json
 
 import numpy as np
 
-from igibson.scene_graphs.enum_obj_states import BinaryStatesEnum, UnaryStatesEnum
-from igibson.scene_graphs.graph_builder import SceneGraphBuilder
+from omnigibson.scene_graphs.graph_builder import SceneGraphBuilder
 
 
 class SceneGraphExporter(SceneGraphBuilder):
-    def __init__(self, h5py_file, num_frames_to_save=None, full_obs=False, **kwargs):
+    def __init__(self, h5py_file, **kwargs):
         """
-        @param h5py_file: file to store exported scene graph
-        @param num_frames_to_save: total number of equidistant frames to save. None if you want to set all frames.
-        """
-        if num_frames_to_save is None:
-            assert full_obs, "You can only use full observability mode if you're subsampling frames."
+        A class that exports a scene graph into a hdf5 file while generating it.
 
-        super(SceneGraphExporter, self).__init__(only_true=True, full_obs=full_obs, **kwargs)
+        Params:
+            h5py_file: an h5py file object to write to
+        """
+        super(SceneGraphExporter, self).__init__(only_true=True, **kwargs)
         self.h5py_file = h5py_file
-
-        self.num_frames_to_save = num_frames_to_save
-        self.frame_idxes_to_save = None
 
     def start(self, activity, log_reader):
         super(SceneGraphExporter, self).start(activity, log_reader)
@@ -50,11 +45,7 @@ class SceneGraphExporter(SceneGraphBuilder):
 
     def step(self, activity, log_reader):
         frame_count = activity.simulator.frame_count
-        if self.num_frames_to_save is not None and frame_count not in self.frame_idxes_to_save:
-            return
-
         super(SceneGraphExporter, self).step(activity, log_reader)
-        print("Frame: %s" % frame_count)
 
         nodes_t = np.zeros((self.num_obj, self.dim), dtype=np.float32)
         for obj in self.G.nodes:
@@ -78,13 +69,3 @@ class SceneGraphExporter(SceneGraphBuilder):
         fc = str(frame_count)
         self.h5py_file.create_dataset("/nodes/" + fc, data=nodes_t, compression="gzip")
         self.h5py_file.create_dataset("/edges/" + fc, data=edges_t, compression="gzip")
-
-        # profiler.stop()
-
-        # html = profiler.output_html()
-        # html_path = "profile.html"
-        # with open(html_path, "w") as f:
-        #     f.write(html)
-
-        # import pdb
-        # pdb.set_trace()

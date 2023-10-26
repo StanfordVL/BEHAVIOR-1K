@@ -78,6 +78,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         disable_grasp_handling=False,
 
         # Unique to Tiago
+        variant="default",
         rigid_trunk=False,
         default_trunk_offset=0.365,
         default_arm_pose="vertical",
@@ -132,6 +133,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
                 If "sticky", will magnetize any object touching the gripper's fingers.
             disable_grasp_handling (bool): If True, will disable all grasp handling for this object. This means that
                 sticky and assisted grasp modes will not work unless the connection/release methodsare manually called.
+            variant (str): Which variant of the robot should be loaded. One of "default", "wrist_cam"
             rigid_trunk (bool) if True, will prevent the trunk from moving during execution.
             default_trunk_offset (float): sets the default height of the robot's trunk
             default_arm_pose (str): Default pose for the robot arm. Should be one of:
@@ -140,6 +142,8 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
                 for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
         """
         # Store args
+        assert variant in ("default", "wrist_cam"), f"Invalid Tiago variant specified {variant}!"
+        self._variant = variant
         self.rigid_trunk = rigid_trunk
         self.default_trunk_offset = default_trunk_offset
         assert_valid_key(key=default_arm_pose, valid_keys=DEFAULT_ARM_POSES, name="default_arm_pose")
@@ -669,11 +673,15 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
     @property
     def usd_path(self):
-        return os.path.join(gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford/tiago_dual_omnidirectional_stanford_33_with_wrist_cam.usd")
-        # return os.path.join(gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford/tiago_dual_omnidirectional_stanford_33.usd")
+        if self._variant == "wrist_cam":
+            return os.path.join(gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford/tiago_dual_omnidirectional_stanford_33_with_wrist_cam.usd")
+        
+        # Default variant
+        return os.path.join(gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford/tiago_dual_omnidirectional_stanford_33.usd")
 
     @property
     def simplified_mesh_usd_path(self):
+        # TODO: How can we make this more general - maybe some automatic way to generate these?
         return os.path.join(gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford/tiago_dual_omnidirectional_stanford_33_simplified_collision_mesh.usd")
 
     @property

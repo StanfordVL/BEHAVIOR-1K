@@ -72,6 +72,11 @@ class Environment(gym.Env, GymObservable, Recreatable):
         for config in configs:
             merge_nested_dicts(base_dict=self.config, extra_dict=parse_config(config), inplace=True)
 
+        # Create the scene graph builder
+        self._scene_graph_builder = None
+        if "scene_graph" in self.config and self.config["scene_graph"] is not None:
+            self._scene_graph_builder = SceneGraphBuilder(**self.config["scene_graph"])
+
         # Set the simulator settings
         og.sim.set_simulation_dt(physics_dt=physics_timestep, rendering_dt=action_timestep)
         og.sim.viewer_width = self.render_config["viewer_width"]
@@ -322,13 +327,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self.load_observation_space()
         self._load_action_space()
 
-        # Load the scene graph builder
-        self._scene_graph_builder = None
-        if "scene_graph" in self.config and self.config["scene_graph"] is not None:
-            self._scene_graph_builder = SceneGraphBuilder(**self.config["scene_graph"])
-            # Here we can directly start it because we have already loaded everything & played
+        # Start the scene graph builder
+        if self._scene_graph_builder:
             self._scene_graph_builder.start(self.scene)
-            self._scene_graph_builder.step(self.scene)  # let's take a step too.
 
         # Denote that the scene is loaded
         self._loaded = True
