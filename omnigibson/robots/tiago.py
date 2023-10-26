@@ -710,10 +710,6 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         if orientation is None:
             orientation = current_orientation
 
-        # Make sure position and orientation are arrays (otherwise set attribute fails)
-        position = np.asarray(position)
-        orientation = np.asarray(orientation)
-
         # If the simulator is playing, set the 6 base joints to achieve the desired pose of base_footprint link frame
         if self._dc is not None and self._dc.is_simulating():
             # Find the relative transformation from base_footprint_link ("base_footprint") frame to root_link
@@ -738,7 +734,8 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             # Move the joint frame for the world_base_joint
             if self._world_base_fixed_joint_prim is not None:
                 self._world_base_fixed_joint_prim.GetAttribute("physics:localPos0").Set(tuple(position))
-                self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(Gf.Quatf(*orientation[[3, 0, 1, 2]]))
+                self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(Gf.Quatf(
+                    orientation[3], orientation[0], orientation[1], orientation[2]))
 
     def set_linear_velocity(self, velocity: np.ndarray):
         # Transform the desired linear velocity from the world frame to the root_link ("base_footprint_x") frame

@@ -183,12 +183,10 @@ class RigidPrim(XFormPrim):
                     # We need to translate the center of mass from the mesh's local frame to the link's local frame
                     local_pos, local_orn = mesh.get_local_pose()
                     coms.append(T.quat2mat(local_orn) @ (com * mesh.scale) + local_pos)
-                    # TODO: This is an issue for collision detection because the collision mesh being checked for collisions is the underlying mesh while
-                    # the one in the environment is the bounding box. This can cause false positives for collision free poses. Currently disabled for this reason.
                     # If we're not a valid volume, use bounding box approximation for the underlying collision approximation
-                    # if not is_volume:
-                    #     log.warning(f"Got invalid (non-volume) collision mesh: {mesh.name}")
-                    #     mesh.set_collision_approximation("boundingCube")
+                    if not is_volume:
+                        log.warning(f"Got invalid (non-volume) collision mesh: {mesh.name}")
+                        mesh.set_collision_approximation("boundingCube")
                 else:
                     self._visual_meshes[mesh_name] = VisualGeomPrim(**mesh_kwargs)
 

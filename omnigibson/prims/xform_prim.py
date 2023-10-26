@@ -236,6 +236,16 @@ class XFormPrim(BasePrim):
             3-array: (roll, pitch, yaw) global euler orientation of this prim
         """
         return quat2euler(self.get_orientation())
+    
+    def get_2d_orientation(self):
+        """
+        Get this prim's orientation on the XY plane of the world frame. This is obtained by
+        projecting the forward vector onto the XY plane and then computing the angle.
+        """
+        fwd = R.from_quat(self.get_orientation()).apply([1, 0, 0])
+        fwd[2] = 0
+        fwd /= np.linalg.norm(fwd)
+        return np.arctan2(fwd[1], fwd[0])
 
     def get_local_pose(self):
         """

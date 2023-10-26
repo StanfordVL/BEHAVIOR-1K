@@ -123,6 +123,10 @@ def env(shared_env):
   return shared_env
 
 @pytest.fixture
+def robot(env):
+  return env.robots[0]
+
+@pytest.fixture
 def prim_gen(env):
   return SymbolicSemanticActionPrimitives(env)
 
@@ -159,11 +163,11 @@ def sponge(env):
 def knife(env):
   return next(iter(env.scene.object_registry("category", "carving_knife")))
 
-def test_in_hand_state(env, prim_gen, steak):
-  assert not steak.states[object_states.InHandOfRobot].get_value()
+def test_in_hand_state(env, robot, prim_gen, steak):
+  assert not robot.states[object_states.IsGrasping].get_value(steak)
   for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.GRASP, steak):
     env.step(action)
-  assert steak.states[object_states.InHandOfRobot].get_value()
+  assert robot.states[object_states.IsGrasping].get_value(steak)
 
 # def test_navigate():
 #    pass
@@ -219,7 +223,7 @@ def test_soak_under(env, prim_gen, sponge, sink):
   # Then grasp the sponge
   for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.GRASP, sponge):
     env.step(action)
-  assert sponge.states[object_states.InHandOfRobot].get_value()
+  assert robot.states[object_states.IsGrasping].get_value(sponge)
 
   # Then soak the sponge under the water
   for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.SOAK_UNDER, sink):
@@ -248,7 +252,7 @@ def test_wipe(env, prim_gen, sponge, sink, countertop):
   # Then grasp the sponge
   for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.GRASP, sponge):
     env.step(action)
-  assert sponge.states[object_states.InHandOfRobot].get_value()
+  assert robot.states[object_states.IsGrasping].get_value(sponge)
 
   # Then soak the sponge under the water
   for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.SOAK_UNDER, sink):

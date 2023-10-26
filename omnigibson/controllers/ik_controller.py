@@ -1,4 +1,5 @@
 import numpy as np
+from omnigibson.macros import create_module_macros
 
 import omnigibson.utils.transform_utils as T
 from omnigibson.controllers import ControlType, ManipulationController
@@ -9,6 +10,12 @@ from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
+
+# Set some macros
+m = create_module_macros(module_path=__file__)
+m.IK_POS_TOLERANCE = 0.002
+m.IK_POS_WEIGHT = 20.0
+m.IK_MAX_ITERATIONS = 100
 
 # Different modes
 IK_MODE_COMMAND_DIMS = {
@@ -270,9 +277,9 @@ class InverseKinematicsController(ManipulationController):
         target_joint_pos = self.solver.solve(
             target_pos=target_pos,
             target_quat=target_quat,
-            tolerance_pos=0.002,
-            weight_pos=20.0,
-            max_iterations=100,
+            tolerance_pos=m.IK_POS_TOLERANCE,
+            weight_pos=m.IK_POS_WEIGHT,
+            max_iterations=m.IK_MAX_ITERATIONS,
         )
 
         if target_joint_pos is None:

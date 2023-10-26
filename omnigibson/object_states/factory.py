@@ -4,6 +4,7 @@ from omnigibson.object_states.kinematics_mixin import KinematicsMixin
 from omnigibson.object_states import *
 
 _ABILITY_TO_STATE_MAPPING = {
+    "robot": [IsGrasping],
     "attachable": [AttachedTo],
     "blender": [],
     "particleApplier": [ParticleApplier],
@@ -36,7 +37,6 @@ _DEFAULT_STATE_SET = frozenset(
         Touching,
         Under,
         Covered,
-        InHandOfRobot,
     ]
 )
 

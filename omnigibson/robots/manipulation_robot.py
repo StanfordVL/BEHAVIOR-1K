@@ -62,7 +62,7 @@ def can_assisted_grasp(obj, link_name):
         return True
     
     # Also allow AG of moving links of fixed objects
-    if obj.fixed_base and link_name != "base_link":
+    if obj.fixed_base and obj.links[link_name] != obj.root_link:
         return True
     
     return False
@@ -651,6 +651,16 @@ class ManipulationRobot(BaseRobot):
         """
         raise NotImplementedError
 
+    @property
+    def arm_workspace_range(self):
+        """
+        Returns:
+            dict: Dictionary mapping arm appendage name to a tuple indicating the start and end of the
+                angular range of the arm workspace around the Z axis of the robot, where 0 is facing
+                forward.
+        """
+        raise NotImplementedError
+
     def get_eef_position(self, arm="default"):
         """
         Args:
@@ -999,7 +1009,7 @@ class ManipulationRobot(BaseRobot):
 
         # Create a p2p joint if it's a child link of a fixed URDF that is connected by a revolute or prismatic joint
         joint_type = "FixedJoint"
-        if ag_obj.fixed_base or ag_obj.root_link.name != ag_link.name:
+        if ag_obj.fixed_base or ag_obj.root_link != ag_link:
             # We search up the tree path from the ag_link until we encounter the root (joint == 0) or a non fixed
             # joint (e.g.: revolute or fixed)
             link_handle = ag_link.handle
@@ -1102,7 +1112,6 @@ class ManipulationRobot(BaseRobot):
 
                     if not applying_grasp:
                         self._release_grasp(arm=arm)
-
             elif applying_grasp:
                 self._ag_data[arm] = self._calculate_in_hand_object(arm=arm)
                 self._establish_grasp(arm=arm, ag_data=self._ag_data[arm])
@@ -1274,8 +1283,9 @@ class ManipulationRobot(BaseRobot):
         if self.grasping_mode == "physical":
             return
 
-        # Include AG_state
+        # Save AG state
         # TODO: currently doese not take care of cloth objects
+        # TODO: add unit tests
         self._ag_obj_constraint_params = state["ag_obj_constraint_params"]
         for arm in self._ag_obj_constraint_params.keys():
             if len(self._ag_obj_constraint_params[arm]) > 0:

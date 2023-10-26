@@ -21,7 +21,7 @@ from omnigibson.object_states.overlaid import Overlaid
 from omnigibson.object_states.particle_modifier import ParticleRemover, ParticleApplier
 from omnigibson.object_states.particle_source_or_sink import ParticleSource, ParticleSink
 from omnigibson.object_states.pose import Pose
-from omnigibson.object_states.robot_related_states import InHandOfRobot
+from omnigibson.object_states.robot_related_states import IsGrasping
 from omnigibson.object_states.saturated import Saturated
 from omnigibson.object_states.temperature import Temperature
 from omnigibson.object_states.toggle import ToggledOn

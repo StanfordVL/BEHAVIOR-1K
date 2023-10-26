@@ -1,6 +1,6 @@
 import numpy as np
 import omnigibson as og
-from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanStateMixin
+from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanStateMixin, RelativeObjectState
 
 
 _IN_REACH_DISTANCE_THRESHOLD = 2.0
@@ -8,16 +8,21 @@ _IN_REACH_DISTANCE_THRESHOLD = 2.0
 _IN_FOV_PIXEL_FRACTION_THRESHOLD = 0.05
 
 
-def _get_robot():
-    from omnigibson.robots import ManipulationRobot
-    valid_robots = [robot for robot in og.sim.scene.robots if isinstance(robot, ManipulationRobot)]
-    if not valid_robots:
-        return None
+class RobotStateMixin:
+    @property
+    def robot(self):
+        from omnigibson.robots.robot_base import BaseRobot
+        assert isinstance(self.obj, BaseRobot), "This state only works with robots."
+        return self.obj
 
-    if len(valid_robots) > 1:
-        raise ValueError("Multiple robots found.")
 
-    return valid_robots[0]
+class IsGrasping(RelativeObjectState, BooleanStateMixin, RobotStateMixin):
+    def _get_value(self, obj):
+        # TODO: Make this work with non-assisted grasping
+        return any(
+            self.robot._ag_obj_in_hand[arm] == obj 
+            for arm in self.robot.arm_names
+        )
 
 
 # class InReachOfRobot(AbsoluteObjectState, BooleanStateMixin):
@@ -29,18 +34,6 @@ def _get_robot():
 #         robot_pos = robot.get_position()
 #         object_pos = self.obj.get_position()
 #         return np.linalg.norm(object_pos - np.array(robot_pos)) < _IN_REACH_DISTANCE_THRESHOLD
-
-
-class InHandOfRobot(AbsoluteObjectState, BooleanStateMixin):
-    def _get_value(self):
-        robot = _get_robot()
-        if not robot:
-            return False
-
-        return any(
-            robot._ag_obj_in_hand[arm] == self.obj 
-            for arm in robot.arm_names
-        )
 
 
 # class InFOVOfRobot(AbsoluteObjectState, BooleanStateMixin):

@@ -1026,6 +1026,24 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             )
 
     def _move_hand_direct_ik(self, target_pose, stop_on_contact=False, ignore_failure=False, pos_thresh=0.04, ori_thresh=0.4, in_world_frame=True, stop_if_stuck=False):
+        """
+        Moves the hand to a target pose using inverse kinematics.
+
+        Args:
+            target_pose (tuple): A tuple of two elements, representing the target pose of the hand as a position and a quaternion.
+            stop_on_contact (bool, optional): Whether to stop the movement if the hand collides with an object. Defaults to False.
+            ignore_failure (bool, optional): Whether to raise an exception if the movement fails. Defaults to False.
+            pos_thresh (float, optional): The position threshold for considering the target pose reached. Defaults to 0.04.
+            ori_thresh (float, optional): The orientation threshold for considering the target pose reached. Defaults to 0.4.
+            in_world_frame (bool, optional): Whether the target pose is given in the world frame. Defaults to True.
+            stop_if_stuck (bool, optional): Whether to stop the movement if the hand is stuck. Defaults to False.
+
+        Yields:
+            numpy.ndarray: The action to be executed by the robot controller.
+
+        Raises:
+            ActionPrimitiveError: If the movement fails and ignore_failure is False.
+        """
         # make sure controller is InverseKinematicsController and in expected mode
         controller_config = self.robot._controller_config["arm_" + self.arm]
         assert controller_config["name"] == "InverseKinematicsController", "Controller must be InverseKinematicsController"
