@@ -7,6 +7,20 @@ import omnigibson.utils.transform_utils as T
 from omnigibson.utils.control_utils import IKSolver
 from pxr import PhysicsSchemaTools, Gf
 
+
+def _wrap_angle(theta):
+    """"
+    Converts an angle to the range [-pi, pi).
+
+    Args:
+        theta (float): angle in radians
+
+    Returns:
+        float: angle in radians in range [-pi, pi)
+    """
+    return (theta + np.pi) % (2 * np.pi) - np.pi
+
+
 def plan_base_motion(
     robot,
     end_conf,
@@ -69,7 +83,7 @@ def plan_base_motion(
         
         @staticmethod
         def is_valid_rotation(si, start_conf, final_orientation):
-            diff = T.wrap_angle(final_orientation - start_conf[2])
+            diff = _wrap_angle(final_orientation - start_conf[2])
             direction = np.sign(diff)
             diff = abs(diff)
             num_points = ceil(diff / ANGLE_DIFF) + 1
@@ -93,7 +107,7 @@ def plan_base_motion(
         state = ob.State(space)
         state().setX(x)
         state().setY(y)
-        state().setYaw(T.wrap_angle(yaw))
+        state().setYaw(_wrap_angle(yaw))
         return state
     
     def state_valid_fn(q):
@@ -165,10 +179,10 @@ def plan_base_motion(
     planner = ompl_geo.RRT(si)
     ss.setPlanner(planner)
 
-    start = create_state(space, start_conf[0], start_conf[1], T.wrap_angle(start_conf[2]))
+    start = create_state(space, start_conf[0], start_conf[1], start_conf[2])
     print(start)
 
-    goal = create_state(space, end_conf[0], end_conf[1], T.wrap_angle(end_conf[2]))
+    goal = create_state(space, end_conf[0], end_conf[1], end_conf[2])
     print(goal)
 
     ss.setStartAndGoalStates(start, goal)
@@ -337,7 +351,6 @@ def plan_arm_motion_ik(
     ik_solver = IKSolver(
         robot_description_path=robot_description_path,
         robot_urdf_path=robot.urdf_path,
-        # default_joint_pos=robot.get_joint_positions()[joint_control_idx],
         default_joint_pos=robot.default_joint_pos[joint_control_idx],
         eef_name=robot.eef_link_names[robot.default_arm],
     )
@@ -350,11 +363,7 @@ def plan_arm_motion_ik(
             target_quat=T.axisangle2quat(eef_pose[3:]),
             max_iterations=1000,
         )
-# ik_solver.solve(
-#     target_pos=eef_pose[:3],
-#     target_quat=T.axisangle2quat(eef_pose[3:]),
-#     max_iterations=1000,
-# )
+
         if control_joint_pos is None:
             return False
         joint_pos[control_idx_in_joint_pos] = control_joint_pos
@@ -434,13 +443,10 @@ def set_base_and_detect_collision(context, pose):
     robot_copy = context.robot_copy
     robot_copy_type = context.robot_copy_type
 
-    translation = pose[0]
-    orientation = pose[1]
-    # context.robot_copy.prim.set_local_poses(np.array([translation]), np.array([orientation]))
-    translation = Gf.Vec3d(*np.array(translation, dtype=float))
+    translation = Gf.Vec3d(*np.array(pose[0], dtype=float))
     robot_copy.prims[robot_copy_type].GetAttribute("xformOp:translate").Set(translation)
 
-    orientation = np.array(orientation, dtype=float)[[3, 0, 1, 2]]
+    orientation = np.array(pose[1], dtype=float)[[3, 0, 1, 2]]
     robot_copy.prims[robot_copy_type].GetAttribute("xformOp:orient").Set(Gf.Quatd(*orientation)) 
 
     return detect_robot_collision(context)
@@ -495,7 +501,6 @@ def detect_robot_collision(context):
 
     def overlap_callback(hit):
         nonlocal valid_hit
-        nonlocal mesh_path
         
         valid_hit = hit.rigid_body not in context.disabled_collision_pairs_dict[mesh_path]
 

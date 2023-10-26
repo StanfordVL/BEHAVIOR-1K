@@ -135,11 +135,12 @@ class PlanningContext(object):
             robot_description_path=self.robot.robot_arm_descriptor_yamls[fk_descriptor],
             robot_urdf_path=self.robot.urdf_path,
         )
+
         arm_links = self.robot.manipulation_link_names
 
         if TORSO_FIXED:
             assert self.arm == "left", "Fixed torso mode only supports left arm!"
-            joint_control_idx = self.robot.arm_cotnrol_idx["left"]
+            joint_control_idx = self.robot.arm_control_idx["left"]
             joint_pos = np.array(self.robot.get_joint_positions()[joint_control_idx])
         else:
             joint_combined_idx = np.concatenate([self.robot.trunk_control_idx, self.robot.arm_control_idx[fk_descriptor]])
@@ -182,7 +183,7 @@ class PlanningContext(object):
                     self.disabled_collision_pairs_dict[mesh.GetPrimPath().pathString] += all_meshes
         # Filter out collision pairs of meshes part of disabled collision pairs
         else:
-            for pair in self.robot.primitive_disabled_collision_pairs:
+            for pair in self.robot.disabled_collision_pairs:
                 link_1 = pair[0]
                 link_2 = pair[1]
                 if link_1 in robot_meshes_copy.keys() and link_2 in robot_meshes_copy.keys():
@@ -484,7 +485,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
                 grasp_pose, target_poses, object_direction, relevant_joint, grasp_required, pos_change = grasp_data
                 if abs(pos_change) < 0.1:
-                    print("Yaw change is small and done,", pos_change)
+                    indented_print("Yaw change is small and done,", pos_change)
                     return
 
                 # Prepare data for the approach later.
@@ -494,7 +495,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 # If the grasp pose is too far, navigate
                 yield from self._navigate_if_needed(obj, pose_on_obj=grasp_pose)
 
-                print("MOVE HAND")
                 yield from self._move_hand(grasp_pose, stop_if_stuck=True)
 
                 # We can pre-grasp in sticky grasping mode only for opening
@@ -503,12 +503,11 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
                 # Since the grasp pose is slightly off the object, we want to move towards the object, around 5cm.
                 # It's okay if we can't go all the way because we run into the object.
-                yield from self._navigate_if_needed(obj, pose_on_obj=approach_pose)  #, check_joint=check_joint)
+                yield from self._navigate_if_needed(obj, pose_on_obj=approach_pose)
                 
                 if should_open:
                     yield from self._move_hand_direct_cartesian(approach_pose, ignore_failure=False, stop_on_contact=True, stop_if_stuck=True)
                 else:
-                    print("go to approach pose")
                     yield from self._move_hand_direct_cartesian(approach_pose, ignore_failure=False, stop_if_stuck=True)
             
                 # Step once to update
@@ -516,7 +515,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 yield self._postprocess_action(empty_action)
 
                 for i, target_pose in enumerate(target_poses):
-                    print(f"go to target pose {i}")
                     yield from self._move_hand_direct_cartesian(target_pose, ignore_failure=False, stop_if_stuck=True)
 
                 # Moving to target pose often fails. This might leave the robot's motors with torques that
@@ -535,7 +533,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                     yield from self._move_base_backward()
 
             except ActionPrimitiveError as e:
-                print(e)
+                indented_print(e)
                 if should_open:
                     yield from self._execute_release() 
                     yield from self._move_base_backward()
@@ -549,6 +547,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 {"target object": obj.name, "is it currently open": obj.states[object_states.Open].get_value()},
             )
 
+    # TODO: Figure out how to generalize out of this "backing out" behavior.
     def _move_base_backward(self, steps=5, speed=0.2):
         """
         Yields action for the robot to move base so the eef is in the target pose using the planner
@@ -962,10 +961,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         return interpolated_plan
     
     def _compute_delta_command(self, controller_name, diff_joint_pos, gain=1.0, min_action=0.0):
-        controller = self.robot._controllers[controller_name]
-        control_limits = controller._control_limits[controller.control_type]
-        gain = 1.0
-        min_action = 0.0
         # for joints not within thresh, set a minimum action value
         # for joints within thres, set action to zero
         delta_action = gain * diff_joint_pos
@@ -1369,6 +1364,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 yield from self._move_hand_direct_joint(reset_pose, control_idx, ignore_failure=True)
     
     def _get_reset_eef_pose(self):
+        # TODO: Add support for Fetch
         if self.robot_model == "Tiago":
             return np.array([0.28493954, 0.37450749, 1.1512334]), np.array([-0.21533823,  0.05361032, -0.08631776,  0.97123871])
         else:
@@ -1393,37 +1389,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 0.05,  # gripper
             ]
         )
-
-        # reset_pose_tiago = np.array([
-        #     -1.78029833e-04,  
-        #     3.20231302e-05, 
-        #     -1.85759447e-07, 
-        #     -1.16488536e-07,
-        #     4.55182843e-08,  
-        #     2.36128806e-04,  
-        #     0.15,  
-        #     0.94,
-        #     -1.1,  
-        #     0.0, 
-        #     -0.9,  
-        #     1.47,
-        #     0.0,  
-        #     2.1,  
-        #     2.71,  
-        #     1.5,
-        #     1.71,  
-        #     1.3, 
-        #     -1.57, 
-        #     -1.4,
-        #     1.39,  
-        #     0.0,  
-        #     0.0,  
-        #     0.045,
-        #     0.045,
-        #     0.045,
-        #     0.045,
-        # ])
-        
+       
         reset_pose_tiago = np.array([
             -1.78029833e-04,  
             3.20231302e-05, 
@@ -1566,13 +1532,13 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             diff_pos = end_pose[0] - self.robot.get_position()
             intermediate_pose = (end_pose[0], T.euler2quat([0, 0, np.arctan2(diff_pos[1], diff_pos[0])]))
             body_intermediate_pose = self._get_pose_in_robot_frame(intermediate_pose)
-            diff_yaw = T.wrap_angle(T.quat2euler(body_intermediate_pose[1])[2])
+            diff_yaw = T.quat2euler(body_intermediate_pose[1])[2]
             if abs(diff_yaw) > DEFAULT_ANGLE_THRESHOLD:
                 yield from self._rotate_in_place(intermediate_pose, angle_threshold=DEFAULT_ANGLE_THRESHOLD)
             else:
                 action = self._empty_action(arm_pose_to_keep=initial_eef_pos)
                 if self.robot_model == "Tiago":
-                    direction_vec = body_target_pose[0][:2] / (np.linalg.norm(body_target_pose[0][:2]) * 5)
+                    direction_vec = body_target_pose[0][:2] / np.linalg.norm(body_target_pose[0][:2]) * KP_LIN_VEL
                     base_action = [direction_vec[0], direction_vec[1], 0.0]
                     action[self.robot.controller_action_idx["base"]] = base_action
                 else:
@@ -1597,7 +1563,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             np.array or None: Action array for one step for the robot to rotate or None if it is done rotating
         """
         body_target_pose = self._get_pose_in_robot_frame(end_pose)
-        diff_yaw = T.wrap_angle(T.quat2euler(body_target_pose[1])[2])
+        diff_yaw = T.quat2euler(body_target_pose[1])[2]
         initial_eef_pos = self.robot.get_eef_position()
 
         while abs(diff_yaw) > angle_threshold:
@@ -1611,7 +1577,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             yield self._postprocess_action(action)
 
             body_target_pose = self._get_pose_in_robot_frame(end_pose)
-            diff_yaw = T.wrap_angle(T.quat2euler(body_target_pose[1])[2])
+            diff_yaw = T.quat2euler(body_target_pose[1])[2]
         
         empty_action = self._empty_action(arm_pose_to_keep=initial_eef_pos)
         yield self._postprocess_action(empty_action)
@@ -1680,31 +1646,31 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         face_max = face_center + face_vertical_half_extent + face_lateral_half_extent
         return np.random.uniform(face_min, face_max)
 
-    def _sample_pose_in_room(self, room: str):
-        """
-        Returns a pose for the robot within in the room where the robot is not in collision with anything
+    # def _sample_pose_in_room(self, room: str):
+    #     """
+    #     Returns a pose for the robot within in the room where the robot is not in collision with anything
 
-        Args:
-            room (str): Name of room
+    #     Args:
+    #         room (str): Name of room
 
-        Returns:
-            2-tuple:
-                - 3-array: (x,y,z) Position in the world frame
-                - 4-array: (x,y,z,w) Quaternion orientation in the world frame
-        """
-        # TODO(MP): Bias the sampling near the agent.
-        for _ in range(MAX_ATTEMPTS_FOR_SAMPLING_POSE_IN_ROOM):
-            _, pos = self.env.scene.get_random_point_by_room_instance(room)
-            yaw = np.random.uniform(-np.pi, np.pi)
-            pose = (pos[0], pos[1], yaw)
-            if self._test_pose(pose):
-                return pose
+    #     Returns:
+    #         2-tuple:
+    #             - 3-array: (x,y,z) Position in the world frame
+    #             - 4-array: (x,y,z,w) Quaternion orientation in the world frame
+    #     """
+    #     # TODO(MP): Bias the sampling near the agent.
+    #     for _ in range(MAX_ATTEMPTS_FOR_SAMPLING_POSE_IN_ROOM):
+    #         _, pos = self.env.scene.get_random_point_by_room_instance(room)
+    #         yaw = np.random.uniform(-np.pi, np.pi)
+    #         pose = (pos[0], pos[1], yaw)
+    #         if self._test_pose(pose):
+    #             return pose
 
-        raise ActionPrimitiveError(
-            ActionPrimitiveError.Reason.SAMPLING_ERROR,
-            "Could not find valid position in the given room to travel to",
-            {"room": room}
-        )
+    #     raise ActionPrimitiveError(
+    #         ActionPrimitiveError.Reason.SAMPLING_ERROR,
+    #         "Could not find valid position in the given room to travel to",
+    #         {"room": room}
+    #     )
 
     def _sample_pose_with_object_and_predicate(self, predicate, held_obj, target_obj, near_poses=None, near_poses_threshold=None):
         """
@@ -1751,7 +1717,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             {"target object": target_obj.name, "object in hand": held_obj.name, "relation": pred_map[predicate]},
         )
 
-    def _test_pose(self, pose_2d, context, pose_on_obj=None, check_joint=None):
+    # TODO: Why do we need to pass in the context here?
+    def _test_pose(self, pose_2d, context, pose_on_obj=None):
         """
         Determines whether the robot can reach the pose on the object and is not in collision at the specified 2d pose
 
