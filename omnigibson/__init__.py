@@ -80,6 +80,11 @@ def create_app():
         config_kwargs["active_gpu"] = gpu_id
         config_kwargs["physics_gpu"] = gpu_id
     app = SimulationApp(config_kwargs)
+
+    # Omni overrides the global logger to be DEBUG, which is very annoying, so we re-override it to the default WARN
+    # TODO: Remove this once omniverse fixes it
+    logging.getLogger().setLevel(logging.WARNING)
+
     import omni
 
     # Enable additional extensions we need

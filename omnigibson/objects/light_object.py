@@ -161,7 +161,7 @@ class LightObject(StatefulObject):
         Returns:
             float: radius for this light
         """
-        return self._light_link.get_attribute("radius")
+        return self._light_link.get_attribute("inputs:radius" if meets_minimum_isaac_version("2023.0.0") else "radius")
 
     @radius.setter
     def radius(self, radius):
@@ -171,7 +171,7 @@ class LightObject(StatefulObject):
         Args:
             radius (float): radius to set
         """
-        self._light_link.set_attribute("radius", radius)
+        self._light_link.set_attribute("inputs:radius" if meets_minimum_isaac_version("2023.0.0") else "radius", radius)
 
     @property
     def intensity(self):

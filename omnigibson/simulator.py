@@ -1027,6 +1027,11 @@ class Simulator(SimulationContext, Serializable):
         with suppress_omni_log(None):
             create_new_stage()
 
+        # Clear physics context
+        self._physics_context = None
+        if meets_minimum_isaac_version("2023.0.0"):
+            self._physx_fabric_interface = None
+
         # Create world prim
         self.stage.DefinePrim("/World", "Xform")
 
