@@ -136,6 +136,7 @@ class PlanningContext(object):
             robot_urdf_path=self.robot.urdf_path,
         )
 
+        # TODO: Remove the need for this after refactoring the FK / descriptors / etc.
         arm_links = self.robot.manipulation_link_names
 
         if TORSO_FIXED:
@@ -506,23 +507,23 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 yield from self._navigate_if_needed(obj, pose_on_obj=approach_pose)
                 
                 if should_open:
-                    yield from self._move_hand_direct_cartesian(approach_pose, ignore_failure=False, stop_on_contact=True, stop_if_stuck=True)
+                    yield from self._move_hand_linearly_cartesian(approach_pose, ignore_failure=False, stop_on_contact=True, stop_if_stuck=True)
                 else:
-                    yield from self._move_hand_direct_cartesian(approach_pose, ignore_failure=False, stop_if_stuck=True)
+                    yield from self._move_hand_linearly_cartesian(approach_pose, ignore_failure=False, stop_if_stuck=True)
             
                 # Step once to update
                 empty_action = self._empty_action()
                 yield self._postprocess_action(empty_action)
 
                 for i, target_pose in enumerate(target_poses):
-                    yield from self._move_hand_direct_cartesian(target_pose, ignore_failure=False, stop_if_stuck=True)
+                    yield from self._move_hand_linearly_cartesian(target_pose, ignore_failure=False, stop_if_stuck=True)
 
                 # Moving to target pose often fails. This might leave the robot's motors with torques that
                 # try to get to a far-away position thus applying large torques, but unable to move due to
                 # the sticky grasp joint. Thus if we release the joint, the robot might suddenly launch in an
                 # arbitrary direction. To avoid this, we command the hand to apply torques with its current
                 # position as its target. This prevents the hand from jerking into some other position when we do a release.
-                yield from self._move_hand_direct_cartesian(
+                yield from self._move_hand_linearly_cartesian(
                     self.robot.eef_links[self.arm].get_position_orientation(), 
                     ignore_failure=True,
                     stop_if_stuck=True
@@ -649,7 +650,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         # Since the grasp pose is slightly off the object, we want to move towards the object, around 5cm.
         # It's okay if we can't go all the way because we run into the object.
         indented_print("Performing grasp approach")
-        yield from self._move_hand_direct_cartesian(approach_pose, stop_on_contact=True)
+        yield from self._move_hand_linearly_cartesian(approach_pose, stop_on_contact=True)
 
         # Step once to update
         empty_action = self._empty_action()
@@ -960,14 +961,13 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         interpolated_plan.append(plan[-1].tolist())
         return interpolated_plan
     
-    def _compute_delta_command(self, controller_name, diff_joint_pos, gain=1.0, min_action=0.0):
+    def _compute_delta_command(self, diff_joint_pos, gain=1.0, min_action=0.0):
         # for joints not within thresh, set a minimum action value
         # for joints within thres, set action to zero
         delta_action = gain * diff_joint_pos
         delta_action[abs(delta_action) < min_action] = np.sign(delta_action[abs(delta_action) < min_action]) * min_action
         delta_action[abs(diff_joint_pos) < JOINT_POS_DIFF_THRESHOLD] = 0.0
-        # TODO - this is temporary
-        if TORSO_FIXED:
+        if not TORSO_FIXED:
             delta_action = np.concatenate([np.zeros(1), delta_action])
         
         return delta_action
@@ -1042,9 +1042,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         # make sure controller is InverseKinematicsController and in expected mode
         controller_config = self.robot._controller_config["arm_" + self.arm]
         assert controller_config["name"] == "InverseKinematicsController", "Controller must be InverseKinematicsController"
-        # assert controller_config["motor_type"] == "velocity", "Controller must be in velocity mode"
         assert controller_config["mode"] == "pose_absolute_ori", "Controller must be in pose_delta_ori mode"
-        # target pose = (position, quat) IN WORLD FRAME
         if in_world_frame:
             target_pose = self._get_pose_in_robot_frame(target_pose)
         target_pos = target_pose[0]
@@ -1093,7 +1091,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 "Your hand was obstructed from moving to the desired joint position"
             )      
 
-    def _move_hand_direct_cartesian(self, target_pose, stop_on_contact=False, ignore_failure=False, stop_if_stuck=False):
+    def _move_hand_linearly_cartesian(self, target_pose, stop_on_contact=False, ignore_failure=False, stop_if_stuck=False):
         """
         Yields action for the robot to move its arm to reach the specified target pose by moving the eef along a line in cartesian
         space from its current pose

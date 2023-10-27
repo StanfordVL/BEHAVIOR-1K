@@ -35,6 +35,7 @@ class FKSolver:
         Returns:
             link_poses (dict): Dictionary mapping each robot link name to its pose
         """
+        # TODO: Refactor this to go over all links at once
         link_poses = {}
         for link_name in link_names:
             pose3_lula = self.kinematics.pose(joint_positions, link_name)

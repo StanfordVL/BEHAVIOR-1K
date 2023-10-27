@@ -2,11 +2,15 @@ import numpy as np
 from math import ceil
 
 import omnigibson as og
+from omnigibson.macros import create_module_macros
 from omnigibson.object_states import ContactBodies
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.control_utils import IKSolver
 from pxr import PhysicsSchemaTools, Gf
 
+m = create_module_macros(module_path=__file__)
+m.ANGLE_DIFF = 0.3
+m.DIST_DIFF = 0.1
 
 def _wrap_angle(theta):
     """"
@@ -26,7 +30,6 @@ def plan_base_motion(
     end_conf,
     context,
     planning_time=15.0,
-    **kwargs
 ):
     """
     Plans a base motion to a 2d pose
@@ -42,9 +45,6 @@ def plan_base_motion(
     """
     from ompl import base as ob
     from ompl import geometric as ompl_geo
-
-    ANGLE_DIFF = 0.3
-    DIST_DIFF = 0.1
 
     class CustomMotionValidator(ob.MotionValidator):
 
@@ -67,7 +67,7 @@ def plan_base_motion(
 
             # Navigation
             dist = np.linalg.norm(goal[:2] - start[:2])
-            num_points = ceil(dist / DIST_DIFF) + 1
+            num_points = ceil(dist / m.DIST_DIFF) + 1
             nav_x = np.linspace(start[0], goal[0], num_points).tolist()
             nav_y = np.linspace(start[1], goal[1], num_points).tolist()
             for i in range(num_points):
@@ -86,7 +86,7 @@ def plan_base_motion(
             diff = _wrap_angle(final_orientation - start_conf[2])
             direction = np.sign(diff)
             diff = abs(diff)
-            num_points = ceil(diff / ANGLE_DIFF) + 1
+            num_points = ceil(diff / m.ANGLE_DIFF) + 1
             nav_angle = np.linspace(0.0, diff, num_points) * direction
             angles = nav_angle + start_conf[2]
             for i in range(num_points):
@@ -210,7 +210,6 @@ def plan_arm_motion(
     context,
     planning_time=15.0,
     torso_fixed=True,
-    **kwargs
 ):
     """
     Plans an arm motion to a final joint position
@@ -311,7 +310,6 @@ def plan_arm_motion_ik(
     context,
     planning_time=15.0,
     torso_fixed=True,
-    **kwargs
 ):
     """
     Plans an arm motion to a final end effector pose

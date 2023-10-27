@@ -274,6 +274,8 @@ class InverseKinematicsController(ManipulationController):
 
         # Calculate and return IK-backed out joint angles
         current_joint_pos = control_dict["joint_position"][self.dof_idx]
+
+        # TODO: Put anti-drift code in here
         target_joint_pos = self.solver.solve(
             target_pos=target_pos,
             target_quat=target_quat,
