@@ -275,20 +275,25 @@ class InverseKinematicsController(ManipulationController):
         # Calculate and return IK-backed out joint angles
         current_joint_pos = control_dict["joint_position"][self.dof_idx]
 
-        # TODO: Put anti-drift code in here
-        target_joint_pos = self.solver.solve(
-            target_pos=target_pos,
-            target_quat=target_quat,
-            tolerance_pos=m.IK_POS_TOLERANCE,
-            weight_pos=m.IK_POS_WEIGHT,
-            max_iterations=m.IK_MAX_ITERATIONS,
-        )
-
-        if target_joint_pos is None:
-            # Print warning that we couldn't find a valid solution, and return the current joint configuration
-            # instead so that we execute a no-op control
-            log.warning(f"Could not find valid IK configuration! Returning no-op control instead.")
+        # If the delta is really small, we just keep the current joint position. This avoids joint
+        # drift caused by IK solver inaccuracy even when zero delta actions are provided.
+        if np.allclose(pos_relative, target_pos, atol=1e-4) and np.allclose(quat_relative, target_quat, atol=1e-4):
             target_joint_pos = current_joint_pos
+        else:
+            # Otherwise we try to solve for the IK configuration.
+            target_joint_pos = self.solver.solve(
+                target_pos=target_pos,
+                target_quat=target_quat,
+                tolerance_pos=m.IK_POS_TOLERANCE,
+                weight_pos=m.IK_POS_WEIGHT,
+                max_iterations=m.IK_MAX_ITERATIONS,
+            )
+
+            if target_joint_pos is None:
+                # Print warning that we couldn't find a valid solution, and return the current joint configuration
+                # instead so that we execute a no-op control
+                log.warning(f"Could not find valid IK configuration! Returning no-op control instead.")
+                target_joint_pos = current_joint_pos
 
         # Optionally pass through smoothing filter for better stability
         if self.control_filter is not None:

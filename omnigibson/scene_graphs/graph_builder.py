@@ -151,9 +151,14 @@ class SceneGraphBuilder(object):
 
         # Update the position of everything that's already in the scene by using our relative position to last frame.
         old_desired_to_new_desired = world_to_desired_frame @ self._last_desired_frame_to_world
-        for obj in self._G.nodes:
-            self._G.nodes[obj]["pose"] = old_desired_to_new_desired @ self._G.nodes[obj]["pose"]
-            self._G.nodes[obj]["bbox_pose"] = old_desired_to_new_desired @ self._G.nodes[obj]["bbox_pose"]
+        nodes = list(self._G.nodes)
+        poses = np.array([self._G.nodes[obj]["pose"] for obj in nodes])
+        bbox_poses = np.array([self._G.nodes[obj]["bbox_pose"] for obj in nodes])
+        updated_poses = old_desired_to_new_desired @ poses
+        updated_bbox_poses = old_desired_to_new_desired @ bbox_poses
+        for i, obj in enumerate(nodes):
+            self._G.nodes[obj]["pose"] = updated_poses[i]
+            self._G.nodes[obj]["bbox_pose"] = updated_bbox_poses[i]
 
         # Update the robot's pose. We don't want to accumulate errors because of the repeated transforms.
         self._G.nodes[self._robot]["pose"] = world_to_desired_frame @ self._get_robot_to_world_transform()

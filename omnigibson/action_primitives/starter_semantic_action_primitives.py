@@ -20,9 +20,10 @@ from scipy.spatial.transform import Rotation, Slerp
 import omnigibson as og
 from omnigibson import object_states
 from omnigibson.action_primitives.action_primitive_set_base import ActionPrimitiveError, ActionPrimitiveErrorGroup, BaseActionPrimitiveSet
+from omnigibson.controllers import JointController, DifferentialDriveController
 from omnigibson.utils.object_state_utils import sample_cuboid_for_predicate
 from omnigibson.objects.object_base import BaseObject
-from omnigibson.robots import BaseRobot
+from omnigibson.robots import BaseRobot, Fetch, Tiago
 from omnigibson.tasks.behavior_task import BehaviorTask
 from omnigibson.utils.motion_planning_utils import (
     plan_base_motion,
@@ -87,7 +88,7 @@ LOW_PRECISION_ANGLE_THRESHOLD = 0.2
 
 TORSO_FIXED = False
 JOINT_POS_DIFF_THRESHOLD = 0.005
-
+JOINT_CONTROL_MIN_ACTION = 0.0
 MAX_ALLOWED_JOINT_ERROR_FOR_LINEAR_MOTION = np.deg2rad(45)
 
 log = create_module_log(module_name=__name__)
@@ -227,7 +228,14 @@ class StarterSemanticActionPrimitiveSet(IntEnum):
 class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
     def __init__(self, env, add_context=False, enable_head_tracking=True, always_track_eef=False):
         """
-        
+        Initializes a StarterSemanticActionPrimitives generator.
+
+        Args:
+            env (Environment): The environment that the primitives will run on.
+            add_context (bool): Whether to add text context to the return value. Defaults to False.
+            enable_head_tracking (bool): Whether to enable head tracking. Defaults to True.
+            always_track_eef (bool, optional): Whether to always track the end effector, as opposed
+              to switching between target object and end effector based on context. Defaults to False.
         """
         log.warning(
             "The StarterSemanticActionPrimitive is a work-in-progress and is only provided as an example. "
@@ -245,6 +253,17 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             StarterSemanticActionPrimitiveSet.TOGGLE_ON: self._toggle_on,
             StarterSemanticActionPrimitiveSet.TOGGLE_OFF: self._toggle_off,
         }
+        # Validate the robot
+        assert isinstance(self.robot, (Fetch, Tiago)), "StarterSemanticActionPrimitives only works with Fetch and Tiago."
+        assert isinstance(self.robot.controllers["base"], (JointController, DifferentialDriveController)), \
+            "StarterSemanticActionPrimitives only works with a JointController or DifferentialDriveController at the robot base."
+        self._base_controller_is_joint = isinstance(self.robot.controllers["base"], JointController)
+        if self.__base_controller_is_joint:
+            assert self.robot.controllers["base"].use_delta_commands, \
+                "StarterSemanticActionPrimitives only works with a base JointController with delta commands enabled."
+            assert self.robot.controllers["base"].command_dim == 3, \
+                "StarterSemanticActionPrimitives only works with a base JointController with 3 dof (x, y, theta)."
+
         self.arm = self.robot.default_arm
         self.robot_model = self.robot.model_name
         self.robot_base_mass = self.robot._links["base_link"].mass
@@ -560,9 +579,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Returns:
             np.array or None: Action array for one step for the robot to move base or None if its at the target pose
         """
-        initial_eef_pos = self.robot.get_eef_position()
         for _ in range(steps):
-            action = self._empty_action(arm_pose_to_keep=initial_eef_pos)
+            action = self._empty_action()
             action[self.robot.controller_action_idx["gripper_{}".format(self.arm)]] = 1.0
             action[self.robot.base_control_idx[0]] = -speed
             yield self._postprocess_action(action)
@@ -578,9 +596,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Returns:
             np.array or None: Action array for one step for the robot to move hand or None if its at the target pose
         """
-        initial_eef_pos = self.robot.get_eef_position()
         for _ in range(steps):
-            action = self._empty_action(arm_pose_to_keep=initial_eef_pos)
+            action = self._empty_action()
             action[self.robot.controller_action_idx["gripper_{}".format(self.arm)]] = 1.0
             action[self.robot.controller_action_idx["arm_{}".format(self.arm)][0]] = -speed
             yield self._postprocess_action(action)
@@ -597,9 +614,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             np.array or None: Action array for one step for the robot to move hand or None if its at the target pose
         """
         # TODO: Combine these movement functions.
-        initial_eef_pos = self.robot.get_eef_position()
         for _ in range(steps):
-            action = self._empty_action(arm_pose_to_keep=initial_eef_pos)
+            action = self._empty_action()
             action[self.robot.controller_action_idx["gripper_{}".format(self.arm)]] = 1.0
             action[self.robot.controller_action_idx["arm_{}".format(self.arm)][2]] = speed
             yield self._postprocess_action(action)
@@ -960,18 +976,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             interpolated_plan += np.linspace(plan[i], plan[i+1], num_intervals, endpoint=False).tolist()
         interpolated_plan.append(plan[-1].tolist())
         return interpolated_plan
-    
-    def _compute_delta_command(self, diff_joint_pos, gain=1.0, min_action=0.0):
-        # for joints not within thresh, set a minimum action value
-        # for joints within thres, set action to zero
-        delta_action = gain * diff_joint_pos
-        delta_action[abs(delta_action) < min_action] = np.sign(delta_action[abs(delta_action) < min_action]) * min_action
-        delta_action[abs(diff_joint_pos) < JOINT_POS_DIFF_THRESHOLD] = 0.0
-        if not TORSO_FIXED:
-            delta_action = np.concatenate([np.zeros(1), delta_action])
-        
-        return delta_action
-        
+           
     def _move_hand_direct_joint(self, joint_pos, control_idx, stop_on_contact=False, max_steps_for_hand_move=MAX_STEPS_FOR_HAND_MOVE, ignore_failure=False):
         """
         Yields action for the robot to move its arm to reach the specified joint positions by directly actuating with no planner
@@ -993,23 +998,24 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         controller_name = "arm_{}".format(self.arm)
         
         action[self.robot.controller_action_idx[controller_name]] = joint_pos
-        prev_eef_pos = [0.0, 0.0, 0.0]
+        prev_eef_pos = np.zeros(3)
 
         for _ in range(max_steps_for_hand_move):
             current_joint_pos = self.robot.get_joint_positions()[control_idx]
-            diff_joint_pos = np.absolute(np.array(current_joint_pos) - np.array(joint_pos))
-            if max(diff_joint_pos) < JOINT_POS_DIFF_THRESHOLD:
+            diff_joint_pos = np.array(current_joint_pos) - np.array(joint_pos)
+            if np.max(np.abs(diff_joint_pos)) < JOINT_POS_DIFF_THRESHOLD:
                 return
             if stop_on_contact and detect_robot_collision_in_sim(self.robot, ignore_obj_in_hand=False):
                 return
-            if max(np.abs(np.array(self.robot.get_eef_position(self.arm) - prev_eef_pos))) < 0.0001:
+            if np.max(np.abs(self.robot.get_eef_position(self.arm) - prev_eef_pos)) < 0.0001:
                 raise ActionPrimitiveError(
                         ActionPrimitiveError.Reason.EXECUTION_ERROR,
-                        f"Hand is stuck"
+                        f"Hand got stuck during execution."
                     )
             
             if use_delta:
-                action[self.robot.controller_action_idx[controller_name]] = self._compute_delta_command(controller_name, diff_joint_pos)
+                # Convert actions to delta.
+                action[self.robot.controller_action_idx[controller_name]] = diff_joint_pos
 
             prev_eef_pos = self.robot.get_eef_position(self.arm)
             yield self._postprocess_action(action)
@@ -1195,9 +1201,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Returns:
             np.array or None: Action array for one step for the robot to grasp or None if its done grasping
         """
-        initial_eef_pos = self.robot.get_eef_position()
         for _ in range(MAX_STEPS_FOR_GRASP_OR_RELEASE):
-            action = self._empty_action(arm_pose_to_keep=initial_eef_pos)
+            action = self._empty_action()
             controller_name = "gripper_{}".format(self.arm)
             action[self.robot.controller_action_idx[controller_name]] = -1.0
             yield self._postprocess_action(action)
@@ -1209,9 +1214,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Returns:
             np.array or None: Action array for one step for the robot to release or None if its done releasing
         """
-        initial_eef_pos = self.robot.get_eef_position()
         for _ in range(MAX_STEPS_FOR_GRASP_OR_RELEASE):
-            action = self._empty_action(arm_pose_to_keep=initial_eef_pos)
+            action = self._empty_action()
             controller_name = "gripper_{}".format(self.arm)
             action[self.robot.controller_action_idx[controller_name]] = 1.0
             yield self._postprocess_action(action)
@@ -1303,13 +1307,10 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         return [head1_joint_goal, head2_joint_goal]
         
-    def _empty_action(self, arm_pose_to_keep=None):
+    def _empty_action(self):
         """
-        No op action
+        Get a no-op action that allows us to run simulation without changing robot configuration.
 
-        Args:
-            arm_pose_to_keep (array) : if provided, returns action that keeps the arm in this pose.
-                Currently only used in IK control pose_absolute_ori mode: assumes [eef position] 
         Returns:
             np.array or None: Action array for one step for the robot to do nothing
         """
@@ -1326,8 +1327,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 current_ori = T.quat2axisangle(current_quat)
                 control_idx = self.robot.controller_action_idx["arm_" + self.arm]
                 action[control_idx[3:]] = current_ori
-                if arm_pose_to_keep is not None:
-                    action[control_idx[:3]] = arm_pose_to_keep - self.robot.get_eef_position()
 
         return action
 
@@ -1524,7 +1523,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             
         end_pose = self._get_robot_pose_from_2d_pose(pose_2d)
         body_target_pose = self._get_pose_in_robot_frame(end_pose)
-        initial_eef_pos = self.robot.get_eef_position()
 
         while np.linalg.norm(body_target_pose[0][:2]) > dist_threshold:
             diff_pos = end_pose[0] - self.robot.get_position()
@@ -1534,8 +1532,8 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             if abs(diff_yaw) > DEFAULT_ANGLE_THRESHOLD:
                 yield from self._rotate_in_place(intermediate_pose, angle_threshold=DEFAULT_ANGLE_THRESHOLD)
             else:
-                action = self._empty_action(arm_pose_to_keep=initial_eef_pos)
-                if self.robot_model == "Tiago":
+                action = self._empty_action()
+                if self._base_controller_is_joint:
                     direction_vec = body_target_pose[0][:2] / np.linalg.norm(body_target_pose[0][:2]) * KP_LIN_VEL
                     base_action = [direction_vec[0], direction_vec[1], 0.0]
                     action[self.robot.controller_action_idx["base"]] = base_action
@@ -1562,22 +1560,21 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         """
         body_target_pose = self._get_pose_in_robot_frame(end_pose)
         diff_yaw = T.quat2euler(body_target_pose[1])[2]
-        initial_eef_pos = self.robot.get_eef_position()
 
         while abs(diff_yaw) > angle_threshold:
-            action = self._empty_action(arm_pose_to_keep=initial_eef_pos)
+            action = self._empty_action()
 
             direction = -1.0 if diff_yaw < 0.0 else 1.0
             ang_vel = KP_ANGLE_VEL * direction
 
-            base_action = [0.0, 0.0, ang_vel] if self.robot_model == "Tiago" else [0.0, ang_vel]
+            base_action = [0.0, 0.0, ang_vel] if self._base_controller_is_joint else [0.0, ang_vel]
             action[self.robot.controller_action_idx["base"]] = base_action
             yield self._postprocess_action(action)
 
             body_target_pose = self._get_pose_in_robot_frame(end_pose)
             diff_yaw = T.quat2euler(body_target_pose[1])[2]
         
-        empty_action = self._empty_action(arm_pose_to_keep=initial_eef_pos)
+        empty_action = self._empty_action()
         yield self._postprocess_action(empty_action)
             
     def _sample_pose_near_object(self, obj, pose_on_obj=None, **kwargs):
@@ -1807,13 +1804,12 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         Returns:
             np.array or None: Action array for one step for the robot to do nothing
         """
-        initial_eef_pos = self.robot.get_eef_position()
         for _ in range(30):
-            empty_action = self._empty_action(arm_pose_to_keep=initial_eef_pos)
+            empty_action = self._empty_action()
             yield self._postprocess_action(empty_action)
 
         for _ in range(MAX_STEPS_FOR_SETTLING):
             if np.linalg.norm(self.robot.get_linear_velocity()) < 0.01:
                 break
-            empty_action = self._empty_action(arm_pose_to_keep=initial_eef_pos)
+            empty_action = self._empty_action()
             yield self._postprocess_action(empty_action)
