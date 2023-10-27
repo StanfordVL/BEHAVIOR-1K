@@ -291,8 +291,6 @@ class OperationalSpaceController(ManipulationController):
         # Run super first
         super().update_command(command=command)
 
-
-
     def update_goal(self, control_dict, target_pos, target_quat, gains=None):
         """
         Updates the internal goal (ee pos and ee ori mat) based on the inputted delta command
@@ -334,7 +332,7 @@ class OperationalSpaceController(ManipulationController):
                     joint_position: Array of current joint positions
                     joint_velocity: Array of current joint velocities
                     mass_matrix: (N_dof, N_dof) Current mass matrix
-                    <@self.task_name>_jacobian: (6, N_dof) Current jacobian matrix for desired task frame frame
+                    <@self.task_name>_jacobian_relative: (6, N_dof) Current jacobian matrix for desired task frame
                     <@self.task_name>_pos_relative: (x,y,z) relative cartesian position of the desired task frame to
                         control, computed in its local frame (e.g.: robot base frame)
                     <@self.task_name>_quat_relative: (x,y,z,w) relative quaternion orientation of the desired task
@@ -359,7 +357,7 @@ class OperationalSpaceController(ManipulationController):
         q = control_dict["joint_position"][self.dof_idx]
         qd = control_dict["joint_velocity"][self.dof_idx]
         mm = control_dict["mass_matrix"][dof_idxs_mat]
-        j_eef = control_dict[f"{self.task_name}_jacobian"][:, self.dof_idx]
+        j_eef = control_dict[f"{self.task_name}_jacobian_relative"][:, self.dof_idx]
         ee_pos = control_dict[f"{self.task_name}_pos_relative"]
         ee_quat = control_dict[f"{self.task_name}_quat_relative"]
         ee_vel = np.concatenate([control_dict[f"{self.task_name}_lin_vel_relative"], control_dict[f"{self.task_name}_ang_vel_relative"]])

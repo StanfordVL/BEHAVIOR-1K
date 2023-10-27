@@ -402,11 +402,12 @@ class ManipulationRobot(BaseRobot):
         dic = super().get_control_dict()
 
         for arm in self.arm_names:
-            dic[f"eef_{arm}_pos_relative"] = self.get_relative_eef_position(arm)
-            dic[f"eef_{arm}_quat_relative"] = self.get_relative_eef_orientation(arm)
+            rel_eef_pos, rel_eef_quat = self.get_relative_eef_pose(arm)
+            dic[f"eef_{arm}_pos_relative"] = rel_eef_pos
+            dic[f"eef_{arm}_quat_relative"] = rel_eef_quat
             dic[f"eef_{arm}_lin_vel_relative"] = self.get_relative_eef_lin_vel(arm)
             dic[f"eef_{arm}_ang_vel_relative"] = self.get_relative_eef_ang_vel(arm)
-            dic[f"eef_{arm}_jacobian"] = self.get_jacobian()[self._eef_link_idxs[arm], :, -self.n_joints:]
+            dic[f"eef_{arm}_jacobian_relative"] = self.get_relative_jacobian()[self._eef_link_idxs[arm], :, -self.n_joints:]
 
         return dic
 
@@ -692,8 +693,11 @@ class ManipulationRobot(BaseRobot):
         arm = self.default_arm if arm == "default" else arm
         eef_link_pose = self.eef_links[arm].get_position_orientation()
         base_link_pose = self.get_position_orientation()
-        pose = T.relative_pose_transform(*eef_link_pose, *base_link_pose)
-        return T.pose2mat(pose) if mat else pose
+        pose_mat = T.pose_in_A_to_pose_in_B(
+            pose_A=T.pose2mat(eef_link_pose),
+            pose_A_in_B=np.linalg.inv(T.pose2mat(base_link_pose)),
+        )
+        return pose_mat if mat else T.mat2pose(pose_mat)
 
     def get_relative_eef_position(self, arm="default"):
         """
@@ -732,7 +736,7 @@ class ManipulationRobot(BaseRobot):
         """
         arm = self.default_arm if arm == "default" else arm
         base_link_quat = self.get_orientation()
-        return T.quat2mat(base_link_quat) @ self.eef_links[arm].get_linear_velocity()
+        return T.quat2mat(base_link_quat).T @ self.eef_links[arm].get_linear_velocity()
 
     def get_relative_eef_ang_vel(self, arm="default"):
         """
@@ -745,7 +749,7 @@ class ManipulationRobot(BaseRobot):
         """
         arm = self.default_arm if arm == "default" else arm
         base_link_quat = self.get_orientation()
-        return T.quat2mat(base_link_quat) @ self.eef_links[arm].get_angular_velocity()
+        return T.quat2mat(base_link_quat).T @ self.eef_links[arm].get_angular_velocity()
 
     def _calculate_in_hand_object_rigid(self, arm="default"):
         """
