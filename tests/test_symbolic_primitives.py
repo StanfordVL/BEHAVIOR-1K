@@ -65,7 +65,6 @@ def start_env():
             ],
             "command_output_limits": None,
             "use_delta_commands": True,
-            "use_single_command": True
           },
           "camera": {
             "name": "JointController",

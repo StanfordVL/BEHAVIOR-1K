@@ -13,10 +13,6 @@ from omnigibson.object_states.factory import get_state_name
 from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanStateMixin, RelativeObjectState
 from omnigibson.utils import transform_utils as T
 
-m = create_module_macros(module_path=__file__)
-
-m.DRAW_EVERY = 1
-
 
 def _formatted_aabb(obj):
     return T.pose2mat((obj.aabb_center, [0, 0, 0, 1])), obj.aabb_extent
