@@ -501,7 +501,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                         {"target object": obj.name},
                     )
 
-                grasp_pose, target_poses, object_direction, relevant_joint, grasp_required, pos_change = grasp_data
+                relevant_joint, grasp_pose, target_poses, object_direction, grasp_required, pos_change = grasp_data
                 if abs(pos_change) < 0.1:
                     indented_print("Yaw change is small and done,", pos_change)
                     return
