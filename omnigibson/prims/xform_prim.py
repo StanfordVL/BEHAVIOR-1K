@@ -154,6 +154,8 @@ class XFormPrim(BasePrim):
         position = current_position if position is None else np.array(position, dtype=float)
         orientation = current_orientation if orientation is None else np.array(orientation, dtype=float)
         orientation = orientation[[3, 0, 1, 2]]     # Flip from x,y,z,w to w,x,y,z
+        assert np.isclose(np.linalg.norm(orientation), 1, atol=1e-3), \
+            f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
 
         mat = Gf.Transform()
         mat.SetRotation(Gf.Rotation(Gf.Quatd(*orientation)))

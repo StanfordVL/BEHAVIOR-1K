@@ -710,6 +710,8 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             position = current_position
         if orientation is None:
             orientation = current_orientation
+        assert np.isclose(np.linalg.norm(orientation), 1, atol=1e-3), \
+            f"{self.name} desired orientation {orientation} is not a unit quaternion."
 
         # If the simulator is playing, set the 6 base joints to achieve the desired pose of base_footprint link frame
         if self._dc is not None and self._dc.is_simulating():

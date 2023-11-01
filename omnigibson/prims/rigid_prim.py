@@ -294,6 +294,8 @@ class RigidPrim(XFormPrim):
                 position = current_position
             if orientation is None:
                 orientation = current_orientation
+            assert np.isclose(np.linalg.norm(orientation), 1, atol=1e-3), \
+                f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
             pose = _dynamic_control.Transform(position, orientation)
             self._dc.set_rigid_body_pose(self._handle, pose)
         else:
@@ -308,7 +310,9 @@ class RigidPrim(XFormPrim):
             # Call super method by default
             pos, ori = super().get_position_orientation()
 
-        return np.array(pos), np.array(ori)
+        assert np.isclose(np.linalg.norm(ori), 1, atol=1e-3), \
+            f"{self.prim_path} orientation {ori} is not a unit quaternion."
+        return pos, ori
 
     def set_local_pose(self, translation=None, orientation=None):
         if self.dc_is_accessible:
