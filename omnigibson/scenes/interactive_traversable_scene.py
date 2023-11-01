@@ -4,6 +4,7 @@ from omnigibson.robots.robot_base import m as robot_macros
 from omnigibson.scenes.traversable_scene import TraversableScene
 from omnigibson.maps.segmentation_map import SegmentationMap
 from omnigibson.utils.asset_utils import get_og_scene_path
+from omnigibson.utils.constants import STRUCTURE_CATEGORIES
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
@@ -175,7 +176,7 @@ class InteractiveTraversableScene(TraversableScene):
 
         # Do not load these object categories (can blacklist building structures as well)
         task_relevant_names = set(task_metadata["inst_to_name"].values()) if "inst_to_name" in task_metadata else set()
-        is_task_relevant = name in task_relevant_names or category in ("walls", "floors")
+        is_task_relevant = name in task_relevant_names or category in STRUCTURE_CATEGORIES
         not_blacklisted = (
             (self.not_load_object_categories is None or category not in self.not_load_object_categories) and
             (not self.load_task_relevant_only or is_task_relevant)

@@ -281,13 +281,23 @@ class InverseKinematicsController(ManipulationController):
             target_joint_pos = current_joint_pos
         else:
             # Otherwise we try to solve for the IK configuration.
-            target_joint_pos = self.solver.solve(
-                target_pos=target_pos,
-                target_quat=target_quat,
-                tolerance_pos=m.IK_POS_TOLERANCE,
-                weight_pos=m.IK_POS_WEIGHT,
-                max_iterations=m.IK_MAX_ITERATIONS,
-            )
+            if self._condition_on_current_position:
+                target_joint_pos = self.solver.solve(
+                    target_pos=target_pos,
+                    target_quat=target_quat,
+                    current_joint_pos=current_joint_pos,
+                    tolerance_pos=m.IK_POS_TOLERANCE,
+                    weight_pos=m.IK_POS_WEIGHT,
+                    max_iterations=m.IK_MAX_ITERATIONS,
+                )
+            else:
+                target_joint_pos = self.solver.solve(
+                    target_pos=target_pos,
+                    target_quat=target_quat,
+                    tolerance_pos=m.IK_POS_TOLERANCE,
+                    weight_pos=m.IK_POS_WEIGHT,
+                    max_iterations=m.IK_MAX_ITERATIONS,
+                )
 
             if target_joint_pos is None:
                 # Print warning that we couldn't find a valid solution, and return the current joint configuration

@@ -243,7 +243,13 @@ class XFormPrim(BasePrim):
         projecting the forward vector onto the XY plane and then computing the angle.
         """
         fwd = R.from_quat(self.get_orientation()).apply([1, 0, 0])
-        fwd[2] = 0
+        fwd[2] = 0.
+
+        # If the object is facing close to straight up, then we can't compute a 2D orientation
+        # in that case, we return zero.
+        if np.linalg.norm(fwd) < 1e-4:
+            return 0.
+
         fwd /= np.linalg.norm(fwd)
         return np.arctan2(fwd[1], fwd[0])
 
