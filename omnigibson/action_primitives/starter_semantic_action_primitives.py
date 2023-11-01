@@ -46,7 +46,7 @@ from omnigibson.utils.control_utils import FKSolver
 
 from omni.usd.commands import CopyPrimCommand, CreatePrimCommand
 from omni.isaac.core.utils.prims import get_prim_at_path
-from omnigibson.utils.ui_utils import create_module_log
+from omnigibson.utils.ui_utils import create_module_logger
 from pxr import Gf
 
 from omnigibson.objects.usd_object import USDObject
@@ -85,7 +85,7 @@ m.JOINT_POS_DIFF_THRESHOLD = 0.005
 m.JOINT_CONTROL_MIN_ACTION = 0.0
 m.MAX_ALLOWED_JOINT_ERROR_FOR_LINEAR_MOTION = np.deg2rad(45)
 
-log = create_module_log(module_name=__name__)
+log = create_module_logger(module_name=__name__)
 
 
 def indented_print(msg, *args, **kwargs):
@@ -254,9 +254,11 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         assert isinstance(self.robot.controllers["base"], (JointController, DifferentialDriveController)), \
             "StarterSemanticActionPrimitives only works with a JointController or DifferentialDriveController at the robot base."
         self._base_controller_is_joint = isinstance(self.robot.controllers["base"], JointController)
-        if self.__base_controller_is_joint:
-            assert self.robot.controllers["base"].use_delta_commands, \
-                "StarterSemanticActionPrimitives only works with a base JointController with delta commands enabled."
+        if self._base_controller_is_joint:
+            assert self.robot.controllers["base"].control_type == ControlType.VELOCITY, \
+                "StarterSemanticActionPrimitives only works with a base JointController with velocity mode."
+            assert not self.robot.controllers["base"].use_delta_commands, \
+                "StarterSemanticActionPrimitives only works with a base JointController with absolute mode."
             assert self.robot.controllers["base"].command_dim == 3, \
                 "StarterSemanticActionPrimitives only works with a base JointController with 3 dof (x, y, theta)."
 
@@ -357,7 +359,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                         copy_robot_meshes[link_name][mesh_name] = copy_mesh
                         copy_robot_meshes_relative_poses[link_name][mesh_name] = relative_pose
 
-                copy_robot_links_relative_poses[link_name] = T.relative_pose_transform(*link.get_position_orientation(), *robot.get_position_orientation())
+                copy_robot_links_relative_poses[link_name] = T.relative_pose_transform(*link.get_position_orientation(), *self.robot.get_position_orientation())
             
             if robot_type == "simplified":
                 og.sim.remove_object(robot_to_copy)
