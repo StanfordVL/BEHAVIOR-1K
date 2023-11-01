@@ -161,8 +161,7 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
 
         # Perform forced assisted grasp
         obj.set_position(self.robot.get_eef_position(self.arm))
-        self.robot._ag_data[self.arm] = (obj, obj.root_link)
-        self.robot._establish_grasp(self.arm, self.robot._ag_data[self.arm], obj.get_position())
+        self.robot._establish_grasp(self.arm, (obj, obj.root_link), obj.get_position())
 
         # Execute for a moment
         yield from self._settle_robot()

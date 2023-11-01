@@ -175,7 +175,6 @@ class ManipulationRobot(BaseRobot):
         self._disable_grasp_handling = disable_grasp_handling
 
         # Initialize other variables used for assistive grasping
-        self._ag_data = {arm: None for arm in self.arm_names}
         self._ag_freeze_joint_pos = {
             arm: {} for arm in self.arm_names
         }  # Frozen positions for keeping fingers held still
@@ -380,7 +379,6 @@ class ManipulationRobot(BaseRobot):
 
         # Remove joint and filtered collision restraints
         og.sim.stage.RemovePrim(self._ag_obj_constraint_params[arm]["ag_joint_prim_path"])
-        self._ag_data[arm] = None
         self._ag_obj_constraints[arm] = None
         self._ag_obj_constraint_params[arm] = {}
         self._ag_freeze_gripper[arm] = False
@@ -1120,8 +1118,7 @@ class ManipulationRobot(BaseRobot):
                     if not applying_grasp:
                         self._release_grasp(arm=arm)
             elif applying_grasp:
-                self._ag_data[arm] = self._calculate_in_hand_object(arm=arm)
-                self._establish_grasp(arm=arm, ag_data=self._ag_data[arm])
+                self._establish_grasp(arm=arm, ag_data=self._calculate_in_hand_object(arm=arm))
 
     def _update_constraint_cloth(self, arm="default"):
         """
@@ -1299,9 +1296,8 @@ class ManipulationRobot(BaseRobot):
                 data = self._ag_obj_constraint_params[arm]
                 obj = og.sim.scene.object_registry("prim_path", data["ag_obj_prim_path"])
                 link = obj.links[data["ag_link_prim_path"].split("/")[-1]]
-                self._ag_data[arm] = (obj, link)
                 self._ag_obj_in_hand[arm] = obj
-                self._establish_grasp(arm=arm, ag_data=self._ag_data[arm], contact_pos=data["contact_pos"])
+                self._establish_grasp(arm=arm, ag_data=(obj, link), contact_pos=data["contact_pos"])
 
     def _serialize(self, state):
         # Call super first
