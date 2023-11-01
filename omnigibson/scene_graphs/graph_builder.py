@@ -143,7 +143,7 @@ class SceneGraphBuilder(object):
         assert self._G is not None, "Cannot step graph builder before starting it."
 
         # Prepare the necessary transformations.
-        desired_frame_to_world, world_to_desired_frame = self._get_desired_frame(self._robot)
+        desired_frame_to_world, world_to_desired_frame = self._get_desired_frame()
 
         # Update the position of everything that's already in the scene by using our relative position to last frame.
         old_desired_to_new_desired = world_to_desired_frame @ self._last_desired_frame_to_world
