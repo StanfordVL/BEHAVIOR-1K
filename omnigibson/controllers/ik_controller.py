@@ -54,6 +54,7 @@ class InverseKinematicsController(ManipulationController):
         mode="pose_delta_ori",
         smoothing_filter_size=None,
         workspace_pose_limiter=None,
+        condition_on_current_position=True,
     ):
         """
         Args:
@@ -108,6 +109,8 @@ class InverseKinematicsController(ManipulationController):
 
                 where pos_command is (x,y,z) cartesian position values, command_quat is (x,y,z,w) quarternion orientation
                 values, and the returned tuple is the processed (pos, quat) command.
+            condition_on_current_position (bool): if True, will use the current joint position as the initial guess for the IK algorithm.
+                Otherwise, will use the default_joint_pos as the initial guess.
         """
         # Store arguments
         control_dim = len(dof_idx)
@@ -124,6 +127,7 @@ class InverseKinematicsController(ManipulationController):
         self.workspace_pose_limiter = workspace_pose_limiter
         self.task_name = task_name
         self.default_joint_pos = default_joint_pos[dof_idx]
+        self.condition_on_current_position = condition_on_current_position
 
         # Create the lula IKSolver
         self.solver = IKSolver(
@@ -281,7 +285,7 @@ class InverseKinematicsController(ManipulationController):
             target_joint_pos = current_joint_pos
         else:
             # Otherwise we try to solve for the IK configuration.
-            if self._condition_on_current_position:
+            if self.condition_on_current_position:
                 target_joint_pos = self.solver.solve(
                     target_pos=target_pos,
                     target_quat=target_quat,

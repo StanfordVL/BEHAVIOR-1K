@@ -160,8 +160,10 @@ class ManipulationRobot(BaseRobot):
                 configurations for this object. This will override any default values specified by this class.
             grasping_mode (str): One of {"physical", "assisted", "sticky"}.
                 If "physical", no assistive grasping will be applied (relies on contact friction + finger force).
-                If "assisted", will magnetize any object touching and within the gripper's fingers.
-                If "sticky", will magnetize any object touching the gripper's fingers.
+                If "assisted", will magnetize any object touching and within the gripper's fingers. In this mode,
+                    at least two "fingers" need to touch the object.
+                If "sticky", will magnetize any object touching the gripper's fingers. In this mode, only one finger
+                    needs to touch the object.
             disable_grasp_handling (bool): If True, the robot will not automatically handle assisted or sticky grasps.
                 Instead, you will need to call the grasp handling methods yourself.
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
@@ -1097,6 +1099,11 @@ class ManipulationRobot(BaseRobot):
             assert cmd_dim == 1, \
                 f"Gripper {arm} controller command dim must be 1 to use assisted grasping, got: {cmd_dim}."
 
+            # We apply a threshold based on the control rather than the command here so that the behavior
+            # stays the same across different controllers and control modes (absolute / delta). This way,
+            # a zero action will actually keep the AG setting where it already is.
+            # TODO: Compare this to the iG2 implementation to see if there could be a benefit to using
+            # a combination of control and existing position.
             controller = self._controllers[f"gripper_{arm}"]
             controlled_joints = controller.dof_idx
             threshold = np.mean(np.array(self.control_limits["position"])[:, controlled_joints], axis=0)
