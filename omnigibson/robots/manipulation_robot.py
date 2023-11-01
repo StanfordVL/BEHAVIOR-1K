@@ -44,30 +44,6 @@ AG_MODES = {
 GraspingPoint = namedtuple("GraspingPoint", ["link_name", "position"])  # link_name (str), position (x,y,z tuple)
 
 
-def can_assisted_grasp(obj, link_name):
-    """
-    Check whether an object @obj can be grasped. This is done
-    by checking its category to see if is in the allowlist.
-
-    Args:
-        obj (BaseObject): Object targeted for an assisted grasp
-
-    Returns:
-        bool: Whether or not this object can be grasped
-    """
-
-    # Allow based on mass
-    mass = obj.links[link_name].mass
-    if mass <= m.ASSIST_GRASP_MASS_THRESHOLD:
-        return True
-    
-    # Also allow AG of moving links of fixed objects
-    if obj.fixed_base and obj.links[link_name] != obj.root_link:
-        return True
-    
-    return False
-
-
 class ManipulationRobot(BaseRobot):
     """
     Robot that is is equipped with grasping (manipulation) capabilities.
@@ -787,7 +763,7 @@ class ManipulationRobot(BaseRobot):
         ag_obj = og.sim.scene.object_registry("prim_path", ag_obj_prim_path)
 
         # Return None if object cannot be assisted grasped or not touching at least two fingers
-        if ag_obj is None or (not can_assisted_grasp(ag_obj, ag_obj_link_name)) or (not touching_at_least_two_fingers):
+        if ag_obj is None or not touching_at_least_two_fingers:
             return None
 
         # Get object and its contacted link
@@ -989,6 +965,43 @@ class ManipulationRobot(BaseRobot):
 
         return cfg
 
+    def _get_assisted_grasp_joint_type(self, ag_obj, ag_link):
+        """
+        Check whether an object @obj can be grasped. If so, return the joint type to use for assisted grasping.
+        Otherwise, return None.
+
+        Args:
+            ag_obj (BaseObject): Object targeted for an assisted grasp
+            ag_link (RigidPrim): Link of the object to be grasped
+
+        Returns:
+            (None or str): If obj can be grasped, returns the joint type to use for assisted grasping.
+        """
+
+        # Deny objects that are too heavy and are not a non-base link of a fixed-base object)
+        mass = ag_link.mass
+        if mass > m.ASSIST_GRASP_MASS_THRESHOLD and not (ag_obj.fixed_base and ag_link != ag_obj.root_link):
+            return None
+        
+        # Otherwise, compute the joint type. We use a fixed joint unless the link is a non-fixed link.
+        joint_type = "FixedJoint"
+        if ag_obj.root_link != ag_link:
+            # We search up the tree path from the ag_link until we encounter the root (joint == 0) or a non fixed
+            # joint (e.g.: revolute or fixed)
+            link_handle = ag_link.handle
+            joint_handle = self._dc.get_rigid_body_parent_joint(link_handle)
+            while joint_handle != 0:
+                # If this joint type is not fixed, we've encountered a valid moving joint
+                # So we create a spherical joint rather than fixed joint
+                if self._dc.get_joint_type(joint_handle) != JointType.JOINT_FIXED:
+                    joint_type = "SphericalJoint"
+                    break
+                # Grab the parent link and its parent joint for the link
+                link_handle = self._dc.get_joint_parent_body(joint_handle)
+                joint_handle = self._dc.get_rigid_body_parent_joint(link_handle)
+
+        return joint_type
+
     def _establish_grasp_rigid(self, arm="default", ag_data=None, contact_pos=None):
         """
         Establishes an ag-assisted grasp, if enabled.
@@ -1007,22 +1020,10 @@ class ManipulationRobot(BaseRobot):
             return
         ag_obj, ag_link = ag_data
 
-        # Create a p2p joint if it's a child link of a fixed URDF that is connected by a revolute or prismatic joint
-        joint_type = "FixedJoint"
-        if ag_obj.fixed_base or ag_obj.root_link != ag_link:
-            # We search up the tree path from the ag_link until we encounter the root (joint == 0) or a non fixed
-            # joint (e.g.: revolute or fixed)
-            link_handle = ag_link.handle
-            joint_handle = self._dc.get_rigid_body_parent_joint(link_handle)
-            while joint_handle != 0:
-                # If this joint type is not fixed, we've encountered a valid moving joint
-                # So we create a spherical joint rather than fixed joint
-                if self._dc.get_joint_type(joint_handle) != JointType.JOINT_FIXED:
-                    joint_type = "SphericalJoint"
-                    break
-                # Grab the parent link and its parent joint for the link
-                link_handle = self._dc.get_joint_parent_body(joint_handle)
-                joint_handle = self._dc.get_rigid_body_parent_joint(link_handle)
+        # Get the appropriate joint type
+        joint_type = self._get_assisted_grasp_joint_type(ag_obj, ag_link)
+        if joint_type is None:
+            return
 
         if contact_pos is None:
             force_data, _ = self._find_gripper_contacts(arm=arm, return_contact_positions=True)
