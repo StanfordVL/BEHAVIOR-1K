@@ -24,7 +24,8 @@ scene:
   include_robots: false
 
 robots:
-  - type: Tiago
+  - name: tiago
+    type: Tiago
     obs_modalities: [scan, rgb, depth]
     scale: 1.0
     self_collisions: true
