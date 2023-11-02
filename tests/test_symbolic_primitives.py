@@ -150,8 +150,7 @@ def pan(env):
   return next(iter(env.scene.object_registry("category", "frying_pan")))
 
 @pytest.fixture
-def steak(env):
-  # TODO: Why apple? Use steak.
+def apple(env):
   return next(iter(env.scene.object_registry("category", "apple")))
 
 @pytest.fixture
@@ -162,11 +161,11 @@ def sponge(env):
 def knife(env):
   return next(iter(env.scene.object_registry("category", "carving_knife")))
 
-def test_in_hand_state(env, robot, prim_gen, steak):
-  assert not robot.states[object_states.IsGrasping].get_value(steak)
-  for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.GRASP, steak):
+def test_in_hand_state(env, robot, prim_gen, apple):
+  assert not robot.states[object_states.IsGrasping].get_value(apple)
+  for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.GRASP, apple):
     env.step(action)
-  assert robot.states[object_states.IsGrasping].get_value(steak)
+  assert robot.states[object_states.IsGrasping].get_value(apple)
 
 # def test_navigate():
 #    pass
@@ -184,24 +183,24 @@ def test_close(env, prim_gen, fridge):
     env.step(action)
   assert not fridge.states[object_states.Open].get_value()
 
-def test_place_inside(env, prim_gen, steak, fridge):
-  assert not steak.states[object_states.Inside].get_value(fridge)
+def test_place_inside(env, prim_gen, apple, fridge):
+  assert not apple.states[object_states.Inside].get_value(fridge)
   assert not fridge.states[object_states.Open].get_value()
   for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.OPEN, fridge):
     env.step(action)
-  for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.GRASP, steak):
+  for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.GRASP, apple):
     env.step(action)
   for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.PLACE_INSIDE, fridge):
     env.step(action)
-  assert steak.states[object_states.Inside].get_value(fridge)
+  assert apple.states[object_states.Inside].get_value(fridge)
 
-def test_place_ontop(env, prim_gen, steak, pan):
-  assert not steak.states[object_states.OnTop].get_value(pan)
-  for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.GRASP, steak):
+def test_place_ontop(env, prim_gen, apple, pan):
+  assert not apple.states[object_states.OnTop].get_value(pan)
+  for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.GRASP, apple):
     env.step(action)
   for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.PLACE_ON_TOP, pan):
     env.step(action)
-  assert steak.states[object_states.OnTop].get_value(pan)
+  assert apple.states[object_states.OnTop].get_value(pan)
 
 def test_toggle_on(env, prim_gen, stove):
   assert not stove.states[object_states.ToggledOn].get_value()
@@ -263,18 +262,16 @@ def test_wipe(env, prim_gen, sponge, sink, countertop):
     env.step(action)
   assert not countertop.states[object_states.Covered].get_value(mud_system)
 
-def test_cut(env, prim_gen, steak, knife, countertop):
-  # assert not steak.states[object_states.Cut].get_value(knife)
+def test_cut(env, prim_gen, apple, knife, countertop):
+  # assert not apple.states[object_states.Cut].get_value(knife)
   print("Grasping knife")
   for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.GRASP, knife):
     env.step(action)
-  for _ in range(60): og.sim.step()
-  print("Cutting steak")
-  for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.CUT, steak):
+  for _ in range(60): env.step(prim_gen._empty_action())
+  print("Cutting apple")
+  for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.CUT, apple):
     env.step(action)
-  for _ in range(60): og.sim.step()
-  while True:
-    og.sim.render()
+  for _ in range(60): env.step(prim_gen._empty_action())
   print("Putting knife back on countertop")
   for action in prim_gen.apply_ref(SymbolicSemanticActionPrimitiveSet.PLACE_ON_TOP, countertop):
     env.step(action)
@@ -288,15 +285,15 @@ def test_cut(env, prim_gen, steak, knife, countertop):
 def main():
   env = start_env()
   prim_gen = SymbolicSemanticActionPrimitives(env)
-  steak = next(iter(env.scene.object_registry("category", "apple")))
+  apple = next(iter(env.scene.object_registry("category", "apple")))
   knife = next(iter(env.scene.object_registry("category", "carving_knife")))
   countertop = next(iter(env.scene.object_registry("category", "countertop")))
 
   print("Will start in 3 seconds")
-  for _ in range(120): og.sim.step()
+  for _ in range(180): env.step(prim_gen._empty_action())
 
   try:
-    test_cut(env, prim_gen, steak, knife, countertop)
+    test_cut(env, prim_gen, apple, knife, countertop)
   except:
     raise
   while True:
