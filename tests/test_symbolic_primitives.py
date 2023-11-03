@@ -9,7 +9,7 @@ gm.USE_FLATCACHE = True
 import omnigibson as og
 from omnigibson import object_states
 from omnigibson.action_primitives.symbolic_semantic_action_primitives import SymbolicSemanticActionPrimitiveSet, SymbolicSemanticActionPrimitives
-from omnigibson.systems import REGISTERED_SYSTEMS
+from omnigibson.systems import get_system
 
 
 def start_env():
@@ -208,8 +208,8 @@ def test_toggle_on(env, prim_gen, stove):
     env.step(action)
   assert stove.states[object_states.ToggledOn].get_value()
 
-def test_soak_under(env, prim_gen, sponge, sink):
-  water_system = REGISTERED_SYSTEMS["water"]
+def test_soak_under(env, prim_gen, robot, sponge, sink):
+  water_system = get_system("water", force_active=True)
   assert not sponge.states[object_states.Saturated].get_value(water_system)
   assert not sink.states[object_states.ToggledOn].get_value()
 
@@ -233,12 +233,12 @@ def test_soak_under(env, prim_gen, sponge, sink):
 
 def test_wipe(env, prim_gen, sponge, sink, countertop):
   # Some pre-assertions
-  water_system = REGISTERED_SYSTEMS["water"]
+  water_system = get_system("water", force_active=True)
   assert not sponge.states[object_states.Saturated].get_value(water_system)
   assert not sink.states[object_states.ToggledOn].get_value()
 
   # Dirty the countertop as the setup
-  mud_system = REGISTERED_SYSTEMS["mud"]
+  mud_system = get_system("mud", force_active=True)
   countertop.states[object_states.Covered].set_value(mud_system, True)
   assert countertop.states[object_states.Covered].get_value(mud_system)
 
