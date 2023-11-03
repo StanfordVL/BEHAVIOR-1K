@@ -16,10 +16,10 @@ from omnigibson.object_states.update_state_mixin import UpdateStateMixin
 from omnigibson.systems.system_base import VisualParticleSystem, PhysicalParticleSystem, get_system, \
     is_visual_particle_system, is_physical_particle_system, is_system_active, REGISTERED_SYSTEMS
 from omnigibson.utils.constants import ParticleModifyMethod, ParticleModifyCondition, PrimType
+from omnigibson.utils.deprecated_utils import Core
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function, \
     get_particle_positions_in_frame, get_particle_positions_from_frame
 from omnigibson.utils.python_utils import classproperty
-from omnigibson.utils.deprecated_utils import Core
 from omnigibson.utils.ui_utils import suppress_omni_log
 from omnigibson.utils.usd_utils import create_primitive_mesh, FlatcacheAPI
 import omnigibson.utils.transform_utils as T
@@ -115,6 +115,7 @@ def create_projection_visualization(
     source.GetRadiusAttr().Set(source_radius)
     # Also make the prim invisible
     UsdGeom.Imageable(source.GetPrim()).MakeInvisible()
+
     # Generate the ComputeGraph nodes to render the projection
     core = Core(lambda val: None, particle_system_name=projection_name)
 
@@ -509,6 +510,36 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
 
         return condition
 
+    def supports_system(self, system_name):
+        """
+        Checks whether this particle modifier supports adding/removing a particle from the specified
+        system, e.g. whether there exists any configuration (toggled on, etc.) in which this modifier
+        can be used to interact with any particles of this system.
+
+        Args:
+            system_name (str): Name of the particle system to check
+
+        Returns:
+            bool: Whether this particle modifier can add or remove a particle from the specified system
+        """
+        return system_name in self.conditions
+
+    def check_conditions_for_system(self, system_name):
+        """
+        Checks whether this particle modifier can add or remove a particle from the specified system
+        in its current configuration, e.g. all of the conditions for addition/removal other than
+        physical position are met.
+
+        Args:
+            system_name (str): Name of the particle system to check
+
+        Returns:
+            bool: Whether this particle modifier can add or remove a particle from the specified system
+        """
+        if not self.supports_system(system_name):
+            return False
+        return all(condition(self.obj) for condition in self.conditions[system_name])
+
     def _update(self):
         # If we're using projection method and flatcache, we need to manually update this object's transforms on the USD
         # so the corresponding visualization and overlap meshes are updated properly
@@ -518,11 +549,11 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
         # Check if there's any overlap and if we're at the correct step
         if self._current_step == 0 and (not self.requires_overlap or self._check_overlap()):
             # Iterate over all owned systems for this particle modifier
-            for system_name, conditions in self.conditions.items():
+            for system_name in self.conditions.keys():
                 # Check if the system is active (for ParticleApplier, the system is always active)
                 if is_system_active(system_name):
                     # Check if all conditions are met
-                    if np.all([condition(self.obj) for condition in conditions]):
+                    if self.check_conditions_for_system(system_name):
                         system = get_system(system_name)
                         # Update saturation limit if it's not specified yet
                         limit = self.visual_particle_modification_limit \

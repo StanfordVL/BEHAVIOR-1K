@@ -4,6 +4,7 @@ import numpy as np
 import omnigibson as og
 from omnigibson.objects import REGISTERED_OBJECTS
 from omnigibson.robots import REGISTERED_ROBOTS
+from omnigibson.scene_graphs.graph_builder import SceneGraphBuilder
 from omnigibson.tasks import REGISTERED_TASKS
 from omnigibson.scenes import REGISTERED_SCENES
 from omnigibson.utils.gym_utils import GymObservable, recursively_generate_flat_dict
@@ -70,6 +71,11 @@ class Environment(gym.Env, GymObservable, Recreatable):
         # Merge in specified configs
         for config in configs:
             merge_nested_dicts(base_dict=self.config, extra_dict=parse_config(config), inplace=True)
+
+        # Create the scene graph builder
+        self._scene_graph_builder = None
+        if "scene_graph" in self.config and self.config["scene_graph"] is not None:
+            self._scene_graph_builder = SceneGraphBuilder(**self.config["scene_graph"])
 
         # Set the simulator settings
         og.sim.set_simulation_dt(physics_dt=physics_timestep, rendering_dt=action_timestep)
@@ -321,6 +327,10 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self.load_observation_space()
         self._load_action_space()
 
+        # Start the scene graph builder
+        if self._scene_graph_builder:
+            self._scene_graph_builder.start(self.scene)
+
         # Denote that the scene is loaded
         self._loaded = True
 
@@ -351,6 +361,16 @@ class Environment(gym.Env, GymObservable, Recreatable):
             obs = recursively_generate_flat_dict(dic=obs)
 
         return obs
+    
+    def get_scene_graph(self):
+        """
+        Get the current scene graph.
+
+        Returns:
+            SceneGraph: Current scene graph
+        """
+        assert self._scene_graph_builder is not None, "Scene graph builder must be specified in config!"
+        return self._scene_graph_builder.get_scene_graph()
 
     def _populate_info(self, info):
         """
@@ -363,6 +383,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
             dict: Information dictionary with added info
         """
         info["episode_length"] = self._current_step
+
+        if self._scene_graph_builder is not None:
+            info["scene_graph"] = self.get_scene_graph()
 
     def step(self, action):
         """
@@ -381,41 +404,48 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 - bool: done, i.e. whether this episode is terminated
                 - dict: info, i.e. dictionary with any useful information
         """
-        # If the action is not a dictionary, convert into a dictionary
-        if not isinstance(action, dict) and not isinstance(action, gym.spaces.Dict):
-            action_dict = dict()
-            idx = 0
+        try:
+            # If the action is not a dictionary, convert into a dictionary
+            if not isinstance(action, dict) and not isinstance(action, gym.spaces.Dict):
+                action_dict = dict()
+                idx = 0
+                for robot in self.robots:
+                    action_dim = robot.action_dim
+                    action_dict[robot.name] = action[idx: idx + action_dim]
+                    idx += action_dim
+            else:
+                # Our inputted action is the action dictionary
+                action_dict = action
+
+            # Iterate over all robots and apply actions
             for robot in self.robots:
-                action_dim = robot.action_dim
-                action_dict[robot.name] = action[idx: idx + action_dim]
-                idx += action_dim
-        else:
-            # Our inputted action is the action dictionary
-            action_dict = action
+                robot.apply_action(action_dict[robot.name])
 
-        # Iterate over all robots and apply actions
-        for robot in self.robots:
-            robot.apply_action(action_dict[robot.name])
+            # Run simulation step
+            og.sim.step()
 
-        # Run simulation step
-        og.sim.step()
+            # Grab observations
+            obs = self.get_obs()
 
-        # Grab observations
-        obs = self.get_obs()
+            # Step the scene graph builder if necessary
+            if self._scene_graph_builder is not None:
+                self._scene_graph_builder.step(self.scene)
 
-        # Grab reward, done, and info, and populate with internal info
-        reward, done, info = self.task.step(self, action)
-        self._populate_info(info)
+            # Grab reward, done, and info, and populate with internal info
+            reward, done, info = self.task.step(self, action)
+            self._populate_info(info)
 
-        if done and self._automatic_reset:
-            # Add lost observation to our information dict, and reset
-            info["last_observation"] = obs
-            obs = self.reset()
+            if done and self._automatic_reset:
+                # Add lost observation to our information dict, and reset
+                info["last_observation"] = obs
+                obs = self.reset()
 
-        # Increment step
-        self._current_step += 1
+            # Increment step
+            self._current_step += 1
 
-        return obs, reward, done, info
+            return obs, reward, done, info
+        except:
+            raise ValueError(f"Failed to execute environment step {self._current_step} in episode {self._current_episode}")
 
     def _reset_variables(self):
         """

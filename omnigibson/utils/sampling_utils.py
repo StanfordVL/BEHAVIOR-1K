@@ -20,6 +20,7 @@ log = create_module_logger(module_name=__name__)
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
 
+m.DEBUG_SAMPLING = False
 m.DEFAULT_AABB_OFFSET_FRACTION = 0.02
 m.DEFAULT_PARALLEL_RAY_NORMAL_ANGLE_TOLERANCE = 1.0  # Around 60 degrees
 m.DEFAULT_HIT_TO_PLANE_THRESHOLD = 0.05
@@ -46,7 +47,7 @@ def fit_plane(points, refusal_log):
             - 3-array: (x,y,z) normal of the fitted plane
     """
     if points.shape[0] < points.shape[1]:
-        if gm.DEBUG:
+        if m.DEBUG_SAMPLING:
             refusal_log.append(f"insufficient points to fit a 3D plane: needs 3, has {points.shape[0]}.")
         return None, None
 
@@ -74,7 +75,7 @@ def check_distance_to_plane(points, plane_centroid, plane_normal, hit_to_plane_t
     """
     distances = get_distance_to_plane(points, plane_centroid, plane_normal)
     if np.any(distances > hit_to_plane_threshold):
-        if gm.DEBUG:
+        if m.DEBUG_SAMPLING:
             refusal_log.append("distances to plane: %r" % distances)
         return False
     return True
@@ -563,7 +564,7 @@ def sample_cuboid_on_object_symmetric_bimodal_distribution(
         list of tuple: list of length num_samples elements where each element is a tuple in the form of
             (cuboid_centroid, cuboid_up_vector, cuboid_rotation, {refusal_reason: [refusal_details...]}). Cuboid positions
             are set to None when no successful sampling happens within the max number of attempts. Refusal details are only
-            filled if the gm.DEBUG flag is globally set to True.
+            filled if the m.DEBUG_SAMPLING flag is globally set to True.
     """
     start_points, end_points = sample_raytest_start_end_symmetric_bimodal_distribution(
         obj,
@@ -651,7 +652,7 @@ def sample_cuboid_on_object_full_grid_topdown(
         list of tuple: list of length num_samples elements where each element is a tuple in the form of
             (cuboid_centroid, cuboid_up_vector, cuboid_rotation, {refusal_reason: [refusal_details...]}). Cuboid positions
             are set to None when no successful sampling happens within the max number of attempts. Refusal details are only
-            filled if the gm.DEBUG flag is globally set to True.
+            filled if the m.DEBUG_SAMPLING flag is globally set to True.
     """
     start_points, end_points = sample_raytest_start_end_full_grid_topdown(
         obj,
@@ -735,7 +736,7 @@ def sample_cuboid_on_object(
         list of tuple: list of length num_samples elements where each element is a tuple in the form of
             (cuboid_centroid, cuboid_up_vector, cuboid_rotation, {refusal_reason: [refusal_details...]}). Cuboid positions
             are set to None when no successful sampling happens within the max number of attempts. Refusal details are only
-            filled if the gm.DEBUG flag is globally set to True.
+            filled if the m.DEBUG_SAMPLING flag is globally set to True.
     """
 
     assert start_points.shape == end_points.shape, \
@@ -904,7 +905,7 @@ def sample_cuboid_on_object(
             results[i] = (cuboid_centroid, plane_normal, rotation.as_quat(), hit_link, refusal_reasons)
             break
 
-    if gm.DEBUG:
+    if m.DEBUG_SAMPLING:
         og.log.debug("Sampling rejection reasons:")
         counter = Counter()
 
@@ -934,7 +935,7 @@ def compute_rotation_from_grid_sample(two_d_grid, projected_hits, cuboid_centroi
             generated hit plane. Otherwise, returns None
     """
     if np.sum(hits) < 3:
-        if gm.DEBUG:
+        if m.DEBUG_SAMPLING:
             refusal_log.append(f"insufficient hits to compute the rotation of the grid: needs 3, has {np.sum(hits)}")
         return None
 
@@ -976,7 +977,7 @@ def check_normal_similarity(center_hit_normal, hit_normals, tolerance, refusal_l
         parallel_hit_normal_angles_to_hit_normal < tolerance
     )
     if not all_rays_hit_with_similar_normal:
-        if gm.DEBUG:
+        if m.DEBUG_SAMPLING:
             refusal_log.append("angles %r" % (np.rad2deg(parallel_hit_normal_angles_to_hit_normal),))
 
         return False
@@ -1006,7 +1007,7 @@ def check_rays_hit_object(cast_results, threshold, refusal_log, body_names=None)
         for ray_res in cast_results
     ]
     if sum(ray_hits) / len(cast_results) < threshold:
-        if gm.DEBUG:
+        if m.DEBUG_SAMPLING:
             refusal_log.append(f"{sum(ray_hits)} / {len(cast_results)} < {threshold} hits: {[ray_res['rigidBody'] for ray_res in cast_results if ray_res['hit']]}")
 
         return None
@@ -1029,7 +1030,7 @@ def check_hit_max_angle_from_z_axis(hit_normal, max_angle_with_z_axis, refusal_l
     """
     hit_angle_with_z = np.arccos(np.clip(np.dot(hit_normal, np.array([0, 0, 1])), -1.0, 1.0))
     if hit_angle_with_z > max_angle_with_z_axis:
-        if gm.DEBUG:
+        if m.DEBUG_SAMPLING:
             refusal_log.append("normal %r" % hit_normal)
 
         return False
@@ -1097,7 +1098,7 @@ def check_cuboid_empty(hit_normal, bottom_corner_positions, this_cuboid_dimensio
     Returns:
         bool: True if the cuboid is empty, else False
     """
-    if gm.DEBUG:
+    if m.DEBUG_SAMPLING:
         draw_debug_markers(bottom_corner_positions)
 
     # Compute top corners.
@@ -1119,7 +1120,7 @@ def check_cuboid_empty(hit_normal, bottom_corner_positions, this_cuboid_dimensio
     all_pairs = np.array(top_to_bottom_pairs + bottom_pairs + top_pairs)
     check_cast_results = raytest_batch(start_points=all_pairs[:, 0, :], end_points=all_pairs[:, 1, :])
     if any(ray["hit"] for ray in check_cast_results):
-        if gm.DEBUG:
+        if m.DEBUG_SAMPLING:
             refusal_log.append("check ray info: %r" % (check_cast_results))
 
         return False

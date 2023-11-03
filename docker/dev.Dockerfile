@@ -38,22 +38,24 @@ ENV MAKEFLAGS="-j `nproc`"
 RUN micromamba run -n omnigibson micromamba install -c conda-forge boost && \
     micromamba run -n omnigibson pip install pyplusplus && \
     git clone https://github.com/ompl/ompl.git /ompl && \
-    mkdir -p /ompl/build/Release
+    mkdir -p /ompl/build/Release && \
+    sed -i "s/find_program(PYPY/# find_program(PYPY/g" /ompl/CMakeModules/Findpypy.cmake
 
-# Build and install OMPL
-RUN cd /ompl/build/Release && \
+# Build and install OMPL 
+RUN micromamba run -n omnigibson /bin/bash --login -c 'source /isaac-sim/setup_conda_env.sh && (which python > /root/PYTHON_EXEC) && (echo $PYTHONPATH > /root/PYTHONPATH)' && \
+    cd /ompl/build/Release && \
     micromamba run -n omnigibson cmake ../.. \
       -DCMAKE_INSTALL_PREFIX="$CONDA_PREFIX" \
       -DBOOST_ROOT="$CONDA_PREFIX" \
-      -DPYTHON_EXEC=/micromamba/envs/omnigibson/bin/python3.10 \
-      -DPYTHONPATH=/micromamba/envs/omnigibson/lib/python3.10/site-packages && \
+      -DPYTHON_EXEC=$(cat /root/PYTHON_EXEC) \
+      -DPYTHONPATH=$(cat /root/PYTHONPATH) && \
     micromamba run -n omnigibson make -j 4 update_bindings && \
     micromamba run -n omnigibson make -j 4 && \
     cd py-bindings && \
     micromamba run -n omnigibson make install
 
 # Test OMPL
-RUN micromamba run -n omnigibson python -c "import ompl"
+RUN micromamba run -n omnigibson python -c "from ompl import base"
 
 ENTRYPOINT ["micromamba", "run", "-n", "omnigibson"]
 

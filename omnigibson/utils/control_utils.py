@@ -6,6 +6,54 @@ import numpy as np
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.sim_utils import meets_minimum_isaac_version
 
+class FKSolver:
+    """
+    Class for thinly wrapping Lula Forward Kinematics solver
+    """
+
+    def __init__(
+        self,
+        robot_description_path,
+        robot_urdf_path,
+    ):
+        # Create robot description and kinematics
+        self.robot_description = lula.load_robot(robot_description_path, robot_urdf_path)
+        self.kinematics = self.robot_description.kinematics()
+
+    def get_link_poses(
+        self,
+        joint_positions,
+        link_names,
+    ):
+        """
+        Given @joint_positions, get poses of the desired links (specified by @link_names)
+
+        Args:
+            joint positions (n-array): Joint positions in configuration space
+            link_names (list): List of robot link names we want to specify (e.g. "gripper_link")
+        
+        Returns:
+            link_poses (dict): Dictionary mapping each robot link name to its pose
+        """
+        # TODO: Refactor this to go over all links at once
+        link_poses = {}
+        for link_name in link_names:
+            pose3_lula = self.kinematics.pose(joint_positions, link_name)
+
+            # get position
+            link_position = pose3_lula.translation
+
+            # get orientation
+            rotation_lula = pose3_lula.rotation
+            link_orientation = (
+                rotation_lula.x(),
+                rotation_lula.y(),
+                rotation_lula.z(),
+                rotation_lula.w(),
+            )
+            link_poses[link_name] =  (link_position, link_orientation)
+        return link_poses
+
 
 class IKSolver:
     """
@@ -78,4 +126,7 @@ class IKSolver:
 
         # Compute target joint positions
         ik_results = lula.compute_ik_ccd(self.kinematics, ik_target_pose, self.eef_name, self.config)
-        return np.array(ik_results.cspace_position)
+        if ik_results.success:
+            return np.array(ik_results.cspace_position)
+        else:
+            return None
