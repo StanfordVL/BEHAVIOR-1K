@@ -289,10 +289,10 @@ class InverseKinematicsController(ManipulationController):
                 target_joint_pos = self.solver.solve(
                     target_pos=target_pos,
                     target_quat=target_quat,
-                    current_joint_pos=current_joint_pos,
                     tolerance_pos=m.IK_POS_TOLERANCE,
                     weight_pos=m.IK_POS_WEIGHT,
                     max_iterations=m.IK_MAX_ITERATIONS,
+                    initial_joint_pos=current_joint_pos,
                 )
             else:
                 target_joint_pos = self.solver.solve(

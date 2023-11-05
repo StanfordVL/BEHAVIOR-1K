@@ -91,8 +91,8 @@ class IKSolver:
         Args:
             target_pos (3-array): desired (x,y,z) local target cartesian position in robot's base coordinate frame
             target_quat (4-array or None): If specified, desired (x,y,z,w) local target quaternion orientation in
-            robot's base coordinate frame. If None, IK will be position-only (will override settings such that
-            orientation's tolerance is very high and weight is 0)
+                robot's base coordinate frame. If None, IK will be position-only (will override settings such that
+                orientation's tolerance is very high and weight is 0)
             tolerance_pos (float): Maximum position error (L2-norm) for a successful IK solution
             tolerance_quat (float): Maximum orientation error (per-axis L2-norm) for a successful IK solution
             weight_pos (float): Weight for the relative importance of position error during CCD
