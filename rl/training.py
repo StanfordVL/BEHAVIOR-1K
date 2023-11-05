@@ -11,6 +11,7 @@ from urllib.parse import urlparse
 
 from PIL import Image
 from tqdm import tqdm
+from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitiveSet
 
 from omnigibson.envs.rl_env import RLEnv
 
@@ -225,7 +226,43 @@ class CustomReader(InputReader):
             path = random.choice(self.files)
         self.cur_file_path = path
         return h5py.File(path + "/data.h5", 'r')
+    
+def evaluate(env, algo, episodes):
+    controller = env.env._primitive_controller
 
+    # Data collection
+    episode_lengths = []
+    episode_rewards = []
+
+    for _ in range(episodes):
+        try:
+            obs = env.reset()
+            timestep = 0
+            while True:
+                del obs['robot0']['robot0:eyes_Camera_sensor_rgb']
+                action = algo.compute_single_action(obs['robot0'])
+                action = env.transform_policy_action(action)
+                obs, reward, done, truncated, info = env.step(action)
+                truncated = True if timestep >= 400 else truncated
+                timestep += 1
+                total_reward += reward
+                if done or timestep >= 400:
+                    episode_lengths.append(timestep)
+                    episode_rewards.append(total_reward)
+                    for action in controller._execute_release():
+                        action = action[0]
+                        env.step(action)
+                    break
+        except Exception as e:
+            pass
+
+    vals = {}
+    vals["mean_eps_length"] = np.mean(np.array(episode_lengths))
+    vals["mean_eps_reward"] = np.mean(np.array(episode_rewards))
+    vals["max_eps_reward"] = max(episode_rewards)
+    vals["min_eps_reward"] = min(episode_rewards)
+
+    return vals
 
 def main(dirs):
     DIST_COEFF = 0.1
@@ -333,10 +370,17 @@ def main(dirs):
                 },
             ]
         }
+    
+    reset_positions =  {
+        'coffee_table_fqluyq_0': ([-0.4767243 , -1.219805  ,  0.25702515], [-3.69874935e-04, -9.39229270e-04,  7.08872199e-01,  7.05336273e-01]),
+        'cologne': ([-0.30000001, -0.80000001,  0.44277492],
+                    [0.        , 0.        , 0.        , 1.000000]),
+        'robot0': ([0.0, 0.0, 0.05], [0.0, 0.0, 0.0, 1.0])
+    }
 
     env_config = {
         "cfg": cfg,
-        "reset_positions": [],
+        "reset_positions": reset_positions,
         "action_space_controllers": ["base", "camera", "arm_left", "gripper_left"]
     }
 
@@ -349,17 +393,38 @@ def main(dirs):
         'robot0:eyes_Camera_sensor_seg_semantic': gym.spaces.Box(0, 4096, (224, 224), np.uint32)
     })
 
-    register_env("my_env", lambda config: RLEnv(config))
+    env = RLEnv(env_config)
+
+    # register_env("my_env", lambda config: RLEnv(config))
     config = (
         SACConfig()
         .environment(
-            env="my_env", 
-            env_config=env_config,
+            env=None, 
+            # env_config=env_config,
             action_space=action_space,
             observation_space=observation_space,
             disable_env_checking=True
         )
         # .environment("CartPole-v1")
+        # .evaluation(
+        #     evaluation_interval=100,
+        #     evaluation_duration=10,
+        #     evaluation_num_workers=1,
+        #     evaluation_duration_unit="episodes",
+        #     evaluation_config={"input": "sampler"},
+            # off_policy_estimation_methods={
+            #     "is": {"type": ImportanceSampling},
+            #     "wis": {"type": WeightedImportanceSampling},
+            #     "dm_fqe": {
+            #         "type": DirectMethod,
+            #         "q_model_config": {"type": FQETorchModel, "polyak_coef": 0.05},
+            #     },
+            #     "dr_fqe": {
+            #         "type": DoublyRobust,
+            #         "q_model_config": {"type": FQETorchModel, "polyak_coef": 0.05},
+            #     },
+            # },
+        # )
         .framework("torch")
         .offline_data(
             # input_ = lambda ioctx: ShuffledInput(
@@ -374,25 +439,6 @@ def main(dirs):
                 "capacity": 1000
             }
         )
-        # .evaluation(
-        #     evaluation_interval=1,
-        #     evaluation_duration=10,
-        #     evaluation_num_workers=1,
-        #     evaluation_duration_unit="episodes",
-        #     evaluation_config={"input": "/tmp/cartpole-eval"},
-        #     off_policy_estimation_methods={
-        #         "is": {"type": ImportanceSampling},
-        #         "wis": {"type": WeightedImportanceSampling},
-        #         "dm_fqe": {
-        #             "type": DirectMethod,
-        #             "q_model_config": {"type": FQETorchModel, "polyak_coef": 0.05},
-        #         },
-        #         "dr_fqe": {
-        #             "type": DoublyRobust,
-        #             "q_model_config": {"type": FQETorchModel, "polyak_coef": 0.05},
-        #         },
-        #     },
-        # )
     )
 
     algo = config.build()
@@ -401,8 +447,12 @@ def main(dirs):
 
     for i in tqdm(range(1000)):
         result = algo.train()
-        if i % 100 == 0:
-            print(pretty_print(result))
+        if i % 5 == 0:
+        # if i % 100 == 99:
+            print(pretty_print(result['info']['learner']))
+            vals = evaluate(env, algo, 10)
+            print(vals)
+            print(i)
             print('----------------------------------')
             algo.save("./checkpoints")
             # path_to_checkpoint = save_result.checkpoint.path
@@ -418,7 +468,6 @@ if __name__ == "__main__":
     parser.add_argument('--dirs', action='store', type=str, nargs="+")
     args = parser.parse_args()
     dirs = [f'./rollouts/{f}' for f in args.dirs]
-    print(dirs)
     main(dirs)
     
 

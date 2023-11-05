@@ -110,6 +110,7 @@ class GraspTask(BaseTask):
             sampled_pose_2d = env._primitive_controller._sample_pose_near_object(obj, pose_on_obj=grasp_pose)
             robot_pose = env._primitive_controller._get_robot_pose_from_2d_pose(sampled_pose_2d)
             robot.set_position_orientation(*robot_pose)
+            print("Reset robot pose to: ", robot_pose)
 
     # Overwrite reset by only removeing reset scene
     def reset(self, env):

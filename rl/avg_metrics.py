@@ -206,6 +206,7 @@ def main(folder, iterations):
                 "name": "cologne",
                 "category": "bottle_of_cologne",
                 "model": "lyipur",
+                "scale": [0.7, 0.7, 0.7],
                 "position": [-0.3, -0.8, 0.5],
             },
         ]
@@ -229,18 +230,27 @@ def main(folder, iterations):
     obj = env.scene.object_registry("name", "cologne")
     recorder = Recorder(folder)
 
+    
+    # Data collection
+    episode_lengths = []
+    episode_rewards = []
+
     for i in tqdm(range(int(iterations))):
         try:
             obs = env.reset()
             recorder.add(-1, obs, np.zeros_like(env.action_space.sample()), 0, False, False, obs['robot0']['proprio'])
             timestep = 0
+            total_reward = 0
             for action in controller.apply_ref(StarterSemanticActionPrimitiveSet.GRASP, obj, track_object=True):
                 action = action[0]
                 obs, reward, done, truncated, info = env.step(action)
                 truncated = True if timestep >= 400 else truncated
                 recorder.add(timestep, obs, env.transform_action(action), reward, done, truncated, obs['robot0']['proprio'])
                 timestep += 1
+                total_reward += reward
                 if done or timestep >= 400:
+                    episode_lengths.append(timestep)
+                    episode_rewards.append(total_reward)
                     for action in controller._execute_release():
                         action = action[0]
                         env.step(action)
@@ -251,6 +261,11 @@ def main(folder, iterations):
             print('--------------------')
         # recorder.save()
         recorder.reset()
+
+    print("Mean episode length: ", np.mean(np.array(episode_lengths)))
+    print("Mean episode reward: ", np.mean(np.array(episode_rewards)))
+    print("Max episode reward: ", max(episode_rewards))
+    print("Min episode reward: ", min(episode_rewards))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run worker")
@@ -265,3 +280,8 @@ if __name__ == "__main__":
     # seg instance - 224 x 224
     # depth - 224 x 224
     # rgb - 224 x 224 x 4
+
+    # Mean episode length:  126.02083333333333
+    # Mean episode reward:  -94.75643726825471
+    # Max episode reward:  11.821625838310196
+    # Min episode reward:  -639.7783623438444

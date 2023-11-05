@@ -1,5 +1,6 @@
 import gym
 import numpy as np
+from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitives
 from omnigibson.envs.env_wrapper import EnvironmentWrapper
 import omnigibson as og
 
@@ -8,7 +9,10 @@ class RLEnv(EnvironmentWrapper):
         cfg = env_config['cfg']
         self.env_config = env_config
         self.env = og.Environment(configs=cfg, action_timestep=1 / 10., physics_timestep=1 / 60.)
+        og.sim.step()
         self.reset_positions = env_config['reset_positions']
+        controller = StarterSemanticActionPrimitives(None, self.env.scene, self.env.robots[0])
+        self.env._primitive_controller = controller
         super().__init__(self.env)
         self._update_action_space()
         # self._update_observation_space()

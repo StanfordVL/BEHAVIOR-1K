@@ -1,16 +1,16 @@
-from ray.rllib.algorithms.algorithm import Algorithm
 import logging
 import math
 import gymnasium as gym
 import h5py
+import argparse
 
 import numpy as np
 import random
 from typing import List, Optional, TYPE_CHECKING, Union
 from urllib.parse import urlparse
+
 from PIL import Image
-import omnigibson as og
-from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitives
+from tqdm import tqdm
 
 from omnigibson.envs.rl_env import RLEnv
 
@@ -93,7 +93,7 @@ class CustomReader(InputReader):
         observation_space = gym.spaces.Dict({
             'proprio': gym.spaces.Box(-np.inf, np.inf, (65,), np.float64), 
             'robot0:eyes_Camera_sensor_depth_linear': gym.spaces.Box(0.0, np.inf, (224, 224), np.float32), 
-            # 'robot0:eyes_Camera_sensor_rgb': gym.spaces.Box(0, 255, (224, 224, 3), np.uint8), 
+            'robot0:eyes_Camera_sensor_rgb': gym.spaces.Box(0, 255, (224, 224, 3), np.uint8), 
             'robot0:eyes_Camera_sensor_seg_instance': gym.spaces.Box(0, 1024, (224, 224), np.uint32), 
             'robot0:eyes_Camera_sensor_seg_semantic': gym.spaces.Box(0, 4096, (224, 224), np.uint32)
         })
@@ -114,7 +114,7 @@ class CustomReader(InputReader):
             prev_obs_seg_instance = np.array(Image.open(f'{self.cur_file_path}/eyes_Camera_sensor_seg_instance/{eps_id}_{t-1}.png'))
             prev_obs_seg_semantic = np.array(Image.open(f'{self.cur_file_path}/eyes_Camera_sensor_seg_semantic/{eps_id}_{t-1}.png'))
             prev_obs = {
-                # 'robot0:eyes_Camera_sensor_rgb': prev_obs_rgb,
+                'robot0:eyes_Camera_sensor_rgb': prev_obs_rgb,
                 'robot0:eyes_Camera_sensor_depth_linear': prev_obs_depth,
                 'robot0:eyes_Camera_sensor_seg_instance': prev_obs_seg_instance,
                 'robot0:eyes_Camera_sensor_seg_semantic': prev_obs_seg_semantic,
@@ -127,13 +127,14 @@ class CustomReader(InputReader):
             obs_seg_instance = np.array(Image.open(f'{self.cur_file_path}/eyes_Camera_sensor_seg_instance/{eps_id}_{t}.png'))
             obs_seg_semantic = np.array(Image.open(f'{self.cur_file_path}/eyes_Camera_sensor_seg_semantic/{eps_id}_{t}.png'))
             obs = {
-                # 'robot0:eyes_Camera_sensor_rgb': obs_rgb,
+                'robot0:eyes_Camera_sensor_rgb': obs_rgb,
                 'robot0:eyes_Camera_sensor_depth_linear': obs_depth,
                 'robot0:eyes_Camera_sensor_seg_instance': obs_seg_instance,
                 'robot0:eyes_Camera_sensor_seg_semantic': obs_seg_semantic,
                 'proprio': proprio,   
             }
 
+            # from IPython import embed; embed()
 
             self.batch_builder.add_values(
                 t=t,
@@ -224,6 +225,7 @@ class CustomReader(InputReader):
             path = random.choice(self.files)
         self.cur_file_path = path
         return h5py.File(path + "/data.h5", 'r')
+
 
 DIST_COEFF = 0.1
 GRASP_REWARD = 0.3
@@ -331,89 +333,74 @@ cfg = {
         ]
     }
 
-reset_positions =  {
-    'coffee_table_fqluyq_0': ([-0.4767243 , -1.219805  ,  0.25702515], [-3.69874935e-04, -9.39229270e-04,  7.08872199e-01,  7.05336273e-01]),
-    'cologne': ([-0.30000001, -0.80000001,  0.44277492],
-                [0.        , 0.        , 0.        , 1.000000]),
-    'robot0': ([0.0, 0.0, 0.05], [0.0, 0.0, 0.0, 1.0])
-}
-
 env_config = {
     "cfg": cfg,
-    "reset_positions": reset_positions,
+    "reset_positions": [],
     "action_space_controllers": ["base", "camera", "arm_left", "gripper_left"]
 }
 
-env = RLEnv(env_config)
-scene = env.scene
-robot = env.env.robots[0]
-og.sim.step()
+action_space = gym.spaces.Box(low=np.array([ -1.,  -1. , -1., -np.inf, -np.inf, -np.inf ,-np.inf ,-np.inf ,-np.inf ,-np.inf ,-np.inf , -1.]), high=np.array([ 1. , 1.,  1. ,np.inf , np.inf, np.inf , np.inf , np.inf , np.inf , np.inf, np.inf , 1.]), shape=(12,), dtype=np.float32)
+observation_space = gym.spaces.Dict({
+    'proprio': gym.spaces.Box(-np.inf, np.inf, (65,), np.float64), 
+    'robot0:eyes_Camera_sensor_depth_linear': gym.spaces.Box(0.0, np.inf, (224, 224), np.float32), 
+    'robot0:eyes_Camera_sensor_rgb': gym.spaces.Box(0, 255, (224, 224, 3), np.uint8), 
+    'robot0:eyes_Camera_sensor_seg_instance': gym.spaces.Box(0, 1024, (224, 224), np.uint32), 
+    'robot0:eyes_Camera_sensor_seg_semantic': gym.spaces.Box(0, 4096, (224, 224), np.uint32)
+})
 
+register_env("my_env", lambda config: RLEnv(config))
+config = (
+    SACConfig()
+    .environment(
+        env="my_env", 
+        env_config=env_config,
+        action_space=action_space,
+        observation_space=observation_space,
+        disable_env_checking=True
+    )
+    # .environment("CartPole-v1")
+    .framework("torch")
+    .offline_data(
+        # input_ = lambda ioctx: ShuffledInput(
+        #     JsonReader("~/rl/cartpole-out", ioctx)
+        # )
+        input_ = lambda ioctx: ShuffledInput(
+            CustomReader(["./rollouts/7b58a49b-493d-4aa4-a228-d8013e8a7d5e"], ioctx)
+        )
+    )
+    .training(
+        replay_buffer_config={
+            "capacity": 1000
+        }
+    )
+    # .evaluation(
+    #     evaluation_interval=1,
+    #     evaluation_duration=10,
+    #     evaluation_num_workers=1,
+    #     evaluation_duration_unit="episodes",
+    #     evaluation_config={"input": "/tmp/cartpole-eval"},
+    #     off_policy_estimation_methods={
+    #         "is": {"type": ImportanceSampling},
+    #         "wis": {"type": WeightedImportanceSampling},
+    #         "dm_fqe": {
+    #             "type": DirectMethod,
+    #             "q_model_config": {"type": FQETorchModel, "polyak_coef": 0.05},
+    #         },
+    #         "dr_fqe": {
+    #             "type": DoublyRobust,
+    #             "q_model_config": {"type": FQETorchModel, "polyak_coef": 0.05},
+    #         },
+    #     },
+    # )
+)
+algo = config.build()
+# Discrete(2)
+# Box([-4.8000002e+00 -3.4028235e+38 -4.1887903e-01 -3.4028235e+38], [4.8000002e+00 3.4028235e+38 4.1887903e-01 3.4028235e+38], (4,), float32)
 
-register_env("my_env", lambda config: env)
-# Use the Algorithm's `from_checkpoint` utility to get a new algo instance
-# that has the exact same state as the old one, from which the checkpoint was
-# created in the first place:
-algo = Algorithm.from_checkpoint("./checkpoints")
-controller = StarterSemanticActionPrimitives(None, scene, robot)
-env.env._primitive_controller = controller
-obs = env.reset()
-del obs['robot0']['robot0:eyes_Camera_sensor_rgb']
-
-reset_pose_tiago = np.array([
-    -1.78029833e-04,  
-    3.20231302e-05, 
-    -1.85759447e-07,
-    0.0, 
-    -0.2,
-    0.0,  
-    0.1, 
-    -6.10000000e-01,
-    -1.10000000e+00,  
-    0.00000000e+00, 
-    -1.10000000e+00,  
-    1.47000000e+00,
-    0.00000000e+00,  
-    8.70000000e-01,  
-    2.71000000e+00,  
-    1.50000000e+00,
-    1.71000000e+00, 
-    -1.50000000e+00, 
-    -1.57000000e+00,  
-    4.50000000e-01,
-    1.39000000e+00,  
-    0.00000000e+00,  
-    0.00000000e+00,  
-    4.50000000e-02,
-    4.50000000e-02,  
-    4.50000000e-02,  
-    4.50000000e-02
-])
-robot_pose = ([0.26179598, -1.2770419,  0.05], [0., 0., 0.70503728, 0.70917024])
-robot.set_joint_positions(reset_pose_tiago)
-robot.set_position_orientation(*robot_pose)
-og.sim.step()
-
-# {
-#  'base': array([0, 1, 2]),
-#  'camera': array([3, 4]),
-#  'arm_left': array([ 5,  6,  7,  8,  9, 10]),
-#  'gripper_left': array([11]),
-#  'arm_right': array([12, 13, 14, 15, 16, 17, 18]),
-#  'gripper_right': array([19])
-#  }
-
-for i in range(100):
-    # transform_obs = DictFlatteningPreprocessor(observation_space).transform(obs['robot0'])
-    # from IPython import embed; embed()
-    action = algo.compute_single_action(obs['robot0'])
-    action = env.transform_policy_action(action)
+for _ in range(3):
+    result = algo.train()
+    print(pretty_print(result))
+    print('-------------------')
     
-    action[0] = 0.0
-    action[1] = 0.0
-    action[2] = 0.0
-    arm_left = np.array([ 5,  6,  7,  8,  9, 10])
-    print(action[arm_left])
-    from IPython import embed; embed()
-    obs, reward, done, truncated, info = env.step(action)
-    del obs['robot0']['robot0:eyes_Camera_sensor_rgb']
+
+
