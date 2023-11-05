@@ -11,7 +11,7 @@ gm.ENABLE_OBJECT_STATES = True
 gm.USE_GPU_DYNAMICS = True
 
 
-def main(random_selection=False, short_exec=False):
+def main(random_selection=False, headless=False, short_exec=False):
     """
     Generates a BEHAVIOR Task environment in an online fashion.
 
