@@ -65,16 +65,14 @@ def primitive_tester(load_object_categories, objects, primitives, primitives_arg
                         "motor_type": "position",
                         "command_input_limits": [-1, 1],
                         "command_output_limits": None,
-                        "use_delta_commands": True,
-                        "use_single_command": True
+                        "use_delta_commands": True
                     },
                     "gripper_right": {
                         "name": "JointController",
                         "motor_type": "position",
                         "command_input_limits": [-1, 1],
                         "command_output_limits": None,
-                        "use_delta_commands": True,
-                        "use_single_command": True
+                        "use_delta_commands": True
                     },
                     "camera": {
                         "name": "JointController",
