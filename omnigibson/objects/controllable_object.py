@@ -172,7 +172,7 @@ class ControllableObject(BaseObject):
             # If we're using normalized action space, override the inputs for all controllers
             if self._action_normalize:
                 cfg["command_input_limits"] = "default"  # default is normalized (-1, 1)
-            
+
             # Create the controller
             controller = create_controller(**cfg)
             # Verify the controller's DOFs can all be driven
