@@ -408,6 +408,7 @@ def main(dirs):
             observation_space=observation_space,
             disable_env_checking=True
         )
+        .resources(num_gpus=1)
         # .environment("CartPole-v1")
         # .evaluation(
         #     evaluation_interval=100,
