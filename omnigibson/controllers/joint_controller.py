@@ -27,6 +27,7 @@ class JointController(LocomotionController, ManipulationController, GripperContr
         command_output_limits="default",
         use_delta_commands=False,
         compute_delta_in_quat_space=None,
+        use_single_command=False,
     ):
         """
         Args:
@@ -56,12 +57,16 @@ class JointController(LocomotionController, ManipulationController, GripperContr
                 joints that need to be processed in quaternion space to avoid gimbal lock issues normally faced by
                 3 DOF rotation joints. Each group needs to consist of three idxes corresponding to the indices in
                 the input space. This is only used in the delta_commands mode.
+            use_single_command (bool): whether all related joints should be controlled with one (scaled) input or
+                independent values individually. If True, then the inputted command should be a single value.
         """
         # Store arguments
         assert_valid_key(key=motor_type.lower(), valid_keys=ControlType.VALID_TYPES_STR, name="motor_type")
         self._motor_type = motor_type.lower()
         self._use_delta_commands = use_delta_commands
         self._compute_delta_in_quat_space = [] if compute_delta_in_quat_space is None else compute_delta_in_quat_space
+
+        self._use_single_command = use_single_command
 
         # When in delta mode, it doesn't make sense to infer output range using the joint limits (since that's an
         # absolute range and our values are relative). So reject the default mode option in that case.
@@ -146,4 +151,4 @@ class JointController(LocomotionController, ManipulationController, GripperContr
 
     @property
     def command_dim(self):
-        return len(self.dof_idx)
+        return 1 if self._use_single_command else len(self.dof_idx)

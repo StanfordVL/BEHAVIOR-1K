@@ -187,6 +187,7 @@ def plan_base_motion(
 
     ss.setStartAndGoalStates(start, goal)
     if not state_valid_fn(start()) or not state_valid_fn(goal()):
+        print('fail')
         return
       
     solved = ss.solve(planning_time)
