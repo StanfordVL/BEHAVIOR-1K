@@ -111,7 +111,7 @@ def primitive_tester(load_object_categories, objects, primitives, primitives_arg
     for primitive, args in zip(primitives, primitives_args):
         try:
             execute_controller(controller.apply_ref(primitive, *args), env)
-        except Exception as e:
+        except:
             og.sim.clear()
             return False
 

@@ -5,7 +5,7 @@ It currently only works with Fetch and Tiago with their JointControllers set to 
 See provided tiago_primitives.yaml config file for an example. See examples/action_primitives for
 runnable examples.
 """
-# from functools import cached_property
+from functools import cached_property
 import inspect
 import logging
 import random
@@ -828,7 +828,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         """
         return self._ik_solver_cartesian_to_joint_space(relative_target_pose) is not None
 
-    # @cached_property
+    @cached_property
     def _manipulation_control_idx(self):
         """The appropriate manipulation control idx for the current settings."""           
         if isinstance(self.robot, Tiago):
@@ -841,7 +841,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         # Otherwise just return the default arm control idx
         return self.robot.arm_control_idx[self.arm]
     
-    # @cached_property
+    @cached_property
     def _manipulation_descriptor_path(self):
         """The appropriate manipulation descriptor for the current settings."""           
         if isinstance(self.robot, Tiago) and m.TIAGO_TORSO_FIXED:
@@ -864,9 +864,9 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 - np.array: Indices for joints in the robot
         """
         ik_solver = IKSolver(
-            robot_description_path=self._manipulation_descriptor_path(),
+            robot_description_path=self._manipulation_descriptor_path,
             robot_urdf_path=self.robot.urdf_path,
-            default_joint_pos=self.robot.default_joint_pos[self._manipulation_control_idx()],
+            default_joint_pos=self.robot.default_joint_pos[self._manipulation_control_idx],
             eef_name=self.robot.eef_link_names[self.arm],
         )
         # Grab the joint positions in order to reach the desired pose target
@@ -1007,7 +1007,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         prev_eef_pos = np.zeros(3)
 
         for _ in range(m.MAX_STEPS_FOR_HAND_MOVE_JOINT):
-            current_joint_pos = self.robot.get_joint_positions()[self._manipulation_control_idx()]
+            current_joint_pos = self.robot.get_joint_positions()[self._manipulation_control_idx]
             diff_joint_pos = np.array(current_joint_pos) - np.array(joint_pos)
             if np.max(np.abs(diff_joint_pos)) < m.JOINT_POS_DIFF_THRESHOLD:
                 return
@@ -1167,10 +1167,10 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             
             for joint_pos in joint_space_data:
                 # Check if the movement can be done roughly linearly.
-                current_joint_positions = self.robot.get_joint_positions()[self._manipulation_control_idx()]
+                current_joint_positions = self.robot.get_joint_positions()[self._manipulation_control_idx]
 
                 failed_joints = []
-                for joint_idx, target_joint_pos, current_joint_pos in zip(self._manipulation_control_idx(), joint_pos, current_joint_positions):
+                for joint_idx, target_joint_pos, current_joint_pos in zip(self._manipulation_control_idx, joint_pos, current_joint_positions):
                     if np.abs(target_joint_pos - current_joint_pos) > m.MAX_ALLOWED_JOINT_ERROR_FOR_LINEAR_MOTION:
                         failed_joints.append(joints[joint_idx].joint_name)
 
@@ -1354,7 +1354,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 yield from self._move_hand_direct_ik(reset_eef_pose, ignore_failure=True, in_world_frame=False)
         else:
             indented_print("Resetting hand")
-            reset_pose = self._get_reset_joint_pos()[self._manipulation_control_idx()]
+            reset_pose = self._get_reset_joint_pos()[self._manipulation_control_idx]
             try:
                 yield from self._move_hand_joint(reset_pose)
             except ActionPrimitiveError:
@@ -1506,7 +1506,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
             np.array or None: Action array for one step for the robot to navigate in range or None if it is done navigating
         """
         pose = self._sample_pose_near_object(obj, pose_on_obj=pose_on_obj, **kwargs)
-        print(pose)
         yield from self._navigate_to_pose(pose)
 
     def _navigate_to_pose_direct(self, pose_2d, low_precision=False):
