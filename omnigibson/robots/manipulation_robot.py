@@ -1093,11 +1093,6 @@ class ManipulationRobot(BaseRobot):
         """
         # Loop over all arms
         for arm in self.arm_names:
-            # Make sure gripper action dimension is only 1
-            cmd_dim = self._controllers[f"gripper_{arm}"].command_dim
-            assert cmd_dim == 1, \
-                f"Gripper {arm} controller command dim must be 1 to use assisted grasping, got: {cmd_dim}."
-
             # We apply a threshold based on the control rather than the command here so that the behavior
             # stays the same across different controllers and control modes (absolute / delta). This way,
             # a zero action will actually keep the AG setting where it already is.

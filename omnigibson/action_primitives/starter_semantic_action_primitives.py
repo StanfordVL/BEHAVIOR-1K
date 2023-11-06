@@ -64,7 +64,7 @@ m.MAX_CARTESIAN_HAND_STEP = 0.002
 m.MAX_STEPS_FOR_HAND_MOVE_JOINT = 500
 m.MAX_STEPS_FOR_HAND_MOVE_IK = 1000
 m.MAX_STEPS_FOR_GRASP_OR_RELEASE = 30
-m.MAX_STEPS_FOR_WAYPOINT_NAVIGATION = 200
+m.MAX_STEPS_FOR_WAYPOINT_NAVIGATION = 500
 m.MAX_ATTEMPTS_FOR_OPEN_CLOSE = 20
 
 m.MAX_ATTEMPTS_FOR_SAMPLING_POSE_WITH_OBJECT_AND_PREDICATE = 20
@@ -295,7 +295,6 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
                 action_type = "nav"
             
         context = action_type + context_function
-        # print(context)
         return action, context
 
     def _load_robot_copy(self):
@@ -1739,7 +1738,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         Args:
             pose_2d (Iterable): (x, y, yaw) 2d pose
-            context (Context): Undoable context reference
+            context (Context): Planning context reference
             pose_on_obj (Iterable of arrays): Pose on the object in the world frame
 
         Returns:

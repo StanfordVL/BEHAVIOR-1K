@@ -65,18 +65,20 @@ def primitive_tester(load_object_categories, objects, primitives, primitives_arg
                         "motor_type": "position",
                         "command_input_limits": [-1, 1],
                         "command_output_limits": None,
-                        "use_delta_commands": True,
+                        "use_delta_commands": True
                     },
                     "gripper_right": {
                         "name": "JointController",
                         "motor_type": "position",
                         "command_input_limits": [-1, 1],
                         "command_output_limits": None,
-                        "use_delta_commands": True,
+                        "use_delta_commands": True
                     },
                     "camera": {
                         "name": "JointController",
-                        "motor_type": "velocity",
+                        "motor_type": "position",
+                        "command_input_limits": None,
+                        "command_output_limits": None,
                         "use_delta_commands": False
                     }
                 }
@@ -103,9 +105,9 @@ def primitive_tester(load_object_categories, objects, primitives, primitives_arg
         og.sim.step()
 
     controller = StarterSemanticActionPrimitives(env)
+    set_start_pose(robot)
     for primitive, args in zip(primitives, primitives_args):
         try:
-            set_start_pose(robot)
             execute_controller(controller.apply_ref(primitive, *args), env)
         except:
             og.sim.clear()
@@ -116,17 +118,16 @@ def primitive_tester(load_object_categories, objects, primitives, primitives_arg
     return True
 
 def test_navigate():
-    categories = ["floors", "ceilings", "walls", "coffee_table"]
+    categories = ["floors", "ceilings", "walls"]
 
     objects = []
     obj_1 = {
         "object": DatasetObject(
-                name="table",
-                category="breakfast_table",
-                model="rjgmmy",
-                scale=[0.3, 0.3, 0.3]
-            ),
-        "position": [-0.7, -2.0, 0.2],
+            name="cologne",
+            category="bottle_of_cologne",
+            model="lyipur"
+        ),
+        "position": [-0.3, -0.8, 0.5],
         "orientation": [0, 0, 0, 1]
     }
     objects.append(obj_1)
@@ -142,29 +143,17 @@ def test_grasp():
     objects = []
     obj_1 = {
         "object": DatasetObject(
-                name="table",
-                category="breakfast_table",
-                model="rjgmmy",
-                scale=[0.3, 0.3, 0.3]
-            ),
-        "position": [-0.7, 0.5, 0.2],
-        "orientation": [0, 0, 0, 1]
-    }
-    obj_2 = {
-        "object": DatasetObject(
             name="cologne",
-            category="cologne",
-            model="lyipur",
-            scale=[0.01, 0.01, 0.01]
+            category="bottle_of_cologne",
+            model="lyipur"
         ),
         "position": [-0.3, -0.8, 0.5],
         "orientation": [0, 0, 0, 1]
     }
     objects.append(obj_1)
-    objects.append(obj_2)
 
     primitives = [StarterSemanticActionPrimitiveSet.GRASP]
-    primitives_args = [(obj_2['object'],)]    
+    primitives_args = [(obj_1['object'],)]    
 
     assert primitive_tester(categories, objects, primitives, primitives_args)
 
@@ -185,9 +174,8 @@ def test_place():
     obj_2 = {
         "object": DatasetObject(
             name="cologne",
-            category="cologne",
-            model="lyipur",
-            scale=[0.01, 0.01, 0.01]
+            category="bottle_of_cologne",
+            model="lyipur"
         ),
         "position": [-0.3, -0.8, 0.5],
         "orientation": [0, 0, 0, 1]
@@ -241,4 +229,3 @@ def test_open_revolute():
     primitives_args = [(obj_1['object'],)]    
 
     assert primitive_tester(categories, objects, primitives, primitives_args)
-
