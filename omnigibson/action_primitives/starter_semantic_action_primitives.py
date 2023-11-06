@@ -5,7 +5,7 @@ It currently only works with Fetch and Tiago with their JointControllers set to 
 See provided tiago_primitives.yaml config file for an example. See examples/action_primitives for
 runnable examples.
 """
-from functools import cached_property
+# from functools import cached_property
 import inspect
 import logging
 import random
@@ -829,7 +829,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         """
         return self._ik_solver_cartesian_to_joint_space(relative_target_pose) is not None
 
-    @cached_property
+    # @cached_property
     def _manipulation_control_idx(self):
         """The appropriate manipulation control idx for the current settings."""           
         if isinstance(self.robot, Tiago):
@@ -842,7 +842,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
         # Otherwise just return the default arm control idx
         return self.robot.arm_control_idx[self.arm]
     
-    @cached_property
+    # @cached_property
     def _manipulation_descriptor_path(self):
         """The appropriate manipulation descriptor for the current settings."""           
         if isinstance(self.robot, Tiago) and m.TIAGO_TORSO_FIXED:
@@ -1739,7 +1739,7 @@ class StarterSemanticActionPrimitives(BaseActionPrimitiveSet):
 
         Args:
             pose_2d (Iterable): (x, y, yaw) 2d pose
-            context (Context): Undoable context reference
+            context (Context): Planning context reference
             pose_on_obj (Iterable of arrays): Pose on the object in the world frame
 
         Returns:

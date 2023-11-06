@@ -242,3 +242,4 @@ def test_open_revolute():
 
     assert primitive_tester(categories, objects, primitives, primitives_args)
 
+test_navigate()
