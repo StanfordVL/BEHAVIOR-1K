@@ -1,6 +1,7 @@
 from ray.rllib.algorithms.sac import SACConfig
 from ray.rllib.algorithms.dqn import DQNConfig
 from ray.rllib.algorithms.ddpg.ddpg import DDPGConfig
+from ray.rllib.algorithms.impala import ImpalaConfig
 from ray.rllib.offline.estimators import (
     ImportanceSampling,
     WeightedImportanceSampling,
@@ -42,7 +43,9 @@ config = (
     SACConfig()
     .environment(env="CartPole-v1")
     .framework("torch")
+    .offline_data(input_="./cartpole_sample_training")
     .rollouts(num_rollout_workers=1)
+    .resources(num_gpus=1)
     .evaluation(
         evaluation_interval=100,
         evaluation_duration=10,

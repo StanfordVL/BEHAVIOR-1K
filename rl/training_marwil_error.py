@@ -39,7 +39,7 @@ from ray.rllib.utils.typing import Any, FileType, SampleBatchType
 
 from ray.tune.registry import register_env
 from ray.tune.logger import pretty_print
-from ray.rllib.algorithms.sac import SACConfig
+from ray.rllib.algorithms.marwil import MARWILConfig
 from ray.rllib.offline import (
     InputReader,
     IOContext,
@@ -242,6 +242,9 @@ def evaluate(env, algo, episodes):
                 del obs['robot0']['robot0:eyes_Camera_sensor_rgb']
                 action = algo.compute_single_action(obs['robot0'])
                 action = env.transform_policy_action(action)
+                action[0] = 0.0
+                action[1] = 0.0
+                action[2] = 0.0
                 obs, reward, done, truncated, info = env.step(action)
                 truncated = True if timestep >= 400 else truncated
                 timestep += 1
@@ -397,7 +400,7 @@ def main(dirs):
 
     # register_env("my_env", lambda config: RLEnv(config))
     config = (
-        SACConfig()
+        MARWILConfig()
         .environment(
             env=None, 
             # env_config=env_config,
@@ -425,6 +428,7 @@ def main(dirs):
             #     },
             # },
         # )
+        # .resources(num_gpus=1)
         .framework("torch")
         .offline_data(
             # input_ = lambda ioctx: ShuffledInput(
@@ -434,27 +438,27 @@ def main(dirs):
                 CustomReader(dirs, ioctx)
             )
         )
-        .training(
-            replay_buffer_config={
-                "capacity": 1000
-            }
-        )
+        # .training(
+        #     replay_buffer_config={
+        #         "capacity": 1000
+        #     }
+        # )
     )
 
     algo = config.build()
     # Discrete(2)
     # Box([-4.8000002e+00 -3.4028235e+38 -4.1887903e-01 -3.4028235e+38], [4.8000002e+00 3.4028235e+38 4.1887903e-01 3.4028235e+38], (4,), float32)
 
-    for i in tqdm(range(20)):
+    for i in tqdm(range(1500)):
         result = algo.train()
-        if i % 5 == 0:
+        if i % 100 == 0:
         # if i % 100 == 99:
             print(pretty_print(result['info']['learner']))
             vals = evaluate(env, algo, 10)
             print(vals)
             print(i)
             print('----------------------------------')
-            algo.save("./checkpoints")
+            algo.save("./checkpoints_marwil")
             # path_to_checkpoint = save_result.checkpoint.path
 
 
