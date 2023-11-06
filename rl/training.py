@@ -257,10 +257,10 @@ def evaluate(env, algo, episodes):
             pass
 
     vals = {}
-    vals["mean_eps_length"] = np.mean(np.array(episode_lengths))
-    vals["mean_eps_reward"] = np.mean(np.array(episode_rewards))
-    vals["max_eps_reward"] = max(episode_rewards)
-    vals["min_eps_reward"] = min(episode_rewards)
+    vals["mean_eps_length"] = np.mean(np.array(episode_lengths)) if episode_lengths else None
+    vals["mean_eps_reward"] = np.mean(np.array(episode_rewards)) if episode_rewards else None
+    vals["max_eps_reward"] = max(episode_rewards) if episode_rewards else None
+    vals["min_eps_reward"] = min(episode_rewards) if episode_rewards else None
 
     return vals
 
@@ -445,7 +445,7 @@ def main(dirs):
     # Discrete(2)
     # Box([-4.8000002e+00 -3.4028235e+38 -4.1887903e-01 -3.4028235e+38], [4.8000002e+00 3.4028235e+38 4.1887903e-01 3.4028235e+38], (4,), float32)
 
-    for i in tqdm(range(1000)):
+    for i in tqdm(range(20)):
         result = algo.train()
         if i % 5 == 0:
         # if i % 100 == 99:
