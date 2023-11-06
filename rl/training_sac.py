@@ -428,7 +428,7 @@ def main(dirs):
             #     },
             # },
         # )
-        .resources(num_gpus=1)
+        # .resources(num_gpus=1)
         .framework("torch")
         .offline_data(
             # input_ = lambda ioctx: ShuffledInput(
