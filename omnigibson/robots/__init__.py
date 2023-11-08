@@ -11,3 +11,4 @@ from omnigibson.robots.tiago import Tiago
 from omnigibson.robots.two_wheel_robot import TwoWheelRobot
 from omnigibson.robots.franka import FrankaPanda
 from omnigibson.robots.franka_allegro import FrankaAllegro
+from omnigibson.robots.behaviorbot import Behaviorbot
