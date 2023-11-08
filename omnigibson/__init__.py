@@ -92,6 +92,7 @@ def create_app():
     from omni.isaac.core.utils.extensions import enable_extension
     enable_extension("omni.flowusd")
     enable_extension("omni.particle.system.bundle")
+    enable_extension("omni.kit.xr.profile.vr")
 
     # Additional import for windows
     if os.name == "nt":
