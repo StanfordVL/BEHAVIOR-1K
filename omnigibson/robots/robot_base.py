@@ -413,6 +413,16 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         # Run super
         super().remove()
 
+    def gen_action_from_vr_data(self, vr_data: dict) -> np.ndarray:
+        """
+        Generate action data from VR input for robot teleoperation
+        Args:
+            vr_data (dict): dictionary containing vr_data from VRSys.step()
+        Returns:
+            np.ndarray: array of action data filled with update value
+        """
+        raise NotImplementedError()
+
     @property
     def sensors(self):
         """
