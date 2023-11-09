@@ -22,6 +22,7 @@ def main():
         "type": robot_name,
         "obs_modalities": ["rgb", "depth", "normal", "scan", "occupancy_grid"],
         "action_normalize": False,
+        "grasping_mode": "assisted"
     }
     object_cfg = [
         {
@@ -56,7 +57,7 @@ def main():
         object_cfg.extend([{
             "type": "PrimitiveObject",
             "prim_path": f"/World/marker_{i}",
-            "name": f"marker_{i}",
+            "name": f"marker_{i}",  
             "primitive_type": "Cube",
             "size": 0.01,
             "visual_only": True,
