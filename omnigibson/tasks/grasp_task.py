@@ -108,6 +108,7 @@ class GraspTask(BaseTask):
             grasp_poses = get_grasp_poses_for_object_sticky(obj)
             grasp_pose, _ = random.choice(grasp_poses)
             sampled_pose_2d = env._primitive_controller._sample_pose_near_object(obj, pose_on_obj=grasp_pose)
+            # sampled_pose_2d = [-0.433881, -0.210183, -2.96118]
             robot_pose = env._primitive_controller._get_robot_pose_from_2d_pose(sampled_pose_2d)
             robot.set_position_orientation(*robot_pose)
             print("Reset robot pose to: ", robot_pose)

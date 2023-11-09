@@ -46,6 +46,7 @@ from ray.rllib.offline import (
     JsonReader,
     ShuffledInput,
 )
+import wandb
 
 if TYPE_CHECKING:
     from ray.rllib.evaluation import RolloutWorker
@@ -397,6 +398,10 @@ def main(dirs):
     })
 
     env = RLEnv(env_config)
+    wandb.init(
+        # set the wandb project where this run will be logged
+        project="grasp-bc",
+    )
 
     # register_env("my_env", lambda config: RLEnv(config))
     config = (
@@ -440,9 +445,11 @@ def main(dirs):
             )
         )
         # .training(
-        #     replay_buffer_config={
-        #         "capacity": 1000
-        #     }
+        #     model={
+        #         "fcnet_hiddens": [256, 256],
+        #         "use_lstm": True,
+        #         "max_seq_len": 10,
+        #     },
         # )
     )
 
@@ -459,6 +466,8 @@ def main(dirs):
             print(vals)
             print(i)
             print('----------------------------------')
+            wandb.log(result['info']['learner'])
+            wandb.log(vals)
             algo.save("./checkpoints_bc")
             # path_to_checkpoint = save_result.checkpoint.path
 

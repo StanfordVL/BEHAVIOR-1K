@@ -350,11 +350,11 @@ robot = env.env.robots[0]
 og.sim.step()
 
 
-register_env("my_env", lambda config: env)
+# register_env("my_env", lambda config: env)
 # Use the Algorithm's `from_checkpoint` utility to get a new algo instance
 # that has the exact same state as the old one, from which the checkpoint was
 # created in the first place:
-algo = Algorithm.from_checkpoint("./checkpoints")
+algo = Algorithm.from_checkpoint("./checkpoints_sac")
 controller = StarterSemanticActionPrimitives(None, scene, robot)
 env.env._primitive_controller = controller
 obs = env.reset()
@@ -414,6 +414,6 @@ for i in range(100):
     action[2] = 0.0
     arm_left = np.array([ 5,  6,  7,  8,  9, 10])
     print(action[arm_left])
-    from IPython import embed; embed()
+    # from IPython import embed; embed()
     obs, reward, done, truncated, info = env.step(action)
     del obs['robot0']['robot0:eyes_Camera_sensor_rgb']
