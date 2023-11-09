@@ -122,7 +122,9 @@ def main():
         if og.sim.is_playing():
             vr_data = vrsys.step()
             if vr_data["robot_attached"] == True and prev_robot_attached == False:
+                # The user just pressed the grip, so snap the VR right controller to the robot's right arm
                 if vr_robot.model_name == "Tiago":
+                    # Tiago's default arm is the left arm
                     robot_eef_position = vr_robot.links[vr_robot.eef_link_names["right"]].get_position()
                 else:
                     robot_eef_position = vr_robot.links[vr_robot.eef_link_names[vr_robot.default_arm]].get_position()

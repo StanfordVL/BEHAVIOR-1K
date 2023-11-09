@@ -1,12 +1,11 @@
-import os
-import itertools
-from typing import List, Tuple, Iterable
-from collections import OrderedDict
 from abc import ABC
-
+from collections import OrderedDict
+import itertools
 import numpy as np
-from scipy.spatial.transform import Rotation as R
+import os
 from pxr import Gf
+from scipy.spatial.transform import Rotation as R
+from typing import List, Tuple, Iterable
 
 import omnigibson as og
 from omnigibson.macros import gm
@@ -17,14 +16,13 @@ from omnigibson.objects.usd_object import USDObject
 import omnigibson.utils.transform_utils as T
 from omnigibson.controllers.controller_base import ControlType
 
+# component suffixes for the 6-DOF arm joint names
 COMPONENT_SUFFIXES = ['x', 'y', 'z', 'rx', 'ry', 'rz']
 
+# Offset between the body and parts
 HEAD_TO_BODY_OFFSET = ([0, 0, -0.4], [0, 0, 0, 1])
 RH_TO_BODY_OFFSET = ([0, 0.15, -0.4], T.euler2quat([0, np.pi, np.pi / 2]))
 LH_TO_BODY_OFFSET = ([0, -0.15, -0.4], T.euler2quat([0, np.pi, -np.pi / 2]))
-
-# Body parameters
-BODY_HEIGHT_RANGE = (0, 2)  # meters. The body is allowed to clip the floor by about a half.
 
 # Hand parameters
 HAND_GHOST_HAND_APPEAR_THRESHOLD = 0.15
@@ -33,16 +31,6 @@ THUMB_1_POS = [0, -0.015, -0.02]
 PALM_CENTER_POS = [0, -0.04, 0.01]
 PALM_BASE_POS = [0, 0, 0.015]
 FINGER_TIP_POS = [0, -0.025, -0.055]
-
-# Assisted grasping parameters
-ASSIST_FRACTION = 1.0
-ARTICULATED_ASSIST_FRACTION = 0.7
-MIN_ASSIST_FORCE = 0
-MAX_ASSIST_FORCE = 500
-ASSIST_FORCE = MIN_ASSIST_FORCE + (MAX_ASSIST_FORCE - MIN_ASSIST_FORCE) * ASSIST_FRACTION
-TRIGGER_FRACTION_THRESHOLD = 0.5
-CONSTRAINT_VIOLATION_THRESHOLD = 0.1
-ATTACHMENT_BUTTON_TIME_THRESHOLD = 1
 
 # Hand link index constants
 PALM_LINK_NAME = "palm"
@@ -88,8 +76,6 @@ class Behaviorbot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             grasping_mode="assisted",
             
             # unique to Behaviorbot
-            agent_id=1,
-            use_body=True,
             use_ghost_hands=True,
 
             **kwargs
@@ -97,11 +83,7 @@ class Behaviorbot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         """
         Initializes Behaviorbot
         Args:
-            agent_id (int): unique id of the agent - used in multi-user VR
-            image_width (int): width of each camera
-            image_height (int): height of each camera
-            use_body (bool): whether to use body
-            use_ghost_hands (bool): whether to use ghost hand
+            use_ghost_hands (bool): whether to show ghost hand when the robot hand is too far away from the controller
         """
 
         super(Behaviorbot, self).__init__(
@@ -129,8 +111,6 @@ class Behaviorbot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         )
 
         # Basic parameters
-        self.agent_id = agent_id
-        self.use_body = use_body
         self.use_ghost_hands = use_ghost_hands
         self._world_base_fixed_joint_prim = None
 
@@ -353,7 +333,6 @@ class Behaviorbot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
     def update_controller_mode(self):
         super().update_controller_mode()
         # overwrite robot params (e.g. damping, stiffess, max_effort) here
-        # set joint mass and rigid body properties
         for link in self.links.values():
             link.ccd_enabled = True
         for arm in self.arm_names:
@@ -444,6 +423,10 @@ class Behaviorbot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         }
 
     def update_hand_contact_info(self):
+        """
+        Helper function that updates the contact info for the hands and body. 
+        Can be used in the future with device haptics to provide collision feedback.
+        """
         self.part_is_in_contact["body"] = len(self.links["body"].contact_list())
         for hand_name in self.arm_names:
             self.part_is_in_contact[hand_name] = len(self.eef_links[hand_name].contact_list()) \
@@ -451,7 +434,8 @@ class Behaviorbot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
     
     def deploy_control(self, control, control_type, indices=None, normalized=False):
         """
-        overwrites controllable_object.deploy_control to make arm revolute joints set_target=False
+        Overwrites controllable_object.deploy_control to make arm revolute joints set_target=False
+        This is needed because otherwise the hand will rotate a full circle backwards when it overshoots pi
         """
         # Run sanity check
         if indices is None:
@@ -594,7 +578,7 @@ class Behaviorbot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             elif hand_data is not None:
                 # hand tracking mode, compute joint rotations for each independent hand joint
                 action[self.controller_action_idx[f"gripper_{part_name}"]] = hand_data[:, :2].T.reshape(-1)
-            # If we reset, action is 1, otherwise 0
+            # If we reset, teleop the robot parts to the desired pose
             if reset:
                 self.parts[part_name].set_position_orientation(des_local_part_pos, des_part_rpy)
             # update ghost hand if necessary
@@ -630,7 +614,7 @@ class BRPart(ABC):
     def load(self) -> None:
         self._root_link = self.parent.links[self.prim_path]
         # setup ghost hand
-        if self.eef_type == "hand":
+        if self.eef_type == "hand" and self.parent.use_ghost_hands:
             gh_name = f"ghost_hand_{self.name}"
             self.ghost_hand = USDObject(
                 prim_path=f"/World/{gh_name}",
@@ -643,25 +627,25 @@ class BRPart(ABC):
             og.sim.import_object(self.ghost_hand)
 
     @property
-    def local_position_orientation(self) -> Tuple[List[float], List[float]]:
+    def local_position_orientation(self) -> Tuple[Iterable[float], Iterable[float]]:
         """
         Get local position and orientation w.r.t. to the body
-        Return:
+        Returns:
             Tuple[Array[x, y, z], Array[x, y, z, w]]
 
         """
         return T.relative_pose_transform(*self.world_position_orientation, *self.parent.get_position_orientation())
 
     @property
-    def world_position_orientation(self) -> None:
+    def world_position_orientation(self) -> Tuple[Iterable[float], Iterable[float]]:
         """
         Get position and orientation in the world space
-        Return:
+        Returns:
             Tuple[Array[x, y, z], Array[x, y, z, w]]
         """
         return self._root_link.get_position_orientation()
 
-    def set_position_orientation(self, pos: List[float], orn: List[float]) -> None:
+    def set_position_orientation(self, pos: Iterable[float], orn: Iterable[float]) -> None:
         """
         Call back function to set the base's position
         """
@@ -672,12 +656,12 @@ class BRPart(ABC):
         self.parent.joints[f"{self.name}_ry_joint"].set_pos(orn[1], drive=False)
         self.parent.joints[f"{self.name}_rz_joint"].set_pos(orn[2], drive=False)
 
-    def update_ghost_hands(self, pos: List[float], orn: List[float]) -> None:
+    def update_ghost_hands(self, pos: Iterable[float], orn: Iterable[float]) -> None:
         """
         Updates ghost hand to track real hand and displays it if the real and virtual hands are too far apart.
         Args:
-            pos (List[float]): list of positions [x, y, z]
-            orn (List[float]): list of rotations [x, y, z, w]
+            pos (Iterable[float]): list of positions [x, y, z]
+            orn (Iterable[float]): list of rotations [x, y, z, w]
         """
         assert self.eef_type == "hand", "ghost hand is only valid for BR hand!"
         # Ghost hand tracks real hand whether it is hidden or not

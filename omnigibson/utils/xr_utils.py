@@ -29,6 +29,9 @@ class VRSys():
             enable_touchpad_movement (bool): whether to enable VR system anchor movement by controller, default is False.
             align_anchor_to_robot_base (bool): whether to align VR anchor to robot base, default is False.
             use_hand_tracking (bool): whether to use hand tracking instead of controllers, default is False.
+
+        NOTE: enable_touchpad_movement and align_anchor_to_robot_base cannot be enabled at the same time. 
+            The former is to enable free movement of the VR system (i.e. the user), while the latter is constraining the VR system to the robot pose.
         """
         self.xr_core = XRCore.get_singleton()
         self.vr_profile = self.xr_core.get_profile("vr")
@@ -181,8 +184,8 @@ class VRSys():
         """
         Updates the anchor of the xr system in the virtual world
         Args:
-            pos_offset (Iterable[float]): the position offset to apply to the anchor *in the frame of hmd*.
-            rot_offset (Iterable[float]): the rotation offset to apply to the anchor *in the frame of hmd*. 
+            pos_offset (Iterable[float]): the position offset to apply to the anchor *in hmd frame*.
+            rot_offset (Iterable[float]): the rotation offset to apply to the anchor *in hmd frame*. 
         """
         if pos_offset is not None:
             # note that x is right, y is up, z is back for ovxr, but x is forward, y is left, z is up for og

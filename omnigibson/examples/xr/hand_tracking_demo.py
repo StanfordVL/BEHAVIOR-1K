@@ -1,17 +1,18 @@
 """
-Example script for vr system.
+Example script for using hand tracking (OpenXR only) with dexterous hand.
+You can set DEBUG_MODE to True to visualize the landmarks of the hands! 
 """
 import omnigibson as og
 from omnigibson.utils.xr_utils import VRSys
 from omnigibson.utils.ui_utils import choose_from_options
 
-# You can set this to True to visualize the landmarks of the hands! 
-DEBUG_MODE = True
+DEBUG_MODE = False  # set to True to visualize the landmarks of the hands
 
 ROBOTS = {
     "Behaviorbot": "Humanoid robot with two hands (default)",
     "FrankaAllegro": "Franka Panda with Allegro hand",
 }
+
 
 def main():
     robot_name = choose_from_options(options=ROBOTS, name="robot")
@@ -53,7 +54,7 @@ def main():
         },
     ]
     if DEBUG_MODE:
-        # Add the marker to visualize hand tracking waypoints
+        # Add the marker to visualize hand tracking landmarks
         object_cfg.extend([{
             "type": "PrimitiveObject",
             "prim_path": f"/World/marker_{i}",
@@ -68,6 +69,10 @@ def main():
     # Create the environment
     env = og.Environment(configs=cfg, action_timestep=1/60., physics_timestep=1/240.)
     env.reset()
+
+    if DEBUG_MODE:
+        markers = [env.scene.object_registry("name", f"marker_{i}") for i in range(52)]
+    
     # Start vrsys 
     vr_robot = env.robots[0]
     vrsys = VRSys(vr_robot=vr_robot, use_hand_tracking=True)
@@ -75,10 +80,6 @@ def main():
     # set headset position to be 1m above ground and facing +x direction
     head_init_transform = vrsys.og2xr(pos=[0, 0, 1], orn=[0, 0, 0, 1])
     vrsys.vr_profile.set_physical_world_to_world_anchor_transform_to_match_xr_device(head_init_transform, vrsys.hmd)
-
-    # get the objects
-    if DEBUG_MODE:
-        markers = [env.scene.object_registry("name", f"marker_{i}") for i in range(52)]
 
     # main simulation loop
     for _ in range(10000):
