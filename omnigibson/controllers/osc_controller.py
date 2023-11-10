@@ -13,6 +13,7 @@ log = create_module_logger(module_name=__name__)
 
 # Different modes
 OSC_MODE_COMMAND_DIMS = {
+    "absolute_pose": 6,      # 6DOF (x,y,z,ax,ay,az) control of pose, whether both position and orientation is given in absolute coordinates
     "pose_absolute_ori": 6,  # 6DOF (dx,dy,dz,ax,ay,az) control over pose, where the orientation is given in absolute axis-angle coordinates
     "pose_delta_ori": 6,  # 6DOF (dx,dy,dz,dax,day,daz) control over pose
     "position_fixed_ori": 3,  # 3DOF (dx,dy,dz) control over position, with orientation commands being kept as fixed initial absolute orientation
@@ -420,9 +421,12 @@ class OperationalSpaceController(ManipulationController):
         pos_relative = np.array(control_dict[f"{self.task_name}_pos_relative"])
         quat_relative = np.array(control_dict[f"{self.task_name}_quat_relative"])
 
-        # The first three values of the command are always the (delta) position, convert to absolute values
-        dpos = command[:3]
-        target_pos = pos_relative + dpos
+        # The first three values of the command are always the (delta) position, convert to absolute values if needed
+        if self.mode == "absolute_pose":
+            target_pos = command[:3]
+        else:
+            dpos = command[:3]
+            target_pos = pos_relative + dpos
 
         # Compute orientation
         if self.mode == "position_fixed_ori":
@@ -433,7 +437,7 @@ class OperationalSpaceController(ManipulationController):
         elif self.mode == "position_compliant_ori":
             # Target quat is simply the current robot orientation
             target_quat = quat_relative
-        elif self.mode == "pose_absolute_ori":
+        elif self.mode == "pose_absolute_ori" or self.mode == "absolute_pose":
             # Received "delta" ori is in fact the desired absolute orientation
             target_quat = T.axisangle2quat(command[3:6])
         else:  # pose_delta_ori control
