@@ -15,6 +15,8 @@ log = create_module_logger(module_name=__name__)
 m = create_module_macros(module_path=__file__)
 m.IK_POS_TOLERANCE = 0.002
 m.IK_POS_WEIGHT = 20.0
+m.IK_ORN_TOLERANCE = 0.001
+m.IK_ORN_WEIGHT = 0.05
 m.IK_MAX_ITERATIONS = 100
 
 # Different modes
@@ -92,6 +94,8 @@ class InverseKinematicsController(ManipulationController):
                 using @motor_type = velocity
             mode (str): mode to use when computing IK. In all cases, position commands are 3DOF delta (dx,dy,dz)
                 cartesian values, relative to the robot base frame. Valid options are:
+                    - "absolute_pose": 6DOF (dx,dy,dz,ax,ay,az) control over pose,
+                        where both the position and the orientation is given in absolute axis-angle coordinates
                     - "pose_absolute_ori": 6DOF (dx,dy,dz,ax,ay,az) control over pose,
                         where the orientation is given in absolute axis-angle coordinates
                     - "pose_delta_ori": 6DOF (dx,dy,dz,dax,day,daz) control over pose
@@ -320,7 +324,9 @@ class InverseKinematicsController(ManipulationController):
                     target_pos=target_pos,
                     target_quat=target_quat,
                     tolerance_pos=m.IK_POS_TOLERANCE,
+                    tolerance_quat=m.IK_ORN_TOLERANCE,
                     weight_pos=m.IK_POS_WEIGHT,
+                    weight_quat=m.IK_ORN_WEIGHT,
                     max_iterations=m.IK_MAX_ITERATIONS,
                     initial_joint_pos=current_joint_pos,
                 )
@@ -329,7 +335,9 @@ class InverseKinematicsController(ManipulationController):
                     target_pos=target_pos,
                     target_quat=target_quat,
                     tolerance_pos=m.IK_POS_TOLERANCE,
+                    tolerance_quat=m.IK_ORN_TOLERANCE,
                     weight_pos=m.IK_POS_WEIGHT,
+                    weight_quat=m.IK_ORN_WEIGHT,
                     max_iterations=m.IK_MAX_ITERATIONS,
                 )
 
