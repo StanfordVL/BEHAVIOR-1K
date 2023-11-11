@@ -4,7 +4,7 @@ import numpy as np
 from transforms3d.euler import euler2quat
 from transforms3d.quaternions import qmult, quat2mat
 
-from omnigibson.controllers import LocomotionController
+from omnigibson.controllers import LocomotionController, DifferentialDriveController
 from omnigibson.robots.robot_base import BaseRobot
 from omnigibson.utils.python_utils import classproperty
 
@@ -209,6 +209,7 @@ class LocomotionRobot(BaseRobot):
         Returns:
             np.ndarray: array of action data
         """
+        assert isinstance(self._controllers["base"], DifferentialDriveController), "Only DifferentialDriveController is supported!"
         if vr_data["robot_attached"]:
             translation_offset = vr_data["button_data"][1]["axis"]["touchpad_y"]
             rotation_offset = vr_data["button_data"][1]["axis"]["touchpad_x"]

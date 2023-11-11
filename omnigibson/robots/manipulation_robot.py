@@ -150,9 +150,9 @@ class ManipulationRobot(BaseRobot):
         """
         # Store relevant internal vars
         assert_valid_key(key=grasping_mode, valid_keys=AG_MODES, name="grasping_mode")
+        assert_valid_key(key=grasping_direction, valid_keys=["lower", "upper"], name="grasping direction")
         self._grasping_mode = grasping_mode
         self._grasping_direction = grasping_direction
-        assert self._grasping_direction in ["lower", "upper"], "grasping_direction must be one of 'lower' or 'upper'"
         self._disable_grasp_handling = disable_grasp_handling
 
         # Initialize other variables used for assistive grasping
