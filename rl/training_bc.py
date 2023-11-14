@@ -398,10 +398,11 @@ def main(dirs):
     })
 
     env = RLEnv(env_config)
-    wandb.init(
-        # set the wandb project where this run will be logged
-        project="grasp-bc",
-    )
+    # wandb.login()
+    # wandb.init(
+    #     # set the wandb project where this run will be logged
+    #     project="grasp-bc",
+    # )
 
     # register_env("my_env", lambda config: RLEnv(config))
     config = (
@@ -434,7 +435,7 @@ def main(dirs):
             #     },
             # },
         # )
-        # .resources(num_gpus=1)
+        .resources(num_gpus=1)
         .framework("torch")
         .offline_data(
             # input_ = lambda ioctx: ShuffledInput(
@@ -444,13 +445,16 @@ def main(dirs):
                 CustomReader(dirs, ioctx)
             )
         )
-        # .training(
-        #     model={
-        #         "fcnet_hiddens": [256, 256],
-        #         "use_lstm": True,
-        #         "max_seq_len": 10,
-        #     },
-        # )
+        .training(
+            model={
+                # "fcnet_hiddens": [256, 256],
+                "use_lstm": True,
+                "max_seq_len": 10,
+                "lstm_cell_size": 256,
+                "lstm_use_prev_action": True,
+                "lstm_use_prev_reward": True,
+            },
+        )
     )
 
     algo = config.build()
@@ -466,8 +470,8 @@ def main(dirs):
             print(vals)
             print(i)
             print('----------------------------------')
-            wandb.log(result['info']['learner'])
-            wandb.log(vals)
+            # wandb.log(result['info']['learner'])
+            # wandb.log(vals)
             algo.save("./checkpoints_bc")
             # path_to_checkpoint = save_result.checkpoint.path
 
