@@ -8,26 +8,7 @@ concurrency:
 
 jobs:
   test:
-    runs-on: [self-hosted, linux, gpu]
-    container:
-      image: stanfordvl/omnigibson-dev:latest
-      options: --gpus=all --privileged --user=root
-      env:
-        DISPLAY: ""
-        OMNIGIBSON_HEADLESS: 1
-      volumes:
-        - /scr/omni-data/datasets:/data
-        - /usr/share/vulkan/icd.d/nvidia_icd.json:/etc/vulkan/icd.d/nvidia_icd.json
-        - /usr/share/vulkan/icd.d/nvidia_layers.json:/etc/vulkan/implicit_layer.d/nvidia_layers.json
-        - /usr/share/glvnd/egl_vendor.d/10_nvidia.json:/usr/share/glvnd/egl_vendor.d/10_nvidia.json
-        - /scr/omni-data/isaac-sim/cache/ov:/root/.cache/ov:rw
-        - /scr/omni-data/isaac-sim/cache/pip:/root/.cache/pip:rw
-        - /scr/omni-data/isaac-sim/cache/glcache:/root/.cache/nvidia/GLCache:rw
-        - /scr/omni-data/isaac-sim/cache/computecache:/root/.nv/ComputeCache:rw
-        - /scr/omni-data/isaac-sim/logs:/root/.nvidia-omniverse/logs:rw
-        - /scr/omni-data/isaac-sim/config:/root/.nvidia-omniverse/config:rw
-        - /scr/omni-data/isaac-sim/data:/root/.local/share/ov/data:rw
-        - /scr/omni-data/isaac-sim/documents:/root/Documents:rw
+    runs-on: [self-hosted, linux, gpu, dataset-enabled]
 
     defaults:
       run:

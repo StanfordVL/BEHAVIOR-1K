@@ -2,17 +2,34 @@ import numpy as np
 from math import ceil
 
 import omnigibson as og
+from omnigibson.macros import create_module_macros
 from omnigibson.object_states import ContactBodies
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.control_utils import IKSolver
 from pxr import PhysicsSchemaTools, Gf
+
+m = create_module_macros(module_path=__file__)
+m.ANGLE_DIFF = 0.3
+m.DIST_DIFF = 0.1
+
+def _wrap_angle(theta):
+    """"
+    Converts an angle to the range [-pi, pi).
+
+    Args:
+        theta (float): angle in radians
+
+    Returns:
+        float: angle in radians in range [-pi, pi)
+    """
+    return (theta + np.pi) % (2 * np.pi) - np.pi
+
 
 def plan_base_motion(
     robot,
     end_conf,
     context,
     planning_time=15.0,
-    **kwargs
 ):
     """
     Plans a base motion to a 2d pose
@@ -20,7 +37,7 @@ def plan_base_motion(
     Args:
         robot (omnigibson.object_states.Robot): Robot object to plan for
         end_conf (Iterable): [x, y, yaw] 2d pose to plan to
-        context (UndoableContext): Context to plan in that includes the robot copy
+        context (PlanningContext): Context to plan in that includes the robot copy
         planning_time (float): Time to plan for
     
     Returns:
@@ -28,9 +45,6 @@ def plan_base_motion(
     """
     from ompl import base as ob
     from ompl import geometric as ompl_geo
-
-    ANGLE_DIFF = 0.3
-    DIST_DIFF = 0.1
 
     class CustomMotionValidator(ob.MotionValidator):
 
@@ -53,7 +67,7 @@ def plan_base_motion(
 
             # Navigation
             dist = np.linalg.norm(goal[:2] - start[:2])
-            num_points = ceil(dist / DIST_DIFF) + 1
+            num_points = ceil(dist / m.DIST_DIFF) + 1
             nav_x = np.linspace(start[0], goal[0], num_points).tolist()
             nav_y = np.linspace(start[1], goal[1], num_points).tolist()
             for i in range(num_points):
@@ -69,10 +83,10 @@ def plan_base_motion(
         
         @staticmethod
         def is_valid_rotation(si, start_conf, final_orientation):
-            diff = T.wrap_angle(final_orientation - start_conf[2])
+            diff = _wrap_angle(final_orientation - start_conf[2])
             direction = np.sign(diff)
             diff = abs(diff)
-            num_points = ceil(diff / ANGLE_DIFF) + 1
+            num_points = ceil(diff / m.ANGLE_DIFF) + 1
             nav_angle = np.linspace(0.0, diff, num_points) * direction
             angles = nav_angle + start_conf[2]
             for i in range(num_points):
@@ -93,7 +107,7 @@ def plan_base_motion(
         state = ob.State(space)
         state().setX(x)
         state().setY(y)
-        state().setYaw(T.wrap_angle(yaw))
+        state().setYaw(_wrap_angle(yaw))
         return state
     
     def state_valid_fn(q):
@@ -165,10 +179,10 @@ def plan_base_motion(
     planner = ompl_geo.RRT(si)
     ss.setPlanner(planner)
 
-    start = create_state(space, start_conf[0], start_conf[1], T.wrap_angle(start_conf[2]))
+    start = create_state(space, start_conf[0], start_conf[1], start_conf[2])
     print(start)
 
-    goal = create_state(space, end_conf[0], end_conf[1], T.wrap_angle(end_conf[2]))
+    goal = create_state(space, end_conf[0], end_conf[1], end_conf[2])
     print(goal)
 
     ss.setStartAndGoalStates(start, goal)
@@ -196,7 +210,6 @@ def plan_arm_motion(
     context,
     planning_time=15.0,
     torso_fixed=True,
-    **kwargs
 ):
     """
     Plans an arm motion to a final joint position
@@ -204,7 +217,7 @@ def plan_arm_motion(
     Args:
         robot (BaseRobot): Robot object to plan for
         end_conf (Iterable): Final joint position to plan to
-        context (UndoableContext): Context to plan in that includes the robot copy
+        context (PlanningContext): Context to plan in that includes the robot copy
         planning_time (float): Time to plan for
     
     Returns:
@@ -297,7 +310,6 @@ def plan_arm_motion_ik(
     context,
     planning_time=15.0,
     torso_fixed=True,
-    **kwargs
 ):
     """
     Plans an arm motion to a final end effector pose
@@ -305,7 +317,7 @@ def plan_arm_motion_ik(
     Args:
         robot (BaseRobot): Robot object to plan for
         end_conf (Iterable): Final end effector pose to plan to
-        context (UndoableContext): Context to plan in that includes the robot copy
+        context (PlanningContext): Context to plan in that includes the robot copy
         planning_time (float): Time to plan for
     
     Returns:
@@ -337,7 +349,6 @@ def plan_arm_motion_ik(
     ik_solver = IKSolver(
         robot_description_path=robot_description_path,
         robot_urdf_path=robot.urdf_path,
-        # default_joint_pos=robot.get_joint_positions()[joint_control_idx],
         default_joint_pos=robot.default_joint_pos[joint_control_idx],
         eef_name=robot.eef_link_names[robot.default_arm],
     )
@@ -350,11 +361,7 @@ def plan_arm_motion_ik(
             target_quat=T.axisangle2quat(eef_pose[3:]),
             max_iterations=1000,
         )
-# ik_solver.solve(
-#     target_pos=eef_pose[:3],
-#     target_quat=T.axisangle2quat(eef_pose[3:]),
-#     max_iterations=1000,
-# )
+
         if control_joint_pos is None:
             return False
         joint_pos[control_idx_in_joint_pos] = control_joint_pos
@@ -425,7 +432,7 @@ def set_base_and_detect_collision(context, pose):
     Moves the robot and detects robot collisions with the environment and itself
 
     Args:
-        context (UndoableContext): Context to plan in that includes the robot copy
+        context (PlanningContext): Context to plan in that includes the robot copy
         pose (Array): Pose in the world frame to check for collisions at
     
     Returns:
@@ -434,13 +441,10 @@ def set_base_and_detect_collision(context, pose):
     robot_copy = context.robot_copy
     robot_copy_type = context.robot_copy_type
 
-    translation = pose[0]
-    orientation = pose[1]
-    # context.robot_copy.prim.set_local_poses(np.array([translation]), np.array([orientation]))
-    translation = Gf.Vec3d(*np.array(translation, dtype=float))
+    translation = Gf.Vec3d(*np.array(pose[0], dtype=float))
     robot_copy.prims[robot_copy_type].GetAttribute("xformOp:translate").Set(translation)
 
-    orientation = np.array(orientation, dtype=float)[[3, 0, 1, 2]]
+    orientation = np.array(pose[1], dtype=float)[[3, 0, 1, 2]]
     robot_copy.prims[robot_copy_type].GetAttribute("xformOp:orient").Set(Gf.Quatd(*orientation)) 
 
     return detect_robot_collision(context)
@@ -450,7 +454,7 @@ def set_arm_and_detect_collision(context, joint_pos):
     Sets joint positions of the robot and detects robot collisions with the environment and itself
 
     Args:
-        context (UndoableContext): Context to plan in that includes the robot copy
+        context (PlanningContext): Context to plan in that includes the robot copy
         joint_pos (Array): Joint positions to set the robot to
     
     Returns:
@@ -481,7 +485,7 @@ def detect_robot_collision(context):
     Detects robot collisions
 
     Args:
-        context (UndoableContext): Context to plan in that includes the robot copy
+        context (PlanningContext): Context to plan in that includes the robot copy
     
     Returns:
         bool: Whether the robot is in collision
@@ -495,7 +499,6 @@ def detect_robot_collision(context):
 
     def overlap_callback(hit):
         nonlocal valid_hit
-        nonlocal mesh_path
         
         valid_hit = hit.rigid_body not in context.disabled_collision_pairs_dict[mesh_path]
 

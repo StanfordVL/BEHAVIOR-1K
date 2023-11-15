@@ -4,6 +4,7 @@ from omnigibson.robots.robot_base import m as robot_macros
 from omnigibson.scenes.traversable_scene import TraversableScene
 from omnigibson.maps.segmentation_map import SegmentationMap
 from omnigibson.utils.asset_utils import get_og_scene_path
+from omnigibson.utils.constants import STRUCTURE_CATEGORIES
 from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
@@ -174,15 +175,19 @@ class InteractiveTraversableScene(TraversableScene):
         in_rooms = [in_rooms] if isinstance(in_rooms, str) else in_rooms
 
         # Do not load these object categories (can blacklist building structures as well)
-        task_relevant_names = set(task_metadata["inst_to_name"].values()) if "inst_to_name" in task_metadata else set()
-        is_task_relevant = name in task_relevant_names or category in ("walls", "floors")
-        not_blacklisted = (
-            (self.not_load_object_categories is None or category not in self.not_load_object_categories) and
-            (not self.load_task_relevant_only or is_task_relevant)
-        )
+        not_blacklisted = self.not_load_object_categories is None or category not in self.not_load_object_categories
 
         # Only load these object categories (no need to white list building structures)
-        whitelisted = self.load_object_categories is None or category in self.load_object_categories
+        task_relevant_names = set(task_metadata["inst_to_name"].values()) if "inst_to_name" in task_metadata else set()
+        is_task_relevant = name in task_relevant_names or category in STRUCTURE_CATEGORIES
+        whitelisted = (
+            # Either no whitelisting-only mode is on
+            (self.load_object_categories is None and not self.load_task_relevant_only) or
+            # Or the object is in the whitelist
+            (self.load_object_categories is not None and category in self.load_object_categories) or
+            # Or it's in the task relevant list
+            (self.load_task_relevant_only and is_task_relevant)
+        )
 
         # This object is not located in one of the selected rooms, skip
         valid_room = self.load_room_instances is None or len(set(self.load_room_instances) & set(in_rooms)) > 0

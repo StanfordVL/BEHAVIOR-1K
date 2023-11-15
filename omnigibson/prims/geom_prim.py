@@ -157,8 +157,7 @@ class CollisionGeomPrim(GeomPrim):
             self._mesh_collision_api = UsdPhysics.MeshCollisionAPI(self._prim) if \
                 self._prim.HasAPI(UsdPhysics.MeshCollisionAPI) else UsdPhysics.MeshCollisionAPI.Apply(self._prim)
             # Set the approximation to be convex hull by default
-            if self.get_collision_approximation() != "boundingSphere":
-                self.set_collision_approximation(approximation_type="convexHull")
+            self.set_collision_approximation(approximation_type="convexHull")
 
     @property
     def collision_enabled(self):

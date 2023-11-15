@@ -157,6 +157,12 @@ class TransitionRuleAPI:
 
     @classmethod
     def execute_transition(cls, added_obj_attrs, removed_objs):
+        """
+        Executes the transition for the given added and removed objects.
+
+        :param added_obj_attrs: List of ObjectAttrs instances to add to the scene
+        :param removed_objs: List of BaseObject instances to remove from the scene
+        """
         # Process all transition results
         if len(removed_objs) > 0:
             disclaimer(
@@ -725,6 +731,10 @@ class SlicingRule(BaseTransitionRule):
         for sliceable_obj in object_candidates["sliceable"]:
             # Object parts offset annotation are w.r.t the base link of the whole object.
             pos, orn = sliceable_obj.get_position_orientation()
+
+            # If it has no parts, silently fail
+            if not sliceable_obj.metadata["object_parts"]:
+                continue
 
             # Load object parts
             for i, part in enumerate(sliceable_obj.metadata["object_parts"].values()):

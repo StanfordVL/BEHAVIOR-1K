@@ -7,7 +7,7 @@ render:
 
 scene:
   type: InteractiveTraversableScene
-  scene_model: grocery_store_cafe
+  scene_model: Rs_int
   trav_map_resolution: 0.1
   trav_map_erosion: 2
   trav_map_with_objects: true
@@ -18,13 +18,14 @@ scene:
   not_load_object_categories: null
   load_room_types: null
   load_room_instances: null
-  load_task_relevant_only: true
+  load_task_relevant_only: false
   seg_map_resolution: 0.1
   scene_source: OG
-  include_robots: true
+  include_robots: false
 
 robots:
-  - type: Fetch
+  - name: tiago
+    type: Tiago
     obs_modalities: [scan, rgb, depth]
     scale: 1.0
     self_collisions: true
@@ -32,45 +33,47 @@ robots:
     action_normalize: false
     action_type: continuous
     grasping_mode: sticky
-    disable_grasp_handling: True
+    disable_grasp_handling: true
     rigid_trunk: false
     default_trunk_offset: 0.365
     default_arm_pose: diagonal30
-    reset_joint_pos: tuck
     controller_config:
       base:
-        name: DifferentialDriveController
-      arm_0:
+        name: JointController
+        motor_type: "velocity"
+      arm_left:
         name: JointController
         motor_type: position
         command_input_limits: null
         command_output_limits: null
         use_delta_commands: false
-      gripper_0:
+      arm_right:
+        name: JointController
+        motor_type: position
+        command_input_limits: null
+        command_output_limits: null
+        use_delta_commands: false
+      gripper_left:
         name: JointController
         motor_type: position
         command_input_limits: [-1, 1]
         command_output_limits: null
         use_delta_commands: true
-        use_single_command: true
+      gripper_right:
+        name: JointController
+        motor_type: position
+        command_input_limits: [-1, 1]
+        command_output_limits: null
+        use_delta_commands: true
       camera:
         name: JointController
+        motor_type: "velocity"
         use_delta_commands: false
 
 objects: []
 
 task:
-  type: BehaviorTask
-  activity_name: buy_a_good_avocado
-  activity_definition_id: 0
-  activity_instance_id: 0
-  online_object_sampling: false
-  debug_object_sampling: null
-  highlight_task_relevant_objects: false
-  termination_config:
-    max_steps: 50000
-  reward_config:
-    r_potential: 1.0
+  type: DummyTask
 
 scene_graph:
   egocentric: true

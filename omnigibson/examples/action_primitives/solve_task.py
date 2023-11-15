@@ -14,8 +14,8 @@ from omnigibson.utils.ui_utils import KeyboardRobotController
 
 
 # Don't use GPU dynamics and use flatcache for performance boost
-gm.USE_GPU_DYNAMICS = False
-gm.ENABLE_FLATCACHE = False
+gm.USE_GPU_DYNAMICS = True
+gm.ENABLE_FLATCACHE = True
 
 def pause(time):
     for _ in range(int(time*100)):
@@ -27,10 +27,23 @@ def execute_controller(ctrl_gen, env):
 
 def main(keyboard_control=False):
     # Load the config
-    config_filename = os.path.join(og.example_config_path, "homeboy.yaml")
+    config_filename = os.path.join(og.example_config_path, "tiago_primitives.yaml")
     config = yaml.load(open(config_filename, "r"), Loader=yaml.FullLoader)
     if keyboard_control:
         config["robots"][0]["action_normalize"] = True
+
+    # Update it to run a grocery shopping task
+    config["scene"]["scene_model"] = "Beechwood_0_int"
+    config["scene"]["load_task_relevant_only"] = True
+    config["scene"]["not_load_object_categories"] = ["ceilings"]
+    config["task"] = {
+        "type": "BehaviorTask",
+        "activity_name": "make_a_military_care_package",
+        "activity_definition_id": 0,
+        "activity_instance_id": 0,
+        "predefined_problem": None,
+        "online_object_sampling": False,
+    }
 
     # Load the environment
     env = og.Environment(configs=config)
@@ -46,17 +59,25 @@ def main(keyboard_control=False):
         action = action_generator.get_teleop_action()
         print("Running demo.")
         print("Press ESC to quit")
-        for _ in range(10):
+        while True:
             env.step(action=action)
     else:
-        controller = SymbolicSemanticActionPrimitives(None, scene, robot)
+        print("Move the camera around")
+        for _ in range(1000):
+            og.sim.render()
+        controller = SymbolicSemanticActionPrimitives(env)
         # Grasp bottle of vodka
         grasp_obj, = scene.object_registry("category", "bottle_of_vodka")
+
+        print("Executing controller")
         execute_controller(controller.apply_ref(SymbolicSemanticActionPrimitiveSet.GRASP, grasp_obj), env)
+        print("Finished executing grasp")
 
         # place bottle of vodka in box
+        print("Executing controller")
         box, = scene.object_registry("category", "storage_box")
         execute_controller(controller.apply_ref(SymbolicSemanticActionPrimitiveSet.PLACE_INSIDE, box), env)
+        print("Finished executing place")
 
 if __name__ == "__main__":
     main()

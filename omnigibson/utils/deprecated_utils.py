@@ -22,7 +22,7 @@ class CreateMeshPrimWithDefaultXformCommand(CMPWDXC):
             prim_type (str): It supports Plane/Sphere/Cone/Cylinder/Disk/Torus/Cube.
 
         kwargs:
-            object_origin (Gf.Vec3f): Position of mesh center.
+            object_origin (Gf.Vec3f): Position of mesh center in stage units.
 
             u_patches (int): The number of patches to tessellate U direction.
 
@@ -31,7 +31,7 @@ class CreateMeshPrimWithDefaultXformCommand(CMPWDXC):
             w_patches (int): The number of patches to tessellate W direction.
                              It only works for Cone/Cylinder/Cube.
 
-            half_scale (float): Half size of mesh. Default None.
+            half_scale (float): Half size of mesh in centimeters. Default is None, which means it's controlled by settings.
 
             u_verts_scale (int): Tessellation Level of U. It's a multiplier of u_patches.
 
@@ -42,23 +42,22 @@ class CreateMeshPrimWithDefaultXformCommand(CMPWDXC):
                                  For Cone/Cylinder, it's to tessellate the caps.
                                  For Cube, it's to tessellate along z-axis.
 
+            above_ground (bool): It will offset the center of mesh above the ground plane if it's True,
+                False otherwise. It's False by default. This param only works when param object_origin is not given.
+                Otherwise, it will be ignored.
+
             stage (Usd.Stage): If specified, stage to create prim on
         """
+
         self._prim_type = prim_type[0:1].upper() + prim_type[1:].lower()
         self._usd_context = omni.usd.get_context()
         self._selection = self._usd_context.get_selection()
         self._stage = kwargs.get("stage", self._usd_context.get_stage())
         self._settings = carb.settings.get_settings()
-        self._prim_path = None
-        self._default_path = None
-        self._prepend_default_prim = True
-        if "prim_path" in kwargs and kwargs["prim_path"]:
-            self._default_path = Sdf.Path(kwargs["prim_path"])
-        self._select_new_prim = True
-        if "select_new_prim" in kwargs:
-            self._select_new_prim = bool(kwargs["select_new_prim"])
-        if "prepend_default_prim" in kwargs:
-            self._prepend_default_prim = bool(kwargs["prepend_default_prim"])
+        self._default_path = kwargs.get("prim_path", None)
+        self._select_new_prim = kwargs.get("select_new_prim", True)
+        self._prepend_default_prim = kwargs.get("prepend_default_prim", True)
+        self._above_round = kwargs.get("above_ground", False)
 
         self._attributes = {**kwargs}
         # Supported mesh types should have an associated evaluator class
@@ -66,7 +65,7 @@ class CreateMeshPrimWithDefaultXformCommand(CMPWDXC):
         assert isinstance(self._evaluator_class, type)
 
 
-class Utils(OmniUtils):
+class Utils2022(OmniUtils):
     """
     Subclass that overrides a specific function within Omni's Utils class to fix a bug
     """
@@ -101,13 +100,39 @@ class Utils(OmniUtils):
         return [material_path]
 
 
+class Utils2023(OmniUtils):
+    def create_material(self, name):
+        material_url = carb.settings.get_settings().get("/exts/omni.particle.system.core/material")
+
+        # TODO: THIS IS THE ONLY LINE WE CHANGE! "/" SHOULD BE ""
+        material_path = ""
+        default_prim = self.stage.GetDefaultPrim()
+        if default_prim:
+            material_path = default_prim.GetPath().pathString
+
+        if not self.stage.GetPrimAtPath(material_path + "/Looks"):
+            self.stage.DefinePrim(material_path + "/Looks", "Scope")
+        material_path += "/Looks/" + name
+        material_path = ou.get_stage_next_free_path(
+            self.stage, material_path, False
+        )
+        prim = self.stage.DefinePrim(material_path, "Material")
+        if material_url:
+            prim.GetReferences().AddReference(material_url)
+        else:
+            carb.log_error("Failed to find material URL in settings")
+
+        return [material_path]
+
+
 class Core(OmniCore):
     """
     Subclass that overrides a specific function within Omni's Core class to fix a bug
     """
     def __init__(self, popup_callback: Callable[[str], None], particle_system_name: str):
         self._popup_callback = popup_callback
-        self.utils = Utils()    # TODO: THIS IS THE ONLY LINE THAT WE CHANGE! ONCE FIXED, REMOVE THIS
+        from omnigibson.utils.sim_utils import meets_minimum_isaac_version
+        self.utils = Utils2023() if meets_minimum_isaac_version("2023.0.0") else Utils2022()
         self.context = ou.get_context()
         self.stage = self.context.get_stage()
         self.selection = self.context.get_selection()
@@ -123,7 +148,7 @@ class Core(OmniCore):
         """
         graph = None
         graph_paths = [path for path in selected_paths
-                       if self.stage.GetPrimAtPath(path).GetTypeName() == "ComputeGraph"]
+                       if self.stage.GetPrimAtPath(path).GetTypeName() in ["ComputeGraph", "OmniGraph"] ]
 
         if len(graph_paths) > 0:
             graph = ogc.get_graph_by_path(graph_paths[0])
@@ -131,6 +156,7 @@ class Core(OmniCore):
                 carb.log_warn(f"Multiple ComputeGraph prims selected. Only the first will be used: {graph.get_path_to_graph()}")
         elif create_new_graph:
             # If no graph was found in the selected prims, we'll make a new graph.
+            # TODO: THIS IS THE ONLY LINE THAT WE CHANGE! ONCE FIXED, REMOVE THIS
             graph_path = Sdf.Path(f"/OmniGraph/{self.particle_system_name}").MakeAbsolutePath(Sdf.Path.absoluteRootPath)
             graph_path = ou.get_stage_next_free_path(self.stage, graph_path, True)
 
@@ -159,4 +185,3 @@ class Core(OmniCore):
             carb.log_info(f"No ComputeGraph selected. A new graph has been created at {graph.get_path_to_graph()}")
 
         return graph
-

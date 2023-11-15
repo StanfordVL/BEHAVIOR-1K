@@ -183,12 +183,10 @@ class RigidPrim(XFormPrim):
                     # We need to translate the center of mass from the mesh's local frame to the link's local frame
                     local_pos, local_orn = mesh.get_local_pose()
                     coms.append(T.quat2mat(local_orn) @ (com * mesh.scale) + local_pos)
-                    # TODO: This is an issue for collision detection because the collision mesh being checked for collisions is the underlying mesh while
-                    # the one in the environment is the bounding box. This can cause false positives for collision free poses. Currently disabled for this reason.
                     # If we're not a valid volume, use bounding box approximation for the underlying collision approximation
-                    # if not is_volume:
-                    #     log.warning(f"Got invalid (non-volume) collision mesh: {mesh.name}")
-                    #     mesh.set_collision_approximation("boundingCube")
+                    if not is_volume:
+                        log.warning(f"Got invalid (non-volume) collision mesh: {mesh.name}")
+                        mesh.set_collision_approximation("boundingCube")
                 else:
                     self._visual_meshes[mesh_name] = VisualGeomPrim(**mesh_kwargs)
 
@@ -296,6 +294,8 @@ class RigidPrim(XFormPrim):
                 position = current_position
             if orientation is None:
                 orientation = current_orientation
+            assert np.isclose(np.linalg.norm(orientation), 1, atol=1e-3), \
+                f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
             pose = _dynamic_control.Transform(position, orientation)
             self._dc.set_rigid_body_pose(self._handle, pose)
         else:
@@ -310,7 +310,9 @@ class RigidPrim(XFormPrim):
             # Call super method by default
             pos, ori = super().get_position_orientation()
 
-        return np.array(pos), np.array(ori)
+        assert np.isclose(np.linalg.norm(ori), 1, atol=1e-3), \
+            f"{self.prim_path} orientation {ori} is not a unit quaternion."
+        return pos, ori
 
     def set_local_pose(self, translation=None, orientation=None):
         if self.dc_is_accessible:

@@ -6,7 +6,7 @@ from scipy.spatial.transform import Rotation as R
 from scipy.spatial import ConvexHull, distance_matrix
 
 import omnigibson as og
-from omnigibson.macros import create_module_macros, Dict, gm
+from omnigibson.macros import create_module_macros, Dict, macros
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.contact_bodies import ContactBodies
 from omnigibson.utils import sampling_utils
@@ -139,6 +139,7 @@ def sample_kinematics(
         og.sim.step_physics()
 
         # This would slightly change because of the step_physics call.
+        old_pos, orientation = objA.get_position_orientation()
 
         # Run import here to avoid circular imports
         from omnigibson.objects.dataset_object import DatasetObject
@@ -188,7 +189,7 @@ def sample_kinematics(
             objA.keep_still()
             success = len(objA.states[ContactBodies].get_value()) == 0
 
-        if gm.DEBUG:
+        if macros.utils.sampling_utils.DEBUG_SAMPLING:
             debug_breakpoint(f"sample_kinematics: {success}")
 
         if success:

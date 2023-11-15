@@ -75,8 +75,10 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
         # Unique to ManipulationRobot
         grasping_mode="physical",
+        disable_grasp_handling=False,
 
         # Unique to Tiago
+        variant="default",
         rigid_trunk=False,
         default_trunk_offset=0.365,
         default_arm_pose="vertical",
@@ -129,6 +131,9 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
                 If "physical", no assistive grasping will be applied (relies on contact friction + finger force).
                 If "assisted", will magnetize any object touching and within the gripper's fingers.
                 If "sticky", will magnetize any object touching the gripper's fingers.
+            disable_grasp_handling (bool): If True, will disable all grasp handling for this object. This means that
+                sticky and assisted grasp modes will not work unless the connection/release methodsare manually called.
+            variant (str): Which variant of the robot should be loaded. One of "default", "wrist_cam"
             rigid_trunk (bool) if True, will prevent the trunk from moving during execution.
             default_trunk_offset (float): sets the default height of the robot's trunk
             default_arm_pose (str): Default pose for the robot arm. Should be one of:
@@ -137,6 +142,8 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
                 for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
         """
         # Store args
+        assert variant in ("default", "wrist_cam"), f"Invalid Tiago variant specified {variant}!"
+        self._variant = variant
         self.rigid_trunk = rigid_trunk
         self.default_trunk_offset = default_trunk_offset
         assert_valid_key(key=default_arm_pose, valid_keys=DEFAULT_ARM_POSES, name="default_arm_pose")
@@ -176,6 +183,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             proprio_obs=proprio_obs,
             sensor_config=sensor_config,
             grasping_mode=grasping_mode,
+            disable_grasp_handling=disable_grasp_handling,
             **kwargs,
         )
 
@@ -598,14 +606,6 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         ]
 
     @property
-    def primitive_disabled_collision_pairs(self):
-        """
-        Returns:
-            Array of arrays: This property in Fetch exists due to a bug. To keep consistency, this exists here. When the bug is fixed in Fetch, this property can be removed from here.
-        """
-        return self.disabled_collision_pairs
-
-    @property
     def manipulation_link_names(self):
         return [
             "torso_fixed_link", 
@@ -665,15 +665,20 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
     @property
     def usd_path(self):
-        # return os.path.join(gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford/tiago_dual_omnidirectional_stanford_33_with_wrist_cam.usd")
+        if self._variant == "wrist_cam":
+            return os.path.join(gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford/tiago_dual_omnidirectional_stanford_33_with_wrist_cam.usd")
+        
+        # Default variant
         return os.path.join(gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford/tiago_dual_omnidirectional_stanford_33.usd")
 
     @property
     def simplified_mesh_usd_path(self):
+        # TODO: How can we make this more general - maybe some automatic way to generate these?
         return os.path.join(gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford/tiago_dual_omnidirectional_stanford_33_simplified_collision_mesh.usd")
 
     @property
     def robot_arm_descriptor_yamls(self):
+        # TODO: Remove the need to do this by making the arm descriptor yaml files generated automatically
         return {"left": os.path.join(gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford_left_arm_descriptor.yaml"),
                 "left_fixed": os.path.join(gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford_left_arm_fixed_trunk_descriptor.yaml"),
                 "right": os.path.join(gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford_right_arm_fixed_trunk_descriptor.yaml"),
@@ -705,6 +710,8 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             position = current_position
         if orientation is None:
             orientation = current_orientation
+        assert np.isclose(np.linalg.norm(orientation), 1, atol=1e-3), \
+            f"{self.name} desired orientation {orientation} is not a unit quaternion."
 
         # If the simulator is playing, set the 6 base joints to achieve the desired pose of base_footprint link frame
         if self._dc is not None and self._dc.is_simulating():
@@ -729,13 +736,9 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             super().set_position_orientation(position, orientation)
             # Move the joint frame for the world_base_joint
             if self._world_base_fixed_joint_prim is not None:
-                # Position and orientation are lists when restoring scene from json. Cast them to np.array
-                if isinstance(position, list):
-                    position = np.array(position)
-                if isinstance(orientation, list):
-                    orientation = np.array(orientation)
                 self._world_base_fixed_joint_prim.GetAttribute("physics:localPos0").Set(tuple(position))
-                self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(Gf.Quatf(*orientation[[3, 0, 1, 2]]))
+                self._world_base_fixed_joint_prim.GetAttribute("physics:localRot0").Set(Gf.Quatf(
+                    orientation[3], orientation[0], orientation[1], orientation[2]))
 
     def set_linear_velocity(self, velocity: np.ndarray):
         # Transform the desired linear velocity from the world frame to the root_link ("base_footprint_x") frame

@@ -1,4 +1,5 @@
 import numpy as np
+from omnigibson.macros import create_module_macros
 
 import omnigibson.utils.transform_utils as T
 from omnigibson.controllers import ControlType, ManipulationController
@@ -9,6 +10,12 @@ from omnigibson.utils.ui_utils import create_module_logger
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
+
+# Set some macros
+m = create_module_macros(module_path=__file__)
+m.IK_POS_TOLERANCE = 0.002
+m.IK_POS_WEIGHT = 20.0
+m.IK_MAX_ITERATIONS = 100
 
 # Different modes
 IK_MODE_COMMAND_DIMS = {
@@ -47,6 +54,7 @@ class InverseKinematicsController(ManipulationController):
         mode="pose_delta_ori",
         smoothing_filter_size=None,
         workspace_pose_limiter=None,
+        condition_on_current_position=True,
     ):
         """
         Args:
@@ -101,6 +109,8 @@ class InverseKinematicsController(ManipulationController):
 
                 where pos_command is (x,y,z) cartesian position values, command_quat is (x,y,z,w) quarternion orientation
                 values, and the returned tuple is the processed (pos, quat) command.
+            condition_on_current_position (bool): if True, will use the current joint position as the initial guess for the IK algorithm.
+                Otherwise, will use the default_joint_pos as the initial guess.
         """
         # Store arguments
         control_dim = len(dof_idx)
@@ -117,6 +127,7 @@ class InverseKinematicsController(ManipulationController):
         self.workspace_pose_limiter = workspace_pose_limiter
         self.task_name = task_name
         self.default_joint_pos = default_joint_pos[dof_idx]
+        self.condition_on_current_position = condition_on_current_position
 
         # Create the lula IKSolver
         self.solver = IKSolver(
@@ -267,20 +278,36 @@ class InverseKinematicsController(ManipulationController):
 
         # Calculate and return IK-backed out joint angles
         current_joint_pos = control_dict["joint_position"][self.dof_idx]
-        target_joint_pos = self.solver.solve(
-            target_pos=target_pos,
-            target_quat=target_quat,
-            tolerance_pos=0.002,
-            weight_pos=20.0,
-            max_iterations=2000,
-            # initial_joint_pos=current_joint_pos,
-        )
 
-        if target_joint_pos is None:
-            # Print warning that we couldn't find a valid solution, and return the current joint configuration
-            # instead so that we execute a no-op control
-            log.warning(f"Could not find valid IK configuration! Returning no-op control instead.")
+        # If the delta is really small, we just keep the current joint position. This avoids joint
+        # drift caused by IK solver inaccuracy even when zero delta actions are provided.
+        if np.allclose(pos_relative, target_pos, atol=1e-4) and np.allclose(quat_relative, target_quat, atol=1e-4):
             target_joint_pos = current_joint_pos
+        else:
+            # Otherwise we try to solve for the IK configuration.
+            if self.condition_on_current_position:
+                target_joint_pos = self.solver.solve(
+                    target_pos=target_pos,
+                    target_quat=target_quat,
+                    tolerance_pos=m.IK_POS_TOLERANCE,
+                    weight_pos=m.IK_POS_WEIGHT,
+                    max_iterations=m.IK_MAX_ITERATIONS,
+                    initial_joint_pos=current_joint_pos,
+                )
+            else:
+                target_joint_pos = self.solver.solve(
+                    target_pos=target_pos,
+                    target_quat=target_quat,
+                    tolerance_pos=m.IK_POS_TOLERANCE,
+                    weight_pos=m.IK_POS_WEIGHT,
+                    max_iterations=m.IK_MAX_ITERATIONS,
+                )
+
+            if target_joint_pos is None:
+                # Print warning that we couldn't find a valid solution, and return the current joint configuration
+                # instead so that we execute a no-op control
+                log.warning(f"Could not find valid IK configuration! Returning no-op control instead.")
+                target_joint_pos = current_joint_pos
 
         # Optionally pass through smoothing filter for better stability
         if self.control_filter is not None:

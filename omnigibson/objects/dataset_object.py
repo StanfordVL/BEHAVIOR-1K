@@ -483,7 +483,6 @@ class DatasetObject(USDObject):
                 - 3-array: (x,y,z) bbox extent in desired frame
                 - 3-array: (x,y,z) bbox center in desired frame
         """
-        assert self.prim_type == PrimType.RIGID, "get_base_aligned_bbox is only supported for rigid objects."
         bbox_type = "visual" if visual else "collision"
 
         # Get the base position transform.
@@ -497,61 +496,70 @@ class DatasetObject(USDObject):
         # this set of points to get our final, base-frame bounding box.
         points = []
 
-        links = {link_name: self._links[link_name]} if link_name is not None else self._links
-        for link_name, link in links.items():
-            # If the link has no visual or collision meshes, we skip over it (based on the @visual flag)
-            meshes = link.visual_meshes if visual else link.collision_meshes
-            if len(meshes) == 0:
-                continue
-
-            # If the link has a bounding box annotation.
-            if self.native_link_bboxes is not None and link_name in self.native_link_bboxes:
-                # Check if the annotation is still missing.
-                if bbox_type not in self.native_link_bboxes[link_name]:
-                    raise ValueError(f"Could not find {bbox_type} bounding box for object {self.name} link {link_name}")
-
-                # Get the extent and transform.
-                bb_data = self.native_link_bboxes[link_name][bbox_type][link_bbox_type]
-                extent_in_bbox_frame = np.array(bb_data["extent"])
-                bbox_to_link_origin = np.array(bb_data["transform"])
-
-                # # Get the link's pose in the base frame.
-                link_frame_to_world = T.pose2mat(link.get_position_orientation())
-                link_frame_to_base_frame = world_to_base_frame @ link_frame_to_world
-
-                # Scale the bounding box in link origin frame. Here we create a transform that first puts the bounding
-                # box's vertices into the link frame, and then scales them to match the scale applied to this object.
-                # Note that once scaled, the vertices of the bounding box do not necessarily form a cuboid anymore but
-                # instead a parallelepiped. This is not a problem because we later fit a bounding box to the points,
-                # this time in the object's base link frame.
-                scale_in_link_frame = np.diag(np.concatenate([self.scales_in_link_frame[link_name], [1]]))
-                bbox_to_scaled_link_origin = np.dot(scale_in_link_frame, bbox_to_link_origin)
-
-                # Compute the bounding box vertices in the base frame.
-                # bbox_to_link_com = np.dot(link_origin_to_link_com, bbox_to_scaled_link_origin)
-                bbox_center_in_base_frame = np.dot(link_frame_to_base_frame, bbox_to_scaled_link_origin)
-                vertices_in_base_frame = np.array(list(itertools.product((1, -1), repeat=3))) * (extent_in_bbox_frame / 2)
-
-                # Add the points to our collection of points.
-                points.extend(trimesh.transformations.transform_points(vertices_in_base_frame, bbox_center_in_base_frame))
-            elif fallback_to_aabb:
-                # If we're visual and the mesh is not visible, there is no fallback so continue
-                if bbox_type == "visual" and not np.all(tuple(mesh.visible for mesh in meshes.values())):
+        if self.prim_type == PrimType.CLOTH:
+            particle_contact_offset = self.root_link.cloth_system.particle_contact_offset
+            particle_positions = self.root_link.compute_particle_positions()
+            particles_in_world_frame = np.concatenate([
+                particle_positions - particle_contact_offset,
+                particle_positions + particle_contact_offset
+            ], axis=0)
+            points.extend(trimesh.transformations.transform_points(particles_in_world_frame, world_to_base_frame))
+        else:
+            links = {link_name: self._links[link_name]} if link_name is not None else self._links
+            for link_name, link in links.items():
+                # If the link has no visual or collision meshes, we skip over it (based on the @visual flag)
+                meshes = link.visual_meshes if visual else link.collision_meshes
+                if len(meshes) == 0:
                     continue
-                # If no BB annotation is available, get the AABB for this link.
-                aabb_center, aabb_extent = BoundingBoxAPI.compute_center_extent(prim=link)
-                aabb_vertices_in_world = aabb_center + np.array(list(itertools.product((1, -1), repeat=3))) * (
-                        aabb_extent / 2
-                )
-                aabb_vertices_in_base_frame = trimesh.transformations.transform_points(
-                    aabb_vertices_in_world, world_to_base_frame
-                )
-                points.extend(aabb_vertices_in_base_frame)
-            else:
-                raise ValueError(
-                    "Bounding box annotation missing for link: %s. Use fallback_to_aabb=True if you're okay with using "
-                    "AABB as fallback." % link_name
-                )
+
+                # If the link has a bounding box annotation.
+                if self.native_link_bboxes is not None and link_name in self.native_link_bboxes:
+                    # Check if the annotation is still missing.
+                    if bbox_type not in self.native_link_bboxes[link_name]:
+                        raise ValueError(f"Could not find {bbox_type} bounding box for object {self.name} link {link_name}")
+
+                    # Get the extent and transform.
+                    bb_data = self.native_link_bboxes[link_name][bbox_type][link_bbox_type]
+                    extent_in_bbox_frame = np.array(bb_data["extent"])
+                    bbox_to_link_origin = np.array(bb_data["transform"])
+
+                    # # Get the link's pose in the base frame.
+                    link_frame_to_world = T.pose2mat(link.get_position_orientation())
+                    link_frame_to_base_frame = world_to_base_frame @ link_frame_to_world
+
+                    # Scale the bounding box in link origin frame. Here we create a transform that first puts the bounding
+                    # box's vertices into the link frame, and then scales them to match the scale applied to this object.
+                    # Note that once scaled, the vertices of the bounding box do not necessarily form a cuboid anymore but
+                    # instead a parallelepiped. This is not a problem because we later fit a bounding box to the points,
+                    # this time in the object's base link frame.
+                    scale_in_link_frame = np.diag(np.concatenate([self.scales_in_link_frame[link_name], [1]]))
+                    bbox_to_scaled_link_origin = np.dot(scale_in_link_frame, bbox_to_link_origin)
+
+                    # Compute the bounding box vertices in the base frame.
+                    # bbox_to_link_com = np.dot(link_origin_to_link_com, bbox_to_scaled_link_origin)
+                    bbox_center_in_base_frame = np.dot(link_frame_to_base_frame, bbox_to_scaled_link_origin)
+                    vertices_in_base_frame = np.array(list(itertools.product((1, -1), repeat=3))) * (extent_in_bbox_frame / 2)
+
+                    # Add the points to our collection of points.
+                    points.extend(trimesh.transformations.transform_points(vertices_in_base_frame, bbox_center_in_base_frame))
+                elif fallback_to_aabb:  # always default to AABB for cloth
+                    # If we're visual and the mesh is not visible, there is no fallback so continue
+                    if bbox_type == "visual" and not np.all(tuple(mesh.visible for mesh in meshes.values())):
+                        continue
+                    # If no BB annotation is available, get the AABB for this link.
+                    aabb_center, aabb_extent = BoundingBoxAPI.compute_center_extent(prim=link)
+                    aabb_vertices_in_world = aabb_center + np.array(list(itertools.product((1, -1), repeat=3))) * (
+                            aabb_extent / 2
+                    )
+                    aabb_vertices_in_base_frame = trimesh.transformations.transform_points(
+                        aabb_vertices_in_world, world_to_base_frame
+                    )
+                    points.extend(aabb_vertices_in_base_frame)
+                else:
+                    raise ValueError(
+                        "Bounding box annotation missing for link: %s. Use fallback_to_aabb=True if you're okay with using "
+                        "AABB as fallback." % link_name
+                    )
 
         if xy_aligned:
             # If the user requested an XY-plane aligned bbox, convert everything to that frame.
