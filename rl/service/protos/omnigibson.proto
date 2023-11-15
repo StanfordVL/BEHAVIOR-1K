@@ -1,0 +1,12 @@
+service Policy {
+  // Sends a greeting
+  rpc Step (StepRequest) returns (StepResponse) {}
+}
+
+message StepRequest {
+  required bytes image = 1;
+}
+
+message StepResponse {
+  repeated float command = 1;
+}
