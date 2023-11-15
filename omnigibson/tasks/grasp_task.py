@@ -1,7 +1,7 @@
 import random
 import numpy as np
 import omnigibson as og
-from omnigibson.action_primitives.starter_semantic_action_primitives import UndoableContext
+from omnigibson.action_primitives.starter_semantic_action_primitives import PlanningContext
 from omnigibson.reward_functions.grasp_reward import GraspReward
 
 from omnigibson.tasks.task_base import BaseTask
