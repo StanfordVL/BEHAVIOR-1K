@@ -11,7 +11,7 @@ class RLEnv(EnvironmentWrapper):
         self.env = og.Environment(configs=cfg, action_timestep=1 / 10., physics_timestep=1 / 60.)
         og.sim.step()
         self.reset_positions = env_config['reset_positions']
-        controller = StarterSemanticActionPrimitives(None, self.env.scene, self.env.robots[0])
+        controller = StarterSemanticActionPrimitives(self.env)
         self.env._primitive_controller = controller
         super().__init__(self.env)
         self._update_action_space()

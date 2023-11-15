@@ -54,7 +54,7 @@ def main():
             {
                 "type": "Tiago",
                 "obs_modalities": ["rgb", "depth_linear", "seg_instance", "seg_semantic", "proprio"],
-                "proprio_obs": ["robot_pose", "joint_qpos", "joint_qvel", "eef_left_pos", "eef_left_quat", "grasp_left"],
+                "proprio_obs": ["joint_qpos", "joint_qvel", "eef_left_pos", "eef_left_quat", "grasp_left"],
                 "scale": 1.0,
                 "self_collisions": True,
                 "action_normalize": False,
@@ -105,7 +105,7 @@ def main():
                         "command_input_limits": [-1, 1],
                         "command_output_limits": None,
                         "use_delta_commands": True,
-                        "use_single_command": True
+                        # "use_single_command": True
                     },
                     "gripper_right": {
                         "name": "JointController",
@@ -113,7 +113,7 @@ def main():
                         "command_input_limits": [-1, 1],
                         "command_output_limits": None,
                         "use_delta_commands": True,
-                        "use_single_command": True
+                        # "use_single_command": True
                     },
                     "camera": {
                         "name": "JointController",
@@ -164,7 +164,7 @@ def main():
 
     obj = env.scene.object_registry("name", "cologne")
 
-    action = np.zeros(20)
+    action = np.zeros(22)
 
     print("Will try to greet world ...")
     with grpc.insecure_channel("localhost:50051") as channel:
@@ -172,12 +172,12 @@ def main():
         for _ in trange(1000):
             obs, reward, done, truncated, info = env.step(action)
             # Load the RGB obs into PILLOW
-            img = Image.fromarray(obs["robot0:eyes_Camera_sensor_rgb"][..., :3])
+            img = Image.fromarray(obs["robot0"]["robot0:eyes_Camera_sensor_rgb"][..., :3])
             img_byte_arr = io.BytesIO()
             img.save(img_byte_arr, format='JPEG')
             img_byte_arr = img_byte_arr.getvalue()
             response = stub.Step(omnigibson_pb2.StepRequest(image=img_byte_arr))
-            action = np.array(response.control)
+            action = np.array([x for x in response.command])
             if done:
                 break
 

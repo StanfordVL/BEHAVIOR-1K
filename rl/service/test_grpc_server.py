@@ -5,14 +5,17 @@ import grpc
 import omnigibson_pb2
 import omnigibson_pb2_grpc
 
+from PIL import Image
+import io
 
 class Policy(omnigibson_pb2_grpc.PolicyServicer):
   def Step(self, request, context):
     # Get the image
     img = Image.open(io.BytesIO(request.image))
     resp = omnigibson_pb2.StepResponse()
-    resp.command.extend([0] * 20)
-    return 
+    print("Got req")
+    resp.command.extend([0] * 22)
+    return resp
 
 
 def serve():
