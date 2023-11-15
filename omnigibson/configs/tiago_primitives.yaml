@@ -42,17 +42,19 @@ robots:
         name: JointController
         motor_type: "velocity"
       arm_left:
-        name: JointController
-        motor_type: position
+        name: InverseKinematicsController
+        motor_type: velocity
         command_input_limits: null
         command_output_limits: null
-        use_delta_commands: false
+        mode : pose_absolute_ori
+        kv: 3.0
       arm_right:
-        name: JointController
-        motor_type: position
+        name: InverseKinematicsController
+        motor_type: velocity
         command_input_limits: null
         command_output_limits: null
-        use_delta_commands: false
+        mode : pose_absolute_ori
+        kv: 3.0
       gripper_left:
         name: JointController
         motor_type: position
@@ -67,7 +69,9 @@ robots:
         use_delta_commands: true
       camera:
         name: JointController
-        motor_type: "velocity"
+        motor_type: position
+        command_input_limits: null
+        command_output_limits: null
         use_delta_commands: false
 
 objects: []
