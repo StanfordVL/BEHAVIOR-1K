@@ -2,10 +2,10 @@
 """Client and server classes corresponding to protobuf-defined services."""
 import grpc
 
-import omnigibson_pb2 as omnigibson__pb2
+import environment_pb2 as environment__pb2
 
 
-class PolicyStub(object):
+class EnvironmentServiceStub(object):
     """Missing associated documentation comment in .proto file."""
 
     def __init__(self, channel):
@@ -14,43 +14,42 @@ class PolicyStub(object):
         Args:
             channel: A grpc.Channel.
         """
-        self.Step = channel.unary_unary(
-                '/Policy/Step',
-                request_serializer=omnigibson__pb2.StepRequest.SerializeToString,
-                response_deserializer=omnigibson__pb2.StepResponse.FromString,
+        self.ManageEnvironment = channel.unary_unary(
+                '/environment.EnvironmentService/ManageEnvironment',
+                request_serializer=environment__pb2.EnvironmentRequest.SerializeToString,
+                response_deserializer=environment__pb2.EnvironmentResponse.FromString,
                 )
 
 
-class PolicyServicer(object):
+class EnvironmentServiceServicer(object):
     """Missing associated documentation comment in .proto file."""
 
-    def Step(self, request, context):
-        """Sends a greeting
-        """
+    def ManageEnvironment(self, request, context):
+        """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
 
-def add_PolicyServicer_to_server(servicer, server):
+def add_EnvironmentServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
-            'Step': grpc.unary_unary_rpc_method_handler(
-                    servicer.Step,
-                    request_deserializer=omnigibson__pb2.StepRequest.FromString,
-                    response_serializer=omnigibson__pb2.StepResponse.SerializeToString,
+            'ManageEnvironment': grpc.unary_unary_rpc_method_handler(
+                    servicer.ManageEnvironment,
+                    request_deserializer=environment__pb2.EnvironmentRequest.FromString,
+                    response_serializer=environment__pb2.EnvironmentResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
-            'Policy', rpc_method_handlers)
+            'environment.EnvironmentService', rpc_method_handlers)
     server.add_generic_rpc_handlers((generic_handler,))
 
 
  # This class is part of an EXPERIMENTAL API.
-class Policy(object):
+class EnvironmentService(object):
     """Missing associated documentation comment in .proto file."""
 
     @staticmethod
-    def Step(request,
+    def ManageEnvironment(request,
             target,
             options=(),
             channel_credentials=None,
@@ -60,8 +59,8 @@ class Policy(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/Policy/Step',
-            omnigibson__pb2.StepRequest.SerializeToString,
-            omnigibson__pb2.StepResponse.FromString,
+        return grpc.experimental.unary_unary(request, target, '/environment.EnvironmentService/ManageEnvironment',
+            environment__pb2.EnvironmentRequest.SerializeToString,
+            environment__pb2.EnvironmentResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
