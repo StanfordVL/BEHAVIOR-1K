@@ -114,3 +114,16 @@ message IsWrappedCommand {
 message IsWrappedResponse {
     bool is_wrapped = 1;
 }
+
+service EnvironmentRegistrationService {
+    rpc RegisterEnvironment(RegisterEnvironmentRequest) returns (RegisterEnvironmentResponse);
+}
+
+message RegisterEnvironmentRequest {
+    string ip = 1;
+    int port = 2;
+}
+
+message RegisterEnvironmentResponse {
+    bool success = 1;
+}

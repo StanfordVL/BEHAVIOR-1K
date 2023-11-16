@@ -1,3 +1,6 @@
+from concurrent.futures import ThreadPoolExecutor
+import threading
+import time
 from typing import List
 
 import grpc
@@ -6,21 +9,69 @@ import environment_pb2_grpc
 
 from stable_baselines3.common.vec_env import VecEnv
 
+class EnvironmentRegistrationServicer(environment_pb2_grpc.EnvironmentRegistrationServicer):
+    def __init__(self, n_workers):
+        self.addresses = [None] * n_workers
+        self.channels = [None] * n_workers
+        self.stubs = [None] * n_workers
+        self.lock = threading.Lock()
+
+    def RegisterEnvironment(self, request, unused_context):
+        with self.lock:
+            for i, env in enumerate(self.addresses):
+                if env is None:
+                    self.addresses[i] = request.ip + ":" + str(request.port)
+                    self.channels[i] = grpc.insecure_channel(self.addresses[i])
+                    self.stubs[i] = environment_pb2_grpc.EnvironmentStub(self.channels[i])
+                    return environment_pb2.EnvironmentRegistrationResponse(success=True)
+            return environment_pb2.EnvironmentRegistrationResponse(success=False)
+        
+    def remove_worker(self, i):
+        assert self.lock.locked()
+        self.addresses[i] = None
+        self.channels[i] = None
+        self.stubs[i] = None
+
+    def await_workers(self):
+        while True:
+            with self.lock:
+                if all([x is not None for x in self.addresses]):
+                    return
+            time.sleep(3)
+
 class GRPCVecEnv(VecEnv):
-    def __init__(self, servers: List[str]):
+    def __init__(self, n_envs):
         self.waiting = False
         self.closed = False
 
-        # Start all the conversations
-        n_envs = len(servers)
-        self.channels = [grpc.insecure_channel(x) for x in servers]
-        self.stubs = [environment_pb2_grpc.EnvironmentStub(x) for x in self.channels]
+        # Start the registration server
+        self.registration_server = grpc.server(ThreadPoolExecutor(max_workers=2))
+        self.registration_servicer = EnvironmentRegistrationServicer(n_envs)
+        environment_pb2_grpc.add_EnvironmentRegistrationServiceServicer_to_server(self.registration_servicer, self.registration_server)
+        self.registration_server.add_insecure_port("[::]:50051")
+        self.registration_server.start()
+
+        # Await the workers
+        self.registration_servicer.await_workers()
 
         # TODO: Fix this call.
-        self.remotes[0].send(("get_spaces", None))
-        observation_space, action_space = self.remotes[0].recv()
+        resp = self._send_command(0, environment_pb2.EnvironmentRequest(get_spaces=environment_pb2.GetSpacesCommand()))
+        observation_space, action_space = None, None  # TODO: Fix this!
 
         super().__init__(n_envs, observation_space, action_space)
+
+    def _send_command(self, i, request):
+        # First wait for all workers to be available.
+        self.registration_servicer.await_workers()
+
+        # Get the stub
+        with self.registration_servicer.lock:
+            try:
+                stub = self.registration_servicer.stubs[i]
+                return stub.ManageEnvironment(request)
+            except:  # TODO: Narrow this exception down.
+                self.registration_servicer.remove_worker(i)
+                raise
 
     def step_async(self, actions: np.ndarray) -> None:
         for remote, action in zip(self.remotes, actions):
