@@ -236,6 +236,11 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
             assert set(wheel_link.collision_meshes) == {"collisions"}, "Wheel link should only have 1 collision!"
             wheel_link.collision_meshes["collisions"].set_collision_approximation("boundingSphere")
 
+        # Temporarily enforce the base link to use a cube approximation (caster wheels are messed up otherwise)
+        base_link = self.root_link
+        assert set(base_link.collision_meshes) == {"collisions"}, "Base link should only have 1 collision!"
+        base_link.collision_meshes["collisions"].set_collision_approximation("boundingCube")
+
         # Also apply a convex decomposition to the torso lift link
         torso_lift_link = self.links["torso_lift_link"]
         assert set(torso_lift_link.collision_meshes) == {"collisions"}, "Wheel link should only have 1 collision!"
