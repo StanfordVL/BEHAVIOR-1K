@@ -336,8 +336,8 @@ class Behaviorbot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         for link in self.links.values():
             link.ccd_enabled = True
         for arm in self.arm_names:
-            for link in self.finger_link_names[arm]:
-                self.links[link].mass = 0.02
+            for finger_link in self.finger_links[arm]:
+                finger_link.mass = 0.02
         self.links["base"].mass = 15
         self.links["lh_palm"].mass = 0.3
         self.links["rh_palm"].mass = 0.3

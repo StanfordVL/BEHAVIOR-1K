@@ -1,7 +1,6 @@
 import os
 import numpy as np
 from typing import Dict, Iterable
-from omni.isaac.motion_generation import LulaKinematicsSolver
 
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm
@@ -23,7 +22,7 @@ class FrankaLeap(ManipulationRobot):
         scale=None,
         visible=True,
         visual_only=False,
-        self_collisions=False,
+        self_collisions=True,
         load_config=None,
         fixed_base=True,
 
@@ -134,14 +133,6 @@ class FrankaLeap(ManipulationRobot):
         # Fetch does not support discrete actions
         raise ValueError("Franka does not support discrete actions!")
 
-    def update_controller_mode(self):
-        super().update_controller_mode()
-        # overwrite joint params here
-        for i in range(7):
-            self.joints[f"panda_joint{i+1}"].damping = 100
-            self.joints[f"panda_joint{i+1}"].stiffness = 1000
-            self.joints[f"panda_joint{i+1}"].max_effort = 100
-
     @property
     def controller_order(self):
         return ["arm_{}".format(self.default_arm), "gripper_{}".format(self.default_arm)]
@@ -152,14 +143,6 @@ class FrankaLeap(ManipulationRobot):
         controllers["arm_{}".format(self.default_arm)] = "InverseKinematicsController"
         controllers["gripper_{}".format(self.default_arm)] = "MultiFingerGripperController"
         return controllers
-    
-    @property
-    def _default_arm_ik_controller_configs(self):
-        conf = super()._default_arm_ik_controller_configs
-        conf[self.default_arm]["mode"] = "pose_absolute_ori"
-        conf[self.default_arm]["command_input_limits"] = None
-        conf[self.default_arm]["motor_type"] = "position"
-        return conf
 
     @property
     def _default_gripper_multi_finger_controller_configs(self):
@@ -184,7 +167,7 @@ class FrankaLeap(ManipulationRobot):
     @property
     def gripper_control_idx(self):
         # thumb.proximal, ..., thumb.tip, ..., ring.tip
-        return {self.default_arm: np.array([8, 12, 16, 20, 10, 14, 18, 22, 9, 13, 17, 21, 7, 11, 15, 19])}
+        return {self.default_arm: np.array([8, 12, 16, 20, 7, 11, 15, 19, 9, 13, 17, 21, 10, 14, 18, 22])}
 
     @property
     def arm_link_names(self):
@@ -205,7 +188,8 @@ class FrankaLeap(ManipulationRobot):
 
     @property
     def finger_joint_names(self):
-        return {self.default_arm: [f"finger_joint_{i}" for i in range(16)]}
+        # thumb.proximal, ..., thumb.tip, ..., ring.tip
+        return {self.default_arm: [f"finger_joint_{i}" for i in [12, 13, 14, 15, 1, 0, 2, 3, 5, 4, 6, 7, 9, 8, 10, 11]]}
 
     @property
     def usd_path(self):
@@ -214,13 +198,6 @@ class FrankaLeap(ManipulationRobot):
     @property
     def robot_arm_descriptor_yamls(self):
         return {self.default_arm: os.path.join(gm.ASSET_PATH, "models/franka/franka_leap_description.yaml")}
-    
-    @property
-    def robot_gripper_descriptor_yamls(self):
-        return {
-            finger: os.path.join(gm.ASSET_PATH, f"models/franka/allegro_{finger}_description.yaml")
-            for finger in ["thumb", "index", "middle", "ring"]
-        }
 
     @property
     def urdf_path(self):
@@ -229,124 +206,14 @@ class FrankaLeap(ManipulationRobot):
     @property
     def gripper_urdf_path(self):
         return os.path.join(gm.ASSET_PATH, "models/franka/leap_hand.urdf")
-    
-    # @property
-    # def assisted_grasp_start_points(self):
-    #     return {self.default_arm: [
-    #         GraspingPoint(link_name=f"base_link", position=[0.015, 0, -0.03]),
-    #         GraspingPoint(link_name=f"base_link", position=[0.015, 0, -0.08]),
-    #         GraspingPoint(link_name=f"link_15_0_tip", position=[0, 0.015, 0.007]),
-    #     ]}
-
-    # @property
-    # def assisted_grasp_end_points(self):
-    #     return {self.default_arm: [
-    #         GraspingPoint(link_name=f"link_3_0_tip", position=[0.012, 0, 0.007]),
-    #         GraspingPoint(link_name=f"link_7_0_tip", position=[0.012, 0, 0.007]),
-    #         GraspingPoint(link_name=f"link_11_0_tip", position=[0.012, 0, 0.007]),
-    #     ]}
 
     @property
     def vr_rotation_offset(self):
         return {self.default_arm: T.euler2quat(np.array([0, np.pi / 2, 0]))}
     
-    def remap_thumb_to_allegro(self, coord: np.ndarray) -> np.ndarray:
-        """
-        remap VR thumb tracking data to allegro thumb, based on the bound of the two embodiments
-        Args:
-            bound (np.ndarray) 3D coord of thumb tracking position in the base_link frame
-        """
-        hand_bound = np.array([[0.005, 0.095], [-0.026, 0.104], [-0.005, 0.053]])    # bound for hand
-        allegro_bound = np.array([[0.017, 0.117], [-0.037, 0.132], [-0.096, -0.009]])    # bound for allegro 
-        for i in range(3):
-            coord[i] = np.interp(coord[i], hand_bound[i], allegro_bound[i])
-        return coord
-
-
     def gen_action_from_vr_data(self, vr_data: dict):
         action = np.zeros(22)
-        if "hand_data" in vr_data:
-            hand_data = vr_data["hand_data"]
-            if "right" in hand_data and "raw" in hand_data["right"]:
-                # The center of allegro hand lies somewhere between palm and middle proximal
-                target_pos = (hand_data["right"]["raw"]["pos"][0] + hand_data["right"]["raw"]["pos"][12]) / 2
-                target_orn = T.quat_multiply(hand_data["right"]["raw"]["orn"][0], self.vr_rotation_offset[self.default_arm])
-                cur_robot_eef_pos, cur_robot_eef_orn = self.links[self.eef_link_names[self.default_arm]].get_position_orientation()
-                base_pos, base_orn = self.get_position_orientation()
-                rel_target_pos, rel_target_orn = T.relative_pose_transform(target_pos + [0.06, 0, 0], target_orn, base_pos, base_orn)
-                rel_cur_pos = T.relative_pose_transform(cur_robot_eef_pos, cur_robot_eef_orn, base_pos, base_orn)[0]
-                action[:6] = np.r_[rel_target_pos - rel_cur_pos, T.quat2axisangle(rel_target_orn)]
-                # joint order: index, middle, pinky
-                angles = hand_data["right"]["angles"]
-                for f_idx in range(3):
-                    for j_idx in range(3):
-                        action[11 + f_idx * 4 + j_idx] = angles[f_idx + 1][j_idx]
-                # specifically, use ik for thumb
-                thumb_pos, thumb_orn = hand_data["right"]["raw"]["pos"][5], hand_data["right"]["raw"]["orn"][5]
-                local_thumb_pos, local_thumb_orn = T.relative_pose_transform(thumb_pos, thumb_orn, target_pos, target_orn)
-                local_thumb_pos = self.remap_thumb_to_allegro(coord=local_thumb_pos)
-                target_thumb_pos = T.pose_transform(
-                    cur_robot_eef_pos, cur_robot_eef_orn, local_thumb_pos, local_thumb_orn,
-                )[0]
-                action[6: 10] = self.allegro_ik_controller.solve({"thumb": target_thumb_pos})["thumb"]
-
-        else:
-            action_from_controller = super().gen_action_from_vr_data(vr_data)
-            action[:6] = action_from_controller[:6]
-            action[6:] = action_from_controller[6]
+        action_from_controller = super().gen_action_from_vr_data(vr_data)
+        action[:6] = action_from_controller[:6]
+        action[6:] = action_from_controller[6]
         return action
-
-
-class LeapIKController:
-    """
-    IK controller for Allegro hand, based on the LulaKinematicsSolver
-    """
-    def __init__(self, robot: FrankaLeap, max_iter=150) -> None:
-        """
-        Initializes the IK controller
-        Args:
-            robot (FrankaAllegro): the Franka Allegro robot
-            max_iter (int): maximum number of iterations for the IK solver, default is 100.
-        """
-        self.robot = robot
-        self.fingers = {
-            "ring":     ("link_3_0_tip",    np.array([7, 11, 15, 19])),     # finger name, finger tip link name, joint indices
-            "middle":   ("link_7_0_tip",    np.array([9, 13, 17, 21])),
-            "index":    ("link_11_0_tip",   np.array([10, 14, 18, 22])),
-            "thumb":    ("link_15_0_tip",   np.array([8, 12, 16, 20])), 
-        }
-        self.finger_ik_solvers = {}
-        for finger in self.fingers.keys():
-            self.finger_ik_solvers[finger]  = LulaKinematicsSolver(
-                robot_description_path = robot.robot_gripper_descriptor_yamls[finger],
-                urdf_path = robot.gripper_urdf_path
-            )
-            self.finger_ik_solvers[finger].ccd_max_iterations = max_iter
-
-    def solve(self, target_gripper_pos: Dict[str, Iterable[float]]) -> Dict[str, np.ndarray]:
-        """
-        compute the joint positions given the position of each finger tip
-        Args:
-            target_gripper_pos (Dict[str, Iterable[float]]): (finger name, the 3-array of target positions of the finger tips)
-        Returns:
-            Dict[str, np.ndarray]: (finger name, 4-array of joint positions in order of proximal to tip)
-        """
-        target_joint_positions = {}
-        # get the current finger joint positions
-        finger_joint_positions = self.robot.get_joint_positions()
-        # get current hand base pose
-        hand_base_pos, hand_base_orn = self.robot.links["base_link"].get_position_orientation()
-        for finger_name, pos in target_gripper_pos.items():
-            target_joint_positions[finger_name] = finger_joint_positions[self.fingers[finger_name][1]]
-            # Grab the finger joint positions in order to reach the desired finger pose
-            self.finger_ik_solvers[finger_name].set_robot_base_pose(hand_base_pos, T.convert_quat(hand_base_orn, "wxyz"))
-            finger_joint_pos, success = self.finger_ik_solvers[finger_name].compute_inverse_kinematics(
-                frame_name=self.fingers[finger_name][0],
-                target_position=pos,
-                target_orientation=None,
-                warm_start=finger_joint_positions[self.fingers[finger_name][1]]
-            )
-            if success:
-                target_joint_positions[finger_name] = finger_joint_pos
-            
-        return target_joint_positions

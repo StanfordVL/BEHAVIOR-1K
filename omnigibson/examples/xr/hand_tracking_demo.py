@@ -6,21 +6,13 @@ import omnigibson as og
 from omnigibson.utils.xr_utils import VRSys
 from omnigibson.utils.ui_utils import choose_from_options
 
-DEBUG_MODE = False  # set to True to visualize the landmarks of the hands
-
-ROBOTS = {
-    "Behaviorbot": "Humanoid robot with two hands (default)",
-    "FrankaAllegro": "Franka Panda with Allegro hand",
-}
-
+DEBUG_MODE = True  # set to True to visualize the landmarks of the hands
 
 def main():
-    robot_name = choose_from_options(options=ROBOTS, name="robot")
-
     # Create the config for generating the environment we want
     scene_cfg = {"type": "Scene"}
     robot0_cfg = {
-        "type": robot_name,
+        "type": "Behaviorbot",
         "obs_modalities": ["rgb", "depth", "normal", "scan", "occupancy_grid"],
         "action_normalize": False,
         "grasping_mode": "assisted"

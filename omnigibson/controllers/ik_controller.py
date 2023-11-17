@@ -15,7 +15,7 @@ log = create_module_logger(module_name=__name__)
 m = create_module_macros(module_path=__file__)
 m.IK_POS_TOLERANCE = 0.002
 m.IK_POS_WEIGHT = 20.0
-m.IK_ORN_TOLERANCE = 0.001
+m.IK_ORN_TOLERANCE = 0.01
 m.IK_ORN_WEIGHT = 0.05
 m.IK_MAX_ITERATIONS = 100
 
@@ -126,7 +126,7 @@ class InverseKinematicsController(ManipulationController):
             if smoothing_filter_size in {None, 0}
             else MovingAverageFilter(obs_dim=control_dim, filter_width=smoothing_filter_size)
         )
-        assert mode in IK_MODES, "Invalid ik mode specified! Valid options are: {IK_MODES}, got: {mode}"
+        assert mode in IK_MODES, f"Invalid ik mode specified! Valid options are: {IK_MODES}, got: {mode}"
         self.mode = mode
         self.kv = kv
         self.workspace_pose_limiter = workspace_pose_limiter
