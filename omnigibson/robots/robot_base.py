@@ -269,7 +269,11 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             n-array: numpy array of all robot-specific proprioceptive observations.
         """
         proprio_dict = self._get_proprioception_dict()
-        return np.concatenate([proprio_dict[obs] for obs in self._proprio_obs])
+        proprio = []
+        for obs_key in self._proprio_obs:
+            obs = proprio_dict[obs_key] if isinstance(proprio_dict[obs_key], np.ndarray) else np.array([proprio_dict[obs_key]]) 
+            proprio.append(obs)
+        return np.concatenate(proprio)
 
     def _get_proprioception_dict(self):
         """

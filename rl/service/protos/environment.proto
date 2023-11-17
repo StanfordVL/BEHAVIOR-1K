@@ -1,0 +1,129 @@
+syntax = "proto3";
+
+package environment;
+
+service EnvironmentService {
+    rpc ManageEnvironment(EnvironmentRequest) returns (EnvironmentResponse);
+}
+
+message EnvironmentRequest {
+    oneof command {
+        StepCommand step = 1;
+        ResetCommand reset = 2;
+        RenderCommand render = 3;
+        CloseCommand close = 4;
+        GetSpacesCommand get_spaces = 5;
+        EnvMethodCommand env_method = 6;
+        GetAttrCommand get_attr = 7;
+        SetAttrCommand set_attr = 8;
+        IsWrappedCommand is_wrapped = 9;
+    }
+}
+
+message EnvironmentResponse {
+    oneof response {
+        StepResponse step_response = 1;
+        ResetResponse reset_response = 2;
+        RenderResponse render_response = 3;
+        CloseResponse close_response = 4;
+        GetSpacesResponse get_spaces_response = 5;
+        EnvMethodResponse env_method_response = 6;
+        GetAttrResponse get_attr_response = 7;
+        SetAttrResponse set_attr_response = 8;
+        IsWrappedResponse is_wrapped_response = 9;
+    }
+}
+
+// Step command and response
+message StepCommand {
+    bytes action = 1; // You might need to change the type based on your action space
+}
+
+message StepResponse {
+    bytes observation = 1; // Change type based on observation space
+    float reward = 2;
+    bool done = 3;
+    bytes info = 4; // Info might be a map or another structured type
+    bytes reset_info = 5; // Include if applicable
+}
+
+// Reset command and response
+message ResetCommand {
+    int32 seed = 1;
+    bytes options = 2; // Options, if any
+}
+
+message ResetResponse {
+    bytes observation = 1; // Change type based on observation space
+    bytes reset_info = 2; // Include additional reset information if applicable
+}
+
+// Render command and response
+message RenderCommand {
+    // Include fields if render command needs parameters
+}
+
+message RenderResponse {
+    bytes render_data = 1; // This could be an image or other render output
+}
+
+// Close command and response (usually empty)
+message CloseCommand {}
+message CloseResponse {}
+
+// GetSpaces command and response
+message GetSpacesCommand {}
+message GetSpacesResponse {
+    bytes observation_space = 1; // This could be a description of the space
+    bytes action_space = 2; // Description of the action space
+}
+
+// EnvMethod command and response (general purpose)
+message EnvMethodCommand {
+    string method_name = 1;
+    bytes arguments = 2; // Arguments for the method, if any
+}
+
+message EnvMethodResponse {
+    bytes result = 1; // The result of the method call
+}
+
+// GetAttr and SetAttr commands and responses
+message GetAttrCommand {
+    string attribute_name = 1;
+}
+
+message GetAttrResponse {
+    bytes attribute_value = 1; // The value of the attribute
+}
+
+message SetAttrCommand {
+    string attribute_name = 1;
+    bytes attribute_value = 2;
+}
+
+message SetAttrResponse {
+    // Usually empty, can include confirmation or result
+}
+
+// IsWrapped command and response
+message IsWrappedCommand {
+    string wrapper_type = 1;
+}
+
+message IsWrappedResponse {
+    bool is_wrapped = 1;
+}
+
+service EnvironmentRegistrationService {
+    rpc RegisterEnvironment(RegisterEnvironmentRequest) returns (RegisterEnvironmentResponse);
+}
+
+message RegisterEnvironmentRequest {
+    string ip = 1;
+    int port = 2;
+}
+
+message RegisterEnvironmentResponse {
+    bool success = 1;
+}
