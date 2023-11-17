@@ -93,7 +93,7 @@ def main(iterations):
             "type": "GraspTask",
             "obj_name": "cologne",
             "termination_config": {
-                "max_steps": 100,
+                "max_steps": 400,
             },
             "reward_config": {
                 "r_dist_coeff": DIST_COEFF,
