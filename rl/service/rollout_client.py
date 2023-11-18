@@ -7,15 +7,27 @@ import gymnasium as gym
 
 class GRPCEnv(gym.Env):
   def __init__(self, url):
+    super().__init__()
     self.url = url
     self.channel = grpc.insecure_channel(url)
-    self.stub = environment_pb2_grpc.EnvironmentStub(self.channel)
+    self.stub = environment_pb2_grpc.EnvironmentServiceStub(self.channel)
     self.observation_space, self.action_space = self._get_spaces()
+    self.metadata = {'render_modes': ['rgb_array']}
+    self.render_mode = 'rgb_array'
+
+    self._step_future = None
 
   def step(self, action):
+    self.step_async(action)
+    return self.step_wait()
+
+  def step_async(self, action):
     request = environment_pb2.StepRequest(action=pickle.dumps(action))
-    response = self.stub.Step(request)
-    return pickle.loads(response.observation), response.reward, response.done, pickle.loads(response.info)
+    self._step_future = self.stub.Step.future(request)
+
+  def step_wait(self):
+    response = self._step_future.result()
+    return pickle.loads(response.observation), response.reward, response.terminated, response.truncated, pickle.loads(response.info)
   
   def reset(self, seed=None, options=None):
     request = environment_pb2.ResetRequest()
@@ -33,7 +45,7 @@ class GRPCEnv(gym.Env):
   
   def close(self):
     request = environment_pb2.CloseRequest()
-    response = self.stub.Close(request)
+    self.stub.Close(request)
     self.channel.close()
 
   def _get_spaces(self):  
@@ -59,8 +71,9 @@ class GRPCEnv(gym.Env):
       attribute_name=attr_name,
       attribute_value=pickle.dumps(value)
     )
+    self.stub.SetAttr(request)
 
   def is_wrapped(self, wrapper_type):
-    request = environment_pb2.IsWrappedRequest(wrapper_class=wrapper_type)
+    request = environment_pb2.IsWrappedRequest(wrapper_class=wrapper_type.__name__)
     response = self.stub.IsWrapped(request)
     return response.is_wrapped

@@ -11,18 +11,18 @@ class StepRequest(_message.Message):
     def __init__(self, action: _Optional[bytes] = ...) -> None: ...
 
 class StepResponse(_message.Message):
-    __slots__ = ["observation", "reward", "done", "info", "reset_info"]
+    __slots__ = ["observation", "reward", "terminated", "truncated", "info"]
     OBSERVATION_FIELD_NUMBER: _ClassVar[int]
     REWARD_FIELD_NUMBER: _ClassVar[int]
-    DONE_FIELD_NUMBER: _ClassVar[int]
+    TERMINATED_FIELD_NUMBER: _ClassVar[int]
+    TRUNCATED_FIELD_NUMBER: _ClassVar[int]
     INFO_FIELD_NUMBER: _ClassVar[int]
-    RESET_INFO_FIELD_NUMBER: _ClassVar[int]
     observation: bytes
     reward: float
-    done: bool
+    terminated: bool
+    truncated: bool
     info: bytes
-    reset_info: bytes
-    def __init__(self, observation: _Optional[bytes] = ..., reward: _Optional[float] = ..., done: bool = ..., info: _Optional[bytes] = ..., reset_info: _Optional[bytes] = ...) -> None: ...
+    def __init__(self, observation: _Optional[bytes] = ..., reward: _Optional[float] = ..., terminated: bool = ..., truncated: bool = ..., info: _Optional[bytes] = ...) -> None: ...
 
 class ResetRequest(_message.Message):
     __slots__ = ["seed", "options"]

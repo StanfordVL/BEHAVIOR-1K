@@ -1,30 +1,39 @@
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
+import inspect
 import pickle
 import grpc
 import environment_pb2
 import environment_pb2_grpc
 
+import gymnasium as gym
+import gymnasium.wrappers
+
 from stable_baselines3.common.env_util import is_wrapped
 
-class EnvironmentServicer(environment_pb2_grpc.EnvironmentServicer):
+def _find_subclasses(module, clazz):
+    return [
+        cls
+            for name, cls in inspect.getmembers(module)
+                if inspect.isclass(cls) and issubclass(cls, clazz)
+    ]
+
+env_closed = asyncio.Event()
+
+class EnvironmentServicer(environment_pb2_grpc.EnvironmentService):
     def __init__(self, env) -> None:
         self.env = env
 
     def Step(self, request, unused_context):
         action = pickle.loads(request.action)
         observation, reward, terminated, truncated, info = self.env.step(action)
-        done = terminated or truncated
-        info["TimeLimit.truncated"] = truncated and not terminated
-
-        if done:
-            info["terminal_observation"] = observation
-            observation, reset_info = self.env.reset()
 
         return environment_pb2.StepResponse(
             observation=pickle.dumps(observation),
             reward=reward,
-            done=done,
-            info=pickle.dumps(info),
-            reset_info=pickle.dumps(reset_info)
+            terminated=terminated,
+            truncated=truncated,
+            info=pickle.dumps(info)
         )
 
     def Reset(self, request, unused_context):
@@ -43,6 +52,7 @@ class EnvironmentServicer(environment_pb2_grpc.EnvironmentServicer):
 
     def Close(self, request, unused_context):
         self.env.close()
+        env_closed.set()
         return environment_pb2.CloseResponse()
 
     def GetSpaces(self, request, unused_context):
@@ -70,15 +80,36 @@ class EnvironmentServicer(environment_pb2_grpc.EnvironmentServicer):
         return environment_pb2.SetAttrResponse()
 
     def IsWrapped(self, request, unused_context):
-        wrapper_type = request.wrapper_type
-        is_wrapped = hasattr(self.env, wrapper_type)  # Assuming is_wrapped is implemented as hasattr
-        return environment_pb2.IsWrappedResponse(is_wrapped=is_wrapped)
+        wrapper_type_name = request.wrapper_type
+        wrapper_types = [x for x in _find_subclasses(gymnasium.wrappers, gym.Wrapper)]
+        wrapper_type, = [x for x in wrapper_types if x.__name__ == wrapper_type_name]
+        is_it_wrapped = is_wrapped(self.env, wrapper_type)
+        return environment_pb2.IsWrappedResponse(is_wrapped=is_it_wrapped)
     
-async def serve(env):
+def register(local_addr, learner_addr):
+    channel = grpc.insecure_channel(learner_addr)
+    stub = environment_pb2_grpc.EnvironmentRegistrationServiceStub(channel)
+    request = environment_pb2.RegisterEnvironmentRequest(
+        ip=local_addr.split(":")[0],
+        port=int(local_addr.split(":")[1])
+    )
+    response = stub.RegisterEnvironment(request)
+    return response.success
+
+async def serve(env, local_addr, learner_addr):
     server = grpc.aio.server()
-    environment_pb2_grpc.add_EnvironmentServicer_to_server(
+    environment_pb2_grpc.add_EnvironmentServiceServicer_to_server(
         EnvironmentServicer(env), server
     )
-    server.add_insecure_port("[::]:50051")
+    server.add_insecure_port(local_addr)
     await server.start()
-    await server.wait_for_termination()
+
+    # With our server started, let's get registered.
+    executor = ThreadPoolExecutor()
+    success = await asyncio.get_running_loop().run_in_executor(executor, register, local_addr, learner_addr)
+    assert success, "Failed to register environment with learner."
+     
+    # Return when either is true
+    _, pending = await asyncio.wait(
+        [env_closed.wait(), server.wait_for_termination()], return_when=asyncio.FIRST_COMPLETED)
+    [t.cancel() for t in pending]

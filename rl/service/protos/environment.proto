@@ -1,4 +1,4 @@
-syntax = "proto3";
+syntax = "proto2";
 
 package environment;
 
@@ -15,33 +15,32 @@ service EnvironmentService {
 }
 
 message StepRequest {
-    bytes action = 1;
+    required bytes action = 1;
 }
 
 message StepResponse {
-    bytes observation = 1;
-    float reward = 2;
-    bool done = 3;
-    bytes info = 4;
-    bytes reset_info = 5;
+    required bytes observation = 1;
+    required float reward = 2;
+    required bool terminated = 3;
+    required bool truncated = 4;
+    required bytes info = 5;
 }
 
 message ResetRequest {
-    int32 seed = 1;
-    bytes options = 2;
+    optional int32 seed = 1;
+    optional bytes options = 2;
 }
 
 message ResetResponse {
-    bytes observation = 1;
-    bytes reset_info = 2;
+    required bytes observation = 1;
+    required bytes reset_info = 2;
 }
 
 message RenderRequest {
-    // Include fields if render Request needs parameters
 }
 
 message RenderResponse {
-    bytes render_data = 1;
+    required bytes render_data = 1;
 }
 
 message CloseRequest {}
@@ -49,43 +48,42 @@ message CloseResponse {}
 
 message GetSpacesRequest {}
 message GetSpacesResponse {
-    bytes observation_space = 1;
-    bytes action_space = 2;
+    required bytes observation_space = 1;
+    required bytes action_space = 2;
 }
 
 message EnvMethodRequest {
-    string method_name = 1;
-    bytes arguments = 2;
+    required string method_name = 1;
+    required bytes arguments = 2;
 }
 
 message EnvMethodResponse {
-    bytes result = 1;
+    required bytes result = 1;
 }
 
 message GetAttrRequest {
-    string attribute_name = 1;
+    required string attribute_name = 1;
 }
 
 message GetAttrResponse {
-    bytes attribute_value = 1;
+    required bytes attribute_value = 1;
 }
 
 message SetAttrRequest {
-    string attribute_name = 1;
-    bytes attribute_value = 2;
+    required string attribute_name = 1;
+    required bytes attribute_value = 2;
 }
 
 message SetAttrResponse {
-    // Usually empty, can include confirmation or result
 }
 
 // IsWrapped Request and response
 message IsWrappedRequest {
-    string wrapper_type = 1;
+    required string wrapper_type = 1;
 }
 
 message IsWrappedResponse {
-    bool is_wrapped = 1;
+    required bool is_wrapped = 1;
 }
 
 service EnvironmentRegistrationService {
@@ -93,10 +91,10 @@ service EnvironmentRegistrationService {
 }
 
 message RegisterEnvironmentRequest {
-    string ip = 1;
-    int32 port = 2;
+    required string ip = 1;
+    required int32 port = 2;
 }
 
 message RegisterEnvironmentResponse {
-    bool success = 1;
+    required bool success = 1;
 }
