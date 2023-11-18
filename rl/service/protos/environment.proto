@@ -3,101 +3,74 @@ syntax = "proto3";
 package environment;
 
 service EnvironmentService {
-    rpc ManageEnvironment(EnvironmentRequest) returns (EnvironmentResponse);
+    rpc Step(StepRequest) returns (StepResponse);
+    rpc Reset(ResetRequest) returns (ResetResponse);
+    rpc Render(RenderRequest) returns (RenderResponse);
+    rpc Close(CloseRequest) returns (CloseResponse);
+    rpc GetSpaces(GetSpacesRequest) returns (GetSpacesResponse);
+    rpc EnvMethod(EnvMethodRequest) returns (EnvMethodResponse);
+    rpc GetAttr(GetAttrRequest) returns (GetAttrResponse);
+    rpc SetAttr(SetAttrRequest) returns (SetAttrResponse);
+    rpc IsWrapped(IsWrappedRequest) returns (IsWrappedResponse);
 }
 
-message EnvironmentRequest {
-    oneof command {
-        StepCommand step = 1;
-        ResetCommand reset = 2;
-        RenderCommand render = 3;
-        CloseCommand close = 4;
-        GetSpacesCommand get_spaces = 5;
-        EnvMethodCommand env_method = 6;
-        GetAttrCommand get_attr = 7;
-        SetAttrCommand set_attr = 8;
-        IsWrappedCommand is_wrapped = 9;
-    }
-}
-
-message EnvironmentResponse {
-    oneof response {
-        StepResponse step_response = 1;
-        ResetResponse reset_response = 2;
-        RenderResponse render_response = 3;
-        CloseResponse close_response = 4;
-        GetSpacesResponse get_spaces_response = 5;
-        EnvMethodResponse env_method_response = 6;
-        GetAttrResponse get_attr_response = 7;
-        SetAttrResponse set_attr_response = 8;
-        IsWrappedResponse is_wrapped_response = 9;
-    }
-}
-
-// Step command and response
-message StepCommand {
-    bytes action = 1; // You might need to change the type based on your action space
+message StepRequest {
+    bytes action = 1;
 }
 
 message StepResponse {
-    bytes observation = 1; // Change type based on observation space
+    bytes observation = 1;
     float reward = 2;
     bool done = 3;
-    bytes info = 4; // Info might be a map or another structured type
-    bytes reset_info = 5; // Include if applicable
+    bytes info = 4;
+    bytes reset_info = 5;
 }
 
-// Reset command and response
-message ResetCommand {
+message ResetRequest {
     int32 seed = 1;
-    bytes options = 2; // Options, if any
+    bytes options = 2;
 }
 
 message ResetResponse {
-    bytes observation = 1; // Change type based on observation space
-    bytes reset_info = 2; // Include additional reset information if applicable
+    bytes observation = 1;
+    bytes reset_info = 2;
 }
 
-// Render command and response
-message RenderCommand {
-    // Include fields if render command needs parameters
+message RenderRequest {
+    // Include fields if render Request needs parameters
 }
 
 message RenderResponse {
-    bytes render_data = 1; // This could be an image or other render output
+    bytes render_data = 1;
 }
 
-// Close command and response (usually empty)
-message CloseCommand {}
+message CloseRequest {}
 message CloseResponse {}
 
-// GetSpaces command and response
-message GetSpacesCommand {}
+message GetSpacesRequest {}
 message GetSpacesResponse {
-    bytes observation_space = 1; // This could be a description of the space
-    bytes action_space = 2; // Description of the action space
+    bytes observation_space = 1;
+    bytes action_space = 2;
 }
 
-// EnvMethod command and response (general purpose)
-message EnvMethodCommand {
+message EnvMethodRequest {
     string method_name = 1;
-    bytes arguments = 2; // Arguments for the method, if any
+    bytes arguments = 2;
 }
 
 message EnvMethodResponse {
-    bytes result = 1; // The result of the method call
+    bytes result = 1;
 }
 
-// GetAttr and SetAttr commands and responses
-message GetAttrCommand {
+message GetAttrRequest {
     string attribute_name = 1;
 }
 
 message GetAttrResponse {
-    bytes attribute_value = 1; // The value of the attribute
+    bytes attribute_value = 1;
 }
 
-message SetAttrCommand {
+message SetAttrRequest {
     string attribute_name = 1;
     bytes attribute_value = 2;
 }
@@ -106,8 +79,8 @@ message SetAttrResponse {
     // Usually empty, can include confirmation or result
 }
 
-// IsWrapped command and response
-message IsWrappedCommand {
+// IsWrapped Request and response
+message IsWrappedRequest {
     string wrapper_type = 1;
 }
 
@@ -121,7 +94,7 @@ service EnvironmentRegistrationService {
 
 message RegisterEnvironmentRequest {
     string ip = 1;
-    int port = 2;
+    int32 port = 2;
 }
 
 message RegisterEnvironmentResponse {

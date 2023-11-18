@@ -14,17 +14,105 @@ class EnvironmentServiceStub(object):
         Args:
             channel: A grpc.Channel.
         """
-        self.ManageEnvironment = channel.unary_unary(
-                '/environment.EnvironmentService/ManageEnvironment',
-                request_serializer=environment__pb2.EnvironmentRequest.SerializeToString,
-                response_deserializer=environment__pb2.EnvironmentResponse.FromString,
+        self.Step = channel.unary_unary(
+                '/environment.EnvironmentService/Step',
+                request_serializer=environment__pb2.StepRequest.SerializeToString,
+                response_deserializer=environment__pb2.StepResponse.FromString,
+                )
+        self.Reset = channel.unary_unary(
+                '/environment.EnvironmentService/Reset',
+                request_serializer=environment__pb2.ResetRequest.SerializeToString,
+                response_deserializer=environment__pb2.ResetResponse.FromString,
+                )
+        self.Render = channel.unary_unary(
+                '/environment.EnvironmentService/Render',
+                request_serializer=environment__pb2.RenderRequest.SerializeToString,
+                response_deserializer=environment__pb2.RenderResponse.FromString,
+                )
+        self.Close = channel.unary_unary(
+                '/environment.EnvironmentService/Close',
+                request_serializer=environment__pb2.CloseRequest.SerializeToString,
+                response_deserializer=environment__pb2.CloseResponse.FromString,
+                )
+        self.GetSpaces = channel.unary_unary(
+                '/environment.EnvironmentService/GetSpaces',
+                request_serializer=environment__pb2.GetSpacesRequest.SerializeToString,
+                response_deserializer=environment__pb2.GetSpacesResponse.FromString,
+                )
+        self.EnvMethod = channel.unary_unary(
+                '/environment.EnvironmentService/EnvMethod',
+                request_serializer=environment__pb2.EnvMethodRequest.SerializeToString,
+                response_deserializer=environment__pb2.EnvMethodResponse.FromString,
+                )
+        self.GetAttr = channel.unary_unary(
+                '/environment.EnvironmentService/GetAttr',
+                request_serializer=environment__pb2.GetAttrRequest.SerializeToString,
+                response_deserializer=environment__pb2.GetAttrResponse.FromString,
+                )
+        self.SetAttr = channel.unary_unary(
+                '/environment.EnvironmentService/SetAttr',
+                request_serializer=environment__pb2.SetAttrRequest.SerializeToString,
+                response_deserializer=environment__pb2.SetAttrResponse.FromString,
+                )
+        self.IsWrapped = channel.unary_unary(
+                '/environment.EnvironmentService/IsWrapped',
+                request_serializer=environment__pb2.IsWrappedRequest.SerializeToString,
+                response_deserializer=environment__pb2.IsWrappedResponse.FromString,
                 )
 
 
 class EnvironmentServiceServicer(object):
     """Missing associated documentation comment in .proto file."""
 
-    def ManageEnvironment(self, request, context):
+    def Step(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def Reset(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def Render(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def Close(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetSpaces(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def EnvMethod(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetAttr(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def SetAttr(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def IsWrapped(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -33,10 +121,50 @@ class EnvironmentServiceServicer(object):
 
 def add_EnvironmentServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
-            'ManageEnvironment': grpc.unary_unary_rpc_method_handler(
-                    servicer.ManageEnvironment,
-                    request_deserializer=environment__pb2.EnvironmentRequest.FromString,
-                    response_serializer=environment__pb2.EnvironmentResponse.SerializeToString,
+            'Step': grpc.unary_unary_rpc_method_handler(
+                    servicer.Step,
+                    request_deserializer=environment__pb2.StepRequest.FromString,
+                    response_serializer=environment__pb2.StepResponse.SerializeToString,
+            ),
+            'Reset': grpc.unary_unary_rpc_method_handler(
+                    servicer.Reset,
+                    request_deserializer=environment__pb2.ResetRequest.FromString,
+                    response_serializer=environment__pb2.ResetResponse.SerializeToString,
+            ),
+            'Render': grpc.unary_unary_rpc_method_handler(
+                    servicer.Render,
+                    request_deserializer=environment__pb2.RenderRequest.FromString,
+                    response_serializer=environment__pb2.RenderResponse.SerializeToString,
+            ),
+            'Close': grpc.unary_unary_rpc_method_handler(
+                    servicer.Close,
+                    request_deserializer=environment__pb2.CloseRequest.FromString,
+                    response_serializer=environment__pb2.CloseResponse.SerializeToString,
+            ),
+            'GetSpaces': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetSpaces,
+                    request_deserializer=environment__pb2.GetSpacesRequest.FromString,
+                    response_serializer=environment__pb2.GetSpacesResponse.SerializeToString,
+            ),
+            'EnvMethod': grpc.unary_unary_rpc_method_handler(
+                    servicer.EnvMethod,
+                    request_deserializer=environment__pb2.EnvMethodRequest.FromString,
+                    response_serializer=environment__pb2.EnvMethodResponse.SerializeToString,
+            ),
+            'GetAttr': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetAttr,
+                    request_deserializer=environment__pb2.GetAttrRequest.FromString,
+                    response_serializer=environment__pb2.GetAttrResponse.SerializeToString,
+            ),
+            'SetAttr': grpc.unary_unary_rpc_method_handler(
+                    servicer.SetAttr,
+                    request_deserializer=environment__pb2.SetAttrRequest.FromString,
+                    response_serializer=environment__pb2.SetAttrResponse.SerializeToString,
+            ),
+            'IsWrapped': grpc.unary_unary_rpc_method_handler(
+                    servicer.IsWrapped,
+                    request_deserializer=environment__pb2.IsWrappedRequest.FromString,
+                    response_serializer=environment__pb2.IsWrappedResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -49,7 +177,7 @@ class EnvironmentService(object):
     """Missing associated documentation comment in .proto file."""
 
     @staticmethod
-    def ManageEnvironment(request,
+    def Step(request,
             target,
             options=(),
             channel_credentials=None,
@@ -59,8 +187,205 @@ class EnvironmentService(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/environment.EnvironmentService/ManageEnvironment',
-            environment__pb2.EnvironmentRequest.SerializeToString,
-            environment__pb2.EnvironmentResponse.FromString,
+        return grpc.experimental.unary_unary(request, target, '/environment.EnvironmentService/Step',
+            environment__pb2.StepRequest.SerializeToString,
+            environment__pb2.StepResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def Reset(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/environment.EnvironmentService/Reset',
+            environment__pb2.ResetRequest.SerializeToString,
+            environment__pb2.ResetResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def Render(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/environment.EnvironmentService/Render',
+            environment__pb2.RenderRequest.SerializeToString,
+            environment__pb2.RenderResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def Close(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/environment.EnvironmentService/Close',
+            environment__pb2.CloseRequest.SerializeToString,
+            environment__pb2.CloseResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def GetSpaces(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/environment.EnvironmentService/GetSpaces',
+            environment__pb2.GetSpacesRequest.SerializeToString,
+            environment__pb2.GetSpacesResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def EnvMethod(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/environment.EnvironmentService/EnvMethod',
+            environment__pb2.EnvMethodRequest.SerializeToString,
+            environment__pb2.EnvMethodResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def GetAttr(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/environment.EnvironmentService/GetAttr',
+            environment__pb2.GetAttrRequest.SerializeToString,
+            environment__pb2.GetAttrResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def SetAttr(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/environment.EnvironmentService/SetAttr',
+            environment__pb2.SetAttrRequest.SerializeToString,
+            environment__pb2.SetAttrResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def IsWrapped(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/environment.EnvironmentService/IsWrapped',
+            environment__pb2.IsWrappedRequest.SerializeToString,
+            environment__pb2.IsWrappedResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+
+class EnvironmentRegistrationServiceStub(object):
+    """Missing associated documentation comment in .proto file."""
+
+    def __init__(self, channel):
+        """Constructor.
+
+        Args:
+            channel: A grpc.Channel.
+        """
+        self.RegisterEnvironment = channel.unary_unary(
+                '/environment.EnvironmentRegistrationService/RegisterEnvironment',
+                request_serializer=environment__pb2.RegisterEnvironmentRequest.SerializeToString,
+                response_deserializer=environment__pb2.RegisterEnvironmentResponse.FromString,
+                )
+
+
+class EnvironmentRegistrationServiceServicer(object):
+    """Missing associated documentation comment in .proto file."""
+
+    def RegisterEnvironment(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+
+def add_EnvironmentRegistrationServiceServicer_to_server(servicer, server):
+    rpc_method_handlers = {
+            'RegisterEnvironment': grpc.unary_unary_rpc_method_handler(
+                    servicer.RegisterEnvironment,
+                    request_deserializer=environment__pb2.RegisterEnvironmentRequest.FromString,
+                    response_serializer=environment__pb2.RegisterEnvironmentResponse.SerializeToString,
+            ),
+    }
+    generic_handler = grpc.method_handlers_generic_handler(
+            'environment.EnvironmentRegistrationService', rpc_method_handlers)
+    server.add_generic_rpc_handlers((generic_handler,))
+
+
+ # This class is part of an EXPERIMENTAL API.
+class EnvironmentRegistrationService(object):
+    """Missing associated documentation comment in .proto file."""
+
+    @staticmethod
+    def RegisterEnvironment(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/environment.EnvironmentRegistrationService/RegisterEnvironment',
+            environment__pb2.RegisterEnvironmentRequest.SerializeToString,
+            environment__pb2.RegisterEnvironmentResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

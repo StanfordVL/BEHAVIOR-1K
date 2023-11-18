@@ -4,7 +4,7 @@ from omnigibson.envs.rl_env import RLEnv
 from omnigibson.macros import gm
 import h5py
 
-from environment_servicer import serve
+from rollout_worker import serve
 
 
 async def main():

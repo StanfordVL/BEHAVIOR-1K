@@ -1,54 +1,10 @@
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
-from typing import ClassVar as _ClassVar, Mapping as _Mapping, Optional as _Optional, Union as _Union
+from typing import ClassVar as _ClassVar, Optional as _Optional
 
 DESCRIPTOR: _descriptor.FileDescriptor
 
-class EnvironmentRequest(_message.Message):
-    __slots__ = ["step", "reset", "render", "close", "get_spaces", "env_method", "get_attr", "set_attr", "is_wrapped"]
-    STEP_FIELD_NUMBER: _ClassVar[int]
-    RESET_FIELD_NUMBER: _ClassVar[int]
-    RENDER_FIELD_NUMBER: _ClassVar[int]
-    CLOSE_FIELD_NUMBER: _ClassVar[int]
-    GET_SPACES_FIELD_NUMBER: _ClassVar[int]
-    ENV_METHOD_FIELD_NUMBER: _ClassVar[int]
-    GET_ATTR_FIELD_NUMBER: _ClassVar[int]
-    SET_ATTR_FIELD_NUMBER: _ClassVar[int]
-    IS_WRAPPED_FIELD_NUMBER: _ClassVar[int]
-    step: StepCommand
-    reset: ResetCommand
-    render: RenderCommand
-    close: CloseCommand
-    get_spaces: GetSpacesCommand
-    env_method: EnvMethodCommand
-    get_attr: GetAttrCommand
-    set_attr: SetAttrCommand
-    is_wrapped: IsWrappedCommand
-    def __init__(self, step: _Optional[_Union[StepCommand, _Mapping]] = ..., reset: _Optional[_Union[ResetCommand, _Mapping]] = ..., render: _Optional[_Union[RenderCommand, _Mapping]] = ..., close: _Optional[_Union[CloseCommand, _Mapping]] = ..., get_spaces: _Optional[_Union[GetSpacesCommand, _Mapping]] = ..., env_method: _Optional[_Union[EnvMethodCommand, _Mapping]] = ..., get_attr: _Optional[_Union[GetAttrCommand, _Mapping]] = ..., set_attr: _Optional[_Union[SetAttrCommand, _Mapping]] = ..., is_wrapped: _Optional[_Union[IsWrappedCommand, _Mapping]] = ...) -> None: ...
-
-class EnvironmentResponse(_message.Message):
-    __slots__ = ["step_response", "reset_response", "render_response", "close_response", "get_spaces_response", "env_method_response", "get_attr_response", "set_attr_response", "is_wrapped_response"]
-    STEP_RESPONSE_FIELD_NUMBER: _ClassVar[int]
-    RESET_RESPONSE_FIELD_NUMBER: _ClassVar[int]
-    RENDER_RESPONSE_FIELD_NUMBER: _ClassVar[int]
-    CLOSE_RESPONSE_FIELD_NUMBER: _ClassVar[int]
-    GET_SPACES_RESPONSE_FIELD_NUMBER: _ClassVar[int]
-    ENV_METHOD_RESPONSE_FIELD_NUMBER: _ClassVar[int]
-    GET_ATTR_RESPONSE_FIELD_NUMBER: _ClassVar[int]
-    SET_ATTR_RESPONSE_FIELD_NUMBER: _ClassVar[int]
-    IS_WRAPPED_RESPONSE_FIELD_NUMBER: _ClassVar[int]
-    step_response: StepResponse
-    reset_response: ResetResponse
-    render_response: RenderResponse
-    close_response: CloseResponse
-    get_spaces_response: GetSpacesResponse
-    env_method_response: EnvMethodResponse
-    get_attr_response: GetAttrResponse
-    set_attr_response: SetAttrResponse
-    is_wrapped_response: IsWrappedResponse
-    def __init__(self, step_response: _Optional[_Union[StepResponse, _Mapping]] = ..., reset_response: _Optional[_Union[ResetResponse, _Mapping]] = ..., render_response: _Optional[_Union[RenderResponse, _Mapping]] = ..., close_response: _Optional[_Union[CloseResponse, _Mapping]] = ..., get_spaces_response: _Optional[_Union[GetSpacesResponse, _Mapping]] = ..., env_method_response: _Optional[_Union[EnvMethodResponse, _Mapping]] = ..., get_attr_response: _Optional[_Union[GetAttrResponse, _Mapping]] = ..., set_attr_response: _Optional[_Union[SetAttrResponse, _Mapping]] = ..., is_wrapped_response: _Optional[_Union[IsWrappedResponse, _Mapping]] = ...) -> None: ...
-
-class StepCommand(_message.Message):
+class StepRequest(_message.Message):
     __slots__ = ["action"]
     ACTION_FIELD_NUMBER: _ClassVar[int]
     action: bytes
@@ -68,7 +24,7 @@ class StepResponse(_message.Message):
     reset_info: bytes
     def __init__(self, observation: _Optional[bytes] = ..., reward: _Optional[float] = ..., done: bool = ..., info: _Optional[bytes] = ..., reset_info: _Optional[bytes] = ...) -> None: ...
 
-class ResetCommand(_message.Message):
+class ResetRequest(_message.Message):
     __slots__ = ["seed", "options"]
     SEED_FIELD_NUMBER: _ClassVar[int]
     OPTIONS_FIELD_NUMBER: _ClassVar[int]
@@ -84,7 +40,7 @@ class ResetResponse(_message.Message):
     reset_info: bytes
     def __init__(self, observation: _Optional[bytes] = ..., reset_info: _Optional[bytes] = ...) -> None: ...
 
-class RenderCommand(_message.Message):
+class RenderRequest(_message.Message):
     __slots__ = []
     def __init__(self) -> None: ...
 
@@ -94,7 +50,7 @@ class RenderResponse(_message.Message):
     render_data: bytes
     def __init__(self, render_data: _Optional[bytes] = ...) -> None: ...
 
-class CloseCommand(_message.Message):
+class CloseRequest(_message.Message):
     __slots__ = []
     def __init__(self) -> None: ...
 
@@ -102,7 +58,7 @@ class CloseResponse(_message.Message):
     __slots__ = []
     def __init__(self) -> None: ...
 
-class GetSpacesCommand(_message.Message):
+class GetSpacesRequest(_message.Message):
     __slots__ = []
     def __init__(self) -> None: ...
 
@@ -114,7 +70,7 @@ class GetSpacesResponse(_message.Message):
     action_space: bytes
     def __init__(self, observation_space: _Optional[bytes] = ..., action_space: _Optional[bytes] = ...) -> None: ...
 
-class EnvMethodCommand(_message.Message):
+class EnvMethodRequest(_message.Message):
     __slots__ = ["method_name", "arguments"]
     METHOD_NAME_FIELD_NUMBER: _ClassVar[int]
     ARGUMENTS_FIELD_NUMBER: _ClassVar[int]
@@ -128,7 +84,7 @@ class EnvMethodResponse(_message.Message):
     result: bytes
     def __init__(self, result: _Optional[bytes] = ...) -> None: ...
 
-class GetAttrCommand(_message.Message):
+class GetAttrRequest(_message.Message):
     __slots__ = ["attribute_name"]
     ATTRIBUTE_NAME_FIELD_NUMBER: _ClassVar[int]
     attribute_name: str
@@ -140,7 +96,7 @@ class GetAttrResponse(_message.Message):
     attribute_value: bytes
     def __init__(self, attribute_value: _Optional[bytes] = ...) -> None: ...
 
-class SetAttrCommand(_message.Message):
+class SetAttrRequest(_message.Message):
     __slots__ = ["attribute_name", "attribute_value"]
     ATTRIBUTE_NAME_FIELD_NUMBER: _ClassVar[int]
     ATTRIBUTE_VALUE_FIELD_NUMBER: _ClassVar[int]
@@ -152,7 +108,7 @@ class SetAttrResponse(_message.Message):
     __slots__ = []
     def __init__(self) -> None: ...
 
-class IsWrappedCommand(_message.Message):
+class IsWrappedRequest(_message.Message):
     __slots__ = ["wrapper_type"]
     WRAPPER_TYPE_FIELD_NUMBER: _ClassVar[int]
     wrapper_type: str
@@ -163,3 +119,17 @@ class IsWrappedResponse(_message.Message):
     IS_WRAPPED_FIELD_NUMBER: _ClassVar[int]
     is_wrapped: bool
     def __init__(self, is_wrapped: bool = ...) -> None: ...
+
+class RegisterEnvironmentRequest(_message.Message):
+    __slots__ = ["ip", "port"]
+    IP_FIELD_NUMBER: _ClassVar[int]
+    PORT_FIELD_NUMBER: _ClassVar[int]
+    ip: str
+    port: int
+    def __init__(self, ip: _Optional[str] = ..., port: _Optional[int] = ...) -> None: ...
+
+class RegisterEnvironmentResponse(_message.Message):
+    __slots__ = ["success"]
+    SUCCESS_FIELD_NUMBER: _ClassVar[int]
+    success: bool
+    def __init__(self, success: bool = ...) -> None: ...
