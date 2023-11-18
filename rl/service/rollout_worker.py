@@ -28,7 +28,7 @@ class EnvironmentServicer(environment_pb2_grpc.EnvironmentServicer):
         )
 
     def Reset(self, request, unused_context):
-        seed = request.seed
+        seed = request.seed if request.HasField("seed") else None
         maybe_options = {"options": pickle.loads(request.options)} if request.options else {}
         observation, reset_info = self.env.reset(seed=seed, **maybe_options)
         

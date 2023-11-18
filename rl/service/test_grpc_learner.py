@@ -4,7 +4,7 @@ import logging
 
 log = logging.getLogger(__name__)
 
-from grpc_vec_env import GRPCVecEnv
+from rl.service.learner_worker import GRPCVecEnv
 
 try:
     import gym

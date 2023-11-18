@@ -62,7 +62,6 @@ message EnvMethodResponse {
     bytes result = 1;
 }
 
-// GetAttr and SetAttr Requests and responses
 message GetAttrRequest {
     string attribute_name = 1;
 }
@@ -95,7 +94,7 @@ service EnvironmentRegistrationService {
 
 message RegisterEnvironmentRequest {
     string ip = 1;
-    int port = 2;
+    int32 port = 2;
 }
 
 message RegisterEnvironmentResponse {
