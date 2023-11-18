@@ -149,6 +149,7 @@ class MultiFingerGripperController(GripperController):
             Array[float]: outputted (non-clipped!) control signal to deploy
         """
         joint_pos = control_dict["joint_position"][self.dof_idx]
+        
         # Choose what to do based on control mode
         if self._mode == "binary":
             # Use max control signal
@@ -157,6 +158,7 @@ class MultiFingerGripperController(GripperController):
                 if command[0] >= 0.0
                 else self._control_limits[ControlType.get_type(self._motor_type)][0][self.dof_idx]
             )
+
         # If we're using delta commands, add this value
         elif self._use_delta_commands:
             # Compute the base value for the command.
@@ -180,8 +182,9 @@ class MultiFingerGripperController(GripperController):
 
                 # Update the command
                 u[[rx_ind, ry_ind, rz_ind]] = end_rots
+
+        # Otherwise, control is simply the command itself        
         else:
-            # Use continuous signal
             u = command
 
         # If we're near the joint limits and we're using velocity / torque control, we zero out the action

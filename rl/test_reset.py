@@ -73,7 +73,7 @@ def main(iterations):
                         "kv": 3.0
                     },
                     "gripper_0": {
-                        "name": "JointController",
+                        "name": "MultiFingerGripperController",
                         "motor_type": "position",
                         "command_input_limits": [-1, 1],
                         "command_output_limits": None,
@@ -139,7 +139,6 @@ def main(iterations):
 
     # Testing random actions with env
     #############################
-    from IPython import embed; embed()
     for i in tqdm(range(int(iterations))):
         try:
             done = False
