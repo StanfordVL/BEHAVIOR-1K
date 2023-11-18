@@ -43,7 +43,7 @@ def main(iterations):
                 "obs_modalities": ["rgb", "depth_linear", "seg_instance", "seg_semantic", "proprio"],
                 "proprio_obs": ["robot_pos", "robot_2d_ori", "joint_qpos", "joint_qvel", "eef_0_pos", "eef_0_quat", "grasp_0"],
                 "scale": 1.0,
-                "self_collisions": False,
+                "self_collisions": True,
                 "action_normalize": False,
                 "action_type": "continuous",
                 "grasping_mode": "sticky",
@@ -139,6 +139,7 @@ def main(iterations):
 
     # Testing random actions with env
     #############################
+    from IPython import embed; embed()
     for i in tqdm(range(int(iterations))):
         try:
             done = False

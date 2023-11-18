@@ -3,6 +3,7 @@ import numpy as np
 from omnigibson.macros import create_module_macros
 from omnigibson.controllers import IsGraspingState, ControlType, GripperController
 from omnigibson.utils.python_utils import assert_valid_key
+import omnigibson.utils.transform_utils as T
 
 VALID_MODES = {
     "binary",
@@ -41,6 +42,7 @@ class MultiFingerGripperController(GripperController):
         inverted=False,
         mode="binary",
         limit_tolerance=0.001,
+        use_delta_commands=False,
     ):
         """
         Args:
@@ -76,6 +78,7 @@ class MultiFingerGripperController(GripperController):
 
             limit_tolerance (float): sets the tolerance from the joint limit ends, below which controls will be zeroed
                 out if the control is using velocity or torque control
+            use_delta_commands (bool): whether inputted commands should be interpreted as delta or absolute values
         """
         # Store arguments
         assert_valid_key(key=motor_type.lower(), valid_keys=ControlType.VALID_TYPES_STR, name="motor_type")
@@ -84,6 +87,7 @@ class MultiFingerGripperController(GripperController):
         self._inverted = inverted
         self._mode = mode
         self._limit_tolerance = limit_tolerance
+        self._use_delta_commands = use_delta_commands
 
         # Create other args to be filled in at runtime
         self._is_grasping = IsGraspingState.FALSE
@@ -91,6 +95,13 @@ class MultiFingerGripperController(GripperController):
         # If we're using binary signal, we override the command output limits
         if mode == "binary":
             command_output_limits = (-1.0, 1.0)
+
+        # When in delta mode, it doesn't make sense to infer output range using the joint limits (since that's an
+        # absolute range and our values are relative). So reject the default mode option in that case.
+        assert not (
+            self._use_delta_commands and command_output_limits == "default"
+        ), "Cannot use 'default' command output limits in delta commands mode of JointController. Try None instead."
+
 
         # Run super init
         super().__init__(
@@ -146,6 +157,29 @@ class MultiFingerGripperController(GripperController):
                 if command[0] >= 0.0
                 else self._control_limits[ControlType.get_type(self._motor_type)][0][self.dof_idx]
             )
+        # If we're using delta commands, add this value
+        elif self._use_delta_commands:
+            # Compute the base value for the command.
+            base_value = control_dict["joint_{}".format(self._motor_type)][self.dof_idx]
+
+            # Apply the command to the base value.
+            u = base_value + command
+
+            # Correct any gimbal lock issues using the compute_delta_in_quat_space group.
+            for rx_ind, ry_ind, rz_ind in self._compute_delta_in_quat_space:
+                # Grab the starting rotations of these joints.
+                start_rots = base_value[[rx_ind, ry_ind, rz_ind]]
+
+                # Grab the delta rotations.
+                delta_rots = command[[rx_ind, ry_ind, rz_ind]]
+
+                # Compute the final rotations in the quaternion space.
+                _, end_quat = T.pose_transform(np.zeros(3), T.euler2quat(delta_rots),
+                                               np.zeros(3), T.euler2quat(start_rots))
+                end_rots = T.quat2euler(end_quat)
+
+                # Update the command
+                u[[rx_ind, ry_ind, rz_ind]] = end_rots
         else:
             # Use continuous signal
             u = command
@@ -250,6 +284,14 @@ class MultiFingerGripperController(GripperController):
     def is_grasping(self):
         # Return cached value
         return self._is_grasping
+
+    @property
+    def use_delta_commands(self):
+        """
+        Returns:
+            bool: Whether this controller is using delta commands or not
+        """
+        return self._use_delta_commands
 
     @property
     def control_type(self):
