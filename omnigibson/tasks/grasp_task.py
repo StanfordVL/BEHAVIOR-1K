@@ -90,7 +90,9 @@ class GraspTask(BaseTask):
         robot_pose = self._primitive_controller._get_robot_pose_from_2d_pose(sampled_pose_2d)
         robot.set_position_orientation(*robot_pose)
 
-        self._primitive_controller._settle_robot()
+        # Settle robot
+        for i in range(100):
+            og.sim.step()
         print("Reset robot pose to: ", robot_pose)
 
     # Overwrite reset by only removeing reset scene
