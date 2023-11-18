@@ -9,71 +9,70 @@ class EnvironmentServicer(environment_pb2_grpc.EnvironmentServicer):
     def __init__(self, env) -> None:
         self.env = env
 
-    def ManageEnvironment(
-        self, request: environment_pb2.EnvironmentRequest, unused_context
-    ) -> environment_pb2.EnvironmentResponse:
-        response = environment_pb2.EnvironmentResponse()
+    def Step(self, request, unused_context):
+        action = pickle.loads(request.action)
+        observation, reward, terminated, truncated, info = self.env.step(action)
+        done = terminated or truncated
+        info["TimeLimit.truncated"] = truncated and not terminated
 
-        if request.WhichOneOf("command") == "step":
-            action = pickle.loads(request.step.action)
-            observation, reward, terminated, truncated, info = self.env.step(action)
-            # convert to SB3 VecEnv api
-            done = terminated or truncated
-            info["TimeLimit.truncated"] = truncated and not terminated
-            if done:
-                # save final observation where user can get it, then reset
-                info["terminal_observation"] = observation
-                observation, reset_info = self._env.reset()
-            subresponse = response.step_response
-            subresponse.observation = pickle.dumps(observation)
-            subresponse.reward = reward
-            subresponse.done = done
-            subresponse.info = pickle.dumps(info)
-            subresponse.reset_info = pickle.dumps(reset_info)
-        elif request.WhichOneOf("command") == "reset":
-            seed = request.reset.seed
-            maybe_options = {"options": pickle.loads(request.reset.options)} if request.reset.options else {}
-            observation, reset_info = self.env.reset(seed=seed, **maybe_options)
-            subresponse = response.reset_response
-            subresponse.observation = pickle.dumps(observation)
-            subresponse.reset_info = pickle.dumps(reset_info)
-        elif request.WhichOneOf("command") == "render":
-            image = self.env.render()
-            subresponse = response.render_response
-            subresponse.render_data = pickle.dumps(image)
-        elif request.WhichOneOf("command") == "close":
-            self._env.close()
-            response.close_response.SetInParent()
-        elif request.WhichOneOf("command") == "get_spaces":
-            subresponse = response.get_spaces_response
-            subresponse.observation_space = pickle.dumps(self.env.observation_space)
-            subresponse.action_space = pickle.dumps(self.env.action_space)
-        elif request.WhichOneOf("command") == "env_method":
-            method_name = request.env_method.method_name
-            args, kwargs = pickle.arguments(request.env_method.args)
-            method = getattr(self.env, method_name)
-            result = method(*args, **kwargs)
-            subresponse = response.env_method_response
-            subresponse.result = pickle.dumps(result)
-        elif request.WhichOneOf("command") == "get_attr":
-            attr = request.get_attr.attribute_name
-            result = getattr(self.env, attr)
-            subresponse = response.get_attr_response
-            subresponse.attribute_value = pickle.dumps(result)
-        elif request.WhichOneOf("command") == "set_attr":
-            attr = request.get_attr.attribute_name
-            val = pickle.loads(request.set_attr.attribute_value)
-            result = setattr(self.env, attr, val)
-            response.set_attr_response.SetInParent()
-        elif request.WhichOneOf("command") == "is_wrapped":
-            wrapper_type = request.is_wrapped.wrapper_type
-            result = is_wrapped(self.env, wrapper_type)
-            subresponse = response.is_wrapped_response
-            subresponse.is_wrapped = result
-        else:
-            raise NotImplementedError(f"Invalid request is not implemented in the worker")
+        if done:
+            info["terminal_observation"] = observation
+            observation, reset_info = self.env.reset()
+
+        return environment_pb2.StepResponse(
+            observation=pickle.dumps(observation),
+            reward=reward,
+            done=done,
+            info=pickle.dumps(info),
+            reset_info=pickle.dumps(reset_info)
+        )
+
+    def Reset(self, request, unused_context):
+        seed = request.seed
+        maybe_options = {"options": pickle.loads(request.options)} if request.options else {}
+        observation, reset_info = self.env.reset(seed=seed, **maybe_options)
         
-        return response
+        return environment_pb2.ResetResponse(
+            observation=pickle.dumps(observation),
+            reset_info=pickle.dumps(reset_info)
+        )
+
+    def Render(self, request, unused_context):
+        image = self.env.render()
+        return environment_pb2.RenderResponse(render_data=pickle.dumps(image))
+
+    def Close(self, request, unused_context):
+        self.env.close()
+        return environment_pb2.CloseResponse()
+
+    def GetSpaces(self, request, unused_context):
+        return environment_pb2.GetSpacesResponse(
+            observation_space=pickle.dumps(self.env.observation_space),
+            action_space=pickle.dumps(self.env.action_space)
+        )
+
+    def EnvMethod(self, request, unused_context):
+        method_name = request.method_name
+        args, kwargs = pickle.loads(request.arguments)
+        method = getattr(self.env, method_name)
+        result = method(*args, **kwargs)
+        return environment_pb2.EnvMethodResponse(result=pickle.dumps(result))
+
+    def GetAttr(self, request, unused_context):
+        attr = request.attribute_name
+        result = getattr(self.env, attr)
+        return environment_pb2.GetAttrResponse(attribute_value=pickle.dumps(result))
+
+    def SetAttr(self, request, unused_context):
+        attr = request.attribute_name
+        val = pickle.loads(request.attribute_value)
+        setattr(self.env, attr, val)
+        return environment_pb2.SetAttrResponse()
+
+    def IsWrapped(self, request, unused_context):
+        wrapper_type = request.wrapper_type
+        is_wrapped = hasattr(self.env, wrapper_type)  # Assuming is_wrapped is implemented as hasattr
+        return environment_pb2.IsWrappedResponse(is_wrapped=is_wrapped)
     
 async def serve(env):
     server = grpc.aio.server()
