@@ -33,6 +33,10 @@ class VRSys():
         NOTE: enable_touchpad_movement and align_anchor_to_robot_base cannot be enabled at the same time. 
             The former is to enable free movement of the VR system (i.e. the user), while the latter is constraining the VR system to the robot pose.
         """
+        # enable xr extension
+        from omni.isaac.core.utils.extensions import enable_extension
+        enable_extension("omni.kit.xr.profile.vr")
+        # get xr core and profile
         self.xr_core = XRCore.get_singleton()
         self.vr_profile = self.xr_core.get_profile("vr")
         self.disable_display_output = disable_display_output

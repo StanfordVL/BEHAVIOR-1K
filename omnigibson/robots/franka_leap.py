@@ -9,7 +9,7 @@ from omnigibson.robots.manipulation_robot import ManipulationRobot, GraspingPoin
 
 class FrankaLeap(ManipulationRobot):
     """
-    Franka Robot with Leap hand
+    Franka Robot with Leap right hand
     """
 
     def __init__(
@@ -193,7 +193,7 @@ class FrankaLeap(ManipulationRobot):
 
     @property
     def usd_path(self):
-        return os.path.join(gm.ASSET_PATH, "models/franka/franka_leap.usd")
+        return os.path.join(gm.ASSET_PATH, "models/franka/franka_panda_leap.usd")
     
     @property
     def robot_arm_descriptor_yamls(self):
@@ -201,7 +201,7 @@ class FrankaLeap(ManipulationRobot):
 
     @property
     def urdf_path(self):
-        return os.path.join(gm.ASSET_PATH, "models/franka/franka_leap.urdf")
+        return os.path.join(gm.ASSET_PATH, "models/franka/franka_panda_leap.urdf")
     
     @property
     def gripper_urdf_path(self):
@@ -217,3 +217,24 @@ class FrankaLeap(ManipulationRobot):
         action[:6] = action_from_controller[:6]
         action[6:] = action_from_controller[6]
         return action
+
+
+class FrankaLeapLeft(FrankaLeap):
+    """
+    Franka Robot with Leap left hand
+    """
+    @property
+    def model_name(self):
+        return "FrankaLeapLeft"    
+    
+    @property
+    def usd_path(self):
+        return os.path.join(gm.ASSET_PATH, "models/franka/franka_panda_leap_left.usd")
+    
+    @property
+    def robot_arm_descriptor_yamls(self):
+        return {self.default_arm: os.path.join(gm.ASSET_PATH, "models/franka/franka_leap_description.yaml")}
+
+    @property
+    def urdf_path(self):
+        return os.path.join(gm.ASSET_PATH, "models/franka/franka_panda_leap_left.urdf")
