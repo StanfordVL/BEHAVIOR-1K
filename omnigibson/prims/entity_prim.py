@@ -1300,7 +1300,7 @@ class EntityPrim(XFormPrim):
     def get_generalized_gravity_forces(self):
         """
         Returns:
-            n-array: (N, N) shaped per-DOF mass matrix, if articulated
+            n-array: (N, N) shaped per-DOF gravity forces, if articulated
         """
         assert self.articulated, "Cannot get generalized gravity forces for non-articulated entity!"
         self._verify_physics_view_is_valid()

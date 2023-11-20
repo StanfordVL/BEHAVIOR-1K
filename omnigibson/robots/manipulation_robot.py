@@ -407,6 +407,9 @@ class ManipulationRobot(BaseRobot):
             dic[f"eef_{arm}_quat_relative"] = rel_eef_quat
             dic[f"eef_{arm}_lin_vel_relative"] = self.get_relative_eef_lin_vel(arm)
             dic[f"eef_{arm}_ang_vel_relative"] = self.get_relative_eef_ang_vel(arm)
+            # -n_joints because there may be an additional 6 entries at the beginning of the array, if this robot does
+            # not have a fixed base (i.e.: the 6DOF --> "floating" joint)
+            # see self.get_relative_jacobian() for more info
             dic[f"eef_{arm}_jacobian_relative"] = self.get_relative_jacobian()[self._eef_link_idxs[arm], :, -self.n_joints:]
 
         return dic
