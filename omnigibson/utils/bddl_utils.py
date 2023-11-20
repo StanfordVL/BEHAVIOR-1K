@@ -24,6 +24,7 @@ from omnigibson.robots import BaseRobot
 from omnigibson import object_states
 from omnigibson.object_states.factory import _KINEMATIC_STATE_SET
 from omnigibson.systems.system_base import is_system_active, get_system
+from omnigibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
@@ -276,7 +277,7 @@ class BDDLSampler:
     ):
         # Store internal variables from inputs
         self._env = env
-        self._scene_model = self._env.scene.scene_model
+        self._scene_model = self._env.scene.scene_model if isinstance(self._env.scene, InteractiveTraversableScene) else None
         self._agent = self._env.robots[0]
         if debug:
             gm.DEBUG = True
@@ -411,9 +412,9 @@ class BDDLSampler:
                     # Invalid room assignment
                     return f"You have assigned room type for [{obj_synset}], but [{obj_synset}] is sampleable. " \
                            f"Only non-sampleable (scene) objects can have room assignment."
-                if room_type not in og.sim.scene.seg_map.room_sem_name_to_ins_name:
+                if self._scene_model is not None and room_type not in og.sim.scene.seg_map.room_sem_name_to_ins_name:
                     # Missing room type
-                    return f"Room type [{room_type}] missing in scene [{og.sim.scene.scene_model}]."
+                    return f"Room type [{room_type}] missing in scene [{self._scene_model}]."
                 if room_type not in self._room_type_to_object_instance:
                     self._room_type_to_object_instance[room_type] = []
                 self._room_type_to_object_instance[room_type].append(obj_inst)
@@ -521,6 +522,12 @@ class BDDLSampler:
         # Sanity check kinematic objects -- any non-system must be kinematically sampled
         remaining_kinematic_entities = nonparticle_entities - unsampleable_obj_instances - \
             self._inroom_object_instances - set.union(*(self._object_sampling_orders["kinematic"] + [set()]))
+
+        # Possibly remove the agent entity if we're in an empty scene -- i.e.: no kinematic sampling needed for the
+        # agent
+        if self._scene_model is None:
+            remaining_kinematic_entities -= {"agent.n.01_1"}
+
         if len(remaining_kinematic_entities) != 0:
             return f"Some objects do not have any kinematic condition defined for them in the initial conditions: " \
                    f"{', '.join(remaining_kinematic_entities)}"
@@ -566,7 +573,8 @@ class BDDLSampler:
                 valid_models = {cat: set(get_all_object_category_models_with_abilities(cat, abilities))
                                 for cat in categories}
 
-                for room_inst in og.sim.scene.seg_map.room_sem_name_to_ins_name[room_type]:
+                room_insts = [None] if self._scene_model is None else og.sim.scene.seg_map.room_sem_name_to_ins_name[room_type]
+                for room_inst in room_insts:
                     # A list of scene objects that satisfy the requested categories
                     room_objs = og.sim.scene.object_registry("in_rooms", room_inst, default_val=[])
                     scene_objs = [obj for obj in room_objs if obj.category in categories and obj.model in valid_models[obj.category]]
@@ -660,11 +668,15 @@ class BDDLSampler:
                         filtered_object_scope[room_type][scene_obj][room_inst].append(obj)
 
         # Compute most problematic objects
-        problematic_objs_by_proportion = defaultdict(list)
-        for child_scope_name, parent_obj_names in problematic_objs.items():
-            problematic_objs_by_proportion[np.mean(list(parent_obj_names.values()))].append(child_scope_name)
+        if len(problematic_objs) == 0:
+            max_problematic_objs = []
+        else:
+            problematic_objs_by_proportion = defaultdict(list)
+            for child_scope_name, parent_obj_names in problematic_objs.items():
+                problematic_objs_by_proportion[np.mean(list(parent_obj_names.values()))].append(child_scope_name)
+            max_problematic_objs = problematic_objs_by_proportion[min(problematic_objs_by_proportion.keys())]
 
-        return filtered_object_scope, problematic_objs_by_proportion[min(problematic_objs_by_proportion.keys())]
+        return filtered_object_scope, max_problematic_objs
 
     def _consolidate_room_instance(self, filtered_object_scope, condition_type):
         """

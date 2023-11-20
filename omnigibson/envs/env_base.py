@@ -1,5 +1,6 @@
 import gym
 import numpy as np
+from copy import deepcopy
 
 import omnigibson as og
 from omnigibson.objects import REGISTERED_OBJECTS
@@ -50,7 +51,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self._automatic_reset = automatic_reset
         self._flatten_action_space = flatten_action_space
         self._flatten_obs_space = flatten_obs_space
+        self.physics_timestep = physics_timestep
         self.action_timestep = action_timestep
+        self.device = device
 
         # Initialize other placeholders that will be filled in later
         self._initial_pos_z_offset = None                   # how high to offset object placement to account for one action step of dropping
@@ -70,12 +73,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
         # Merge in specified configs
         for config in configs:
             merge_nested_dicts(base_dict=self.config, extra_dict=parse_config(config), inplace=True)
-
-        # Set the simulator settings
-        og.sim.set_simulation_dt(physics_dt=physics_timestep, rendering_dt=action_timestep)
-        og.sim.viewer_width = self.render_config["viewer_width"]
-        og.sim.viewer_height = self.render_config["viewer_height"]
-        og.sim.device = device
 
         # Load this environment
         self.load()
@@ -153,10 +150,22 @@ class Environment(gym.Env, GymObservable, Recreatable):
         drop_distance = 0.5 * 9.8 * (self.action_timestep ** 2)
         assert drop_distance < self._initial_pos_z_offset, "initial_pos_z_offset is too small for collision checking"
 
-    def _load_task(self):
+    def _load_task(self, task_config=None):
         """
         Load task
+
+        Args:
+            task_confg (None or dict): If specified, custom task configuration to use. Otherwise, will use
+                self.task_config. Note that if a custom task configuration is specified, the internal task config
+                will be updated as well
         """
+        # Update internal config if specified
+        if task_config is not None:
+            # Copy task config, in case self.task_config and task_config are the same!
+            task_config = deepcopy(task_config)
+            self.task_config.clear()
+            self.task_config.update(task_config)
+
         # Sanity check task to make sure it's valid
         task_type = self.task_config["type"]
         assert_valid_key(key=task_type, valid_keys=REGISTERED_TASKS, name="task type")
@@ -188,6 +197,13 @@ class Environment(gym.Env, GymObservable, Recreatable):
             cls_type_descriptor="scene",
         )
         og.sim.import_scene(scene)
+
+        # Set the simulator settings
+        og.sim.set_simulation_dt(physics_dt=self.physics_timestep, rendering_dt=self.action_timestep)
+        og.sim.viewer_width = self.render_config["viewer_width"]
+        og.sim.viewer_height = self.render_config["viewer_height"]
+        og.sim.device = self.device
+
         assert og.sim.is_stopped(), "Simulator must be stopped after loading scene!"
 
     def _load_robots(self):
@@ -324,6 +340,31 @@ class Environment(gym.Env, GymObservable, Recreatable):
         # Denote that the scene is loaded
         self._loaded = True
 
+    def update_task(self, task_config):
+        """
+        Updates the internal task using @task_config. NOTE: This will internally reset the environment as well!
+
+        Args:
+            task_config (dict): Task configuration for updating the new task
+        """
+        # Make sure sim is playing
+        assert og.sim.is_playing(), "Update task should occur while sim is playing!"
+
+        # Denote scene as not loaded yet
+        self._loaded = False
+        og.sim.stop()
+        self._load_task(task_config=task_config)
+        og.sim.play()
+        self.reset()
+
+        # Load obs / action spaces
+        self.load_observation_space()
+        self._load_action_space()
+
+        # Scene is now loaded again
+        self._loaded = True
+
+
     def close(self):
         """
         Clean up the environment and shut down the simulation.
@@ -443,7 +484,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         # Grab and return observations
         obs = self.get_obs()
 
-        if self.observation_space is not None and not self.observation_space.contains(obs):
+        if self._loaded and not self.observation_space.contains(obs):
             # Flatten obs, and print out all keys and values
             log.error("OBSERVATION SPACE:")
             for key, value in recursively_generate_flat_dict(dic=self.observation_space).items():
@@ -544,6 +585,14 @@ class Environment(gym.Env, GymObservable, Recreatable):
         return self.config["task"]
 
     @property
+    def wrapper_config(self):
+        """
+        Returns:
+            dict: Wrapper-specific configuration kwargs
+        """
+        return self.config["wrapper"]
+
+    @property
     def default_config(self):
         """
         Returns:
@@ -584,5 +633,10 @@ class Environment(gym.Env, GymObservable, Recreatable):
             # Task kwargs
             "task": {
                 "type": "DummyTask",
-            }
+            },
+
+            # Wrapper kwargs
+            "wrapper": {
+                "type": None,
+            },
         }
