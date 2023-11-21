@@ -193,7 +193,7 @@ class FrankaLeap(ManipulationRobot):
 
     @property
     def usd_path(self):
-        return os.path.join(gm.ASSET_PATH, "models/franka/franka_panda_leap.usd")
+        return os.path.join(gm.ASSET_PATH, "models/franka/franka_leap.usd")
     
     @property
     def robot_arm_descriptor_yamls(self):
@@ -201,11 +201,7 @@ class FrankaLeap(ManipulationRobot):
 
     @property
     def urdf_path(self):
-        return os.path.join(gm.ASSET_PATH, "models/franka/franka_panda_leap.urdf")
-    
-    @property
-    def gripper_urdf_path(self):
-        return os.path.join(gm.ASSET_PATH, "models/franka/leap_hand.urdf")
+        return os.path.join(gm.ASSET_PATH, "models/franka/franka_leap.urdf")
 
     @property
     def vr_rotation_offset(self):
@@ -229,7 +225,7 @@ class FrankaLeapLeft(FrankaLeap):
     
     @property
     def usd_path(self):
-        return os.path.join(gm.ASSET_PATH, "models/franka/franka_panda_leap_left.usd")
+        return os.path.join(gm.ASSET_PATH, "models/franka/franka_leap_left.usd")
     
     @property
     def robot_arm_descriptor_yamls(self):
@@ -237,4 +233,4 @@ class FrankaLeapLeft(FrankaLeap):
 
     @property
     def urdf_path(self):
-        return os.path.join(gm.ASSET_PATH, "models/franka/franka_panda_leap_left.urdf")
+        return os.path.join(gm.ASSET_PATH, "models/franka/franka_leap_left.urdf")

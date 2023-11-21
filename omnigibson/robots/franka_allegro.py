@@ -202,10 +202,6 @@ class FrankaAllegro(ManipulationRobot):
         return os.path.join(gm.ASSET_PATH, "models/franka/franka_allegro.urdf")
     
     @property
-    def eef_urdf_path(self):
-        return os.path.join(gm.ASSET_PATH, "models/franka/allegro_hand.urdf")
-    
-    @property
     def disabled_collision_pairs(self):
         return [
             ["link_12_0", "part_studio_link"],
