@@ -163,7 +163,7 @@ class MultiFingerGripperController(GripperController):
                 else self._control_limits[ControlType.get_type(self._motor_type)][0][self.dof_idx]
             )
 
-        elif self.mode == "ternary":
+        elif self._mode == "ternary":
             if command > 0.33:
                 u = self._control_limits[ControlType.get_type(self._motor_type)][1][self.dof_idx]
             elif command < -0.33:
@@ -172,7 +172,7 @@ class MultiFingerGripperController(GripperController):
                 u = control_dict["joint_{}".format(self._motor_type)][self.dof_idx]
 
         # If we're using delta commands, add this value
-        elif self.mode == "smooth_delta":
+        elif self._mode == "smooth_delta":
             # Compute the base value for the command.
             base_value = control_dict["joint_{}".format(self._motor_type)][self.dof_idx]
 
@@ -222,10 +222,6 @@ class MultiFingerGripperController(GripperController):
             is_grasping = IsGraspingState.FALSE
 
         else:
-            assert np.all(
-                self._control == self._control[0]
-            ), f"MultiFingerGripperController has different values in the command for non-independent mode: {self._control}"
-
             assert m.POS_TOLERANCE > self._limit_tolerance, (
                 "Joint position tolerance for is_grasping heuristics checking is smaller than or equal to the "
                 "gripper controller's tolerance of zero-ing out velocities, which makes the heuristics invalid."
