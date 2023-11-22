@@ -124,7 +124,7 @@ def get_camera_params(viewport):
     view_proj_mat = helpers.get_view_proj_mat(view_params)
 
     return {
-        "pose": np.array(prim_tf),
+        "pose": np.array(prim_tf).T,        # omni natively gives transposed pose so we have to "un"-transpose it
         "fov": fov,
         "focal_length": view_params["focal_length"],
         "horizontal_aperture": view_params["horizontal_aperture"],

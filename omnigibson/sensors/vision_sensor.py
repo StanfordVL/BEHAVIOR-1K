@@ -350,10 +350,28 @@ class VisionSensor(BaseSensor):
         self.visible = True
 
     @property
+    def horizontal_aperture(self):
+        """
+        Returns:
+            float: horizontal aperture of this sensor, in mm
+        """
+        return self.get_attribute("horizontalAperture")
+
+    @horizontal_aperture.setter
+    def horizontal_aperture(self, length):
+        """
+        Sets the focal length @length for this sensor
+
+        Args:
+            length (float): horizontal aperture of this sensor, in meters
+        """
+        self.set_attribute("horizontalAperture", length)
+
+    @property
     def focal_length(self):
         """
         Returns:
-            float: focal length of this sensor, in meters
+            float: focal length of this sensor, in mm
         """
         return self.get_attribute("focalLength")
 
@@ -363,9 +381,32 @@ class VisionSensor(BaseSensor):
         Sets the focal length @length for this sensor
 
         Args:
-            length (float): focal length of this sensor, in meters
+            length (float): focal length of this sensor, in mm
         """
         self.set_attribute("focalLength", length)
+
+    @property
+    def intrinsic_matrix(self):
+        """
+        Returns:
+            n-array: (3, 3) camera intrinsic matrix. Transforming point p (x,y,z) in the camera frame via K * p will
+                produce p' (x', y', w) - the point in the image plane. To get pixel coordiantes, divide x' and y' by w
+        """
+        params = get_camera_params(viewport=self._viewport.viewport_api)
+        h, w = self.image_height, self.image_width
+        horizontal_fov = params["fov"]
+        vertical_fov = horizontal_fov * h / w
+
+        f_x = (w / 2.0) / np.tan(horizontal_fov / 2.0)
+        f_y = (h / 2.0) / np.tan(vertical_fov / 2.0)
+
+        K = np.array([
+            [f_x, 0.0, w / 2.0],
+            [0.0, f_y, h / 2.0],
+            [0.0, 0.0, 1.0]
+        ])
+
+        return K
 
     @property
     def _obs_space_mapping(self):

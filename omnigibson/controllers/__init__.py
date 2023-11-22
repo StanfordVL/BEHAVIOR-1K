@@ -9,6 +9,7 @@ from omnigibson.controllers.controller_base import (
     GripperController,
 )
 from omnigibson.controllers.dd_controller import DifferentialDriveController
+from omnigibson.controllers.osc_controller import OperationalSpaceController
 from omnigibson.controllers.ik_controller import InverseKinematicsController
 from omnigibson.controllers.joint_controller import JointController
 from omnigibson.controllers.multi_finger_gripper_controller import MultiFingerGripperController
