@@ -8,15 +8,10 @@ import numpy as np
 import omnigibson as og
 from omnigibson.macros import gm
 from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitives, StarterSemanticActionPrimitiveSet
-from omnigibson.robots import REGISTERED_ROBOTS
-from omnigibson.utils.ui_utils import KeyboardRobotController
-
-
 
 # Don't use GPU dynamics and use flatcache for performance boost
 # gm.USE_GPU_DYNAMICS = True
-gm.ENABLE_FLATCACHE = True
-
+# gm.ENABLE_FLATCACHE = True
 
 def execute_controller(ctrl_gen, env):
     for action in ctrl_gen:

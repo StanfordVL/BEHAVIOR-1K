@@ -29,18 +29,16 @@ robots:
     obs_modalities: [scan, rgb, depth]
     scale: 1.0
     self_collisions: true
-    # action_normalize: false
     action_normalize: false
     action_type: continuous
     grasping_mode: sticky
-    disable_grasp_handling: true
     rigid_trunk: false
     default_trunk_offset: 0.365
     default_arm_pose: diagonal30
     controller_config:
       base:
         name: JointController
-        motor_type: "velocity"
+        motor_type: velocity
       arm_left:
         name: InverseKinematicsController
         motor_type: velocity

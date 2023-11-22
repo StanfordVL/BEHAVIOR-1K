@@ -8,7 +8,6 @@ import numpy as np
 import omnigibson as og
 from omnigibson.macros import gm
 from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitives, StarterSemanticActionPrimitiveSet
-from omnigibson.robots import REGISTERED_ROBOTS
 
 # Don't use GPU dynamics and use flatcache for performance boost
 # gm.USE_GPU_DYNAMICS = True
@@ -66,6 +65,9 @@ def main():
 
     # Allow user to move camera more easily
     og.sim.enable_viewer_camera_teleoperation()
+
+    og.sim.stop()
+    og.sim.play()
 
     controller = StarterSemanticActionPrimitives(env)
     set_start_pose(robot)
