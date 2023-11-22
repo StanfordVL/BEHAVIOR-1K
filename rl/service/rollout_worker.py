@@ -2,6 +2,7 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import inspect
 import pickle
+from typing import Optional
 import grpc
 import environment_pb2
 import environment_pb2_grpc
@@ -9,14 +10,33 @@ import environment_pb2_grpc
 import gymnasium as gym
 import gymnasium.wrappers
 
-from stable_baselines3.common.env_util import is_wrapped
+def _unwrap_wrapper(env: gym.Env, wrapper_class: str) -> Optional[gym.Wrapper]:
+    """
+    Retrieve a ``VecEnvWrapper`` object by recursively searching.
 
-def _find_subclasses(module, clazz):
-    return [
-        cls
-            for name, cls in inspect.getmembers(module)
-                if inspect.isclass(cls) and issubclass(cls, clazz)
-    ]
+    :param env: Environment to unwrap
+    :param wrapper_class: Wrapper to look for
+    :return: Environment unwrapped till ``wrapper_class`` if it has been wrapped with it
+    """
+    env_tmp = env
+    while isinstance(env_tmp, gym.Wrapper):
+        this_wrapper_class = type(env_tmp)
+        class_str = ".".join([this_wrapper_class.__module__, this_wrapper_class.__qualname__])
+        if class_str == wrapper_class:
+            return env_tmp
+        env_tmp = env_tmp.env
+    return None
+
+
+def _is_wrapped(env: gym.Env, wrapper_class: str) -> bool:
+    """
+    Check if a given environment has been wrapped with a given wrapper.
+
+    :param env: Environment to check
+    :param wrapper_class: Wrapper class to look for
+    :return: True if environment has been wrapped with ``wrapper_class``.
+    """
+    return _unwrap_wrapper(env, wrapper_class) is not None
 
 env_closed = asyncio.Event()
 
@@ -80,10 +100,7 @@ class EnvironmentServicer(environment_pb2_grpc.EnvironmentService):
         return environment_pb2.SetAttrResponse()
 
     def IsWrapped(self, request, unused_context):
-        wrapper_type_name = request.wrapper_type
-        wrapper_types = [x for x in _find_subclasses(gymnasium.wrappers, gym.Wrapper)]
-        wrapper_type, = [x for x in wrapper_types if x.__name__ == wrapper_type_name]
-        is_it_wrapped = is_wrapped(self.env, wrapper_type)
+        is_it_wrapped = _is_wrapped(self.env, request.wrapper_type)
         return environment_pb2.IsWrappedResponse(is_wrapped=is_it_wrapped)
     
 def register(local_addr, learner_addr):

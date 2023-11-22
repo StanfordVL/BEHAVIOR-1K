@@ -74,6 +74,7 @@ class GRPCEnv(gym.Env):
     self.stub.SetAttr(request)
 
   def is_wrapped(self, wrapper_type):
-    request = environment_pb2.IsWrappedRequest(wrapper_class=wrapper_type.__name__)
+    wrapper_type_str = ".".join([wrapper_type.__module__, wrapper_type.__qualname__])
+    request = environment_pb2.IsWrappedRequest(wrapper_type=wrapper_type_str)
     response = self.stub.IsWrapped(request)
     return response.is_wrapped

@@ -1,33 +1,22 @@
 import argparse
-import os, time
 import logging
 
 log = logging.getLogger(__name__)
 
-from rl.service.learner_worker import GRPCVecEnv
+from learner_worker import GRPCVecEnv
 
-try:
-    import gym
-    import torch as th
-    import torch.nn as nn
-    import wandb
-    from stable_baselines3 import PPO
-    from stable_baselines3.common.evaluation import evaluate_policy
-    from stable_baselines3.common.preprocessing import maybe_transpose
-    from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
-    from stable_baselines3.common.utils import set_random_seed
-    from stable_baselines3.common.vec_env import VecVideoRecorder, VecMonitor
-    from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback, EvalCallback
-    from wandb.integration.sb3 import WandbCallback 
-
-except ModuleNotFoundError:
-    log.error("torch, stable-baselines3, or wandb is not installed. "
-                 "See which packages are missing, and then run the following for any missing packages:\n"
-                 "pip install torch\n"
-                 "pip install stable-baselines3==1.7.0\n"
-                 "pip install wandb\n"
-                 "Also, please update gym to >=0.26.1 after installing sb3: pip install gym>=0.26.1")
-    exit(1)
+import gym
+import torch as th
+import torch.nn as nn
+import wandb
+from stable_baselines3 import PPO
+from stable_baselines3.common.evaluation import evaluate_policy
+from stable_baselines3.common.preprocessing import maybe_transpose
+from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
+from stable_baselines3.common.utils import set_random_seed
+from stable_baselines3.common.vec_env import VecVideoRecorder, VecMonitor
+from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback, EvalCallback
+from wandb.integration.sb3 import WandbCallback 
 
 
 class CustomCombinedExtractor(BaseFeaturesExtractor):
@@ -82,6 +71,8 @@ def main():
     # Parse args
     parser = argparse.ArgumentParser(description="Train or evaluate a PPO agent in BEHAVIOR")
 
+    parser.add_argument("--n_envs", type=int, default=8, help="Number of parallel environments to run")
+
     parser.add_argument(
         "--checkpoint",
         type=str,
@@ -99,7 +90,7 @@ def main():
     prefix = ''
     seed = 0
 
-    env = GRPCVecEnv(["localhost:50051"])
+    env = GRPCVecEnv("localhost:50051", args.n_envs)
 
     # TODO: None of this stuff works: make it work by running env locally and connecting to it.
     # If we're evaluating, hide the ceilings and enable camera teleoperation so the user can easily
@@ -135,19 +126,19 @@ def main():
             "batch_size": 8,
             "total_timesteps": 10000000,
         }
-        env = VecMonitor(env)
-        env = VecVideoRecorder(
-            env,
-            f"videos/{run.id}",
-            record_video_trigger=lambda x: x % 2000 == 0,
-            video_length=200,
-        )
         run = wandb.init(
             project="sb3",
             config=config,
             sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
             monitor_gym=True,  # auto-upload the videos of agents playing the game
             # save_code=True,  # optional
+        )
+        env = VecMonitor(env)
+        env = VecVideoRecorder(
+            env,
+            f"videos/{run.id}",
+            record_video_trigger=lambda x: x % 2000 == 0,
+            video_length=200,
         )
         tensorboard_log_dir = f"runs/{run.id}"
         model = PPO(
@@ -160,6 +151,7 @@ def main():
             batch_size=config["batch_size"],
             device='cuda',
         )
+        checkpoint_callback = CheckpointCallback(save_freq=1000, save_path=tensorboard_log_dir, name_prefix=prefix)
         eval_callback = EvalCallback(eval_env=env, eval_freq=1000, n_eval_episodes=20)
         wandb_callback = WandbCallback(
             model_save_path=tensorboard_log_dir,
