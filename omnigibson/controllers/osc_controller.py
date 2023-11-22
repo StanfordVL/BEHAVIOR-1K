@@ -13,18 +13,18 @@ log = create_module_logger(module_name=__name__)
 
 # Different modes
 OSC_MODE_COMMAND_DIMS = {
-    "absolute_pose": 6,      # 6DOF (x,y,z,ax,ay,az) control of pose, whether both position and orientation is given in absolute coordinates
-    "pose_absolute_ori": 6,  # 6DOF (dx,dy,dz,ax,ay,az) control over pose, where the orientation is given in absolute axis-angle coordinates
-    "pose_delta_ori": 6,  # 6DOF (dx,dy,dz,dax,day,daz) control over pose
-    "position_fixed_ori": 3,  # 3DOF (dx,dy,dz) control over position, with orientation commands being kept as fixed initial absolute orientation
-    "position_compliant_ori": 3,  # 3DOF (dx,dy,dz) control over position, with orientation commands automatically being sent as 0s (so can drift over time)
+    "absolute_pose": 6,             # 6DOF (x,y,z,ax,ay,az) control of pose, whether both position and orientation is given in absolute coordinates
+    "pose_absolute_ori": 6,         # 6DOF (dx,dy,dz,ax,ay,az) control over pose, where the orientation is given in absolute axis-angle coordinates
+    "pose_delta_ori": 6,            # 6DOF (dx,dy,dz,dax,day,daz) control over pose
+    "position_fixed_ori": 3,        # 3DOF (dx,dy,dz) control over position, with orientation commands being kept as fixed initial absolute orientation
+    "position_compliant_ori": 3,    # 3DOF (dx,dy,dz) control over position, with orientation commands automatically being sent as 0s (so can drift over time)
 }
 OSC_MODES = set(OSC_MODE_COMMAND_DIMS.keys())
 
 
 class OperationalSpaceController(ManipulationController):
     """
-    Controller class to convert (delta) EEF commands into joint efforts using Operational Space Control
+    Controller class to convert (delta or absolute) EEF commands into joint efforts using Operational Space Control
 
     This controller expects 6DOF delta commands (dx, dy, dz, dax, day, daz), where the delta orientation
     commands are in axis-angle form, and outputs low-level torque commands.
@@ -288,10 +288,6 @@ class OperationalSpaceController(ManipulationController):
 
         return state_dict, idx + 4
 
-    def update_command(self, command):
-        # Run super first
-        super().update_command(command=command)
-
     def update_goal(self, control_dict, target_pos, target_quat, gains=None):
         """
         Updates the internal goal (ee pos and ee ori mat) based on the inputted delta command
@@ -348,7 +344,8 @@ class OperationalSpaceController(ManipulationController):
         Returns:
             n-array: low-level effort control actions, NOT post-processed
         """
-        # Possibly grab parameters from dict, otherwise, use internal values
+        # TODO: Update to possibly grab parameters from dict
+        # For now, always use internal values
         kp = self.kp
         damping_ratio = self.damping_ratio
         kd = 2 * np.sqrt(kp) * damping_ratio
