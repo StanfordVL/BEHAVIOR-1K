@@ -9,14 +9,10 @@ import omnigibson as og
 from omnigibson.macros import gm
 from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitives, StarterSemanticActionPrimitiveSet
 from omnigibson.robots import REGISTERED_ROBOTS
-from omnigibson.utils.ui_utils import KeyboardRobotController
-
-
 
 # Don't use GPU dynamics and use flatcache for performance boost
 # gm.USE_GPU_DYNAMICS = True
-gm.ENABLE_FLATCACHE = True
-
+# gm.ENABLE_FLATCACHE = True
 
 def execute_controller(ctrl_gen, env):
     for action in ctrl_gen:
@@ -40,18 +36,28 @@ def main():
     config_filename = os.path.join(og.example_config_path, "tiago_primitives.yaml")
     config = yaml.load(open(config_filename, "r"), Loader=yaml.FullLoader)
 
-    # Update it to run a grocery shopping task
-    config["scene"]["scene_model"] = "Benevolence_1_int"
-    config["scene"]["load_task_relevant_only"] = True
-    config["scene"]["not_load_object_categories"] = ["ceilings"]
-    config["task"] = {
-        "type": "BehaviorTask",
-        "activity_name": "picking_up_trash",
-        "activity_definition_id": 0,
-        "activity_instance_id": 0,
-        "predefined_problem": None,
-        "online_object_sampling": False,
-    }
+    # Update it to create a custom environment and run some actions
+    config["scene"]["scene_model"] = "Rs_int"
+    config["scene"]["load_object_categories"] = ["floors", "ceilings", "walls", "coffee_table"]
+    config["objects"] = [
+        {
+            "type": "DatasetObject",
+            "name": "cologne",
+            "category": "bottle_of_cologne",
+            "model": "lyipur",
+            "position": [-0.3, -0.8, 0.5],
+            "orientation": [0, 0, 0, 1]
+        },
+        {
+            "type": "DatasetObject",
+            "name": "table",
+            "category": "breakfast_table",
+            "model": "rjgmmy",
+            "scale": [0.3, 0.3, 0.3],
+            "position": [-0.7, 0.5, 0.2],
+            "orientation": [0, 0, 0, 1]
+        }
+    ]
 
     # Load the environment
     env = og.Environment(configs=config)
@@ -64,16 +70,16 @@ def main():
     controller = StarterSemanticActionPrimitives(env)
     set_start_pose(robot)
 
-    # Grasp can of soda
-    grasp_obj = scene.object_registry("name", "can_of_soda_89")
+    # Grasp of cologne
+    grasp_obj = scene.object_registry("name", "cologne")
     print("Executing controller")
     execute_controller(controller.apply_ref(StarterSemanticActionPrimitiveSet.GRASP, grasp_obj), env)
     print("Finished executing grasp")
 
-    # Place can in trash can
+    # Place cologne on another table
     print("Executing controller")
-    trash = scene.object_registry("name", "trash_can_85")
-    execute_controller(controller.apply_ref(StarterSemanticActionPrimitiveSet.PLACE_INSIDE, trash), env)
+    table = scene.object_registry("name", "table")
+    execute_controller(controller.apply_ref(StarterSemanticActionPrimitiveSet.PLACE_ON_TOP, table), env)
     print("Finished executing place")
 
 if __name__ == "__main__":
