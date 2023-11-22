@@ -6,7 +6,7 @@ from scipy.spatial.transform import Rotation as R
 from scipy.spatial import ConvexHull, distance_matrix
 
 import omnigibson as og
-from omnigibson.macros import create_module_macros, Dict, gm
+from omnigibson.macros import create_module_macros, Dict, macros
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.contact_bodies import ContactBodies
 from omnigibson.utils import sampling_utils
@@ -40,6 +40,48 @@ m.UNDER_RAY_CASTING_SAMPLING_PARAMS = Dict({
     "aabb_offset_fraction": 0.02,
     "max_sampling_attempts": 50,
 })
+
+
+def sample_cuboid_for_predicate(predicate, on_obj, bbox_extent):
+    if predicate == "onTop":
+        params = m.ON_TOP_RAY_CASTING_SAMPLING_PARAMS
+    elif predicate == "inside":
+        params = m.INSIDE_RAY_CASTING_SAMPLING_PARAMS
+    elif predicate == "under":
+        params = m.UNDER_RAY_CASTING_SAMPLING_PARAMS
+    else:
+        raise ValueError(f"predicate must be onTop, under or inside in order to use ray casting-based "
+                            f"kinematic sampling, but instead got: {predicate}")
+
+    if predicate == "under":
+        start_points, end_points = sampling_utils.sample_raytest_start_end_symmetric_bimodal_distribution(
+            obj=on_obj,
+            num_samples=1,
+            axis_probabilities=[0, 0, 1],
+            **params,
+        )
+        return sampling_utils.sample_cuboid_on_object(
+            obj=None,
+            start_points=start_points,
+            end_points=end_points,
+            ignore_objs=[on_obj],
+            cuboid_dimensions=bbox_extent,
+            refuse_downwards=True,
+            undo_cuboid_bottom_padding=True,
+            max_angle_with_z_axis=0.17,
+            hit_proportion=0.0,  # rays will NOT hit the object itself, but the surface below it.
+        )
+    else:
+        return sampling_utils.sample_cuboid_on_object_symmetric_bimodal_distribution(
+            on_obj,
+            num_samples=1,
+            axis_probabilities=[0, 0, 1],
+            cuboid_dimensions=bbox_extent,
+            refuse_downwards=True,
+            undo_cuboid_bottom_padding=True,
+            max_angle_with_z_axis=0.17,
+            **params,
+        )
 
 
 def sample_kinematics(
@@ -99,16 +141,6 @@ def sample_kinematics(
         # This would slightly change because of the step_physics call.
         old_pos, orientation = objA.get_position_orientation()
 
-        if predicate == "onTop":
-            params = m.ON_TOP_RAY_CASTING_SAMPLING_PARAMS
-        elif predicate == "inside":
-            params = m.INSIDE_RAY_CASTING_SAMPLING_PARAMS
-        elif predicate == "under":
-            params = m.UNDER_RAY_CASTING_SAMPLING_PARAMS
-        else:
-            raise ValueError(f"predicate must be onTop, under or inside in order to use ray casting-based "
-                             f"kinematic sampling, but instead got: {predicate}")
-
         # Run import here to avoid circular imports
         from omnigibson.objects.dataset_object import DatasetObject
         if isinstance(objA, DatasetObject) and objA.prim_type == PrimType.RIGID:
@@ -122,36 +154,7 @@ def sample_kinematics(
             parallel_bbox_orn = np.array([0.0, 0.0, 0.0, 1.0])
             parallel_bbox_extents = aabb_upper - aabb_lower
 
-        if predicate == "under":
-            start_points, end_points = sampling_utils.sample_raytest_start_end_symmetric_bimodal_distribution(
-                obj=objB,
-                num_samples=1,
-                axis_probabilities=[0, 0, 1],
-                **params,
-            )
-            sampling_results = sampling_utils.sample_cuboid_on_object(
-                obj=None,
-                start_points=start_points,
-                end_points=end_points,
-                ignore_objs=[objB],
-                cuboid_dimensions=parallel_bbox_extents,
-                refuse_downwards=True,
-                undo_cuboid_bottom_padding=True,
-                max_angle_with_z_axis=0.17,
-                hit_proportion=0.0,  # rays will NOT hit the object itself, but the surface below it.
-            )
-        else:
-            sampling_results = sampling_utils.sample_cuboid_on_object_symmetric_bimodal_distribution(
-                objB,
-                num_samples=1,
-                axis_probabilities=[0, 0, 1],
-                cuboid_dimensions=parallel_bbox_extents,
-                refuse_downwards=True,
-                undo_cuboid_bottom_padding=True,
-                max_angle_with_z_axis=0.17,
-                **params,
-            )
-
+        sampling_results = sample_cuboid_for_predicate(predicate, objB, parallel_bbox_extents)
         sampled_vector = sampling_results[0][0]
         sampled_quaternion = sampling_results[0][2]
 
@@ -186,7 +189,7 @@ def sample_kinematics(
             objA.keep_still()
             success = len(objA.states[ContactBodies].get_value()) == 0
 
-        if gm.DEBUG:
+        if macros.utils.sampling_utils.DEBUG_SAMPLING:
             debug_breakpoint(f"sample_kinematics: {success}")
 
         if success:

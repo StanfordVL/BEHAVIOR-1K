@@ -41,7 +41,8 @@ setup(
         "termcolor",
         "progressbar",
         "pymeshlab",
-        "click"
+        "click",
+        "aenum",
     ],
     tests_require=[],
     python_requires=">=3",

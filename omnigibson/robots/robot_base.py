@@ -281,6 +281,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         joint_velocities = self.get_joint_velocities(normalized=False)
         joint_efforts = self.get_joint_efforts(normalized=False)
         pos, ori = self.get_position(), self.get_rpy()
+        ori_2d = self.get_2d_orientation()
         return dict(
             joint_qpos=joint_positions,
             joint_qpos_sin=np.sin(joint_positions),
@@ -290,6 +291,9 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             robot_pos=pos,
             robot_ori_cos=np.cos(ori),
             robot_ori_sin=np.sin(ori),
+            robot_2d_ori=ori_2d,
+            robot_2d_ori_cos=np.cos(ori_2d),
+            robot_2d_ori_sin=np.sin(ori_2d),
             robot_lin_vel=self.get_linear_velocity(),
             robot_ang_vel=self.get_angular_velocity(),
         )
