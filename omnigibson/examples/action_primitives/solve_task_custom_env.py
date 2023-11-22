@@ -66,9 +66,6 @@ def main():
     # Allow user to move camera more easily
     og.sim.enable_viewer_camera_teleoperation()
 
-    og.sim.stop()
-    og.sim.play()
-
     controller = StarterSemanticActionPrimitives(env)
     set_start_pose(robot)
 
