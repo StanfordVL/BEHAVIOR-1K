@@ -696,11 +696,8 @@ class ManipulationRobot(BaseRobot):
         arm = self.default_arm if arm == "default" else arm
         eef_link_pose = self.eef_links[arm].get_position_orientation()
         base_link_pose = self.get_position_orientation()
-        pose_mat = T.pose_in_A_to_pose_in_B(
-            pose_A=T.pose2mat(eef_link_pose),
-            pose_A_in_B=np.linalg.inv(T.pose2mat(base_link_pose)),
-        )
-        return pose_mat if mat else T.mat2pose(pose_mat)
+        pose = T.relative_pose_transform(*eef_link_pose, *base_link_pose)
+        return T.pose2mat(pose) if mat else pose
 
     def get_relative_eef_position(self, arm="default"):
         """
