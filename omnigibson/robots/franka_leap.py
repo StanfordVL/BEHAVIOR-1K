@@ -179,11 +179,11 @@ class FrankaLeap(ManipulationRobot):
 
     @property
     def eef_link_names(self):
-        return {self.default_arm: "palm_lower"}
+        return {self.default_arm: "palm_center"}
 
     @property
     def finger_link_names(self):
-        links = ["mcp_joint", "pip", "dip", "fingertip"]
+        links = ["mcp_joint", "pip", "dip", "fingertip", "realtip"]
         return {self.default_arm: [f"{link}_{i}" for i in range(1, 5) for link in links]}
 
     @property
@@ -205,7 +205,7 @@ class FrankaLeap(ManipulationRobot):
 
     @property
     def vr_rotation_offset(self):
-        return {self.default_arm: T.euler2quat(np.array([0, np.pi / 2, 0]))}
+        return {self.default_arm: T.euler2quat(np.array([0, np.pi, np.pi / 2]))}
     
     def gen_action_from_vr_data(self, vr_data: dict):
         action = np.zeros(22)
