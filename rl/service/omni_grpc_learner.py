@@ -121,7 +121,7 @@ def main():
 
     else:
         config = {
-            "policy_type": "MultiInputPolicy",
+            "policy_type": "MlpPolicy",
             "n_steps": 20 * 10,
             "batch_size": 8,
             "total_timesteps": 10000000,
@@ -146,7 +146,7 @@ def main():
             env,
             verbose=1,
             tensorboard_log=tensorboard_log_dir,
-            policy_kwargs=policy_kwargs,
+            # policy_kwargs=policy_kwargs,
             n_steps=config["n_steps"],
             batch_size=config["batch_size"],
             device='cuda',
@@ -156,8 +156,9 @@ def main():
         wandb_callback = WandbCallback(
             model_save_path=tensorboard_log_dir,
             verbose=2,
-        ),
-        callback = CallbackList([wandb_callback, eval_callback])
+        )
+        callback = CallbackList([wandb_callback, eval_callback, checkpoint_callback])
+        print(callback.callbacks)
 
         log.debug(model.policy)
         log.info(f"model: {model}")

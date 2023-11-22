@@ -21,8 +21,8 @@ async def main():
         "robots": [
             {
                 "type": "Fetch",
-                "obs_modalities": ["rgb", "depth_linear", "seg_instance", "seg_semantic", "proprio"],
-                "proprio_obs": ["robot_pos", "robot_2d_ori", "joint_qpos", "joint_qvel", "eef_0_pos", "eef_0_quat", "grasp_0"],
+                "obs_modalities": ["rgb", "proprio"],
+                "proprio_obs": ["joint_qpos", "joint_qvel", "eef_0_pos", "eef_0_quat", "grasp_0"],
                 "scale": 1.0,
                 "self_collisions": True,
                 "action_normalize": False,
@@ -33,7 +33,7 @@ async def main():
                 "default_trunk_offset": 0.365,
                 "sensor_config": {
                     "VisionSensor": {
-                        "modalities": ["rgb", "depth_linear", "seg_instance", "seg_semantic"],
+                        "modalities": ["rgb"],
                         "sensor_kwargs": {
                             "image_width": 224,
                             "image_height": 224
@@ -55,10 +55,9 @@ async def main():
                     },
                     "gripper_0": {
                         "name": "MultiFingerGripperController",
-                        "motor_type": "position",
+                        "motor_type": "ternary",
                         "command_input_limits": [-1, 1],
                         "command_output_limits": None,
-                        "use_delta_commands": True
                     },
                     "camera": {
                         "name": "JointController",
