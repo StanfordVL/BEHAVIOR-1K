@@ -5,9 +5,9 @@ from omnigibson.macros import gm
 
 from rollout_worker import serve
 
-gm.USE_GPU_DYNAMICS = True
+gm.USE_FLATCACHE = True
 
-async def main():
+async def main(local_addr, learner_addr):
 
     DIST_COEFF = 0.1
     GRASP_REWARD = 0.3
@@ -55,7 +55,8 @@ async def main():
                     },
                     "gripper_0": {
                         "name": "MultiFingerGripperController",
-                        "motor_type": "ternary",
+                        "mode": "ternary",
+                        "motor_type": "position",
                         "command_input_limits": [-1, 1],
                         "command_output_limits": None,
                     },
@@ -94,7 +95,9 @@ async def main():
     env = og.Environment(configs=cfg, action_timestep=1 / 10., physics_timestep=1 / 60.)
 
     # Now start servicing!
-    await serve(env)
+    await serve(env, local_addr, learner_addr)
 
 if __name__ == "__main__":
-    asyncio.get_event_loop().run_until_complete(main())
+    import sys
+    local_port = int(sys.argv[1])
+    asyncio.get_event_loop().run_until_complete(main("localhost:" + str(local_port), "localhost:50051"))
