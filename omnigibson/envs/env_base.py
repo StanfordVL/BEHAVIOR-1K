@@ -1,4 +1,4 @@
-import gym
+import gymnasium as gym
 import numpy as np
 
 import omnigibson as og
@@ -398,10 +398,11 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 of actions
 
         Returns:
-            4-tuple:
+            5-tuple:
                 - dict: state, i.e. next observation
                 - float: reward, i.e. reward at this current timestep
-                - bool: done, i.e. whether this episode is terminated
+                - bool: terminated, i.e. whether this episode ended due to a failure or success
+                - bool: truncated, i.e. whether this episode ended due to a time limit etc.
                 - dict: info, i.e. dictionary with any useful information
         """
         try:
@@ -440,10 +441,21 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 info["last_observation"] = obs
                 obs = self.reset()
 
+            # Hacky way to check for time limit info to split terminated and truncated
+            terminated = False
+            truncated = False
+            for tc, tc_data in info["done"]["termination_conditions"].items():
+                if tc_data["done"]:
+                    if tc == "timeout":
+                        truncated = True
+                    else:
+                        terminated = True
+            assert (terminated or truncated) == done, "Terminated and truncated must match done!"
+
             # Increment step
             self._current_step += 1
 
-            return obs, reward, done, info
+            return obs, reward, terminated, truncated, info
         except:
             raise ValueError(f"Failed to execute environment step {self._current_step} in episode {self._current_episode}")
 

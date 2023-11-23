@@ -14,7 +14,7 @@ from math import ceil
 import cv2
 from matplotlib import pyplot as plt
 
-import gym
+import gymnasium as gym
 import numpy as np
 from scipy.spatial.transform import Rotation, Slerp
 

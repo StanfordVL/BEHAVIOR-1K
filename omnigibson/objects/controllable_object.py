@@ -1,7 +1,7 @@
 from abc import abstractmethod
 from copy import deepcopy
 import numpy as np
-import gym
+import gymnasium as gym
 from collections.abc import Iterable
 import omnigibson as og
 from omnigibson.objects.object_base import BaseObject

@@ -1,6 +1,6 @@
 import numpy as np
 import time
-import gym
+import gymnasium as gym
 
 import omnigibson as og
 from omnigibson.sensors.sensor_base import BaseSensor

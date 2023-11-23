@@ -21,7 +21,7 @@ setup(
     zip_safe=False,
     packages=find_packages(),
     install_requires=[
-        "gym>=0.26",
+        "gymnasium>=0.28.1",
         "numpy>=1.20.0",
         "GitPython",
         "transforms3d>=0.3.1",

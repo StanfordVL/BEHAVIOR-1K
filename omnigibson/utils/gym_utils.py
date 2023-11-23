@@ -1,4 +1,4 @@
-import gym
+import gymnasium as gym
 from abc import ABCMeta, abstractmethod
 import numpy as np
 

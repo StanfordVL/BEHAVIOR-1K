@@ -201,16 +201,22 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
         # Get all dones and successes from individual termination conditions
         dones = []
         successes = []
-        for termination_condition in self._termination_conditions.values():
+        info = dict() if info is None else info
+        if "termination_conditions" not in info:
+            info["termination_conditions"] = dict()
+        for name, termination_condition in self._termination_conditions.items():
             d, s = termination_condition.step(self, env, action)
             dones.append(d)
             successes.append(s)
+            info["termination_conditions"][name] = {
+                "done": d,
+                "success": s,
+            }
         # Any True found corresponds to a done / success
         done = sum(dones) > 0
         success = sum(successes) > 0
 
         # Populate info
-        info = dict() if info is None else info
         info["success"] = success
         return done, info
 

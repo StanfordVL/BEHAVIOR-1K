@@ -1,5 +1,5 @@
 from abc import abstractmethod
-import gym
+import gymnasium as gym
 
 from omnigibson.robots.locomotion_robot import LocomotionRobot
 from omnigibson.utils.python_utils import classproperty
