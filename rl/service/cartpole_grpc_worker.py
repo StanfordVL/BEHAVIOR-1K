@@ -6,7 +6,7 @@ from rollout_worker import serve
 
 
 async def main(local_addr, learner_addr):
-    env = gym.make("CartPole-v1", render_mode='rgb_array')
+    env = gym.make("PongNoFrameskip-v4", render_mode='rgb_array')
 
     # Now start servicing!
     await serve(env, local_addr, learner_addr)

@@ -8,7 +8,7 @@ import sys
 n_envs = int(sys.argv[1])
 env = GRPCVecEnv("localhost:50051", n_envs)
 
-model = A2C("MlpPolicy", env, verbose=1)
+model = A2C("CnnPolicy", env, verbose=1)
 model.learn(total_timesteps=10_000)
 
 vec_env = model.get_env()
