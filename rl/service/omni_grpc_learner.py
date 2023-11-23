@@ -5,7 +5,7 @@ log = logging.getLogger(__name__)
 
 from learner_worker import GRPCVecEnv
 
-import gym
+import gymnasium as gym
 import torch as th
 import torch.nn as nn
 import wandb
@@ -14,7 +14,7 @@ from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.preprocessing import maybe_transpose
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from stable_baselines3.common.utils import set_random_seed
-from stable_baselines3.common.vec_env import VecVideoRecorder, VecMonitor
+from stable_baselines3.common.vec_env import VecVideoRecorder, VecMonitor, VecFrameStack
 from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback, EvalCallback
 from wandb.integration.sb3 import WandbCallback 
 
@@ -28,11 +28,17 @@ class CustomCombinedExtractor(BaseFeaturesExtractor):
         self.step_index = 0
         total_concat_size = 0
         feature_size = 128
+        time_dimension = None
         for key, subspace in observation_space.spaces.items():
             # For now, only keep RGB observations
-            if "rgb" in key:
-                log.info(f"obs {key} shape: {subspace.shape}")
-                n_input_channels = subspace.shape[0]  # channel first
+            log.info(f"obs {key} shape: {subspace.shape}")
+            if time_dimension is None:
+                time_dimension = subspace.shape[0]
+            else:
+                assert time_dimension == subspace.shape[0], f"All observation subspaces must have the same time dimension. Expected {time_dimension}, found {subspace.shape[0]}"
+            if key == "rgb":
+                assert len(subspace.shape) == 4, "Expected frame-stacked (f, c, h, w) RGB observations"
+                n_input_channels = subspace.shape[1]  # channel 
                 cnn = nn.Sequential(
                     nn.Conv2d(n_input_channels, 4, kernel_size=8, stride=4, padding=0),
                     nn.ReLU(),
@@ -50,6 +56,24 @@ class CustomCombinedExtractor(BaseFeaturesExtractor):
                 fc = nn.Sequential(nn.Linear(n_flatten, feature_size), nn.ReLU())
                 extractors[key] = nn.Sequential(cnn, fc)
                 total_concat_size += feature_size
+            elif key == "proprio":
+                assert len(subspace.shape) == 2, "Expected frame-stacked (f, n) proprio observations"
+                mlp = nn.Sequential(
+                    nn.Linear(subspace.shape[0], feature_size),
+                    nn.ReLU(),
+                    nn.Linear(subspace.shape[0], feature_size),
+                    nn.ReLU(),
+                )
+                extractors[key] = mlp
+                total_concat_size += feature_size
+
+        self._across_time = nn.Sequential(
+            nn.Linear(total_concat_size * 5, feature_size),
+            nn.ReLU(),
+            nn.Linear(subspace.shape[0], feature_size),
+            nn.ReLU(),
+        )
+
         self.extractors = nn.ModuleDict(extractors)
 
         # Update the features dim manually
@@ -60,10 +84,12 @@ class CustomCombinedExtractor(BaseFeaturesExtractor):
         self.step_index += 1
 
         # self.extractors contain nn.Modules that do all the processing.
-        for key, extractor in self.extractors.items():
-            encoded_tensor_list.append(extractor(observations[key]))
+        for i in range(next(iter(observations.values())).shape[0]):
+            for key, extractor in self.extractors.items():
+                encoded_tensor_list.append(extractor(observations[key][i]))
 
         feature = th.cat(encoded_tensor_list, dim=1)
+        feature = self._across_time(feature)
         return feature
 
 
@@ -104,9 +130,9 @@ def main():
     set_random_seed(seed)
     env.reset()
 
-    policy_kwargs = dict(
-        features_extractor_class=CustomCombinedExtractor,
-    )
+    # policy_kwargs = dict(
+    #     features_extractor_class=CustomCombinedExtractor,
+    # )
 
     if args.eval:
         raise ValueError("This does not currently work.")
@@ -121,10 +147,10 @@ def main():
 
     else:
         config = {
-            "policy_type": "MlpPolicy",
-            "n_steps": 20 * 10,
+            "policy_type": "MultiInputPolicy",
+            "n_steps": 30 * 10,
             "batch_size": 8,
-            "total_timesteps": 10000000,
+            "total_timesteps": 10_000_000,
         }
         run = wandb.init(
             project="sb3",
@@ -133,13 +159,14 @@ def main():
             monitor_gym=True,  # auto-upload the videos of agents playing the game
             # save_code=True,  # optional
         )
+        env = VecFrameStack(env, n_stack=5, channels_order="first")
         env = VecMonitor(env)
-        env = VecVideoRecorder(
-            env,
-            f"videos/{run.id}",
-            record_video_trigger=lambda x: x % 2000 == 0,
-            video_length=200,
-        )
+        # env = VecVideoRecorder(
+        #     env,
+        #     f"videos/{run.id}",
+        #     record_video_trigger=lambda x: x % 2000 == 0,
+        #     video_length=200,
+        # )
         tensorboard_log_dir = f"runs/{run.id}"
         model = PPO(
             config["policy_type"],
@@ -152,12 +179,12 @@ def main():
             device='cuda',
         )
         checkpoint_callback = CheckpointCallback(save_freq=1000, save_path=tensorboard_log_dir, name_prefix=prefix)
-        eval_callback = EvalCallback(eval_env=env, eval_freq=1000, n_eval_episodes=20)
+        # eval_callback = EvalCallback(eval_env=env, eval_freq=1000, n_eval_episodes=20)
         wandb_callback = WandbCallback(
             model_save_path=tensorboard_log_dir,
             verbose=2,
         )
-        callback = CallbackList([wandb_callback, eval_callback, checkpoint_callback])
+        callback = CallbackList([wandb_callback, checkpoint_callback])
         print(callback.callbacks)
 
         log.debug(model.policy)

@@ -92,7 +92,7 @@ async def main(local_addr, learner_addr):
         ]
     }
 
-    env = og.Environment(configs=cfg, action_timestep=1 / 10., physics_timestep=1 / 60.)
+    env = og.Environment(configs=cfg, action_timestep=1 / 10., physics_timestep=1 / 60., flatten_obs_space=True)
 
     # Now start servicing!
     await serve(env, local_addr, learner_addr)
