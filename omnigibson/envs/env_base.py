@@ -195,6 +195,11 @@ class Environment(gym.Env, GymObservable, Recreatable):
         Load the scene and robot specified in the config file.
         """
         assert og.sim.is_stopped(), "Simulator must be stopped before loading scene!"
+
+        # Set the simulator settings
+        # NOTE: This must be done BEFORE the scene is loaded, or else all vision sensors can't retrieve observations
+        og.sim.set_simulation_dt(physics_dt=self.physics_timestep, rendering_dt=self.action_timestep)
+
         # Create the scene from our scene config
         scene = create_class_from_registry_and_config(
             cls_name=self.scene_config["type"],
@@ -204,8 +209,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         )
         og.sim.import_scene(scene)
 
-        # Set the simulator settings
-        og.sim.set_simulation_dt(physics_dt=self.physics_timestep, rendering_dt=self.action_timestep)
+        # Set the rendering settings
         og.sim.viewer_width = self.render_config["viewer_width"]
         og.sim.viewer_height = self.render_config["viewer_height"]
         og.sim.device = self.device
