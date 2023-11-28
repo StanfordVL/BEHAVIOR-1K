@@ -40,7 +40,7 @@ def main():
     }
 
     # Create the environment
-    env = og.Environment(configs=cfg, action_timestep=1/60., physics_timestep=1/60.)
+    env = og.Environment(configs=cfg)
 
     # Set camera to appropriate viewing pose
     og.sim.viewer_camera.set_position_orientation(
