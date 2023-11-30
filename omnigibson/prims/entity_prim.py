@@ -806,6 +806,10 @@ class EntityPrim(XFormPrim):
                 joint.initialize()
             joint.update_handles()
 
+        # Update the physics view if we're articulated
+        if self.articulated:
+            self._physics_view = og.sim.physics_sim_view.create_articulation_view(self.articulation_root_path)
+
     def get_joint_positions(self, normalized=False):
         """
         Grabs this entity's joint positions
