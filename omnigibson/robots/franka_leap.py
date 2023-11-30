@@ -157,6 +157,22 @@ class FrankaLeap(ManipulationRobot):
         return np.r_[[0.86, -0.27, -0.68, -1.52, -0.18, 1.29, 1.72], np.zeros(16)]
 
     @property
+    def assisted_grasp_start_points(self):
+        return {self.default_arm: [
+            GraspingPoint(link_name=f"palm_center", position=[0, -0.025, 0.035]),
+            GraspingPoint(link_name=f"palm_center", position=[0, 0.03, 0.035]),
+            GraspingPoint(link_name=f"fingertip_4", position=[-0.0115, -0.07, -0.015]),
+        ]}
+
+    @property
+    def assisted_grasp_end_points(self):
+        return {self.default_arm: [
+            GraspingPoint(link_name=f"fingertip_1", position=[-0.0115, -0.06, 0.015]),
+            GraspingPoint(link_name=f"fingertip_2", position=[-0.0115, -0.06, 0.015]),
+            GraspingPoint(link_name=f"fingertip_3", position=[-0.0115, -0.06, 0.015]),
+        ]}
+
+    @property
     def finger_lengths(self):
         return {self.default_arm: 0.1}
 

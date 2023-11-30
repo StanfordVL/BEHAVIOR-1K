@@ -1217,12 +1217,12 @@ class ManipulationRobot(BaseRobot):
             # We apply a threshold based on the control rather than the command here so that the behavior
             # stays the same across different controllers and control modes (absolute / delta). This way,
             # a zero action will actually keep the AG setting where it already is.
-            # TODO: Compare this to the iG2 implementation to see if there could be a benefit to using
-            # a combination of control and existing position.
             controller = self._controllers[f"gripper_{arm}"]
             controlled_joints = controller.dof_idx
             threshold = np.mean(np.array(self.control_limits["position"])[:, controlled_joints], axis=0)
-            if self._grasping_direction == "lower":
+            if controller.control is None:
+                applying_grasp = False
+            elif self._grasping_direction == "lower":
                 applying_grasp = np.any(controller.control < threshold)
             else:
                 applying_grasp = np.any(controller.control > threshold)
