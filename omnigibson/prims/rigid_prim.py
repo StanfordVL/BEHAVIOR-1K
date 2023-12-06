@@ -1,11 +1,11 @@
-import trimesh.triangles
 from omni.isaac.core.utils.prims import get_prim_at_path, get_prim_parent
 from omni.isaac.core.utils.transformations import tf_matrix_from_pose
 from omni.isaac.core.utils.rotations import gf_quat_to_np_array
-from pxr import Gf, UsdPhysics, Usd, UsdGeom, PhysxSchema
+from pxr import Gf, UsdPhysics, Usd, UsdGeom, PhysxSchema, PhysicsSchemaTools
 import numpy as np
 from omni.isaac.dynamic_control import _dynamic_control
 
+import omnigibson as og
 from omnigibson.macros import gm, create_module_macros
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.prims.geom_prim import CollisionGeomPrim, VisualGeomPrim
@@ -658,15 +658,15 @@ class RigidPrim(XFormPrim):
         """
         Enable physics for this rigid body
         """
-        if self.dc_is_accessible:
-            self._dc.wake_up_rigid_body(self._handle)
+        prim_id = PhysicsSchemaTools.sdfPathToInt(self.prim_path)
+        og.sim.psi.wake_up(og.sim.stage_id, prim_id)
 
     def sleep(self):
         """
         Disable physics for this rigid body
         """
-        if self.dc_is_accessible:
-            self._dc.sleep_rigid_body(self._handle)
+        prim_id = PhysicsSchemaTools.sdfPathToInt(self.prim_path)
+        og.sim.psi.put_to_sleep(og.sim.stage_id, prim_id)
 
     def _dump_state(self):
         # Grab pose from super class

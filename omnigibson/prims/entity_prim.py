@@ -2,14 +2,11 @@ import numpy as np
 
 from omni.isaac.core.articulations import ArticulationView
 from omni.isaac.core.utils.rotations import gf_quat_to_np_array
-from omni.isaac.core.utils.transformations import tf_matrix_from_pose
-from omni.isaac.core.utils.types import DOFInfo
-from omni.isaac.dynamic_control import _dynamic_control
 from omni.isaac.core.utils.stage import get_current_stage
-from pxr import Gf, Usd, UsdGeom, UsdPhysics, PhysxSchema
+from pxr import Gf, Usd, UsdGeom, UsdPhysics, PhysxSchema, PhysicsSchemaTools
 import omni
 
-from omni.isaac.core.utils.prims import get_prim_property, set_prim_property, get_prim_parent, get_prim_at_path
+from omni.isaac.core.utils.prims import get_prim_property, set_prim_property
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
@@ -51,7 +48,7 @@ class EntityPrim(XFormPrim):
     ):
         # Other values that will be filled in at runtime
         self._root_link_name = None             # Name of the root link
-        self._n_dof = None                      # dof with dynamic control
+        self._n_dof = None
         self._links = None
         self._joints = None
         self._materials = None
@@ -356,27 +353,6 @@ class EntityPrim(XFormPrim):
         return self._links[self.root_link_name].prim
 
     @property
-    def handle(self):
-        """
-        Returns:
-            None or int: ID (articulation) handle assigned to this prim from dynamic_control interface. Note that
-                if this prim is not an articulation, it is None
-        """
-        return self._handle
-
-    @property
-    def root_handle(self):
-        """
-        Handle used by Isaac Sim's dynamic control module to reference the root body in this object.
-        Note: while self.handle may be 0 (i.e.: invalid articulation, i.e.: object with no joints), root_handle should
-            always be non-zero (i.e.: valid) if this object is initialized!
-
-        Returns:
-            int: ID handle assigned to this prim's root prim from dynamic_control interface
-        """
-        return self._root_handle
-
-    @property
     def n_dof(self):
         """
         Returns:
@@ -518,8 +494,7 @@ class EntityPrim(XFormPrim):
                 motors or manual values to immediately set. Default is False, corresponding to an instantaneous
                 setting of the positions
         """
-        # Run sanity checks -- make sure our handle is initialized and that we are articulated
-        assert self._handle is not None, "handles are not initialized yet!"
+        # Run sanity checks -- make sure that we are articulated
         assert self.n_joints > 0, "Tried to call method not intended for entity prim with no joints!"
 
         # Possibly de-normalize the inputs
@@ -551,8 +526,7 @@ class EntityPrim(XFormPrim):
                 motors or manual values to immediately set. Default is False, corresponding to an instantaneous
                 setting of the velocities
         """
-        # Run sanity checks -- make sure our handle is initialized and that we are articulated
-        assert self._handle is not None, "handles are not initialized yet!"
+        # Run sanity checks -- make sure we are articulated
         assert self.n_joints > 0, "Tried to call method not intended for entity prim with no joints!"
 
         # Possibly de-normalize the inputs
@@ -580,8 +554,7 @@ class EntityPrim(XFormPrim):
             normalized (bool): Whether the inputted joint efforts should be interpreted as normalized values. Default
                 is False
         """
-        # Run sanity checks -- make sure our handle is initialized and that we are articulated
-        assert self._handle is not None, "handles are not initialized yet!"
+        # Run sanity checks -- make sure we are articulated
         assert self.n_joints > 0, "Tried to call method not intended for entity prim with no joints!"
 
         # Possibly de-normalize the inputs
@@ -1155,7 +1128,8 @@ class EntityPrim(XFormPrim):
         Enable physics for this articulation
         """
         if self.articulated:
-            self._dc.wake_up_articulation(self._handle)
+            prim_id = PhysicsSchemaTools.sdfPathToInt(self.prim_path)
+            og.sim.psi.wake_up(og.sim.stage_id, prim_id)
         else:
             for link in self._links.values():
                 link.wake()
@@ -1165,7 +1139,8 @@ class EntityPrim(XFormPrim):
         Disable physics for this articulation
         """
         if self.articulated:
-            self._dc.sleep_articulation(self._handle)
+            prim_id = PhysicsSchemaTools.sdfPathToInt(self.prim_path)
+            og.sim.psi.put_to_sleep(og.sim.stage_id, prim_id)
         else:
             for link in self._links.values():
                 link.sleep()

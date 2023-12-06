@@ -1055,6 +1055,7 @@ class ManipulationRobot(BaseRobot):
             return None
         
         # Otherwise, compute the joint type. We use a fixed joint unless the link is a non-fixed link.
+        # TODO: Make this not use the handle!
         joint_type = "FixedJoint"
         if ag_obj.root_link != ag_link:
             # We search up the tree path from the ag_link until we encounter the root (joint == 0) or a non fixed
