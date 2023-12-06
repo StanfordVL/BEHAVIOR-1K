@@ -110,7 +110,7 @@ class VisionSensor(BaseSensor):
         load_config=None,
         image_height=128,
         image_width=128,
-        focal_length=17.0,
+        focal_length=17.0,                          # Default 17.0 since this is roughly the human eye focal length
         clipping_range=(0.001, 10000000.0),
         viewport_name=None,
     ):

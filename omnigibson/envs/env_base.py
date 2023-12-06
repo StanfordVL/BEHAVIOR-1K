@@ -312,9 +312,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
             for sensor_name, sensor in self._external_sensors.items():
                 # Load the sensor observation space
                 external_obs_space[sensor_name] = sensor.load_observation_space()
-                # sensor_obs_space = sensor.load_observation_space()
-                # for obs_modality, obs_modality_space in sensor_obs_space.items():
-                #     external_obs_space[f"{sensor_name}_{obs_modality}"] = obs_modality_space
             obs_space["external"] = gym.spaces.Dict(external_obs_space)
 
         return obs_space
