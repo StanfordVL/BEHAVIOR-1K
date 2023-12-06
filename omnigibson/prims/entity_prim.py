@@ -778,7 +778,11 @@ class EntityPrim(XFormPrim):
         return self.root_link.get_angular_velocity()
 
     def set_position_orientation(self, position=None, orientation=None):
-        self._articulation_view.set_world_poses(position[None, :], orientation[None, :])
+        if position is not None:
+            position = position[None, :]
+        if orientation is not None:
+            orientation = orientation[None, :]
+        self._articulation_view.set_world_poses(position, orientation)
         BoundingBoxAPI.clear()
 
     def get_position_orientation(self):
@@ -786,7 +790,11 @@ class EntityPrim(XFormPrim):
         return positions[0], orientations[0]
 
     def set_local_pose(self, translation=None, orientation=None):
-        self._articulation_view.set_local_poses(translation[None, :], orientation[None, :])
+        if translation is not None:
+            translation = translation[None, :]
+        if orientation is not None:
+            orientation = orientation[None, :]
+        self._articulation_view.set_local_poses(translation, orientation)
         BoundingBoxAPI.clear()
 
     def get_local_pose(self):
