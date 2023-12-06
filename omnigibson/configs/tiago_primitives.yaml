@@ -37,30 +37,30 @@ robots:
     obs_modalities: [scan, rgb, depth]
     scale: 1.0
     self_collisions: true
-    # action_normalize: false
     action_normalize: false
     action_type: continuous
     grasping_mode: sticky
-    disable_grasp_handling: true
     rigid_trunk: false
     default_trunk_offset: 0.365
     default_arm_pose: diagonal30
     controller_config:
       base:
         name: JointController
-        motor_type: "velocity"
+        motor_type: velocity
       arm_left:
-        name: JointController
-        motor_type: position
+        name: InverseKinematicsController
+        motor_type: velocity
         command_input_limits: null
         command_output_limits: null
-        use_delta_commands: false
+        mode : pose_absolute_ori
+        kv: 3.0
       arm_right:
-        name: JointController
-        motor_type: position
+        name: InverseKinematicsController
+        motor_type: velocity
         command_input_limits: null
         command_output_limits: null
-        use_delta_commands: false
+        mode : pose_absolute_ori
+        kv: 3.0
       gripper_left:
         name: JointController
         motor_type: position
@@ -75,7 +75,9 @@ robots:
         use_delta_commands: true
       camera:
         name: JointController
-        motor_type: "velocity"
+        motor_type: position
+        command_input_limits: null
+        command_output_limits: null
         use_delta_commands: false
 
 objects: []
