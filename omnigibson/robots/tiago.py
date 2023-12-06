@@ -3,6 +3,7 @@ import os
 import numpy as np
 from pxr import Gf
 
+import omnigibson as og
 from omnigibson.macros import gm
 import omnigibson.utils.transform_utils as T
 from omnigibson.macros import create_module_macros
@@ -696,13 +697,9 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         }
 
     def get_position_orientation(self):
-        # If the simulator is playing, return the pose of the base_footprint link frame
-        if self._dc is not None and self._dc.is_simulating():
-            return self.base_footprint_link.get_position_orientation()
-
-        # Else, return the pose of the robot frame
-        else:
-            return super().get_position_orientation()
+        # TODO: This is a bad idea. If we need the pose to be here, let's put the base there.
+        # We shouldn't have a different behavior for only this object.
+        return self.base_footprint_link.get_position_orientation()
 
     def set_position_orientation(self, position=None, orientation=None):
         current_position, current_orientation = self.get_position_orientation()
@@ -713,8 +710,9 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         assert np.isclose(np.linalg.norm(orientation), 1, atol=1e-3), \
             f"{self.name} desired orientation {orientation} is not a unit quaternion."
 
+        # TODO: Reconsider the need for this. Why can't these behaviors be unified? Does the joint really need to move?
         # If the simulator is playing, set the 6 base joints to achieve the desired pose of base_footprint link frame
-        if self._dc is not None and self._dc.is_simulating():
+        if og.sim.is_playing():
             # Find the relative transformation from base_footprint_link ("base_footprint") frame to root_link
             # ("base_footprint_x") frame. Assign it to the 6 1DoF joints that control the base.
             # Note that the 6 1DoF joints are originated from the root_link ("base_footprint_x") frame.
