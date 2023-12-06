@@ -88,7 +88,6 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
                 yield from ctrl(*args)
                 success = True
             except ActionPrimitiveError as e:
-                print(e)
                 errors.append(e)
 
             try:
@@ -165,7 +164,7 @@ class SymbolicSemanticActionPrimitives(StarterSemanticActionPrimitives):
         self.robot._establish_grasp(self.arm, (obj, obj.root_link), obj.get_position())
 
         # Execute for a moment
-        # yield from self._settle_robot()
+        yield from self._settle_robot()
 
         # Verify
         if self._get_obj_in_hand() is None:
