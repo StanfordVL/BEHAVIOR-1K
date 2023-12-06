@@ -1,3 +1,4 @@
+from omni.isaac.core.prims import RigidPrimView
 from omni.isaac.core.utils.prims import get_prim_at_path, get_prim_parent
 from omni.isaac.core.utils.transformations import tf_matrix_from_pose
 from omni.isaac.core.utils.rotations import gf_quat_to_np_array
@@ -60,15 +61,9 @@ class RigidPrim(XFormPrim):
         load_config=None,
     ):
         # Other values that will be filled in at runtime
-        self._dc = None                     # Dynamic control interface
+        self._rigid_prim_view = None
         self._cs = None                     # Contact sensor interface
-        self._handle = None
-        self._contact_handle = None
         self._body_name = None
-        self._rigid_api = None
-        self._physx_rigid_api = None
-        self._physx_contact_report_api = None
-        self._mass_api = None
 
         self._visual_only = None
         self._collision_meshes = None
@@ -85,17 +80,12 @@ class RigidPrim(XFormPrim):
         # run super first
         super()._post_load()
 
-        # Apply rigid body and mass APIs
-        self._rigid_api = UsdPhysics.RigidBodyAPI(self._prim) if self._prim.HasAPI(UsdPhysics.RigidBodyAPI) else \
-            UsdPhysics.RigidBodyAPI.Apply(self._prim)
-        self._physx_rigid_api = PhysxSchema.PhysxRigidBodyAPI(self._prim) if \
-            self._prim.HasAPI(PhysxSchema.PhysxRigidBodyAPI) else PhysxSchema.PhysxRigidBodyAPI.Apply(self._prim)
-        self._mass_api = UsdPhysics.MassAPI(self._prim) if self._prim.HasAPI(UsdPhysics.MassAPI) else \
-            UsdPhysics.MassAPI.Apply(self._prim)
+        # Create the view
+        self._rigid_prim_view = RigidPrimView(self._prim_path)
 
         # Only create contact report api if we're not visual only
         if not self._visual_only:
-            self._physx_contact_report_api_api = PhysxSchema.PhysxContactReportAPI(self._prim) if \
+            PhysxSchema.PhysxContactReportAPI(self._prim) if \
                 self._prim.HasAPI(PhysxSchema.PhysxContactReportAPI) else \
                 PhysxSchema.PhysxContactReportAPI.Apply(self._prim)
 
@@ -127,15 +117,12 @@ class RigidPrim(XFormPrim):
         # Run super method first
         super()._initialize()
 
-        # Get dynamic control and contact sensing interfaces
-        self._dc = _dynamic_control.acquire_dynamic_control_interface()
-
         # Initialize all owned meshes
         for mesh_group in (self._collision_meshes, self._visual_meshes):
             for mesh in mesh_group.values():
                 mesh.initialize()
 
-        # We grab contact info for the first time before setting our internal handle, because this changes the dc handle
+        # Get contact info first
         if self.contact_reporting_enabled:
             self._cs.get_rigid_body_raw_data(self._prim_path)
 
@@ -216,7 +203,7 @@ class RigidPrim(XFormPrim):
         """
         Updates all internal handles for this prim, in case they change since initialization
         """
-        self._handle = None if self.kinematic_only else self._dc.get_rigid_body(self._prim_path)
+        self._rigid_prim_view.initialize(og.sim.physics_sim_view)
 
     def contact_list(self):
         """
@@ -225,17 +212,12 @@ class RigidPrim(XFormPrim):
         Returns:
             list of CsRawData: raw contact info for this rigid body
         """
-        # # Make sure we have the ability to grab contacts for this object
-        # assert self._physx_contact_report_api is not None, \
-        #     "Cannot grab contacts for this rigid prim without Physx's contact report API being added!"
+        # Make sure we have the ability to grab contacts for this object
         contacts = []
         if self.contact_reporting_enabled:
             raw_data = self._cs.get_rigid_body_raw_data(self._prim_path)
             for c in raw_data:
-                # contact sensor handles and dynamic articulation handles are not comparable
-                # every prim has a cs to convert (cs) handle to prim path (decode_body_name)
-                # but not every prim (e.g. groundPlane) has a dc to convert prim path to (dc) handle (get_rigid_body)
-                # so simpler to convert both handles (int) to prim paths (str) for comparison
+                # convert handles to prim paths for comparison
                 c = [*c] # CsRawData enforces body0 and body1 types to be ints, but we want strings
                 c[2] = self._cs.decode_body_name(c[2])
                 c[3] = self._cs.decode_body_name(c[3])
@@ -249,21 +231,14 @@ class RigidPrim(XFormPrim):
         Args:
             velocity (np.ndarray): linear velocity to set the rigid prim to. Shape (3,).
         """
-        if self.dc_is_accessible:
-            self._dc.set_rigid_body_linear_velocity(self._handle, velocity)
-        else:
-            self._rigid_api.GetVelocityAttr().Set(Gf.Vec3f(velocity.tolist()))
+        self._rigid_prim_view.set_linear_velocities(velocity[None, :])
 
     def get_linear_velocity(self):
         """
         Returns:
             np.ndarray: current linear velocity of the the rigid prim. Shape (3,).
         """
-        if self.dc_is_accessible:
-            lin_vel = np.array(self._dc.get_rigid_body_linear_velocity(self._handle))
-        else:
-            lin_vel = self._rigid_api.GetVelocityAttr().Get()
-        return np.array(lin_vel)
+        return self._rigid_prim_view.get_linear_velocities()[0]
 
     def set_angular_velocity(self, velocity):
         """
@@ -272,99 +247,41 @@ class RigidPrim(XFormPrim):
         Args:
             velocity (np.ndarray): angular velocity to set the rigid prim to. Shape (3,).
         """
-        if self.dc_is_accessible:
-            self._dc.set_rigid_body_angular_velocity(self._handle, velocity)
-        else:
-            self._rigid_api.GetAngularVelocityAttr().Set(Gf.Vec3f(velocity.tolist()))
+        self._rigid_prim_view.set_angular_velocities(velocity[None, :])
 
     def get_angular_velocity(self):
         """
         Returns:
             np.ndarray: current angular velocity of the the rigid prim. Shape (3,).
         """
-        if self.dc_is_accessible:
-            return np.array(self._dc.get_rigid_body_angular_velocity(self._handle))
-        else:
-            return np.array(self._rigid_api.GetAngularVelocityAttr().Get())
+        return self._rigid_prim_view.get_angular_velocities()[0]
 
     def set_position_orientation(self, position=None, orientation=None):
-        if self.dc_is_accessible:
-            current_position, current_orientation = self.get_position_orientation()
-            if position is None:
-                position = current_position
-            if orientation is None:
-                orientation = current_orientation
+        if position is not None:
+            position = position[None, :]
+        if orientation is not None:
             assert np.isclose(np.linalg.norm(orientation), 1, atol=1e-3), \
                 f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
-            pose = _dynamic_control.Transform(position, orientation)
-            self._dc.set_rigid_body_pose(self._handle, pose)
-        else:
-            # Call super method by default
-            super().set_position_orientation(position=position, orientation=orientation)
+            orientation = orientation[None, :]
+        self._rigid_prim_view.set_world_poses(positions=position, orientations=orientation)
 
     def get_position_orientation(self):
-        if self.dc_is_accessible:
-            pose = self._dc.get_rigid_body_pose(self._handle)
-            pos, ori = np.asarray(pose.p), np.asarray(pose.r)
-        else:
-            # Call super method by default
-            pos, ori = super().get_position_orientation()
+        pos, ori = self._rigid_prim_view.get_world_poses()
 
         assert np.isclose(np.linalg.norm(ori), 1, atol=1e-3), \
             f"{self.prim_path} orientation {ori} is not a unit quaternion."
-        return pos, ori
+        return pos[0], ori[0]
 
     def set_local_pose(self, translation=None, orientation=None):
-        if self.dc_is_accessible:
-            current_translation, current_orientation = self.get_local_pose()
-            translation = current_translation if translation is None else translation
-            orientation = current_orientation if orientation is None else orientation
-            orientation = orientation[[3, 0, 1, 2]]  # Flip from x,y,z,w to w,x,y,z
-            local_transform = tf_matrix_from_pose(translation=translation, orientation=orientation)
-            parent_world_tf = UsdGeom.Xformable(get_prim_parent(self._prim)).ComputeLocalToWorldTransform(
-                Usd.TimeCode.Default()
-            )
-            my_world_transform = np.matmul(parent_world_tf, local_transform)
-            transform = Gf.Transform()
-            transform.SetMatrix(Gf.Matrix4d(np.transpose(my_world_transform)))
-            calculated_position = transform.GetTranslation()
-            calculated_orientation = transform.GetRotation().GetQuat()
-            self.set_position_orientation(
-                position=np.array(calculated_position), orientation=gf_quat_to_np_array(calculated_orientation)
-            )
-        else:
-            # Call super method by default
-            super().set_local_pose(translation=translation, orientation=orientation)
+        if translation is not None:
+            translation = translation[None, :]
+        if orientation is not None:
+            orientation = orientation[None, :]
+        self._articulation_view.set_local_poses(translation, orientation)
 
     def get_local_pose(self):
-        if self.dc_is_accessible:
-            parent_world_tf = UsdGeom.Xformable(get_prim_parent(self._prim)).ComputeLocalToWorldTransform(
-                Usd.TimeCode.Default()
-            )
-            world_position, world_orientation = self.get_position_orientation()
-            world_orientation = world_orientation[[3, 0, 1, 2]]  # Flip from x,y,z,w to w,x,y,z
-            my_world_transform = tf_matrix_from_pose(translation=world_position, orientation=world_orientation)
-            local_transform = np.matmul(np.linalg.inv(np.transpose(parent_world_tf)), my_world_transform)
-            transform = Gf.Transform()
-            transform.SetMatrix(Gf.Matrix4d(np.transpose(local_transform)))
-            calculated_translation = transform.GetTranslation()
-            calculated_orientation = transform.GetRotation().GetQuat()
-            pos, ori = np.array(calculated_translation), gf_quat_to_np_array(calculated_orientation)[[1, 2, 3, 0]] # Flip from w,x,y,z to x,y,z,w to
-        else:
-            # Call super method by default
-            pos, ori = super().get_local_pose()
-
-        return np.array(pos), np.array(ori)
-
-    @property
-    def handle(self):
-        """
-        Handle used by Isaac Sim's dynamic control module to reference this rigid prim
-
-        Returns:
-            int: ID handle assigned to this prim from dynamic_control interface
-        """
-        return self._handle
+        positions, orientations = self._articulation_view.get_local_poses()
+        return positions[0], orientations[0]
 
     @property
     def body_name(self):
@@ -453,15 +370,11 @@ class RigidPrim(XFormPrim):
         Returns:
             float: mass of the rigid body in kg.
         """
-        raw_usd_mass = self._mass_api.GetMassAttr().Get()
-        # If our raw_usd_mass isn't specified, we check dynamic control if possible (sim is playing),
-        # otherwise we fallback to analytical computation of volume * density
-        if raw_usd_mass != 0:
-            mass = raw_usd_mass
-        elif self.dc_is_accessible:
-            mass = self.rigid_body_properties.mass
-        else:
-            mass = self.volume * self.density
+        mass = self._rigid_prim_view.get_masses()[0]
+
+        # Fallback to analytical computation of volume * density
+        if mass == 0:
+            return self.volume * self.density
 
         return mass
 
@@ -620,39 +533,17 @@ class RigidPrim(XFormPrim):
         """
         return self._prim.HasAPI(PhysxSchema.PhysxContactReportAPI)
 
-    @property
-    def rigid_body_properties(self):
-        """
-        Returns:
-            None or RigidBodyProperty: Properties for this rigid body, if accessible. If they do not exist or
-                dc cannot be queried, this will return None
-        """
-        return self._dc.get_rigid_body_properties(self._handle) if self.dc_is_accessible else None
-
-    @property
-    def dc_is_accessible(self):
-        """
-        Checks if dynamic control interface is accessible (checks whether we have a dc handle for this body
-        and if dc is simulating)
-
-        Returns:
-            bool: Whether dc interface can be used or not
-        """
-        return self._handle is not None and self._dc.is_simulating() and not self.kinematic_only
-
     def enable_gravity(self):
         """
         Enables gravity for this rigid body
         """
-        self.set_attribute("physxRigidBody:disableGravity", False)
-        # self._dc.set_rigid_body_disable_gravity(self._handle, False)
+        self._rigid_prim_view.enable_gravities()
 
     def disable_gravity(self):
         """
         Disables gravity for this rigid body
         """
-        self.set_attribute("physxRigidBody:disableGravity", True)
-        # self._dc.set_rigid_body_disable_gravity(self._handle, True)
+        self._rigid_prim_view.disable_gravities()
 
     def wake(self):
         """
