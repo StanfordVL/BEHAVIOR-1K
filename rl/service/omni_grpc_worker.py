@@ -1,4 +1,3 @@
-import asyncio
 import numpy as np
 import omnigibson as og
 from omnigibson.macros import gm
@@ -7,7 +6,7 @@ from rollout_worker import serve
 
 gm.USE_FLATCACHE = True
 
-async def main(local_addr, learner_addr):
+def main(local_addr, learner_addr):
 
     DIST_COEFF = 0.1
     GRASP_REWARD = 0.3
@@ -92,12 +91,12 @@ async def main(local_addr, learner_addr):
         ]
     }
 
-    env = og.Environment(configs=cfg, action_timestep=1 / 10., physics_timestep=1 / 60., flatten_obs_space=True)
+    env = og.Environment(configs=cfg, action_timestep=1 / 10., physics_timestep=1 / 60., flatten_obs_space=True, flatten_action_space=True)
 
     # Now start servicing!
-    await serve(env, local_addr, learner_addr)
+    serve(env, local_addr, learner_addr)
 
 if __name__ == "__main__":
     import sys
     local_port = int(sys.argv[1])
-    asyncio.get_event_loop().run_until_complete(main("localhost:" + str(local_port), "localhost:50051"))
+    main("localhost:" + str(local_port), "localhost:50051")

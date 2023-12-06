@@ -118,6 +118,8 @@ def main():
 
     env = GRPCVecEnv("localhost:50051", args.n_envs)
 
+    # import IPython; IPython.embed()
+
     # TODO: None of this stuff works: make it work by running env locally and connecting to it.
     # If we're evaluating, hide the ceilings and enable camera teleoperation so the user can easily
     # visualize the rollouts dynamically
