@@ -1,4 +1,4 @@
-FROM stanfordvl/omnigibson-dev
+FROM stanfordvl/omnigibson-dev:latest
 
 # Copy over omnigibson source
 ADD . /omnigibson-src

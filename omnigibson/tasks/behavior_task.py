@@ -5,6 +5,7 @@ from bddl.activity import (
     evaluate_goal_conditions,
     get_goal_conditions,
     get_ground_goal_state_options,
+    get_natural_initial_conditions,
     get_initial_conditions,
     get_natural_goal_conditions,
     get_object_scope,
@@ -17,6 +18,7 @@ from omnigibson.reward_functions.potential_reward import PotentialReward
 from omnigibson.robots.robot_base import BaseRobot
 from omnigibson.systems.system_base import get_system, add_callback_on_system_init, add_callback_on_system_clear, \
     REGISTERED_SYSTEMS
+from omnigibson.scenes.scene_base import Scene
 from omnigibson.scenes.interactive_traversable_scene import InteractiveTraversableScene
 from omnigibson.utils.bddl_utils import OmniGibsonBDDLBackend, BDDLEntity, BEHAVIOR_ACTIVITIES, BDDLSampler
 from omnigibson.tasks.task_base import BaseTask
@@ -142,7 +144,7 @@ class BehaviorTask(BaseTask):
             task_cfg.get("predefined_problem", None) is not None else task_cfg["activity_name"]
         if scene_file is None and scene_instance is None and not task_cfg["online_object_sampling"]:
             scene_instance = cls.get_cached_activity_scene_filename(
-                scene_model=scene_cfg["scene_model"],
+                scene_model=scene_cfg.get("scene_model", "Scene"),
                 activity_name=activity_name,
                 activity_definition_id=task_cfg.get("activity_definition_id", 0),
                 activity_instance_id=task_cfg.get("activity_instance_id", 0),
@@ -254,6 +256,7 @@ class BehaviorTask(BaseTask):
         np.random.shuffle(self.instruction_order)
         self.currently_viewed_index = 0
         self.currently_viewed_instruction = self.instruction_order[self.currently_viewed_index]
+        self.activity_natural_language_initial_conditions = get_natural_initial_conditions(self.activity_conditions)
         self.activity_natural_language_goal_conditions = get_natural_goal_conditions(self.activity_conditions)
 
     def get_potential(self, env):
@@ -522,8 +525,8 @@ class BehaviorTask(BaseTask):
 
     @classproperty
     def valid_scene_types(cls):
-        # Must be an interactive traversable scene
-        return {InteractiveTraversableScene}
+        # Any scene can be used
+        return {Scene}
 
     @classproperty
     def default_termination_config(cls):

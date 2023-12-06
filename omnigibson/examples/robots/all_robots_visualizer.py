@@ -17,7 +17,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         }
     }
 
-    env = og.Environment(configs=cfg, action_timestep=1/60., physics_timestep=1/60.)
+    env = og.Environment(configs=cfg)
 
     # Iterate over all robots and demo their motion
     for robot_name, robot_cls in REGISTERED_ROBOTS.items():

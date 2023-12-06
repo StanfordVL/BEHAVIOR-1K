@@ -596,6 +596,34 @@ class KeyboardRobotController:
 
         return mapping
 
+    def generate_osc_keypress_mapping(self, controller_info):
+        """
+        Generates a dictionary for keypress mappings for OSC control, based on the inputted @controller_info
+
+        Args:
+            controller_info (dict): Dictionary of controller information for the specific robot arm to control
+                with OSC
+
+        Returns:
+            dict: Populated keypress mappings for IK to control the specified controller
+        """
+        mapping = {}
+
+        mapping[carb.input.KeyboardInput.UP] = {"idx": controller_info["start_idx"] + 0, "val": 0.5}
+        mapping[carb.input.KeyboardInput.DOWN] = {"idx": controller_info["start_idx"] + 0, "val": -0.5}
+        mapping[carb.input.KeyboardInput.RIGHT] = {"idx": controller_info["start_idx"] + 1, "val": -0.5}
+        mapping[carb.input.KeyboardInput.LEFT] = {"idx": controller_info["start_idx"] + 1, "val": 0.5}
+        mapping[carb.input.KeyboardInput.P] = {"idx": controller_info["start_idx"] + 2, "val": 0.5}
+        mapping[carb.input.KeyboardInput.SEMICOLON] = {"idx": controller_info["start_idx"] + 2, "val": -0.5}
+        mapping[carb.input.KeyboardInput.N] = {"idx": controller_info["start_idx"] + 3, "val": 0.5}
+        mapping[carb.input.KeyboardInput.B] = {"idx": controller_info["start_idx"] + 3, "val": -0.5}
+        mapping[carb.input.KeyboardInput.O] = {"idx": controller_info["start_idx"] + 4, "val": 0.5}
+        mapping[carb.input.KeyboardInput.U] = {"idx": controller_info["start_idx"] + 4, "val": -0.5}
+        mapping[carb.input.KeyboardInput.V] = {"idx": controller_info["start_idx"] + 5, "val": 0.5}
+        mapping[carb.input.KeyboardInput.C] = {"idx": controller_info["start_idx"] + 5, "val": -0.5}
+
+        return mapping
+
     def populate_keypress_mapping(self):
         """
         Populates the mapping @self.keypress_mapping, which maps keypresses to action info:
@@ -629,6 +657,9 @@ class KeyboardRobotController:
             elif info["name"] == "InverseKinematicsController":
                 self.ik_arms.append(component)
                 self.keypress_mapping.update(self.generate_ik_keypress_mapping(controller_info=info))
+            elif info["name"] == "OperationalSpaceController":
+                self.ik_arms.append(component)
+                self.keypress_mapping.update(self.generate_osc_keypress_mapping(controller_info=info))
             elif info["name"] == "MultiFingerGripperController":
                 if info["command_dim"] > 1:
                     for i in range(info["command_dim"]):

@@ -824,6 +824,26 @@ class Wrapper:
             super().__setattr__(key, value)
 
 
+def nums2array(nums, dim, dtype=float):
+    """
+    Converts input @nums into numpy array of length @dim. If @nums is a single number, broadcasts input to
+    corresponding dimension size @dim before converting into numpy array
+
+    Args:
+        nums (float or array): Numbers to map to numpy array
+        dim (int): Size of array to broadcast input to
+
+    Returns:
+        torch.Tensor: Mapped input numbers
+    """
+    # Make sure the inputted nums isn't a string
+    assert not isinstance(nums, str), "Only numeric types are supported for this operation!"
+
+    out = np.array(nums, dtype=dtype) if isinstance(nums, Iterable) else np.ones(dim, dtype=dtype) * nums
+
+    return out
+
+
 def clear():
     """
     Clear state tied to singleton classes

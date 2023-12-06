@@ -806,6 +806,10 @@ class EntityPrim(XFormPrim):
                 joint.initialize()
             joint.update_handles()
 
+        # Update the physics view if we're articulated
+        if self.articulated:
+            self._physics_view = og.sim.physics_sim_view.create_articulation_view(self.articulation_root_path)
+
     def get_joint_positions(self, normalized=False):
         """
         Grabs this entity's joint positions
@@ -1290,6 +1294,59 @@ class EntityPrim(XFormPrim):
             aabb_lo, aabb_hi = np.array(aabb_lo), np.array(aabb_hi)
 
         return aabb_lo, aabb_hi
+
+    def get_coriolis_and_centrifugal_forces(self):
+        """
+        Returns:
+            n-array: (N,) shaped per-DOF coriolis and centrifugal forces experienced by the entity, if articulated
+        """
+        assert self.articulated, "Cannot get coriolis and centrifugal forces for non-articulated entity!"
+        self._verify_physics_view_is_valid()
+        return self._physics_view.get_coriolis_and_centrifugal_forces().reshape(self.n_dof)
+
+    def get_generalized_gravity_forces(self):
+        """
+        Returns:
+            n-array: (N, N) shaped per-DOF gravity forces, if articulated
+        """
+        assert self.articulated, "Cannot get generalized gravity forces for non-articulated entity!"
+        self._verify_physics_view_is_valid()
+        return self._physics_view.get_generalized_gravity_forces().reshape(self.n_dof)
+
+    def get_mass_matrix(self):
+        """
+        Returns:
+            n-array: (N, N) shaped per-DOF mass matrix, if articulated
+        """
+        assert self.articulated, "Cannot get mass matrix for non-articulated entity!"
+        self._verify_physics_view_is_valid()
+        return self._physics_view.get_mass_matrices().reshape(self.n_dof, self.n_dof)
+
+    def get_jacobian(self):
+        """
+        Returns:
+            n-array: (N_links - 1 [+ 1], 6, N_dof [+ 6]) shaped per-link jacobian, if articulated. Note that the first
+                dimension is +1 and the final dimension is +6 if the entity does not have a fixed base
+                (i.e.: there is an additional "floating" joint tying the robot to the world frame)
+        """
+        assert self.articulated, "Cannot get jacobian for non-articulated entity!"
+        self._verify_physics_view_is_valid()
+        return self._physics_view.get_jacobians().squeeze(axis=0)
+
+    def get_relative_jacobian(self):
+        """
+        Returns:
+            n-array: (N_links - 1 [+ 1], 6, N_dof [+ 6]) shaped per-link relative jacobian, if articulated (expressed in
+                this entity's base frame). Note that the first dimension is +1 and the final dimension is +6 if the
+                entity does not have a fixed base (i.e.: there is an additional "floating" joint tying the robot to
+                the world frame)
+        """
+        jac = self.get_jacobian()
+        ori_t = T.quat2mat(self.get_orientation()).T.astype(np.float32)
+        tf = np.zeros((1, 6, 6), dtype=np.float32)
+        tf[:, :3, :3] = ori_t
+        tf[:, 3:, 3:] = ori_t
+        return tf @ jac
 
     def wake(self):
         """

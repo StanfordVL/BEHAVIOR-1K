@@ -66,6 +66,9 @@ class ParticleModifyCondition(IntEnum):
 # Valid omni characters for specifying strings, e.g. prim paths
 VALID_OMNI_CHARS = frozenset({'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '_', '/'})
 
+# Structure categories that need to always be loaded for stability purposes
+STRUCTURE_CATEGORIES = frozenset({"floors", "walls", "ceilings", "lawn", "driveway", "fence"})
+
 # Note that we are starting this from bit 6 since bullet seems to be giving special meaning to groups 0-5.
 # Collision groups for objects. For special logic, different categories can be assigned different collision groups.
 ALL_COLLISION_GROUPS_MASK = -1

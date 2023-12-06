@@ -197,6 +197,11 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         init_info = scene_info["objects_info"]["init_info"]
         init_state = scene_info["state"]["object_registry"]
         init_systems = scene_info["state"]["system_registry"].keys()
+        task_metadata = {}
+        try:
+            task_metadata = scene_info["metadata"]["task"]
+        except:
+            pass
 
         # Create desired systems
         for system_name in init_systems:
@@ -206,7 +211,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # accordingly
         for obj_name, obj_info in init_info.items():
             # Check whether we should load the object or not
-            if not self._should_load_object(obj_info=obj_info):
+            if not self._should_load_object(obj_info=obj_info, task_metadata=task_metadata):
                 continue
             # Create object class instance
             obj = create_object_from_init_info(obj_info)
@@ -229,7 +234,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         for key, data in scene_info.get("metadata", dict()).items():
             og.sim.write_metadata(key=key, data=data)
 
-    def _should_load_object(self, obj_info):
+    def _should_load_object(self, obj_info, task_metadata):
         """
         Helper function to check whether we should load an object given its init_info. Useful for potentially filtering
         objects based on, e.g., their category, size, etc.
@@ -594,11 +599,15 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
             name=plane.name,
         )
 
-    def update_initial_state(self):
+    def update_initial_state(self, state=None):
         """
         Updates the initial state for this scene (which the scene will get reset to upon calling reset())
+
+        Args:
+            state (None or dict): If specified, the state to set internally. Otherwise, will set the initial state to
+                be the current state
         """
-        self._initial_state = self.dump_state(serialized=False)
+        self._initial_state = self.dump_state(serialized=False) if state is None else state
 
     def update_objects_info(self):
         """

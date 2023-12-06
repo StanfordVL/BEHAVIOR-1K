@@ -89,7 +89,10 @@ class ToggledOn(AbsoluteObjectState, BooleanStateMixin, LinkBasedStateMixin, Upd
         def check_overlap():
             nonlocal valid_hit
             valid_hit = False
-            og.sim.psqi.overlap_mesh(*projection_mesh_ids, reportFn=overlap_callback)
+            if self.visual_marker.prim.GetTypeName() == "Mesh":
+                og.sim.psqi.overlap_mesh(*projection_mesh_ids, reportFn=overlap_callback)
+            else:
+                og.sim.psqi.overlap_shape(*projection_mesh_ids, reportFn=overlap_callback)
             return valid_hit
 
         self._check_overlap = check_overlap

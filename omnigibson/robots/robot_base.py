@@ -253,9 +253,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         # and grab their observations, processing them into a flat dict
         obs_dict = dict()
         for sensor_name, sensor in self._sensors.items():
-            sensor_obs = sensor.get_obs()
-            for obs_modality, obs in sensor_obs.items():
-                obs_dict[f"{sensor_name}_{obs_modality}"] = obs
+            obs_dict[sensor_name] = sensor.get_obs()
 
         # Have to handle proprio separately since it's not an actual sensor
         if "proprio" in self._obs_modalities:
@@ -281,6 +279,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         joint_velocities = self.get_joint_velocities(normalized=False)
         joint_efforts = self.get_joint_efforts(normalized=False)
         pos, ori = self.get_position(), self.get_rpy()
+        ori_2d = self.get_2d_orientation()
         return dict(
             joint_qpos=joint_positions,
             joint_qpos_sin=np.sin(joint_positions),
@@ -290,6 +289,9 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
             robot_pos=pos,
             robot_ori_cos=np.cos(ori),
             robot_ori_sin=np.sin(ori),
+            robot_2d_ori=ori_2d,
+            robot_2d_ori_cos=np.cos(ori_2d),
+            robot_2d_ori_sin=np.sin(ori_2d),
             robot_lin_vel=self.get_linear_velocity(),
             robot_ang_vel=self.get_angular_velocity(),
         )
@@ -300,9 +302,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
 
         for sensor_name, sensor in self._sensors.items():
             # Load the sensor observation space
-            sensor_obs_space = sensor.load_observation_space()
-            for obs_modality, obs_modality_space in sensor_obs_space.items():
-                obs_space[f"{sensor_name}_{obs_modality}"] = obs_modality_space
+            obs_space[sensor_name] = sensor.load_observation_space()
 
         # Have to handle proprio separately since it's not an actual sensor
         if "proprio" in self._obs_modalities:

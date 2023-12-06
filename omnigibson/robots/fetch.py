@@ -7,7 +7,10 @@ from omnigibson.robots.active_camera_robot import ActiveCameraRobot
 from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
 from omnigibson.robots.two_wheel_robot import TwoWheelRobot
 from omnigibson.utils.python_utils import assert_valid_key
+from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.usd_utils import JointType
+
+log = create_module_logger(module_name=__name__)
 
 DEFAULT_ARM_POSES = {
     "vertical",
@@ -60,6 +63,7 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
 
         # Unique to ManipulationRobot
         grasping_mode="physical",
+        disable_grasp_handling=False,
 
         # Unique to Fetch
         rigid_trunk=False,
@@ -112,6 +116,8 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
                 If "physical", no assistive grasping will be applied (relies on contact friction + finger force).
                 If "assisted", will magnetize any object touching and within the gripper's fingers.
                 If "sticky", will magnetize any object touching the gripper's fingers.
+            disable_grasp_handling (bool): If True, will disable all grasp handling for this object. This means that
+                sticky and assisted grasp modes will not work unless the connection/release methodsare manually called.
             rigid_trunk (bool) if True, will prevent the trunk from moving during execution.
             default_trunk_offset (float): sets the default height of the robot's trunk
             default_arm_pose (str): Default pose for the robot arm. Should be one of:
@@ -156,6 +162,7 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
             proprio_obs=proprio_obs,
             sensor_config=sensor_config,
             grasping_mode=grasping_mode,
+            disable_grasp_handling=disable_grasp_handling,
             **kwargs,
         )
 
@@ -216,7 +223,24 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         else:
             raise ValueError("Unknown default arm pose: {}".format(self.default_arm_pose))
         return pos
+    
+    def _post_load(self):
+        super()._post_load()
 
+        # Set the wheels back to using sphere approximations
+        for wheel_name in ["l_wheel_link", "r_wheel_link"]:
+            log.warning(
+                "Fetch wheel links are post-processed to use sphere approximation collision meshes."
+                "Please ignore any previous errors about these collision meshes.")
+            wheel_link = self.links[wheel_name]
+            assert set(wheel_link.collision_meshes) == {"collisions"}, "Wheel link should only have 1 collision!"
+            wheel_link.collision_meshes["collisions"].set_collision_approximation("boundingSphere")
+
+        # Also apply a convex decomposition to the torso lift link
+        torso_lift_link = self.links["torso_lift_link"]
+        assert set(torso_lift_link.collision_meshes) == {"collisions"}, "Wheel link should only have 1 collision!"
+        torso_lift_link.collision_meshes["collisions"].set_collision_approximation("convexDecomposition")
+        
     @property
     def discrete_action_list(self):
         # Not supported for this robot
@@ -387,6 +411,40 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         return [
             ["torso_lift_link", "shoulder_lift_link"],
             ["torso_lift_link", "torso_fixed_link"],
+            ["torso_lift_link", "estop_link"],
+            ["base_link", "laser_link"],
+            ["base_link", "torso_fixed_link"],
+            ["base_link", "l_wheel_link"],
+            ["base_link", "r_wheel_link"],
+            ["base_link", "estop_link"],
+            ["torso_lift_link", "shoulder_pan_link"],
+            ["torso_lift_link", "head_pan_link"],
+            ["head_pan_link", "head_tilt_link"],
+            ["shoulder_pan_link", "shoulder_lift_link"],
+            ["shoulder_lift_link", "upperarm_roll_link"],
+            ["upperarm_roll_link", "elbow_flex_link"],
+            ["elbow_flex_link", "forearm_roll_link"],
+            ["forearm_roll_link", "wrist_flex_link"],
+            ["wrist_flex_link", "wrist_roll_link"],
+            ["wrist_roll_link", "gripper_link"],
+        ]
+
+    @property
+    def manipulation_link_names(self):
+        return [
+            "torso_lift_link", 
+            "head_pan_link", 
+            "head_tilt_link",  
+            "shoulder_pan_link", 
+            "shoulder_lift_link", 
+            "upperarm_roll_link", 
+            "elbow_flex_link", 
+            "forearm_roll_link", 
+            "wrist_flex_link", 
+            "wrist_roll_link", 
+            "gripper_link", 
+            "l_gripper_finger_link", 
+            "r_gripper_finger_link",
         ]
 
     @property
@@ -437,3 +495,9 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
     @property
     def urdf_path(self):
         return os.path.join(gm.ASSET_PATH, "models/fetch/fetch.urdf")
+
+    @property
+    def arm_workspace_range(self):
+        return {
+            self.default_arm : [np.deg2rad(-45), np.deg2rad(45)]
+        }

@@ -119,6 +119,10 @@ def main():
     with open(f"{example_config_path}/turtlebot_nav.yaml", "r") as f:
         cfg = yaml.load(f, Loader=yaml.FullLoader)
 
+    # Make sure flattened obs and action space is used
+    cfg["env"]["flatten_action_space"] = True
+    cfg["env"]["flatten_obs_space"] = True
+
     # Only use RGB obs
     cfg["robots"][0]["obs_modalities"] = ["rgb"]
 
@@ -126,13 +130,7 @@ def main():
     if not args.eval:
         cfg["task"]["visualize_goal"] = False
 
-    env = og.Environment(
-        configs=cfg,
-        action_timestep=1 / 60.,
-        physics_timestep=1 / 60.,
-        flatten_action_space=True,
-        flatten_obs_space=True,
-    )
+    env = og.Environment(configs=cfg)
 
     # If we're evaluating, hide the ceilings and enable camera teleoperation so the user can easily
     # visualize the rollouts dynamically

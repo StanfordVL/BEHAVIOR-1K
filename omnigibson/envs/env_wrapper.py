@@ -1,7 +1,32 @@
 from omnigibson.utils.python_utils import Wrapper
+from omnigibson.utils.python_utils import Registerable, classproperty, create_class_from_registry_and_config
+from omnigibson.utils.ui_utils import create_module_logger
+from copy import deepcopy
+
+# Global dicts that will contain mappings
+REGISTERED_ENV_WRAPPERS = dict()
+
+# Create module logger
+log = create_module_logger(module_name=__name__)
 
 
-class EnvironmentWrapper(Wrapper):
+def create_wrapper(env):
+    """
+    Wraps environment @env with wrapper defined by env.wrapper_config
+    """
+    wrapper_cfg = deepcopy(env.wrapper_config)
+    wrapper_type = wrapper_cfg.pop("type")
+    wrapper_cfg["env"] = env
+
+    return create_class_from_registry_and_config(
+        cls_name=wrapper_type,
+        cls_registry=REGISTERED_ENV_WRAPPERS,
+        cfg=wrapper_cfg,
+        cls_type_descriptor="wrapper",
+    )
+
+
+class EnvironmentWrapper(Wrapper, Registerable):
     """
     Base class for all environment wrappers in OmniGibson. In general, reset(), step(), and observation_spec() should
     be overwritten
@@ -50,3 +75,15 @@ class EnvironmentWrapper(Wrapper):
         """
         return self.env.observation_spec()
 
+    @classproperty
+    def _do_not_register_classes(cls):
+        # Don't register this class since it's an abstract template
+        classes = super()._do_not_register_classes
+        classes.add("EnvironmentWrapper")
+        return classes
+
+    @classproperty
+    def _cls_registry(cls):
+        # Global robot registry
+        global REGISTERED_ENV_WRAPPERS
+        return REGISTERED_ENV_WRAPPERS

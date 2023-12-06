@@ -196,9 +196,12 @@ class Open(AbsoluteObjectState, BooleanStateMixin):
         """
         Set the openness state, either to a random joint position satisfying the new value, or fully open/closed.
 
-        @param new_value: bool value for the openness state of the object.
-        @param fully: whether the object should be fully opened/closed (e.g. all relevant joints to 0/1).
-        @return: bool indicating setter success. Failure may happen due to unannotated objects.
+        Args:
+            new_value (bool): The new value for the openness state of the object.
+            fully (bool): Whether the object should be fully opened/closed (e.g. all relevant joints to 0/1).
+
+        Returns:
+            bool: A boolean indicating the success of the setter. Failure may happen due to unannotated objects.
         """
         both_sides, relevant_joints, joint_directions = self.relevant_joints_info
         if not relevant_joints:

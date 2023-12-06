@@ -33,7 +33,7 @@ gm.GUI_VIEWPORT_ONLY = False
 # Do not suppress known omni warnings / errors, and also put omnigibson in a debug state
 # This includes extra information for things such as object sampling, and also any debug
 # logging messages
-gm.DEBUG = False
+gm.DEBUG = (os.getenv("OMNIGIBSON_DEBUG", 'False').lower() in ('true', '1', 't'))
 
 # Whether to print out disclaimers (i.e.: known failure cases resulting from Omniverse's current bugs / limitations)
 gm.SHOW_DISCLAIMERS = False
