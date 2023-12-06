@@ -1,5 +1,6 @@
 import numpy as np
 
+from omni.isaac.core.articulations import ArticulationView
 from omni.isaac.core.utils.rotations import gf_quat_to_np_array
 from omni.isaac.core.utils.transformations import tf_matrix_from_pose
 from omni.isaac.core.utils.types import DOFInfo
@@ -49,11 +50,7 @@ class EntityPrim(XFormPrim):
         load_config=None,
     ):
         # Other values that will be filled in at runtime
-        self._dc = None                         # Dynamics control interface
-        self._handle = None                     # Handle to this articulation
-        self._root_handle = None                # Handle to the root rigid body of this articulation
         self._root_link_name = None             # Name of the root link
-        self._dofs_infos = None
         self._n_dof = None                      # dof with dynamic control
         self._links = None
         self._joints = None
@@ -84,26 +81,20 @@ class EntityPrim(XFormPrim):
                 material.shader_force_populate(render=False)
 
         # Initialize all the links
-        # This must happen BEFORE the handle is generated for this prim, because things changing in the RigidPrims may
-        # cause the handle to change!
         for link in self._links.values():
             link.initialize()
 
-        # Get dynamic control info
-        self._dc = _dynamic_control.acquire_dynamic_control_interface()
-
         # Update joint information
         self.update_joints()
-
-        # Construct physics view
-        if self.articulated:
-            self._articulation_view = og.sim.physics_sim_view.create_articulation_view(self.articulation_root_path)
 
     def _load(self):
         # By default, this prim cannot be instantiated from scratch!
         raise NotImplementedError("By default, an entity prim cannot be created from scratch.")
 
     def _post_load(self):
+        # Prepare the articulation view (at this point only working via the USD interface)
+        self._articulation_view = ArticulationView(self._prim_path)
+
         # If this is a cloth, delete the root link and replace it with the single nested mesh
         if self._prim_type == PrimType.CLOTH:
             # Verify only a single link and a single mesh exists
@@ -218,9 +209,8 @@ class EntityPrim(XFormPrim):
         # in the children joints
         valid_root_links = list(set(self._links.keys()) - joint_children)
 
-        # TODO: Uncomment safety check here after we figure out how to handle legacy multi-bodied assets like bed with pillow
-        # assert len(valid_root_links) == 1, f"Only a single root link should have been found for this entity prim, " \
-        #                                    f"but found multiple instead: {valid_root_links}"
+        assert len(valid_root_links) == 1, f"Only a single root link should have been found for this entity prim, " \
+                                           f"but found multiple instead: {valid_root_links}"
         self._root_link_name = valid_root_links[0] if len(valid_root_links) == 1 else "base_link"
 
     def update_joints(self):
@@ -237,51 +227,31 @@ class EntityPrim(XFormPrim):
         self._joints = dict()
         self.update_handles()
 
-        # Handle case separately based on whether the handle is valid (i.e.: whether we are actually articulated or not)
-        if (not self.kinematic_only) and self._handle is not None:
-            root_prim = get_prim_at_path(self._dc.get_rigid_body_path(self._root_handle))
-            n_dof = self._dc.get_articulation_dof_count(self._handle)
+        # Handle case separately based on whether we are actually articulated or not
+        if not self.kinematic_only:
+            self._n_dof = self._articulation_view.num_dof
 
+            # TODO: This still includes fixed joints for objects that also have non-fixed?
             # Additionally grab DOF info if we have non-fixed joints
-            if n_dof > 0:
-                self._dofs_infos = dict()
-                # Grab DOF info
-                for index in range(n_dof):
-                    dof_handle = self._dc.get_articulation_dof(self._handle, index)
-                    dof_name = self._dc.get_dof_name(dof_handle)
-                    # add dof to list
-                    prim_path = self._dc.get_dof_path(dof_handle)
-                    self._dofs_infos[dof_name] = DOFInfo(prim_path=prim_path, handle=dof_handle, prim=self.prim,
-                                                         index=index)
-
-                for i in range(self._dc.get_articulation_joint_count(self._handle)):
-                    joint_handle = self._dc.get_articulation_joint(self._handle, i)
-                    joint_name = self._dc.get_joint_name(joint_handle)
-                    joint_path = self._dc.get_joint_path(joint_handle)
-                    joint_prim = get_prim_at_path(joint_path)
+            if self._n_dof > 0:
+                for i in range(self._articulation_view._metadata.joint_count):
+                    joint_name = self._articulation_view._metadata.joint_names[i]
+                    joint_dof_offset = self._articulation_view._metadata.joint_dof_offsets[i]
+                    joint_path = self._articulation_view._metadata.dof_paths[0][joint_dof_offset]
                     # Only add the joint if it's not fixed (i.e.: it has DOFs > 0)
-                    if self._dc.get_joint_dof_count(joint_handle) > 0:
+                    if self._articulation_view._metadata.joint_dof_counts[i] > 0:
                         joint = JointPrim(
                             prim_path=joint_path,
                             name=f"{self._name}:joint_{joint_name}",
-                            articulation=self._handle,
+                            articulation=self._articulation_view,
                         )
                         joint.initialize()
                         self._joints[joint_name] = joint
         else:
             # TODO: May need to extend to clusters of rigid bodies, that aren't exactly joined
             # We assume this object contains a single rigid body
-            body_path = f"{self._prim_path}/{self.root_link_name}"
-            root_prim = get_prim_at_path(body_path)
-            n_dof = 0
+            self._n_dof = 0
 
-        # Make sure root prim stored is the same as the one found during initialization
-        assert self.root_prim == root_prim, \
-            f"Mismatch in root prims! Original was {self.root_prim.GetPrimPath()}, " \
-            f"initialized is {root_prim.GetPrimPath()}!"
-
-        # Store values internally
-        self._n_dof = n_dof
         self._update_joint_limits()
 
     def _update_joint_limits(self):
@@ -349,7 +319,7 @@ class EntityPrim(XFormPrim):
              bool: Whether this prim is articulated or not
         """
         # An invalid handle implies that there is no articulation available for this object
-        return self._handle is not None or self.articulation_root_path is not None
+        return self.articulation_root_path is not None
 
     @property
     def articulation_root_path(self):
@@ -483,14 +453,6 @@ class EntityPrim(XFormPrim):
         return self._materials
 
     @property
-    def dof_properties(self):
-        """
-        Returns:
-            n-array: Array of DOF properties assigned to this articulation's DoFs.
-        """
-        return self._dc.get_articulation_dof_properties(self._handle)
-
-    @property
     def visual_only(self):
         """
         Returns:
@@ -564,26 +526,13 @@ class EntityPrim(XFormPrim):
         if normalized:
             positions = self._denormalize_positions(positions=positions, indices=indices)
 
-        # Grab current DOF states
-        dof_states = self._dc.get_articulation_dof_states(self._handle, _dynamic_control.STATE_POS)
-
-        # Possibly set specific values in the array if indies are specified
-        if indices is None:
-            assert len(positions) == self._n_dof, \
-                "set_joint_positions called without specifying indices, but the desired positions do not match n_dof."
-            new_positions = positions
-        else:
-            new_positions = dof_states["pos"]
-            new_positions[indices] = positions
-
         # Set the DOF states
-        dof_states["pos"] = new_positions
         if not drive:
-            self._dc.set_articulation_dof_states(self._handle, dof_states, _dynamic_control.STATE_POS)
+            self._articulation_view.set_joint_positions(positions=positions, joint_indices=indices)
             BoundingBoxAPI.clear()
 
         # Also set the target
-        self._dc.set_articulation_dof_position_targets(self._handle, new_positions.astype(np.float32))
+        self._articulation_view.set_joint_position_targets(positions=positions, joint_indices=indices)
 
     def set_joint_velocities(self, velocities, indices=None, normalized=False, drive=False):
         """
@@ -610,23 +559,12 @@ class EntityPrim(XFormPrim):
         if normalized:
             velocities = self._denormalize_velocities(velocities=velocities, indices=indices)
 
-        # Grab current DOF states
-        dof_states = self._dc.get_articulation_dof_states(self._handle, _dynamic_control.STATE_VEL)
-
-        # Possibly set specific values in the array if indies are specified
-        if indices is None:
-            new_velocities = velocities
-        else:
-            new_velocities = dof_states["vel"]
-            new_velocities[indices] = velocities
-
         # Set the DOF states
-        dof_states["vel"] = new_velocities
         if not drive:
-            self._dc.set_articulation_dof_states(self._handle, dof_states, _dynamic_control.STATE_VEL)
+            self._articulation_view.set_joint_velocities(velocities=velocities, joint_indices=indices)
 
         # Also set the target
-        self._dc.set_articulation_dof_velocity_targets(self._handle, new_velocities.astype(np.float32))
+        self._articulation_view.set_joint_velocity_targets(velocities=velocities, joint_indices=indices)
 
     def set_joint_efforts(self, efforts, indices=None, normalized=False):
         """
@@ -650,19 +588,8 @@ class EntityPrim(XFormPrim):
         if normalized:
             efforts = self._denormalize_efforts(efforts=efforts, indices=indices)
 
-        # Grab current DOF states
-        dof_states = self._dc.get_articulation_dof_states(self._handle, _dynamic_control.STATE_EFFORT)
-
-        # Possibly set specific values in the array if indies are specified
-        if indices is None:
-            new_efforts = efforts
-        else:
-            new_efforts = dof_states["effort"]
-            new_efforts[indices] = efforts
-
         # Set the DOF states
-        dof_states["effort"] = new_efforts
-        self._dc.set_articulation_dof_states(self._handle, dof_states, _dynamic_control.STATE_EFFORT)
+        self._articulation_view.set_joint_efforts(velocities=efforts, joint_indices=indices)
 
     def _normalize_positions(self, positions, indices=None):
         """
@@ -768,32 +695,14 @@ class EntityPrim(XFormPrim):
         """
         return efforts * self.max_joint_efforts if indices is None else efforts * self.max_joint_efforts[indices]
 
-    def _verify_articulation_view_is_valid(self):
-        """
-        Helper function to make sure that the internal physics view is valid -- if not, will automatically refresh the
-        internal pointer
-        """
-        if not self._articulation_view.check():
-            self._articulation_view = og.sim.physics_sim_view.create_articulation_view(self.articulation_root_path)
-
     def update_handles(self):
         """
         Updates all internal handles for this prim, in case they change since initialization
         """
         assert og.sim.is_playing(), "Simulator must be playing if updating handles!"
 
-        # Grab the handle -- we know it might not return a valid value, so we suppress omni's warning here
-        self._handle = None if self.articulation_root_path is None else \
-            self._dc.get_articulation(self.articulation_root_path)
-
-        # Sanity check -- make sure handle is not invalid handle -- it should only ever be None or a valid integer
-        assert self._handle != _dynamic_control.INVALID_HANDLE, \
-            f"Got invalid articulation handle for entity at {self.articulation_root_path}"
-
-        # We only have a root handle if we're not a cloth prim
-        if self._prim_type != PrimType.CLOTH:
-            self._root_handle = self._dc.get_articulation_root_body(self._handle) if \
-                self._handle is not None else self.root_link.handle
+        # Reinitialize the articulation view
+        self._articulation_view.initialize(og.sim.physics_sim_view)
 
         # Update all links and joints as well
         for link in self._links.values():
@@ -806,10 +715,6 @@ class EntityPrim(XFormPrim):
                 joint.initialize()
             joint.update_handles()
 
-        # Update the physics view if we're articulated
-        if self.articulated:
-            self._physics_view = og.sim.physics_sim_view.create_articulation_view(self.articulation_root_path)
-
     def get_joint_positions(self, normalized=False):
         """
         Grabs this entity's joint positions
@@ -820,12 +725,10 @@ class EntityPrim(XFormPrim):
         Returns:
             n-array: n-DOF length array of positions
         """
-        # Run sanity checks -- make sure our handle is initialized and that we are articulated
-        assert self._handle is not None, "handles are not initialized yet!"
+        # Run sanity checks -- make sure we are articulated
         assert self.n_joints > 0, "Tried to call method not intended for entity prim with no joints!"
 
-        self._verify_articulation_view_is_valid()
-        joint_positions = self._articulation_view.get_dof_positions().reshape(self.n_dof)
+        joint_positions = self._articulation_view.get_joint_positions().reshape(self.n_dof)
 
         # Possibly normalize values when returning
         return self._normalize_positions(positions=joint_positions) if normalized else joint_positions
@@ -840,12 +743,10 @@ class EntityPrim(XFormPrim):
         Returns:
             n-array: n-DOF length array of velocities
         """
-        # Run sanity checks -- make sure our handle is initialized and that we are articulated
-        assert self._handle is not None, "handles are not initialized yet!"
+        # Run sanity checks -- make sure we are articulated
         assert self.n_joints > 0, "Tried to call method not intended for entity prim with no joints!"
 
-        self._verify_articulation_view_is_valid()
-        joint_velocities = self._articulation_view.get_dof_velocities().reshape(self.n_dof)
+        joint_velocities = self._articulation_view.get_joint_velocities().reshape(self.n_dof)
 
         # Possibly normalize values when returning
         return self._normalize_velocities(velocities=joint_velocities) if normalized else joint_velocities
@@ -860,12 +761,10 @@ class EntityPrim(XFormPrim):
         Returns:
             n-array: n-DOF length array of efforts
         """
-        # Run sanity checks -- make sure our handle is initialized and that we are articulated
-        assert self._handle is not None, "handles are not initialized yet!"
+        # Run sanity checks -- make sure we are articulated
         assert self.n_joints > 0, "Tried to call method not intended for entity prim with no joints!"
 
-        self._verify_articulation_view_is_valid()
-        joint_efforts = self._articulation_view.get_dof_actuation_forces().reshape(self.n_dof)
+        joint_efforts = self._articulation_view.get_applied_joint_efforts().reshape(self.n_dof)
 
         # Possibly normalize values when returning
         return self._normalize_efforts(efforts=joint_efforts) if normalized else joint_efforts
@@ -906,117 +805,20 @@ class EntityPrim(XFormPrim):
         return self.root_link.get_angular_velocity()
 
     def set_position_orientation(self, position=None, orientation=None):
-        current_position, current_orientation = self.get_position_orientation()
-        if position is None:
-            position = current_position
-        if orientation is None:
-            orientation = current_orientation
-
-        if self._prim_type == PrimType.CLOTH:
-            if self._dc is not None and self._dc.is_simulating():
-                self.root_link.set_position_orientation(position, orientation)
-            else:
-                super().set_position_orientation(position, orientation)
-        else:
-            if self._root_handle is not None and self._root_handle != _dynamic_control.INVALID_HANDLE and \
-                    self._dc is not None and self._dc.is_simulating():
-                self.root_link.set_position_orientation(position, orientation)
-            else:
-                super().set_position_orientation(position=position, orientation=orientation)
-
+        self._articulation_view.set_world_poses(position[None, :], orientation[None, :])
         BoundingBoxAPI.clear()
 
     def get_position_orientation(self):
-        if self._prim_type == PrimType.CLOTH:
-            if self._dc is not None and self._dc.is_simulating():
-                return self.root_link.get_position_orientation()
-            else:
-                return super().get_position_orientation()
-        else:
-            if self._root_handle is not None and self._root_handle != _dynamic_control.INVALID_HANDLE and \
-                    self._dc is not None and self._dc.is_simulating():
-                return self.root_link.get_position_orientation()
-            else:
-                return super().get_position_orientation()
-
-    def _set_local_pose_when_simulating(self, translation=None, orientation=None):
-        """
-        Sets prim's pose with respect to the local frame (the prim's parent frame) when simulation is running.
-
-        Args:
-            translation (None or 3-array): if specified, (x,y,z) translation in the local frame of the prim
-                (with respect to its parent prim). Default is None, which means left unchanged.
-            orientation (None or 4-array): if specified, (x,y,z,w) quaternion orientation in the local frame of the prim
-                (with respect to its parent prim). Default is None, which means left unchanged.
-        """
-        current_translation, current_orientation = self.get_local_pose()
-        if translation is None:
-            translation = current_translation
-        if orientation is None:
-            orientation = current_orientation
-        orientation = orientation[[3, 0, 1, 2]]
-        local_transform = tf_matrix_from_pose(translation=translation, orientation=orientation)
-        parent_world_tf = UsdGeom.Xformable(get_prim_parent(self._prim)).ComputeLocalToWorldTransform(
-            Usd.TimeCode.Default()
-        )
-        my_world_transform = np.matmul(parent_world_tf, local_transform)
-        transform = Gf.Transform()
-        transform.SetMatrix(Gf.Matrix4d(np.transpose(my_world_transform)))
-        calculated_position = transform.GetTranslation()
-        calculated_orientation = transform.GetRotation().GetQuat()
-        self.set_position_orientation(
-            position=np.array(calculated_position),
-            orientation=gf_quat_to_np_array(calculated_orientation)[[1, 2, 3, 0]],
-        )
+        positions, orientations = self._articulation_view.get_world_poses()
+        return positions[0], orientations[0]
 
     def set_local_pose(self, translation=None, orientation=None):
-        if self._prim_type == PrimType.CLOTH:
-            if self._dc is not None and self._dc.is_simulating():
-                self._set_local_pose_when_simulating(translation=translation, orientation=orientation)
-            else:
-                super().set_local_pose(translation=translation, orientation=orientation)
-        else:
-            if self._root_handle is not None and self._root_handle != _dynamic_control.INVALID_HANDLE and \
-                    self._dc is not None and self._dc.is_simulating():
-                self._set_local_pose_when_simulating(translation=translation, orientation=orientation)
-            else:
-                super().set_local_pose(translation=translation, orientation=orientation)
+        self._articulation_view.set_local_poses(translation[None, :], orientation[None, :])
         BoundingBoxAPI.clear()
 
-    def _get_local_pose_when_simulating(self):
-        """
-        Gets prim's pose with respect to the prim's local frame (it's parent frame) when simulation is running
-
-        Returns:
-            2-tuple:
-                - 3-array: (x,y,z) position in the local frame
-                - 4-array: (x,y,z,w) quaternion orientation in the local frame
-        """
-        parent_world_tf = UsdGeom.Xformable(get_prim_parent(self._prim)).ComputeLocalToWorldTransform(
-            Usd.TimeCode.Default()
-        )
-        world_position, world_orientation = self.get_position_orientation()
-        my_world_transform = tf_matrix_from_pose(translation=world_position,
-                                                 orientation=world_orientation[[3, 0, 1, 2]])
-        local_transform = np.matmul(np.linalg.inv(np.transpose(parent_world_tf)), my_world_transform)
-        transform = Gf.Transform()
-        transform.SetMatrix(Gf.Matrix4d(np.transpose(local_transform)))
-        calculated_translation = transform.GetTranslation()
-        calculated_orientation = transform.GetRotation().GetQuat()
-        return np.array(calculated_translation), gf_quat_to_np_array(calculated_orientation)[[1, 2, 3, 0]]
-
     def get_local_pose(self):
-        if self._prim_type == PrimType.CLOTH:
-            if self._dc is not None and self._dc.is_simulating():
-                return self._get_local_pose_when_simulating()
-            else:
-                return super().get_local_pose()
-        else:
-            if self._root_handle is not None and self._root_handle != _dynamic_control.INVALID_HANDLE and \
-                    self._dc is not None and self._dc.is_simulating():
-                return self._get_local_pose_when_simulating()
-            else:
-                return super().get_local_pose()
+        positions, orientations = self._articulation_view.get_local_poses()
+        return positions[0], orientations[0]
 
     # TODO: Is the omni joint damping (used for driving motors) same as dissipative joint damping (what we had in pb)?
     @property
