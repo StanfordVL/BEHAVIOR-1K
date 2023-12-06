@@ -495,6 +495,14 @@ class Simulator(SimulationContext, Serializable):
             with suppress_omni_log(channels=channels):
                 super().play()
 
+            # If we're stopped, take a physics step and update the physics sim view. This must happen BEFORE the
+            # handles are updated, since updating the physics view makes the per-object physics view invalid
+            self.step_physics()
+
+            # Initialize physics view and RigidContactAPI
+            self._physics_sim_view = omni.physics.tensors.create_simulation_view(self.backend)
+            self._physics_sim_view.set_subspace_roots("/")
+
             # Take a render step -- this is needed so that certain (unknown, maybe omni internal state?) is populated
             # correctly.
             self.render()
@@ -516,12 +524,6 @@ class Simulator(SimulationContext, Serializable):
                     for robot in self.scene.robots:
                         if robot.initialized:
                             robot.update_controller_mode()
-
-                self.step_physics()
-
-                # Initialize physics view and RigidContactAPI
-                self._physics_sim_view = omni.physics.tensors.create_simulation_view(self.backend)
-                self._physics_sim_view.set_subspace_roots("/")
 
             # Additionally run non physics things
             self._non_physics_step()
