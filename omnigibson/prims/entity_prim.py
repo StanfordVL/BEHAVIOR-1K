@@ -1,6 +1,5 @@
 import numpy as np
 
-from omni.isaac.core.articulations import ArticulationView
 from omni.isaac.core.utils.rotations import gf_quat_to_np_array
 from omni.isaac.core.utils.stage import get_current_stage
 from pxr import Gf, Usd, UsdGeom, UsdPhysics, PhysxSchema, PhysicsSchemaTools
@@ -15,6 +14,7 @@ from omnigibson.prims.cloth_prim import ClothPrim
 from omnigibson.prims.joint_prim import JointPrim
 from omnigibson.prims.rigid_prim import RigidPrim
 from omnigibson.prims.xform_prim import XFormPrim
+from omnigibson.utils.extended_articulation_view import ExtendedArticulationView
 from omnigibson.utils.constants import PrimType, GEOM_TYPES, JointType, JointAxis
 from omnigibson.utils.ui_utils import suppress_omni_log
 from omnigibson.utils.usd_utils import BoundingBoxAPI
@@ -90,7 +90,7 @@ class EntityPrim(XFormPrim):
 
     def _post_load(self):
         # Prepare the articulation view (at this point only working via the USD interface)
-        self._articulation_view = ArticulationView(self._prim_path)
+        self._articulation_view = ExtendedArticulationView(self._prim_path)
 
         # If this is a cloth, delete the root link and replace it with the single nested mesh
         if self._prim_type == PrimType.CLOTH:
@@ -234,13 +234,13 @@ class EntityPrim(XFormPrim):
                 for i in range(self._articulation_view._metadata.joint_count):
                     joint_name = self._articulation_view._metadata.joint_names[i]
                     joint_dof_offset = self._articulation_view._metadata.joint_dof_offsets[i]
-                    joint_path = self._articulation_view._metadata.dof_paths[0][joint_dof_offset]
+                    joint_path = self._articulation_view.dof_paths[0][joint_dof_offset]
                     # Only add the joint if it's not fixed (i.e.: it has DOFs > 0)
                     if self._articulation_view._metadata.joint_dof_counts[i] > 0:
                         joint = JointPrim(
                             prim_path=joint_path,
                             name=f"{self._name}:joint_{joint_name}",
-                            articulation=self._articulation_view,
+                            articulation_view=self._articulation_view,
                         )
                         joint.initialize()
                         self._joints[joint_name] = joint
@@ -273,8 +273,8 @@ class EntityPrim(XFormPrim):
             else:
                 assert not self.initialized, \
                     "Cannot update joint limits for a non-uniformly scaled object when already initialized."
-                for link_name, link in self.links.items():
-                    if joint.parent_name == link_name:
+                for link in self.links.values():
+                    if joint.body0 == link.prim_path:
                         # Find the parent link frame orientation in the object frame
                         _, link_local_orn = link.get_local_pose()
 
