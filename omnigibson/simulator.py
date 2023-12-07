@@ -12,7 +12,6 @@ import omni.physics
 from omni.isaac.core.simulation_context import SimulationContext
 from omni.isaac.core.utils.prims import get_prim_at_path
 from omni.isaac.core.utils.stage import open_stage, create_new_stage
-from omni.isaac.dynamic_control import _dynamic_control
 from omni.physx.bindings._physx import ContactEventType, SimulationEvent
 import omni.kit.loop._loop as omni_loop
 from pxr import Usd, PhysicsSchemaTools, UsdUtils
@@ -805,14 +804,6 @@ class Simulator(SimulationContext, Serializable):
         SimulationContext.__del__(self)
         Simulator._world_initialized = None
         return
-
-    @property
-    def dc(self):
-        """
-        Returns:
-            _dynamic_control.DynamicControl: Dynamic control (dc) interface
-        """
-        return self._dynamic_control
 
     @property
     def pi(self):
