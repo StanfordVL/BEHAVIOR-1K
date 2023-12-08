@@ -53,7 +53,7 @@ from omnigibson.objects.usd_object import USDObject
 
 m = create_module_macros(module_path=__file__)
 
-m.DEFAULT_BODY_OFFSET_FROM_FLOOR = 0.05
+m.DEFAULT_BODY_OFFSET_FROM_FLOOR = 0.01
 
 m.KP_LIN_VEL = 0.3
 m.KP_ANGLE_VEL = 0.2
