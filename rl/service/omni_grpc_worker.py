@@ -62,7 +62,7 @@ def main(local_addr, learner_addr):
                     "camera": {
                         "name": "JointController",
                         "motor_type": "position",
-                        "command_input_limits": None,
+                        "command_input_limits": "default",
                         "command_output_limits": None,
                         "use_delta_commands": False
                     }
