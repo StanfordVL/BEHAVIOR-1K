@@ -39,3 +39,5 @@ class Falling(FailureCondition):
             robot_up = rotation.apply(np.array([0, 0, 1]))
             if robot_up[2] < 0.75:
                 return True
+            
+        return False
