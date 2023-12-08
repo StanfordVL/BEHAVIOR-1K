@@ -6,6 +6,7 @@ from omnigibson.reward_functions.grasp_reward import GraspReward
 
 from omnigibson.tasks.task_base import BaseTask
 from omnigibson.scenes.scene_base import Scene
+from omnigibson.termination_conditions.falling import Falling
 from omnigibson.termination_conditions.grasp_goal import GraspGoal
 from omnigibson.termination_conditions.timeout import Timeout
 from omnigibson.utils.grasping_planning_utils import get_grasp_poses_for_object_sticky
@@ -42,6 +43,7 @@ class GraspTask(BaseTask):
             self.obj_name
         )
         terminations["timeout"] = Timeout(max_steps=self._termination_config["max_steps"])
+        terminations["falling"] = Falling()
 
         return terminations
 
