@@ -466,7 +466,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self._current_episode += 1
         self._current_step = 0
 
-    def reset(self, seed=None, options=None):
+    def reset(self, **kwargs):
         """
         Reset episode.
         """
@@ -492,7 +492,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 log.error(("obs", key, value.dtype, value.shape))
             raise ValueError("Observation space does not match returned observations!")
 
-        return obs
+        return obs, {}
 
     @property
     def episode_steps(self):
