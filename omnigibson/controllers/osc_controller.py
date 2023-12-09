@@ -456,7 +456,7 @@ class OperationalSpaceController(ManipulationController):
         pos_relative = np.array(control_dict[f"{self.task_name}_pos_relative"])
         quat_relative = np.array(control_dict[f"{self.task_name}_quat_relative"])
 
-        # The first three values of the command are always the (delta) position, convert to absolute values if needed
+        # Convert position command to absolute values if needed
         if self.mode == "absolute_pose":
             target_pos = command[:3]
         else:

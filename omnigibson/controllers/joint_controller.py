@@ -141,7 +141,12 @@ class JointController(LocomotionController, ManipulationController, GripperContr
                 raise ValueError(f"Got invalid motor type: {self._motor_type}!")
         else:
             # Directly use info from control dict
-            cmd = control_dict["joint_{}".format(self._motor_type)][self.dof_idx]
+            if self._motor_type == "position":
+                # Maintain current qpos
+                cmd = control_dict["joint_{}".format(self._motor_type)][self.dof_idx]
+            else:
+                # For velocity / effort, directly set to 0
+                cmd = np.zeros(self.command_dim)
 
         return cmd
 

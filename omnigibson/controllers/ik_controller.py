@@ -278,7 +278,7 @@ class InverseKinematicsController(ManipulationController):
         pos_relative = np.array(control_dict["{}_pos_relative".format(self.task_name)])
         quat_relative = np.array(control_dict["{}_quat_relative".format(self.task_name)])
 
-        # The first three values of the command are always the (delta) position, convert to absolute values if needed
+        # Convert position command to absolute values if needed
         if self.mode == "absolute_pose":
             target_pos = command[:3]
         else:
