@@ -1,5 +1,6 @@
 import random
 import numpy as np
+from scipy.spatial.transform import Rotation as R
 import omnigibson as og
 from omnigibson.action_primitives.starter_semantic_action_primitives import PlanningContext
 from omnigibson.reward_functions.grasp_reward import GraspReward
@@ -93,8 +94,26 @@ class GraspTask(BaseTask):
         robot.set_position_orientation(*robot_pose)
 
         # Settle robot
-        for i in range(100):
+        for _ in range(10):
             og.sim.step()
+
+        for _ in range(100):
+            og.sim.step()
+            if np.linalg.norm(robot.get_linear_velocity()) > 1e-2:
+                continue 
+            if np.linalg.norm(robot.get_angular_velocity()) > 1e-2:
+                continue
+            # otherwise we've stopped
+            break
+        else:
+            raise ValueError("Robot could not settle")
+
+        # Check if the robot has toppled
+        rotation = R.from_quat(robot.get_orientation())
+        robot_up = rotation.apply(np.array([0, 0, 1]))
+        if robot_up[2] < 0.75:
+            raise ValueError("Robot has toppled over")
+
         print("Reset robot pose to: ", robot_pose)
 
     # Overwrite reset by only removeing reset scene
@@ -106,8 +125,15 @@ class GraspTask(BaseTask):
             env (Environment): environment instance to reset
         """
         # Reset the scene, agent, and variables
-        self._reset_scene(env)
-        self._reset_agent(env)
+        for _ in range(20):
+            try:
+                self._reset_scene(env)
+                self._reset_agent(env)
+                break
+            except Exception as e:
+                print("Resetting error: ", e)
+        else:
+            raise ValueError("Could not reset task.")
         self._reset_variables(env)
 
         # Also reset all termination conditions and reward functions
