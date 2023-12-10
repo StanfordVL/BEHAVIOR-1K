@@ -2,7 +2,7 @@ import numpy as np
 import omnigibson as og
 from omnigibson import object_states
 from omnigibson.macros import gm, macros
-from omnigibson.systems import WaterSystem
+from omnigibson.systems import get_system
 from omnigibson.utils.constants import ParticleModifyMethod
 
 # Make sure object states are enabled, we're using GPU dynamics, and HQ rendering is enabled
@@ -24,20 +24,20 @@ def main():
                 "name": "light",
                 "light_type": "Sphere",
                 "radius": 0.01,
-                "intensity": 1e5,
+                "intensity": 1e8,
                 "position": [-2.0, -2.0, 1.0],
             },
             {
                 "type": "DatasetObject",
                 "name": "cabinet",
                 "category": "bottom_cabinet",
-                "model": "45087",
+                "model": "zuwvdo",
+                "bounding_box": [1.595, 0.537, 1.14],
                 "abilities": {
                     "freezable": {},
                     "cookable": {},
                     "burnable": {},
                     "saturable": {},
-                    "toggleable": {},
                     "particleRemover": {
                         "method": ParticleModifyMethod.ADJACENCY,
                         "conditions": {
@@ -50,17 +50,17 @@ def main():
                             # according to the water.
                             # NOTE: This will only change color if gm.ENABLE_HQ_RENDERING and gm.USE_GPU_DYNAMICS is
                             # enabled!
-                            WaterSystem: [],
+                            "water": [],
                         },
             },
                 },
-                "position": [0, 0, 0.55],
+                "position": [0, 0, 0.59],
             },
         ],
     }
 
     # Create the environment
-    env = og.Environment(configs=cfg, action_timestep=1/60., physics_timestep=1/60.)
+    env = og.Environment(configs=cfg)
 
     # Set camera to appropriate viewing pose
     og.sim.viewer_camera.set_position_orientation(
@@ -76,7 +76,6 @@ def main():
     assert object_states.Cooked in obj.states
     assert object_states.Burnt in obj.states
     assert object_states.Saturated in obj.states
-    assert object_states.ToggledOn in obj.states
 
     def report_states():
         # Make sure states are propagated before printing
@@ -88,8 +87,7 @@ def main():
         print("obj is frozen:", obj.states[object_states.Frozen].get_value())
         print("obj is cooked:", obj.states[object_states.Cooked].get_value())
         print("obj is burnt:", obj.states[object_states.Burnt].get_value())
-        print("obj is soaked:", obj.states[object_states.Saturated].get_value(WaterSystem))
-        print("obj is toggledon:", obj.states[object_states.ToggledOn].get_value())
+        print("obj is soaked:", obj.states[object_states.Saturated].get_value(get_system("water")))
         print("obj textures:", obj.get_textures())
 
     # Report default states
@@ -119,22 +117,12 @@ def main():
 
     # Notify user that we're about to soak the object, and then soak the object
     input("\nObject will be saturated with water. Press ENTER to continue.")
-    obj.states[object_states.Saturated].set_value(WaterSystem, True)
+    obj.states[object_states.Saturated].set_value(get_system("water"), True)
     report_states()
 
     # Notify user that we're about to unsoak the object, and then unsoak the object
     input("\nObject will be unsaturated with water. Press ENTER to continue.")
-    obj.states[object_states.Saturated].set_value(WaterSystem, False)
-    report_states()
-
-    # Notify user that we're about to toggle on the object, and then toggle on the object
-    input("\nObject will be toggled on. Press ENTER to continue.")
-    obj.states[object_states.ToggledOn].set_value(True)
-    report_states()
-
-    # Notify user that we're about to toggle off the object, and then toggle off the object
-    input("\nObject will be toggled off. Press ENTER to continue.")
-    obj.states[object_states.ToggledOn].set_value(False)
+    obj.states[object_states.Saturated].set_value(get_system("water"), False)
     report_states()
 
     # Close environment at the end

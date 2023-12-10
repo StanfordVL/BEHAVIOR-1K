@@ -154,7 +154,7 @@ def check_points_in_sphere(size, pos, quat, scale, particle_positions):
         size (float): radius dimensions of the sphere
         pos (3-array): (x,y,z) local location of the sphere
         quat (4-array): (x,y,z,w) local orientation of the sphere
-        scale (3-array): (x,y,z) local scale of the cube, specified in its local frame
+        scale (3-array): (x,y,z) local scale of the sphere, specified in its local frame
         particle_positions ((N, 3) array): positions to check for whether it is in the sphere
 
     Returns:
@@ -207,6 +207,59 @@ def check_points_in_convex_hull_mesh(mesh_face_centroids, mesh_face_normals, pos
     return in_range
 
 
+def _generate_convex_hull_volume_checker_functions(convex_hull_mesh):
+    """
+    An internal helper function used to programmatically generate lambda funtions to check for particle
+    points within a convex hull mesh defined by face centroids @mesh_face_centroids and @mesh_face_normals.
+
+    Note that this is needed as an EXTERNAL helper function to @generate_points_in_volume_checker_function
+    because we "bake" certain arguments as part of the lambda internal scope, and
+    directly generating functions in a for loop results in these local variables being overwritten each time
+    (meaning that all the generated lambda functions reference the SAME variables!!)
+
+    Args:
+        convex_hull_mesh (Usd.Prim): Raw USD convex hull mesh to generate the volume checker functions
+
+    Returns:
+        2-tuple:
+            - function: Generated lambda function with signature:
+
+                    in_range = check_in_volume(mesh, particle_positions)
+
+                where @in_range is a N-array boolean numpy array, (True where the particle is in the convex hull mesh
+                    volume), @mesh is the raw USD mesh, and @particle_positions is a (N, 3) array specifying the particle
+                    positions in the SAME coordinate frame as @mesh
+
+            - function: Function for grabbing real-time LOCAL scale volume of the container. Signature:
+
+                vol = calc_volume(mesh)
+
+            where @vol is the total volume being checked (expressed in the mesh's LOCAL scale), and @mesh is the raw
+                USD mesh
+    """
+    # For efficiency, we pre-compute the mesh using trimesh and find its corresponding faces and normals
+    trimesh_mesh = mesh_prim_to_trimesh_mesh(convex_hull_mesh, include_normals=False, include_texcoord=False).convex_hull
+    assert trimesh_mesh.is_convex, \
+        f"Trying to generate a volume checker function for a non-convex mesh {convex_hull_mesh.GetPath().pathString}"
+    face_centroids = trimesh_mesh.vertices[trimesh_mesh.faces].mean(axis=1)
+    face_normals = trimesh_mesh.face_normals
+
+    # This function assumes that:
+    # 1. @particle_positions are in the local container_link frame
+    # 2. the @check_points_in_[...] function will convert them into the local @mesh frame
+    in_volume = lambda mesh, particle_positions: check_points_in_convex_hull_mesh(
+        mesh_face_centroids=face_centroids,
+        mesh_face_normals=face_normals,
+        pos=np.array(mesh.GetAttribute("xformOp:translate").Get()),
+        quat=np.array(
+            [*(mesh.GetAttribute("xformOp:orient").Get().imaginary), mesh.GetAttribute("xformOp:orient").Get().real]),
+        scale=np.array(mesh.GetAttribute("xformOp:scale").Get()),
+        particle_positions=particle_positions,
+    )
+    calc_volume = lambda mesh: trimesh_mesh.volume if trimesh_mesh.is_volume else trimesh_mesh.convex_hull.volume
+    return in_volume, calc_volume
+
+
 def generate_points_in_volume_checker_function(obj, volume_link, use_visual_meshes=True, mesh_name_prefixes=None):
     """
     Generates a function for quickly checking which of a group of points are contained within any container volumes.
@@ -243,47 +296,19 @@ def generate_points_in_volume_checker_function(obj, volume_link, use_visual_mesh
             where @vol is the total volume being checked (expressed in global scale) aggregated across
             all container sub-volumes
     """
-    # If the object doesn't uniform scale, we make sure the volume link has no relative orientation w.r.t to
-    # the object (root link) frame
-    # TODO: Can we remove this restriction in the future? The current paradigm of how scale operates makes this difficult
-    if (obj.scale.max() - obj.scale.min()) > 1e-3:
-        volume_link_quat = volume_link.get_orientation()
-        object_quat = obj.get_orientation()
-        quat_distance = T.quat_distance(volume_link_quat, object_quat)
-        assert np.isclose(quat_distance[3], 1, atol=1e-3), \
-            f"Volume link must have no relative orientation w.r.t the root link! (i.e.: quat distance [0, 0, 0, 1])! " \
-            f"Got quat distance: {quat_distance}"
     # Iterate through all visual meshes and keep track of any that are prefixed with container
     container_meshes = []
     meshes = volume_link.visual_meshes if use_visual_meshes else volume_link.collision_meshes
     for container_mesh_name, container_mesh in meshes.items():
         if mesh_name_prefixes is None or mesh_name_prefixes in container_mesh_name:
-            container_meshes.append(container_mesh.prim)
+            container_meshes.append(container_mesh)
 
     # Programmatically define the volume checker functions based on each container found
     volume_checker_fcns = []
-    volume_calc_fcns = []
     for sub_container_mesh in container_meshes:
-        mesh_type = sub_container_mesh.GetTypeName()
+        mesh_type = sub_container_mesh.prim.GetTypeName()
         if mesh_type == "Mesh":
-            # For efficiency, we pre-compute the mesh using trimesh and find its corresponding faces and normals
-            trimesh_mesh = mesh_prim_to_trimesh_mesh(sub_container_mesh)
-            assert trimesh_mesh.is_convex, f"Trying to generate a volume checker function for a non-convex mesh {sub_container_mesh.GetPath().pathString}"
-            face_centroids = trimesh_mesh.vertices[trimesh_mesh.faces].mean(axis=1)
-            face_normals = trimesh_mesh.face_normals
-
-            # This function assumes that:
-            # 1. @particle_positions are in the local container_link frame
-            # 2. the @check_points_in_[...] function will convert them into the local @mesh frame
-            fcn = lambda mesh, particle_positions: check_points_in_convex_hull_mesh(
-                mesh_face_centroids=face_centroids,
-                mesh_face_normals=face_normals,
-                pos=np.array(mesh.GetAttribute("xformOp:translate").Get()),
-                quat=np.array([*(mesh.GetAttribute("xformOp:orient").Get().imaginary), mesh.GetAttribute("xformOp:orient").Get().real]),
-                scale=np.array(mesh.GetAttribute("xformOp:scale").Get()),
-                particle_positions=particle_positions,
-            )
-            vol_fcn = lambda mesh: trimesh_mesh.volume if trimesh_mesh.is_volume else trimesh_mesh.convex_hull.volume
+            fcn, vol_fcn = _generate_convex_hull_volume_checker_functions(convex_hull_mesh=sub_container_mesh.prim)
         elif mesh_type == "Sphere":
             fcn = lambda mesh, particle_positions: check_points_in_sphere(
                 size=mesh.GetAttribute("radius").Get(),
@@ -292,7 +317,6 @@ def generate_points_in_volume_checker_function(obj, volume_link, use_visual_mesh
                 scale=np.array(mesh.GetAttribute("xformOp:scale").Get()),
                 particle_positions=particle_positions,
             )
-            vol_fcn = lambda mesh: 4 / 3 * np.pi * (mesh.GetAttribute("radius").Get() ** 3)
         elif mesh_type == "Cylinder":
             fcn = lambda mesh, particle_positions: check_points_in_cylinder(
                 size=[mesh.GetAttribute("radius").Get(), mesh.GetAttribute("height").Get()],
@@ -301,7 +325,6 @@ def generate_points_in_volume_checker_function(obj, volume_link, use_visual_mesh
                 scale=np.array(mesh.GetAttribute("xformOp:scale").Get()),
                 particle_positions=particle_positions,
             )
-            vol_fcn = lambda mesh: np.pi * (mesh.GetAttribute("radius").Get() ** 2) * mesh.GetAttribute("height").Get()
         elif mesh_type == "Cone":
             fcn = lambda mesh, particle_positions: check_points_in_cone(
                 size=[mesh.GetAttribute("radius").Get(), mesh.GetAttribute("height").Get()],
@@ -310,7 +333,6 @@ def generate_points_in_volume_checker_function(obj, volume_link, use_visual_mesh
                 scale=np.array(mesh.GetAttribute("xformOp:scale").Get()),
                 particle_positions=particle_positions,
             )
-            vol_fcn = lambda mesh: np.pi * (mesh.GetAttribute("radius").Get() ** 2) * mesh.GetAttribute("height").Get() / 3.0
         elif mesh_type == "Cube":
             fcn = lambda mesh, particle_positions: check_points_in_cube(
                 size=mesh.GetAttribute("size").Get(),
@@ -319,12 +341,10 @@ def generate_points_in_volume_checker_function(obj, volume_link, use_visual_mesh
                 scale=np.array(mesh.GetAttribute("xformOp:scale").Get()),
                 particle_positions=particle_positions,
             )
-            vol_fcn = lambda mesh: mesh.GetAttribute("size").Get() ** 3
         else:
             raise ValueError(f"Cannot create volume checker function for mesh of type: {mesh_type}")
 
         volume_checker_fcns.append(fcn)
-        volume_calc_fcns.append(vol_fcn)
 
     # Define the actual volume checker function
     def check_points_in_volumes(particle_positions):
@@ -347,19 +367,40 @@ def generate_points_in_volume_checker_function(obj, volume_link, use_visual_mesh
 
         in_volumes = np.zeros(n_particles).astype(bool)
         for checker_fcn, mesh in zip(volume_checker_fcns, container_meshes):
-            in_volumes |= checker_fcn(mesh, particle_positions)
+            in_volumes |= checker_fcn(mesh.prim, particle_positions)
 
         return in_volumes
 
     # Define the actual volume calculator function
-    def calculate_volume():
-        # Aggregate values across all subvolumes
-        # NOTE: Assumes all volumes are strictly disjointed (becuase we sum over all subvolumes to calculate
-        # total raw volume)
-        # TODO: Is there a way we can explicitly check if disjointed?
-        vols = [calc_fcn(mesh) * np.product(mesh.GetAttribute("xformOp:scale").Get())
-                for calc_fcn, mesh in zip(volume_calc_fcns, container_meshes)]
-        # Aggregate over all volumes and scale by the link's global scale
-        return np.sum(vols) * np.product(volume_link.get_world_scale())
+    def calculate_volume(precision=1e-5):
+        # We use monte-carlo sampling to approximate the voluem up to @precision
+        # NOTE: precision defines the RELATIVE precision of the volume computation -- i.e.: the relative error with
+        # respect to the volume link's global AABB
+
+        # Convert precision to minimum number of particles to sample
+        min_n_particles = int(np.ceil(1. / precision))
+
+        # Make sure container meshes are visible so AABB computation is correct
+        for mesh in container_meshes:
+            mesh.visible = True
+
+        # Determine equally-spaced sampling distance to achieve this minimum particle count
+        aabb_volume = np.product(volume_link.aabb_extent)
+        sampling_distance = np.cbrt(aabb_volume / min_n_particles)
+        low, high = volume_link.aabb
+        n_particles_per_axis = ((high - low) / sampling_distance).astype(int) + 1
+        assert np.all(n_particles_per_axis), "Must increase precision for calculate_volume -- too coarse for sampling!"
+        # 1e-10 is added because the extent might be an exact multiple of particle radius
+        arrs = [np.arange(lo, hi, sampling_distance)
+                for lo, hi, n in zip(low, high, n_particles_per_axis)]
+        # Generate 3D-rectangular grid of points, and only keep the ones inside the mesh
+        points = np.stack([arr.flatten() for arr in np.meshgrid(*arrs)]).T
+
+        # Re-hide container meshes
+        for mesh in container_meshes:
+            mesh.visible = False
+
+        # Return the fraction of the link AABB's volume based on fraction of points enclosed within it
+        return aabb_volume * np.mean(check_points_in_volumes(points))
 
     return check_points_in_volumes, calculate_volume

@@ -64,9 +64,9 @@ class StaticTraversableScene(TraversableScene):
             floor_plane_color=floor_plane_color,
         )
 
-    def _load(self, simulator):
+    def _load(self):
         # Run super first
-        super()._load(simulator=simulator)
+        super()._load()
 
         # Load the scene mesh (use downsampled one if available)
         filename = os.path.join(get_scene_path(self.scene_model), "mesh_z_up_downsampled.obj")

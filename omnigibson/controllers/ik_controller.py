@@ -1,4 +1,5 @@
 import numpy as np
+from omnigibson.macros import create_module_macros
 
 import omnigibson.utils.transform_utils as T
 from omnigibson.controllers import ControlType, ManipulationController
@@ -10,12 +11,19 @@ from omnigibson.utils.ui_utils import create_module_logger
 # Create module logger
 log = create_module_logger(module_name=__name__)
 
+# Set some macros
+m = create_module_macros(module_path=__file__)
+m.IK_POS_TOLERANCE = 0.002
+m.IK_POS_WEIGHT = 20.0
+m.IK_MAX_ITERATIONS = 100
+
 # Different modes
 IK_MODE_COMMAND_DIMS = {
-    "pose_absolute_ori": 6,  # 6DOF (dx,dy,dz,ax,ay,az) control over pose, where the orientation is given in absolute axis-angle coordinates
-    "pose_delta_ori": 6,  # 6DOF (dx,dy,dz,dax,day,daz) control over pose
-    "position_fixed_ori": 3,  # 3DOF (dx,dy,dz) control over position, with orientation commands being kept as fixed initial absolute orientation
-    "position_compliant_ori": 3,  # 3DOF (dx,dy,dz) control over position, with orientation commands automatically being sent as 0s (so can drift over time)
+    "absolute_pose": 6,             # 6DOF (x,y,z,ax,ay,az) control of pose, whether both position and orientation is given in absolute coordinates
+    "pose_absolute_ori": 6,         # 6DOF (dx,dy,dz,ax,ay,az) control over pose, where the orientation is given in absolute axis-angle coordinates
+    "pose_delta_ori": 6,            # 6DOF (dx,dy,dz,dax,day,daz) control over pose
+    "position_fixed_ori": 3,        # 3DOF (dx,dy,dz) control over position, with orientation commands being kept as fixed initial absolute orientation
+    "position_compliant_ori": 3,    # 3DOF (dx,dy,dz) control over position, with orientation commands automatically being sent as 0s (so can drift over time)
 }
 IK_MODES = set(IK_MODE_COMMAND_DIMS.keys())
 
@@ -47,6 +55,7 @@ class InverseKinematicsController(ManipulationController):
         mode="pose_delta_ori",
         smoothing_filter_size=None,
         workspace_pose_limiter=None,
+        condition_on_current_position=True,
     ):
         """
         Args:
@@ -101,6 +110,8 @@ class InverseKinematicsController(ManipulationController):
 
                 where pos_command is (x,y,z) cartesian position values, command_quat is (x,y,z,w) quarternion orientation
                 values, and the returned tuple is the processed (pos, quat) command.
+            condition_on_current_position (bool): if True, will use the current joint position as the initial guess for the IK algorithm.
+                Otherwise, will use the default_joint_pos as the initial guess.
         """
         # Store arguments
         control_dim = len(dof_idx)
@@ -117,17 +128,18 @@ class InverseKinematicsController(ManipulationController):
         self.workspace_pose_limiter = workspace_pose_limiter
         self.task_name = task_name
         self.default_joint_pos = default_joint_pos[dof_idx]
+        self.condition_on_current_position = condition_on_current_position
 
         # Create the lula IKSolver
         self.solver = IKSolver(
             robot_description_path=robot_description_path,
             robot_urdf_path=robot_urdf_path,
             eef_name=eef_name,
-            default_joint_pos=default_joint_pos,
+            default_joint_pos=self.default_joint_pos,
         )
 
         # Other variables that will be filled in at runtime
-        self._quat_target = None
+        self._fixed_quat_target = None
 
         # If the mode is set as absolute orientation and using default config,
         # change input and output limits accordingly.
@@ -163,10 +175,13 @@ class InverseKinematicsController(ManipulationController):
         )
 
     def reset(self):
+        # Call super first
+        super().reset()
+
         # Reset the filter and clear internal control state
         if self.control_filter is not None:
             self.control_filter.reset()
-        self._quat_target = None
+        self._fixed_quat_target = None
 
     @property
     def state_size(self):
@@ -178,7 +193,7 @@ class InverseKinematicsController(ManipulationController):
         state = super()._dump_state()
 
         # Add internal quaternion target and filter state
-        state["quat_target"] = self._quat_target
+        state["fixed_quat_target"] = self._fixed_quat_target
         state["control_filter"] = self.control_filter.dump_state(serialized=False)
 
         return state
@@ -188,7 +203,7 @@ class InverseKinematicsController(ManipulationController):
         super()._load_state(state=state)
 
         # Load relevant info for this controller
-        self._quat_target = state["quat_target"]
+        self._fixed_quat_target = state["fixed_quat_target"]
         self.control_filter.load_state(state["control_filter"], serialized=False)
 
     def _serialize(self, state):
@@ -198,7 +213,7 @@ class InverseKinematicsController(ManipulationController):
         # Serialize state for this controller
         return np.concatenate([
             state_flat,
-            np.zeros(4) if state["quat_target"] is None else state["quat_target"],      # Encode None as zeros for consistent serialization size
+            np.zeros(4) if state["fixed_quat_target"] is None else state["fixed_quat_target"],      # Encode None as zeros for consistent serialization size
             self.control_filter.serialize(state=state["control_filter"]),
         ]).astype(float)
 
@@ -207,10 +222,33 @@ class InverseKinematicsController(ManipulationController):
         state_dict, idx = super()._deserialize(state=state)
 
         # Deserialize state for this controller
-        state_dict["quat_target"] = None if np.all(state[idx: idx + 4] == 0.0) else state[idx: idx + 4]
+        state_dict["fixed_quat_target"] = None if np.all(state[idx: idx + 4] == 0.0) else state[idx: idx + 4]
         state_dict["control_filter"] = self.control_filter.deserialize(state=state[idx + 4: idx + 4 + self.control_filter.state_size])
 
         return state_dict, idx + 4 + self.control_filter.state_size
+
+    def compute_no_op_command(self, control_dict):
+        # Compute based on mode
+        pos_relative = np.array(control_dict[f"{self.task_name}_pos_relative"])
+        quat_relative = np.array(control_dict[f"{self.task_name}_quat_relative"])
+
+        if self.mode == "absolute_pose":
+            # 6DOF (x,y,z,ax,ay,az) control of pose, whether both position and orientation is given in absolute coordinates
+            cmd = np.concatenate([pos_relative, T.quat2axisangle(quat_relative)])
+        elif self.mode == "pose_absolute_ori":
+            # 6DOF (dx,dy,dz,ax,ay,az) control over pose, where the orientation is given in absolute axis-angle coordinates
+            cmd = np.concatenate([np.zeros(3), T.quat2axisangle(quat_relative)])
+        elif self.mode == "pose_delta_ori":
+            # 6DOF (dx,dy,dz,dax,day,daz) control over pose
+            cmd = np.zeros(6)
+        elif self.mode == "position_fixed_ori" or self.mode == "position_compliant_ori":
+            # 3DOF (dx,dy,dz) control over position, with orientation commands being kept as fixed initial absolute orientation, OR
+            # 3DOF (dx,dy,dz) control over position, with orientation commands automatically being sent as 0s (so can drift over time)
+            cmd = np.zeros(3)
+        else:
+            raise ValueError(f"Got invalid command mode type: {self.mode}!")
+
+        return cmd
 
     def _command_to_control(self, command, control_dict):
         """
@@ -240,25 +278,28 @@ class InverseKinematicsController(ManipulationController):
         pos_relative = np.array(control_dict["{}_pos_relative".format(self.task_name)])
         quat_relative = np.array(control_dict["{}_quat_relative".format(self.task_name)])
 
-        # The first three values of the command are always the (delta) position, convert to absolute values
-        dpos = command[:3]
-        target_pos = pos_relative + dpos
+        # Convert position command to absolute values if needed
+        if self.mode == "absolute_pose":
+            target_pos = command[:3]
+        else:
+            dpos = command[:3]
+            target_pos = pos_relative + dpos
 
         # Compute orientation
         if self.mode == "position_fixed_ori":
             # We need to grab the current robot orientation as the commanded orientation if there is none saved
-            if self._quat_target is None:
-                self._quat_target = quat_relative
-            target_quat = self._quat_target
+            if self._fixed_quat_target is None:
+                self._fixed_quat_target = quat_relative.astype(np.float32)
+            target_quat = self._fixed_quat_target
         elif self.mode == "position_compliant_ori":
             # Target quat is simply the current robot orientation
             target_quat = quat_relative
-        elif self.mode == "pose_absolute_ori":
+        elif self.mode == "pose_absolute_ori" or self.mode == "absolute_pose":
             # Received "delta" ori is in fact the desired absolute orientation
-            target_quat = T.axisangle2quat(command[3:])
+            target_quat = T.axisangle2quat(command[3:6])
         else:  # pose_delta_ori control
             # Grab dori and compute target ori
-            dori = T.quat2mat(T.axisangle2quat(command[3:]))
+            dori = T.quat2mat(T.axisangle2quat(command[3:6]))
             target_quat = T.mat2quat(dori @ T.quat2mat(quat_relative))
 
         # Possibly limit to workspace if specified
@@ -267,17 +308,36 @@ class InverseKinematicsController(ManipulationController):
 
         # Calculate and return IK-backed out joint angles
         current_joint_pos = control_dict["joint_position"][self.dof_idx]
-        target_joint_pos = self.solver.solve(
-            target_pos=target_pos,
-            target_quat=target_quat,
-            initial_joint_pos=current_joint_pos,
-        )
 
-        if target_joint_pos is None:
-            # Print warning that we couldn't find a valid solution, and return the current joint configuration
-            # instead so that we execute a no-op control
-            log.warning(f"Could not find valid IK configuration! Returning no-op control instead.")
+        # If the delta is really small, we just keep the current joint position. This avoids joint
+        # drift caused by IK solver inaccuracy even when zero delta actions are provided.
+        if np.allclose(pos_relative, target_pos, atol=1e-4) and np.allclose(quat_relative, target_quat, atol=1e-4):
             target_joint_pos = current_joint_pos
+        else:
+            # Otherwise we try to solve for the IK configuration.
+            if self.condition_on_current_position:
+                target_joint_pos = self.solver.solve(
+                    target_pos=target_pos,
+                    target_quat=target_quat,
+                    tolerance_pos=m.IK_POS_TOLERANCE,
+                    weight_pos=m.IK_POS_WEIGHT,
+                    max_iterations=m.IK_MAX_ITERATIONS,
+                    initial_joint_pos=current_joint_pos,
+                )
+            else:
+                target_joint_pos = self.solver.solve(
+                    target_pos=target_pos,
+                    target_quat=target_quat,
+                    tolerance_pos=m.IK_POS_TOLERANCE,
+                    weight_pos=m.IK_POS_WEIGHT,
+                    max_iterations=m.IK_MAX_ITERATIONS,
+                )
+
+            if target_joint_pos is None:
+                # Print warning that we couldn't find a valid solution, and return the current joint configuration
+                # instead so that we execute a no-op control
+                log.warning(f"Could not find valid IK configuration! Returning no-op control instead.")
+                target_joint_pos = current_joint_pos
 
         # Optionally pass through smoothing filter for better stability
         if self.control_filter is not None:

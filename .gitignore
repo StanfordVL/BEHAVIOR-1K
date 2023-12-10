@@ -84,3 +84,7 @@ omnigibson/render/mesh_renderer/libcryptopp.so.8.6
 # Coverage
 .coverage
 coverage.xml
+
+# Doc
+docs/reference
+site/

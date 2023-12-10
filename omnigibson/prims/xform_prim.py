@@ -1,4 +1,4 @@
-from collections import Iterable
+from collections.abc import Iterable
 from pxr import Gf, Usd, UsdGeom, UsdShade, UsdPhysics
 from omni.isaac.core.utils.rotations import gf_quat_to_np_array
 from omni.isaac.core.utils.prims import (
@@ -8,10 +8,11 @@ from omni.isaac.core.utils.prims import (
 )
 import numpy as np
 import carb
+import omnigibson as og
 from omni.isaac.core.utils.stage import get_current_stage
 from omnigibson.prims.prim_base import BasePrim
 from omnigibson.prims.material_prim import MaterialPrim
-from omnigibson.utils.transform_utils import quat2mat, mat2euler
+from omnigibson.utils.transform_utils import quat2euler
 from omnigibson.utils.usd_utils import BoundingBoxAPI
 from scipy.spatial.transform import Rotation as R
 
@@ -53,12 +54,8 @@ class XFormPrim(BasePrim):
             load_config=load_config,
         )
 
-    def _load(self, simulator=None):
-        # Define an Xform prim at the current stage, or the simulator's stage if specified
-        stage = get_current_stage()
-        prim = stage.DefinePrim(self._prim_path, "Xform")
-
-        return prim
+    def _load(self):
+        return og.sim.stage.DefinePrim(self._prim_path, "Xform")
 
     def _post_load(self):
         # run super first
@@ -157,6 +154,8 @@ class XFormPrim(BasePrim):
         position = current_position if position is None else np.array(position, dtype=float)
         orientation = current_orientation if orientation is None else np.array(orientation, dtype=float)
         orientation = orientation[[3, 0, 1, 2]]     # Flip from x,y,z,w to w,x,y,z
+        assert np.isclose(np.linalg.norm(orientation), 1, atol=1e-3), \
+            f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
 
         mat = Gf.Transform()
         mat.SetRotation(Gf.Rotation(Gf.Quatd(*orientation)))
@@ -238,11 +237,27 @@ class XFormPrim(BasePrim):
         Returns:
             3-array: (roll, pitch, yaw) global euler orientation of this prim
         """
-        return mat2euler(quat2mat(self.get_orientation()))
+        return quat2euler(self.get_orientation())
+    
+    def get_2d_orientation(self):
+        """
+        Get this prim's orientation on the XY plane of the world frame. This is obtained by
+        projecting the forward vector onto the XY plane and then computing the angle.
+        """
+        fwd = R.from_quat(self.get_orientation()).apply([1, 0, 0])
+        fwd[2] = 0.
+
+        # If the object is facing close to straight up, then we can't compute a 2D orientation
+        # in that case, we return zero.
+        if np.linalg.norm(fwd) < 1e-4:
+            return 0.
+
+        fwd /= np.linalg.norm(fwd)
+        return np.arctan2(fwd[1], fwd[0])
 
     def get_local_pose(self):
         """
-        Gets prim's pose with respect to the prim's local frame (it's parent frame)
+        Gets prim's pose with respect to the prim's local frame (its parent frame)
 
         Returns:
             2-tuple:

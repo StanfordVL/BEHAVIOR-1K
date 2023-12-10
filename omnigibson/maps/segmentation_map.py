@@ -5,6 +5,7 @@ import numpy as np
 from PIL import Image
 
 import omnigibson as og
+from omnigibson.macros import gm
 from omnigibson.maps.map_base import BaseMap
 from omnigibson.utils.ui_utils import create_module_logger
 
@@ -62,7 +63,7 @@ class SegmentationMap(BaseMap):
         img_ins = np.array(img_ins.resize((map_size, map_size), Image.NEAREST))
         img_sem = np.array(img_sem.resize((map_size, map_size), Image.NEAREST))
 
-        room_categories = os.path.join(og.og_dataset_path, "metadata", "room_categories.txt")
+        room_categories = os.path.join(gm.DATASET_PATH, "metadata", "room_categories.txt")
         with open(room_categories, "r") as fp:
             room_cats = [line.rstrip() for line in fp.readlines()]
 

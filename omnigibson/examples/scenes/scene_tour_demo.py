@@ -14,7 +14,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     It sets the camera to various poses and records images, and then generates a trajectory from a set of waypoints
     and records the resulting video.
     """
-    og.log.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
+    og.log.info(f"Demo {__file__}\n    " + "*" * 80 + "\n    Description:\n" + main.__doc__ + "*" * 80)
 
     # Make sure the example is not being run headless. If so, terminate early
     if gm.HEADLESS:
@@ -82,7 +82,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         key=carb.input.KeyboardInput.J,
         callback_fn=lambda: cam_mover.record_trajectory_from_waypoints(
             waypoints=np.array(waypoints),
-            per_step_distance=0.05,
+            per_step_distance=0.02,
             fps=30,
             steps_per_frame=1,
             fpath=None,             # This corresponds to the default path inferred from cam_mover.save_dir

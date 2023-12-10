@@ -17,9 +17,6 @@ class Pose(AbsoluteObjectState):
         orn = self.obj.get_orientation()
         return np.array(pos), np.array(orn)
 
-    def _set_value(self, new_value):
-        raise NotImplementedError("Pose state currently does not support setting.")
-
     def _has_changed(self, get_value_args, value, info):
         # Only changed if the squared distance between old position and current position has
         # changed above some threshold

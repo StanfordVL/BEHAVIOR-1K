@@ -1,7 +1,7 @@
 import os
 import numpy as np
 
-import omnigibson
+from omnigibson.macros import gm
 from omnigibson.robots.locomotion_robot import LocomotionRobot
 
 
@@ -24,8 +24,8 @@ class Husky(LocomotionRobot):
 
     @property
     def usd_path(self):
-        return os.path.join(omnigibson.assets_path, "models/husky/husky/husky.usd")
+        return os.path.join(gm.ASSET_PATH, "models/husky/husky/husky.usd")
 
     @property
     def urdf_path(self):
-        return os.path.join(omnigibson.assets_path, "models/husky/husky.urdf")
+        return os.path.join(gm.ASSET_PATH, "models/husky/husky.urdf")

@@ -16,7 +16,6 @@ from scipy.spatial.transform import Rotation as R
 from scipy.interpolate import CubicSpline
 from scipy.integrate import quad
 import omni
-import omni.ui
 import omni.log
 import carb
 import random
@@ -123,7 +122,10 @@ def suppress_omni_log(channels):
     # Record the state to restore to after the context exists
     log = omni.log.get_log()
 
-    if channels is None:
+    if gm.DEBUG:
+        # Do nothing
+        pass
+    elif channels is None:
         # Globally disable log
         log.enabled = False
     else:
@@ -138,8 +140,11 @@ def suppress_omni_log(channels):
 
     yield
 
-    if channels is None:
-        # Globallly re-enable log
+    if gm.DEBUG:
+        # Do nothing
+        pass
+    elif channels is None:
+        # Globally re-enable log
         log.enabled = True
     else:
         # Unsuppress the channels
@@ -155,18 +160,20 @@ def suppress_loggers(logger_names):
     Args:
         logger_names (list of str): Logger name(s) whose corresponding loggers should be suppressed
     """
-    # Store prior states so we can restore them after this context exits
-    logger_levels = {name: logging.getLogger(name).getEffectiveLevel() for name in logger_names}
+    if not gm.DEBUG:
+        # Store prior states so we can restore them after this context exits
+        logger_levels = {name: logging.getLogger(name).getEffectiveLevel() for name in logger_names}
 
-    # Suppress the loggers (only output fatal messages)
-    for name in logger_names:
-        logging.getLogger(name).setLevel(logging.FATAL)
+        # Suppress the loggers (only output fatal messages)
+        for name in logger_names:
+            logging.getLogger(name).setLevel(logging.FATAL)
 
     yield
 
-    # Unsuppress the loggers
-    for name in logger_names:
-        logging.getLogger(name).setLevel(logger_levels[name])
+    if not gm.DEBUG:
+        # Unsuppress the loggers
+        for name in logger_names:
+            logging.getLogger(name).setLevel(logger_levels[name])
 
 
 def create_module_logger(module_name):
@@ -251,13 +258,19 @@ class CameraMover:
     def __init__(self, cam, delta=0.25, save_dir=f"{og.root_path}/../images"):
         self.cam = cam
         self.delta = delta
-        self.light_val = 5e5
+        self.light_val = gm.FORCE_LIGHT_INTENSITY
         self.save_dir = save_dir
 
         self._appwindow = omni.appwindow.get_default_app_window()
         self._input = carb.input.acquire_input_interface()
         self._keyboard = self._appwindow.get_keyboard()
         self._sub_keyboard = self._input.subscribe_to_keyboard_events(self._keyboard, self._sub_keyboard_event)
+
+    def clear(self):
+        """
+        Clears this camera mover. After this is called, the camera mover cannot be used.
+        """
+        self._input.unsubscribe_to_keyboard_events(self._keyboard, self._sub_keyboard)
 
     def set_save_dir(self, save_dir):
         """
@@ -385,6 +398,10 @@ class CameraMover:
         """
         # Create splines and their derivatives
         n_waypoints = len(waypoints)
+        if n_waypoints < 3:
+            og.log.error("Cannot generate trajectory from waypoints with less than 3 waypoints!")
+            return
+
         splines = [CubicSpline(range(n_waypoints), waypoints[:, i], bc_type='clamped') for i in range(3)]
         dsplines = [spline.derivative() for spline in splines]
 
@@ -399,7 +416,7 @@ class CameraMover:
             path_length = int(dist / per_step_distance)
             interpolated_points = np.zeros((path_length, 3))
             for i in range(path_length):
-                curr_step = step + (1.0 / path_length * i)
+                curr_step = step + (i / path_length)
                 interpolated_points[i, :] = np.array([spline(curr_step) for spline in splines])
             return interpolated_points
 
@@ -418,7 +435,7 @@ class CameraMover:
                 tilt_angle = np.arcsin(z)
                 # Infer global quat orientation from these angles
                 quat = T.euler2quat([np.pi / 2 - tilt_angle, 0.0, pan_angle])
-                poses.append([positions[i], quat])
+                poses.append([positions[j], quat])
 
         # Record the generated trajectory
         self.record_trajectory(poses=poses, fps=fps, steps_per_frame=steps_per_frame, fpath=fpath)
@@ -579,6 +596,34 @@ class KeyboardRobotController:
 
         return mapping
 
+    def generate_osc_keypress_mapping(self, controller_info):
+        """
+        Generates a dictionary for keypress mappings for OSC control, based on the inputted @controller_info
+
+        Args:
+            controller_info (dict): Dictionary of controller information for the specific robot arm to control
+                with OSC
+
+        Returns:
+            dict: Populated keypress mappings for IK to control the specified controller
+        """
+        mapping = {}
+
+        mapping[carb.input.KeyboardInput.UP] = {"idx": controller_info["start_idx"] + 0, "val": 0.5}
+        mapping[carb.input.KeyboardInput.DOWN] = {"idx": controller_info["start_idx"] + 0, "val": -0.5}
+        mapping[carb.input.KeyboardInput.RIGHT] = {"idx": controller_info["start_idx"] + 1, "val": -0.5}
+        mapping[carb.input.KeyboardInput.LEFT] = {"idx": controller_info["start_idx"] + 1, "val": 0.5}
+        mapping[carb.input.KeyboardInput.P] = {"idx": controller_info["start_idx"] + 2, "val": 0.5}
+        mapping[carb.input.KeyboardInput.SEMICOLON] = {"idx": controller_info["start_idx"] + 2, "val": -0.5}
+        mapping[carb.input.KeyboardInput.N] = {"idx": controller_info["start_idx"] + 3, "val": 0.5}
+        mapping[carb.input.KeyboardInput.B] = {"idx": controller_info["start_idx"] + 3, "val": -0.5}
+        mapping[carb.input.KeyboardInput.O] = {"idx": controller_info["start_idx"] + 4, "val": 0.5}
+        mapping[carb.input.KeyboardInput.U] = {"idx": controller_info["start_idx"] + 4, "val": -0.5}
+        mapping[carb.input.KeyboardInput.V] = {"idx": controller_info["start_idx"] + 5, "val": 0.5}
+        mapping[carb.input.KeyboardInput.C] = {"idx": controller_info["start_idx"] + 5, "val": -0.5}
+
+        return mapping
+
     def populate_keypress_mapping(self):
         """
         Populates the mapping @self.keypress_mapping, which maps keypresses to action info:
@@ -612,6 +657,9 @@ class KeyboardRobotController:
             elif info["name"] == "InverseKinematicsController":
                 self.ik_arms.append(component)
                 self.keypress_mapping.update(self.generate_ik_keypress_mapping(controller_info=info))
+            elif info["name"] == "OperationalSpaceController":
+                self.ik_arms.append(component)
+                self.keypress_mapping.update(self.generate_osc_keypress_mapping(controller_info=info))
             elif info["name"] == "MultiFingerGripperController":
                 if info["command_dim"] > 1:
                     for i in range(info["command_dim"]):
@@ -707,11 +755,12 @@ class KeyboardRobotController:
             # Only handle the action if the value is specified
             if val is not None:
                 # If there is no index, the user is controlling a joint with "[" and "]"
-                if idx is None:
+                if idx is None and len(self.joint_command_idx) != 0:
                     idx = self.joint_command_idx[self.active_joint_command_idx_idx]
 
                 # Set the action
-                action[idx] = val
+                if idx is not None:
+                    action[idx] = val
 
         # Possibly set the persistent gripper action
         if len(self.binary_grippers) > 0 and self.keypress_mapping[carb.input.KeyboardInput.T]["val"] is not None:

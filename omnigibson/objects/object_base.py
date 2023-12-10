@@ -1,5 +1,6 @@
 from abc import ABCMeta
 import numpy as np
+from collections.abc import Iterable
 
 import omnigibson as og
 from omnigibson.macros import create_module_macros, gm
@@ -11,7 +12,7 @@ from omnigibson.utils.constants import (
 from pxr import UsdPhysics, PhysxSchema
 from omnigibson.utils.usd_utils import create_joint, CollisionAPI
 from omnigibson.prims.entity_prim import EntityPrim
-from omnigibson.utils.python_utils import Registerable, classproperty
+from omnigibson.utils.python_utils import Registerable, classproperty, get_uuid
 from omnigibson.utils.constants import PrimType, CLASS_NAME_TO_CLASS_ID
 from omnigibson.utils.ui_utils import create_module_logger, suppress_omni_log
 
@@ -37,8 +38,8 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
 
     def __init__(
             self,
-            prim_path,
-            name=None,
+            name,
+            prim_path=None,
             category="object",
             class_id=None,
             uuid=None,
@@ -53,9 +54,9 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
     ):
         """
         Args:
-            prim_path (str): global path in the stage to this object
-            name (None or str): Name for the object. Names need to be unique per scene. If None, a name will be
-                generated at the time the object is added to the scene, using the object's category.
+            name (str): Name for the object. Names need to be unique per scene
+            prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
+                created at /World/<name>
             category (str): Category for the object. Defaults to "object".
             class_id (None or int): What class ID the object should be assigned in semantic segmentation rendering mode.
                 If None, the ID will be inferred from this object's category.
@@ -76,13 +77,11 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
                 Note that this base object does NOT pass kwargs down into the Prim-type super() classes, and we assume
                 that kwargs are only shared between all SUBclasses (children), not SUPERclasses (parents).
         """
-        # Generate a name if necessary. Note that the generation order & set of these names is not deterministic.
-        if name is None:
-            address = "%08X" % id(self)
-            name = "{}_{}".format(category, address)
+        # Generate default prim path if none is specified
+        prim_path = f"/World/{name}" if prim_path is None else prim_path
 
         # Store values
-        self.uuid = int(str(id(self))[-8:]) if uuid is None else uuid
+        self.uuid = get_uuid(name) if uuid is None else uuid
         assert len(str(self.uuid)) <= 8, f"UUID for this object must be at max 8-digits, got: {self.uuid}"
         self.category = category
         self.fixed_base = fixed_base
@@ -97,13 +96,12 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         self.class_id = class_id
 
         # Values to be created at runtime
-        self._simulator = None
         self._highlight_cached_values = None
         self._highlighted = None
 
         # Create load config from inputs
         load_config = dict() if load_config is None else load_config
-        load_config["scale"] = scale
+        load_config["scale"] = np.array(scale) if isinstance(scale, Iterable) else scale
         load_config["visible"] = visible
         load_config["visual_only"] = visual_only
         load_config["self_collisions"] = self_collisions
@@ -121,24 +119,18 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         self._init_info["args"]["name"] = self.name
         self._init_info["args"]["uuid"] = self.uuid
 
-    def load(self, simulator=None):
-        # Run sanity check, any of these objects REQUIRE a simulator to be specified
-        assert simulator is not None, "Simulator must be specified for loading any object subclassed from BaseObject!"
-
-        # Save simulator reference
-        self._simulator = simulator
-
+    def load(self):
         # Run super method ONLY if we're not loaded yet
         if self.loaded:
             prim = self._prim
         else:
-            prim = super().load(simulator=simulator)
+            prim = super().load()
             log.info(f"Loaded {self.name} at {self.prim_path}")
         return prim
 
-    def remove(self, simulator=None):
+    def remove(self):
         # Run super first
-        super().remove(simulator=simulator)
+        super().remove()
 
         # Notify user that the object was removed
         log.info(f"Removed {self.name} from {self.prim_path}")
@@ -195,14 +187,9 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             type_label="class",
         )
 
-        # Force populate inputs and outputs of the shaders of all materials
-        # We suppress errors from omni.hydra if we're using encrypted assets, because we're loading from tmp location,
-        # not the original location
-        with suppress_omni_log(channels=["omni.hydra"] if gm.USE_ENCRYPTED_ASSETS else []):
-            # Single render step needed before populating materials
-            og.sim.render()
-            for material in self.materials:
-                material.shader_force_populate(render=False)
+    def _initialize(self):
+        # Run super first
+        super()._initialize()
 
         # Iterate over all links and grab their relevant material info for highlighting (i.e.: emissivity info)
         self._highlighted = False
@@ -221,8 +208,8 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         if self.kinematic_only or ((not has_articulated_joints) and (not has_fixed_joints)):
             # Kinematic only, or non-jointed single body objects
             return None
-        elif has_articulated_joints and not self.fixed_base:
-            # Non-fixed objects that have articulated joints
+        elif not self.fixed_base and has_articulated_joints:
+            # This is all remaining non-fixed objects
             # This is a bit hacky because omniverse is buggy
             # Articulation roots mess up the joint order if it's on a non-fixed base robot, e.g. a
             # mobile manipulator. So if we have to move it to the actual root link of the robot instead.
@@ -265,6 +252,20 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
     @volume.setter
     def volume(self, volume):
         raise NotImplementedError("Cannot set volume directly for an object!")
+
+    @property
+    def scale(self):
+        # Just super call
+        return super().scale
+
+    @scale.setter
+    def scale(self, scale):
+        # call super first
+        # A bit esoteric -- see https://gist.github.com/Susensio/979259559e2bebcd0273f1a95d7c1e79
+        super(BaseObject, type(self)).scale.fset(self, scale)
+
+        # Update init info for scale
+        self._init_info["args"]["scale"] = scale
 
     @property
     def link_prim_paths(self):

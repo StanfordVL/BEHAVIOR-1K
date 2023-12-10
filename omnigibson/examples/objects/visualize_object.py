@@ -4,7 +4,7 @@ import numpy as np
 import omnigibson as og
 from omnigibson.utils.asset_utils import (
     get_all_object_categories,
-    get_object_models_of_category,
+    get_all_object_category_models,
 )
 from omnigibson.utils.ui_utils import choose_from_options
 import omnigibson.utils.transform_utils as T
@@ -15,7 +15,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     Visualizes object as specified by its USD path, @usd_path. If None if specified, will instead
     result in an object selection from OmniGibson's object dataset
     """
-    og.log.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
+    og.log.info(f"Demo {__file__}\n    " + "*" * 80 + "\n    Description:\n" + main.__doc__ + "*" * 80)
 
     # Assuming that if random_selection=True, headless=True, short_exec=True, we are calling it from tests and we
     # do not want to parse args (it would fail because the calling function is pytest "testfile.py")
@@ -57,7 +57,7 @@ def main(random_selection=False, headless=False, short_exec=False):
                                            random_selection=random_selection)
 
         # Select a model to load
-        available_obj_models = get_object_models_of_category(obj_category)
+        available_obj_models = get_all_object_category_models(obj_category)
         obj_model = choose_from_options(options=available_obj_models, name="object model",
                                         random_selection=random_selection)
 
@@ -127,7 +127,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         if obj.n_dof > 0:
             frac = (i % steps_per_joint) / steps_per_joint
             j_frac = -1.0 + 2.0 * frac if (i // steps_per_joint) % 2 == 0 else 1.0 - 2.0 * frac
-            obj.set_joint_positions(positions=j_frac * np.ones(obj.n_dof), normalized=True, target=False)
+            obj.set_joint_positions(positions=j_frac * np.ones(obj.n_dof), normalized=True, drive=False)
             obj.keep_still()
         obj.set_position_orientation(position=pos, orientation=quat)
         env.step(np.array([]))

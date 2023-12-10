@@ -1,38 +1,37 @@
-from IPython import embed
-
-import omnigibson
+import omnigibson as og
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.adjacency import HorizontalAdjacency, VerticalAdjacency, flatten_planes
-from omnigibson.object_states.kinematics import KinematicsMixin
-from omnigibson.object_states.object_state_base import BooleanState, RelativeObjectState
+from omnigibson.object_states.kinematics_mixin import KinematicsMixin
+from omnigibson.object_states.object_state_base import BooleanStateMixin, RelativeObjectState
 from omnigibson.utils.object_state_utils import sample_kinematics
 from omnigibson.utils.usd_utils import BoundingBoxAPI
+from omnigibson.utils.object_state_utils import m as os_m
 
 
-class Inside(KinematicsMixin, RelativeObjectState, BooleanState):
-    @staticmethod
-    def get_dependencies():
-        return KinematicsMixin.get_dependencies() + [AABB, HorizontalAdjacency, VerticalAdjacency]
+class Inside(RelativeObjectState, KinematicsMixin, BooleanStateMixin):
+    @classmethod
+    def get_dependencies(cls):
+        deps = super().get_dependencies()
+        deps.update({AABB, HorizontalAdjacency, VerticalAdjacency})
+        return deps
 
     def _set_value(self, other, new_value):
         if not new_value:
             raise NotImplementedError("Inside does not support set_value(False)")
 
-        state = self._simulator.dump_state(serialized=False)
+        state = og.sim.dump_state(serialized=False)
 
-        for _ in range(10):
+        for _ in range(os_m.DEFAULT_HIGH_LEVEL_SAMPLING_ATTEMPTS):
             if sample_kinematics("inside", self.obj, other) and self.get_value(other):
                 return True
             else:
-                self._simulator.load_state(state, serialized=False)
+                og.sim.load_state(state, serialized=False)
 
         return False
 
     def _get_value(self, other):
         # First check that the inner object's position is inside the outer's AABB.
-        # Since we usually check for a small set of outer objects, this is cheap.
-        # Also note that this produces garbage values for fixed objects - but we are
-        # assuming none of our inside-checking objects are fixed.
+        # Since we usually check for a small set of outer objects, this is cheap
         aabb_lower, aabb_upper = self.obj.states[AABB].get_value()
         inner_object_pos = (aabb_lower + aabb_upper) / 2.0
         outer_object_aabb = other.states[AABB].get_value()

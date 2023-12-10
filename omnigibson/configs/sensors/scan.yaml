@@ -1,0 +1,30 @@
+# Example ScanSensor sensor config
+# See omnigibson/sensors/__init__/create_sensor and omnigibson/sensors/scan_sensor for docstring of arguments
+# Arguments below are the arguments that should be specified by external user (other kwargs
+# used in constructor are generated automatically at runtime)
+robot:
+  sensor_config:
+    ScanSensor:
+      modalities: [scan, occupancy_grid]  # if specified, this will override the values in robots_config["obs_modalities"]
+      enabled: true
+      noise_type: null
+      noise_kwargs: null
+      sensor_kwargs:
+
+        # Basic LIDAR kwargs
+        min_range: 0.05
+        max_range: 10.0
+        horizontal_fov: 360.0
+        vertical_fov: 1.0
+        yaw_offset: 0.0
+        horizontal_resolution: 1.0
+        vertical_resolution: 1.0
+        rotation_rate: 0.0
+        draw_points: false
+        draw_lines: false
+
+        # Occupancy Grid kwargs
+        occupancy_grid_resolution: 128
+        occupancy_grid_range: 5.0
+        occupancy_grid_inner_radius: 0.5
+        occupancy_grid_local_link: null

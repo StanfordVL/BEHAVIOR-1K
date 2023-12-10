@@ -5,12 +5,13 @@ import numpy as np
 from pxr.Sdf import ValueTypeNames as VT
 from pxr import Sdf, Gf
 
-from omnigibson.macros import create_module_macros
+import omnigibson as og
+from omnigibson.macros import create_module_macros, gm
 from omnigibson.object_states.factory import (
     get_default_states,
-    get_object_state_instance,
     get_state_name,
     get_states_for_ability,
+    get_states_by_dependency_order,
     get_texture_change_states,
     get_fire_states,
     get_steam_states,
@@ -20,12 +21,11 @@ from omnigibson.object_states.factory import (
 from omnigibson.object_states.object_state_base import REGISTERED_OBJECT_STATES
 from omnigibson.object_states.heat_source_or_sink import HeatSourceOrSink
 from omnigibson.object_states.on_fire import OnFire
+from omnigibson.object_states.particle_modifier import ParticleRemover
 from omnigibson.objects.object_base import BaseObject
 from omnigibson.renderer_settings.renderer_settings import RendererSettings
-from omnigibson.systems.micro_particle_system import FluidSystem
 from omnigibson.utils.constants import PrimType, EmitterType
-from omnigibson.utils.usd_utils import BoundingBoxAPI
-from omnigibson.utils.python_utils import classproperty
+from omnigibson.utils.python_utils import classproperty, extract_class_init_kwargs_from_dict
 from omnigibson.object_states import Saturated
 from omnigibson.utils.ui_utils import create_module_logger
 
@@ -57,8 +57,8 @@ class StatefulObject(BaseObject):
 
     def __init__(
             self,
-            prim_path,
-            name=None,
+            name,
+            prim_path=None,
             category="object",
             class_id=None,
             uuid=None,
@@ -75,9 +75,9 @@ class StatefulObject(BaseObject):
     ):
         """
         Args:
-            prim_path (str): global path in the stage to this object
-            name (None or str): Name for the object. Names need to be unique per scene. If None, a name will be
-                generated at the time the object is added to the scene, using the object's category.
+            name (str): Name for the object. Names need to be unique per scene
+            prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
+                created at /World/<name>
             category (str): Category for the object. Defaults to "object".
             class_id (None or int): What class ID the object should be assigned in semantic segmentation rendering mode.
                 If None, the ID will be inferred from this object's category.
@@ -105,19 +105,18 @@ class StatefulObject(BaseObject):
         self._emitters = dict()
         self._visual_states = None
         self._current_texture_state = None
+        self._include_default_states = include_default_states
 
         # Load abilities from taxonomy if needed & possible
         if abilities is None:
             abilities = {}
             if OBJECT_TAXONOMY is not None:
                 # TODO! Update!!
-                taxonomy_class = OBJECT_TAXONOMY.get_class_name_from_igibson_category(category)
+                taxonomy_class = OBJECT_TAXONOMY.get_synset_from_category(category)
                 if taxonomy_class is not None:
                     abilities = OBJECT_TAXONOMY.get_abilities(taxonomy_class)
         assert isinstance(abilities, dict), "Object abilities must be in dictionary form."
-
         self._abilities = abilities
-        self.prepare_object_states(abilities=abilities, include_default_states=include_default_states)
 
         # Run super init
         super().__init__(
@@ -136,13 +135,33 @@ class StatefulObject(BaseObject):
             **kwargs,
         )
 
+    def _post_load(self):
+        # Run super first
+        super()._post_load()
+
+        # Prepare the object states
+        self._states = {}
+        self.prepare_object_states()
+
     def _initialize(self):
         # Run super first
         super()._initialize()
 
         # Initialize all states
         for state in self._states.values():
-            state.initialize(self._simulator)
+            state.initialize()
+
+        # Check whether this object requires any visual updates
+        states_set = set(self.states)
+        self._visual_states = states_set & get_visual_states()
+
+        # If we require visual updates, possibly create additional APIs
+        if len(self._visual_states) > 0:
+            if len(states_set & get_steam_states()) > 0:
+                self._create_emitter_apis(EmitterType.STEAM)
+
+            if len(states_set & get_fire_states()) > 0:
+                self._create_emitter_apis(EmitterType.FIRE)
 
     def add_state(self, state):
         """
@@ -174,54 +193,52 @@ class StatefulObject(BaseObject):
         """
         return self._abilities
 
-    def prepare_object_states(self, abilities=None, include_default_states=True):
+    def prepare_object_states(self):
         """
         Prepare the state dictionary for an object by generating the appropriate
         object state instances.
 
         This uses the abilities of the object and the state dependency graph to
         find & instantiate all relevant states.
-
-        Args:
-            abilities (None or dict): If specified, dict in the form of {ability: {param: value}} containing
-                object abilities and parameters.
-            include_default_states (bool): whether to include the default object states from @get_default_states
         """
-        if abilities is None:
-            abilities = {}
+        states_info = {state_type: {"ability": None, "params": dict()} for state_type in get_default_states()} if \
+            self._include_default_states else dict()
 
-        state_types_and_params = [(state, {}) for state in get_default_states()] if include_default_states else []
+        # Map the state type (class) to ability name and params
+        if gm.ENABLE_OBJECT_STATES:
+            for ability, params in self._abilities.items():
+                for state_type in get_states_for_ability(ability):
+                    states_info[state_type] = {"ability": ability, "params": params}
 
-        # Map the ability params to the states immediately imported by the abilities
-        for ability, params in abilities.items():
-            state_types_and_params.extend((state_name, params) for state_name in get_states_for_ability(ability))
-
-        # Add the dependencies into the list, too.
-        for state_type, _ in state_types_and_params:
-            # Add each state's dependencies, too. Note that only required dependencies are added.
+        # Add the dependencies into the list, too, and sort based on the dependency chain
+        # Must iterate over explicit tuple since dictionary changes size mid-iteration
+        for state_type in tuple(states_info.keys()):
+            # Add each state's dependencies, too. Note that only required dependencies are explicitly added, but both
+            # required AND optional dependencies are checked / sorted
             for dependency in state_type.get_dependencies():
-                if all(other_state != dependency for other_state, _ in state_types_and_params):
-                    state_types_and_params.append((dependency, {}))
+                if dependency not in states_info:
+                    states_info[dependency] = {"ability": None, "params": dict()}
 
-        # Now generate the states in topological order.
+        # Iterate over all sorted state types, generating the states in topological order.
         self._states = dict()
-        for state_type, params in reversed(state_types_and_params):
-            self._states[state_type] = get_object_state_instance(state_type, self, params)
+        for state_type in get_states_by_dependency_order(states=states_info):
+            # Skip over any types that are not in our info dict -- these correspond to optional dependencies
+            if state_type not in states_info:
+                continue
 
-    def _post_load(self):
-        super()._post_load()
-
-        # Check whether this object requires any visual updates
-        states_set = set(self.states)
-        self._visual_states = states_set & get_visual_states()
-
-        # If we require visual updates, possibly create additional APIs
-        if len(self._visual_states) > 0:
-            if len(states_set & get_steam_states()) > 0:
-                self._create_emitter_apis(EmitterType.STEAM)
-
-            if len(states_set & get_fire_states()) > 0:
-                self._create_emitter_apis(EmitterType.FIRE)
+            relevant_params = extract_class_init_kwargs_from_dict(cls=state_type, dic=states_info[state_type]["params"], copy=False)
+            compatible, reason = state_type.is_compatible(obj=self, **relevant_params)
+            if compatible:
+                self._states[state_type] = state_type(obj=self, **relevant_params)
+            else:
+                log.warning(f"State {state_type.__name__} is incompatible with obj {self.name}. Reason: {reason}")
+                # Remove the ability if it exists
+                # Note that the object may still have some of the states related to the desired ability. In this way,
+                # we guarantee that the existence of a certain ability in self.abilities means at ALL corresponding
+                # object state dependencies are met by the underlying object asset
+                ability = states_info[state_type]["ability"]
+                if ability in self._abilities:
+                    self._abilities.pop(ability)
 
     def _create_emitter_apis(self, emitter_type):
         """
@@ -238,16 +255,17 @@ class StatefulObject(BaseObject):
         emitter_config = {}
         bbox_extent_local = self.native_bbox if hasattr(self, "native_bbox") else self.aabb_extent / self.scale
         if emitter_type == EmitterType.FIRE:
+            fire_at_metalink = True
             if OnFire in self.states:
-                fire_at_metalink = self.states[OnFire].get_state_link_name() in self._links
-                # Use the heat source link if there exists any (e.g. candle wick), or use the root link (e.g. charcoal).
-                link_name = self.states[OnFire].get_state_link_name() if fire_at_metalink else self.root_link_name
+                # Note whether the heat source link is explicitly set
+                link = self.states[OnFire].link
+                fire_at_metalink = link != self.root_link
             elif HeatSourceOrSink in self.states:
-                # Missing the heat source link annotation, return.
-                if self.states[HeatSourceOrSink].get_state_link_name() not in self._links:
+                # Only apply fire to non-root-link (i.e.: explicitly specified) heat source links
+                # Otherwise, immediately return
+                link = self.states[HeatSourceOrSink].link
+                if link == self.root_link:
                     return
-                fire_at_metalink = True
-                link_name = self.states[HeatSourceOrSink].get_state_link_name()
             else:
                 raise ValueError("Unknown fire state")
 
@@ -263,7 +281,7 @@ class StatefulObject(BaseObject):
             emitter_config["constantMask"] = 5.0
             emitter_config["attenuation"] = 0.5
         elif emitter_type == EmitterType.STEAM:
-            link_name = self.root_link_name
+            link = self.root_link
             emitter_config["name"] = "flowEmitterBox"
             emitter_config["type"] = "FlowEmitterBox"
             emitter_config["position"] = (0.0, 0.0, bbox_extent_local[2] * m.STEAM_EMITTER_HEIGHT_RATIO)
@@ -279,13 +297,13 @@ class StatefulObject(BaseObject):
 
         # Define prim paths.
         # The flow system is created under the root link so that it automatically updates its pose as the object moves
-        flowEmitter_prim_path = f"{self._prim_path}/{link_name}/{emitter_config['name']}"
-        flowSimulate_prim_path = f"{self._prim_path}/{link_name}/flowSimulate"
-        flowOffscreen_prim_path = f"{self._prim_path}/{link_name}/flowOffscreen"
-        flowRender_prim_path = f"{self._prim_path}/{link_name}/flowRender"
+        flowEmitter_prim_path = f"{link.prim_path}/{emitter_config['name']}"
+        flowSimulate_prim_path = f"{link.prim_path}/flowSimulate"
+        flowOffscreen_prim_path = f"{link.prim_path}/flowOffscreen"
+        flowRender_prim_path = f"{link.prim_path}/flowRender"
 
         # Define prims.
-        stage = self._simulator.stage
+        stage = og.sim.stage
         emitter = stage.DefinePrim(flowEmitter_prim_path, emitter_config["type"])
         simulate = stage.DefinePrim(flowSimulate_prim_path, "FlowSimulate")
         offscreen = stage.DefinePrim(flowOffscreen_prim_path, "FlowOffscreen")
@@ -373,8 +391,8 @@ class StatefulObject(BaseObject):
                 state = self.states[state_type]
                 if state_type in get_texture_change_states():
                     if state_type == Saturated:
-                        for fluid_system in FluidSystem.get_systems().values():
-                            if state.get_value(fluid_system):
+                        for particle_system in ParticleRemover.supported_active_systems:
+                            if state.get_value(particle_system):
                                 texture_change_states.append(state)
                                 # Only need to do this once, since soaked handles all fluid systems
                                 break
@@ -403,7 +421,7 @@ class StatefulObject(BaseObject):
         the current albedo map by adding and scaling the values. See @self._update_albedo_value for details.
 
         Args:
-            object_state (BooleanState or None): the object state that the diffuse color should match to
+            object_state (BooleanStateMixin or None): the object state that the diffuse color should match to
         """
         for material in self.materials:
             self._update_albedo_value(object_state, material)
@@ -415,7 +433,7 @@ class StatefulObject(BaseObject):
         albedo_value = diffuse_tint * (albedo_value + albedo_add)
 
         Args:
-            object_state (BooleanState or None): the object state that the diffuse color should match to
+            object_state (BooleanStateMixin or None): the object state that the diffuse color should match to
             material (MaterialPrim): the material to use to update the albedo value
         """
         if object_state is None:
@@ -426,26 +444,27 @@ class StatefulObject(BaseObject):
             # Query the object state for the parameters
             albedo_add, diffuse_tint = object_state.get_texture_change_params()
 
-        if material.albedo_add != albedo_add:
-            material.albedo_add = albedo_add
+        if material.is_glass:
+            if not np.allclose(material.glass_color, diffuse_tint):
+                material.glass_color = diffuse_tint
 
-        if not np.allclose(material.diffuse_tint, diffuse_tint):
-            material.diffuse_tint = diffuse_tint
+        else:
+            if material.albedo_add != albedo_add:
+                material.albedo_add = albedo_add
 
-    def remove(self, simulator=None):
+            if not np.allclose(material.diffuse_tint, diffuse_tint):
+                material.diffuse_tint = diffuse_tint
+
+    def remove(self):
         """
         Removes this prim from omniverse stage
-
-        Args:
-            simulator (None or SimulationContext): If specified, should be simulator into which this prim will be
-                removed. Otherwise, it will be removed from the default stage
         """
         # Iterate over all states and run their remove call
         for state_instance in self._states.values():
             state_instance.remove()
 
         # Run super
-        super().remove(simulator=simulator)
+        super().remove()
 
     def _dump_state(self):
         # Grab state from super class
@@ -472,7 +491,7 @@ class StatefulObject(BaseObject):
                 if state_name in state["non_kin"]:
                     state_instance.load_state(state=state["non_kin"][state_name], serialized=False)
                 else:
-                    log.warning("Missing object state [{}] in the state dump".format(state_name))
+                    log.warning(f"Missing object state [{state_name}] in the state dump for obj {self.name}")
 
         # Clear cache after loading state
         self.clear_states_cache()
@@ -514,7 +533,6 @@ class StatefulObject(BaseObject):
             return
         for _, obj_state in self._states.items():
             obj_state.clear_cache()
-        BoundingBoxAPI.clear()
 
     def set_position_orientation(self, position=None, orientation=None):
         super().set_position_orientation(position=position, orientation=orientation)

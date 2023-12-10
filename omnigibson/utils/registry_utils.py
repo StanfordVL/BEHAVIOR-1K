@@ -3,7 +3,7 @@ A set of utility functions for registering and tracking objects
 """
 from inspect import isclass
 import numpy as np
-from collections import Iterable
+from collections.abc import Iterable
 from omnigibson.macros import create_module_macros
 from omnigibson.utils.python_utils import Serializable, SerializableNonInstance, UniquelyNamed
 from omnigibson.utils.ui_utils import create_module_logger
@@ -139,9 +139,7 @@ class Registry(UniquelyNamed):
                     if attr in mapping:
                         log.warning(f"Instance identifier '{k}' should be unique for adding to this registry mapping! Existing {k}: {attr}")
                         # Special case for "name" attribute, which should ALWAYS be unique
-                        if k == "name":
-                            log.error(f"For name attribute, objects MUST be unique. Exiting.")
-                            exit(-1)
+                        assert k != "name", "For name attribute, objects MUST be unique."
                     mapping[attr] = obj
                 else:
                     # Not unique case
@@ -321,10 +319,6 @@ class SerializableRegistry(Registry, Serializable):
 
     @property
     def state_size(self):
-        # Total state size is the sum of all individual states from each object
-        for obj in self.objects:
-            print(obj.name)
-            print(obj.state_size)
         return sum(obj.state_size for obj in self.objects)
 
     def _dump_state(self):
@@ -335,7 +329,10 @@ class SerializableRegistry(Registry, Serializable):
         return state
 
     def _load_state(self, state):
-        # Iterate over all objects and load their states
+        # Iterate over all objects and load their states. Currently the objects and the state don't have to match, i.e.
+        # there might be objects in the scene that do not appear in the state dict (a warning will be printed), or
+        # the state might contain additional information about objects that are NOT in the scene. For both cases, state
+        # loading will be skipped.
         for obj in self.objects:
             if obj.name not in state:
                 log.warning(f"Object '{obj.name}' is not in the state dict to load from. Skip loading its state.")
@@ -353,7 +350,7 @@ class SerializableRegistry(Registry, Serializable):
         # along the way
         idx = 0
         for obj in self.objects:
-            print(f"obj: {obj.name}, state size: {obj.state_size}, idx: {idx}, passing in state length: {len(state[idx:])}")
+            log.debug(f"obj: {obj.name}, state size: {obj.state_size}, idx: {idx}, passing in state length: {len(state[idx:])}")
             # We pass in the entire remaining state vector, assuming the object only parses the relevant states
             # at the beginning
             state_dict[obj.name] = obj.deserialize(state[idx:])

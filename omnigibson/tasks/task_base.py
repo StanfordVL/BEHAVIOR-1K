@@ -50,6 +50,7 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
         self._loaded = False
         self._reward = None
         self._done = None
+        self._success = None
         self._info = None
         self._low_dim_obs_dim = None
 
@@ -74,6 +75,18 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
                 observation space
         """
         raise NotImplementedError()
+
+    @classmethod
+    def verify_scene_and_task_config(cls, scene_cfg, task_cfg):
+        """
+        Runs any necessary sanity checks on the scene and task configs passed; and possibly modifies them in-place
+
+        Args:
+            scene_cfg (dict): Scene configuration
+            task_cfg (dict): Task configuration
+        """
+        # Default is no-op
+        pass
 
     def _load_observation_space(self):
         # Create the non low dim obs space
@@ -148,7 +161,8 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
         """
         # By default, reset reward, done, and info
         self._reward = None
-        self._done = None
+        self._done = False
+        self._success = False
         self._info = None
 
     def reset(self, env):
@@ -299,6 +313,7 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
         # Update the internal state of this task
         self._reward = reward
         self._done = done
+        self._success = done_info["success"]
         self._info = {
             "reward": reward_info,
             "done": done_info,
@@ -331,6 +346,15 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
         """
         assert self._done is not None, "At least one step() must occur before done can be calculated!"
         return self._done
+
+    @property
+    def success(self):
+        """
+        Returns:
+            bool: Whether this task has succeeded or not
+        """
+        assert self._success is not None, "At least one step() must occur before success can be calculated!"
+        return self._success
 
     @property
     def info(self):

@@ -33,7 +33,8 @@ class PointReachingTask(PointNavigationTask):
         visualize_goal (bool): Whether to visualize the initial / goal locations
         visualize_path (bool): Whether to visualize the path from initial to goal location, as represented by
             discrete waypoints
-        marker_height (float): If visualizing, specifies the height of the visual markers (m)
+        goal_height (float): If visualizing, specifies the height of the visual goals (m)
+        waypoint_height (float): If visualizing, specifies the height of the visual waypoints (m)
         waypoint_width (float): If visualizing, specifies the width of the visual waypoints (m)
         n_vis_waypoints (int): If visualizing, specifies the number of waypoints to generate
         termination_config (None or dict): Keyword-mapped configuration to use to generate termination conditions. This
@@ -59,9 +60,10 @@ class PointReachingTask(PointNavigationTask):
             height_range=None,
             visualize_goal=False,
             visualize_path=False,
-            marker_height=0.2,
+            goal_height=0.06,
+            waypoint_height=0.05,
             waypoint_width=0.1,
-            n_vis_waypoints=250,
+            n_vis_waypoints=10,
             reward_config=None,
             termination_config=None,
     ):
@@ -80,7 +82,8 @@ class PointReachingTask(PointNavigationTask):
             path_range=path_range,
             visualize_goal=visualize_goal,
             visualize_path=visualize_path,
-            marker_height=marker_height,
+            goal_height=goal_height,
+            waypoint_height=waypoint_height,
             waypoint_width=waypoint_width,
             n_vis_waypoints=n_vis_waypoints,
             reward_type="l2",           # Must use l2 for reaching task
@@ -114,7 +117,7 @@ class PointReachingTask(PointNavigationTask):
 
     def _get_l2_potential(self, env):
         # Distance calculated from robot EEF, not base!
-        return T.l2_distance(env.robots[self._robot_idn].get_end_effector_position(), self._goal_pos)
+        return T.l2_distance(env.robots[self._robot_idn].get_eef_position(), self._goal_pos)
 
     def _get_obs(self, env):
         # Get obs from super
@@ -125,10 +128,10 @@ class PointReachingTask(PointNavigationTask):
         low_dim_obs["eef_to_goal"] = self._global_pos_to_robot_frame(env=env, pos=self._goal_pos)
 
         # Add local eef position as well
-        low_dim_obs["eef_local_pos"] = self._global_pos_to_robot_frame(env=env, pos=env.robots[self._robot_idn].get_end_effector_position())
+        low_dim_obs["eef_local_pos"] = self._global_pos_to_robot_frame(env=env, pos=env.robots[self._robot_idn].get_eef_position())
 
         return low_dim_obs, obs
 
     def get_current_pos(self, env):
         # Current position is the robot's EEF, not base!
-        return env.robots[self._robot_idn].get_end_effector_position()
+        return env.robots[self._robot_idn].get_eef_position()

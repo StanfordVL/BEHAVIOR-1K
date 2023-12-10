@@ -1,4 +1,4 @@
-from collections import Iterable
+from collections.abc import Iterable
 from pxr import Gf, Usd, Sdf, UsdGeom, UsdShade, UsdPhysics, PhysxSchema
 from omni.isaac.dynamic_control import _dynamic_control
 from omni.isaac.core.utils.rotations import gf_quat_to_np_array
@@ -12,13 +12,16 @@ from omni.isaac.core.utils.prims import (
     get_prim_object_type,
 )
 import numpy as np
+import omnigibson as og
 from omni.isaac.core.utils.stage import get_current_stage
 from omnigibson.macros import create_module_macros
 from omnigibson.prims.prim_base import BasePrim
 from omnigibson.utils.usd_utils import create_joint
-from omnigibson.utils.constants import JointType
+from omnigibson.utils.constants import JointType, JointAxis
 from omnigibson.utils.python_utils import assert_valid_key
 import omnigibson.utils.transform_utils as T
+from omnigibson.utils.usd_utils import BoundingBoxAPI
+
 from omnigibson.controllers.controller_base import ControlType
 
 
@@ -86,6 +89,7 @@ class JointPrim(BasePrim):
         self._control_type = None
         self._dof_properties = None
         self._joint_state_api = None
+        self._driven = None
 
         # The following values will only be valid if this joint is part of an articulation
         self._dc = None
@@ -101,17 +105,15 @@ class JointPrim(BasePrim):
             load_config=load_config,
         )
 
-    def _load(self, simulator=None):
+    def _load(self):
         # Make sure this joint isn't articulated
         assert not self.articulated, "Joint cannot be created, since this is an articulated joint! We are assuming" \
                                      "the joint already exists in the stage."
 
         # Define a joint prim at the current stage
-        stage = get_current_stage()
         prim = create_joint(
             prim_path=self._prim_path,
             joint_type=self._load_config.get("joint_type", JointType.JOINT),
-            stage=stage,
         )
 
         return prim
@@ -119,6 +121,9 @@ class JointPrim(BasePrim):
     def _post_load(self):
         # run super first
         super()._post_load()
+
+        # Check whether this joint is driven or not
+        self._driven = self._prim.HasAPI(UsdPhysics.DriveAPI)
 
         # Add joint state API if this is a revolute or prismatic joint
         self._joint_type = JointType.get_type(self._prim.GetTypeName().split("Physics")[-1])
@@ -164,9 +169,11 @@ class JointPrim(BasePrim):
                 dof_props = self._dc.get_dof_properties(dof_handle)
                 self._dof_handles.append(dof_handle)
                 self._dof_properties.append(dof_props)
-                # Infer control type based on whether kp and kd are 0 or not
+                # Infer control type based on whether kp and kd are 0 or not, as well as whether this joint is driven or not
                 kp, kd = dof_props.stiffness, dof_props.damping
-                if kp == 0.0:
+                if not self._driven:
+                    control_type = ControlType.NONE
+                elif kp == 0.0:
                     control_type = ControlType.EFFORT if kd == 0.0 else ControlType.VELOCITY
                 else:
                     control_type = ControlType.POSITION
@@ -325,6 +332,14 @@ class JointPrim(BasePrim):
                 {JOINT_PRISMATIC, JOINT_REVOLUTE, JOINT_FIXED, JOINT_SPHERICAL}
         """
         return self._joint_type
+
+    @property
+    def driven(self):
+        """
+        Returns:
+            bool: Whether this joint can be driven by a motor or not
+        """
+        return self._driven
 
     @property
     def control_type(self):
@@ -496,7 +511,12 @@ class JointPrim(BasePrim):
         Args:
             lower_limit (float): lower_limit to set
         """
-        # Can't use DC because it's read only property
+        # Only support revolute and prismatic joints for now
+        assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
+        # Set dc properties
+        self._dof_properties[0].lower = lower_limit
+        self._dc.set_dof_properties(self._dof_handles[0], self._dof_properties[0])
+        # Set USD properties
         lower_limit = T.rad2deg(lower_limit) if self.is_revolute else lower_limit
         self.set_attribute("physics:lowerLimit", lower_limit)
 
@@ -524,7 +544,12 @@ class JointPrim(BasePrim):
         Args:
             upper_limit (float): upper_limit to set
         """
-        # Can't use DC because it's read only property
+        # Only support revolute and prismatic joints for now
+        assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
+        # Set dc properties
+        self._dof_properties[0].upper = upper_limit
+        self._dc.set_dof_properties(self._dof_handles[0], self._dof_properties[0])
+        # Set USD properties
         upper_limit = T.rad2deg(upper_limit) if self.is_revolute else upper_limit
         self.set_attribute("physics:upperLimit", upper_limit)
 
@@ -536,8 +561,32 @@ class JointPrim(BasePrim):
         """
         # Only support revolute and prismatic joints for now
         assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
-        # We either return the raw value or a default value if there is no max specified
         return self._dof_properties[0].has_limits
+
+    @property
+    def axis(self):
+        """
+        Gets this joint's axis
+
+        Returns:
+            str: axis for this joint, one of "X", "Y, "Z"
+        """
+        # Only support revolute and prismatic joints for now
+        assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
+        return self.get_attribute("physics:axis")
+
+    @axis.setter
+    def axis(self, axis):
+        """
+        Sets this joint's axis
+
+        Args:
+            str: axis for this joint, one of "X", "Y, "Z"
+        """
+        # Only support revolute and prismatic joints for now
+        assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
+        assert axis in JointAxis, f"Invalid joint axis specified: {axis}!"
+        self.set_attribute("physics:axis", axis)
 
     @property
     def n_dof(self):
@@ -718,7 +767,7 @@ class JointPrim(BasePrim):
         """
         return effort * self.max_effort
 
-    def set_pos(self, pos, normalized=False, target=False):
+    def set_pos(self, pos, normalized=False, drive=False):
         """
         Set the position of this joint in metric space
 
@@ -727,12 +776,14 @@ class JointPrim(BasePrim):
                 float if the joint only has a single DOF, otherwise it should be an n-array of floats.
             normalized (bool): Whether the input is normalized to [-1, 1] (in this case, the values will be
                 de-normalized first before being executed). Default is False
-            target (bool): Whether the position being set is a target value or manual value to immediately set. Default
-                is False, corresponding to an instantaneous setting of the position
+            drive (bool): Whether the joint should be driven naturally via its motor to the position being set or
+                whether it should be instantaneously set. Default is False, corresponding to an
+                instantaneous setting of the position
         """
         # Sanity checks -- make sure we're the correct control type if we're setting a target and that we're articulated
         self.assert_articulated()
-        if target:
+        if drive:
+            assert self._driven, "Can only use set_pos with drive=True if this joint is driven!"
             assert self._control_type == ControlType.POSITION, \
                 "Trying to set joint position target, but control type is not position!"
 
@@ -745,12 +796,14 @@ class JointPrim(BasePrim):
 
         # Set the DOF(s) in this joint
         for dof_handle, p in zip(self._dof_handles, pos):
-            if not target:
+            if not drive:
                 self._dc.set_dof_position(dof_handle, p)
-            # We set the position in either case
+                BoundingBoxAPI.clear()
+
+            # We set the position target in either case
             self._dc.set_dof_position_target(dof_handle, p)
 
-    def set_vel(self, vel, normalized=False, target=False):
+    def set_vel(self, vel, normalized=False, drive=False):
         """
         Set the velocity of this joint in metric space
 
@@ -759,12 +812,14 @@ class JointPrim(BasePrim):
                 float if the joint only has a single DOF, otherwise it should be an n-array of floats.
             normalized (bool): Whether the input is normalized to [-1, 1] (in this case, the values will be
                 de-normalized first before being executed). Default is False
-            target (bool): Whether the velocity being set is a target value or manual value to immediately set. Default
-                is False, corresponding to an instantaneous setting of the velocity
+            drive (bool): Whether the joint should be driven naturally via its motor to the velocity being set or
+                whether it should be instantaneously set. Default is False, corresponding to an
+                instantaneous setting of the velocity
         """
         # Sanity checks -- make sure we're the correct control type if we're setting a target and that we're articulated
         self.assert_articulated()
-        if target:
+        if drive:
+            assert self._driven, "Can only use set_vel with drive=True if this joint is driven!"
             assert self._control_type == ControlType.VELOCITY, \
                 f"Trying to set joint velocity target for joint {self.name}, but control type is not velocity!"
 
@@ -777,7 +832,7 @@ class JointPrim(BasePrim):
 
         # Set the DOF(s) in this joint
         for dof_handle, v in zip(self._dof_handles, vel):
-            if not target:
+            if not drive:
                 self._dc.set_dof_velocity(dof_handle, v)
             # We set the target in either case
             self._dc.set_dof_velocity_target(dof_handle, v)
@@ -793,7 +848,7 @@ class JointPrim(BasePrim):
                 de-normalized first before being executed). Default is False
         """
         # Sanity checks -- make sure that we're articulated (no control type check like position and velocity
-        # because we can't set effort targets)
+        # because we can't set effort targets) and that we're driven
         self.assert_articulated()
 
         # Standardize input
@@ -812,6 +867,9 @@ class JointPrim(BasePrim):
         Zero out all velocities for this prim
         """
         self.set_vel(np.zeros(self.n_dof))
+        # If not driven, set torque equal to zero as well
+        if not self.driven:
+            self.set_effort(np.zeros(self.n_dof))
 
     def _dump_state(self):
         pos, vel, effort = self.get_state() if self.articulated else (np.array([]), np.array([]), np.array([]))
@@ -826,13 +884,14 @@ class JointPrim(BasePrim):
 
     def _load_state(self, state):
         if self.articulated:
-            self.set_pos(state["pos"], target=False)
-            self.set_vel(state["vel"], target=False)
-            self.set_effort(state["effort"])
+            self.set_pos(state["pos"], drive=False)
+            self.set_vel(state["vel"], drive=False)
+            if self.driven:
+                self.set_effort(state["effort"])
             if self._control_type == ControlType.POSITION:
-                self.set_pos(state["target_pos"], target=True)
+                self.set_pos(state["target_pos"], drive=True)
             elif self._control_type == ControlType.VELOCITY:
-                self.set_vel(state["target_vel"], target=True)
+                self.set_vel(state["target_vel"], drive=True)
 
     def _serialize(self, state):
         return np.concatenate([
@@ -853,6 +912,6 @@ class JointPrim(BasePrim):
             target_vel=state[4*self.n_dof:5*self.n_dof],
         ), 5*self.n_dof
 
-    def duplicate(self, simulator, prim_path):
+    def duplicate(self, prim_path):
         # Cannot directly duplicate a joint prim
         raise NotImplementedError("Cannot directly duplicate a joint prim!")

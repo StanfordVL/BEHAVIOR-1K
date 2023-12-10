@@ -1,5 +1,13 @@
 env:
+  action_timestep: 0.01666              # (float): environment executes action per action_timestep second
+  physics_timestep: 0.01666             # (float): physics timestep for physx
+  device: null                          # (None or str): specifies the device to be used if running on the gpu with torch backend
+  automatic_reset: false                # (bool): whether to automatic reset after an episode finishes
+  flatten_action_space: false           # (bool): whether to flatten the action space as a sinle 1D-array
+  flatten_obs_space: false              # (bool): whether the observation space should be flattened when generated
+  use_external_obs: false               # (bool): Whether to use external observations or not
   initial_pos_z_offset: 0.1
+  external_sensors: null                # (None or list): If specified, list of sensor configurations for external sensors to add. Should specify sensor "type" and any additional kwargs to instantiate the sensor. Each entry should be the kwargs passed to @create_sensor, in addition to position, orientation
 
 render:
   viewer_width: 1280
@@ -29,6 +37,15 @@ robots:
     self_collision: false
     action_normalize: true
     action_type: continuous
+    sensor_config:
+      VisionSensor:
+        sensor_kwargs:
+          image_height: 128
+          image_width: 128
+      ScanSensor:
+          sensor_kwargs:
+            min_range: 0.05
+            max_range: 10.0
     controller_config:
       base:
         name: DifferentialDriveController
@@ -46,7 +63,7 @@ task:
   goal_in_polar: false
   path_range: [1.0, 10.0]
   visualize_goal: true
-  visualize_path: true
+  visualize_path: false
   n_vis_waypoints: 25
   reward_type: geodesic
   termination_config:

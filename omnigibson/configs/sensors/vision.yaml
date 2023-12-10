@@ -1,0 +1,14 @@
+# Example VisionSensor sensor config
+# See omnigibson/sensors/__init__/create_sensor and omnigibson/sensors/vision_sensor for docstring of arguments
+# Arguments below are the arguments that should be specified by external user (other kwargs
+# used in constructor are generated automatically at runtime)
+robot:
+  sensor_config:
+    VisionSensor:
+      modalities: [rgb, depth]  # if specified, this will override the values in robots_config["obs_modalities"]
+      enabled: true
+      noise_type: null
+      noise_kwargs: null
+      sensor_kwargs:
+        image_height: 128
+        image_width: 128

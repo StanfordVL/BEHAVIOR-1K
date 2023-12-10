@@ -14,10 +14,10 @@ def main(random_selection=False, headless=False, short_exec=False):
     It steps the environment 100 times with random actions sampled from the action space,
     using the Gym interface, resetting it 10 times.
     """
-    og.log.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
+    og.log.info(f"Demo {__file__}\n    " + "*" * 80 + "\n    Description:\n" + main.__doc__ + "*" * 80)
 
     # Load the config
-    config_filename = os.path.join(og.example_config_path, f"turtlebot_interactive_nav.yaml")
+    config_filename = os.path.join(og.example_config_path, f"turtlebot_nav.yaml")
     config = yaml.load(open(config_filename, "r"), Loader=yaml.FullLoader)
 
     # check if we want to quick load or full load the scene

@@ -3,43 +3,34 @@
 BYellow='\033[1;33m'
 Color_Off='\033[0m'
 
+# Parse the command line arguments.
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 DEFAULT_DATA_DIR="$SCRIPT_DIR/omnigibson_data"
-DATA_PATH=${1:-$DEFAULT_DATA_DIR}
+DATA_PATH=$DEFAULT_DATA_DIR
+GUI=true
 
-ICD_PATH="/usr/share/vulkan/icd.d/nvidia_icd.json"
-LAYERS_PATH="/usr/share/vulkan/icd.d/nvidia_layers.json"
-EGL_VENDOR_PATH="/usr/share/glvnd/egl_vendor.d/10_nvidia.json"
+# Parse command line arguments
+while [[ $# -gt 0 ]]
+do
+    key="$1"
 
-# Assert the presence of relevant Vulkan files
-if [ ! -e "$ICD_PATH" ]; then
-    echo "Missing ${ICD_PATH} file."
-    echo "(default path: /usr/share/vulkan/icd.d/nvidia_icd.json)";
-    echo "In some distributions this file will be at /etc/vulkan/icd.d/";
-    echo "Consider updating your driver to 525 if you cannot find the file.";
-    echo "To continue update the file path at the top of the run_docker.sh file and retry";
-    exit;
-fi 
-if [ ! -e "$LAYERS_PATH" ]; then
-    echo "Missing ${LAYERS_PATH} file."
-    echo "(default path: /usr/share/vulkan/icd.d/nvidia_layers.json)";
-    echo "In some distributions this file will be at /etc/vulkan/implicit_layer.d/";
-    echo "Consider updating your driver to 525 if you cannot find the file.";
-    echo "To continue update the file path at the top of the run_docker.sh file and retry";
-    exit;
-fi 
-if [ ! -e "$EGL_VENDOR_PATH" ]; then
-    echo "Missing ${EGL_VENDOR_PATH} file."
-    echo "(default path: /usr/share/vulkan/icd.d/nvidia_icd.json)";
-    echo "To continue update the file path at the top of the run_docker.sh file and retry";
-    exit;
-fi 
+    case $key in
+        -h|--headless)
+        GUI=false
+        shift
+        ;;
+        *)
+        DATA_PATH="$1"
+        shift
+        ;;
+    esac
+done
 
 # Move directories from their legacy paths.
-if [ -e "${DATA_PATH}/og_dataset"]; then
+if [ -e "${DATA_PATH}/og_dataset" ]; then
     mv "${DATA_PATH}/og_dataset" "${DATA_PATH}/datasets/og_dataset"
 fi
-if [ -e "${DATA_PATH}/assets"]; then
+if [ -e "${DATA_PATH}/assets" ]; then
     mv "${DATA_PATH}/assets" "${DATA_PATH}/datasets/assets"
 fi
 
@@ -64,15 +55,20 @@ while true; do
 done
 
 docker pull stanfordvl/omnigibson:latest
+DOCKER_DISPLAY=""
+OMNIGIBSON_HEADLESS=1
+if [ "$GUI" = true ] ; then
+    xhost +local:root
+    DOCKER_DISPLAY=$DISPLAY
+    OMNIGIBSON_HEADLESS=0
+fi
 docker run \
     --gpus all \
     --privileged \
-    -e DISPLAY \
-    -e OMNIGIBSON_HEADLESS=1 \
+    -e DISPLAY=${DOCKER_DISPLAY} \
+    -e OMNIGIBSON_HEADLESS=${OMNIGIBSON_HEADLESS} \
     -v $DATA_PATH/datasets:/data \
-    -v ${ICD_PATH}:/etc/vulkan/icd.d/nvidia_icd.json \
-    -v ${LAYERS_PATH}:/etc/vulkan/implicit_layer.d/nvidia_layers.json \
-    -v ${EGL_VENDOR_PATH}:/usr/share/glvnd/egl_vendor.d/10_nvidia.json \
+    -v $DATA_PATH/isaac-sim/cache/kit:/isaac-sim/kit/cache/Kit:rw \
     -v $DATA_PATH/isaac-sim/cache/ov:/root/.cache/ov:rw \
     -v $DATA_PATH/isaac-sim/cache/pip:/root/.cache/pip:rw \
     -v $DATA_PATH/isaac-sim/cache/glcache:/root/.cache/nvidia/GLCache:rw \
@@ -82,3 +78,6 @@ docker run \
     -v $DATA_PATH/isaac-sim/data:/root/.local/share/ov/data:rw \
     -v $DATA_PATH/isaac-sim/documents:/root/Documents:rw \
     --network=host --rm -it stanfordvl/omnigibson:latest
+if [ "$GUI" = true ] ; then
+    xhost -local:root
+fi

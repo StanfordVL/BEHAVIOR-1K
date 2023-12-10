@@ -34,7 +34,7 @@ class GeomPrim(XFormPrim):
             load_config=load_config,
         )
 
-    def _load(self, simulator=None):
+    def _load(self):
         # This should not be called, because this prim cannot be instantiated from scratch!
         raise NotImplementedError("By default, a geom prim cannot be created from scratch.")
 
@@ -45,7 +45,7 @@ class GeomPrim(XFormPrim):
         # By default, GeomPrim shows up in the rendering.
         self.purpose = "default"
 
-    def duplicate(self, simulator, prim_path):
+    def duplicate(self, prim_path):
         # Cannot directly duplicate a mesh prim
         raise NotImplementedError("Cannot directly duplicate a geom prim!")
 

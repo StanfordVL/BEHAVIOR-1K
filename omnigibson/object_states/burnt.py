@@ -1,6 +1,6 @@
 from omnigibson.macros import create_module_macros
 from omnigibson.object_states.max_temperature import MaxTemperature
-from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanState
+from omnigibson.object_states.object_state_base import AbsoluteObjectState, BooleanStateMixin
 
 
 # Create settings for this module
@@ -9,14 +9,16 @@ m = create_module_macros(module_path=__file__)
 m.DEFAULT_BURN_TEMPERATURE = 200
 
 
-class Burnt(AbsoluteObjectState, BooleanState):
+class Burnt(AbsoluteObjectState, BooleanStateMixin):
     def __init__(self, obj, burn_temperature=m.DEFAULT_BURN_TEMPERATURE):
         super(Burnt, self).__init__(obj)
         self.burn_temperature = burn_temperature
 
-    @staticmethod
-    def get_dependencies():
-        return AbsoluteObjectState.get_dependencies() + [MaxTemperature]
+    @classmethod
+    def get_dependencies(cls):
+        deps = super().get_dependencies()
+        deps.add(MaxTemperature)
+        return deps
 
     def _set_value(self, new_value):
         current_max_temp = self.obj.states[MaxTemperature].get_value()

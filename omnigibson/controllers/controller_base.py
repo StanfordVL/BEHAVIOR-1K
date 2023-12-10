@@ -1,4 +1,4 @@
-from collections import Iterable
+from collections.abc import Iterable
 from enum import IntEnum
 
 import numpy as np
@@ -35,10 +35,12 @@ class IsGraspingState(IntEnum):
 
 # Define macros
 class ControlType:
+    NONE = -1
     POSITION = 0
     VELOCITY = 1
     EFFORT = 2
     _MAPPING = {
+        "none": NONE,
         "position": POSITION,
         "velocity": VELOCITY,
         "effort": EFFORT,
@@ -228,31 +230,55 @@ class BaseController(Serializable, Registerable, Recreatable):
         Returns:
             Array[float]: numpy array of outputted control signals
         """
+        # Make command no-op command if not specified
+        if self._command is None:
+            self._command = self.compute_no_op_command(control_dict)
         control = self._command_to_control(command=self._command, control_dict=control_dict)
         self._control = self.clip_control(control=control)
         return self._control
 
     def reset(self):
         """
-        Resets this controller. Should be implemented by subclass.
+        Resets this controller. Can be extended by subclass
+        """
+        self._command = None
+
+    def compute_no_op_command(self, control_dict):
+        """
+        Compute no-op action given the current state @control_dict
+
+        Args:
+            control_dict (dict): Current state
+
+        Returns:
+            Array[float]: No-op command for this controller
         """
         raise NotImplementedError
 
     def _dump_state(self):
-        # Default is no state (empty dict)
-        return dict()
+        # Default is just the command
+        return dict(
+            command_is_valid=self._command is not None,
+            command=self._command,
+        )
 
     def _load_state(self, state):
-        # Default is no state (empty dict), so this is a no-op
-        pass
+        # Load command
+        self._command = state["command"] if state["command_is_valid"] else None
 
     def _serialize(self, state):
-        # Default is no state, so do nothing
-        return np.array([])
+        # Make sure size of the state is consistent, even if we have no command
+        return np.concatenate([
+            [state["command_is_valid"]],
+            state["command"] if state["command_is_valid"] else np.zeros(self.command_dim),
+        ])
 
     def _deserialize(self, state):
-        # Default is no state, so do nothing
-        return dict(), 0
+        command_is_valid = bool(state[0])
+        state_dict = dict(
+            command_is_valid=command_is_valid,
+            command=state[1:1 + self.command_dim]) if command_is_valid else None
+        return state_dict, self.command_dim + 1
 
     def _command_to_control(self, command, control_dict):
         """
@@ -292,8 +318,8 @@ class BaseController(Serializable, Registerable, Recreatable):
 
     @property
     def state_size(self):
-        # Default is no state, so return 0
-        return 0
+        # Default is command dim + 1 (for whether the command is valid or not)
+        return self.command_dim + 1
 
     @property
     def control(self):

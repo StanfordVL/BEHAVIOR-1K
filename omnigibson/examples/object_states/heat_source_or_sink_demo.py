@@ -18,18 +18,19 @@ def main():
                 "type": "DatasetObject",
                 "name": "stove",
                 "category": "stove",
-                "model": "101908",
+                "model": "qbjiva",
+                "bounding_box": [1.611, 0.769, 1.147],
                 "abilities": {
                     "heatSource": {"requires_toggled_on": True},
                     "toggleable": {},
                 },
-                "position": [0, 0, 0.4],
+                "position": [0, 0, 0.61],
             }
         ],
     }
 
     # Create the environment
-    env = og.Environment(configs=cfg, action_timestep=1/60., physics_timestep=1/60.)
+    env = og.Environment(configs=cfg)
 
     # Get reference to stove object
     stove = env.scene.object_registry("name", "stove")
@@ -77,7 +78,7 @@ def main():
 
     # Move stove, notify user
     input("Heat source is now moving: Press ENTER to continue.")
-    stove.set_position(np.array([0, 1.0, 0.4]))
+    stove.set_position(np.array([0, 1.0, 0.61]))
     for i in range(100):
         env.step(np.array([]))
 

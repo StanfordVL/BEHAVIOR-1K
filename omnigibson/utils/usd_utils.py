@@ -1,5 +1,5 @@
 import math
-from collections import Iterable
+from collections.abc import Iterable
 import os
 
 import omni.usd
@@ -22,9 +22,11 @@ import trimesh
 
 import omnigibson as og
 from omnigibson.macros import gm
-from omnigibson.utils.constants import JointType, PRIMITIVE_MESH_TYPES
+from omnigibson.utils.constants import JointType, PRIMITIVE_MESH_TYPES, PrimType, GEOM_TYPES
+from omnigibson.utils.deprecated_utils import CreateMeshPrimWithDefaultXformCommand
 from omnigibson.utils.python_utils import assert_valid_key
 from omnigibson.utils.ui_utils import suppress_omni_log
+
 import omnigibson.utils.transform_utils as T
 
 GF_TO_VT_MAPPING = {
@@ -122,7 +124,7 @@ def get_camera_params(viewport):
     view_proj_mat = helpers.get_view_proj_mat(view_params)
 
     return {
-        "pose": np.array(prim_tf),
+        "pose": np.array(prim_tf).T,        # omni natively gives transposed pose so we have to "un"-transpose it
         "fov": fov,
         "focal_length": view_params["focal_length"],
         "horizontal_aperture": view_params["horizontal_aperture"],
@@ -147,20 +149,27 @@ def get_semantic_objects_pose():
     return pose
 
 
-def create_joint(prim_path, joint_type, body0=None, body1=None, enabled=True, stage=None):
+def create_joint(prim_path, joint_type, body0=None, body1=None, enabled=True,
+                 joint_frame_in_parent_frame_pos=None, joint_frame_in_parent_frame_quat=None,
+                 joint_frame_in_child_frame_pos=None, joint_frame_in_child_frame_quat=None,
+                 break_force=None, break_torque=None):
     """
     Creates a joint between @body0 and @body1 of specified type @joint_type
 
     Args:
         prim_path (str): absolute path to where the joint will be created
-        joint_type (str): type of joint to create. Valid options are:
+        joint_type (str or JointType): type of joint to create. Valid options are:
             "FixedJoint", "Joint", "PrismaticJoint", "RevoluteJoint", "SphericalJoint"
                         (equivalently, one of JointType)
-        body0 (str): absolute path to the first body's prim. At least @body0 or @body1 must be specified.
-        body1 (str): absolute path to the second body's prim. At least @body0 or @body1 must be specified.
-        enabled (bool): whether to enable this joint or not
-        stage (Usd.Stage): if specified, should be specific stage to be used to load the joint.
-            Otherwise, the current active stage will be used.
+        body0 (str or None): absolute path to the first body's prim. At least @body0 or @body1 must be specified.
+        body1 (str or None): absolute path to the second body's prim. At least @body0 or @body1 must be specified.
+        enabled (bool): whether to enable this joint or not.
+        joint_frame_in_parent_frame_pos (np.ndarray or None): relative position of the joint frame to the parent frame (body0).
+        joint_frame_in_parent_frame_quat (np.ndarray or None): relative orientation of the joint frame to the parent frame (body0).
+        joint_frame_in_child_frame_pos (np.ndarray or None): relative position of the joint frame to the child frame (body1).
+        joint_frame_in_child_frame_quat (np.ndarray or None): relative orientation of the joint frame to the child frame (body1).
+        break_force (float or None): break force for linear dofs, unit is Newton.
+        break_torque (float or None): break torque for angular dofs, unit is Newton-meter.
 
     Returns:
         Usd.Prim: Created joint prim
@@ -173,11 +182,8 @@ def create_joint(prim_path, joint_type, body0=None, body1=None, enabled=True, st
     assert body0 is not None or body1 is not None, \
         f"At least either body0 or body1 must be specified when creating a joint!"
 
-    # Define an Xform prim at the current stage, or the simulator's stage if specified
-    stage = get_current_stage() if stage is None else stage
-
     # Create the joint
-    joint = UsdPhysics.__dict__[joint_type].Define(stage, prim_path)
+    joint = UsdPhysics.__dict__[joint_type].Define(og.sim.stage, prim_path)
 
     # Possibly add body0, body1 targets
     if body0 is not None:
@@ -193,14 +199,167 @@ def create_joint(prim_path, joint_type, body0=None, body1=None, enabled=True, st
     # Apply joint API interface
     PhysxSchema.PhysxJointAPI.Apply(joint_prim)
 
+    # We need to step rendering once to auto-fill the local pose before overwriting it.
+    # Note that for some reason, if multi_gpu is used, this line will crash if create_joint is called during on_contact
+    # callback, e.g. when an attachment joint is being created due to contacts.
+    og.sim.render()
+
+    if joint_frame_in_parent_frame_pos is not None:
+        joint_prim.GetAttribute("physics:localPos0").Set(Gf.Vec3f(*joint_frame_in_parent_frame_pos))
+    if joint_frame_in_parent_frame_quat is not None:
+        joint_prim.GetAttribute("physics:localRot0").Set(Gf.Quatf(*joint_frame_in_parent_frame_quat[[3, 0, 1, 2]]))
+    if joint_frame_in_child_frame_pos is not None:
+        joint_prim.GetAttribute("physics:localPos1").Set(Gf.Vec3f(*joint_frame_in_child_frame_pos))
+    if joint_frame_in_child_frame_quat is not None:
+        joint_prim.GetAttribute("physics:localRot1").Set(Gf.Quatf(*joint_frame_in_child_frame_quat[[3, 0, 1, 2]]))
+
+    if break_force is not None:
+        joint_prim.GetAttribute("physics:breakForce").Set(break_force)
+    if break_torque is not None:
+        joint_prim.GetAttribute("physics:breakTorque").Set(break_torque)
+
     # Possibly (un-/)enable this joint
     joint_prim.GetAttribute("physics:jointEnabled").Set(enabled)
 
-    # We need to step rendering once to auto-fill the local pose before overwriting it.
-    og.sim.render()
+    # We update the simulation now without stepping physics if sim is playing so we can bypass the snapping warning from PhysicsUSD
+    if og.sim.is_playing():
+        with suppress_omni_log(channels=["omni.physx.plugin"]):
+            og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
 
     # Return this joint
     return joint_prim
+
+
+class RigidContactAPI:
+    """
+    Class containing class methods to aggregate rigid body contacts across all rigid bodies in the simulator
+    """
+    # Dictionary mapping rigid body prim path to corresponding index in the contact view matrix
+    _PATH_TO_IDX = None
+
+    # Contact view for generating contact matrices at each timestep
+    _CONTACT_VIEW = None
+
+    # Current aggregated contacts over all rigid bodies at the current timestep. Shape: (N, N, 3)
+    _CONTACT_MATRIX = None
+
+    # Current cache, mapping 2-tuple (prim_paths_a, prim_paths_b) to contact values
+    _CONTACT_CACHE = None
+
+    @classmethod
+    def initialize_view(cls):
+        """
+        Initializes the rigid contact view. Note: Can only be done when sim is playing!
+        """
+        assert og.sim.is_playing(), "Cannot create rigid contact view while sim is not playing!"
+
+        # Compile deterministic mapping from rigid body path to idx
+        # Note that omni's ordering is based on the top-down object ordering path on the USD stage, which coincidentally
+        # matches the same ordering we store objects in our registry. So the mapping we generate from our registry
+        # mapping aligns with omni's ordering!
+        i = 0
+        cls._PATH_TO_IDX = dict()
+        for obj in og.sim.scene.objects:
+            if obj.prim_type == PrimType.RIGID:
+                for link in obj.links.values():
+                    if not link.kinematic_only:
+                        cls._PATH_TO_IDX[link.prim_path] = i
+                        i += 1
+
+        # If there are no valid objects, clear the view and terminate early
+        if i == 0:
+            cls._CONTACT_VIEW = None
+            return
+
+        # Generate rigid body view, making sure to update the simulation first (without physics) so that the physx
+        # backend is synchronized with any newly added objects
+        # We also suppress the omni tensor plugin from giving warnings we expect
+        og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
+        with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
+            cls._CONTACT_VIEW = og.sim.physics_sim_view.create_rigid_contact_view(
+                pattern="/World/*/*",
+                filter_patterns=list(cls._PATH_TO_IDX.keys()),
+            )
+
+        # Sanity check generated view -- this should generate square matrices of shape (N, N, 3)
+        n_bodies = len(cls._PATH_TO_IDX)
+        # from IPython import embed; embed()
+        assert cls._CONTACT_VIEW.sensor_count == n_bodies and cls._CONTACT_VIEW.filter_count == n_bodies, \
+            f"Got unexpected contact view shape. Expected: ({n_bodies}, {n_bodies}); " \
+            f"got: ({cls._CONTACT_VIEW.sensor_count}, {cls._CONTACT_VIEW.filter_count})"
+
+    @classmethod
+    def get_body_idx(cls, prim_path):
+        """
+        Returns:
+            int: idx assigned to the rigid body defined by @prim_path
+        """
+        return cls._PATH_TO_IDX[prim_path]
+
+    @classmethod
+    def get_all_impulses(cls):
+        """
+        Grab all impulses at the current timestep
+
+        Returns:
+            n-array: (N, N, 3) impulse array defining current impulses between all N contact-sensor enabled rigid bodies
+                in the simulator
+        """
+        # Generate the contact matrix if it doesn't already exist
+        if cls._CONTACT_MATRIX is None:
+            cls._CONTACT_MATRIX = cls._CONTACT_VIEW.get_contact_force_matrix(dt=1.0)
+
+        return cls._CONTACT_MATRIX
+
+    @classmethod
+    def get_impulses(cls, prim_paths_a, prim_paths_b):
+        """
+        Grabs the matrix representing all impulse forces between rigid prims from @prim_paths_a and
+        rigid prims from @prim_paths_b
+
+        Args:
+            prim_paths_a (list of str): Rigid body prim path(s) with which to grab contact impulses against
+                any of the rigid body prim path(s) defined by @prim_paths_b
+            prim_paths_b (list of str): Rigid body prim path(s) with which to grab contact impulses against
+                any of the rigid body prim path(s) defined by @prim_paths_a
+
+        Returns:
+            n-array: (N, M, 3) impulse array defining current impulses between N bodies from @prim_paths_a and M bodies
+                from @prim_paths_b
+        """
+        # Compute subset of matrix and return
+        idxs_a = [cls._PATH_TO_IDX[path] for path in prim_paths_a]
+        idxs_b = [cls._PATH_TO_IDX[path] for path in prim_paths_b]
+        return cls.get_all_impulses()[idxs_a][:, idxs_b]
+
+    @classmethod
+    def in_contact(cls, prim_paths_a, prim_paths_b):
+        """
+        Check if any rigid prim from @prim_paths_a is in contact with any rigid prim from @prim_paths_b
+
+        Args:
+            prim_paths_a (list of str): Rigid body prim path(s) with which to check contact against any of the rigid
+                body prim path(s) defined by @prim_paths_b
+            prim_paths_b (list of str): Rigid body prim path(s) with which to check contact against any of the rigid
+                body prim path(s) defined by @prim_paths_a
+
+        Returns:
+            bool: Whether any body from @prim_paths_a is in contact with any body from @prim_paths_b
+        """
+        # Check if the contact tuple already exists in the cache; if so, return the value
+        key = (tuple(prim_paths_a), tuple(prim_paths_b))
+        if key not in cls._CONTACT_CACHE:
+            # In contact if any of the matrix values representing the interaction between the two groups is non-zero
+            cls._CONTACT_CACHE[key] = np.any(cls.get_impulses(prim_paths_a=prim_paths_a, prim_paths_b=prim_paths_b))
+        return cls._CONTACT_CACHE[key]
+
+    @classmethod
+    def clear(cls):
+        """
+        Clears the internal contact matrix and cache
+        """
+        cls._CONTACT_MATRIX = None
+        cls._CONTACT_CACHE = dict()
 
 
 class CollisionAPI:
@@ -214,7 +373,6 @@ class CollisionAPI:
         """
         Adds the prim and all nested prims specified by @prim_path to the global collision group @col_group. If @col_group
         does not exist, then it will either be created if @create_if_not_exist is True, otherwise will raise an Error.
-
         Args:
             col_group (str): Name of the collision group to assign the prim at @prim_path to
             prim_path (str): Prim (and all nested prims) to assign to this @col_group
@@ -339,6 +497,7 @@ class BoundingBoxAPI:
         """
         # Create cache if it doesn't already exist
         if cls.CACHE_NON_FLATCACHE is None:
+            og.sim.psi.fetch_results()
             cls.CACHE_NON_FLATCACHE = create_bbox_cache(use_extents_hint=False)
 
         # Grab aabb
@@ -346,7 +505,7 @@ class BoundingBoxAPI:
 
         # Sanity check values
         if np.any(aabb[3:] < aabb[:3]):
-            raise ValueError(f"Got invalid aabb values: low={aabb[:3]}, high={aabb[3:]}")
+            raise ValueError(f"Got invalid aabb values for prim: {prim_path}: low={aabb[:3]}, high={aabb[3:]}")
 
         return aabb[:3], aabb[3:]
 
@@ -492,7 +651,7 @@ class FlatcacheAPI:
         # For any prim transforms that were manually updated, we need to restore their original transforms
         for prim in cls.MODIFIED_PRIMS:
             cls.reset_raw_object_transforms_in_usd(prim)
-        cls.FLATCACHE_MODIFIED_PRIMS = set()
+        cls.MODIFIED_PRIMS = set()
 
 
 def clear():
@@ -503,20 +662,20 @@ def clear():
     BoundingBoxAPI.clear()
 
 
-def create_mesh_prim_with_default_xform(primitive_type, prim_path, stage=None, u_patches=None, v_patches=None):
+def create_mesh_prim_with_default_xform(primitive_type, prim_path, u_patches=None, v_patches=None, stage=None):
     """
     Creates a mesh prim of the specified @primitive_type at the specified @prim_path
 
     Args:
         primitive_type (str): Primitive mesh type, should be one of PRIMITIVE_MESH_TYPES to be valid
         prim_path (str): Destination prim path to store the mesh prim
-        stage (Usd.Stage or None): If specified, should be specific stage to be used to load the mesh prim.
-            Otherwise, the current active stage will be used.
         u_patches (int or None): If specified, should be an integer that represents how many segments to create in the
             u-direction. E.g. 10 means 10 segments (and therefore 11 vertices) will be created.
         v_patches (int or None): If specified, should be an integer that represents how many segments to create in the
             v-direction. E.g. 10 means 10 segments (and therefore 11 vertices) will be created.
             Both u_patches and v_patches need to be specified for them to be effective.
+        stage (None or Usd.Stage): If specified, stage on which the primitive mesh should be generated. If None, will
+            use og.sim.stage
     """
 
     assert primitive_type in PRIMITIVE_MESH_TYPES, "Invalid primitive mesh type: {primitive_type}"
@@ -526,37 +685,33 @@ def create_mesh_prim_with_default_xform(primitive_type, prim_path, stage=None, u
     hs_backup = carb.settings.get_settings().get(evaluator.SETTING_OBJECT_HALF_SCALE)
     carb.settings.get_settings().set(evaluator.SETTING_U_SCALE, 1)
     carb.settings.get_settings().set(evaluator.SETTING_V_SCALE, 1)
+    stage = og.sim.stage if stage is None else stage
 
     # Default half_scale (i.e. half-extent, half_height, radius) is 1.
     # TODO (eric): change it to 0.5 once the mesh generator API accepts floating-number HALF_SCALE
     #  (currently it only accepts integer-number and floors 0.5 into 0).
     carb.settings.get_settings().set(evaluator.SETTING_OBJECT_HALF_SCALE, 1)
+    kwargs = dict(prim_type=primitive_type, prim_path=prim_path, stage=stage)
     if u_patches is not None and v_patches is not None:
-        omni.kit.commands.execute(
-            "CreateMeshPrimWithDefaultXform",
-            prim_type=primitive_type,
-            prim_path=prim_path,
-            u_patches=u_patches,
-            v_patches=v_patches,
-        )
-    else:
-        omni.kit.commands.execute(
-            "CreateMeshPrimWithDefaultXform",
-            prim_type=primitive_type,
-            prim_path=prim_path,
-        )
+        kwargs["u_patches"] = u_patches
+        kwargs["v_patches"] = v_patches
+
+    CreateMeshPrimWithDefaultXformCommand(**kwargs).do()
 
     carb.settings.get_settings().set(evaluator.SETTING_U_SCALE, u_backup)
     carb.settings.get_settings().set(evaluator.SETTING_V_SCALE, v_backup)
     carb.settings.get_settings().set(evaluator.SETTING_OBJECT_HALF_SCALE, hs_backup)
 
 
-def mesh_prim_to_trimesh_mesh(mesh_prim):
+def mesh_prim_to_trimesh_mesh(mesh_prim, include_normals=True, include_texcoord=True):
     """
     Generates trimesh mesh from @mesh_prim
 
     Args:
         mesh_prim (Usd.Prim): Mesh prim to convert into trimesh mesh
+        include_normals (bool): Whether to include the normals in the resulting trimesh or not
+        include_texcoord (bool): Whether to include the corresponding 2D-texture coordinates in the resulting
+            trimesh or not
 
     Returns:
         trimesh.Trimesh: Generated trimesh mesh
@@ -572,10 +727,108 @@ def mesh_prim_to_trimesh_mesh(mesh_prim):
             faces.append([face_indices[i], face_indices[i + j + 1], face_indices[i + j + 2]])
         i += count
 
-    return trimesh.Trimesh(vertices=vertices, faces=faces)
+    kwargs = dict(vertices=vertices, faces=faces)
+
+    if include_normals:
+        kwargs["vertex_normals"] = np.array(mesh_prim.GetAttribute("normals").Get())
+
+    if include_texcoord:
+        kwargs["visual"] = trimesh.visual.TextureVisuals(uv=np.array(mesh_prim.GetAttribute("primvars:st").Get()))
+
+    return trimesh.Trimesh(**kwargs)
 
 
-def create_primitive_mesh(prim_path, primitive_type, extents=1.0, u_patches=None, v_patches=None):
+def sample_mesh_keypoints(mesh_prim, n_keypoints, n_keyfaces, seed=None):
+    """
+    Samples keypoints and keyfaces for mesh @mesh_prim
+
+    Args:
+        mesh_prim (Usd.Prim): Mesh prim to be sampled from
+        n_keypoints (int): number of (unique) keypoints to randomly sample from @mesh_prim
+        n_keyfaces (int): number of (unique) keyfaces to randomly sample from @mesh_prim
+        seed (None or int): If set, sets the random seed for deterministic results
+
+    Returns:
+        2-tuple:
+            - n-array: (n,) 1D int array representing the randomly sampled point idxs from @mesh_prim.
+                Note that since this is without replacement, the total length of the array may be less than
+                @n_keypoints
+            - None or n-array: 1D int array representing the randomly sampled face idxs from @mesh_prim.
+                Note that since this is without replacement, the total length of the array may be less than
+                @n_keyfaces
+    """
+    # Set seed if deterministic
+    if seed is not None:
+        np.random.seed(seed)
+
+    # Generate trimesh mesh from which to aggregate points
+    tm = mesh_prim_to_trimesh_mesh(mesh_prim=mesh_prim, include_normals=False, include_texcoord=False)
+    n_unique_vertices, n_unique_faces = len(tm.vertices), len(tm.faces)
+    faces_flat = tm.faces.flatten()
+    n_vertices = len(faces_flat)
+
+    # Sample vertices
+    unique_vertices = np.unique(faces_flat, return_index=True)[1]
+    assert len(unique_vertices) == n_unique_vertices
+    keypoint_idx = np.random.choice(unique_vertices, size=n_keypoints, replace=False) if \
+        n_unique_vertices > n_keypoints else unique_vertices
+
+    # Sample faces
+    keyface_idx = np.random.choice(n_unique_faces, size=n_keyfaces, replace=False) if \
+        n_unique_faces > n_keyfaces else np.arange(n_unique_faces)
+
+    return keypoint_idx, keyface_idx
+
+
+def get_mesh_volume_and_com(mesh_prim):
+    """
+    Computes the volume and center of mass for @mesh_prim
+
+    Args:
+        mesh_prim (Usd.Prim): Mesh prim to compute volume and center of mass for
+
+    Returns:
+        Tuple[bool, float, np.array]: Tuple containing the (is_volume, volume, center_of_mass) in the mesh
+            frame of @mesh_prim
+    """
+    mesh_type = mesh_prim.GetPrimTypeInfo().GetTypeName()
+    assert mesh_type in GEOM_TYPES, f"Invalid mesh type: {mesh_type}"
+    # Default volume and com
+    volume = 0.0
+    com = np.zeros(3)
+    is_volume = True
+    if mesh_type == "Mesh":
+        # We construct a trimesh object from this mesh in order to infer its volume
+        trimesh_mesh = mesh_prim_to_trimesh_mesh(mesh_prim, include_normals=False, include_texcoord=False)
+        is_volume = trimesh_mesh.is_volume
+        if is_volume:
+            volume = trimesh_mesh.volume
+            com = trimesh_mesh.center_mass
+        else:
+            # If the mesh is not a volume, we compute its convex hull and use that instead
+            try:
+                trimesh_mesh_convex = trimesh_mesh.convex_hull
+                volume = trimesh_mesh_convex.volume
+                com = trimesh_mesh_convex.center_mass
+            except:
+                # if convex hull computation fails, it usually means the mesh is degenerated. We just skip it.
+                pass
+    elif mesh_type == "Sphere":
+        volume = 4 / 3 * np.pi * (mesh_prim.GetAttribute("radius").Get() ** 3)
+    elif mesh_type == "Cube":
+        volume = mesh_prim.GetAttribute("size").Get() ** 3
+    elif mesh_type == "Cone":
+        volume = np.pi * (mesh_prim.GetAttribute("radius").Get() ** 2) * mesh_prim.GetAttribute("height").Get() / 3
+        com = np.array([0, 0, mesh_prim.GetAttribute("height").Get() / 4])
+    elif mesh_type == "Cylinder":
+        volume = np.pi * (mesh_prim.GetAttribute("radius").Get() ** 2) * mesh_prim.GetAttribute("height").Get()
+    else:
+        raise ValueError(f"Cannot compute volume for mesh of type: {mesh_type}")
+
+    return is_volume, volume, com
+
+
+def create_primitive_mesh(prim_path, primitive_type, extents=1.0, u_patches=None, v_patches=None, stage=None):
     """
     Helper function that generates a UsdGeom.Mesh prim at specified @prim_path of type @primitive_type.
 
@@ -592,13 +845,15 @@ def create_primitive_mesh(prim_path, primitive_type, extents=1.0, u_patches=None
         v_patches (int or None): If specified, should be an integer that represents how many segments to create in the
             v-direction. E.g. 10 means 10 segments (and therefore 11 vertices) will be created.
             Both u_patches and v_patches need to be specified for them to be effective.
+        stage (None or Usd.Stage): If specified, stage on which the primitive mesh should be generated. If None, will
+            use og.sim.stage
 
     Returns:
         UsdGeom.Mesh: Generated primitive mesh as a prim on the active stage
     """
     assert_valid_key(key=primitive_type, valid_keys=PRIMITIVE_MESH_TYPES, name="primitive mesh type")
-    create_mesh_prim_with_default_xform(primitive_type, prim_path, stage=og.sim.stage, u_patches=u_patches, v_patches=v_patches)
-    mesh = UsdGeom.Mesh.Define(og.sim.stage, prim_path)
+    create_mesh_prim_with_default_xform(primitive_type, prim_path, u_patches=u_patches, v_patches=v_patches, stage=stage)
+    mesh = UsdGeom.Mesh.Define(og.sim.stage if stage is None else stage, prim_path)
 
     # Modify the points and normals attributes so that total extents is the desired
     # This means multiplying omni's default by extents * 50.0, as the native mesh generated has extents [-0.01, 0.01]

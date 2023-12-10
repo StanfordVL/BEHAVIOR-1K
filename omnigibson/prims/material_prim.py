@@ -48,7 +48,7 @@ class MaterialPrim(BasePrim):
             load_config=load_config,
         )
 
-    def _load(self, simulator=None):
+    def _load(self):
         # We create a new material at the specified path
         mtl_created = []
         omni.kit.commands.execute(
@@ -104,7 +104,7 @@ class MaterialPrim(BasePrim):
                 occurred externally, no additional rendering step is needed
         """
         assert self._shader is not None
-        asyncio.run(asyncio.wait([self._load_mdl_parameters(render=render)]))
+        asyncio.run(self._load_mdl_parameters(render=render))
 
     def shader_update_asset_paths_with_root_path(self, root_path):
         """
@@ -152,6 +152,14 @@ class MaterialPrim(BasePrim):
         assert inp in self.shader_input_names, \
             f"Got invalid shader input to set! Current inputs are: {self.shader_input_names}. Got: {inp}"
         self._shader.GetInput(inp).Set(val)
+
+    @property
+    def is_glass(self):
+        """
+        Returns:
+            bool: Whether this material is a glass material or not
+        """
+        return "glass_color" in self.shader_input_names
 
     @property
     def shader(self):
@@ -1012,3 +1020,55 @@ class MaterialPrim(BasePrim):
              color (3-array): this material's specular_transmission_scattering_color in (R,G,B)
         """
         self.set_input(inp="specular_transmission_scattering_color", val=Gf.Vec3f(*np.array(color, dtype=float)))
+
+    @property
+    def specular_reflection_ior_preset(self):
+        """
+        Returns:
+            int: this material's specular_reflection_ior_preset (int corresponding to enum)
+        """
+        return self.get_input(inp="specular_reflection_ior_preset")
+
+    @specular_reflection_ior_preset.setter
+    def specular_reflection_ior_preset(self, preset):
+        """
+        Args:
+             preset (int): this material's specular_reflection_ior_preset (int corresponding to enum)
+        """
+        self.set_input(inp="specular_reflection_ior_preset", val=preset)
+
+    @property
+    def enable_diffuse_transmission(self):
+        """
+        Returns:
+            float: this material's applied enable_diffuse_transmission
+        """
+        return self.get_input(inp="enable_diffuse_transmission")
+
+    @enable_diffuse_transmission.setter
+    def enable_diffuse_transmission(self, val):
+        """
+        Args:
+             val (bool): this material's applied enable_diffuse_transmission
+        """
+        self.set_input(inp="enable_diffuse_transmission", val=val)
+
+    @property
+    def glass_color(self):
+        """
+        Returns:
+            3-array: this material's applied (R,G,B) glass color (only applicable to OmniGlass materials)
+        """
+        assert self.is_glass, f"Tried to query glass_color shader input, " \
+                              f"but material at {self.prim_path} is not an OmniGlass material!"
+        return np.array(self.get_input(inp="glass_color"))
+
+    @glass_color.setter
+    def glass_color(self, color):
+        """
+        Args:
+             color (3-array): this material's applied (R,G,B) glass color (only applicable to OmniGlass materials)
+        """
+        assert self.is_glass, f"Tried to set glass_color shader input, " \
+                              f"but material at {self.prim_path} is not an OmniGlass material!"
+        self.set_input(inp="glass_color", val=Gf.Vec3f(*np.array(color, dtype=float)))

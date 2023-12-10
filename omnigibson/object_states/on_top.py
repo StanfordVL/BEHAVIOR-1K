@@ -1,29 +1,31 @@
-from IPython import embed
-
 import omnigibson as og
-from omnigibson.object_states.kinematics import KinematicsMixin
+from omnigibson.object_states.kinematics_mixin import KinematicsMixin
 from omnigibson.object_states.adjacency import VerticalAdjacency
-from omnigibson.object_states.object_state_base import BooleanState, RelativeObjectState
+from omnigibson.object_states.object_state_base import BooleanStateMixin, RelativeObjectState
 from omnigibson.object_states.touching import Touching
 from omnigibson.utils.object_state_utils import sample_kinematics
+from omnigibson.utils.object_state_utils import m as os_m
 
 
-class OnTop(KinematicsMixin, RelativeObjectState, BooleanState):
-    @staticmethod
-    def get_dependencies():
-        return KinematicsMixin.get_dependencies() + RelativeObjectState.get_dependencies() + [Touching, VerticalAdjacency]
+class OnTop(KinematicsMixin, RelativeObjectState, BooleanStateMixin):
+
+    @classmethod
+    def get_dependencies(cls):
+        deps = super().get_dependencies()
+        deps.update({Touching, VerticalAdjacency})
+        return deps
 
     def _set_value(self, other, new_value):
         if not new_value:
             raise NotImplementedError("OnTop does not support set_value(False)")
 
-        state = self._simulator.dump_state(serialized=False)
+        state = og.sim.dump_state(serialized=False)
 
-        for _ in range(10):
+        for _ in range(os_m.DEFAULT_HIGH_LEVEL_SAMPLING_ATTEMPTS):
             if sample_kinematics("onTop", self.obj, other) and self.get_value(other):
                 return True
             else:
-                self._simulator.load_state(state, serialized=False)
+                og.sim.load_state(state, serialized=False)
 
         return False
 
@@ -33,4 +35,5 @@ class OnTop(KinematicsMixin, RelativeObjectState, BooleanState):
             return False
 
         adjacency = self.obj.states[VerticalAdjacency].get_value()
-        return other in adjacency.negative_neighbors and other not in adjacency.positive_neighbors
+        other_adjacency = other.states[VerticalAdjacency].get_value()
+        return other in adjacency.negative_neighbors and other not in adjacency.positive_neighbors and self.obj not in other_adjacency.negative_neighbors

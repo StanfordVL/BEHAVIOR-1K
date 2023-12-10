@@ -16,24 +16,25 @@ def main(random_selection=False, headless=False, short_exec=False):
 
     https://docs.omniverse.nvidia.com/prod_extensions/prod_extensions/ext_replicator/visualization.html#the-visualizer
     """
-    og.log.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
+    og.log.info(f"Demo {__file__}\n    " + "*" * 80 + "\n    Description:\n" + main.__doc__ + "*" * 80)
 
     # Specify objects to load
     banana_cfg = dict(
         type="DatasetObject",
         name="banana",
         category="banana",
-        model="09_0",
-        scale=[3.0, 5.0, 2.0],
+        model="vvyyyv",
+        bounding_box=[0.643, 0.224, 0.269],
         position=[-0.906661, -0.545106,  0.136824],
-        orientation=[0, 0, 0.76040583, -0.6494482 ],
+        orientation=[0, 0, 0.76040583, -0.6494482],
     )
 
     door_cfg = dict(
         type="DatasetObject",
         name="door",
         category="door",
-        model="8930",
+        model="ohagsq",
+        bounding_box=[1.528, 0.064, 1.299],
         position=[-2.0, 0, 0.70000001],
         orientation=[0, 0, -0.38268343,  0.92387953],
     )
@@ -47,7 +48,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     }
 
     # Create the environment
-    env = og.Environment(configs=cfg, action_timestep=1/60., physics_timestep=1/60.)
+    env = og.Environment(configs=cfg)
 
     # Set camera to appropriate viewing pose
     cam = og.sim.viewer_camera
@@ -75,7 +76,9 @@ def main(random_selection=False, headless=False, short_exec=False):
         # Also write the 2d loose bounding box to disk
         if "3d" not in bbox_modality:
             colorized_img = colorize_bboxes(bboxes_2d_data=obs[bbox_modality], bboxes_2d_rgb=obs["rgb"], num_channels=4)
-            plt.imsave(f"{bbox_modality}_img.png", colorized_img)
+            fpath = f"{bbox_modality}_img.png"
+            plt.imsave(fpath, colorized_img)
+            og.log.info(f"Saving modality [{bbox_modality}] image to: {fpath}")
 
     # Always close environment down at end
     env.close()

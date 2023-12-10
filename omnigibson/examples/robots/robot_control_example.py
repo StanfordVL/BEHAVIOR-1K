@@ -21,7 +21,7 @@ SCENES = dict(
     empty="Empty environment with no objects",
 )
 
-# Don't use GPU dynamics and Use flatcache for performance boost
+# Don't use GPU dynamics and use flatcache for performance boost
 gm.USE_GPU_DYNAMICS = False
 gm.ENABLE_FLATCACHE = True
 
@@ -61,7 +61,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     Robot control demo with selection
     Queries the user to select a robot, the controllers, a scene and a type of input (random actions or teleop)
     """
-    og.log.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
+    og.log.info(f"Demo {__file__}\n    " + "*" * 80 + "\n    Description:\n" + main.__doc__ + "*" * 80)
 
     # Choose scene to load
     scene_model = choose_from_options(options=SCENES, name="scene", random_selection=random_selection)
@@ -72,6 +72,10 @@ def main(random_selection=False, headless=False, short_exec=False):
     )
 
     # Create the config for generating the environment we want
+    env_cfg = dict()
+    env_cfg["action_timestep"] = 1 / 10.
+    env_cfg["physics_timestep"] = 1 / 60.
+
     scene_cfg = dict()
     if scene_model == "empty":
         scene_cfg["type"] = "Scene"
@@ -90,7 +94,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     cfg = dict(scene=scene_cfg, robots=[robot0_cfg])
 
     # Create the environment
-    env = og.Environment(configs=cfg, action_timestep=1/60., physics_timestep=1/60.)
+    env = og.Environment(configs=cfg)
 
     # Choose robot controller to use
     robot = env.robots[0]
@@ -131,9 +135,8 @@ def main(random_selection=False, headless=False, short_exec=False):
     step = 0
     while step != max_steps:
         action = action_generator.get_random_action() if control_mode == "random" else action_generator.get_teleop_action()
-        for _ in range(10):
-            env.step(action=action)
-            step += 1
+        env.step(action=action)
+        step += 1
 
     # Always shut down the environment cleanly at the end
     env.close()

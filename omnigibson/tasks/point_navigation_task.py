@@ -1,6 +1,7 @@
 import numpy as np
 
 import omnigibson as og
+from omnigibson.object_states import Pose
 from omnigibson.objects.primitive_object import PrimitiveObject
 from omnigibson.reward_functions.collision_reward import CollisionReward
 from omnigibson.reward_functions.point_goal_reward import PointGoalReward
@@ -46,7 +47,8 @@ class PointNavigationTask(BaseTask):
         visualize_goal (bool): Whether to visualize the initial / goal locations
         visualize_path (bool): Whether to visualize the path from initial to goal location, as represented by
             discrete waypoints
-        marker_height (float): If visualizing, specifies the height of the visual markers (m)
+        goal_height (float): If visualizing, specifies the height of the visual goals (m)
+        waypoint_height (float): If visualizing, specifies the height of the visual waypoints (m)
         waypoint_width (float): If visualizing, specifies the width of the visual waypoints (m)
         n_vis_waypoints (int): If visualizing, specifies the number of waypoints to generate
         reward_type (str): Type of reward to use. Valid options are: {"l2", "geodesic"}
@@ -72,9 +74,10 @@ class PointNavigationTask(BaseTask):
             path_range=None,
             visualize_goal=False,
             visualize_path=False,
-            marker_height=0.2,
+            goal_height=0.06,
+            waypoint_height=0.05,
             waypoint_width=0.1,
-            n_vis_waypoints=250,
+            n_vis_waypoints=10,
             reward_type="l2",
             termination_config=None,
             reward_config=None,
@@ -93,7 +96,8 @@ class PointNavigationTask(BaseTask):
         self._randomize_goal_pos = goal_pos is None
         self._visualize_goal = visualize_goal
         self._visualize_path = visualize_path
-        self._marker_height = marker_height
+        self._goal_height = goal_height
+        self._waypoint_height = waypoint_height
         self._waypoint_width = waypoint_width
         self._n_vis_waypoints = n_vis_waypoints
         assert_valid_key(key=reward_type, valid_keys=POINT_NAVIGATION_REWARD_TYPES, name="reward type")
@@ -144,6 +148,12 @@ class PointNavigationTask(BaseTask):
         # Load visualization
         self._load_visualization_markers(env=env)
 
+        # Auto-initialize all markers
+        og.sim.play()
+        env.scene.reset()
+        env.scene.update_initial_state()
+        og.sim.stop()
+
     def _load_visualization_markers(self, env):
         """
         Load visualization, such as initial and target position, shortest path, etc
@@ -151,41 +161,40 @@ class PointNavigationTask(BaseTask):
         Args:
             env (Environment): Active environment instance
         """
-        cyl_size = np.array([self._goal_tolerance, self._goal_tolerance, self._marker_height])
-        self._initial_pos_marker = PrimitiveObject(
-            prim_path="/World/task_initial_pos_marker",
-            primitive_type="Cylinder",
-            name="task_initial_pos_marker",
-            scale=cyl_size,
-            visible=self._visualize_goal,
-            visual_only=True,
-            rgba=np.array([1, 0, 0, 0.3]),
-        )
-        self._goal_pos_marker = PrimitiveObject(
-            prim_path="/World/task_goal_pos_marker",
-            primitive_type="Cylinder",
-            name="task_goal_pos_marker",
-            scale=cyl_size,
-            visible=self._visualize_goal,
-            visual_only=True,
-            rgba=np.array([0, 0, 1, 0.3]),
-        )
+        if self._visualize_goal:
+            self._initial_pos_marker = PrimitiveObject(
+                prim_path="/World/task_initial_pos_marker",
+                primitive_type="Cylinder",
+                name="task_initial_pos_marker",
+                radius=self._goal_tolerance,
+                height=self._goal_height,
+                visual_only=True,
+                rgba=np.array([1, 0, 0, 0.3]),
+            )
+            self._goal_pos_marker = PrimitiveObject(
+                prim_path="/World/task_goal_pos_marker",
+                primitive_type="Cylinder",
+                name="task_goal_pos_marker",
+                radius=self._goal_tolerance,
+                height=self._goal_height,
+                visual_only=True,
+                rgba=np.array([0, 0, 1, 0.3]),
+            )
 
-        # Load the objects into the simulator
-        og.sim.import_object(self._initial_pos_marker)
-        og.sim.import_object(self._goal_pos_marker)
+            # Load the objects into the simulator
+            og.sim.import_object(self._initial_pos_marker)
+            og.sim.import_object(self._goal_pos_marker)
 
         # Additionally generate waypoints along the path if we're building the map in the environment
-        if env.scene.trav_map.build_graph:
+        if env.scene.trav_map.build_graph and self._visualize_path:
             waypoints = []
-            waypoint_size = np.array([self._waypoint_width, self._waypoint_width, self._marker_height])
             for i in range(self._n_vis_waypoints):
                 waypoint = PrimitiveObject(
                     prim_path=f"/World/task_waypoint_marker{i}",
                     primitive_type="Cylinder",
                     name=f"task_waypoint_marker{i}",
-                    scale=waypoint_size,
-                    visible=self._visualize_path,
+                    radius=self._waypoint_width,
+                    height=self._waypoint_height,
                     visual_only=True,
                     rgba=np.array([0, 1, 0, 0.3]),
                 )
@@ -194,9 +203,6 @@ class PointNavigationTask(BaseTask):
 
             # Store waypoints
             self._waypoint_markers = waypoints
-
-        # Take one sim step to initialize all the markers
-        og.sim.step()
 
     def _sample_initial_pose_and_goal_pos(self, env, max_trials=100):
         """
@@ -271,7 +277,7 @@ class PointNavigationTask(BaseTask):
         Returns:
             float: L2 distance to the target position
         """
-        return T.l2_distance(env.robots[self._robot_idn].get_position()[:2], self._goal_pos[:2])
+        return T.l2_distance(env.robots[self._robot_idn].states[Pose].get_value()[0][:2], self._goal_pos[:2])
 
     def get_potential(self, env):
         """
@@ -299,9 +305,6 @@ class PointNavigationTask(BaseTask):
         # We attempt to sample valid initial poses and goal positions
         success, max_trials = False, 100
 
-        # Store the state of the environment now, so that we can restore it after each setting attempt
-        state = og.sim.dump_state(serialized=True)
-
         initial_pos, initial_quat, goal_pos = None, None, None
         for i in range(max_trials):
             initial_pos, initial_quat, goal_pos = self._sample_initial_pose_and_goal_pos(env)
@@ -310,16 +313,13 @@ class PointNavigationTask(BaseTask):
                 env.robots[self._robot_idn], initial_pos, initial_quat, env.initial_pos_z_offset
             ) and test_valid_pose(env.robots[self._robot_idn], goal_pos, None, env.initial_pos_z_offset)
 
-            # Load the original state
-            og.sim.load_state(state=state, serialized=True)
-
             # Don't need to continue iterating if we succeeded
             if success:
                 break
 
         # Notify user if we failed to reset a collision-free sampled pose
         if not success:
-            log.warning("WARNING: Failed to reset robot without collision")
+            log.warning("Failed to reset robot without collision")
 
         # Land the robot
         land_object(env.robots[self._robot_idn], initial_pos, initial_quat, env.initial_pos_z_offset)
@@ -349,7 +349,7 @@ class PointNavigationTask(BaseTask):
 
         # Add additional info
         info["path_length"] = self._path_length
-        info["spl"] = float(info["success"]) * min(1.0, self._geodesic_dist / self._path_length) if done else 0.0
+        info["spl"] = float(info["success"]) * min(1.0, self._geodesic_dist / self._path_length) if done and self._path_length != 0.0 else 0.0
 
         return done, info
 
@@ -364,8 +364,8 @@ class PointNavigationTask(BaseTask):
         Returns:
             3-array: (x,y,z) position in self._robot_idn agent's local frame
         """
-        delta_pos_global = np.array(pos) - env.robots[self._robot_idn].get_position()
-        return T.quat2mat(env.robots[self._robot_idn].get_orientation()).T @ delta_pos_global
+        delta_pos_global = np.array(pos) - env.robots[self._robot_idn].states[Pose].get_value()[0]
+        return T.quat2mat(env.robots[self._robot_idn].states[Pose].get_value()[1]).T @ delta_pos_global
 
     def _get_obs(self, env):
         # Get relative position of goal with respect to the current agent position
@@ -374,9 +374,9 @@ class PointNavigationTask(BaseTask):
             xy_pos_to_goal = np.array(T.cartesian_to_polar(*xy_pos_to_goal))
 
         # linear velocity and angular velocity
-        quat = env.robots[self._robot_idn].get_orientation()
-        lin_vel = T.quat2mat(quat).T @ env.robots[self._robot_idn].get_linear_velocity()
-        ang_vel = T.quat2mat(quat).T @ env.robots[self._robot_idn].get_angular_velocity()
+        ori_t = T.quat2mat(env.robots[self._robot_idn].states[Pose].get_value()[1]).T
+        lin_vel = ori_t @ env.robots[self._robot_idn].get_linear_velocity()
+        ang_vel = ori_t @ env.robots[self._robot_idn].get_angular_velocity()
 
         # Compose observation dict
         low_dim_obs = dict(
@@ -404,7 +404,7 @@ class PointNavigationTask(BaseTask):
         Returns:
             3-array: (x,y,z) global current position representing the robot
         """
-        return env.robots[self._robot_idn].get_position()
+        return env.robots[self._robot_idn].states[Pose].get_value()[0]
 
     def get_shortest_path_to_goal(self, env, start_xy_pos=None, entire_path=False):
         """
@@ -422,7 +422,7 @@ class PointNavigationTask(BaseTask):
                 - list of 2-array: List of (x,y) waypoints representing the path # TODO: is this true?
                 - float: geodesic distance of the path to the goal position
         """
-        start_xy_pos = env.robots[self._robot_idn].get_position()[:2] if start_xy_pos is None else start_xy_pos
+        start_xy_pos = env.robots[self._robot_idn].states[Pose].get_value()[0][:2] if start_xy_pos is None else start_xy_pos
         return env.scene.get_shortest_path(self._floor, start_xy_pos, self._goal_pos[:2], entire_path=entire_path)
 
     def _step_visualization(self, env):
@@ -451,7 +451,7 @@ class PointNavigationTask(BaseTask):
         self._step_visualization(env=env)
 
         # Update other internal variables
-        new_robot_pos = env.robots[self._robot_idn].get_position()
+        new_robot_pos = env.robots[self._robot_idn].states[Pose].get_value()[0]
         self._path_length += T.l2_distance(self._current_robot_pos[:2], new_robot_pos[:2])
         self._current_robot_pos = new_robot_pos
 

@@ -11,11 +11,15 @@ from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.prims.geom_prim import CollisionGeomPrim, VisualGeomPrim
 from omnigibson.utils.constants import GEOM_TYPES
 from omnigibson.utils.sim_utils import CsRawData
-from omnigibson.utils.usd_utils import mesh_prim_to_trimesh_mesh
+from omnigibson.utils.usd_utils import get_mesh_volume_and_com
+import omnigibson.utils.transform_utils as T
+from omnigibson.utils.ui_utils import create_module_logger
 
 # Import omni sensor based on type
 from omni.isaac.sensor import _sensor as _s
 
+# Create module logger
+log = create_module_logger(module_name=__name__)
 
 # Create settings for this module
 m = create_module_macros(module_path=__file__)
@@ -90,7 +94,7 @@ class RigidPrim(XFormPrim):
             UsdPhysics.MassAPI.Apply(self._prim)
 
         # Only create contact report api if we're not visual only
-        if (not self._visual_only) and gm.ENABLE_GLOBAL_CONTACT_REPORTING:
+        if not self._visual_only:
             self._physx_contact_report_api_api = PhysxSchema.PhysxContactReportAPI(self._prim) if \
                 self._prim.HasAPI(PhysxSchema.PhysxContactReportAPI) else \
                 PhysxSchema.PhysxContactReportAPI.Apply(self._prim)
@@ -101,9 +105,10 @@ class RigidPrim(XFormPrim):
         self.update_meshes()
 
         # Possibly set the mass / density
-        if len(self._collision_meshes) == 0:
-            # We have no collision meshes, so set a negligible mass
+        if not self.has_collision_meshes:
+            # A meta (virtual) link has no collision meshes; set a negligible mass and a zero density (ignored)
             self.mass = 1e-6
+            self.density = 0.0
         elif "mass" in self._load_config and self._load_config["mass"] is not None:
             self.mass = self._load_config["mass"]
         if "density" in self._load_config and self._load_config["density"] is not None:
@@ -172,13 +177,16 @@ class RigidPrim(XFormPrim):
                     mesh.set_contact_offset(m.DEFAULT_CONTACT_OFFSET)
                     mesh.set_rest_offset(m.DEFAULT_REST_OFFSET)
                     self._collision_meshes[mesh_name] = mesh
-                    # We construct a trimesh object from this mesh in order to infer its center-of-mass and volume
-                    # TODO: Cleaner way to aggregate this information? Right now we just skip if we encounter a primitive
-                    mesh_vertices = mesh_prim.GetAttribute("points").Get()
-                    if mesh_vertices is not None and len(mesh_vertices) >= 4:
-                        msh = mesh_prim_to_trimesh_mesh(mesh_prim)
-                        coms.append(msh.center_mass)
-                        vols.append(msh.volume)
+
+                    is_volume, volume, com = get_mesh_volume_and_com(mesh_prim)
+                    vols.append(volume)
+                    # We need to translate the center of mass from the mesh's local frame to the link's local frame
+                    local_pos, local_orn = mesh.get_local_pose()
+                    coms.append(T.quat2mat(local_orn) @ (com * mesh.scale) + local_pos)
+                    # If we're not a valid volume, use bounding box approximation for the underlying collision approximation
+                    if not is_volume:
+                        log.warning(f"Got invalid (non-volume) collision mesh: {mesh.name}")
+                        mesh.set_collision_approximation("boundingCube")
                 else:
                     self._visual_meshes[mesh_name] = VisualGeomPrim(**mesh_kwargs)
 
@@ -286,6 +294,8 @@ class RigidPrim(XFormPrim):
                 position = current_position
             if orientation is None:
                 orientation = current_orientation
+            assert np.isclose(np.linalg.norm(orientation), 1, atol=1e-3), \
+                f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
             pose = _dynamic_control.Transform(position, orientation)
             self._dc.set_rigid_body_pose(self._handle, pose)
         else:
@@ -300,7 +310,9 @@ class RigidPrim(XFormPrim):
             # Call super method by default
             pos, ori = super().get_position_orientation()
 
-        return np.array(pos), np.array(ori)
+        assert np.isclose(np.linalg.norm(ori), 1, atol=1e-3), \
+            f"{self.prim_path} orientation {ori} is not a unit quaternion."
+        return pos, ori
 
     def set_local_pose(self, translation=None, orientation=None):
         if self.dc_is_accessible:
@@ -388,6 +400,14 @@ class RigidPrim(XFormPrim):
         """
         return self._visual_only
 
+    @property
+    def has_collision_meshes(self):
+        """
+        Returns:
+            bool: Whether this link has any collision mesh
+        """
+        return len(self._collision_meshes) > 0
+
     @visual_only.setter
     def visual_only(self, val):
         """
@@ -418,31 +438,7 @@ class RigidPrim(XFormPrim):
         # TODO (eric): revise this once omni exposes API to query volume of GeomPrims
         volume = 0.0
         for collision_mesh in self._collision_meshes.values():
-            mesh = collision_mesh.prim
-            mesh_type = mesh.GetPrimTypeInfo().GetTypeName()
-            assert mesh_type in GEOM_TYPES, f"Invalid collision mesh type: {mesh_type}"
-            if mesh_type == "Mesh":
-                # We construct a trimesh object from this mesh in order to infer its volume
-                trimesh_mesh = mesh_prim_to_trimesh_mesh(mesh)
-                if trimesh_mesh.is_volume:
-                    mesh_volume = trimesh_mesh.volume
-                elif trimesh.triangles.all_coplanar(trimesh_mesh.triangles):
-                    # The mesh is a plane, so we can't make a convex hull -- return 0 volume
-                    mesh_volume = 0.0
-                else:
-                    # Fallback to convex hull approximation
-                    mesh_volume = trimesh_mesh.convex_hull.volume
-            elif mesh_type == "Sphere":
-                mesh_volume = 4 / 3 * np.pi * (mesh.GetAttribute("radius").Get() ** 3)
-            elif mesh_type == "Cube":
-                mesh_volume = mesh.GetAttribute("size").Get() ** 3
-            elif mesh_type == "Cone":
-                mesh_volume = np.pi * (mesh.GetAttribute("radius").Get() ** 2) * mesh.GetAttribute("height").Get() / 3
-            elif mesh_type == "Cylinder":
-                mesh_volume = np.pi * (mesh.GetAttribute("radius").Get() ** 2) * mesh.GetAttribute("height").Get()
-            else:
-                raise ValueError(f"Cannot compute volume for mesh of type: {mesh_type}")
-
+            _, mesh_volume, _ = get_mesh_volume_and_com(collision_mesh.prim)
             volume += mesh_volume * np.product(collision_mesh.get_world_scale())
 
         return volume

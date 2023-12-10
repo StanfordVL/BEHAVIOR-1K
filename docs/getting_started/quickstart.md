@@ -11,12 +11,14 @@ Let's start with the following:
 
 ```{.python .annotate}
 import omnigibson as og # (1)!
+from omnigibson.macros import gm # (2)!
 
 # Start with an empty configuration
 cfg = dict()
 ```
 
 1. All python scripts should start with this line! This allows access to key global variables through the top-level package.
+2. Global macros (`gm`) can always be accessed directly and modified on the fly!
 
 ## 🏔️ **Defining a scene**
 Next, let's define a scene:
@@ -29,7 +31,7 @@ cfg["scene"] = {
 ```
 
 1. Our configuration gets parsed automatically and generates the appropriate class instance based on `type` (the string form of the class name). In this case, we're generating the most basic scene, which only consists of a floor plane. Check out [all of our available `Scene` classes](../reference/scenes/scene_base.md)!
-2. In addition to specifying `type`, the remaining keyword-arguments get passed directly into the class constructor. So for the base [`Scene`](../reference/scenes/scene_base.md) class, you could optionally specify `"use_floor_plane"` and `"floor_plane_visible"`, whereas for the more powerful [`InteractiveTraversableScene`](../reference/scenes/interactive_traversable_scene.md) class (which loads a curated, preconfigured scene) you can additionally specify options for filtering objects, such as `"load_object_categories"` and `"load_room_types"`. You can see all available keyword-arguments by viewing the individual `Scene` class you'd like to load!
+2. In addition to specifying `type`, the remaining keyword-arguments get passed directly into the class constructor. So for the base [`Scene`](../reference/scenes/scene_base.md) class, you could optionally specify `"use_floor_plane"` and `"floor_plane_visible"`, whereas for the more powerful [`InteractiveTraversableScene`](../reference/scenes/interactive_traversable_scene.md) class (which loads a curated, preconfigured scene) you can additionally specify options for filtering objects, such as `"load_object_categories"` and `"load_room_types"`. You can see all available keyword-arguments by viewing the [individual `Scene` class](../reference/scenes/scene_base.md) you'd like to load!
 
 ## 🎾 **Defining objects**
 We can optionally define some objects to load into our scene:
@@ -38,9 +40,9 @@ We can optionally define some objects to load into our scene:
 cfg["objects"] = [ # (1)!
     {
         "type": "USDObject", # (2)!
-        "name": "ghost_apple", # (3)!
-        "usd_path": f"{og.og_dataset_path}/objects/apple/00_0/usd/00_0.usd",
-        "category": "apple", # (4)!
+        "name": "ghost_stain", # (3)!
+        "usd_path": f"{gm.ASSET_PATH}/models/stain/stain.usd",
+        "category": "stain", # (4)!
         "visual_only": True, # (5)!
         "scale": [2.0, 1.0, 2.0], # (6)!
         "position": [3.0, 0, 2.0], # (7)!
@@ -50,7 +52,7 @@ cfg["objects"] = [ # (1)!
         "type": "DatasetObject", # (9)!
         "name": "delicious_apple",
         "category": "apple",
-        "model": "00_0", # (10)!
+        "model": "agveuv", # (10)!
         "position": [0, 0, 1.0],
     },
     {
@@ -82,7 +84,7 @@ cfg["objects"] = [ # (1)!
 6. `scale` is used by all object classes and defines the global (x,y,z) relative scale of the object.
 7. `position` is used by all object classes and defines the initial (x,y,z) position of the object in the global frame.
 8. `orientation` is used by all object classes and defines the initial (x,y,z,w) quaternion orientation of the object in the global frame.
-9. A [`DatasetObject`](../reference/objects/dataset_object.md) is an object pulled directly from our **BEHAVIOR** dataset. It includes metadata and annotations not found on a generic `USDObject`.
+9. A [`DatasetObject`](../reference/objects/dataset_object.md) is an object pulled directly from our **BEHAVIOR** dataset. It includes metadata and annotations not found on a generic `USDObject`. Note that these assets are encrypted, and thus cannot be created via the `USDObject` class.
 10. Instead of explicitly defining the hardcoded path to the dataset USD model, `model` (in conjunction with `category`) is used to infer the exact dataset object to load. In this case this is the exact same underlying raw USD asset that was loaded above as a `USDObject`!
 11. A [`PrimitiveObject`](../reference/objects/primitive_object.md) is a programmatically generated object defining a convex primitive shape.
 12. `primitive_type` defines what primitive shape to load -- see [`PrimitiveObject`](../reference/objects/primitive_object.md) for available options!
@@ -111,10 +113,7 @@ cfg["robots"] = [ # (1)!
 3. Execute `print(og.ALL_SENSOR_MODALITIES)` for a list of all available observation modalities!
 
 ## 📋 **Defining a task**
-Lastly, we can optionally define a task to load into our scene. Since we're just getting started, let's load a "Dummy" task: (1)
-{ .annotate }
-
-1. Note: this is the task that is loaded anyways even if we don't explicitly define a task in our config!
+Lastly, we can optionally define a task to load into our scene. Since we're just getting started, let's load a "Dummy" task (which is the task that is loaded anyways even if we don't explicitly define a task in our config): 
 
 ```{.python .annotate}
 cfg["task"] = {
@@ -149,6 +148,7 @@ obs, rew, done, info = env.step(env.action_space.sample())
 
     ``` py linenums="1"
     import omnigibson as og
+    from omnigibson.macros import gm
     
     cfg = dict()
     
@@ -162,9 +162,9 @@ obs, rew, done, info = env.step(env.action_space.sample())
     cfg["objects"] = [
         {
             "type": "USDObject",
-            "name": "ghost_apple",
-            "usd_path": f"{og.og_dataset_path}/objects/apple/00_0/usd/00_0.usd",
-            "category": "apple",
+            "name": "ghost_stain",
+            "usd_path": f"{gm.ASSET_PATH}/models/stain/stain.usd",
+            "category": "stain",
             "visual_only": True,
             "scale": [2.0, 1.0, 2.0],
             "position": [3.0, 0, 2.0],
@@ -174,7 +174,7 @@ obs, rew, done, info = env.step(env.action_space.sample())
             "type": "DatasetObject",
             "name": "delicious_apple",
             "category": "apple",
-            "model": "00_0",
+            "model": "agveuv",
             "position": [0, 0, 1.0],
         },
         {
@@ -231,6 +231,10 @@ Look around by:
 * `Left-CLICK + Drag`: Tilt
 * `Scroll-Wheel-CLICK + Drag`: Pan
 * `Scroll-Wheel UP / DOWN`: Zoom
+
+Interact with objects by:
+
+* `Shift + Left-CLICK + Drag`: Apply force on selected object
 
 Or, for more fine-grained control, run:
 ```{.python .annotate}

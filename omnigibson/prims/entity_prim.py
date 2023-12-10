@@ -8,15 +8,19 @@ from omni.isaac.core.utils.stage import get_current_stage
 from pxr import Gf, Usd, UsdGeom, UsdPhysics, PhysxSchema
 import omni
 
-from omni.isaac.core.utils.prims import get_prim_property, set_prim_property, \
-    get_prim_parent, get_prim_at_path
+from omni.isaac.core.utils.prims import get_prim_property, set_prim_property, get_prim_parent, get_prim_at_path
 
 import omnigibson as og
+import omnigibson.utils.transform_utils as T
+
 from omnigibson.prims.cloth_prim import ClothPrim
 from omnigibson.prims.joint_prim import JointPrim
 from omnigibson.prims.rigid_prim import RigidPrim
 from omnigibson.prims.xform_prim import XFormPrim
-from omnigibson.utils.constants import PrimType, GEOM_TYPES
+from omnigibson.utils.constants import PrimType, GEOM_TYPES, JointType, JointAxis
+from omnigibson.utils.ui_utils import suppress_omni_log
+from omnigibson.utils.usd_utils import BoundingBoxAPI
+
 from omnigibson.macros import gm
 
 
@@ -53,10 +57,13 @@ class EntityPrim(XFormPrim):
         self._n_dof = None                      # dof with dynamic control
         self._links = None
         self._joints = None
+        self._materials = None
         self._visual_only = None
+        self._physics_view = None
 
         # This needs to be initialized to be used for _load() of PrimitiveObject
-        self._prim_type = load_config["prim_type"] if "prim_type" in load_config else PrimType.RIGID
+        self._prim_type = load_config["prim_type"] if load_config is not None and "prim_type" in load_config else PrimType.RIGID
+        assert self._prim_type in iter(PrimType), f"Unknown prim type {self._prim_type}!"
 
         # Run super init
         super().__init__(
@@ -68,6 +75,13 @@ class EntityPrim(XFormPrim):
     def _initialize(self):
         # Run super method
         super()._initialize()
+
+        # Force populate inputs and outputs of the shaders of all materials
+        # We suppress errors from omni.hydra if we're using encrypted assets, because we're loading from tmp location,
+        # not the original location
+        with suppress_omni_log(channels=["omni.hydra"]):
+            for material in self.materials:
+                material.shader_force_populate(render=False)
 
         # Initialize all the links
         # This must happen BEFORE the handle is generated for this prim, because things changing in the RigidPrims may
@@ -81,13 +95,42 @@ class EntityPrim(XFormPrim):
         # Update joint information
         self.update_joints()
 
-    def _load(self, simulator=None):
+        # Construct physics view
+        if self.articulated:
+            self._physics_view = og.sim.physics_sim_view.create_articulation_view(self.articulation_root_path)
+
+    def _load(self):
         # By default, this prim cannot be instantiated from scratch!
         raise NotImplementedError("By default, an entity prim cannot be created from scratch.")
 
     def _post_load(self):
+        # If this is a cloth, delete the root link and replace it with the single nested mesh
+        if self._prim_type == PrimType.CLOTH:
+            # Verify only a single link and a single mesh exists
+            old_link_prim = None
+            cloth_mesh_prim = None
+            for prim in self._prim.GetChildren():
+                if prim.GetPrimTypeInfo().GetTypeName() == "Xform":
+                    assert old_link_prim is None, "Found multiple XForm links for a Cloth entity prim! Expected: 1"
+                    old_link_prim = prim
+                    for child in prim.GetChildren():
+                        if child.GetPrimTypeInfo().GetTypeName() == "Mesh" and not child.HasAPI(UsdPhysics.CollisionAPI):
+                            assert cloth_mesh_prim is None, "Found multiple meshes for a Cloth entity prim! Expected: 1"
+                            cloth_mesh_prim = child
+
+            # Move mesh prim one level up via copy, then delete the original link
+            # NOTE: We copy because we cannot directly move the prim because it is ancestral
+            # NOTE: We use this specific delete method because alternative methods (eg: "delete_prim") fail beacuse
+            # the prim is ancestral. Note that because it is non-destructive, the original link prim path is still
+            # tracked by omni, so we have to utilize a new unique prim path for the copied cloth mesh
+            # See omni.kit.context_menu module for reference
+            new_path = f"{self._prim_path}/{old_link_prim.GetName()}_cloth"
+            omni.kit.commands.execute("CopyPrim", path_from=cloth_mesh_prim.GetPath(), path_to=new_path)
+            omni.kit.commands.execute("DeletePrims", paths=[old_link_prim.GetPath()], destructive=False)
+
         # Setup links info FIRST before running any other post loading behavior
-        self.update_links()
+        # We pass in scale explicitly so that the generated links can leverage the desired entity scale
+        self.update_links(load_config=dict(scale=self._load_config.get("scale", None)))
 
         # Set visual only flag
         # This automatically handles setting collisions / gravity appropriately per-link
@@ -100,6 +143,10 @@ class EntityPrim(XFormPrim):
             if gm.AG_CLOTH:
                 self.create_attachment_point_link()
 
+        # Globally disable any requested collision links
+        for link_name in self.disabled_collision_link_names:
+            self._links[link_name].disable_collisions()
+
         # Disable any requested collision pairs
         for a_name, b_name in self.disabled_collision_pairs:
             link_a, link_b = self._links[a_name], self._links[b_name]
@@ -108,10 +155,28 @@ class EntityPrim(XFormPrim):
         # Run super
         super()._post_load()
 
-    def update_links(self):
+        # Cache material information
+        materials = set()
+        material_paths = set()
+        for link in self._links.values():
+            xforms = [link] + list(link.visual_meshes.values()) if self.prim_type == PrimType.RIGID else [link]
+            for xform in xforms:
+                if xform.has_material():
+                    mat_path = xform.material.prim_path
+                    if mat_path not in material_paths:
+                        materials.add(xform.material)
+                        material_paths.add(mat_path)
+
+        self._materials = materials
+
+    def update_links(self, load_config=None):
         """
         Helper function to refresh owned joints. Useful for synchronizing internal data if
         additional bodies are added manually
+
+        Args:
+            load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
+            loading each of the link's rigid prims
         """
         # Make sure to clean up all pre-existing names for all links
         if self._links is not None:
@@ -123,14 +188,11 @@ class EntityPrim(XFormPrim):
         self._links = dict()
         joint_children = set()
         for prim in self._prim.GetChildren():
-            link = None
+            link_cls = None
             link_name = prim.GetName()
             if self._prim_type == PrimType.RIGID and prim.GetPrimTypeInfo().GetTypeName() == "Xform":
                 # For rigid body object, process prims that are Xforms (e.g. rigid links)
-                link = RigidPrim(
-                    prim_path=prim.GetPrimPath().__str__(),
-                    name=f"{self._name}:{link_name}",
-                )
+                link_cls = RigidPrim
                 # Also iterate through all children to infer joints and determine the children of those joints
                 # We will use this info to infer which link is the base link!
                 for child_prim in prim.GetChildren():
@@ -141,15 +203,16 @@ class EntityPrim(XFormPrim):
                         if len(relationships["physics:body0"].GetTargets()) > 0:
                             joint_children.add(relationships["physics:body1"].GetTargets()[0].pathString.split("/")[-1])
 
-            if self._prim_type == PrimType.CLOTH and prim.GetPrimTypeInfo().GetTypeName() in GEOM_TYPES:
-                # For cloth object, process prims that belong to any of the GEOM_TYPES (e.g. Cube, Mesh, etc)
-                link = ClothPrim(
+            elif self._prim_type == PrimType.CLOTH and prim.GetPrimTypeInfo().GetTypeName() == "Mesh":
+                # For cloth object, process prims that are Meshes
+                link_cls = ClothPrim
+
+            if link_cls is not None:
+                self._links[link_name] = link_cls(
                     prim_path=prim.GetPrimPath().__str__(),
                     name=f"{self._name}:{link_name}",
+                    load_config=load_config,
                 )
-
-            if link is not None:
-                self._links[link_name] = link
 
         # Infer the correct root link name -- this corresponds to whatever link does not have any joint existing
         # in the children joints
@@ -219,6 +282,57 @@ class EntityPrim(XFormPrim):
 
         # Store values internally
         self._n_dof = n_dof
+        self._update_joint_limits()
+
+    def _update_joint_limits(self):
+        """
+        Helper function to update internal joint limits for prismatic joints based on the object's scale
+        """
+        # If the scale is [1, 1, 1], we can skip this step
+        if np.allclose(self.scale, np.ones(3)):
+            return
+
+        prismatic_joints = {j_name: j for j_name, j in self._joints.items() if j.joint_type == JointType.JOINT_PRISMATIC}
+
+        # If there are no prismatic joints, we can skip this step
+        if len(prismatic_joints) == 0:
+            return
+
+        uniform_scale = np.allclose(self.scale, self.scale[0])
+
+        for joint_name, joint in prismatic_joints.items():
+            if uniform_scale:
+                scale_along_axis = self.scale[0]
+            else:
+                assert not self.initialized, \
+                    "Cannot update joint limits for a non-uniformly scaled object when already initialized."
+                for link_name, link in self.links.items():
+                    if joint.parent_name == link_name:
+                        # Find the parent link frame orientation in the object frame
+                        _, link_local_orn = link.get_local_pose()
+
+                        # Find the joint frame orientation in the parent link frame
+                        joint_local_orn = gf_quat_to_np_array(joint.get_attribute("physics:localRot0"))[[1, 2, 3, 0]]
+
+                        # Compute the joint frame orientation in the object frame
+                        joint_orn = T.quat_multiply(quaternion1=joint_local_orn, quaternion0=link_local_orn)
+
+                        # assert T.check_quat_right_angle(joint_orn), \
+                        #     f"Objects that are NOT uniformly scaled requires all joints to have orientations that " \
+                        #     f"are factors of 90 degrees! Got orn: {joint_orn} for object {self.name}"
+
+                        # Find the joint axis unit vector (e.g. [1, 0, 0] for "X", [0, 1, 0] for "Y", etc.)
+                        axis_in_joint_frame = np.zeros(3)
+                        axis_in_joint_frame[JointAxis.index(joint.axis)] = 1.0
+
+                        # Compute the joint axis unit vector in the object frame
+                        axis_in_obj_frame = T.quat2mat(joint_orn) @ axis_in_joint_frame
+
+                        # Find the correct scale along the joint axis direction
+                        scale_along_axis = self.scale[np.argmax(np.abs(axis_in_obj_frame))]
+
+            joint.lower_limit = joint.lower_limit * scale_along_axis
+            joint.upper_limit = joint.upper_limit * scale_along_axis
 
     @property
     def prim_type(self):
@@ -258,7 +372,7 @@ class EntityPrim(XFormPrim):
     def root_link(self):
         """
         Returns:
-            RigidPrim: Root link of this object prim
+            RigidPrim or ClothPrim: Root link of this object prim
         """
         return self._links[self.root_link_name]
 
@@ -364,18 +478,9 @@ class EntityPrim(XFormPrim):
         Loop through each link and their visual meshes to gather all the materials that belong to this object
 
         Returns:
-            materials: a list of MaterialPrim that belongs to this object
+            set of MaterialPrim: a set of MaterialPrim that belongs to this object
         """
-        materials = set()
-        material_paths = set()
-        for link in self._links.values():
-            xforms = [link] + list(link.visual_meshes.values()) if self.prim_type == PrimType.RIGID else [link]
-            for xform in xforms:
-                if xform.has_material():
-                    mat_path = xform.material.prim_path
-                    if mat_path not in material_paths:
-                        materials.add(xform.material)
-        return materials
+        return self._materials
 
     @property
     def dof_properties(self):
@@ -434,7 +539,7 @@ class EntityPrim(XFormPrim):
         for link in self._links.values():
             link.disable_gravity()
 
-    def set_joint_positions(self, positions, indices=None, normalized=False, target=False):
+    def set_joint_positions(self, positions, indices=None, normalized=False, drive=False):
         """
         Set the joint positions (both actual value and target values) in simulation. Note: only works if the simulator
         is actively running!
@@ -447,8 +552,9 @@ class EntityPrim(XFormPrim):
                 Default is None, which assumes that all joints are being set.
             normalized (bool): Whether the inputted joint positions should be interpreted as normalized values. Default
                 is False
-            target (bool): Whether the positions being set are target values or manual values to immediately set.
-                Default is False, corresponding to an instantaneous setting of the positions
+            drive (bool): Whether the positions being set are values that should be driven naturally by this entity's
+                motors or manual values to immediately set. Default is False, corresponding to an instantaneous
+                setting of the positions
         """
         # Run sanity checks -- make sure our handle is initialized and that we are articulated
         assert self._handle is not None, "handles are not initialized yet!"
@@ -472,13 +578,14 @@ class EntityPrim(XFormPrim):
 
         # Set the DOF states
         dof_states["pos"] = new_positions
-        if not target:
+        if not drive:
             self._dc.set_articulation_dof_states(self._handle, dof_states, _dynamic_control.STATE_POS)
+            BoundingBoxAPI.clear()
 
         # Also set the target
         self._dc.set_articulation_dof_position_targets(self._handle, new_positions.astype(np.float32))
 
-    def set_joint_velocities(self, velocities, indices=None, normalized=False, target=False):
+    def set_joint_velocities(self, velocities, indices=None, normalized=False, drive=False):
         """
         Set the joint velocities (both actual value and target values) in simulation. Note: only works if the simulator
         is actively running!
@@ -491,8 +598,9 @@ class EntityPrim(XFormPrim):
                 Default is None, which assumes that all joints are being set.
             normalized (bool): Whether the inputted joint velocities should be interpreted as normalized values. Default
                 is False
-            target (bool): Whether the velocities being set are target values or manual values to immediately set.
-                Default is False, corresponding to an instantaneous setting of the velocities
+            drive (bool): Whether the velocities being set are values that should be driven naturally by this entity's
+                motors or manual values to immediately set. Default is False, corresponding to an instantaneous
+                setting of the velocities
         """
         # Run sanity checks -- make sure our handle is initialized and that we are articulated
         assert self._handle is not None, "handles are not initialized yet!"
@@ -514,7 +622,7 @@ class EntityPrim(XFormPrim):
 
         # Set the DOF states
         dof_states["vel"] = new_velocities
-        if not target:
+        if not drive:
             self._dc.set_articulation_dof_states(self._handle, dof_states, _dynamic_control.STATE_VEL)
 
         # Also set the target
@@ -660,6 +768,14 @@ class EntityPrim(XFormPrim):
         """
         return efforts * self.max_joint_efforts if indices is None else efforts * self.max_joint_efforts[indices]
 
+    def _verify_physics_view_is_valid(self):
+        """
+        Helper function to make sure that the internal physics view is valid -- if not, will automatically refresh the
+        internal pointer
+        """
+        if not self._physics_view.check():
+            self._physics_view = og.sim.physics_sim_view.create_articulation_view(self.articulation_root_path)
+
     def update_handles(self):
         """
         Updates all internal handles for this prim, in case they change since initialization
@@ -690,6 +806,10 @@ class EntityPrim(XFormPrim):
                 joint.initialize()
             joint.update_handles()
 
+        # Update the physics view if we're articulated
+        if self.articulated:
+            self._physics_view = og.sim.physics_sim_view.create_articulation_view(self.articulation_root_path)
+
     def get_joint_positions(self, normalized=False):
         """
         Grabs this entity's joint positions
@@ -704,7 +824,10 @@ class EntityPrim(XFormPrim):
         assert self._handle is not None, "handles are not initialized yet!"
         assert self.n_joints > 0, "Tried to call method not intended for entity prim with no joints!"
 
-        joint_positions = self._dc.get_articulation_dof_states(self._handle, _dynamic_control.STATE_POS)["pos"]
+        assert self._dc is not None, f"Dynamic control interface is not initialized for {self._name}"
+        joint_states = self._dc.get_articulation_dof_states(self._handle, _dynamic_control.STATE_POS)
+        assert joint_states is not None, f"Failed to get joint states for {self.name}"
+        joint_positions = joint_states["pos"]
 
         # Possibly normalize values when returning
         return self._normalize_positions(positions=joint_positions) if normalized else joint_positions
@@ -801,6 +924,8 @@ class EntityPrim(XFormPrim):
             else:
                 super().set_position_orientation(position=position, orientation=orientation)
 
+        BoundingBoxAPI.clear()
+
     def get_position_orientation(self):
         if self._prim_type == PrimType.CLOTH:
             if self._dc is not None and self._dc.is_simulating():
@@ -856,6 +981,7 @@ class EntityPrim(XFormPrim):
                 self._set_local_pose_when_simulating(translation=translation, orientation=orientation)
             else:
                 super().set_local_pose(translation=translation, orientation=orientation)
+        BoundingBoxAPI.clear()
 
     def _get_local_pose_when_simulating(self):
         """
@@ -989,6 +1115,14 @@ class EntityPrim(XFormPrim):
             n-array: n-DOF length array specifying whether joint has a limit or not
         """
         return np.array([j.has_limit for j in self._joints.values()])
+
+    @property
+    def disabled_collision_link_names(self):
+        """
+        Returns:
+            list of str: List of link names for this entity whose collisions should be globally disabled
+        """
+        return []
 
     @property
     def disabled_collision_pairs(self):
@@ -1146,6 +1280,74 @@ class EntityPrim(XFormPrim):
         """
         self.root_link.kinematic_only = val
 
+    @property
+    def aabb(self):
+        # If we're a cloth prim type, we compute the bounding box from the limits of the particles. Otherwise, use the
+        # normal method for computing bounding box
+        if self._prim_type == PrimType.CLOTH:
+            particle_contact_offset = self.root_link.cloth_system.particle_contact_offset
+            particle_positions = self.root_link.compute_particle_positions()
+            aabb_lo, aabb_hi = np.min(particle_positions, axis=0) - particle_contact_offset, \
+                               np.max(particle_positions, axis=0) + particle_contact_offset
+        else:
+            aabb_lo, aabb_hi = super().aabb
+            aabb_lo, aabb_hi = np.array(aabb_lo), np.array(aabb_hi)
+
+        return aabb_lo, aabb_hi
+
+    def get_coriolis_and_centrifugal_forces(self):
+        """
+        Returns:
+            n-array: (N,) shaped per-DOF coriolis and centrifugal forces experienced by the entity, if articulated
+        """
+        assert self.articulated, "Cannot get coriolis and centrifugal forces for non-articulated entity!"
+        self._verify_physics_view_is_valid()
+        return self._physics_view.get_coriolis_and_centrifugal_forces().reshape(self.n_dof)
+
+    def get_generalized_gravity_forces(self):
+        """
+        Returns:
+            n-array: (N, N) shaped per-DOF gravity forces, if articulated
+        """
+        assert self.articulated, "Cannot get generalized gravity forces for non-articulated entity!"
+        self._verify_physics_view_is_valid()
+        return self._physics_view.get_generalized_gravity_forces().reshape(self.n_dof)
+
+    def get_mass_matrix(self):
+        """
+        Returns:
+            n-array: (N, N) shaped per-DOF mass matrix, if articulated
+        """
+        assert self.articulated, "Cannot get mass matrix for non-articulated entity!"
+        self._verify_physics_view_is_valid()
+        return self._physics_view.get_mass_matrices().reshape(self.n_dof, self.n_dof)
+
+    def get_jacobian(self):
+        """
+        Returns:
+            n-array: (N_links - 1 [+ 1], 6, N_dof [+ 6]) shaped per-link jacobian, if articulated. Note that the first
+                dimension is +1 and the final dimension is +6 if the entity does not have a fixed base
+                (i.e.: there is an additional "floating" joint tying the robot to the world frame)
+        """
+        assert self.articulated, "Cannot get jacobian for non-articulated entity!"
+        self._verify_physics_view_is_valid()
+        return self._physics_view.get_jacobians().squeeze(axis=0)
+
+    def get_relative_jacobian(self):
+        """
+        Returns:
+            n-array: (N_links - 1 [+ 1], 6, N_dof [+ 6]) shaped per-link relative jacobian, if articulated (expressed in
+                this entity's base frame). Note that the first dimension is +1 and the final dimension is +6 if the
+                entity does not have a fixed base (i.e.: there is an additional "floating" joint tying the robot to
+                the world frame)
+        """
+        jac = self.get_jacobian()
+        ori_t = T.quat2mat(self.get_orientation()).T.astype(np.float32)
+        tf = np.zeros((1, 6, 6), dtype=np.float32)
+        tf[:, :3, :3] = ori_t
+        tf[:, 3:, 3:] = ori_t
+        return tf @ jac
+
     def wake(self):
         """
         Enable physics for this articulation
@@ -1174,6 +1376,8 @@ class EntityPrim(XFormPrim):
         self.set_angular_velocity(velocity=np.zeros(3))
         for joint in self._joints.values():
             joint.keep_still()
+        # Make sure object is awake
+        self.wake()
 
     def create_attachment_point_link(self):
         """
@@ -1243,6 +1447,9 @@ class EntityPrim(XFormPrim):
         self.root_link._load_state(state=state["root_link"])
         for joint_name, joint_state in state["joints"].items():
             self._joints[joint_name]._load_state(state=joint_state)
+
+        # Make sure this object is awake
+        self.wake()
 
     def _serialize(self, state):
         # We serialize by first flattening the root link state and then iterating over all joints and

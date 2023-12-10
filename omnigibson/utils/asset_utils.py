@@ -3,34 +3,49 @@ import json
 import os
 import subprocess
 import tempfile
+import contextlib
+import inspect
+from copy import deepcopy
+from pathlib import Path
 from cryptography.fernet import Fernet
 from collections import defaultdict
-
+from urllib.request import urlretrieve
 import yaml
-
+import progressbar
 import omnigibson as og
+from omnigibson.macros import gm
 from omnigibson.utils.ui_utils import create_module_logger
-
-if os.name == "nt":
-    import win32api
-    import win32con
+if os.getenv("OMNIGIBSON_NO_OMNIVERSE", default=0) != "1":
+    from pxr import Usd
 
 # Create module logger
 log = create_module_logger(module_name=__name__)
 
+pbar = None
 
-def folder_is_hidden(p):
+def show_progress(block_num, block_size, total_size):
+    global pbar
+    if pbar is None:
+        pbar = progressbar.ProgressBar(maxval=total_size)
+        pbar.start()
+
+    downloaded = block_num * block_size
+    if downloaded < total_size:
+        pbar.update(downloaded)
+    else:
+        pbar.finish()
+        pbar = None
+
+def is_dot_file(p):
     """
-    Removes hidden folders from a list. Works on Linux, Mac and Windows
+    Check if a filename starts with a dot.
+    Note that while this does not actually correspond to checking for hidden files on Windows, the
+    files we want to ignore will still start with a dot and thus this works.
 
     Returns:
         bool: true if a folder is hidden in the OS
     """
-    if os.name == "nt":
-        attribute = win32api.GetFileAttributes(p)
-        return attribute & (win32con.FILE_ATTRIBUTE_HIDDEN | win32con.FILE_ATTRIBUTE_SYSTEM)
-    else:
-        return p.startswith(".")  # linux-osx
+    return p.startswith(".")
 
 
 def get_og_avg_category_specs():
@@ -40,7 +55,7 @@ def get_og_avg_category_specs():
     Returns:
         dict: Average category specifications for all object categories
     """
-    avg_obj_dim_file = os.path.join(og.og_dataset_path, "metadata", "avg_category_specs.json")
+    avg_obj_dim_file = os.path.join(gm.DATASET_PATH, "metadata", "avg_category_specs.json")
     if os.path.exists(avg_obj_dim_file):
         with open(avg_obj_dim_file) as f:
             return json.load(f)
@@ -52,22 +67,6 @@ def get_og_avg_category_specs():
         return dict()
 
 
-def get_assisted_grasping_categories():
-    """
-    Generate a list of categories that can be grasped using assisted grasping,
-    using labels provided in average category specs file.
-
-    Returns:
-        list of str: Object category allowlist for assisted grasping
-    """
-    assisted_grasp_category_allow_list = set()
-    avg_category_spec = get_og_avg_category_specs()
-    for k, v in avg_category_spec.items():
-        if v["enable_ag"]:
-            assisted_grasp_category_allow_list.add(k)
-    return assisted_grasp_category_allow_list
-
-
 def get_og_category_ids():
     """
     Get OmniGibson object categories
@@ -75,7 +74,7 @@ def get_og_category_ids():
     Returns:
         str: file path to the scene name
     """
-    og_dataset_path = og.og_dataset_path
+    og_dataset_path = gm.DATASET_PATH
     og_categories_files = os.path.join(og_dataset_path, "metadata", "categories.txt")
     name_to_id = {}
     with open(og_categories_files, "r") as fp:
@@ -91,10 +90,10 @@ def get_available_og_scenes():
     Returns:
         list: Available OmniGibson interactive scenes
     """
-    og_dataset_path = og.og_dataset_path
+    og_dataset_path = gm.DATASET_PATH
     og_scenes_path = os.path.join(og_dataset_path, "scenes")
     available_og_scenes = sorted(
-        [f for f in os.listdir(og_scenes_path) if (not folder_is_hidden(f) and f != "background")]
+        [f for f in os.listdir(og_scenes_path) if (not is_dot_file(f) and f != "background")]
     )
     return available_og_scenes
 
@@ -109,7 +108,7 @@ def get_og_scene_path(scene_name):
     Returns:
         str: file path to the scene name
     """
-    og_dataset_path = og.og_dataset_path
+    og_dataset_path = gm.DATASET_PATH
     og_scenes_path = os.path.join(og_dataset_path, "scenes")
     log.info("Scene name: {}".format(scene_name))
     assert scene_name in os.listdir(og_scenes_path), "Scene {} does not exist".format(scene_name)
@@ -126,7 +125,7 @@ def get_og_category_path(category_name):
     Returns:
         str: file path to the object category
     """
-    og_dataset_path = og.og_dataset_path
+    og_dataset_path = gm.DATASET_PATH
     og_categories_path = os.path.join(og_dataset_path, "objects")
     assert category_name in os.listdir(og_categories_path), "Category {} does not exist".format(category_name)
     return os.path.join(og_categories_path, category_name)
@@ -150,36 +149,18 @@ def get_og_model_path(category_name, model_name):
     return os.path.join(og_category_path, model_name)
 
 
-def get_object_models_of_category(category_name, filter_method=None):
+def get_all_system_categories():
     """
-    Get OmniGibson all object models of a given category
-
-    # TODO: Make this less ugly -- filter_method is a single hard-coded check
-
-    Args:
-        category_name (str): object category
-        filter_method (str): Method to use for filtering object models
+    Get OmniGibson all system categories
 
     Returns:
-        list: all object models of a given category
+        list: all system categories
     """
-    models = []
-    og_category_path = get_og_category_path(category_name)
-    for model_name in os.listdir(og_category_path):
-        if filter_method is None:
-            models.append(model_name)
-        elif filter_method in ["sliceable_part", "sliceable_whole"]:
-            model_path = get_og_model_path(category_name, model_name)
-            metadata_json = os.path.join(model_path, "misc", "metadata.json")
-            with open(metadata_json) as f:
-                metadata = json.load(f)
-            if (filter_method == "sliceable_part" and "object_parts" not in metadata) or (
-                filter_method == "sliceable_whole" and "object_parts" in metadata
-            ):
-                models.append(model_name)
-        else:
-            raise Exception("Unknown filter method: {}".format(filter_method))
-    return sorted(models)
+    og_dataset_path = gm.DATASET_PATH
+    og_categories_path = os.path.join(og_dataset_path, "systems")
+
+    categories =[f for f in os.listdir(og_categories_path) if not is_dot_file(f)]
+    return sorted(categories)
 
 
 def get_all_object_categories():
@@ -189,10 +170,10 @@ def get_all_object_categories():
     Returns:
         list: all object categories
     """
-    og_dataset_path = og.og_dataset_path
+    og_dataset_path = gm.DATASET_PATH
     og_categories_path = os.path.join(og_dataset_path, "objects")
 
-    categories =[f for f in os.listdir(og_categories_path) if not folder_is_hidden(f)]
+    categories =[f for f in os.listdir(og_categories_path) if not is_dot_file(f)]
     return sorted(categories)
 
 
@@ -203,7 +184,7 @@ def get_all_object_models():
     Returns:
         list: all object model paths
     """
-    og_dataset_path = og.og_dataset_path
+    og_dataset_path = gm.DATASET_PATH
     og_categories_path = os.path.join(og_dataset_path, "objects")
 
     categories = os.listdir(og_categories_path)
@@ -218,13 +199,92 @@ def get_all_object_models():
     return sorted(models)
 
 
+def get_all_object_category_models(category):
+    """
+    Get all object models from @category
+
+    Args:
+        category (str): Object category name
+
+    Returns:
+        list of str: all object models belonging to @category
+    """
+    og_dataset_path = gm.DATASET_PATH
+    og_categories_path = os.path.join(og_dataset_path, "objects", category)
+    return sorted(os.listdir(og_categories_path)) if os.path.exists(og_categories_path) else []
+
+
+def get_all_object_category_models_with_abilities(category, abilities):
+    """
+    Get all object models from @category whose assets are properly annotated with necessary metalinks to support
+    abilities @abilities
+
+    Args:
+        category (str): Object category name
+        abilities (dict): Dictionary mapping requested abilities to keyword arguments to pass to the corresponding
+            object state constructors. The abilities' required annotations will be guaranteed for the returned
+            models
+
+    Returns:
+        list of str: all object models belonging to @category which are properly annotated with necessary metalinks
+            to support the requested list of @abilities
+    """
+    # Avoid circular imports
+    from omnigibson.objects.dataset_object import DatasetObject
+    from omnigibson.object_states.factory import get_states_for_ability
+    from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
+
+    # Get all valid models
+    all_models = get_all_object_category_models(category=category)
+
+    # Generate all object states required per object given the requested set of abilities
+    state_types_and_params = [(state_type, params) for ability, params in abilities.items()
+                              for state_type in get_states_for_ability(ability)]
+    for state_type, _ in state_types_and_params:
+        # Add each state's dependencies, too. Note that only required dependencies are added.
+        for dependency in state_type.get_dependencies():
+            if all(other_state != dependency for other_state, _ in state_types_and_params):
+                state_types_and_params.append((dependency, dict()))
+
+    # Get mapping for class init kwargs
+    state_init_default_kwargs = dict()
+    for state_type, _ in state_types_and_params:
+        default_kwargs = inspect.signature(state_type.__init__).parameters
+        state_init_default_kwargs[state_type] = \
+            {kwarg: val.default for kwarg, val in default_kwargs.items()
+             if kwarg != "self" and val.default != inspect._empty}
+
+    # Iterate over all models and sanity check each one, making sure they satisfy all the requested @abilities
+    valid_models = []
+
+    def supports_state_types(states_and_params, obj_prim):
+        # Check all link states
+        for state_type, params in states_and_params:
+            kwargs = deepcopy(state_init_default_kwargs[state_type])
+            kwargs.update(params)
+            if not state_type.is_compatible_asset(prim=obj_prim, **kwargs)[0]:
+                return False
+        return True
+
+    for model in all_models:
+        usd_path = DatasetObject.get_usd_path(category=category, model=model)
+        usd_path = usd_path.replace(".usd", ".encrypted.usd")
+        with decrypted(usd_path) as fpath:
+            stage = Usd.Stage.Open(fpath)
+            prim = stage.GetDefaultPrim()
+            if supports_state_types(state_types_and_params, prim):
+                valid_models.append(model)
+
+    return valid_models
+
+
 def get_og_assets_version():
     """
     Returns:
         str: OmniGibson asset version
     """
     process = subprocess.Popen(
-        ["git", "-C", og.og_dataset_path, "rev-parse", "HEAD"], shell=False, stdout=subprocess.PIPE
+        ["git", "-C", gm.DATASET_PATH, "rev-parse", "HEAD"], shell=False, stdout=subprocess.PIPE
     )
     git_head_hash = str(process.communicate()[0].strip())
     return "{}".format(git_head_hash)
@@ -236,7 +296,7 @@ def get_available_g_scenes():
         list: available Gibson scenes
     """
     data_path = og.g_dataset_path
-    available_g_scenes = sorted([f for f in os.listdir(data_path) if not folder_is_hidden(f)])
+    available_g_scenes = sorted([f for f in os.listdir(data_path) if not is_dot_file(f)])
     return available_g_scenes
 
 
@@ -285,16 +345,17 @@ def download_assets():
     """
     Download OmniGibson assets
     """
-    if os.path.exists(og.assets_path):
+    if os.path.exists(gm.ASSET_PATH):
         print("Assets already downloaded.")
     else:
-        tmp_file = os.path.join(tempfile.gettempdir(), "og_assets.tar.gz")
-        os.makedirs(og.assets_path, exist_ok=True)
-        path = "https://storage.googleapis.com/gibson_scenes/og_assets.tar.gz"
-        log.info(f"Downloading and decompressing demo OmniGibson assets from {path}")
-        assert subprocess.call(["wget", "-c", "--no-check-certificate", "--retry-connrefused", "--tries=5", "--timeout=5", path, "-O", tmp_file]) == 0, "Assets download failed."
-        assert subprocess.call(["tar", "-zxf", tmp_file, "--strip-components=1", "--directory", og.assets_path]) == 0, "Assets extraction failed."
-        # These datasets come as folders; in these folder there are scenes, so --strip-components are needed.
+        with tempfile.TemporaryDirectory() as td:
+            tmp_file = os.path.join(td, "og_assets.tar.gz")
+            os.makedirs(gm.ASSET_PATH, exist_ok=True)
+            path = "https://storage.googleapis.com/gibson_scenes/og_assets.tar.gz"
+            log.info(f"Downloading and decompressing demo OmniGibson assets from {path}")
+            assert urlretrieve(path, tmp_file, show_progress), "Assets download failed."
+            assert subprocess.call(["tar", "-zxf", tmp_file, "--strip-components=1", "--directory", gm.ASSET_PATH]) == 0, "Assets extraction failed."
+            # These datasets come as folders; in these folder there are scenes, so --strip-components are needed.
 
 
 def download_demo_data():
@@ -318,11 +379,11 @@ def print_user_agreement():
 
 
 def download_key():
-    os.makedirs(os.path.dirname(og.key_path), exist_ok=True)
-    if not os.path.exists(og.assets_path):
+    os.makedirs(os.path.dirname(gm.KEY_PATH), exist_ok=True)
+    if not os.path.exists(gm.ASSET_PATH):
         _=((()==())+(()==()));__=(((_<<_)<<_)*_);___=('c%'[::(([]!=[])-(()==()))])*(((_<<_)<<_)+(((_<<_)*_)+((_<<_)+(_+(()==())))))%((__+(((_<<_)<<_)+(_<<_))),(__+(((_<<_)<<_)+(((_<<_)*_)+(_*_)))),(__+(((_<<_)<<_)+(((_<<_)*_)+(_*_)))),(__+(((_<<_)<<_)+((_<<_)*_))),(__+(((_<<_)<<_)+(((_<<_)*_)+(_+(()==()))))),(((_<<_)<<_)+(((_<<_)*_)+((_<<_)+_))),(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==()))))),(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==()))))),(__+(((_<<_)<<_)+(((_<<_)*_)+(_+(()==()))))),(__+(((_<<_)<<_)+(((_<<_)*_)+(_*_)))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==())))))),(__+(((_<<_)<<_)+(((_<<_)*_)+_))),(__+(((_<<_)<<_)+(()==()))),(__+(((_<<_)<<_)+((_*_)+(_+(()==()))))),(__+(((_<<_)<<_)+((_*_)+(()==())))),(((_<<_)<<_)+((_<<_)+((_*_)+_))),(__+(((_<<_)<<_)+((_*_)+(_+(()==()))))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==())))))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==())))))),(__+(((_<<_)<<_)+((_*_)+(_+(()==()))))),(__+(((_<<_)<<_)+((_<<_)+(_*_)))),(__+(((_<<_)<<_)+((_*_)+(()==())))),(__+(((_<<_)<<_)+(()==()))),(__+(((_<<_)<<_)+((_<<_)*_))),(__+(((_<<_)<<_)+((_<<_)+(()==())))),(__+(((_<<_)<<_)+(((_<<_)*_)+(_+(()==()))))),(((_<<_)<<_)+((_<<_)+((_*_)+_))),(__+(((_<<_)<<_)+(_+(()==())))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==())))))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+(()==()))))),(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==()))))),(__+(((_<<_)<<_)+((_*_)+(_+(()==()))))),(__+(((_<<_)<<_)+((_<<_)+(()==())))),(__+(((_<<_)<<_)+_)),(__+(((_<<_)<<_)+(((_<<_)*_)+(_+(()==()))))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==())))))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+_)))),(__+(((_<<_)*_)+((_<<_)+((_*_)+(_+(()==())))))),(__+(((_<<_)<<_)+(((_<<_)*_)+(_+(()==()))))),(__+(((_<<_)<<_)+(_+(()==())))),(__+(((_<<_)<<_)+((_*_)+(()==())))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+_)))),(__+(((_<<_)<<_)+((_*_)+(()==())))),(__+(((_<<_)<<_)+(((_<<_)*_)+(_+(()==()))))),(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==()))))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==())))))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+(()==()))))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+_)))),(__+(((_<<_)<<_)+((_<<_)+(()==())))),(__+(((_<<_)<<_)+((_*_)+(_+(()==()))))),(__+(((_<<_)<<_)+((_<<_)+(()==())))),(__+(((_<<_)<<_)+_)),(__+(((_<<_)<<_)+(((_<<_)*_)+(_+(()==()))))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+(_+(()==())))))),(__+(((_<<_)<<_)+((_<<_)+((_*_)+_)))),(((_<<_)<<_)+((_<<_)+((_*_)+_))),(__+(((_<<_)<<_)+((_<<_)+(_+(()==()))))),(__+(((_<<_)<<_)+((_*_)+(()==())))),(__+(((_<<_)<<_)+(((_<<_)*_)+((_<<_)+(()==()))))))
         path = ___
-        assert subprocess.call(["wget", "-c", "--no-check-certificate", "--retry-connrefused", "--tries=5", "--timeout=5", path, "-O", og.key_path]) == 0, "Key download failed."
+        assert urlretrieve(path, gm.KEY_PATH, show_progress), "Key download failed."
 
 
 def download_og_dataset():
@@ -330,7 +391,7 @@ def download_og_dataset():
     Download OmniGibson dataset
     """
     # Print user agreement
-    if os.path.exists(og.key_path):
+    if os.path.exists(gm.KEY_PATH):
         print("OmniGibson dataset encryption key already installed.")
     else:
         print("\n")
@@ -345,15 +406,15 @@ def download_og_dataset():
 
         download_key()
 
-    if os.path.exists(og.og_dataset_path):
+    if os.path.exists(gm.DATASET_PATH):
         print("OmniGibson dataset already installed.")
     else:
         tmp_file = os.path.join(tempfile.gettempdir(), "og_dataset.tar.gz")
-        os.makedirs(og.og_dataset_path, exist_ok=True)
+        os.makedirs(gm.DATASET_PATH, exist_ok=True)
         path = "https://storage.googleapis.com/gibson_scenes/og_dataset.tar.gz"
         log.info(f"Downloading and decompressing demo OmniGibson dataset from {path}")
-        assert subprocess.call(["wget", "-c", "--no-check-certificate", "--retry-connrefused", "--tries=5", "--timeout=5", path, "-O", tmp_file]) == 0, "Dataset download failed."
-        assert subprocess.call(["tar", "-zxf", tmp_file, "--strip-components=1", "--directory", og.og_dataset_path]) == 0, "Dataset extraction failed."
+        assert urlretrieve(path, tmp_file, show_progress), "Dataset download failed."
+        assert subprocess.call(["tar", "-zxf", tmp_file, "--strip-components=1", "--directory", gm.DATASET_PATH]) == 0, "Dataset extraction failed."
         # These datasets come as folders; in these folder there are scenes, so --strip-components are needed.
 
 
@@ -379,8 +440,8 @@ def change_data_path():
             yaml.dump(global_config, f)
 
 
-def decrypt_file(encrypted_filename, decrypted_filename=None, decrypted_file=None):
-    with open(og.key_path, "rb") as filekey:
+def decrypt_file(encrypted_filename, decrypted_filename):
+    with open(gm.KEY_PATH, "rb") as filekey:
         key = filekey.read()
     fernet = Fernet(key)
 
@@ -389,15 +450,12 @@ def decrypt_file(encrypted_filename, decrypted_filename=None, decrypted_file=Non
 
     decrypted = fernet.decrypt(encrypted)
 
-    if decrypted_file is not None:
+    with open(decrypted_filename, "wb") as decrypted_file:
         decrypted_file.write(decrypted)
-    else:
-        with open(decrypted_filename, "wb") as decrypted_file:
-            decrypted_file.write(decrypted)
 
 
 def encrypt_file(original_filename, encrypted_filename=None, encrypted_file=None):
-    with open(og.key_path, "rb") as filekey:
+    with open(gm.KEY_PATH, "rb") as filekey:
         key = filekey.read()
     fernet = Fernet(key)
 
@@ -411,6 +469,14 @@ def encrypt_file(original_filename, encrypted_filename=None, encrypted_file=None
     else:
         with open(encrypted_filename, "wb") as encrypted_file:
             encrypted_file.write(encrypted)
+
+
+@contextlib.contextmanager
+def decrypted(encrypted_filename):
+    fpath = Path(encrypted_filename)
+    decrypted_filename = os.path.join(og.tempdir, f"{fpath.stem}.tmp{fpath.suffix}")
+    decrypt_file(encrypted_filename=encrypted_filename, decrypted_filename=decrypted_filename)
+    yield decrypted_filename
 
 
 if __name__ == "__main__":

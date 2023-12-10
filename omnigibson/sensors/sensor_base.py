@@ -54,7 +54,7 @@ class BaseSensor(XFormPrim, GymObservable, Registerable, metaclass=ABCMeta):
             load_config=load_config,
         )
 
-    def _load(self, simulator=None):
+    def _load(self):
         # Sub-sensors must implement this class directly! Cannot use parent XForm class by default
         raise NotImplementedError("Sensor class must implement _load!")
 

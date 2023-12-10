@@ -2,9 +2,10 @@
 A set of utility functions for general python usage
 """
 import inspect
+import re
 from abc import ABCMeta
 from copy import deepcopy
-from collections import Iterable
+from collections.abc import Iterable
 from functools import wraps
 from importlib import import_module
 
@@ -132,7 +133,7 @@ class Recreatable(metaclass=RecreatableAbcMeta):
 
 def create_object_from_init_info(init_info):
     """
-    Create a new object based on an given init info.
+    Create a new object based on given init info.
 
     Args:
         init_info (dict): Nested dictionary that contains an object's init information.
@@ -272,6 +273,73 @@ def create_class_from_registry_and_config(cls_name, cls_registry, cfg, cls_type_
 
     # Create the class
     return cls(**cls_kwargs)
+
+
+def get_uuid(name, n_digits=8):
+    """
+    Helper function to create a unique @n_digits uuid given a unique @name
+
+    Args:
+        name (str): Name of the object or class
+        n_digits (int): Number of digits of the uuid, default is 8
+
+    Returns:
+        int: uuid
+    """
+    return abs(hash(name)) % (10 ** n_digits)
+
+
+def camel_case_to_snake_case(camel_case_text):
+    """
+    Helper function to convert a camel case text to snake case, e.g. "StrawberrySmoothie" -> "strawberry_smoothie"
+
+    Args:
+        camel_case_text (str): Text in camel case
+
+    Returns:
+        str: snake case text
+    """
+    return re.sub(r'(?<!^)(?=[A-Z])', '_', camel_case_text).lower()
+
+
+def snake_case_to_camel_case(snake_case_text):
+    """
+    Helper function to convert a snake case text to camel case, e.g. "strawberry_smoothie" -> "StrawberrySmoothie"
+
+    Args:
+        snake_case_text (str): Text in snake case
+
+    Returns:
+        str: camel case text
+    """
+    return ''.join(item.title() for item in snake_case_text.split('_'))
+
+
+def meets_minimum_version(test_version, minimum_version):
+    """
+    Verify that @test_version meets the @minimum_version
+
+    Args:
+        test_version (str): Python package version. Should be, e.g., 0.26.1
+        minimum_version (str): Python package version to test against. Should be, e.g., 0.27.2
+
+    Returns:
+        bool: Whether @test_version meets @minimum_version
+    """
+    test_nums = [int(num) for num in test_version.split(".")]
+    minimum_nums = [int(num) for num in minimum_version.split(".")]
+    assert len(test_nums) == 3
+    assert len(minimum_nums) == 3
+
+    for test_num, minimum_num in zip(test_nums, minimum_nums):
+        if test_num > minimum_num:
+            return True
+        elif test_num < minimum_num:
+            return False
+        # Otherwise, we continue through all sub-versions
+
+    # If we get here, that means test_version == threshold_version, so this is a success
+    return True
 
 
 class UniquelyNamed:
@@ -678,11 +746,102 @@ class SerializableNonInstance:
         """
         # Sanity check the idx with the expected state size
         state_dict, idx = cls._deserialize(state=state)
-        assert cls.state_size is not None, "State size must be specified by subclass!"
         assert idx == cls.state_size, f"Invalid state deserialization occurred! Expected {cls.state_size} total " \
                                       f"values to be deserialized, only {idx} were."
 
         return state_dict
+
+
+class Wrapper:
+    """
+    Base class for all wrappers in OmniGibson
+
+    Args:
+        obj (any): Arbitrary python object instance to wrap
+    """
+
+    def __init__(self, obj):
+        # Set the internal attributes -- store wrapped obj
+        self.wrapped_obj = obj
+
+    @classmethod
+    def class_name(cls):
+        return cls.__name__
+
+    def _warn_double_wrap(self):
+        """
+        Utility function that checks if we're accidentally trying to double wrap an env
+        Raises:
+            Exception: [Double wrapping env]
+        """
+        obj = self.wrapped_obj
+        while True:
+            if isinstance(obj, Wrapper):
+                if obj.class_name() == self.class_name():
+                    raise Exception("Attempted to double wrap with Wrapper: {}".format(self.__class__.__name__))
+                obj = obj.wrapped_obj
+            else:
+                break
+
+    @property
+    def unwrapped(self):
+        """
+        Grabs unwrapped object
+
+        Returns:
+            any: The unwrapped object instance
+        """
+        return self.wrapped_obj.unwrapped if hasattr(self.wrapped_obj, "unwrapped") else self.wrapped_obj
+
+    # this method is a fallback option on any methods the original env might support
+    def __getattr__(self, attr):
+        # If we're querying wrapped_obj, raise an error
+        if attr == "wrapped_obj":
+            raise AttributeError("wrapped_obj attribute not initialized yet!")
+
+        # Sanity check to make sure wrapped obj is not None -- if so, raise error
+        assert self.wrapped_obj is not None, f"Cannot access attribute {attr} since wrapped_obj is None!"
+
+        # using getattr ensures that both __getattribute__ and __getattr__ (fallback) get called
+        # (see https://stackoverflow.com/questions/3278077/difference-between-getattr-vs-getattribute)
+        orig_attr = getattr(self.wrapped_obj, attr)
+        if callable(orig_attr):
+            def hooked(*args, **kwargs):
+                result = orig_attr(*args, **kwargs)
+                # prevent wrapped_class from becoming unwrapped
+                if id(result) == id(self.wrapped_obj):
+                    return self
+                return result
+            return hooked
+        else:
+            return orig_attr
+
+    def __setattr__(self, key, value):
+        # Call setattr on wrapped obj if it has the attribute, otherwise, operate on this object
+        if hasattr(self, "wrapped_obj") and self.wrapped_obj is not None and hasattr(self.wrapped_obj, key):
+            setattr(self.wrapped_obj, key, value)
+        else:
+            super().__setattr__(key, value)
+
+
+def nums2array(nums, dim, dtype=float):
+    """
+    Converts input @nums into numpy array of length @dim. If @nums is a single number, broadcasts input to
+    corresponding dimension size @dim before converting into numpy array
+
+    Args:
+        nums (float or array): Numbers to map to numpy array
+        dim (int): Size of array to broadcast input to
+
+    Returns:
+        torch.Tensor: Mapped input numbers
+    """
+    # Make sure the inputted nums isn't a string
+    assert not isinstance(nums, str), "Only numeric types are supported for this operation!"
+
+    out = np.array(nums, dtype=dtype) if isinstance(nums, Iterable) else np.ones(dim, dtype=dtype) * nums
+
+    return out
 
 
 def clear():
@@ -690,3 +849,4 @@ def clear():
     Clear state tied to singleton classes
     """
     NAMES.clear()
+    CLASS_NAMES.clear()

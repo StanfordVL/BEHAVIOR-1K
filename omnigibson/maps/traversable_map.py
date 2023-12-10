@@ -107,7 +107,7 @@ class TraversableMap(BaseMap):
 
             # We search for the largest connected areas
             if self.build_graph:
-                # Directly set map siz
+                # Directly set map size
                 self.floor_graph = self.build_trav_graph(map_size, maps_path, floor, trav_map)
 
             self.floor_map.append(trav_map)
@@ -155,8 +155,11 @@ class TraversableMap(BaseMap):
             # only take the largest connected component
             largest_cc = max(nx.connected_components(g), key=len)
             g = g.subgraph(largest_cc).copy()
-            with open(graph_file, "wb") as pfile:
-                pickle.dump(g, pfile)
+            try:
+                with open(graph_file, "wb") as pfile:
+                    pickle.dump(g, pfile)
+            except:
+                log.warning("Cannot cache traversable graph to disk possibly because dataset is read-only. Will have to recompute each time.")
 
         floor_graph.append(g)
 

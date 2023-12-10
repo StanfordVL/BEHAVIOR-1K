@@ -1,6 +1,11 @@
+import os
+import tempfile
+
+import omnigibson as og
 from omnigibson.objects.stateful_object import StatefulObject
 from omnigibson.utils.constants import PrimType
 from omnigibson.utils.usd_utils import add_asset_to_stage
+from omnigibson.utils.asset_utils import decrypt_file
 
 
 class USDObject(StatefulObject):
@@ -11,9 +16,10 @@ class USDObject(StatefulObject):
 
     def __init__(
         self,
-        prim_path,
+        name,
         usd_path,
-        name=None,
+        encrypted=False,
+        prim_path=None,
         category="object",
         class_id=None,
         uuid=None,
@@ -30,10 +36,11 @@ class USDObject(StatefulObject):
     ):
         """
         Args:
-            prim_path (str): global path in the stage to this object
+            name (str): Name for the object. Names need to be unique per scene
             usd_path (str): global path to the USD file to load
-            name (None or str): Name for the object. Names need to be unique per scene. If None, a name will be
-                generated at the time the object is added to the scene, using the object's category.
+            encrypted (bool): whether this file is encrypted (and should therefore be decrypted) or not
+            prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
+                created at /World/<name>
             category (str): Category for the object. Defaults to "object".
             class_id (None or int): What class ID the object should be assigned in semantic segmentation rendering mode.
                 If None, the ID will be inferred from this object's category.
@@ -59,6 +66,7 @@ class USDObject(StatefulObject):
                 that kwargs are only shared between all SUBclasses (children), not SUPERclasses (parents).
         """
         self._usd_path = usd_path
+        self._encrypted = encrypted
         super().__init__(
             prim_path=prim_path,
             name=name,
@@ -77,11 +85,26 @@ class USDObject(StatefulObject):
             **kwargs,
         )
 
-    def _load(self, simulator=None):
+    def _load(self):
         """
         Load the object into pybullet and set it to the correct pose
         """
-        return add_asset_to_stage(asset_path=self._usd_path, prim_path=self._prim_path)
+        usd_path = self._usd_path
+        if self._encrypted:
+            # Create a temporary file to store the decrytped asset, load it, and then delete it
+            encrypted_filename = self._usd_path.replace(".usd", ".encrypted.usd")
+            decrypted_fd, usd_path = tempfile.mkstemp(os.path.basename(self._usd_path), dir=og.tempdir)
+            decrypt_file(encrypted_filename, usd_path)
+
+        prim = add_asset_to_stage(asset_path=usd_path, prim_path=self._prim_path)
+
+        if self._encrypted:
+            os.close(decrypted_fd)
+            # On Windows, Isaac Sim won't let go of the file until the prim is removed, so we can't delete it.
+            if os.name == "posix":
+                os.remove(usd_path)
+
+        return prim
 
     def _create_prim_with_same_kwargs(self, prim_path, name, load_config):
         # Add additional kwargs

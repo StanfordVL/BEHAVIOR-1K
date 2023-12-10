@@ -8,82 +8,35 @@ concurrency:
 
 jobs:
   test:
-    runs-on: [self-hosted, linux, gpu]
-    if: github.repository == 'StanfordVL/OmniGibson-dev'
+    runs-on: [self-hosted, linux, gpu, dataset-enabled]
+
+    defaults:
+      run:
+        shell: micromamba run -n omnigibson /bin/bash -leo pipefail {0}
 
     steps:
+      - name: Fix home
+        run: echo "HOME=/root" >> $GITHUB_ENV
+
       - name: Checkout source
         uses: actions/checkout@v2
         with:
           submodules: true
-          path: omnigibson
-
-      - name: Add CUDA to env
-        run: echo "/usr/local/cuda/bin" >> $GITHUB_PATH
-
-      - name: Setup python
-        uses: actions/setup-python@v2
-        with:
-          python-version: "3.8"
-          architecture: x64
+          path: omnigibson-src
 
       - name: Install dev requirements
-        working-directory: omnigibson
+        working-directory: omnigibson-src
         run: pip install -r requirements-dev.txt
 
       - name: Install
-        working-directory: omnigibson
+        working-directory: omnigibson-src
         run: pip install -e .
-
-      - name: Uninstall pip bddl
-        working-directory: omnigibson
-        run: pip uninstall -y bddl
-
-      - name: Checkout BDDL
-        uses: actions/checkout@v2
-        with:
-          repository: StanfordVL/bddl-dev
-          ref: 581be50e7cfd2b3a1447aaa1b4fc2424b673339c
-          token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}  # PAT is required since this is a different repo
-          path: bddl
-          submodules: recursive
-          lfs: true
-
-      - name: Install BDDL
-        working-directory: bddl
-        run: pip install -e .
-
-      - name: Link Dataset
-        working-directory: omnigibson
-        run: ln -s /scr/ig-data omnigibson/data
-
-      # The below method of checking out ig-dataset is currently unused due to poor speed.
-      # - name: Create data directory
-      #   run: mkdir -p omnigibson/omnigibson/data
-      #
-      # - name: Checkout og_dataset
-      #   uses: actions/checkout@v2
-      #   with:
-      #     repository: StanfordVL/og_dataset
-      #     token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}  # PAT is required since this is a different repo
-      #     path: omnigibson/omnigibson/data/og_dataset
-      #     submodules: recursive
-      #     lfs: true
-      #
-      # - name: Checkout og_assets
-      #   uses: actions/checkout@v2
-      #   with:
-      #     repository: StanfordVL/og_assets
-      #     token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}  # PAT is required since this is a different repo
-      #     path: omnigibson/omnigibson/data/assets
-      #     submodules: recursive
-      #     lfs: true
 
       - name: Run tests
-        working-directory: omnigibson
-        run: pytest
+        working-directory: omnigibson-src
+        run: source /isaac-sim/setup_conda_env.sh && pytest
 
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v2.1.0
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
+      # - name: Upload coverage to Codecov
+      #   uses: codecov/codecov-action@v2.1.0
+      #   with:
+      #     token: ${{ secrets.CODECOV_TOKEN }}

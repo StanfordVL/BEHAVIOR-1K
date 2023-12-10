@@ -2,17 +2,17 @@ import numpy as np
 
 from omnigibson.object_states.aabb import AABB
 from omnigibson.object_states.adjacency import HorizontalAdjacency, flatten_planes
-from omnigibson.object_states.kinematics import KinematicsMixin
-from omnigibson.object_states.object_state_base import BooleanState, RelativeObjectState
+from omnigibson.object_states.kinematics_mixin import KinematicsMixin
+from omnigibson.object_states.object_state_base import BooleanStateMixin, RelativeObjectState
 
 
-class NextTo(KinematicsMixin, RelativeObjectState, BooleanState):
-    @staticmethod
-    def get_dependencies():
-        return KinematicsMixin.get_dependencies() + [HorizontalAdjacency]
+class NextTo(KinematicsMixin, RelativeObjectState, BooleanStateMixin):
 
-    def _set_value(self, other, new_value):
-        raise NotImplementedError()
+    @classmethod
+    def get_dependencies(cls):
+        deps = super().get_dependencies()
+        deps.add(HorizontalAdjacency)
+        return deps
 
     def _get_value(self, other):
         objA_states = self.obj.states

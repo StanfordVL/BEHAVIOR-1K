@@ -1,5 +1,21 @@
 env:
+  action_timestep: 0.01666              # (float): environment executes action per action_timestep second
+  physics_timestep: 0.01666             # (float): physics timestep for physx
+  device: null                          # (None or str): specifies the device to be used if running on the gpu with torch backend
+  automatic_reset: false                # (bool): whether to automatic reset after an episode finishes
+  flatten_action_space: false           # (bool): whether to flatten the action space as a sinle 1D-array
+  flatten_obs_space: false              # (bool): whether the observation space should be flattened when generated
+  use_external_obs: false               # (bool): Whether to use external observations or not
   initial_pos_z_offset: 0.1
+  external_sensors:                     # (None or list): If specified, list of sensor configurations for external sensors to add. Should specify sensor "type" and any additional kwargs to instantiate the sensor. Each entry should be the kwargs passed to @create_sensor, in addition to position, orientation
+    - sensor_type: VisionSensor
+      modalities: [rgb, depth]
+      sensor_kwargs:
+        image_height: 128
+        image_width: 128
+      local_position: [0, 0, 1.0]
+      local_orientation: [0.707, 0.0, 0.0, 0.707]
+
 
 render:
   viewer_width: 1280
@@ -33,6 +49,15 @@ robots:
     default_trunk_offset: 0.365
     default_arm_pose: diagonal30
     reset_joint_pos: tuck
+    sensor_config:
+      VisionSensor:
+        sensor_kwargs:
+          image_height: 128
+          image_width: 128
+      ScanSensor:
+          sensor_kwargs:
+            min_range: 0.05
+            max_range: 10.0
     controller_config:
       base:
         name: DifferentialDriveController
@@ -50,7 +75,7 @@ objects: []
 
 task:
   type: BehaviorTask
-  activity_name: putting_away_Halloween_decorations
+  activity_name: prepare_sea_salt_soak
   activity_definition_id: 0
   activity_instance_id: 0
   predefined_problem: null

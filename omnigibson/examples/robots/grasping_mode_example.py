@@ -5,6 +5,7 @@ import numpy as np
 
 import omnigibson as og
 from omnigibson.macros import gm
+from omnigibson.sensors import VisionSensor
 from omnigibson.utils.ui_utils import choose_from_options, KeyboardRobotController
 
 GRASPING_MODES = dict(
@@ -20,9 +21,9 @@ gm.ENABLE_FLATCACHE = True
 def main(random_selection=False, headless=False, short_exec=False):
     """
     Robot grasping mode demo with selection
-    Queries the user to select a type of grasping mode and GUI
+    Queries the user to select a type of grasping mode
     """
-    og.log.info("*" * 80 + "\nDescription:" + main.__doc__ + "*" * 80)
+    og.log.info(f"Demo {__file__}\n    " + "*" * 80 + "\n    Description:\n" + main.__doc__ + "*" * 80)
 
     # Choose type of grasping
     grasping_mode = choose_from_options(options=GRASPING_MODES, name="grasping mode", random_selection=random_selection)
@@ -42,7 +43,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         type="DatasetObject",
         name="table",
         category="breakfast_table",
-        model="1b4e6f9dd22a8c628ef9d976af675b86",
+        model="lcsizg",
         bounding_box=[0.5, 0.5, 0.8],
         fit_avg_dim_volume=False,
         fixed_base=True,
@@ -54,7 +55,7 @@ def main(random_selection=False, headless=False, short_exec=False):
         type="DatasetObject",
         name="chair",
         category="straight_chair",
-        model="2a8d87523e23a01d5f40874aec1ee3a6",
+        model="amgwaw",
         bounding_box=None,
         fit_avg_dim_volume=True,
         fixed_base=False,
@@ -75,13 +76,19 @@ def main(random_selection=False, headless=False, short_exec=False):
     cfg = dict(scene=scene_cfg, robots=[robot0_cfg], objects=[table_cfg, chair_cfg, box_cfg])
 
     # Create the environment
-    env = og.Environment(configs=cfg, action_timestep=1/60., physics_timestep=1/60.)
+    env = og.Environment(configs=cfg)
 
     # Reset the robot
     robot = env.robots[0]
     robot.set_position([0, 0, 0])
     robot.reset()
     robot.keep_still()
+
+    # Make the robot's camera(s) high-res
+    for sensor in robot.sensors.values():
+        if isinstance(sensor, VisionSensor):
+            sensor.image_height = 720
+            sensor.image_width = 720
 
     # Update the simulator's viewer camera's pose so it points towards the robot
     og.sim.viewer_camera.set_position_orientation(

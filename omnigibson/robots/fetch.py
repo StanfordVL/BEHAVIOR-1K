@@ -1,13 +1,16 @@
 import os
 import numpy as np
 
-import omnigibson as og
+from omnigibson.macros import gm
 from omnigibson.controllers import ControlType
 from omnigibson.robots.active_camera_robot import ActiveCameraRobot
 from omnigibson.robots.manipulation_robot import GraspingPoint, ManipulationRobot
 from omnigibson.robots.two_wheel_robot import TwoWheelRobot
 from omnigibson.utils.python_utils import assert_valid_key
+from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.usd_utils import JointType
+
+log = create_module_logger(module_name=__name__)
 
 DEFAULT_ARM_POSES = {
     "vertical",
@@ -32,16 +35,16 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
     def __init__(
         self,
         # Shared kwargs in hierarchy
-        prim_path,
-        name=None,
+        name,
+        prim_path=None,
         class_id=None,
         uuid=None,
         scale=None,
         visible=True,
-        fixed_base=False,
         visual_only=False,
         self_collisions=False,
         load_config=None,
+        fixed_base=False,
 
         # Unique to USDObject hierarchy
         abilities=None,
@@ -56,22 +59,24 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         # Unique to BaseRobot
         obs_modalities="all",
         proprio_obs="default",
+        sensor_config=None,
 
         # Unique to ManipulationRobot
         grasping_mode="physical",
+        disable_grasp_handling=False,
 
         # Unique to Fetch
         rigid_trunk=False,
         default_trunk_offset=0.365,
-        default_arm_pose="vertical",
+        default_arm_pose="diagonal30",
 
         **kwargs,
     ):
         """
         Args:
-            prim_path (str): global path in the stage to this object
-            name (None or str): Name for the object. Names need to be unique per scene. If None, a name will be
-                generated at the time the object is added to the scene, using the object's category.
+            name (str): Name for the object. Names need to be unique per scene
+            prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
+                created at /World/<name>
             class_id (None or int): What class ID the object should be assigned in semantic segmentation rendering mode.
                 If None, the ID will be inferred from this object's category.
             uuid (None or int): Unique unsigned-integer identifier to assign to this object (max 8-numbers).
@@ -80,7 +85,6 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
                 for this object. A single number corresponds to uniform scaling along the x,y,z axes, whereas a
                 3-array specifies per-axis scaling.
             visible (bool): whether to render this object or not in the stage
-            fixed_base (bool): whether to fix the base of this object or not
             visual_only (bool): Whether this object should be visual only (and not collide with any other objects)
             self_collisions (bool): Whether to enable self collisions for this object
             load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
@@ -100,14 +104,20 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
             obs_modalities (str or list of str): Observation modalities to use for this robot. Default is "all", which
                 corresponds to all modalities being used.
                 Otherwise, valid options should be part of omnigibson.sensors.ALL_SENSOR_MODALITIES.
+                Note: If @sensor_config explicitly specifies `modalities` for a given sensor class, it will
+                    override any values specified from @obs_modalities!
             proprio_obs (str or list of str): proprioception observation key(s) to use for generating proprioceptive
                 observations. If str, should be exactly "default" -- this results in the default proprioception
                 observations being used, as defined by self.default_proprio_obs. See self._get_proprioception_dict
                 for valid key choices
+            sensor_config (None or dict): nested dictionary mapping sensor class name(s) to specific sensor
+                configurations for this object. This will override any default values specified by this class.
             grasping_mode (str): One of {"physical", "assisted", "sticky"}.
                 If "physical", no assistive grasping will be applied (relies on contact friction + finger force).
                 If "assisted", will magnetize any object touching and within the gripper's fingers.
                 If "sticky", will magnetize any object touching the gripper's fingers.
+            disable_grasp_handling (bool): If True, will disable all grasp handling for this object. This means that
+                sticky and assisted grasp modes will not work unless the connection/release methodsare manually called.
             rigid_trunk (bool) if True, will prevent the trunk from moving during execution.
             default_trunk_offset (float): sets the default height of the robot's trunk
             default_arm_pose (str): Default pose for the robot arm. Should be one of:
@@ -150,7 +160,9 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
             reset_joint_pos=reset_joint_pos,
             obs_modalities=obs_modalities,
             proprio_obs=proprio_obs,
+            sensor_config=sensor_config,
             grasping_mode=grasping_mode,
+            disable_grasp_handling=disable_grasp_handling,
             **kwargs,
         )
 
@@ -211,7 +223,24 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         else:
             raise ValueError("Unknown default arm pose: {}".format(self.default_arm_pose))
         return pos
+    
+    def _post_load(self):
+        super()._post_load()
 
+        # Set the wheels back to using sphere approximations
+        for wheel_name in ["l_wheel_link", "r_wheel_link"]:
+            log.warning(
+                "Fetch wheel links are post-processed to use sphere approximation collision meshes."
+                "Please ignore any previous errors about these collision meshes.")
+            wheel_link = self.links[wheel_name]
+            assert set(wheel_link.collision_meshes) == {"collisions"}, "Wheel link should only have 1 collision!"
+            wheel_link.collision_meshes["collisions"].set_collision_approximation("boundingSphere")
+
+        # Also apply a convex decomposition to the torso lift link
+        torso_lift_link = self.links["torso_lift_link"]
+        assert set(torso_lift_link.collision_meshes) == {"collisions"}, "Wheel link should only have 1 collision!"
+        torso_lift_link.collision_meshes["collisions"].set_collision_approximation("convexDecomposition")
+        
     @property
     def discrete_action_list(self):
         # Not supported for this robot
@@ -382,6 +411,40 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         return [
             ["torso_lift_link", "shoulder_lift_link"],
             ["torso_lift_link", "torso_fixed_link"],
+            ["torso_lift_link", "estop_link"],
+            ["base_link", "laser_link"],
+            ["base_link", "torso_fixed_link"],
+            ["base_link", "l_wheel_link"],
+            ["base_link", "r_wheel_link"],
+            ["base_link", "estop_link"],
+            ["torso_lift_link", "shoulder_pan_link"],
+            ["torso_lift_link", "head_pan_link"],
+            ["head_pan_link", "head_tilt_link"],
+            ["shoulder_pan_link", "shoulder_lift_link"],
+            ["shoulder_lift_link", "upperarm_roll_link"],
+            ["upperarm_roll_link", "elbow_flex_link"],
+            ["elbow_flex_link", "forearm_roll_link"],
+            ["forearm_roll_link", "wrist_flex_link"],
+            ["wrist_flex_link", "wrist_roll_link"],
+            ["wrist_roll_link", "gripper_link"],
+        ]
+
+    @property
+    def manipulation_link_names(self):
+        return [
+            "torso_lift_link", 
+            "head_pan_link", 
+            "head_tilt_link",  
+            "shoulder_pan_link", 
+            "shoulder_lift_link", 
+            "upperarm_roll_link", 
+            "elbow_flex_link", 
+            "forearm_roll_link", 
+            "wrist_flex_link", 
+            "wrist_roll_link", 
+            "gripper_link", 
+            "l_gripper_finger_link", 
+            "r_gripper_finger_link",
         ]
 
     @property
@@ -423,12 +486,18 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
 
     @property
     def usd_path(self):
-        return os.path.join(og.assets_path, "models/fetch/fetch/fetch.usd")
+        return os.path.join(gm.ASSET_PATH, "models/fetch/fetch/fetch.usd")
 
     @property
     def robot_arm_descriptor_yamls(self):
-        return {self.default_arm: os.path.join(og.assets_path, "models/fetch/fetch_descriptor.yaml")}
+        return {self.default_arm: os.path.join(gm.ASSET_PATH, "models/fetch/fetch_descriptor.yaml")}
 
     @property
     def urdf_path(self):
-        return os.path.join(og.assets_path, "models/fetch/fetch.urdf")
+        return os.path.join(gm.ASSET_PATH, "models/fetch/fetch.urdf")
+
+    @property
+    def arm_workspace_range(self):
+        return {
+            self.default_arm : [np.deg2rad(-45), np.deg2rad(45)]
+        }

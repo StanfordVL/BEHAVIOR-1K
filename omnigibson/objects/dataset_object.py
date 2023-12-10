@@ -1,8 +1,7 @@
 import itertools
 import math
 import os
-import tempfile
-
+import stat
 import cv2
 import numpy as np
 
@@ -11,12 +10,12 @@ from scipy.spatial.transform import Rotation
 from omni.isaac.core.utils.rotations import gf_quat_to_np_array
 
 import omnigibson as og
+from omnigibson.macros import gm
 from omnigibson.objects.usd_object import USDObject
-from omnigibson.prims.rigid_prim import RigidPrim
 from omnigibson.utils.constants import AVERAGE_CATEGORY_SPECS, DEFAULT_JOINT_FRICTION, SPECIAL_JOINT_FRICTIONS, JointType
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.usd_utils import BoundingBoxAPI
-from omnigibson.utils.asset_utils import decrypt_file
+from omnigibson.utils.asset_utils import get_all_object_category_models
 from omnigibson.utils.constants import PrimType
 from omnigibson.macros import gm, create_module_macros
 from omnigibson.utils.ui_utils import create_module_logger
@@ -41,9 +40,8 @@ class DatasetObject(USDObject):
 
     def __init__(
         self,
-        prim_path,
-        usd_path=None,
-        name=None,
+        name,
+        prim_path=None,
         category="object",
         model=None,
         class_id=None,
@@ -60,21 +58,20 @@ class DatasetObject(USDObject):
         bounding_box=None,
         fit_avg_dim_volume=False,
         in_rooms=None,
-        bddl_object_scope=None,
         **kwargs,
     ):
         """
         Args:
-            prim_path (str): global path in the stage to this object
-            usd_path (None or str): If specified, global path to the USD file to load. Note that this will override
-                @category + @model!
-            name (None or str): Name for the object. Names need to be unique per scene. If None, a name will be
-                generated at the time the object is added to the scene, using the object's category.
+            name (str): Name for the object. Names need to be unique per scene
+            prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
+                created at /World/<name>
             category (str): Category for the object. Defaults to "object".
-            model (None or str): if @usd_path is not specified, then this must be specified in conjunction with
+            model (None or str): If specified, this is used in conjunction with
                 @category to infer the usd filepath to load for this object, which evaluates to the following:
 
                     {og_dataset_path}/objects/{category}/{model}/usd/{model}.usd
+
+                Otherwise, will randomly sample a model given @category
 
             class_id (None or int): What class ID the object should be assigned in semantic segmentation rendering mode.
                 If None, the ID will be inferred from this object's category.
@@ -99,17 +96,15 @@ class DatasetObject(USDObject):
                 -- not both!
             fit_avg_dim_volume (bool): whether to fit the object to have the same volume as the average dimension
                 while keeping the aspect ratio. Note that if this is set, it will override both @scale and @bounding_box
-            in_rooms (None or list): If specified, sets the rooms that this object should belong to
-            bddl_object_scope (None or str): If specified, should set the BDDL object scope name, e.g. chip.n.04_2
+            in_rooms (None or str or list): If specified, sets the room(s) that this object should belong to. Either
+                a list of room type(s) or a single room type
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
                 for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
         """
         # Store variables
-        self._in_rooms = in_rooms
-        self._bddl_object_scope = bddl_object_scope
-
-        # Info that will be filled in at runtime
-        self.supporting_surfaces = None             # Dictionary mapping link names to surfaces represented by links
+        if isinstance(in_rooms, str):
+            assert "," not in in_rooms
+        self._in_rooms = [in_rooms] if isinstance(in_rooms, str) else in_rooms
 
         # Make sure only one of bounding_box and scale are specified
         if bounding_box is not None and scale is not None:
@@ -121,20 +116,18 @@ class DatasetObject(USDObject):
         load_config["fit_avg_dim_volume"] = fit_avg_dim_volume
 
         # Infer the correct usd path to use
-        if usd_path is None:
-            assert model is not None, f"Either usd_path or model and category must be specified in order to create a" \
-                                      f"DatasetObject!"
-            usd_path = f"{og.og_dataset_path}/objects/{category}/{model}/usd/{model}.usd"
-
-        # Post-process the usd path if we're generating a cloth object
-        if prim_type == PrimType.CLOTH:
-            assert usd_path.endswith(".usd"), f"usd_path [{usd_path}] is invalid."
-            usd_path = usd_path[:-4] + "_cloth.usd"
+        if model is None:
+            available_models = get_all_object_category_models(category=category)
+            assert len(available_models) > 0, f"No available models found for category {category}!"
+            model = np.random.choice(available_models)
+        self._model = model
+        usd_path = self.get_usd_path(category=category, model=model)
 
         # Run super init
         super().__init__(
             prim_path=prim_path,
             usd_path=usd_path,
+            encrypted=True,
             name=name,
             category=category,
             class_id=class_id,
@@ -151,30 +144,21 @@ class DatasetObject(USDObject):
             **kwargs,
         )
 
-    def load_supporting_surfaces(self):
-        # Initialize dict of supporting surface info
-        self.supporting_surfaces = {}
+    @classmethod
+    def get_usd_path(cls, category, model):
+        """
+        Grabs the USD path for a DatasetObject corresponding to @category and @model.
 
-        # See if we have any height info -- if not, we can immediately return
-        heights_info = self.heights_per_link
-        if heights_info is None:
-            return
+        NOTE: This is the unencrypted path, NOT the encrypted path
 
-        # TODO: Integrate images directly into usd file?
-        # We loop over all the predicates and corresponding supported links in our heights info
-        usd_dir = os.path.dirname(self._usd_path)
-        for predicate, links in heights_info.items():
-            height_maps = {}
-            for link_name, heights in links.items():
-                height_maps[link_name] = []
-                for i, z_value in enumerate(heights):
-                    # Get boolean birds-eye view xy-mask image for this surface
-                    img_fname = os.path.join(usd_dir, "../misc", "height_maps_per_link", predicate, link_name, f"{i}.png")
-                    xy_map = cv2.imread(img_fname, 0)
-                    # Add this map to the supporting surfaces for this link and predicate combination
-                    height_maps[link_name].append((z_value, xy_map))
-            # Add this heights map to the overall supporting surfaces
-            self.supporting_surfaces[predicate] = height_maps
+        Args:
+            category (str): Category for the object
+            model (str): Specific model ID of the object
+
+        Returns:
+            str: Absolute filepath to the corresponding USD asset file
+        """
+        return os.path.join(gm.DATASET_PATH, "objects", category, model, "usd", f"{model}.usd")
 
     def sample_orientation(self):
         """
@@ -209,25 +193,29 @@ class DatasetObject(USDObject):
         # Run super method first
         super()._initialize()
 
+        # Apply any forced light intensity updates.
+        if gm.FORCE_LIGHT_INTENSITY is not None:
+            def recursive_light_update(child_prim):
+                if "Light" in child_prim.GetPrimTypeInfo().GetTypeName():
+                    child_prim.GetAttribute("intensity").Set(gm.FORCE_LIGHT_INTENSITY)
+
+                for child_child_prim in child_prim.GetChildren():
+                    recursive_light_update(child_child_prim)
+
+            recursive_light_update(self._prim)
+
+        # Apply any forced roughness updates
+        for material in self.materials:
+            if ("reflection_roughness_texture_influence" in material.shader_input_names and
+                "reflection_roughness_constant" in material.shader_input_names):
+                material.reflection_roughness_texture_influence = 0.0
+                material.reflection_roughness_constant = gm.FORCE_ROUGHNESS
+
         # Set the joint frictions based on category
         friction = SPECIAL_JOINT_FRICTIONS.get(self.category, DEFAULT_JOINT_FRICTION)
         for joint in self._joints.values():
             if joint.joint_type != JointType.JOINT_FIXED:
                 joint.friction = friction
-
-    def _load(self, simulator=None):
-        if gm.USE_ENCRYPTED_ASSETS:
-            # Create a temporary file to store the decrytped asset, load it, and then delete it.
-            with tempfile.NamedTemporaryFile(suffix=".usd") as fp:
-                original_usd_path = self._usd_path
-                encrypted_filename = original_usd_path.replace(".usd", ".encrypted.usd")
-                decrypt_file(encrypted_filename, decrypted_file=fp)
-                self._usd_path = fp.name
-                prim = super()._load(simulator=simulator)
-                self._usd_path = original_usd_path
-                return prim
-        else:
-            return super()._load(simulator=simulator)
 
     def _post_load(self):
         # We run this post loading first before any others because we're modifying the load config that will be used
@@ -236,61 +224,52 @@ class DatasetObject(USDObject):
         if self._load_config["fit_avg_dim_volume"]:
             # By default, we assume scale does not change if no avg obj specs are given, otherwise, scale accordingly
             scale = np.ones(3)
-            if self.avg_obj_dims is not None:
+            if self.avg_obj_dims is not None and self.avg_obj_dims["size"] is not None:
                 # Find the average volume, and scale accordingly relative to the native volume based on the bbox
                 volume_ratio = np.product(self.avg_obj_dims["size"]) / np.product(self.native_bbox)
                 size_ratio = np.cbrt(volume_ratio)
                 scale *= size_ratio
         # Otherwise, if manual bounding box is specified, scale based on ratio between that and the native bbox
         elif self._load_config["bounding_box"] is not None:
-            scale = self._load_config["bounding_box"] / self.native_bbox
+            scale = np.ones(3)
+            valid_idxes = self.native_bbox > 1e-4
+            scale[valid_idxes] = np.array(self._load_config["bounding_box"])[valid_idxes] / self.native_bbox[valid_idxes]
         else:
-            scale = np.ones(3) if self._load_config["scale"] is None else self._load_config["scale"]
+            scale = np.ones(3) if self._load_config["scale"] is None else np.array(self._load_config["scale"])
+
+        # Assert that the scale does not have too small dimensions
+        assert np.all(scale > 1e-4), f"Scale of {self.name} is too small: {scale}"
 
         # Set this scale in the load config -- it will automatically scale the object during self.initialize()
         self._load_config["scale"] = scale
 
-        # Load any supporting surfaces belonging to this object
-        self.load_supporting_surfaces()
-
         # Run super last
         super()._post_load()
 
-        if gm.USE_ENCRYPTED_ASSETS:
-            # The loaded USD is from an already-deleted temporary file, so the asset paths for texture maps are wrong.
-            # We explicitly provide the root_path to update all the asset paths: the asset paths are relative to the
-            # original USD folder, i.e. <category>/<model>/usd.
-            root_path = os.path.dirname(self._usd_path)
-            for material in self.materials:
-                material.shader_update_asset_paths_with_root_path(root_path)
+        # The loaded USD is from an already-deleted temporary file, so the asset paths for texture maps are wrong.
+        # We explicitly provide the root_path to update all the asset paths: the asset paths are relative to the
+        # original USD folder, i.e. <category>/<model>/usd.
+        root_path = os.path.dirname(self._usd_path)
+        for material in self.materials:
+            material.shader_update_asset_paths_with_root_path(root_path)
 
         # Assign realistic density and mass based on average object category spec
-        if self.avg_obj_dims is not None:
+        if self.avg_obj_dims is not None and self.avg_obj_dims["size"] is not None and self.avg_obj_dims["mass"] is not None:
             # Assume each link has the same density
             v_ratio = (np.product(self.native_bbox) * np.product(self.scale)) / np.product(self.avg_obj_dims["size"])
             mass = self.avg_obj_dims["mass"] * v_ratio
             if self._prim_type == PrimType.RIGID:
                 density = mass / self.volume
                 for link in self._links.values():
-                    # If we're not a metalink, overwrite the original, inaccurate mass value
-                    if not bool(link.prim.GetAttribute("ig:is_metalink").Get()):
+                    # If not a meta (virtual) link, set the density based on avg_obj_dims and a zero mass (ignored)
+                    if link.has_collision_meshes:
                         link.mass = 0.0
                         link.density = density
 
             elif self._prim_type == PrimType.CLOTH:
                 # Cloth cannot set density. Internally omni evenly distributes the mass to each particle
                 mass = self.avg_obj_dims["mass"] * v_ratio
-                self._links["base_link"].mass = mass
-
-        # Lastly, after post loading (which includes loading / registering the links internally)
-        # check for any metalinks. If there are any, we disable gravity and collisions for them, and also reduce
-        # their density and mass
-        for link in self._links.values():
-            if bool(link.prim.GetAttribute("ig:is_metalink").Get()):
-                # Make sure this link is only visual (i.e.: no collisions or gravity enabled), and also set small mass
-                link.visual_only = True
-                link.mass = 1e-6
-                link.density = 0.0
+                self.root_link.mass = mass
 
     def _update_texture_change(self, object_state):
         """
@@ -300,7 +279,7 @@ class DatasetObject(USDObject):
         it modifies the current albedo map by adding and scaling the values. See @self._update_albedo_value for details.
 
         Args:
-            object_state (BooleanState or None): the object state that the diffuse color should match to
+            object_state (BooleanStateMixin or None): the object state that the diffuse color should match to
         """
         # TODO: uncomment these once our dataset has the object state-conditioned texture maps
         # DEFAULT_ALBEDO_MAP_SUFFIX = frozenset({"DIFFUSE", "COMBINED", "albedo"})
@@ -329,6 +308,7 @@ class DatasetObject(USDObject):
             # else:
             #     print(f"Warning: DatasetObject [{self.prim_path}] does not have texture map: "
             #           f"[{target_texture_path}]. Falling back to directly updating albedo value.")
+
             self._update_albedo_value(object_state, material)
 
     def set_bbox_center_position_orientation(self, position=None, orientation=None):
@@ -349,6 +329,14 @@ class DatasetObject(USDObject):
         self.set_position_orientation(position, orientation)
 
     @property
+    def model(self):
+        """
+        Returns:
+            str: Unique model ID for this object
+        """
+        return self._model
+
+    @property
     def in_rooms(self):
         """
         Returns:
@@ -367,26 +355,6 @@ class DatasetObject(USDObject):
         # Store the value to the internal variable and also update the init kwargs accordingly
         self._init_info["args"]["in_rooms"] = rooms
         self._in_rooms = rooms
-
-    @property
-    def bddl_object_scope(self):
-        """
-        Returns:
-            None or str: If specified, BDDL object scope name (e.g. chip.n.04_2) to assign to this object
-        """
-        return self._bddl_object_scope
-
-    @bddl_object_scope.setter
-    def bddl_object_scope(self, name):
-        """
-        Sets which BDDL object scope name for this object. If no name, then should set to None
-
-        Args:
-            name (None or str): If specified, BDDL object scope name (e.g. chip.n.04_2) to assign to this object
-        """
-        # Store the value to the internal variable and also update the init kwargs accordingly
-        self._init_info["args"]["bddl_object_scope"] = name
-        self._bddl_object_scope = name
 
     @property
     def native_bbox(self):
@@ -421,16 +389,6 @@ class DatasetObject(USDObject):
         return self.get_custom_data().get("metadata", None)
 
     @property
-    def heights_per_link(self):
-        """
-        Gets this object's heights per link information, if it exists
-
-        Returns:
-            None or dict: Nested dictionary of object's height per link information if it exists, else None
-        """
-        return self.get_custom_data().get("heights_per_link", None)
-
-    @property
     def orientations(self):
         """
         Returns:
@@ -438,6 +396,21 @@ class DatasetObject(USDObject):
         """
         metadata = self.metadata
         return None if metadata is None else metadata.get("orientations", None)
+
+    @property
+    def scale(self):
+        # Just super call
+        return super().scale
+
+    @scale.setter
+    def scale(self, scale):
+        # call super first
+        # A bit esoteric -- see https://gist.github.com/Susensio/979259559e2bebcd0273f1a95d7c1e79
+        super(DatasetObject, type(self)).scale.fset(self, scale)
+
+        # Remove bounding_box from scale if it's in our args
+        if "bounding_box" in self._init_info["args"]:
+            self._init_info["args"].pop("bounding_box")
 
     @property
     def scaled_bbox_center_in_base_frame(self):
@@ -507,10 +480,9 @@ class DatasetObject(USDObject):
             4-tuple:
                 - 3-array: (x,y,z) bbox center position in world frame
                 - 3-array: (x,y,z,w) bbox quaternion orientation in world frame
-                - 3-array: (x,y,z) bbox extent in world frame
+                - 3-array: (x,y,z) bbox extent in desired frame
                 - 3-array: (x,y,z) bbox center in desired frame
         """
-        assert self.prim_type == PrimType.RIGID, "get_base_aligned_bbox is only supported for rigid objects."
         bbox_type = "visual" if visual else "collision"
 
         # Get the base position transform.
@@ -524,75 +496,70 @@ class DatasetObject(USDObject):
         # this set of points to get our final, base-frame bounding box.
         points = []
 
-        links = {link_name: self._links[link_name]} if link_name is not None else self._links
-        for link_name, link in links.items():
-            # If the link has no visual or collision meshes, we skip over it (based on the @visual flag)
-            meshes = link.visual_meshes if visual else link.collision_meshes
-            if len(meshes) == 0:
-                continue
-
-            # If the link has a bounding box annotation.
-            if self.native_link_bboxes is not None and link_name in self.native_link_bboxes:
-                # If a visual bounding box does not exist in the dictionary, try switching to collision.
-                # We expect that every link has its collision bb annotated (or set to None if none exists).
-                if bbox_type == "visual" and "visual" not in self.native_link_bboxes[link_name]:
-                    log.debug(
-                        "Falling back to collision bbox for object %s link %s since no visual bbox exists.",
-                        self.name,
-                        link_name,
-                    )
-                    bbox_type = "collision"
-
-                # Check if the annotation is still missing.
-                if bbox_type not in self.native_link_bboxes[link_name]:
-                    raise ValueError(
-                        "Could not find %s bounding box for object %s link %s" % (bbox_type, self.name, link_name)
-                    )
-
-                # Check if a mesh exists for this link. If None, the link is meshless, so we continue to the next link.
-                # TODO: Because of encoding, may need to be UsdTokens.none, not None
-                if self.native_link_bboxes[link_name][bbox_type] is None:
+        if self.prim_type == PrimType.CLOTH:
+            particle_contact_offset = self.root_link.cloth_system.particle_contact_offset
+            particle_positions = self.root_link.compute_particle_positions()
+            particles_in_world_frame = np.concatenate([
+                particle_positions - particle_contact_offset,
+                particle_positions + particle_contact_offset
+            ], axis=0)
+            points.extend(trimesh.transformations.transform_points(particles_in_world_frame, world_to_base_frame))
+        else:
+            links = {link_name: self._links[link_name]} if link_name is not None else self._links
+            for link_name, link in links.items():
+                # If the link has no visual or collision meshes, we skip over it (based on the @visual flag)
+                meshes = link.visual_meshes if visual else link.collision_meshes
+                if len(meshes) == 0:
                     continue
 
-                # Get the extent and transform.
-                bb_data = self.native_link_bboxes[link_name][bbox_type][link_bbox_type]
-                extent_in_bbox_frame = np.array(bb_data["extent"])
-                bbox_to_link_origin = np.array(bb_data["transform"])
+                # If the link has a bounding box annotation.
+                if self.native_link_bboxes is not None and link_name in self.native_link_bboxes:
+                    # Check if the annotation is still missing.
+                    if bbox_type not in self.native_link_bboxes[link_name]:
+                        raise ValueError(f"Could not find {bbox_type} bounding box for object {self.name} link {link_name}")
 
-                # # Get the link's pose in the base frame.
-                link_frame_to_world = T.pose2mat(link.get_position_orientation())
-                link_frame_to_base_frame = world_to_base_frame @ link_frame_to_world
+                    # Get the extent and transform.
+                    bb_data = self.native_link_bboxes[link_name][bbox_type][link_bbox_type]
+                    extent_in_bbox_frame = np.array(bb_data["extent"])
+                    bbox_to_link_origin = np.array(bb_data["transform"])
 
-                # Scale the bounding box in link origin frame. Here we create a transform that first puts the bounding
-                # box's vertices into the link frame, and then scales them to match the scale applied to this object.
-                # Note that once scaled, the vertices of the bounding box do not necessarily form a cuboid anymore but
-                # instead a parallelepiped. This is not a problem because we later fit a bounding box to the points,
-                # this time in the object's base link frame.
-                scale_in_link_frame = np.diag(np.concatenate([self.scales_in_link_frame[link_name], [1]]))
-                bbox_to_scaled_link_origin = np.dot(scale_in_link_frame, bbox_to_link_origin)
+                    # # Get the link's pose in the base frame.
+                    link_frame_to_world = T.pose2mat(link.get_position_orientation())
+                    link_frame_to_base_frame = world_to_base_frame @ link_frame_to_world
 
-                # Compute the bounding box vertices in the base frame.
-                # bbox_to_link_com = np.dot(link_origin_to_link_com, bbox_to_scaled_link_origin)
-                bbox_center_in_base_frame = np.dot(link_frame_to_base_frame, bbox_to_scaled_link_origin)
-                vertices_in_base_frame = np.array(list(itertools.product((1, -1), repeat=3))) * (extent_in_bbox_frame / 2)
+                    # Scale the bounding box in link origin frame. Here we create a transform that first puts the bounding
+                    # box's vertices into the link frame, and then scales them to match the scale applied to this object.
+                    # Note that once scaled, the vertices of the bounding box do not necessarily form a cuboid anymore but
+                    # instead a parallelepiped. This is not a problem because we later fit a bounding box to the points,
+                    # this time in the object's base link frame.
+                    scale_in_link_frame = np.diag(np.concatenate([self.scales_in_link_frame[link_name], [1]]))
+                    bbox_to_scaled_link_origin = np.dot(scale_in_link_frame, bbox_to_link_origin)
 
-                # Add the points to our collection of points.
-                points.extend(trimesh.transformations.transform_points(vertices_in_base_frame, bbox_center_in_base_frame))
-            elif fallback_to_aabb:
-                # If no BB annotation is available, get the AABB for this link.
-                aabb_center, aabb_extent = BoundingBoxAPI.compute_center_extent(prim_path=link.prim_path)
-                aabb_vertices_in_world = aabb_center + np.array(list(itertools.product((1, -1), repeat=3))) * (
-                        aabb_extent / 2
-                )
-                aabb_vertices_in_base_frame = trimesh.transformations.transform_points(
-                    aabb_vertices_in_world, world_to_base_frame
-                )
-                points.extend(aabb_vertices_in_base_frame)
-            else:
-                raise ValueError(
-                    "Bounding box annotation missing for link: %s. Use fallback_to_aabb=True if you're okay with using "
-                    "AABB as fallback." % link_name
-                )
+                    # Compute the bounding box vertices in the base frame.
+                    # bbox_to_link_com = np.dot(link_origin_to_link_com, bbox_to_scaled_link_origin)
+                    bbox_center_in_base_frame = np.dot(link_frame_to_base_frame, bbox_to_scaled_link_origin)
+                    vertices_in_base_frame = np.array(list(itertools.product((1, -1), repeat=3))) * (extent_in_bbox_frame / 2)
+
+                    # Add the points to our collection of points.
+                    points.extend(trimesh.transformations.transform_points(vertices_in_base_frame, bbox_center_in_base_frame))
+                elif fallback_to_aabb:  # always default to AABB for cloth
+                    # If we're visual and the mesh is not visible, there is no fallback so continue
+                    if bbox_type == "visual" and not np.all(tuple(mesh.visible for mesh in meshes.values())):
+                        continue
+                    # If no BB annotation is available, get the AABB for this link.
+                    aabb_center, aabb_extent = BoundingBoxAPI.compute_center_extent(prim=link)
+                    aabb_vertices_in_world = aabb_center + np.array(list(itertools.product((1, -1), repeat=3))) * (
+                            aabb_extent / 2
+                    )
+                    aabb_vertices_in_base_frame = trimesh.transformations.transform_points(
+                        aabb_vertices_in_world, world_to_base_frame
+                    )
+                    points.extend(aabb_vertices_in_base_frame)
+                else:
+                    raise ValueError(
+                        "Bounding box annotation missing for link: %s. Use fallback_to_aabb=True if you're okay with using "
+                        "AABB as fallback." % link_name
+                    )
 
         if xy_aligned:
             # If the user requested an XY-plane aligned bbox, convert everything to that frame.
@@ -648,7 +615,6 @@ class DatasetObject(USDObject):
         # Add additional kwargs (fit_avg_dim_volume and bounding_box are already captured in load_config)
         return self.__class__(
             prim_path=prim_path,
-            usd_path=self._usd_path,
             name=name,
             category=self.category,
             class_id=self.class_id,
@@ -660,5 +626,4 @@ class DatasetObject(USDObject):
             load_config=load_config,
             abilities=self._abilities,
             in_rooms=self.in_rooms,
-            bddl_object_scope=self.bddl_object_scope,
         )

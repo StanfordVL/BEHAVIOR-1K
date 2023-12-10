@@ -1,6 +1,4 @@
 from omnigibson.macros import create_module_macros
-from omnigibson.object_states.link_based_state_mixin import LinkBasedStateMixin
-from omnigibson.object_states.object_state_base import AbsoluteObjectState
 from omnigibson.object_states.temperature import Temperature
 from omnigibson.object_states.heat_source_or_sink import HeatSourceOrSink
 from omnigibson.object_states.update_state_mixin import UpdateStateMixin
@@ -57,9 +55,21 @@ class OnFire(HeatSourceOrSink, UpdateStateMixin):
         )
         self.ignition_temperature = ignition_temperature
 
-    @staticmethod
-    def get_dependencies():
-        return HeatSourceOrSink.get_dependencies() + [Temperature]
+    @classmethod
+    def requires_metalink(cls, **kwargs):
+        # Does not require metalink to be specified
+        return False
+
+    @property
+    def _default_link(self):
+        # Fallback to root link
+        return self.obj.root_link
+
+    @classmethod
+    def get_dependencies(cls):
+        deps = super().get_dependencies()
+        deps.add(Temperature)
+        return deps
 
     def _update(self):
         # If it's on fire, maintain the fire temperature

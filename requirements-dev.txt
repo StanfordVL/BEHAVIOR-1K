@@ -1,0 +1,10 @@
+pytest>=6.2.3
+pytest-cov>=3.0.0
+mkdocs
+mkdocs-autorefs
+mkdocs-gen-files
+mkdocs-material
+mkdocs-material-extensions
+mkdocstrings[python]
+mkdocs-section-index
+mkdocs-literate-nav

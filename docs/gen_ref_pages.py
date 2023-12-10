@@ -31,7 +31,7 @@ for path in sorted(Path(src).rglob("*.py")):  #
 
     with mkdocs_gen_files.open(full_doc_path, "w") as fd:
         ident = ".".join(parts)
-        fd.write(f"::: {ident}")
+        fd.write(f"# {parts[-1]}\n\n::: {ident}")
 
     mkdocs_gen_files.set_edit_path(full_doc_path, Path("../../") / path)
 

@@ -5,30 +5,38 @@ NOTE: This is generally decentralized -- the monolithic @settings variable is cr
 but submodules within OmniGibson may import this dictionary and add to it dynamically
 """
 import os
+import pathlib
 
 from addict import Dict
-
 
 # Initialize settings
 macros = Dict()
 gm = macros.globals
 
+# Path (either relative to OmniGibson/omnigibson directory or global absolute path) for data
+# Assets correspond to non-objects / scenes (e.g.: robots), and dataset incliudes objects + scene
+gm.ASSET_PATH = "data/assets"
+gm.DATASET_PATH = "data/og_dataset"
+gm.KEY_PATH = "data/omnigibson.key"
+
+# Which GPU to use -- None will result in omni automatically using an appropriate GPU. Otherwise, set with either
+# integer or string-form integer
+gm.GPU_ID = os.getenv("OMNIGIBSON_GPU_ID", None)
+
 # Whether to generate a headless or non-headless application upon OmniGibson startup
 gm.HEADLESS = (os.getenv("OMNIGIBSON_HEADLESS", 'False').lower() in ('true', '1', 't'))
 
-# Whether to use extra settings (verboseness, extra GUI features) for debugging
-gm.DEBUG = True
+# Whether only the viewport should be shown in the GUI or not (if not, other peripherals are additionally shown)
+# CANNOT be set at runtime
+gm.GUI_VIEWPORT_ONLY = False
+
+# Do not suppress known omni warnings / errors, and also put omnigibson in a debug state
+# This includes extra information for things such as object sampling, and also any debug
+# logging messages
+gm.DEBUG = (os.getenv("OMNIGIBSON_DEBUG", 'False').lower() in ('true', '1', 't'))
 
 # Whether to print out disclaimers (i.e.: known failure cases resulting from Omniverse's current bugs / limitations)
-gm.SHOW_DISCLAIMERS = True
-
-# Whether to enable (a) [global / robot] contact checking or not
-# Note: You can enable the robot contact checking, even if global checking is disabled
-# If global checking is enabled but robot checking disabled, global checking will take
-# precedence (i.e.: robot will still have contact checking)
-# TODO: Remove this once we have an optimized solution
-gm.ENABLE_GLOBAL_CONTACT_REPORTING = False
-gm.ENABLE_ROBOT_CONTACT_REPORTING = True
+gm.SHOW_DISCLAIMERS = False
 
 # Whether to use omni's GPU dynamics
 # This is necessary for certain features; e.g. particles (fluids / cloth)
@@ -62,11 +70,14 @@ gm.ENABLE_TRANSITION_RULES = True
 gm.DEFAULT_VIEWER_WIDTH = 1280
 gm.DEFAULT_VIEWER_HEIGHT = 720
 
-# Whether to use encrypted assets
-gm.USE_ENCRYPTED_ASSETS = True
-
 # (Demo-purpose) Whether to activate Assistive Grasping mode for Cloth (it's handled differently from RigidBody)
 gm.AG_CLOTH = False
+
+# Forced light intensity for all DatasetObjects. None if the USD-provided intensities should be respected.
+gm.FORCE_LIGHT_INTENSITY = 150000
+
+# Forced roughness for all DatasetObjects. None if the USD-provided roughness maps should be respected.
+gm.FORCE_ROUGHNESS = 0.7
 
 
 # Create helper function for generating sub-dictionaries
@@ -83,11 +94,14 @@ def create_module_macros(module_path):
         Dict: addict dictionary which can be populated with values
     """
     # Sanity check module path, make sure omnigibson/ is in the path
-    assert "omnigibson/" in module_path, \
-        f"module_path is expected to be a filepath including the omnigibson root directory, got: {module_path}!"
+    module_path = pathlib.Path(module_path)
+    omnigibson_path = pathlib.Path(__file__).parent
 
     # Trim the .py, and anything before and including omnigibson/, and split into its appropriate parts
-    subsections = module_path[:-3].split("omnigibson/")[-1].split("/")
+    try:
+        subsections = module_path.with_suffix("").relative_to(omnigibson_path).parts
+    except ValueError:
+        raise ValueError("module_path is expected to be a filepath including the omnigibson root directory, got: {module_path}!")
 
     # Create and return the generated sub-dictionary
     def _recursively_get_or_create_dict(dic, keys):
