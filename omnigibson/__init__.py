@@ -73,11 +73,10 @@ def print_save_usd_warning(_):
 def create_app():
     global app
     from omni.isaac.kit import SimulationApp
-    remote_rendering = bool(os.getenv("REMOTE_ENABLED"))
-    app = SimulationApp({"headless": gm.HEADLESS or remote_rendering})
+    app = SimulationApp({"headless": gm.HEADLESS or bool(gm.REMOTE_STREAMING)})
 
     # Default Livestream settings
-    if remote_rendering:
+    if gm.REMOTE_STREAMING:
         app.set_setting("/app/window/drawMouse", True)
         app.set_setting("/app/livestream/proto", "ws")
         app.set_setting("/app/livestream/websocket/framerate_limit", 120)
@@ -85,21 +84,26 @@ def create_app():
 
         from omni.isaac.core.utils.extensions import enable_extension
 
-        # Note: Only one livestream extension can be enabled at a time
-        # Enable Native Livestream extension
-        # Default App: Streaming Client from the Omniverse Launcher
-        # enable_extension("omni.kit.livestream.native")
-
-        # Enable WebSocket Livestream extension
-        # Default URL: http://localhost:8211/streaming/client/
-        # enable_extension("omni.services.streamclient.websocket")
-
-        # Enable WebRTC Livestream extension
-        # Default URL: http://localhost:8211/streaming/webrtc-client/
-        enable_extension("omni.services.streamclient.webrtc")
         hostname = socket.gethostname()
-        print("Now streaming on:")
-        print(f"\thttp://{hostname}:8211/streaming/webrtc-client?server={hostname}\n")
+
+        # Note: Only one livestream extension can be enabled at a time
+        if gm.REMOTE_STREAMING == "native":
+            # Enable Native Livestream extension
+            # Default App: Streaming Client from the Omniverse Launcher
+            enable_extension("omni.kit.livestream.native")
+            print(f"Now streaming on {hostname} via Omniverse Streaming Client\n")
+        elif gm.REMOTE_STREAMING == "websocket":
+            # Enable WebSocket Livestream extension
+            # Default URL: http://localhost:8211/streaming/client/
+            enable_extension("omni.services.streamclient.websocket")
+            print(f"Now streaming on: http://{hostname}:8211/streaming/client\n")
+        elif gm.REMOTE_STREAMING == "webrtc":
+            # Enable WebRTC Livestream extension
+            # Default URL: http://localhost:8211/streaming/webrtc-client/
+            enable_extension("omni.services.streamclient.webrtc")
+            print(f"Now streaming on: http://{hostname}:8211/streaming/webrtc-client?server={hostname}\n")
+        else:
+            raise ValueError(f"Invalid REMOTE_STREAMING option {gm.REMOTE_STREAMING}. Must be one of None, native, websocket, webrtc.")
 
     # If multi_gpu is used, og.sim.render() will cause a segfault when called during on_contact callbacks,
     # e.g. when an attachment joint is being created due to contacts (create_joint calls og.sim.render() internally).
