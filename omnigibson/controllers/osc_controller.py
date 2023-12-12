@@ -198,7 +198,7 @@ class OperationalSpaceController(ManipulationController):
         # Other variables that will be filled in at runtime
         self.goal_pos = None
         self.goal_ori_mat = None
-        self._quat_target = None
+        self._fixed_quat_target = None
 
         # Run super init
         super().__init__(
@@ -210,17 +210,20 @@ class OperationalSpaceController(ManipulationController):
         )
 
     def reset(self):
+        # Call super first
+        super().reset()
+
         # Clear internal variables
         self.goal_pos = None
         self.goal_ori_mat = None
-        self._quat_target = None
+        self._fixed_quat_target = None
         self._clear_variable_gains()
 
     @property
     def state_size(self):
-        # Add 4 for internal quat target
-        # TODO: Store goal pose, goal ori mat, gains, etc.
-        return super().state_size + 4
+        # Add 3 for goal pos + 4 for goal quat + 1 for goal validity + 4 for fixed quat target
+        # TODO: Store gains, etc.
+        return super().state_size + 12
 
     def _clear_variable_gains(self):
         """
@@ -257,8 +260,11 @@ class OperationalSpaceController(ManipulationController):
         # Run super first
         state = super()._dump_state()
 
-        # Add internal quaternion target and filter state
-        state["quat_target"] = self._quat_target
+        # Add internal goal targets
+        state["goal_is_valid"] = self.goal_pos is not None
+        state["goal_pos"] = self.goal_pos
+        state["goal_ori_mat"] = self.goal_ori_mat
+        state["fixed_quat_target"] = self._fixed_quat_target
 
         return state
 
@@ -267,7 +273,9 @@ class OperationalSpaceController(ManipulationController):
         super()._load_state(state=state)
 
         # Load relevant info for this controller
-        self._quat_target = state["quat_target"]
+        self.goal_pos = state["goal_pos"]
+        self.goal_ori_mat = state["goal_ori_mat"]
+        self._fixed_quat_target = state["fixed_quat_target"]
 
     def _serialize(self, state):
         # Run super first
@@ -276,7 +284,10 @@ class OperationalSpaceController(ManipulationController):
         # Serialize state for this controller
         return np.concatenate([
             state_flat,
-            np.zeros(4) if state["quat_target"] is None else state["quat_target"],      # Encode None as zeros for consistent serialization size
+            [state["goal_is_valid"]],
+            state["goal_pos"] if state["goal_is_valid"] else np.zeros(3),
+            T.mat2quat(state["goal_ori_mat"]) if state["goal_is_valid"] else np.zeros(4),
+            np.zeros(4) if state["fixed_quat_target"] is None else state["fixed_quat_target"],
         ]).astype(float)
 
     def _deserialize(self, state):
@@ -284,9 +295,13 @@ class OperationalSpaceController(ManipulationController):
         state_dict, idx = super()._deserialize(state=state)
 
         # Deserialize state for this controller
-        state_dict["quat_target"] = None if np.all(state[idx: idx + 4] == 0.0) else state[idx: idx + 4]
+        goal_is_valid = bool(state[idx])
+        state_dict["goal_is_valid"] = goal_is_valid
+        state_dict["goal_pos"] = state[idx + 1: idx + 4] if goal_is_valid else None
+        state_dict["goal_ori_mat"] = T.quat2mat(state[idx + 4: idx + 8]) if goal_is_valid else None
+        state_dict["fixed_quat_target"] = None if np.all(state[idx + 8: idx + 12] == 0.0) else state[idx + 8: idx + 12]
 
-        return state_dict, idx + 4
+        return state_dict, idx + 12
 
     def update_goal(self, control_dict, target_pos, target_quat, gains=None):
         """
@@ -383,6 +398,29 @@ class OperationalSpaceController(ManipulationController):
         # Return the control torques
         return u
 
+    def compute_no_op_command(self, control_dict):
+        # Compute based on mode
+        pos_relative = np.array(control_dict[f"{self.task_name}_pos_relative"])
+        quat_relative = np.array(control_dict[f"{self.task_name}_quat_relative"])
+
+        if self.mode == "absolute_pose":
+            # 6DOF (x,y,z,ax,ay,az) control of pose, whether both position and orientation is given in absolute coordinates
+            cmd = np.concatenate([pos_relative, T.quat2axisangle(quat_relative)])
+        elif self.mode == "pose_absolute_ori":
+            # 6DOF (dx,dy,dz,ax,ay,az) control over pose, where the orientation is given in absolute axis-angle coordinates
+            cmd = np.concatenate([np.zeros(3), T.quat2axisangle(quat_relative)])
+        elif self.mode == "pose_delta_ori":
+            # 6DOF (dx,dy,dz,dax,day,daz) control over pose
+            cmd = np.zeros(6)
+        elif self.mode == "position_fixed_ori" or self.mode == "position_compliant_ori":
+            # 3DOF (dx,dy,dz) control over position, with orientation commands being kept as fixed initial absolute orientation, OR
+            # 3DOF (dx,dy,dz) control over position, with orientation commands automatically being sent as 0s (so can drift over time)
+            cmd = np.zeros(3)
+        else:
+            raise ValueError(f"Got invalid command mode type: {self.mode}!")
+
+        return cmd
+
     def _command_to_control(self, command, control_dict):
         """
         Converts the (already preprocessed) inputted @command into deployable (non-clipped!) joint control signal.
@@ -418,7 +456,7 @@ class OperationalSpaceController(ManipulationController):
         pos_relative = np.array(control_dict[f"{self.task_name}_pos_relative"])
         quat_relative = np.array(control_dict[f"{self.task_name}_quat_relative"])
 
-        # The first three values of the command are always the (delta) position, convert to absolute values if needed
+        # Convert position command to absolute values if needed
         if self.mode == "absolute_pose":
             target_pos = command[:3]
         else:
@@ -428,9 +466,9 @@ class OperationalSpaceController(ManipulationController):
         # Compute orientation
         if self.mode == "position_fixed_ori":
             # We need to grab the current robot orientation as the commanded orientation if there is none saved
-            if self._quat_target is None:
-                self._quat_target = quat_relative.astype(np.float32)
-            target_quat = self._quat_target
+            if self._fixed_quat_target is None:
+                self._fixed_quat_target = quat_relative.astype(np.float32)
+            target_quat = self._fixed_quat_target
         elif self.mode == "position_compliant_ori":
             # Target quat is simply the current robot orientation
             target_quat = quat_relative

@@ -79,9 +79,9 @@ class DifferentialDriveController(LocomotionController):
             command_output_limits=command_output_limits,
         )
 
-    def reset(self):
-        # No-op
-        pass
+    def compute_no_op_command(self, control_dict):
+        # This is zero-vector, since we want zero linear / angular velocity
+        return np.zeros(2)
 
     def _command_to_control(self, command, control_dict):
         """

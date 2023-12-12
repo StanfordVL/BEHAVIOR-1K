@@ -58,6 +58,10 @@ class NullJointController(JointController):
             command_output_limits=command_output_limits,
         )
 
+    def compute_no_op_command(self, control_dict):
+        # Set the command to be internal stored default value
+        return self._default_command
+
     def _preprocess_command(self, command):
         # Set the command to be internal stored default value
         return np.array(self._default_command)
