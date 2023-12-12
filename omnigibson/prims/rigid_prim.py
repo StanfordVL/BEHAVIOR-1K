@@ -162,8 +162,9 @@ class RigidPrim(XFormPrim):
             if prim.GetPrimTypeInfo().GetTypeName() in GEOM_TYPES:
                 mesh_name, mesh_path = prim.GetName(), prim.GetPrimPath().__str__()
                 mesh_prim = get_prim_at_path(prim_path=mesh_path)
-                mesh_kwargs = {"prim_path": mesh_path, "name": f"{self._name}:{mesh_name}"}
-                if mesh_prim.HasAPI(UsdPhysics.CollisionAPI):
+                is_collision = mesh_prim.HasAPI(UsdPhysics.CollisionAPI)
+                mesh_kwargs = {"prim_path": mesh_path, "name": f"{self._name}:{'collision' if is_collision else 'visual'}_{mesh_name}"}
+                if is_collision:
                     mesh = CollisionGeomPrim(**mesh_kwargs)
                     # We also modify the collision mesh's contact and rest offsets, since omni's default values result
                     # in lightweight objects sometimes not triggering contacts correctly
