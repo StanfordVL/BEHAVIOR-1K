@@ -810,12 +810,12 @@ class EntityPrim(XFormPrim):
         positions, orientations = self._articulation_view.get_world_poses()
         return positions[0], orientations[0]
 
-    def set_local_pose(self, translation=None, orientation=None):
-        if translation is not None:
-            translation = translation[None, :]
+    def set_local_pose(self, position=None, orientation=None):
+        if position is not None:
+            position = position[None, :]
         if orientation is not None:
             orientation = orientation[None, :]
-        self._articulation_view.set_local_poses(translation, orientation)
+        self._articulation_view.set_local_poses(position, orientation)
         BoundingBoxAPI.clear()
 
     def get_local_pose(self):

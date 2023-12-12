@@ -175,7 +175,7 @@ class XFormPrim(BasePrim):
         calculated_translation = transform.GetTranslation()
         calculated_orientation = transform.GetRotation().GetQuat()
         self.set_local_pose(
-            translation=np.array(calculated_translation), orientation=gf_quat_to_np_array(calculated_orientation)[[1, 2, 3, 0]]     # Flip from w,x,y,z to x,y,z,w
+            position=np.array(calculated_translation), orientation=gf_quat_to_np_array(calculated_orientation)[[1, 2, 3, 0]]     # Flip from w,x,y,z to x,y,z,w
         )
 
     def get_position_orientation(self):
@@ -268,24 +268,24 @@ class XFormPrim(BasePrim):
         xform_orient_op = self.get_attribute("xformOp:orient")
         return np.array(xform_translate_op), gf_quat_to_np_array(xform_orient_op)[[1, 2, 3, 0]]
 
-    def set_local_pose(self, translation=None, orientation=None):
+    def set_local_pose(self, position=None, orientation=None):
         """
         Sets prim's pose with respect to the local frame (the prim's parent frame).
 
         Args:
-            translation (None or 3-array): if specified, (x,y,z) translation in the local frame of the prim
+            position (None or 3-array): if specified, (x,y,z) position in the local frame of the prim
                 (with respect to its parent prim). Default is None, which means left unchanged.
             orientation (None or 4-array): if specified, (x,y,z,w) quaternion orientation in the local frame of the prim
                 (with respect to its parent prim). Default is None, which means left unchanged.
         """
         properties = self.prim.GetPropertyNames()
-        if translation is not None:
-            translation = Gf.Vec3d(*np.array(translation, dtype=float))
+        if position is not None:
+            position = Gf.Vec3d(*np.array(position, dtype=float))
             if "xformOp:translate" not in properties:
                 carb.log_error(
                     "Translate property needs to be set for {} before setting its position".format(self.name)
                 )
-            self.set_attribute("xformOp:translate", translation)
+            self.set_attribute("xformOp:translate", position)
         if orientation is not None:
             orientation = np.array(orientation, dtype=float)[[3, 0, 1, 2]]
             if "xformOp:orient" not in properties:
