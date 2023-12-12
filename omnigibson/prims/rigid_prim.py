@@ -384,7 +384,7 @@ class RigidPrim(XFormPrim):
         Args:
             mass (float): mass of the rigid body in kg.
         """
-        self._mass_api.GetMassAttr().Set(mass)
+        self._rigid_prim_view.set_masses([mass])
 
     @property
     def density(self):
@@ -392,7 +392,7 @@ class RigidPrim(XFormPrim):
         Returns:
             float: density of the rigid body in kg / m^3.
         """
-        raw_usd_mass = self._mass_api.GetMassAttr().Get()
+        raw_usd_mass = self._rigid_prim_view.get_masses()[0]
         # We first check if the raw usd mass is specified, since mass overrides density
         # If it's specified, we infer density based on that value divided by volume
         # Otherwise, we try to directly grab the raw usd density value, and if that value
@@ -400,7 +400,7 @@ class RigidPrim(XFormPrim):
         if raw_usd_mass != 0:
             density = raw_usd_mass / self.volume
         else:
-            density = self._mass_api.GetDensityAttr().Get()
+            density = self._rigid_prim_view.get_densities()[0]
             if density == 0:
                 density = 1000.0
 
@@ -412,7 +412,7 @@ class RigidPrim(XFormPrim):
         Args:
             density (float): density of the rigid body in kg / m^3.
         """
-        self._mass_api.GetDensityAttr().Set(density)
+        self._rigid_prim_view.set_densities([density])
 
     @property
     def kinematic_only(self):
