@@ -77,11 +77,11 @@ class RigidPrim(XFormPrim):
         )
 
     def _post_load(self):
-        # run super first
-        super()._post_load()
-
         # Create the view
         self._rigid_prim_view = RigidPrimView(self._prim_path)
+
+        # run super first
+        super()._post_load()
 
         # Only create contact report api if we're not visual only
         if not self._visual_only:
