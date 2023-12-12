@@ -92,10 +92,10 @@ class JointPrim(BasePrim):
         self._driven = None
 
         # The following values will only be valid if this joint is part of an articulation
-        self._n_dof = None
-        self._joint_idx = None
-        self._joint_dof_offset = None
-        self._joint_name = None
+        self._n_dof = None  # The number of degrees of freedom this joint provides
+        self._joint_idx = None  # The index of this joint in the parent articulation's joint array
+        self._joint_dof_offset = None  # The starting index of the DOFs for this joint in the parent articulation's DOF array
+        self._joint_name = None  # The name of this joint in the parent's articulation tree
 
         # Run super method
         super().__init__(
@@ -208,11 +208,7 @@ class JointPrim(BasePrim):
         # Set values
         kps = np.full((1, self._n_dof), kp)
         kds = np.full((1, self._n_dof), kd)
-        self._articulation_view.set_gains(kps=kps, kds=kds, joint_indices=self.dof_indices, save_to_usd=True)
-
-        # Assert no weirdness happening around the save_to_usd business.
-        kps, kds = self._articulation_view.get_gains(joint_indices=self.dof_indices)
-        assert np.allclose(kps, kp) and np.allclose(kds, kd), "Something went wrong with setting the gains!"
+        self._articulation_view.set_gains(kps=kps, kds=kds, joint_indices=self.dof_indices)
 
         # Update control type
         self._control_type = control_type

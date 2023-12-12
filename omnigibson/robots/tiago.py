@@ -697,8 +697,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         }
 
     def get_position_orientation(self):
-        # TODO: This is a bad idea. If we need the pose to be here, let's put the base there.
-        # We shouldn't have a different behavior for only this object.
+        # TODO: Investigate the need for this custom behavior.
         return self.base_footprint_link.get_position_orientation()
 
     def set_position_orientation(self, position=None, orientation=None):
