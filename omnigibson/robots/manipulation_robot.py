@@ -1,6 +1,7 @@
 from abc import abstractmethod
 from collections import namedtuple
 import numpy as np
+import networkx as nx
 
 import omnigibson as og
 from omnigibson.macros import gm, create_module_macros
@@ -783,12 +784,11 @@ class ManipulationRobot(BaseRobot):
 
         candidate_data = []
         for prim_path in candidates_set:
-            # Calculate position of the object link
-            # Note: this assumes the simulator is playing!
-            rb_handle = self._dc.get_rigid_body(prim_path)
-            pose = self._dc.get_rigid_body_pose(rb_handle)
-            link_pos = np.asarray(pose.p)
-            dist = np.linalg.norm(np.array(link_pos) - np.array(gripper_center_pos))
+            # Calculate position of the object link. Only allow this for objects currently.
+            obj_prim_path, link_name = prim_path.rsplit("/", 1)[-1]
+            candidate_obj = og.sim.scene.object_registry("prim_path", obj_prim_path)
+            candidate_link = candidate_obj.links[link_name]
+            dist = np.linalg.norm(np.array(candidate_link.get_position()) - np.array(gripper_center_pos))
             candidate_data.append((prim_path, dist))
 
         candidate_data = sorted(candidate_data, key=lambda x: x[-1])
@@ -1055,22 +1055,14 @@ class ManipulationRobot(BaseRobot):
             return None
         
         # Otherwise, compute the joint type. We use a fixed joint unless the link is a non-fixed link.
-        # TODO: Make this not use the handle!
+        # A link is non-fixed if it has any non-fixed parent joints.
         joint_type = "FixedJoint"
-        if ag_obj.root_link != ag_link:
-            # We search up the tree path from the ag_link until we encounter the root (joint == 0) or a non fixed
-            # joint (e.g.: revolute or fixed)
-            link_handle = ag_link.handle
-            joint_handle = self._dc.get_rigid_body_parent_joint(link_handle)
-            while joint_handle != 0:
-                # If this joint type is not fixed, we've encountered a valid moving joint
-                # So we create a spherical joint rather than fixed joint
-                if self._dc.get_joint_type(joint_handle) != JointType.JOINT_FIXED:
-                    joint_type = "SphericalJoint"
-                    break
-                # Grab the parent link and its parent joint for the link
-                link_handle = self._dc.get_joint_parent_body(joint_handle)
-                joint_handle = self._dc.get_rigid_body_parent_joint(link_handle)
+        articulation_graph = ag_obj.articulation_graph
+        for edge in nx.edge_dfs(articulation_graph, ag_link, orientation="reverse"):
+            joint = articulation_graph.edges[edge]["joint"]
+            if joint.joint_type != JointType.JOINT_FIXED:
+                joint_type = "SphericalJoint"
+                break
 
         return joint_type
 

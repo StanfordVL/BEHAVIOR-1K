@@ -1,4 +1,5 @@
 import numpy as np
+import networkx as nx
 
 from omni.isaac.core.utils.rotations import gf_quat_to_np_array
 from omni.isaac.core.utils.stage import get_current_stage
@@ -417,6 +418,26 @@ class EntityPrim(XFormPrim):
             dict: Dictionary mapping link names (str) to link prims (RigidPrim) owned by this articulation
         """
         return self._links
+    
+    @property
+    def articulation_tree(self):
+        """
+        Get a graph of the articulation tree, where nodes are links (RigidPrim) and edges
+        correspond to joints (JointPrim), where the JointPrim is accessible on the `joint`
+        data field of the edge.
+        """
+        G = nx.DiGraph()
+        rename_later = {}
+        for link in self.links.values():
+            prim_path = link.prim_path
+            G.add_node(prim_path)
+            rename_later[prim_path] = link
+        for joint in self.joints.values():
+            if joint.body0 not in G.nodes or joint.body1 not in G.nodes:
+                continue
+            G.add_edge(joint.body0, joint.body1, joint=joint)
+        nx.relabel_nodes(G, rename_later)
+        return G
 
     @property
     def materials(self):
