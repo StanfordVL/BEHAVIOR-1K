@@ -145,7 +145,7 @@ class JointPrim(BasePrim):
         # Update the joint indices etc.
         self.update_handles()
 
-        # Initialize dynamic control references if this joint is articulated
+        # Get control type
         if self.articulated:
             control_types = []
             stiffnesses, dampings = self._articulation_view.get_gains(joint_indices=self.dof_indices)
@@ -549,7 +549,7 @@ class JointPrim(BasePrim):
         Returns:
              bool: Whether this joint is articulated or not
         """
-        return self.n_dof > 0
+        return self._articulation_view is not None
 
     @property
     def is_revolute(self):
