@@ -622,8 +622,8 @@ class JointPrim(BasePrim):
 
         # Grab raw states
         targets = self._articulation_view.get_applied_actions()
-        pos = targets.joint_positions
-        vel = targets.joint_velocities
+        pos = targets.joint_positions[0][self.dof_indices]
+        vel = targets.joint_velocities[0][self.dof_indices]
 
         # Potentially normalize if requested
         if normalized:
