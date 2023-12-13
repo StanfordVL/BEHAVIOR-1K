@@ -1084,8 +1084,7 @@ class EntityPrim(XFormPrim):
             n-array: (N,) shaped per-DOF coriolis and centrifugal forces experienced by the entity, if articulated
         """
         assert self.articulated, "Cannot get coriolis and centrifugal forces for non-articulated entity!"
-        self._verify_physics_view_is_valid()
-        return self._physics_view.get_coriolis_and_centrifugal_forces().reshape(self.n_dof)
+        return self._articulation_view.get_coriolis_and_centrifugal_forces().reshape(self.n_dof)
 
     def get_generalized_gravity_forces(self):
         """
@@ -1093,8 +1092,7 @@ class EntityPrim(XFormPrim):
             n-array: (N, N) shaped per-DOF gravity forces, if articulated
         """
         assert self.articulated, "Cannot get generalized gravity forces for non-articulated entity!"
-        self._verify_physics_view_is_valid()
-        return self._physics_view.get_generalized_gravity_forces().reshape(self.n_dof)
+        return self._articulation_view.get_generalized_gravity_forces().reshape(self.n_dof)
 
     def get_mass_matrix(self):
         """
@@ -1102,8 +1100,7 @@ class EntityPrim(XFormPrim):
             n-array: (N, N) shaped per-DOF mass matrix, if articulated
         """
         assert self.articulated, "Cannot get mass matrix for non-articulated entity!"
-        self._verify_physics_view_is_valid()
-        return self._physics_view.get_mass_matrices().reshape(self.n_dof, self.n_dof)
+        return self._articulation_view.get_mass_matrices().reshape(self.n_dof, self.n_dof)
 
     def get_jacobian(self):
         """
@@ -1113,8 +1110,7 @@ class EntityPrim(XFormPrim):
                 (i.e.: there is an additional "floating" joint tying the robot to the world frame)
         """
         assert self.articulated, "Cannot get jacobian for non-articulated entity!"
-        self._verify_physics_view_is_valid()
-        return self._physics_view.get_jacobians().squeeze(axis=0)
+        return self._articulation_view.get_jacobians().squeeze(axis=0)
 
     def get_relative_jacobian(self):
         """
