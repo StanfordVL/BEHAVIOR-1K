@@ -148,8 +148,8 @@ class JointPrim(BasePrim):
         # Initialize dynamic control references if this joint is articulated
         if self.articulated:
             control_types = []
-            stifnesses, dampings = self._articulation_view.get_gains(joint_indices=self.dof_indices)
-            for i, (kp, kd) in enumerate(zip(stifnesses[0], dampings[0])):
+            stiffnesses, dampings = self._articulation_view.get_gains(joint_indices=self.dof_indices)
+            for i, (kp, kd) in enumerate(zip(stiffnesses[0], dampings[0])):
                 # Infer control type based on whether kp and kd are 0 or not, as well as whether this joint is driven or not
                 # TODO: Maybe assert mutual exclusiveness here?
                 if not self._driven:
@@ -344,25 +344,25 @@ class JointPrim(BasePrim):
         Gets this joint's maximum effort
 
         Returns:
-            float: maximum force for this joint
+            float: maximum effort for this joint
         """
         # Only support revolute and prismatic joints for now
         assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
         # We either return the raw value or a default value if there is no max specified
-        raw_force = self._articulation_view.get_max_efforts(joint_indices=self.dof_indices)[0][0]
-        return m.DEFAULT_MAX_EFFORT if raw_force is None or np.abs(raw_force) > m.INF_EFFORT_THRESHOLD else raw_force
+        raw_effort = self._articulation_view.get_max_efforts(joint_indices=self.dof_indices)[0][0]
+        return m.DEFAULT_MAX_EFFORT if raw_effort is None or np.abs(raw_effort) > m.INF_EFFORT_THRESHOLD else raw_effort
 
     @max_effort.setter
-    def max_effort(self, force):
+    def max_effort(self, effort):
         """
         Sets this joint's maximum effort
 
         Args:
-            force (float): Force to set
+            effort (float): effort to set
         """
         # Only support revolute and prismatic joints for now
         assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
-        self._articulation_view.set_max_efforts(np.array([[force]]), joint_indices=self.dof_indices)
+        self._articulation_view.set_max_efforts(np.array([[effort]]), joint_indices=self.dof_indices)
 
     @property
     def stiffness(self):
@@ -432,7 +432,7 @@ class JointPrim(BasePrim):
         Args:
             friction (float): friction to set
         """
-        self._articulation_view.set_friction_coefficients(np.array([[friction]]), joint_indices=self.dof_indices)[0][0]
+        self._articulation_view.set_friction_coefficients(np.array([[friction]]), joint_indices=self.dof_indices)
 
     @property
     def lower_limit(self):
@@ -794,7 +794,7 @@ class JointPrim(BasePrim):
             effort = self._denormalize_effort(effort)
 
         # Set the DOF(s) in this joint
-        self._articulation_view.set_joint_efforts(velocities=effort, joint_indices=self.dof_indices)
+        self._articulation_view.set_joint_efforts(efforts=effort, joint_indices=self.dof_indices)
 
     def keep_still(self):
         """
