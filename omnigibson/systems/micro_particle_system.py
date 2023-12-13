@@ -44,7 +44,7 @@ m = create_module_macros(module_path=__file__)
 
 # TODO: Tune these default values!
 # TODO (eric): figure out whether one offset can fit all
-m.MAX_CLOTH_PARTICLES = 20000
+m.MAX_CLOTH_PARTICLES = 20000  # Comes from a limitation in physx - do not increase
 m.CLOTH_PARTICLE_CONTACT_OFFSET = 0.0075
 m.CLOTH_REMESHING_ERROR_THRESHOLD = 0.05
 m.CLOTH_STRETCH_STIFFNESS = 10000.0
@@ -1578,11 +1578,11 @@ class Cloth(MicroParticleSystem):
                 cm = ms.current_mesh()
                 if cm.vertex_number() > m.MAX_CLOTH_PARTICLES:
                     # We have too many vertices, so we will re-mesh again
-                    particle_distance *= 1.47  # halve the number of vertices
+                    particle_distance *= np.sqrt(2)  # halve the number of vertices
                 else:
                     break
             else:
-                raise ValueError("Could not remesh with less than MAX_CLOTH_PARTICLES vertices!")
+                raise ValueError(f"Could not remesh with less than MAX_CLOTH_PARTICLES ({m.MAX_CLOTH_PARTICLES}) vertices!")
 
             # Re-write data to @mesh_prim
             new_face_vertex_ids = cm.face_matrix().flatten()
