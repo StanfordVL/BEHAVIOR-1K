@@ -316,7 +316,9 @@ class EntityPrim(XFormPrim):
         Returns:
              bool: Whether this prim is articulated or not
         """
-        return self._prim.HasAPI(UsdPhysics.ArticulationRootAPI)
+        # Note that this is not equivalent to self.n_joints > 0 because articulation root path is
+        # overridden by the object classes
+        return self.articulation_root_path is not None
 
     @property
     def articulation_root_path(self):
