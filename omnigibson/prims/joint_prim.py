@@ -550,6 +550,7 @@ class JointPrim(BasePrim):
         Returns:
             list of int: Indices of this joint's DOFs in the parent articulation's DOF array
         """
+        assert self.articulated, "Can only get DOF indices for articulated joints!"
         return list(range(self._joint_dof_offset, self._joint_dof_offset + self._n_dof))
 
     @property
@@ -576,13 +577,6 @@ class JointPrim(BasePrim):
         """
         return self._joint_type in {JointType.JOINT_REVOLUTE, JointType.JOINT_PRISMATIC}
 
-    def assert_articulated(self):
-        """
-        Sanity check to make sure this joint is articulated. Used as a gatekeeping function to prevent non-intended
-        behavior (e.g.: trying to grab this joint's state if it's not articulated)
-        """
-        assert self.articulated, "Tried to call method not intended for non-articulated joint!"
-
     def get_state(self, normalized=False):
         """
         (pos, vel, effort) state of this joint
@@ -598,7 +592,7 @@ class JointPrim(BasePrim):
                 - n-array: effort of this joint, where n = number of DOF for this joint
         """
         # Make sure we only call this if we're an articulated joint
-        self.assert_articulated()
+        assert self.articulated, "Can only get state for articulated joints!"
 
         # Grab raw states
         pos = self._articulation_view.get_joint_positions(joint_indices=self.dof_indices)[0]
@@ -624,7 +618,7 @@ class JointPrim(BasePrim):
                 - n-array: target velocity of this joint, where n = number of DOF for this joint
         """
         # Make sure we only call this if we're an articulated joint
-        self.assert_articulated()
+        assert self.articulated, "Can only get targets for articulated joints!"
 
         # Grab raw states
         targets = self._articulation_view.get_applied_actions()
@@ -733,7 +727,7 @@ class JointPrim(BasePrim):
                 instantaneous setting of the position
         """
         # Sanity checks -- make sure we're the correct control type if we're setting a target and that we're articulated
-        self.assert_articulated()
+        assert self.articulated, "Can only set position for articulated joints!"
         if drive:
             assert self._driven, "Can only use set_pos with drive=True if this joint is driven!"
             assert self._control_type == ControlType.POSITION, \
@@ -768,7 +762,7 @@ class JointPrim(BasePrim):
                 instantaneous setting of the velocity
         """
         # Sanity checks -- make sure we're the correct control type if we're setting a target and that we're articulated
-        self.assert_articulated()
+        assert self.articulated, "Can only set velocity for articulated joints!"
         if drive:
             assert self._driven, "Can only use set_vel with drive=True if this joint is driven!"
             assert self._control_type == ControlType.VELOCITY, \
@@ -800,7 +794,7 @@ class JointPrim(BasePrim):
         """
         # Sanity checks -- make sure that we're articulated (no control type check like position and velocity
         # because we can't set effort targets) and that we're driven
-        self.assert_articulated()
+        assert self.articulated, "Can only set effort for articulated joints!"
 
         # Standardize input
         effort = np.array([effort]) if self._n_dof == 1 and not isinstance(effort, Iterable) else np.array(effort)
