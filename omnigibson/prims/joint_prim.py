@@ -173,7 +173,7 @@ class JointPrim(BasePrim):
         """
         # It's a bit tricky to get the joint index here. We need to find the first dof at this prim path
         # first, then get the corresponding joint index from that dof offset.
-        self._joint_dof_offset = list(self._articulation_view.dof_paths[0]).index(self._prim_path)
+        self._joint_dof_offset = list(self._articulation_view._dof_paths[0]).index(self._prim_path)
         self._joint_idx = list(self._articulation_view._metadata.joint_dof_offsets).index(self._joint_dof_offset)
         self._joint_name = self._articulation_view._metadata.joint_names[self._joint_idx]
         self._n_dof = self._articulation_view._metadata.joint_dof_counts[self._joint_idx]
@@ -558,7 +558,7 @@ class JointPrim(BasePrim):
         Returns:
              bool: Whether this joint is articulated or not
         """
-        return self._art is not None
+        return self.n_dof > 0
 
     @property
     def is_revolute(self):

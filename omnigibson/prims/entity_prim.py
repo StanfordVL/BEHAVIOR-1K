@@ -91,7 +91,7 @@ class EntityPrim(XFormPrim):
 
     def _post_load(self):
         # Prepare the articulation view (at this point only working via the USD interface)
-        self._articulation_view = ExtendedArticulationView(self._prim_path)
+        self._articulation_view = ExtendedArticulationView(self._prim_path + "/base_link")
 
         # If this is a cloth, delete the root link and replace it with the single nested mesh
         if self._prim_type == PrimType.CLOTH:
@@ -235,7 +235,7 @@ class EntityPrim(XFormPrim):
                 for i in range(self._articulation_view._metadata.joint_count):
                     joint_name = self._articulation_view._metadata.joint_names[i]
                     joint_dof_offset = self._articulation_view._metadata.joint_dof_offsets[i]
-                    joint_path = self._articulation_view.dof_paths[0][joint_dof_offset]
+                    joint_path = self._articulation_view._dof_paths[0][joint_dof_offset]
                     # Only add the joint if it's not fixed (i.e.: it has DOFs > 0)
                     if self._articulation_view._metadata.joint_dof_counts[i] > 0:
                         joint = JointPrim(
