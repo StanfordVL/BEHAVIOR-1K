@@ -233,11 +233,11 @@ class EntityPrim(XFormPrim):
             # Additionally grab DOF info if we have non-fixed joints
             if self._n_dof > 0:
                 for i in range(self._articulation_view._metadata.joint_count):
-                    joint_name = self._articulation_view._metadata.joint_names[i]
-                    joint_dof_offset = self._articulation_view._metadata.joint_dof_offsets[i]
-                    joint_path = self._articulation_view._dof_paths[0][joint_dof_offset]
                     # Only add the joint if it's not fixed (i.e.: it has DOFs > 0)
                     if self._articulation_view._metadata.joint_dof_counts[i] > 0:
+                        joint_name = self._articulation_view._metadata.joint_names[i]
+                        joint_dof_offset = self._articulation_view._metadata.joint_dof_offsets[i]
+                        joint_path = self._articulation_view._dof_paths[0][joint_dof_offset]
                         joint = JointPrim(
                             prim_path=joint_path,
                             name=f"{self._name}:joint_{joint_name}",
