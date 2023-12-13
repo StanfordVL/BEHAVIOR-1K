@@ -174,7 +174,10 @@ class JointPrim(BasePrim):
         # It's a bit tricky to get the joint index here. We need to find the first dof at this prim path
         # first, then get the corresponding joint index from that dof offset.
         self._joint_dof_offset = list(self._articulation_view._dof_paths[0]).index(self._prim_path)
-        self._joint_idx = list(self._articulation_view._metadata.joint_dof_offsets).index(self._joint_dof_offset)
+        joint_dof_offsets = self._articulation_view._metadata.joint_dof_offsets
+        # Note that we are finding the last occurrence of the dof offset, since that corresponds to the joint index
+        # The first occurrence can be a fixed link that is 0-dof, meaning the offset will be repeated.
+        self._joint_idx = next(i for i in reversed(range(len(joint_dof_offsets))) if joint_dof_offsets[i] == self._joint_dof_offset)
         self._joint_name = self._articulation_view._metadata.joint_names[self._joint_idx]
         self._n_dof = self._articulation_view._metadata.joint_dof_counts[self._joint_idx]
         
