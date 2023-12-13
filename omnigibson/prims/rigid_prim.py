@@ -277,10 +277,10 @@ class RigidPrim(XFormPrim):
             position = np.asarray(position)[None, :]
         if orientation is not None:
             orientation = np.asarray(orientation)[None, :]
-        self._articulation_view.set_local_poses(position, orientation)
+        self._rigid_prim_view.set_local_poses(position, orientation)
 
     def get_local_pose(self):
-        positions, orientations = self._articulation_view.get_local_poses()
+        positions, orientations = self._rigid_prim_view.get_local_poses()
         return positions[0], orientations[0]
 
     @property
