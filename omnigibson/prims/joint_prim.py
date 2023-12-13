@@ -87,8 +87,6 @@ class JointPrim(BasePrim):
         # Other values that will be filled in at runtime
         self._joint_type = None
         self._control_type = None
-        self._dof_properties = None
-        self._joint_state_api = None
         self._driven = None
 
         # The following values will only be valid if this joint is part of an articulation
@@ -133,7 +131,6 @@ class JointPrim(BasePrim):
             # happens because joint prims are usually created externally during an EntityPrim's initialization phase
             assert self._prim.HasAPI(PhysxSchema.JointStateAPI), \
                 "Revolute or Prismatic joints must already have JointStateAPI added!"
-            self._joint_state_api = PhysxSchema.JointStateAPI(self._prim, state_type)
 
         # Possibly set the bodies
         if "body0" in self._load_config and self._load_config["body0"] is not None:
@@ -313,16 +310,6 @@ class JointPrim(BasePrim):
             ControlType: control type for this joint
         """
         return self._control_type
-
-    @property
-    def dof_properties(self):
-        """
-        Returns:
-            list of DOFProperties: Per-DOF properties for this joint.
-                See https://docs.omniverse.nvidia.com/py/isaacsim/source/extensions/omni.isaac.dynamic_control/docs/index.html#omni.isaac.dynamic_control._dynamic_control.DofProperties
-                for more information.
-        """
-        return self._dof_properties
 
     @property
     def max_velocity(self):
@@ -512,7 +499,7 @@ class JointPrim(BasePrim):
         """
         # Only support revolute and prismatic joints for now
         assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
-        return self._dof_properties[0].has_limits
+        return np.all(np.abs(self._articulation_view.get_joint_limits(joint_indices=self.dof_indices)) < m.INF_POS_THRESHOLD)
 
     @property
     def axis(self):
