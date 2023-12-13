@@ -151,9 +151,6 @@ class ManipulationRobot(BaseRobot):
         self._grasping_mode = grasping_mode
         self._disable_grasp_handling = disable_grasp_handling
 
-        # Other internal variables initialized later
-        self._eef_link_idxs = {arm: None for arm in self.arm_names}
-
         # Initialize other variables used for assistive grasping
         self._ag_freeze_joint_pos = {
             arm: {} for arm in self.arm_names
@@ -218,12 +215,6 @@ class ManipulationRobot(BaseRobot):
 
     def _initialize(self):
         super()._initialize()
-
-        # Store index of EEF within link count
-        offset = -1 if self.fixed_base else 0
-        link_path_to_idx = {path: i for i, path in enumerate(self._physics_view.link_paths[0])}
-        for arm in self.arm_names:
-            self._eef_link_idxs[arm] = link_path_to_idx[self.eef_links[arm].prim_path] + offset
 
         if gm.AG_CLOTH:
             for arm in self.arm_names:
@@ -399,7 +390,8 @@ class ManipulationRobot(BaseRobot):
             # -n_joints because there may be an additional 6 entries at the beginning of the array, if this robot does
             # not have a fixed base (i.e.: the 6DOF --> "floating" joint)
             # see self.get_relative_jacobian() for more info
-            dic[f"eef_{arm}_jacobian_relative"] = self.get_relative_jacobian()[self._eef_link_idxs[arm], :, -self.n_joints:]
+            eef_link_idx = self._articulation_view.get_body_index(self.eef_links[arm].body_name)
+            dic[f"eef_{arm}_jacobian_relative"] = self.get_relative_jacobian()[eef_link_idx, :, -self.n_joints:]
 
         return dic
 
