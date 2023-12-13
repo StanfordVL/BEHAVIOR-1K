@@ -91,7 +91,8 @@ class EntityPrim(XFormPrim):
 
     def _post_load(self):
         # Prepare the articulation view (at this point only working via the USD interface)
-        self._articulation_view = ExtendedArticulationView(self._prim_path + "/base_link")
+        if self.n_joints > 0:
+            self._articulation_view = ExtendedArticulationView(self._prim_path + "/base_link")
 
         # If this is a cloth, delete the root link and replace it with the single nested mesh
         if self._prim_type == PrimType.CLOTH:
@@ -226,7 +227,7 @@ class EntityPrim(XFormPrim):
         self.update_handles()
 
         # Handle case separately based on whether we are actually articulated or not
-        if not self.kinematic_only:
+        if self._articulation_view and not self.kinematic_only:
             self._n_dof = self._articulation_view.num_dof
 
             # Additionally grab DOF info if we have non-fixed joints
@@ -315,8 +316,7 @@ class EntityPrim(XFormPrim):
         Returns:
              bool: Whether this prim is articulated or not
         """
-        # An invalid handle implies that there is no articulation available for this object
-        return self.articulation_root_path is not None
+        return self.n_joints > 0
 
     @property
     def articulation_root_path(self):
@@ -675,7 +675,8 @@ class EntityPrim(XFormPrim):
         assert og.sim.is_playing(), "Simulator must be playing if updating handles!"
 
         # Reinitialize the articulation view
-        self._articulation_view.initialize(og.sim.physics_sim_view)
+        if self._articulation_view is not None:
+            self._articulation_view.initialize(og.sim.physics_sim_view)
 
         # Update all links and joints as well
         for link in self._links.values():
@@ -778,6 +779,10 @@ class EntityPrim(XFormPrim):
         return self.root_link.get_angular_velocity()
 
     def set_position_orientation(self, position=None, orientation=None):
+        # Delegate to XFormPrim if we are not articulated
+        if self._articulation_view is None:
+            return super().set_position_orientation(position=position, orientation=orientation)
+        
         if position is not None:
             position = np.asarray(position)[None, :]
         if orientation is not None:
@@ -786,10 +791,18 @@ class EntityPrim(XFormPrim):
         BoundingBoxAPI.clear()
 
     def get_position_orientation(self):
+        # Delegate to XFormPrim if we are not articulated
+        if self._articulation_view is None:
+            return super().get_position_orientation()
+
         positions, orientations = self._articulation_view.get_world_poses()
         return positions[0], orientations[0]
 
     def set_local_pose(self, position=None, orientation=None):
+        # Delegate to XFormPrim if we are not articulated
+        if self._articulation_view is None:
+            return super().set_local_pose(position=position, orientation=orientation)
+        
         if position is not None:
             position = np.asarray(position)[None, :]
         if orientation is not None:
@@ -798,6 +811,10 @@ class EntityPrim(XFormPrim):
         BoundingBoxAPI.clear()
 
     def get_local_pose(self):
+        # Delegate to XFormPrim if we are not articulated
+        if self._articulation_view is None:
+            return super().get_local_pose()
+        
         positions, orientations = self._articulation_view.get_local_poses()
         return positions[0], orientations[0]
 
