@@ -779,9 +779,9 @@ class EntityPrim(XFormPrim):
 
     def set_position_orientation(self, position=None, orientation=None):
         if position is not None:
-            position = position[None, :]
+            position = np.asarray(position)[None, :]
         if orientation is not None:
-            orientation = orientation[None, :]
+            orientation = np.asarray(orientation)[None, :]
         self._articulation_view.set_world_poses(position, orientation)
         BoundingBoxAPI.clear()
 
@@ -791,9 +791,9 @@ class EntityPrim(XFormPrim):
 
     def set_local_pose(self, position=None, orientation=None):
         if position is not None:
-            position = position[None, :]
+            position = np.asarray(position)[None, :]
         if orientation is not None:
-            orientation = orientation[None, :]
+            orientation = np.asarray(orientation)[None, :]
         self._articulation_view.set_local_poses(position, orientation)
         BoundingBoxAPI.clear()
 

@@ -258,11 +258,11 @@ class RigidPrim(XFormPrim):
 
     def set_position_orientation(self, position=None, orientation=None):
         if position is not None:
-            position = position[None, :]
+            position = np.asarray(position)[None, :]
         if orientation is not None:
             assert np.isclose(np.linalg.norm(orientation), 1, atol=1e-3), \
                 f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
-            orientation = orientation[None, :]
+            orientation = np.asarray(orientation)[None, :]
         self._rigid_prim_view.set_world_poses(positions=position, orientations=orientation)
 
     def get_position_orientation(self):
@@ -274,9 +274,9 @@ class RigidPrim(XFormPrim):
 
     def set_local_pose(self, position=None, orientation=None):
         if position is not None:
-            position = position[None, :]
+            position = np.asarray(position)[None, :]
         if orientation is not None:
-            orientation = orientation[None, :]
+            orientation = np.asarray(orientation)[None, :]
         self._articulation_view.set_local_poses(position, orientation)
 
     def get_local_pose(self):
