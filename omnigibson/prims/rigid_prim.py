@@ -358,10 +358,12 @@ class RigidPrim(XFormPrim):
         # Set gravity and collisions based on value
         if val:
             self.disable_collisions()
-            self.disable_gravity()
+            if not self.kinematic_only:
+                self.disable_gravity()
         else:
             self.enable_collisions()
-            self.enable_gravity()
+            if not self.kinematic_only:
+                self.enable_gravity()
 
         # Also set the internal value
         self._visual_only = val
