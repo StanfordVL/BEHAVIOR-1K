@@ -94,6 +94,10 @@ class EntityPrim(XFormPrim):
         # We pass in scale explicitly so that the generated links can leverage the desired entity scale
         self.update_links(load_config=dict(scale=self._load_config.get("scale", None)))
 
+        # Prepare the articulation view.
+        if self.n_joints > 0:
+            self._articulation_view = ExtendedArticulationView(self._prim_path + "/base_link")
+
         # If this is a cloth, delete the root link and replace it with the single nested mesh
         if self._prim_type == PrimType.CLOTH:
             # Verify only a single link and a single mesh exists
@@ -672,10 +676,8 @@ class EntityPrim(XFormPrim):
         """
         assert og.sim.is_playing(), "Simulator must be playing if updating handles!"
 
-        # Create the articulation view
-        if self.n_joints > 0:
-            if self._articulation_view is None:
-                self._articulation_view = ExtendedArticulationView(self._prim_path + "/base_link")
+        # Reinitialize the articulation view
+        if self._articulation_view is not None:
             self._articulation_view.initialize(og.sim.physics_sim_view)
 
         # Update all links and joints as well

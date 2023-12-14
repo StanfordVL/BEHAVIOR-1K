@@ -77,6 +77,10 @@ class RigidPrim(XFormPrim):
         )
 
     def _post_load(self):
+        # Create the view
+        if not self.kinematic_only:
+            self._rigid_prim_view = RigidPrimView(self._prim_path)
+
         # run super first
         super()._post_load()
 
@@ -200,10 +204,7 @@ class RigidPrim(XFormPrim):
         """
         Updates all internal handles for this prim, in case they change since initialization
         """
-        # Create the view
-        if not self.kinematic_only:
-            if self._rigid_prim_view is None:
-                self._rigid_prim_view = RigidPrimView(self._prim_path)
+        if self._rigid_prim_view is not None:
             self._rigid_prim_view.initialize(og.sim.physics_sim_view)
 
     def contact_list(self):
