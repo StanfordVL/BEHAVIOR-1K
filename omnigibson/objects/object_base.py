@@ -149,7 +149,7 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             # merely set this to be a static collider, i.e.: kinematic-only
             # The custom scaling / fixed joints requirement is needed because omniverse complains about scaling that
             # occurs with respect to fixed joints, as omni will "snap" bodies together otherwise
-            if self.n_joints == 0 and (np.all(np.isclose(self._load_config["scale"], 1.0, atol=1e-3)) or self.n_fixed_joints == 0) and (self.load_config["kinematic_only"] != False):
+            if self.n_joints == 0 and (np.all(np.isclose(self._load_config["scale"], 1.0, atol=1e-3)) or self.n_fixed_joints == 0) and (self._load_config["kinematic_only"] != False):
                 kinematic_only = True
             else:
                 # Create fixed joint, and set Body0 to be this object's root prim
@@ -160,8 +160,8 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
                 )
         
         # Validate that we didn't make a kinematic-only decision that does not match
-        assert self.load_config["kinematic_only"] is None or kinematic_only == self.load_config["kinematic_only"], \
-            f"Kinematic only decision does not match! Got: {kinematic_only}, expected: {self.load_config['kinematic_only']}"
+        assert self._load_config["kinematic_only"] is None or kinematic_only == self._load_config["kinematic_only"], \
+            f"Kinematic only decision does not match! Got: {kinematic_only}, expected: {self._load_config['kinematic_only']}"
         
         # Actually apply the kinematic-only decision
         if kinematic_only:
