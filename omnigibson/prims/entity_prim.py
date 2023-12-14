@@ -377,7 +377,10 @@ class EntityPrim(XFormPrim):
         else:
             # Manually iterate over all links and check for any joints that are not fixed joints!
             num = 0
-            for child_prim in self.prim.GetDescendants():
+            children = list(self.prim.GetChildren())
+            while children:
+                child_prim = children.pop()
+                children.extend(child_prim.GetChildren())
                 prim_type = child_prim.GetPrimTypeInfo().GetTypeName().lower()
                 if "joint" in prim_type and "fixed" not in prim_type:
                     num += 1
@@ -391,7 +394,10 @@ class EntityPrim(XFormPrim):
         """
         # Manually iterate over all links and check for any joints that are not fixed joints!
         num = 0
-        for child_prim in self.prim.GetDescendants():
+        children = list(self.prim.GetChildren())
+        while children:
+            child_prim = children.pop()
+            children.extend(child_prim.GetChildren())
             prim_type = child_prim.GetPrimTypeInfo().GetTypeName().lower()
             if "joint" in prim_type and "fixed" in prim_type:
                 num += 1
