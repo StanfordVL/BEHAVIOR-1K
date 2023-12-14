@@ -250,6 +250,10 @@ class EntityPrim(XFormPrim):
             # We assume this object contains a single rigid body
             self._n_dof = 0
 
+        assert self.n_joints == len(self._joints), \
+            f"Number of joints inferred from prim tree ({self.n_joints}) does not match number of joints " \
+            f"found in the articulation view ({len(self._joints)})!"
+
         self._update_joint_limits()
 
     def _update_joint_limits(self):
@@ -373,11 +377,10 @@ class EntityPrim(XFormPrim):
         else:
             # Manually iterate over all links and check for any joints that are not fixed joints!
             num = 0
-            for link in self._links.values():
-                for child_prim in link.prim.GetChildren():
-                    prim_type = child_prim.GetPrimTypeInfo().GetTypeName().lower()
-                    if "joint" in prim_type and "fixed" not in prim_type:
-                        num += 1
+            for child_prim in self.prim.GetDescendants():
+                prim_type = child_prim.GetPrimTypeInfo().GetTypeName().lower()
+                if "joint" in prim_type and "fixed" not in prim_type:
+                    num += 1
         return num
 
     @property
@@ -388,11 +391,10 @@ class EntityPrim(XFormPrim):
         """
         # Manually iterate over all links and check for any joints that are not fixed joints!
         num = 0
-        for link in self._links.values():
-            for child_prim in link.prim.GetChildren():
-                prim_type = child_prim.GetPrimTypeInfo().GetTypeName().lower()
-                if "joint" in prim_type and "fixed" in prim_type:
-                    num += 1
+        for child_prim in self.prim.GetDescendants():
+            prim_type = child_prim.GetPrimTypeInfo().GetTypeName().lower()
+            if "joint" in prim_type and "fixed" in prim_type:
+                num += 1
 
         return num
 
