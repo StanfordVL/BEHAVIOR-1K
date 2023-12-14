@@ -1154,6 +1154,7 @@ def _create_system_from_metadata(system_name):
                         visible=False,
                         fixed_base=False,
                         visual_only=True,
+                        kinematic_only=True,
                         include_default_states=False,
                         abilities={},
                     )
@@ -1169,6 +1170,7 @@ def _create_system_from_metadata(system_name):
                         visible=False,
                         fixed_base=False,
                         visual_only=True,
+                        kinematic_only=True,
                         include_default_states=False,
                         abilities={},
                     )

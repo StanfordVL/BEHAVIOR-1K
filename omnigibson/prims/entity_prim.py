@@ -1073,17 +1073,6 @@ class EntityPrim(XFormPrim):
         """
         return self.root_link.kinematic_only
 
-    @kinematic_only.setter
-    def kinematic_only(self, val):
-        """
-        Args:
-            val (bool): Whether this object is a kinematic-only object (otherwise, it is a rigid body). A kinematic-only
-                object is not subject to simulator dynamics, and remains fixed unless the user explicitly sets the
-                body's pose / velocities. See https://docs.omniverse.nvidia.com/app_create/prod_extensions/ext_physics/rigid-bodies.html?highlight=rigid%20body%20enabled#kinematic-rigid-bodies
-                for more information
-        """
-        self.root_link.kinematic_only = val
-
     @property
     def aabb(self):
         # If we're a cloth prim type, we compute the bounding box from the limits of the particles. Otherwise, use the

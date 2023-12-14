@@ -451,18 +451,6 @@ class RigidPrim(XFormPrim):
         """
         return self.get_attribute("physics:kinematicEnabled")
 
-    @kinematic_only.setter
-    def kinematic_only(self, val):
-        """
-        Args:
-            val (bool): Whether this object is a kinematic-only object (otherwise, it is a rigid body). A kinematic-only
-                object is not subject to simulator dynamics, and remains fixed unless the user explicitly sets the
-                body's pose / velocities. See https://docs.omniverse.nvidia.com/app_create/prod_extensions/ext_physics/rigid-bodies.html?highlight=rigid%20body%20enabled#kinematic-rigid-bodies
-                for more information
-        """
-        self.set_attribute("physics:kinematicEnabled", val)
-        self.set_attribute("physics:rigidBodyEnabled", not val)
-
     @property
     def solver_position_iteration_count(self):
         """
