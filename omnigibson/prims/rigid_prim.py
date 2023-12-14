@@ -78,7 +78,8 @@ class RigidPrim(XFormPrim):
 
     def _post_load(self):
         # Create the view
-        self._rigid_prim_view = RigidPrimView(self._prim_path)
+        if not self.kinematic_only:
+            self._rigid_prim_view = RigidPrimView(self._prim_path)
 
         # run super first
         super()._post_load()
@@ -203,7 +204,8 @@ class RigidPrim(XFormPrim):
         """
         Updates all internal handles for this prim, in case they change since initialization
         """
-        self._rigid_prim_view.initialize(og.sim.physics_sim_view)
+        if self._rigid_prim_view is not None:
+            self._rigid_prim_view.initialize(og.sim.physics_sim_view)
 
     def contact_list(self):
         """
@@ -231,6 +233,7 @@ class RigidPrim(XFormPrim):
         Args:
             velocity (np.ndarray): linear velocity to set the rigid prim to. Shape (3,).
         """
+        assert not self.kinematic_only, "Cannot set linear velocity for a kinematic-only body!"
         self._rigid_prim_view.set_linear_velocities(velocity[None, :])
 
     def get_linear_velocity(self):
@@ -238,6 +241,7 @@ class RigidPrim(XFormPrim):
         Returns:
             np.ndarray: current linear velocity of the the rigid prim. Shape (3,).
         """
+        assert not self.kinematic_only, "Cannot get linear velocity for a kinematic-only body!"
         return self._rigid_prim_view.get_linear_velocities()[0]
 
     def set_angular_velocity(self, velocity):
@@ -247,6 +251,7 @@ class RigidPrim(XFormPrim):
         Args:
             velocity (np.ndarray): angular velocity to set the rigid prim to. Shape (3,).
         """
+        assert not self.kinematic_only, "Cannot set angular velocity for a kinematic-only body!"
         self._rigid_prim_view.set_angular_velocities(velocity[None, :])
 
     def get_angular_velocity(self):
@@ -254,9 +259,14 @@ class RigidPrim(XFormPrim):
         Returns:
             np.ndarray: current angular velocity of the the rigid prim. Shape (3,).
         """
+        assert not self.kinematic_only, "Cannot get angular velocity for a kinematic-only body!"
         return self._rigid_prim_view.get_angular_velocities()[0]
 
     def set_position_orientation(self, position=None, orientation=None):
+        # Fallback to the xformprim method for kinematic-only objects
+        if self.kinematic_only:
+            return super().set_position_orientation(position=position, orientation=orientation)
+
         if position is not None:
             position = np.asarray(position)[None, :]
         if orientation is not None:
@@ -266,6 +276,10 @@ class RigidPrim(XFormPrim):
         self._rigid_prim_view.set_world_poses(positions=position, orientations=orientation)
 
     def get_position_orientation(self):
+        # Fallback to the xformprim method for kinematic-only objects
+        if self.kinematic_only:
+            return super().get_position_orientation()
+        
         pos, ori = self._rigid_prim_view.get_world_poses()
 
         assert np.isclose(np.linalg.norm(ori), 1, atol=1e-3), \
@@ -273,6 +287,10 @@ class RigidPrim(XFormPrim):
         return pos[0], ori[0]
 
     def set_local_pose(self, position=None, orientation=None):
+        # Fallback to the xformprim method for kinematic-only objects
+        if self.kinematic_only:
+            return super().set_local_pose(position=position, orientation=orientation)
+        
         if position is not None:
             position = np.asarray(position)[None, :]
         if orientation is not None:
@@ -280,6 +298,10 @@ class RigidPrim(XFormPrim):
         self._rigid_prim_view.set_local_poses(position, orientation)
 
     def get_local_pose(self):
+        # Fallback to the xformprim method for kinematic-only objects
+        if self.kinematic_only:
+            return super().get_local_pose()
+
         positions, orientations = self._rigid_prim_view.get_local_poses()
         return positions[0], orientations[0]
 
@@ -370,6 +392,7 @@ class RigidPrim(XFormPrim):
         Returns:
             float: mass of the rigid body in kg.
         """
+        assert not self.kinematic_only, "Cannot get mass for a kinematic-only body!"
         mass = self._rigid_prim_view.get_masses()[0]
 
         # Fallback to analytical computation of volume * density
@@ -384,6 +407,7 @@ class RigidPrim(XFormPrim):
         Args:
             mass (float): mass of the rigid body in kg.
         """
+        assert not self.kinematic_only, "Cannot set mass for a kinematic-only body!"
         self._rigid_prim_view.set_masses([mass])
 
     @property
@@ -392,6 +416,7 @@ class RigidPrim(XFormPrim):
         Returns:
             float: density of the rigid body in kg / m^3.
         """
+        assert not self.kinematic_only, "Cannot get density for a kinematic-only body!"
         raw_usd_mass = self._rigid_prim_view.get_masses()[0]
         # We first check if the raw usd mass is specified, since mass overrides density
         # If it's specified, we infer density based on that value divided by volume
@@ -412,6 +437,7 @@ class RigidPrim(XFormPrim):
         Args:
             density (float): density of the rigid body in kg / m^3.
         """
+        assert not self.kinematic_only, "Cannot set density for a kinematic-only body!"
         self._rigid_prim_view.set_densities([density])
 
     @property
@@ -537,12 +563,14 @@ class RigidPrim(XFormPrim):
         """
         Enables gravity for this rigid body
         """
+        assert not self.kinematic_only, "Cannot enable gravity for a kinematic-only body!"
         self._rigid_prim_view.enable_gravities()
 
     def disable_gravity(self):
         """
         Disables gravity for this rigid body
         """
+        assert not self.kinematic_only, "Cannot disable gravity for a kinematic-only body!"
         self._rigid_prim_view.disable_gravities()
 
     def wake(self):
