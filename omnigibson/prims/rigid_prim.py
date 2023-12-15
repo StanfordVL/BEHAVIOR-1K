@@ -1,4 +1,3 @@
-from omni.isaac.core.prims import RigidPrimView
 from omni.isaac.core.utils.prims import get_prim_at_path, get_prim_parent
 from omni.isaac.core.utils.transformations import tf_matrix_from_pose
 from omni.isaac.core.utils.rotations import gf_quat_to_np_array
@@ -11,6 +10,7 @@ from omnigibson.macros import gm, create_module_macros
 from omnigibson.prims.xform_prim import XFormPrim
 from omnigibson.prims.geom_prim import CollisionGeomPrim, VisualGeomPrim
 from omnigibson.utils.constants import GEOM_TYPES
+from omnigibson.utils.deprecated_utils import RigidPrimView
 from omnigibson.utils.sim_utils import CsRawData
 from omnigibson.utils.usd_utils import get_mesh_volume_and_com
 import omnigibson.utils.transform_utils as T
