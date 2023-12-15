@@ -513,11 +513,11 @@ class EntityPrim(XFormPrim):
 
         # Set the DOF states
         if not drive:
-            self._articulation_view.set_joint_positions(positions=positions, joint_indices=indices)
+            self._articulation_view.set_joint_positions(positions, joint_indices=indices)
             BoundingBoxAPI.clear()
 
         # Also set the target
-        self._articulation_view.set_joint_position_targets(positions=positions, joint_indices=indices)
+        self._articulation_view.set_joint_position_targets(positions, joint_indices=indices)
 
     def set_joint_velocities(self, velocities, indices=None, normalized=False, drive=False):
         """
@@ -545,10 +545,10 @@ class EntityPrim(XFormPrim):
 
         # Set the DOF states
         if not drive:
-            self._articulation_view.set_joint_velocities(velocities=velocities, joint_indices=indices)
+            self._articulation_view.set_joint_velocities(velocities, joint_indices=indices)
 
         # Also set the target
-        self._articulation_view.set_joint_velocity_targets(velocities=velocities, joint_indices=indices)
+        self._articulation_view.set_joint_velocity_targets(velocities, joint_indices=indices)
 
     def set_joint_efforts(self, efforts, indices=None, normalized=False):
         """
@@ -572,7 +572,7 @@ class EntityPrim(XFormPrim):
             efforts = self._denormalize_efforts(efforts=efforts, indices=indices)
 
         # Set the DOF states
-        self._articulation_view.set_joint_efforts(velocities=efforts, joint_indices=indices)
+        self._articulation_view.set_joint_efforts(efforts, joint_indices=indices)
 
     def _normalize_positions(self, positions, indices=None):
         """
