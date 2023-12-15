@@ -152,27 +152,25 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
             scale = np.ones(3) if self._load_config["scale"] is None else np.array(self._load_config["scale"])
             if self.n_joints == 0 and (np.all(np.isclose(scale, 1.0, atol=1e-3)) or self.n_fixed_joints == 0) and (self._load_config["kinematic_only"] != False):
                 kinematic_only = True
-            else:
-                # Create fixed joint, and set Body0 to be this object's root prim
-                create_joint(
-                    prim_path=f"{self._prim_path}/rootJoint",
-                    joint_type="FixedJoint",
-                    body1=f"{self._prim_path}/{self._root_link_name}",
-                )
         
         # Validate that we didn't make a kinematic-only decision that does not match
         assert self._load_config["kinematic_only"] is None or kinematic_only == self._load_config["kinematic_only"], \
             f"Kinematic only decision does not match! Got: {kinematic_only}, expected: {self._load_config['kinematic_only']}"
         
         # Actually apply the kinematic-only decision
-        if kinematic_only:
-            for prim in self._prim.GetChildren():
-                if prim.GetPrimTypeInfo().GetTypeName() == "Xform":
-                    prim.GetAttribute("physics:kinematicEnabled").Set(True)
-                    prim.GetAttribute("physics:rigidBodyEnabled").Set(False)
+        self._load_config["kinematic_only"] = kinematic_only
 
         # Run super first
         super()._post_load()
+
+        # If the object is fixed_base but kinematic only is false, create the joint
+        if self.fixed_base and not self.kinematic_only:
+            # Create fixed joint, and set Body0 to be this object's root prim
+            create_joint(
+                prim_path=f"{self._prim_path}/rootJoint",
+                joint_type="FixedJoint",
+                body1=f"{self._prim_path}/{self._root_link_name}",
+            )
 
         # Set visibility
         if "visible" in self._load_config and self._load_config["visible"] is not None:

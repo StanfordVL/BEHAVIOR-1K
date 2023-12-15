@@ -15,7 +15,7 @@ from omnigibson.prims.cloth_prim import ClothPrim
 from omnigibson.prims.joint_prim import JointPrim
 from omnigibson.prims.rigid_prim import RigidPrim
 from omnigibson.prims.xform_prim import XFormPrim
-from omnigibson.utils.extended_articulation_view import ExtendedArticulationView
+from omnigibson.utils.deprecated_utils import ArticulationView
 from omnigibson.utils.constants import PrimType, GEOM_TYPES, JointType, JointAxis
 from omnigibson.utils.ui_utils import suppress_omni_log
 from omnigibson.utils.usd_utils import BoundingBoxAPI
@@ -92,11 +92,14 @@ class EntityPrim(XFormPrim):
     def _post_load(self):
         # Setup links info FIRST before running any other post loading behavior
         # We pass in scale explicitly so that the generated links can leverage the desired entity scale
-        self.update_links(load_config=dict(scale=self._load_config.get("scale", None)))
+        self.update_links(load_config=dict(
+            scale=self._load_config.get("scale", None),
+            kinematic_only=self._load_config.get("kinematic_only", None)
+        ))
 
         # Prepare the articulation view.
         if self.n_joints > 0:
-            self._articulation_view = ExtendedArticulationView(self._prim_path + "/base_link")
+            self._articulation_view = ArticulationView(self._prim_path + "/base_link")
 
         # If this is a cloth, delete the root link and replace it with the single nested mesh
         if self._prim_type == PrimType.CLOTH:

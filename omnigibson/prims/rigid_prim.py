@@ -52,6 +52,7 @@ class RigidPrim(XFormPrim):
             density (None or float): If specified, density of this body in kg / m^3
             visual_only (None or bool): If specified, whether this prim should include collisions or not.
                 Default is True.
+            kinematic_only (None or bool): If specified, whether this prim should be kinematic-only or not.
     """
 
     def __init__(
@@ -79,6 +80,11 @@ class RigidPrim(XFormPrim):
     def _post_load(self):
         # Create the view
         self._rigid_prim_view = RigidPrimView(self._prim_path)
+
+        # Set it to be kinematic if necessary
+        if "kinematic_only" in self._load_config and self._load_config["kinematic_only"]:
+            self.set_attribute("physics:kinematicEnabled", True)
+            self.set_attribute("physics:rigidBodyEnabled", False)
 
         # run super first
         super()._post_load()
