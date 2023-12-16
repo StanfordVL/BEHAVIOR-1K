@@ -90,14 +90,6 @@ class EntityPrim(XFormPrim):
         raise NotImplementedError("By default, an entity prim cannot be created from scratch.")
 
     def _post_load(self):
-        # Setup links info FIRST before running any other post loading behavior
-        # We pass in scale explicitly so that the generated links can leverage the desired entity scale
-        self.update_links()
-
-        # Prepare the articulation view.
-        if self.n_joints > 0:
-            self._articulation_view_direct = ArticulationView(self._prim_path + "/base_link")
-
         # If this is a cloth, delete the root link and replace it with the single nested mesh
         if self._prim_type == PrimType.CLOTH:
             # Verify only a single link and a single mesh exists
@@ -121,6 +113,14 @@ class EntityPrim(XFormPrim):
             new_path = f"{self._prim_path}/{old_link_prim.GetName()}_cloth"
             omni.kit.commands.execute("CopyPrim", path_from=cloth_mesh_prim.GetPath(), path_to=new_path)
             omni.kit.commands.execute("DeletePrims", paths=[old_link_prim.GetPath()], destructive=False)
+
+        # Setup links info FIRST before running any other post loading behavior
+        # We pass in scale explicitly so that the generated links can leverage the desired entity scale
+        self.update_links()
+
+        # Prepare the articulation view.
+        if self.n_joints > 0:
+            self._articulation_view_direct = ArticulationView(self._prim_path + "/base_link")
 
         # Set visual only flag
         # This automatically handles setting collisions / gravity appropriately per-link
