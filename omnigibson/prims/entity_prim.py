@@ -206,7 +206,7 @@ class EntityPrim(XFormPrim):
         # in the children joints
         valid_root_links = list(set(links_to_create.keys()) - joint_children)
 
-        assert len(valid_root_links) == 1, f"Only a single root link should have been found for this entity prim, " \
+        assert len(valid_root_links) == 1, f"Only a single root link should have been found for {self.name}, " \
                                            f"but found multiple instead: {valid_root_links}"
         self._root_link_name = valid_root_links[0] if len(valid_root_links) == 1 else "base_link"
 
