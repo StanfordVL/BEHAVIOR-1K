@@ -54,7 +54,7 @@ class EntityPrim(XFormPrim):
         self._joints = None
         self._materials = None
         self._visual_only = None
-        self._articulation_view = None
+        self._articulation_view_direct = None
 
         # This needs to be initialized to be used for _load() of PrimitiveObject
         self._prim_type = load_config["prim_type"] if load_config is not None and "prim_type" in load_config else PrimType.RIGID
@@ -92,14 +92,11 @@ class EntityPrim(XFormPrim):
     def _post_load(self):
         # Setup links info FIRST before running any other post loading behavior
         # We pass in scale explicitly so that the generated links can leverage the desired entity scale
-        self.update_links(load_config=dict(
-            scale=self._load_config.get("scale", None),
-            kinematic_only=self._load_config.get("kinematic_only", None)
-        ))
+        self.update_links()
 
         # Prepare the articulation view.
         if self.n_joints > 0:
-            self._articulation_view = ArticulationView(self._prim_path + "/base_link")
+            self._articulation_view_direct = ArticulationView(self._prim_path + "/base_link")
 
         # If this is a cloth, delete the root link and replace it with the single nested mesh
         if self._prim_type == PrimType.CLOTH:
@@ -162,15 +159,15 @@ class EntityPrim(XFormPrim):
 
         self._materials = materials
 
-    def update_links(self, load_config=None):
+    def update_links(self):
         """
         Helper function to refresh owned joints. Useful for synchronizing internal data if
         additional bodies are added manually
-
-        Args:
-            load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
-            loading each of the link's rigid prims
         """
+        load_config = {
+            "scale": self._load_config.get("scale", None),
+        }
+
         # Make sure to clean up all pre-existing names for all links
         if self._links is not None:
             for link in self._links.values():
@@ -178,8 +175,8 @@ class EntityPrim(XFormPrim):
 
         # We iterate over all children of this object's prim,
         # and grab any that are presumed to be rigid bodies (i.e.: other Xforms)
-        self._links = dict()
         joint_children = set()
+        links_to_create = {}
         for prim in self._prim.GetChildren():
             link_cls = None
             link_name = prim.GetName()
@@ -200,20 +197,31 @@ class EntityPrim(XFormPrim):
                 # For cloth object, process prims that are Meshes
                 link_cls = ClothPrim
 
+            # Keep track of all the links we will create. We can't create that just yet because we need to find
+            # the base link first.
             if link_cls is not None:
-                self._links[link_name] = link_cls(
-                    prim_path=prim.GetPrimPath().__str__(),
-                    name=f"{self._name}:{link_name}",
-                    load_config=load_config,
-                )
+                links_to_create[link_name] = (link_cls, prim)
 
         # Infer the correct root link name -- this corresponds to whatever link does not have any joint existing
         # in the children joints
-        valid_root_links = list(set(self._links.keys()) - joint_children)
+        valid_root_links = list(set(links_to_create.keys()) - joint_children)
 
         assert len(valid_root_links) == 1, f"Only a single root link should have been found for this entity prim, " \
                                            f"but found multiple instead: {valid_root_links}"
         self._root_link_name = valid_root_links[0] if len(valid_root_links) == 1 else "base_link"
+
+        # Now actually create the links
+        self._links = dict()
+        for link_name, (link_cls, prim) in links_to_create.items():
+            link_load_config = {
+                "kinematic_only": self._load_config["kinematic_only"] if link_name == self._root_link_name else False,
+            }
+            link_load_config.update(load_config)
+            self._links[link_name] = link_cls(
+                prim_path=prim.GetPrimPath().__str__(),
+                name=f"{self._name}:{link_name}",
+                load_config=link_load_config,
+            )
 
     def update_joints(self):
         """
@@ -244,7 +252,7 @@ class EntityPrim(XFormPrim):
                         joint = JointPrim(
                             prim_path=joint_path,
                             name=f"{self._name}:joint_{joint_name}",
-                            articulation_view=self._articulation_view,
+                            articulation_view=self._articulation_view_direct,
                         )
                         joint.initialize()
                         self._joints[joint_name] = joint
@@ -308,6 +316,20 @@ class EntityPrim(XFormPrim):
 
             joint.lower_limit = joint.lower_limit * scale_along_axis
             joint.upper_limit = joint.upper_limit * scale_along_axis
+
+    @property
+    def _articulation_view(self):
+        if self._articulation_view_direct is None:
+            return None
+
+        # Validate that the articulation view is initialized and that if physics is running, the
+        # view is valid.
+        if og.sim.is_playing():
+            assert self._articulation_view_direct.is_physics_handle_valid() and \
+                self._articulation_view_direct._physics_view.check(), \
+                "Articulation view must be valid if physics is running!"
+        
+        return self._articulation_view_direct
 
     @property
     def prim_type(self):
@@ -688,8 +710,8 @@ class EntityPrim(XFormPrim):
         assert og.sim.is_playing(), "Simulator must be playing if updating handles!"
 
         # Reinitialize the articulation view
-        if self._articulation_view is not None:
-            self._articulation_view.initialize(og.sim.physics_sim_view)
+        if self._articulation_view_direct is not None:
+            self._articulation_view_direct.initialize(og.sim.physics_sim_view)
 
         # Update all links and joints as well
         for link in self._links.values():
@@ -799,7 +821,7 @@ class EntityPrim(XFormPrim):
         if position is not None:
             position = np.asarray(position)[None, :]
         if orientation is not None:
-            orientation = np.asarray(orientation)[None, :]
+            orientation = np.asarray(orientation)[None, [3, 0, 1, 2]]
         self._articulation_view.set_world_poses(position, orientation)
         BoundingBoxAPI.clear()
 
@@ -809,7 +831,7 @@ class EntityPrim(XFormPrim):
             return super().get_position_orientation()
 
         positions, orientations = self._articulation_view.get_world_poses()
-        return positions[0], orientations[0]
+        return positions[0], orientations[0][[1, 2, 3, 0]]
 
     def set_local_pose(self, position=None, orientation=None):
         # Delegate to XFormPrim if we are not articulated
@@ -819,7 +841,7 @@ class EntityPrim(XFormPrim):
         if position is not None:
             position = np.asarray(position)[None, :]
         if orientation is not None:
-            orientation = np.asarray(orientation)[None, :]
+            orientation = np.asarray(orientation)[None, [3, 0, 1, 2]]
         self._articulation_view.set_local_poses(position, orientation)
         BoundingBoxAPI.clear()
 
@@ -829,7 +851,7 @@ class EntityPrim(XFormPrim):
             return super().get_local_pose()
         
         positions, orientations = self._articulation_view.get_local_poses()
-        return positions[0], orientations[0]
+        return positions[0], orientations[0][[1, 2, 3, 0]]
 
     # TODO: Is the omni joint damping (used for driving motors) same as dissipative joint damping (what we had in pb)?
     @property

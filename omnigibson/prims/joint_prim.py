@@ -82,7 +82,7 @@ class JointPrim(BasePrim):
         articulation_view=None,
     ):
         # Grab dynamic control reference and set properties
-        self._articulation_view = articulation_view
+        self._articulation_view_direct = articulation_view
 
         # Other values that will be filled in at runtime
         self._joint_type = None
@@ -212,6 +212,20 @@ class JointPrim(BasePrim):
 
         # Update control type
         self._control_type = control_type
+
+    @property
+    def _articulation_view(self):
+        if self._articulation_view_direct is None:
+            return None
+
+        # Validate that the articulation view is initialized and that if physics is running, the
+        # view is valid.
+        if og.sim.is_playing():
+            assert self._articulation_view_direct.is_physics_handle_valid() and \
+                self._articulation_view_direct._physics_view.check(), \
+                "Articulation view must be valid if physics is running!"
+        
+        return self._articulation_view_direct
 
     @property
     def body0(self):

@@ -62,7 +62,7 @@ class RigidPrim(XFormPrim):
         load_config=None,
     ):
         # Other values that will be filled in at runtime
-        self._rigid_prim_view = None
+        self._rigid_prim_view_direct = None
         self._cs = None                     # Contact sensor interface
         self._body_name = None
 
@@ -79,7 +79,7 @@ class RigidPrim(XFormPrim):
 
     def _post_load(self):
         # Create the view
-        self._rigid_prim_view = RigidPrimView(self._prim_path)
+        self._rigid_prim_view_direct = RigidPrimView(self._prim_path)
 
         # Set it to be kinematic if necessary
         if "kinematic_only" in self._load_config and self._load_config["kinematic_only"]:
@@ -213,7 +213,7 @@ class RigidPrim(XFormPrim):
         # and dynamic objects are the same, physx tensor APIs do NOT exist for kinematic-only
         # objects, meaning initializing the view actively breaks the view.
         if not self.kinematic_only:
-            self._rigid_prim_view.initialize(og.sim.physics_sim_view)
+            self._rigid_prim_view_direct.initialize(og.sim.physics_sim_view)
 
     def contact_list(self):
         """
@@ -267,15 +267,12 @@ class RigidPrim(XFormPrim):
         return self._rigid_prim_view.get_angular_velocities()[0]
 
     def set_position_orientation(self, position=None, orientation=None):
-        # Fallback to the xformprim method for kinematic-only objects
-        return super().set_position_orientation(position=position, orientation=orientation)
-
         if position is not None:
             position = np.asarray(position)[None, :]
         if orientation is not None:
             assert np.isclose(np.linalg.norm(orientation), 1, atol=1e-3), \
                 f"{self.prim_path} desired orientation {orientation} is not a unit quaternion."
-            orientation = np.asarray(orientation)[None, :]
+            orientation = np.asarray(orientation)[None, [3, 0, 1, 2]]
         self._rigid_prim_view.set_world_poses(positions=position, orientations=orientation)
 
     def get_position_orientation(self):
@@ -283,18 +280,34 @@ class RigidPrim(XFormPrim):
 
         assert np.isclose(np.linalg.norm(ori), 1, atol=1e-3), \
             f"{self.prim_path} orientation {ori} is not a unit quaternion."
-        return pos[0], ori[0]
+        return pos[0], ori[0][[1, 2, 3, 0]]
 
     def set_local_pose(self, position=None, orientation=None):
         if position is not None:
             position = np.asarray(position)[None, :]
         if orientation is not None:
-            orientation = np.asarray(orientation)[None, :]
+            orientation = np.asarray(orientation)[None, [3, 0, 1, 2]]
         self._rigid_prim_view.set_local_poses(position, orientation)
 
     def get_local_pose(self):
         positions, orientations = self._rigid_prim_view.get_local_poses()
-        return positions[0], orientations[0]
+        return positions[0], orientations[0][[1, 2, 3, 0]]
+
+    @property
+    def _rigid_prim_view(self):
+        if self._rigid_prim_view_direct is None:
+            return None
+
+        # Validate that the if physics is running, the view is valid.
+        if not self.kinematic_only and og.sim.is_playing():
+            assert self._rigid_prim_view_direct.is_physics_handle_valid() and \
+                self._rigid_prim_view_direct._physics_view.check(), \
+                "Rigid prim view must be valid if physics is running!"
+
+        assert not (og.sim.is_playing() and not self._rigid_prim_view_direct.is_valid), \
+            "Rigid prim view must be valid if physics is running!"
+        
+        return self._rigid_prim_view_direct
 
     @property
     def body_name(self):
