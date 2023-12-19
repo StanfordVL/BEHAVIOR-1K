@@ -394,7 +394,7 @@ class Simulator(SimulationContext, Serializable):
         self.app.update()
 
         # Update all handles that are now broken because objects have changed
-        self._update_handles()
+        self.update_handles()
 
         # Refresh all current rules
         TransitionRuleAPI.prune_active_rules()
@@ -404,7 +404,7 @@ class Simulator(SimulationContext, Serializable):
         Reset internal variables when a new stage is loaded
         """
 
-    def _update_handles(self):
+    def update_handles(self):
         # First, refresh the physics sim view
         self._physics_sim_view = omni.physics.tensors.create_simulation_view(self.backend)
         self._physics_sim_view.set_subspace_roots("/")
@@ -453,7 +453,7 @@ class Simulator(SimulationContext, Serializable):
                 self._objects_to_initialize = self._objects_to_initialize[n_objects_to_initialize:]
 
                 # Re-initialize the physics view because the number of objects has changed
-                self._update_handles()
+                self.update_handles()
 
                 # Also refresh the transition rules that are currently active
                 TransitionRuleAPI.refresh_all_rules()
@@ -519,7 +519,7 @@ class Simulator(SimulationContext, Serializable):
 
             # Update all object handles, unless this is a play during initialization
             if og.sim is not None:
-                self._update_handles()
+                self.update_handles()
 
             if was_stopped:
                 # We need to update controller mode because kp and kd were set to the original (incorrect) values when
