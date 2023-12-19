@@ -253,17 +253,16 @@ class RigidContactAPI:
         """
         assert og.sim.is_playing(), "Cannot create rigid contact view while sim is not playing!"
 
-        # If there are no valid objects, clear the view and terminate early
-        if i == 0:
-            cls._CONTACT_VIEW = None
-            return
-
         # Generate rigid body view, making sure to update the simulation first (without physics) so that the physx
         # backend is synchronized with any newly added objects
         # We also suppress the omni tensor plugin from giving warnings we expect
         og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
         with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
             cls._CONTACT_VIEW = og.sim.physics_sim_view.create_rigid_contact_view(pattern="/World/*/*")
+
+        if cls._CONTACT_VIEW is None or cls._CONTACT_VIEW._backend is None:
+            cls._CONTACT_VIEW = None
+            return
         
         cls._PATH_TO_IDX = {prim_path: idx for idx, prim_path in enumerate(cls._CONTACT_VIEW.sensor_paths)}
 

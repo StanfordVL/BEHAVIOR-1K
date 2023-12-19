@@ -517,8 +517,9 @@ class Simulator(SimulationContext, Serializable):
             # correctly.
             self.render()
 
-            # Update all object handles
-            self._update_handles()
+            # Update all object handles, unless this is a play during initialization
+            if og.sim is not None:
+                self._update_handles()
 
             if was_stopped:
                 # We need to update controller mode because kp and kd were set to the original (incorrect) values when
