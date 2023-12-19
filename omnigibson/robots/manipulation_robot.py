@@ -1,7 +1,6 @@
 from abc import abstractmethod
 from collections import namedtuple
 import numpy as np
-import networkx as nx
 
 import omnigibson as og
 from omnigibson.macros import gm, create_module_macros
@@ -778,7 +777,9 @@ class ManipulationRobot(BaseRobot):
         for prim_path in candidates_set:
             # Calculate position of the object link. Only allow this for objects currently.
             obj_prim_path, link_name = prim_path.rsplit("/", 1)[-1]
-            candidate_obj = og.sim.scene.object_registry("prim_path", obj_prim_path)
+            candidate_obj = og.sim.scene.object_registry("prim_path", obj_prim_path, None)
+            if candidate_obj is None or link_name not in candidate_obj.links:
+                continue
             candidate_link = candidate_obj.links[link_name]
             dist = np.linalg.norm(np.array(candidate_link.get_position()) - np.array(gripper_center_pos))
             candidate_data.append((prim_path, dist))
