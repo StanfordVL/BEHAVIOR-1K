@@ -324,7 +324,7 @@ class EntityPrim(XFormPrim):
 
         # Validate that the articulation view is initialized and that if physics is running, the
         # view is valid.
-        if og.sim.is_playing():
+        if og.sim.is_playing() and self.initialized:
             assert self._articulation_view_direct.is_physics_handle_valid() and \
                 self._articulation_view_direct._physics_view.check(), \
                 "Articulation view must be valid if physics is running!"

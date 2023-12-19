@@ -301,7 +301,7 @@ class RigidPrim(XFormPrim):
             return None
 
         # Validate that the if physics is running, the view is valid.
-        if not self.kinematic_only and og.sim.is_playing():
+        if not self.kinematic_only and og.sim.is_playing() and self.initialized:
             assert self._rigid_prim_view_direct.is_physics_handle_valid() and \
                 self._rigid_prim_view_direct._physics_view.check(), \
                 "Rigid prim view must be valid if physics is running!"
