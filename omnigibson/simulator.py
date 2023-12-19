@@ -417,7 +417,7 @@ class Simulator(SimulationContext, Serializable):
                     obj.update_handles()
 
         # Finally update any unified views
-        if og.sim.is_playing():
+        if self.is_playing():
             RigidContactAPI.initialize_view()
 
     def _non_physics_step(self):
