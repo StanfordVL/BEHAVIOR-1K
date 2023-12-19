@@ -253,19 +253,6 @@ class RigidContactAPI:
         """
         assert og.sim.is_playing(), "Cannot create rigid contact view while sim is not playing!"
 
-        # Compile deterministic mapping from rigid body path to idx
-        # Note that omni's ordering is based on the top-down object ordering path on the USD stage, which coincidentally
-        # matches the same ordering we store objects in our registry. So the mapping we generate from our registry
-        # mapping aligns with omni's ordering!
-        i = 0
-        cls._PATH_TO_IDX = dict()
-        for obj in og.sim.scene.objects:
-            if obj.prim_type == PrimType.RIGID:
-                for link in obj.links.values():
-                    if not link.kinematic_only:
-                        cls._PATH_TO_IDX[link.prim_path] = i
-                        i += 1
-
         # If there are no valid objects, clear the view and terminate early
         if i == 0:
             cls._CONTACT_VIEW = None
@@ -276,17 +263,9 @@ class RigidContactAPI:
         # We also suppress the omni tensor plugin from giving warnings we expect
         og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
         with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
-            cls._CONTACT_VIEW = og.sim.physics_sim_view.create_rigid_contact_view(
-                pattern="/World/*/*",
-                filter_patterns=list(cls._PATH_TO_IDX.keys()),
-            )
-
-        # Sanity check generated view -- this should generate square matrices of shape (N, N, 3)
-        n_bodies = len(cls._PATH_TO_IDX)
-        # from IPython import embed; embed()
-        assert cls._CONTACT_VIEW.sensor_count == n_bodies and cls._CONTACT_VIEW.filter_count == n_bodies, \
-            f"Got unexpected contact view shape. Expected: ({n_bodies}, {n_bodies}); " \
-            f"got: ({cls._CONTACT_VIEW.sensor_count}, {cls._CONTACT_VIEW.filter_count})"
+            cls._CONTACT_VIEW = og.sim.physics_sim_view.create_rigid_contact_view(pattern="/World/*/*")
+        
+        cls._PATH_TO_IDX = {prim_path: idx for idx, prim_path in enumerate(cls._CONTACT_VIEW.sensor_paths)}
 
     @classmethod
     def get_body_idx(cls, prim_path):
@@ -359,6 +338,7 @@ class RigidContactAPI:
         Clears the internal contact matrix and cache
         """
         cls._CONTACT_MATRIX = None
+        cls._PATH_TO_IDX = None
         cls._CONTACT_CACHE = dict()
 
 
