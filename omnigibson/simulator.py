@@ -405,6 +405,10 @@ class Simulator(SimulationContext, Serializable):
         """
 
     def update_handles(self):
+        # Handles are only relevant when physx is running
+        if not self.is_playing():
+            return
+
         # First, refresh the physics sim view
         self._physics_sim_view = omni.physics.tensors.create_simulation_view(self.backend)
         self._physics_sim_view.set_subspace_roots("/")
@@ -417,8 +421,7 @@ class Simulator(SimulationContext, Serializable):
                     obj.update_handles()
 
         # Finally update any unified views
-        if self.is_playing():
-            RigidContactAPI.initialize_view()
+        RigidContactAPI.initialize_view()
 
     def _non_physics_step(self):
         """
