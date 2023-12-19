@@ -814,9 +814,12 @@ class EntityPrim(XFormPrim):
         return self.root_link.get_angular_velocity()
 
     def set_position_orientation(self, position=None, orientation=None):
-        # Delegate to XFormPrim if we are not articulated
+        # Delegate to RigidPrim or XFormPrim if we are not articulated
         if self._articulation_view is None:
-            return super().set_position_orientation(position=position, orientation=orientation)
+            if self.root_link is not None:
+                return self.root_link.set_position_orientation(position=position, orientation=orientation)
+            else:
+                return super().set_position_orientation(position=position, orientation=orientation)
         
         if position is not None:
             position = np.asarray(position)[None, :]
@@ -826,18 +829,24 @@ class EntityPrim(XFormPrim):
         BoundingBoxAPI.clear()
 
     def get_position_orientation(self):
-        # Delegate to XFormPrim if we are not articulated
+        # Delegate to RigidPrim or XFormPrim if we are not articulated
         if self._articulation_view is None:
-            return super().get_position_orientation()
+            if self.root_link is not None:
+                return self.root_link.get_position_orientation()
+            else:
+                return super().get_position_orientation()
 
         positions, orientations = self._articulation_view.get_world_poses()
         return positions[0], orientations[0][[1, 2, 3, 0]]
 
     def set_local_pose(self, position=None, orientation=None):
-        # Delegate to XFormPrim if we are not articulated
+        # Delegate to RigidPrim or XFormPrim if we are not articulated
         if self._articulation_view is None:
-            return super().set_local_pose(position=position, orientation=orientation)
-        
+            if self.root_link is not None:
+                return self.root_link.set_local_pose(position=position, orientation=orientation)
+            else:
+                return super().set_local_pose(position=position, orientation=orientation)
+
         if position is not None:
             position = np.asarray(position)[None, :]
         if orientation is not None:
@@ -846,9 +855,12 @@ class EntityPrim(XFormPrim):
         BoundingBoxAPI.clear()
 
     def get_local_pose(self):
-        # Delegate to XFormPrim if we are not articulated
+        # Delegate to RigidPrim or XFormPrim if we are not articulated
         if self._articulation_view is None:
-            return super().get_local_pose()
+            if self.root_link is not None:
+                return self.root_link.get_local_pose()
+            else:
+                return super().get_local_pose()
         
         positions, orientations = self._articulation_view.get_local_poses()
         return positions[0], orientations[0][[1, 2, 3, 0]]
