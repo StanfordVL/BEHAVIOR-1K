@@ -393,9 +393,8 @@ class Simulator(SimulationContext, Serializable):
         self._scene.remove_object(obj)
         self.app.update()
 
-        # Re-initialize the physics view if we're playing because the number of objects has changed
-        if og.sim.is_playing():
-            RigidContactAPI.initialize_view()
+        # Update all handles that are now broken because objects have changed
+        self._update_handles()
 
         # Refresh all current rules
         TransitionRuleAPI.prune_active_rules()
@@ -404,6 +403,22 @@ class Simulator(SimulationContext, Serializable):
         """
         Reset internal variables when a new stage is loaded
         """
+
+    def _update_handles(self):
+        # First, refresh the physics sim view
+        self._physics_sim_view = omni.physics.tensors.create_simulation_view(self.backend)
+        self._physics_sim_view.set_subspace_roots("/")
+
+        # Then update the handles for all objects
+        if self.scene is not None and self.scene.initialized:
+            for obj in self.scene.objects:
+                # Only need to update if object is already initialized as well
+                if obj.initialized:
+                    obj.update_handles()
+
+        # Finally update any unified views
+        if og.sim.is_playing():
+            RigidContactAPI.initialize_view()
 
     def _non_physics_step(self):
         """
@@ -438,7 +453,7 @@ class Simulator(SimulationContext, Serializable):
                 self._objects_to_initialize = self._objects_to_initialize[n_objects_to_initialize:]
 
                 # Re-initialize the physics view because the number of objects has changed
-                RigidContactAPI.initialize_view()
+                self._update_handles()
 
                 # Also refresh the transition rules that are currently active
                 TransitionRuleAPI.refresh_all_rules()
@@ -498,20 +513,12 @@ class Simulator(SimulationContext, Serializable):
             # handles are updated, since updating the physics view makes the per-object physics view invalid
             self.step_physics()
 
-            # Initialize physics view and RigidContactAPI
-            self._physics_sim_view = omni.physics.tensors.create_simulation_view(self.backend)
-            self._physics_sim_view.set_subspace_roots("/")
-
             # Take a render step -- this is needed so that certain (unknown, maybe omni internal state?) is populated
             # correctly.
             self.render()
 
             # Update all object handles
-            if self.scene is not None and self.scene.initialized:
-                for obj in self.scene.objects:
-                    # Only need to update if object is already initialized as well
-                    if obj.initialized:
-                        obj.update_handles()
+            self._update_handles()
 
             if was_stopped:
                 # We need to update controller mode because kp and kd were set to the original (incorrect) values when
