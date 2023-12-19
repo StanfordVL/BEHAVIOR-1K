@@ -298,6 +298,7 @@ class XFormPrim(BasePrim):
             else:
                 rotq = Gf.Quatd(*orientation)
             xform_op.Set(rotq)
+        BoundingBoxAPI.clear()
         return
 
     def get_world_scale(self):
