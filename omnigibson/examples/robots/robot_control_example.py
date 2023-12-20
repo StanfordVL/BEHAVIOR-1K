@@ -91,7 +91,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     robot0_cfg["action_normalize"] = True
 
     # Compile config
-    cfg = dict(scene=scene_cfg, robots=[robot0_cfg])
+    cfg = dict(env=env_cfg, scene=scene_cfg, robots=[robot0_cfg])
 
     # Create the environment
     env = og.Environment(configs=cfg)
