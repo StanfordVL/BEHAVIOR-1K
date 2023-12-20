@@ -54,6 +54,7 @@ class EntityPrim(XFormPrim):
         self._joints = None
         self._materials = None
         self._visual_only = None
+        self._articulation_tree = None
         self._articulation_view_direct = None
 
         # This needs to be initialized to be used for _load() of PrimitiveObject
@@ -267,6 +268,7 @@ class EntityPrim(XFormPrim):
             f"found in the articulation view ({len(self._joints)})!"
 
         self._update_joint_limits()
+        self._compute_articulation_tree()
 
     def _update_joint_limits(self):
         """
@@ -454,25 +456,56 @@ class EntityPrim(XFormPrim):
         """
         return self._links
     
-    @property
-    def articulation_tree(self):
+    def _compute_articulation_tree(self):
         """
-        Get a graph of the articulation tree, where nodes are links (RigidPrim) and edges
-        correspond to joints (JointPrim), where the JointPrim is accessible on the `joint`
-        data field of the edge.
+        Get a graph of the articulation tree, where nodes are link names and edges
+        correspond to joint names, where the joint name is accessible on the `joint_name`
+        data field of the edge, and the joint type on the `joint_type` field.
         """
         G = nx.DiGraph()
         rename_later = {}
-        for link in self.links.values():
+
+        # Add the links
+        for link_name, link in self.links.items():
             prim_path = link.prim_path
             G.add_node(prim_path)
-            rename_later[prim_path] = link
-        for joint in self.joints.values():
-            if joint.body0 not in G.nodes or joint.body1 not in G.nodes:
-                continue
-            G.add_edge(joint.body0, joint.body1, joint=joint)
+            rename_later[prim_path] = link_name
+
+        # Add the joints
+        children = list(self.prim.GetChildren())
+        while children:
+            child_prim = children.pop()
+            children.extend(child_prim.GetChildren())
+            prim_type = child_prim.GetPrimTypeInfo().GetTypeName()
+            if "Joint" in prim_type:
+                # Get body 0
+                body0_targets = self._prim.GetRelationship("physics:body0").GetTargets()
+                if not body0_targets:
+                    continue
+                body0 = str(body0_targets[0])
+
+                # Get body 1
+                body1_targets = self._prim.GetRelationship("physics:body1").GetTargets()
+                if not body1_targets:
+                    continue
+                body1 = str(body1_targets[0])
+
+                # Assert both bodies in links
+                if body0 not in G.nodes or body1 not in G.nodes:
+                    continue
+            
+                # Add the joint
+                joint_type_str = "JOINT_" + prim_type.replace("Joint", "").upper()
+                G.add_edge(body0, body1, joint_name=child_prim.GetName(), joint_type=JointType[joint_type_str])
+
+        # Relabel nodes to use link name instead of prim path
         nx.relabel_nodes(G, rename_later)
-        return G
+        
+        self._articulation_tree = G
+
+    @property
+    def articulation_tree(self):
+        return self._articulation_tree
 
     @property
     def materials(self):

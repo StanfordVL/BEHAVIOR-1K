@@ -1,6 +1,7 @@
 from abc import abstractmethod
 from collections import namedtuple
 import numpy as np
+import networkx as nx
 
 import omnigibson as og
 from omnigibson.macros import gm, create_module_macros
@@ -1050,13 +1051,11 @@ class ManipulationRobot(BaseRobot):
         # Otherwise, compute the joint type. We use a fixed joint unless the link is a non-fixed link.
         # A link is non-fixed if it has any non-fixed parent joints.
         joint_type = "FixedJoint"
-        # TODO: Add this logic back w/o the graph using just the articulationview.
-        # articulation_graph = ag_obj.articulation_graph
-        # for edge in nx.edge_dfs(articulation_graph, ag_link, orientation="reverse"):
-        #     joint = articulation_graph.edges[edge]["joint"]
-        #     if joint.joint_type != JointType.JOINT_FIXED:
-        #         joint_type = "SphericalJoint"
-        #         break
+        for edge in nx.edge_dfs(ag_obj.articulation_tree, ag_link, orientation="reverse"):
+            joint = ag_obj.articulation_tree.edges[edge]["joint"]
+            if joint.joint_type != JointType.JOINT_FIXED:
+                joint_type = "SphericalJoint"
+                break
 
         return joint_type
 
