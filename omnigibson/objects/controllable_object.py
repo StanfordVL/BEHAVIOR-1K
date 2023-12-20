@@ -286,11 +286,12 @@ class ControllableObject(BaseObject):
 
     def apply_action(self, action):
         """
+        Converts inputted actions into low-level control signals
 
-        Converts inputted actions into low-level control signals and deploys them on the object
+        NOTE: This does NOT deploy control on the object. Use self.step() instead.
 
         Args:
-            n_array: n-DOF length array of actions to convert and deploy on the object
+            action (n-array): n-DOF length array of actions to apply to this object's internal controllers
         """
         # Store last action as the current action being applied
         self._last_action = action
@@ -304,25 +305,26 @@ class ControllableObject(BaseObject):
             self.action_dim, len(action)
         )
 
-        # Run convert actions to controls
-        control, control_type = self._actions_to_control(action=action)
+        # First, loop over all controllers, and update the desired command
+        idx = 0
 
-        # Deploy control signals
-        self.deploy_control(control=control, control_type=control_type, indices=None, normalized=False)
+        for name, controller in self._controllers.items():
+            # Set command, then take a controller step
+            controller.update_command(command=action[idx : idx + controller.command_dim])
+            # Update idx
+            idx += controller.command_dim
 
-    def _actions_to_control(self, action):
+        # If we haven't already created a physics callback, do so now so control gets updated every sim step
+        callback_name = f"{self.name}_controller_callback"
+        if not og.sim.physics_callback_exists(callback_name=callback_name):
+            og.sim.add_physics_callback(
+                callback_name=callback_name,
+                callback_fn=lambda x: self.step(),
+            )
+
+    def step(self):
         """
-        Converts inputted @action into low level control signals to deploy directly on the object.
-        This returns two arrays: the converted low level control signals and an array corresponding
-        to the specific ControlType for each signal.
-
-        Args:
-            action (n-array): n-DOF length array of actions to convert and deploy on the object
-
-        Returns:
-            2-tuple:
-                - n-array: raw control signals to send to the object's joints
-                - list: control types for each joint
+        Takes a controller step across all controllers and deploys the computed control signals onto the object.
         """
         # First, loop over all controllers, and calculate the computed control
         control = dict()
@@ -332,8 +334,6 @@ class ControllableObject(BaseObject):
         control_dict = self.get_control_dict()
 
         for name, controller in self._controllers.items():
-            # Set command, then take a controller step
-            controller.update_command(command=action[idx : idx + controller.command_dim])
             control[name] = {
                 "value": controller.step(control_dict=control_dict),
                 "type": controller.control_type,
@@ -350,8 +350,8 @@ class ControllableObject(BaseObject):
             u_vec[idx] = ctrl["value"]
             u_type_vec[idx] = ctrl["type"]
 
-        # Return control
-        return u_vec, u_type_vec
+        # Deploy control signals
+        self.deploy_control(control=u_vec, control_type=u_type_vec, indices=None, normalized=False)
 
     def deploy_control(self, control, control_type, indices=None, normalized=False):
         """
@@ -436,8 +436,8 @@ class ControllableObject(BaseObject):
             elif ctrl_type == ControlType.POSITION:
                 joint.set_pos(ctrl, normalized=norm, drive=True)
             elif ctrl_type == ControlType.NONE:
-                # Do nothing
-                pass
+                # Set zero efforts
+                joint.set_effort(0, normalized=False)
             else:
                 raise ValueError("Invalid control type specified: {}".format(ctrl_type))
 
@@ -457,6 +457,9 @@ class ControllableObject(BaseObject):
                 - joint_effort: (n_dof,) joint efforts
                 - root_pos: (3,) (x,y,z) global cartesian position of the object's root link
                 - root_quat: (4,) (x,y,z,w) global cartesian orientation of ths object's root link
+                - mass_matrix: (n_dof, n_dof) mass matrix
+                - gravity_force: (n_dof,) per-joint generalized gravity forces
+                - cc_force: (n_dof,) per-joint centripetal and centrifugal forces
         """
         pos, ori = self.get_position_orientation()
         return dict(
@@ -465,6 +468,9 @@ class ControllableObject(BaseObject):
             joint_effort=self.get_joint_efforts(normalized=False),
             root_pos=pos,
             root_quat=ori,
+            mass_matrix=self.get_mass_matrix(),
+            gravity_force=self.get_generalized_gravity_forces(),
+            cc_force=self.get_coriolis_and_centrifugal_forces(),
         )
 
     def dump_action(self):

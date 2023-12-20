@@ -1,5 +1,6 @@
 import gymnasium as gym
 import numpy as np
+from copy import deepcopy
 
 import omnigibson as og
 from omnigibson.objects import REGISTERED_OBJECTS
@@ -7,6 +8,7 @@ from omnigibson.robots import REGISTERED_ROBOTS
 from omnigibson.scene_graphs.graph_builder import SceneGraphBuilder
 from omnigibson.tasks import REGISTERED_TASKS
 from omnigibson.scenes import REGISTERED_SCENES
+from omnigibson.sensors import create_sensor
 from omnigibson.utils.gym_utils import GymObservable, recursively_generate_flat_dict
 from omnigibson.utils.config_utils import parse_config
 from omnigibson.utils.ui_utils import create_module_logger
@@ -22,40 +24,20 @@ class Environment(gym.Env, GymObservable, Recreatable):
     """
     Core environment class that handles loading scene, robot(s), and task, following OpenAI Gym interface.
     """
-    def __init__(
-        self,
-        configs,
-        action_timestep=1 / 60.0,
-        physics_timestep=1 / 60.0,
-        device=None,
-        automatic_reset=False,
-        flatten_action_space=False,
-        flatten_obs_space=False,
-    ):
+    def __init__(self, configs):
         """
         Args:
             configs (str or dict or list of str or dict): config_file path(s) or raw config dictionaries.
                 If multiple configs are specified, they will be merged sequentially in the order specified.
-                This allows procedural generation of a "full" config from small sub-configs.
-            action_timestep (float): environment executes action per action_timestep second
-            physics_timestep: physics timestep for physx
-            device (None or str): specifies the device to be used if running on the gpu with torch backend
-            automatic_reset (bool): whether to automatic reset after an episode finishes
-            flatten_action_space (bool): whether to flatten the action space as a sinle 1D-array
-            flatten_obs_space (bool): whether the observation space should be flattened when generated
+                This allows procedural generation of a "full" config from small sub-configs. For valid keys, please
+                see @default_config below
         """
         # Call super first
         super().__init__()
 
-        # Store settings and other initialized values
-        self._automatic_reset = automatic_reset
-        self._flatten_action_space = flatten_action_space
-        self._flatten_obs_space = flatten_obs_space
-        self.action_timestep = action_timestep
-
         # Initialize other placeholders that will be filled in later
-        self._initial_pos_z_offset = None                   # how high to offset object placement to account for one action step of dropping
         self._task = None
+        self._external_sensors = None
         self._loaded = None
         self._current_episode = 0
 
@@ -72,17 +54,20 @@ class Environment(gym.Env, GymObservable, Recreatable):
         for config in configs:
             merge_nested_dicts(base_dict=self.config, extra_dict=parse_config(config), inplace=True)
 
+        # Store settings and other initialized values
+        self._automatic_reset = self.env_config["automatic_reset"]
+        self._flatten_action_space = self.env_config["flatten_action_space"]
+        self._flatten_obs_space = self.env_config["flatten_obs_space"]
+        self.physics_timestep = self.env_config["physics_timestep"]
+        self.action_timestep = self.env_config["action_timestep"]
+        self.device = self.env_config["device"]
+        self._initial_pos_z_offset = self.env_config["initial_pos_z_offset"]    # how high to offset object placement to account for one action step of dropping
+
         # Create the scene graph builder
         self._scene_graph_builder = None
         if "scene_graph" in self.config and self.config["scene_graph"] is not None:
             self._scene_graph_builder = SceneGraphBuilder(**self.config["scene_graph"])
-
-        # Set the simulator settings
-        og.sim.set_simulation_dt(physics_dt=physics_timestep, rendering_dt=action_timestep)
-        og.sim.viewer_width = self.render_config["viewer_width"]
-        og.sim.viewer_height = self.render_config["viewer_height"]
-        og.sim.device = device
-
+          
         # Load this environment
         self.load()
 
@@ -159,10 +144,22 @@ class Environment(gym.Env, GymObservable, Recreatable):
         drop_distance = 0.5 * 9.8 * (self.action_timestep ** 2)
         assert drop_distance < self._initial_pos_z_offset, "initial_pos_z_offset is too small for collision checking"
 
-    def _load_task(self):
+    def _load_task(self, task_config=None):
         """
         Load task
+
+        Args:
+            task_confg (None or dict): If specified, custom task configuration to use. Otherwise, will use
+                self.task_config. Note that if a custom task configuration is specified, the internal task config
+                will be updated as well
         """
+        # Update internal config if specified
+        if task_config is not None:
+            # Copy task config, in case self.task_config and task_config are the same!
+            task_config = deepcopy(task_config)
+            self.task_config.clear()
+            self.task_config.update(task_config)
+
         # Sanity check task to make sure it's valid
         task_type = self.task_config["type"]
         assert_valid_key(key=task_type, valid_keys=REGISTERED_TASKS, name="task type")
@@ -186,6 +183,11 @@ class Environment(gym.Env, GymObservable, Recreatable):
         Load the scene and robot specified in the config file.
         """
         assert og.sim.is_stopped(), "Simulator must be stopped before loading scene!"
+
+        # Set the simulator settings
+        # NOTE: This must be done BEFORE the scene is loaded, or else all vision sensors can't retrieve observations
+        og.sim.set_simulation_dt(physics_dt=self.physics_timestep, rendering_dt=self.action_timestep)
+
         # Create the scene from our scene config
         scene = create_class_from_registry_and_config(
             cls_name=self.scene_config["type"],
@@ -194,6 +196,12 @@ class Environment(gym.Env, GymObservable, Recreatable):
             cls_type_descriptor="scene",
         )
         og.sim.import_scene(scene)
+
+        # Set the rendering settings
+        og.sim.viewer_width = self.render_config["viewer_width"]
+        og.sim.viewer_height = self.render_config["viewer_height"]
+        og.sim.device = self.device
+
         assert og.sim.is_stopped(), "Simulator must be stopped after loading scene!"
 
     def _load_robots(self):
@@ -260,6 +268,33 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
         assert og.sim.is_stopped(), "Simulator must be stopped after loading objects!"
 
+    def _load_external_sensors(self):
+        """
+        Load any additional custom external sensors into the scene
+        """
+        assert og.sim.is_stopped(), "Simulator must be stopped before loading external sensors!"
+        sensors_config = self.env_config["external_sensors"]
+        if sensors_config is not None:
+            self._external_sensors = dict()
+            for i, sensor_config in enumerate(sensors_config):
+                # Add a name for the object if necessary
+                if "name" not in sensor_config:
+                    sensor_config["name"] = f"external_sensor{i}"
+                # Determine prim path if not specified
+                if "prim_path" not in sensor_config:
+                    sensor_config["prim_path"] = f"/World/{sensor_config['name']}"
+                # Pop the desired position and orientation
+                local_position, local_orientation = sensor_config.pop("local_position", None), sensor_config.pop("local_orientation", None)
+                # Make sure sensor exists, grab its corresponding kwargs, and create the sensor
+                sensor = create_sensor(**sensor_config)
+                # Load an initialize this sensor
+                sensor.load()
+                sensor.initialize()
+                sensor.set_local_pose(local_position, local_orientation)
+                self._external_sensors[sensor.name] = sensor
+
+        assert og.sim.is_stopped(), "Simulator must be stopped after loading external sensors!"
+
     def _load_observation_space(self):
         # Grab robot(s) and task obs spaces
         obs_space = dict()
@@ -270,6 +305,15 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
         # Also load the task obs space
         obs_space["task"] = self._task.load_observation_space()
+
+        # Also load any external sensors
+        if self._external_sensors is not None:
+            external_obs_space = dict()
+            for sensor_name, sensor in self._external_sensors.items():
+                # Load the sensor observation space
+                external_obs_space[sensor_name] = sensor.load_observation_space()
+            obs_space["external"] = gym.spaces.Dict(external_obs_space)
+
         return obs_space
 
     def load_observation_space(self):
@@ -319,6 +363,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self._load_robots()
         self._load_objects()
         self._load_task()
+        self._load_external_sensors()
 
         og.sim.play()
         self.reset()
@@ -333,6 +378,31 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
         # Denote that the scene is loaded
         self._loaded = True
+
+    def update_task(self, task_config):
+        """
+        Updates the internal task using @task_config. NOTE: This will internally reset the environment as well!
+
+        Args:
+            task_config (dict): Task configuration for updating the new task
+        """
+        # Make sure sim is playing
+        assert og.sim.is_playing(), "Update task should occur while sim is playing!"
+
+        # Denote scene as not loaded yet
+        self._loaded = False
+        og.sim.stop()
+        self._load_task(task_config=task_config)
+        og.sim.play()
+        self.reset()
+
+        # Load obs / action spaces
+        self.load_observation_space()
+        self._load_action_space()
+
+        # Scene is now loaded again
+        self._loaded = True
+
 
     def close(self):
         """
@@ -355,6 +425,13 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
         # Add task observations
         obs["task"] = self._task.get_obs(env=self)
+
+        # Add external sensor observations if they exist
+        if self._external_sensors is not None:
+            external_obs = dict()
+            for sensor_name, sensor in self._external_sensors.items():
+                external_obs[sensor_name] = sensor.get_obs()
+            obs["external"] = external_obs
 
         # Possibly flatten obs if requested
         if self._flatten_obs_space:
@@ -482,7 +559,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         # Grab and return observations
         obs = self.get_obs()
 
-        if self.observation_space is not None and not self.observation_space.contains(obs):
+        if self._loaded and not self.observation_space.contains(obs):
             # Flatten obs, and print out all keys and values
             log.error("OBSERVATION SPACE:")
             for key, value in recursively_generate_flat_dict(dic=self.observation_space).items():
@@ -535,6 +612,15 @@ class Environment(gym.Env, GymObservable, Recreatable):
         return self.scene.robots
 
     @property
+    def external_sensors(self):
+        """
+        Returns:
+            None or dict: If self.env_config["external_sensors"] is specified, returns the dict mapping sensor name to
+                instantiated sensor. Otherwise, returns None
+        """
+        return self._external_sensors
+
+    @property
     def env_config(self):
         """
         Returns:
@@ -583,6 +669,14 @@ class Environment(gym.Env, GymObservable, Recreatable):
         return self.config["task"]
 
     @property
+    def wrapper_config(self):
+        """
+        Returns:
+            dict: Wrapper-specific configuration kwargs
+        """
+        return self.config["wrapper"]
+
+    @property
     def default_config(self):
         """
         Returns:
@@ -592,7 +686,14 @@ class Environment(gym.Env, GymObservable, Recreatable):
         return {
             # Environment kwargs
             "env": {
+                "action_timestep": 1 / 60.,
+                "physics_timestep": 1 / 60.,
+                "device": None,
+                "automatic_reset": False,
+                "flatten_action_space": False,
+                "flatten_obs_space": False,
                 "initial_pos_z_offset": 0.1,
+                "external_sensors": None,
             },
 
             # Rendering kwargs
@@ -623,5 +724,10 @@ class Environment(gym.Env, GymObservable, Recreatable):
             # Task kwargs
             "task": {
                 "type": "DummyTask",
-            }
+            },
+
+            # Wrapper kwargs
+            "wrapper": {
+                "type": None,
+            },
         }

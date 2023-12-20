@@ -124,7 +124,7 @@ def get_camera_params(viewport):
     view_proj_mat = helpers.get_view_proj_mat(view_params)
 
     return {
-        "pose": np.array(prim_tf),
+        "pose": np.array(prim_tf).T,        # omni natively gives transposed pose so we have to "un"-transpose it
         "fov": fov,
         "focal_length": view_params["focal_length"],
         "horizontal_aperture": view_params["horizontal_aperture"],
@@ -768,7 +768,7 @@ def sample_mesh_keypoints(mesh_prim, n_keypoints, n_keyfaces, seed=None):
     n_vertices = len(faces_flat)
 
     # Sample vertices
-    unique_vertices = np.unique(faces_flat, return_index=True)[1]
+    unique_vertices = np.unique(faces_flat)
     assert len(unique_vertices) == n_unique_vertices
     keypoint_idx = np.random.choice(unique_vertices, size=n_keypoints, replace=False) if \
         n_unique_vertices > n_keypoints else unique_vertices

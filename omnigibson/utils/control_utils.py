@@ -3,6 +3,7 @@ Set of utilities for helping to execute robot control
 """
 import lula
 import numpy as np
+from numba import jit
 import omnigibson.utils.transform_utils as T
 from omnigibson.utils.sim_utils import meets_minimum_isaac_version
 
@@ -130,3 +131,40 @@ class IKSolver:
             return np.array(ik_results.cspace_position)
         else:
             return None
+
+
+@jit(nopython=True)
+def orientation_error(desired, current):
+    """
+    This function calculates a 3-dimensional orientation error vector for use in the
+    impedance controller. It does this by computing the delta rotation between the
+    inputs and converting that rotation to exponential coordinates (axis-angle
+    representation, where the 3d vector is axis * angle).
+    See https://en.wikipedia.org/wiki/Axis%E2%80%93angle_representation for more information.
+    Optimized function to determine orientation error from matrices
+
+    Args:
+        desired (tensor): (..., 3, 3) where final two dims are 2d array representing target orientation matrix
+        current (tensor): (..., 3, 3) where final two dims are 2d array representing current orientation matrix
+    Returns:
+        tensor: (..., 3) where final dim is (ax, ay, az) axis-angle representing orientation error
+    """
+    # convert input shapes
+    input_shape = desired.shape[:-2]
+    desired = desired.reshape(-1, 3, 3)
+    current = current.reshape(-1, 3, 3)
+
+    # grab relevant info
+    rc1 = current[:, :, 0]
+    rc2 = current[:, :, 1]
+    rc3 = current[:, :, 2]
+    rd1 = desired[:, :, 0]
+    rd2 = desired[:, :, 1]
+    rd3 = desired[:, :, 2]
+
+    error = 0.5 * (np.cross(rc1, rd1) + np.cross(rc2, rd2) + np.cross(rc3, rd3))
+
+    # Reshape
+    error = error.reshape(*input_shape, 3)
+
+    return error

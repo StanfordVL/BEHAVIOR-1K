@@ -64,6 +64,8 @@ class VisionSensor(BaseSensor):
             loading this sensor's prim at runtime.
         image_height (int): Height of generated images, in pixels
         image_width (int): Width of generated images, in pixels
+        focal_length (float): Focal length to set
+        clipping_range (2-tuple): (min, max) viewing range of this vision sensor
         viewport_name (None or str): If specified, will link this camera to the specified viewport, overriding its
             current camera. Otherwise, creates a new viewport
     """
@@ -108,12 +110,16 @@ class VisionSensor(BaseSensor):
         load_config=None,
         image_height=128,
         image_width=128,
+        focal_length=17.0,                          # Default 17.0 since this is roughly the human eye focal length
+        clipping_range=(0.001, 10000000.0),
         viewport_name=None,
     ):
         # Create load config from inputs
         load_config = dict() if load_config is None else load_config
         load_config["image_height"] = image_height
         load_config["image_width"] = image_width
+        load_config["focal_length"] = focal_length
+        load_config["clipping_range"] = clipping_range
         load_config["viewport_name"] = viewport_name
 
         # Create variables that will be filled in later at runtime
@@ -184,6 +190,10 @@ class VisionSensor(BaseSensor):
         # Set the viewer size (requires taking one render step afterwards)
         self._viewport.viewport_api.set_texture_resolution((self._load_config["image_width"], self._load_config["image_height"]))
 
+        # Also update focal length and clipping range
+        self.focal_length = self._load_config["focal_length"]
+        self.clipping_range = self._load_config["clipping_range"]
+
         # Requires 3 render updates to propagate changes
         for i in range(3):
             render()
@@ -245,12 +255,6 @@ class VisionSensor(BaseSensor):
         # We also need to initialize this new modality
         if should_initialize:
             self.initialize_sensors(names=modality)
-
-    def get_local_pose(self):
-        # We have to overwrite this because camera prims can't set their quat for some reason ):
-        xform_translate_op = self.get_attribute("xformOp:translate")
-        xform_orient_op = self.get_attribute("xformOp:rotateXYZ")
-        return np.array(xform_translate_op), euler2quat(np.array(xform_orient_op))
 
     def remove(self):
         # Remove from global sensors dictionary
@@ -350,10 +354,28 @@ class VisionSensor(BaseSensor):
         self.visible = True
 
     @property
+    def horizontal_aperture(self):
+        """
+        Returns:
+            float: horizontal aperture of this sensor, in mm
+        """
+        return self.get_attribute("horizontalAperture")
+
+    @horizontal_aperture.setter
+    def horizontal_aperture(self, length):
+        """
+        Sets the focal length @length for this sensor
+
+        Args:
+            length (float): horizontal aperture of this sensor, in meters
+        """
+        self.set_attribute("horizontalAperture", length)
+
+    @property
     def focal_length(self):
         """
         Returns:
-            float: focal length of this sensor, in meters
+            float: focal length of this sensor, in mm
         """
         return self.get_attribute("focalLength")
 
@@ -363,9 +385,32 @@ class VisionSensor(BaseSensor):
         Sets the focal length @length for this sensor
 
         Args:
-            length (float): focal length of this sensor, in meters
+            length (float): focal length of this sensor, in mm
         """
         self.set_attribute("focalLength", length)
+
+    @property
+    def intrinsic_matrix(self):
+        """
+        Returns:
+            n-array: (3, 3) camera intrinsic matrix. Transforming point p (x,y,z) in the camera frame via K * p will
+                produce p' (x', y', w) - the point in the image plane. To get pixel coordiantes, divide x' and y' by w
+        """
+        params = get_camera_params(viewport=self._viewport.viewport_api)
+        h, w = self.image_height, self.image_width
+        horizontal_fov = params["fov"]
+        vertical_fov = horizontal_fov * h / w
+
+        f_x = (w / 2.0) / np.tan(horizontal_fov / 2.0)
+        f_y = (h / 2.0) / np.tan(vertical_fov / 2.0)
+
+        K = np.array([
+            [f_x, 0.0, w / 2.0],
+            [0.0, f_y, h / 2.0],
+            [0.0, 0.0, 1.0]
+        ])
+
+        return K
 
     @property
     def _obs_space_mapping(self):

@@ -76,7 +76,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     cfg = dict(scene=scene_cfg, robots=[robot0_cfg], objects=[table_cfg, chair_cfg, box_cfg])
 
     # Create the environment
-    env = og.Environment(configs=cfg, action_timestep=1/60., physics_timestep=1/60.)
+    env = og.Environment(configs=cfg)
 
     # Reset the robot
     robot = env.robots[0]

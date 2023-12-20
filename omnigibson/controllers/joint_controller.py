@@ -78,10 +78,6 @@ class JointController(LocomotionController, ManipulationController, GripperContr
             command_output_limits=command_output_limits,
         )
 
-    def reset(self):
-        # Nothing to reset.
-        pass
-
     def _command_to_control(self, command, control_dict):
         """
         Converts the (already preprocessed) inputted @command into deployable (non-clipped!) joint control signal
@@ -131,6 +127,28 @@ class JointController(LocomotionController, ManipulationController, GripperContr
     def is_grasping(self):
         # No good heuristic to determine grasping, so return UNKNOWN
         return IsGraspingState.UNKNOWN
+
+    def compute_no_op_command(self, control_dict):
+        # Compute based on mode
+        if self.use_delta_commands:
+            if self._motor_type == "position":
+                # Zero values
+                cmd = np.zeros(self.command_dim)
+            elif self._motor_type == "velocity" or self._motor_type == "effort":
+                # Run negative delta
+                cmd = -control_dict["joint_{}".format(self._motor_type)][self.dof_idx]
+            else:
+                raise ValueError(f"Got invalid motor type: {self._motor_type}!")
+        else:
+            # Directly use info from control dict
+            if self._motor_type == "position":
+                # Maintain current qpos
+                cmd = control_dict["joint_{}".format(self._motor_type)][self.dof_idx]
+            else:
+                # For velocity / effort, directly set to 0
+                cmd = np.zeros(self.command_dim)
+
+        return cmd
 
     @property
     def use_delta_commands(self):
