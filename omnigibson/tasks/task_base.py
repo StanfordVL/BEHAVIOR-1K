@@ -185,7 +185,9 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
             reward_function.reset(self, env)
 
         # Fill in low dim obs dim so we can use this to create the observation space later
-        self._low_dim_obs_dim = len(self.get_obs(env=env, flatten_low_dim=True)["low_dim"])
+        obs = self.get_obs(env=env, flatten_low_dim=True)
+        if "low_dim" in obs:
+            self._low_dim_obs_dim = len(obs["low_dim"])
 
     def _step_termination(self, env, action, info=None):
         """
