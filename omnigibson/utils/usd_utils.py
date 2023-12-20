@@ -258,7 +258,10 @@ class RigidContactAPI:
         # We also suppress the omni tensor plugin from giving warnings we expect
         og.sim.pi.update_simulation(elapsedStep=0, currentTime=og.sim.current_time)
         with suppress_omni_log(channels=["omni.physx.tensors.plugin"]):
-            cls._CONTACT_VIEW = og.sim.physics_sim_view.create_rigid_contact_view(pattern="/World/*/*")
+            cls._CONTACT_VIEW = og.sim.physics_sim_view.create_rigid_contact_view(
+                pattern="/World/*/*",
+                filter_patterns=["/World/*/*"],
+            )
 
         if cls._CONTACT_VIEW is None or cls._CONTACT_VIEW._backend is None:
             cls._CONTACT_VIEW = None
