@@ -499,7 +499,7 @@ class EntityPrim(XFormPrim):
                 G.add_edge(body0, body1, joint_name=child_prim.GetName(), joint_type=JointType[joint_type_str])
 
         # Relabel nodes to use link name instead of prim path
-        nx.relabel_nodes(G, rename_later)
+        nx.relabel_nodes(G, rename_later, copy=False)
 
         # Assert all nodes have in-degree of 1 except root
         in_degrees = {node: G.in_degree(node) for node in G.nodes}
