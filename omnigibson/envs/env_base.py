@@ -302,12 +302,12 @@ class Environment(gym.Env, GymObservable, Recreatable):
         for robot in self.robots:
             # Load the observation space for the robot
             robot_obs = robot.load_observation_space()
-            if gym.utils.flatdim(robot_obs) > 0:
+            if gym.spaces.utils.flatdim(robot_obs) > 0:
                 obs_space[robot.name] = robot_obs
 
         # Also load the task obs space
         task_space = self._task.load_observation_space()
-        if gym.utils.flatdim(task_space) > 0:
+        if gym.spaces.utils.flatdim(task_space) > 0:
             obs_space["task"] = task_space
 
         # Also load any external sensors
@@ -425,11 +425,11 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
         # Grab all observations from each robot
         for robot in self.robots:
-            if gym.utils.flatdim(robot.observation_space) > 0:
+            if gym.spaces.utils.flatdim(robot.observation_space) > 0:
                 obs[robot.name] = robot.get_obs()
 
         # Add task observations
-        if gym.utils.flatdim(self._task.observation_space) > 0:
+        if gym.spaces.utils.flatdim(self._task.observation_space) > 0:
             obs["task"] = self._task.get_obs(env=self)
 
         # Add external sensor observations if they exist
