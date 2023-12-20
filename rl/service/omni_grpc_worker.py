@@ -2,7 +2,7 @@ import numpy as np
 import omnigibson as og
 from omnigibson.macros import gm
 
-from grpc_server import serve_env_over_grpc
+from telegym import serve_env_over_grpc
 
 gm.USE_FLATCACHE = True
 

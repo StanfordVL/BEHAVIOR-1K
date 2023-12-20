@@ -3,8 +3,6 @@ import logging
 
 log = logging.getLogger(__name__)
 
-from grpc_client_vec_env import GRPCClientVecEnv
-
 import gymnasium as gym
 import torch as th
 import torch.nn as nn
