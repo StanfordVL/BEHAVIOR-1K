@@ -49,6 +49,7 @@ async def _register_workers(local_addr, n_envs):
     registration_servicer = EnvironmentRegistrationServicer(n_envs)
     environment_pb2_grpc.add_EnvironmentRegistrationServiceServicer_to_server(registration_servicer, registration_server)
     registration_server.add_insecure_port(local_addr)
+    print(f"Launching registration server at {local_addr}.")
     await registration_server.start()
 
     # Await the workers
