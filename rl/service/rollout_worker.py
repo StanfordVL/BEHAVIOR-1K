@@ -191,10 +191,13 @@ def serve(env, local_addr, learner_addr):
     )
     server.add_insecure_port(local_addr)
     server.start()
+    print("Launched env server.")
 
     # With our server started, let's get registered.
+    print("Registering env with learner.")
     success = register(local_addr, learner_addr)
     assert success, "Failed to register environment with learner."
+    print("Registered successfully.")
 
     # Repeatedly feed commands from queue into the servicer
     servicer = EnvironmentServicerReal(env)
