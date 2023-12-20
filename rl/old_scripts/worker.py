@@ -93,6 +93,12 @@ def main(policy_path, rollouts_path, iterations):
     h5py.get_config().track_order = True
 
     cfg = {
+        "env": {
+            "action_timestep": 1 / 10.,
+            "physics_timestep": 1 / 60.,
+            "flatten_obs_space": True,
+            "flatten_action_space": True,
+        },
         "scene": {
             "type": "InteractiveTraversableScene",
             "scene_model": "Rs_int",
@@ -185,7 +191,7 @@ def main(policy_path, rollouts_path, iterations):
     }
 
     # Create the environment
-    env = og.Environment(configs=cfg, action_timestep=1 / 60., physics_timestep=1 / 60.)
+    env = og.Environment(configs=cfg)
     scene = env.scene
     robot = env.robots[0]
     og.sim.step()
