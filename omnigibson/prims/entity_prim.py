@@ -479,13 +479,13 @@ class EntityPrim(XFormPrim):
             prim_type = child_prim.GetPrimTypeInfo().GetTypeName()
             if "Joint" in prim_type:
                 # Get body 0
-                body0_targets = self._prim.GetRelationship("physics:body0").GetTargets()
+                body0_targets = child_prim.GetRelationship("physics:body0").GetTargets()
                 if not body0_targets:
                     continue
                 body0 = str(body0_targets[0])
 
                 # Get body 1
-                body1_targets = self._prim.GetRelationship("physics:body1").GetTargets()
+                body1_targets = child_prim.GetRelationship("physics:body1").GetTargets()
                 if not body1_targets:
                     continue
                 body1 = str(body1_targets[0])
@@ -495,11 +495,17 @@ class EntityPrim(XFormPrim):
                     continue
             
                 # Add the joint
-                joint_type_str = "JOINT_" + prim_type.replace("Joint", "").upper()
+                joint_type_str = "JOINT_" + prim_type.replace("PhysicsJoint", "").upper()
                 G.add_edge(body0, body1, joint_name=child_prim.GetName(), joint_type=JointType[joint_type_str])
 
         # Relabel nodes to use link name instead of prim path
         nx.relabel_nodes(G, rename_later)
+
+        # Assert all nodes have in-degree of 1 except root
+        in_degrees = {node: G.in_degree(node) for node in G.nodes}
+        assert in_degrees[self.root_link_name] == 0, "Root link should have in-degree of 0!"
+        assert all([in_degrees[node] == 1 for node in G.nodes if node != self.root_link_name]), \
+            "All non-root links should have in-degree of 1!"
         
         self._articulation_tree = G
 
