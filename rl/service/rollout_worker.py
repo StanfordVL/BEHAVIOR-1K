@@ -194,7 +194,7 @@ def serve(env, local_addr, learner_addr):
     print("Launched env server.")
 
     # With our server started, let's get registered.
-    print("Registering env with learner.")
+    print(f"Registering env {local_addr} with learner {learner_addr}.")
     success = register(local_addr, learner_addr)
     assert success, "Failed to register environment with learner."
     print("Registered successfully.")
