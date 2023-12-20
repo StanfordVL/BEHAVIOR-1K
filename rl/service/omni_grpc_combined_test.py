@@ -28,6 +28,12 @@ def create_env():
     GRASP_REWARD = 0.3
 
     cfg = {
+        "env": {
+            "action_timestep": 1 / 10.,
+            "physics_timestep": 1 / 60.,
+            "flatten_obs_space": True,
+            "flatten_action_space": True,
+        },
         "scene": {
             "type": "InteractiveTraversableScene",
             "scene_model": "Rs_int",
@@ -107,7 +113,7 @@ def create_env():
         ]
     }
 
-    env = og.Environment(configs=cfg, action_timestep=1 / 10., physics_timestep=1 / 60., flatten_obs_space=True, flatten_action_space=True)
+    env = og.Environment(configs=cfg)
     return env
 
 class CustomCombinedExtractor(BaseFeaturesExtractor):

@@ -12,6 +12,12 @@ def main(local_addr, learner_addr):
     GRASP_REWARD = 0.3
 
     cfg = {
+        "env": {
+            "action_timestep": 1 / 10.,
+            "physics_timestep": 1 / 60.,
+            "flatten_obs_space": True,
+            "flatten_action_space": True,
+        },
         "scene": {
             "type": "InteractiveTraversableScene",
             "scene_model": "Rs_int",
@@ -91,7 +97,7 @@ def main(local_addr, learner_addr):
         ]
     }
 
-    env = og.Environment(configs=cfg, action_timestep=1 / 10., physics_timestep=1 / 60., flatten_obs_space=True, flatten_action_space=True)
+    env = og.Environment(configs=cfg)
 
     # Now start servicing!
     serve_env_over_grpc(env, local_addr, learner_addr)
