@@ -773,7 +773,7 @@ class ManipulationRobot(BaseRobot):
         candidate_data = []
         for prim_path in candidates_set:
             # Calculate position of the object link. Only allow this for objects currently.
-            obj_prim_path, link_name = prim_path.rsplit("/", 1)[-1]
+            obj_prim_path, link_name = prim_path.rsplit("/", 1)
             candidate_obj = og.sim.scene.object_registry("prim_path", obj_prim_path, None)
             if candidate_obj is None or link_name not in candidate_obj.links:
                 continue
