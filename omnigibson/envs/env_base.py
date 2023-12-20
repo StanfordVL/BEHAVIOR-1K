@@ -370,11 +370,12 @@ class Environment(gym.Env, GymObservable, Recreatable):
         self._load_external_sensors()
 
         og.sim.play()
-        self.reset()
 
         # Load the obs / action spaces
         self.load_observation_space()
         self._load_action_space()
+
+        self.reset()
 
         # Start the scene graph builder
         if self._scene_graph_builder:
