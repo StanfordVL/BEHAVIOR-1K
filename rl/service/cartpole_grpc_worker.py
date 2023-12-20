@@ -2,14 +2,14 @@ import asyncio
 
 import gymnasium as gym
 
-from rollout_worker import serve
+from grpc_server import serve_env_over_grpc
 
 
 async def main(local_addr, learner_addr):
     env = gym.make("PongNoFrameskip-v4", render_mode='rgb_array')
 
     # Now start servicing!
-    await serve(env, local_addr, learner_addr)
+    await serve_env_over_grpc(env, local_addr, learner_addr)
 
 if __name__ == "__main__":
     import sys

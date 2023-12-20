@@ -11,7 +11,7 @@ import grpc
 import numpy as np
 import environment_pb2
 import environment_pb2_grpc
-from rollout_client import GRPCEnv
+from grpc_client_env import GRPCClientEnv
 
 from stable_baselines3.common.vec_env.base_vec_env import VecEnv, VecEnvIndices, VecEnvObs, VecEnvStepReturn
 from stable_baselines3.common.vec_env import DummyVecEnv
@@ -25,7 +25,7 @@ class EnvironmentRegistrationServicer(environment_pb2_grpc.EnvironmentRegistrati
         for i, env in enumerate(self.envs):
             if env is None:
                 address = request.ip + ":" + str(request.port)
-                self.envs[i] = GRPCEnv(address)
+                self.envs[i] = GRPCClientEnv(address)
 
                 remaining = sum(1 for x in self.envs if x is None)
                 print(f"Registering worker at {address}, {remaining} more workers needed.")
@@ -55,7 +55,7 @@ async def _register_workers(local_addr, n_envs):
     # Await the workers
     return await registration_servicer.await_workers()
 
-class GRPCVecEnv(DummyVecEnv):
+class GRPCClientVecEnv(DummyVecEnv):
     def __init__(self, local_addr, n_envs):
         self.waiting = False
 

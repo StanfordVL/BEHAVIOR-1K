@@ -3,7 +3,7 @@ import logging
 
 log = logging.getLogger(__name__)
 
-from learner_worker import GRPCVecEnv
+from grpc_client_vec_env import GRPCClientVecEnv
 
 import gymnasium as gym
 import torch as th
@@ -116,7 +116,7 @@ def main():
     prefix = ''
     seed = 0
 
-    env = GRPCVecEnv("localhost:50051", args.n_envs)
+    env = GRPCClientVecEnv("localhost:50051", args.n_envs)
 
     # import IPython; IPython.embed()
 

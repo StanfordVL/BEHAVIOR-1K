@@ -181,7 +181,7 @@ def register(local_addr, learner_addr):
     print("Registration successful")
 
 
-def serve(env, local_addr, learner_addr):
+def serve_env_over_grpc(env, local_addr, learner_addr):
     request_queue = Queue()
     response_queue = Queue()
 
@@ -193,10 +193,11 @@ def serve(env, local_addr, learner_addr):
     server.start()
     print("Launched env server.")
 
-    # With our server started, let's get registered.
-    print(f"Registering env {local_addr} with learner {learner_addr}.")
-    registration = threading.Thread(target=register, args=(local_addr, learner_addr))
-    registration.start()
+    # With our server started, let's get registered if necessary.
+    if learner_addr:
+        print(f"Registering env {local_addr} with learner {learner_addr}.")
+        registration = threading.Thread(target=register, args=(local_addr, learner_addr))
+        registration.start()
 
     # Repeatedly feed commands from queue into the servicer
     servicer = EnvironmentServicerReal(env)

@@ -2,7 +2,7 @@ import numpy as np
 import omnigibson as og
 from omnigibson.macros import gm
 
-from rollout_worker import serve
+from grpc_server import serve_env_over_grpc
 
 gm.USE_FLATCACHE = True
 
@@ -94,7 +94,7 @@ def main(local_addr, learner_addr):
     env = og.Environment(configs=cfg, action_timestep=1 / 10., physics_timestep=1 / 60., flatten_obs_space=True, flatten_action_space=True)
 
     # Now start servicing!
-    serve(env, local_addr, learner_addr)
+    serve_env_over_grpc(env, local_addr, learner_addr)
 
 if __name__ == "__main__":
     import sys

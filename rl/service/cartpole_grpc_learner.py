@@ -1,12 +1,12 @@
 from stable_baselines3 import A2C
 from stable_baselines3.common.env_util import make_vec_env
 
-from learner_worker import GRPCVecEnv
+from grpc_client_vec_env import GRPCClientVecEnv
 
 import sys
 
 n_envs = int(sys.argv[1])
-env = GRPCVecEnv("localhost:50051", n_envs)
+env = GRPCClientVecEnv("localhost:50051", n_envs)
 
 model = A2C("CnnPolicy", env, verbose=1)
 model.learn(total_timesteps=10_000)

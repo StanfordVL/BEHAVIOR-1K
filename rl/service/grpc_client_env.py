@@ -5,7 +5,7 @@ import environment_pb2_grpc
 
 import gymnasium as gym
 
-class GRPCEnv(gym.Env):
+class GRPCClientEnv(gym.Env):
   def __init__(self, url):
     super().__init__()
     self.url = url
