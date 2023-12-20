@@ -142,12 +142,6 @@ class GraspTask(BaseTask):
         for reward_function in self._reward_functions.values():
             reward_function.reset(self, env)
 
-        # Fill in low dim obs dim so we can use this to create the observation space later
-        obs = self.get_obs(env=env, flatten_low_dim=True)
-        if "low_dim" in obs:
-            self._low_dim_obs_dim = len(obs["low_dim"])
-
-
     def _get_random_joint_position(self, robot):
         joint_positions = []
         joint_control_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])

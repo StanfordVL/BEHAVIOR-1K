@@ -111,6 +111,11 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
         # Run internal method
         self._load(env=env)
 
+        # Load the obs space dim
+        obs = self.get_obs(env=env, flatten_low_dim=True)
+        if "low_dim" in obs:
+            self._low_dim_obs_dim = len(obs["low_dim"])
+
         # We're now initialized
         self._loaded = True
 
@@ -183,11 +188,6 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
             termination_condition.reset(self, env)
         for reward_function in self._reward_functions.values():
             reward_function.reset(self, env)
-
-        # Fill in low dim obs dim so we can use this to create the observation space later
-        obs = self.get_obs(env=env, flatten_low_dim=True)
-        if "low_dim" in obs:
-            self._low_dim_obs_dim = len(obs["low_dim"])
 
     def _step_termination(self, env, action, info=None):
         """
