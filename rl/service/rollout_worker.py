@@ -53,7 +53,6 @@ class EnvironmentServicerReal(environment_pb2_grpc.EnvironmentService):
 
     def Step(self, request, unused_context):
         action = pickle.loads(request.action)
-        print("Action:", action, type(action))
         assert self.env.action_space.contains(action), "Action must be contained in action space."
         observation, reward, terminated, truncated, info = self.env.step(action)
 
@@ -178,7 +177,8 @@ def register(local_addr, learner_addr):
         port=int(local_addr.split(":")[1])
     )
     response = stub.RegisterEnvironment(request)
-    return response.success
+    assert response.success, "Registration failed"
+    print("Registration successful")
 
 
 def serve(env, local_addr, learner_addr):
@@ -195,9 +195,8 @@ def serve(env, local_addr, learner_addr):
 
     # With our server started, let's get registered.
     print(f"Registering env {local_addr} with learner {learner_addr}.")
-    success = register(local_addr, learner_addr)
-    assert success, "Failed to register environment with learner."
-    print("Registered successfully.")
+    registration = threading.Thread(target=register, args=(local_addr, learner_addr))
+    registration.start()
 
     # Repeatedly feed commands from queue into the servicer
     servicer = EnvironmentServicerReal(env)
