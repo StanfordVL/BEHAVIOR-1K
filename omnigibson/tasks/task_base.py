@@ -291,7 +291,7 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
         low_dim_obs, obs = self._get_obs(env=env)
 
         # Possibly flatten low dim and add to main observation dictionary
-        if self._low_dim_obs_dim > 0:
+        if low_dim_obs:
             obs["low_dim"] = self._flatten_low_dim_obs(obs=low_dim_obs) if flatten_low_dim else low_dim_obs
 
         return obs
