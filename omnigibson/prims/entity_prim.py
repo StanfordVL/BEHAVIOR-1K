@@ -495,8 +495,8 @@ class EntityPrim(XFormPrim):
                     continue
             
                 # Add the joint
-                joint_type_str = "JOINT_" + prim_type.replace("PhysicsJoint", "").upper()
-                G.add_edge(body0, body1, joint_name=child_prim.GetName(), joint_type=JointType[joint_type_str])
+                joint_type = JointType.get_type(prim_type.split("Physics")[-1])
+                G.add_edge(body0, body1, joint_name=child_prim.GetName(), joint_type=joint_type)
 
         # Relabel nodes to use link name instead of prim path
         nx.relabel_nodes(G, rename_later, copy=False)

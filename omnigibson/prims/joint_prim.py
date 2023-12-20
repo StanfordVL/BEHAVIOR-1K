@@ -125,7 +125,6 @@ class JointPrim(BasePrim):
         # Add joint state API if this is a revolute or prismatic joint
         self._joint_type = JointType.get_type(self._prim.GetTypeName().split("Physics")[-1])
         if self.is_single_dof:
-            state_type = "angular" if self._joint_type == JointType.JOINT_REVOLUTE else "linear"
             # We MUST already have the joint state API defined beforehand in the USD
             # This is because physx complains if we try to add physx APIs AFTER a simulation step occurs, which
             # happens because joint prims are usually created externally during an EntityPrim's initialization phase
