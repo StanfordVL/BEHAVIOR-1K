@@ -1,6 +1,7 @@
 from abc import abstractmethod
 from collections import namedtuple
 import numpy as np
+import networkx as nx
 
 import omnigibson as og
 from omnigibson.macros import gm, create_module_macros
@@ -150,9 +151,6 @@ class ManipulationRobot(BaseRobot):
         self._grasping_mode = grasping_mode
         self._disable_grasp_handling = disable_grasp_handling
 
-        # Other internal variables initialized later
-        self._eef_link_idxs = {arm: None for arm in self.arm_names}
-
         # Initialize other variables used for assistive grasping
         self._ag_freeze_joint_pos = {
             arm: {} for arm in self.arm_names
@@ -217,12 +215,6 @@ class ManipulationRobot(BaseRobot):
 
     def _initialize(self):
         super()._initialize()
-
-        # Store index of EEF within link count
-        offset = -1 if self.fixed_base else 0
-        link_path_to_idx = {path: i for i, path in enumerate(self._physics_view.link_paths[0])}
-        for arm in self.arm_names:
-            self._eef_link_idxs[arm] = link_path_to_idx[self.eef_links[arm].prim_path] + offset
 
         if gm.AG_CLOTH:
             for arm in self.arm_names:
@@ -394,7 +386,8 @@ class ManipulationRobot(BaseRobot):
             # -n_joints because there may be an additional 6 entries at the beginning of the array, if this robot does
             # not have a fixed base (i.e.: the 6DOF --> "floating" joint)
             # see self.get_relative_jacobian() for more info
-            dic[f"eef_{arm}_jacobian_relative"] = self.get_relative_jacobian()[self._eef_link_idxs[arm], :, -self.n_joints:]
+            eef_link_idx = self._articulation_view.get_body_index(self.eef_links[arm].body_name)
+            dic[f"eef_{arm}_jacobian_relative"] = self.get_relative_jacobian()[eef_link_idx, :, -self.n_joints:]
 
         return dic
 
@@ -779,12 +772,13 @@ class ManipulationRobot(BaseRobot):
 
         candidate_data = []
         for prim_path in candidates_set:
-            # Calculate position of the object link
-            # Note: this assumes the simulator is playing!
-            rb_handle = self._dc.get_rigid_body(prim_path)
-            pose = self._dc.get_rigid_body_pose(rb_handle)
-            link_pos = np.asarray(pose.p)
-            dist = np.linalg.norm(np.array(link_pos) - np.array(gripper_center_pos))
+            # Calculate position of the object link. Only allow this for objects currently.
+            obj_prim_path, link_name = prim_path.rsplit("/", 1)[-1]
+            candidate_obj = og.sim.scene.object_registry("prim_path", obj_prim_path, None)
+            if candidate_obj is None or link_name not in candidate_obj.links:
+                continue
+            candidate_link = candidate_obj.links[link_name]
+            dist = np.linalg.norm(np.array(candidate_link.get_position()) - np.array(gripper_center_pos))
             candidate_data.append((prim_path, dist))
 
         candidate_data = sorted(candidate_data, key=lambda x: x[-1])
@@ -1051,21 +1045,13 @@ class ManipulationRobot(BaseRobot):
             return None
         
         # Otherwise, compute the joint type. We use a fixed joint unless the link is a non-fixed link.
+        # A link is non-fixed if it has any non-fixed parent joints.
         joint_type = "FixedJoint"
-        if ag_obj.root_link != ag_link:
-            # We search up the tree path from the ag_link until we encounter the root (joint == 0) or a non fixed
-            # joint (e.g.: revolute or fixed)
-            link_handle = ag_link.handle
-            joint_handle = self._dc.get_rigid_body_parent_joint(link_handle)
-            while joint_handle != 0:
-                # If this joint type is not fixed, we've encountered a valid moving joint
-                # So we create a spherical joint rather than fixed joint
-                if self._dc.get_joint_type(joint_handle) != JointType.JOINT_FIXED:
-                    joint_type = "SphericalJoint"
-                    break
-                # Grab the parent link and its parent joint for the link
-                link_handle = self._dc.get_joint_parent_body(joint_handle)
-                joint_handle = self._dc.get_rigid_body_parent_joint(link_handle)
+        for edge in nx.edge_dfs(ag_obj.articulation_tree, ag_link.body_name, orientation="reverse"):
+            joint = ag_obj.articulation_tree.edges[edge]["joint"]
+            if joint.joint_type != JointType.JOINT_FIXED:
+                joint_type = "SphericalJoint"
+                break
 
         return joint_type
 

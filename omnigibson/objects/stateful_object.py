@@ -66,6 +66,7 @@ class StatefulObject(BaseObject):
             visible=True,
             fixed_base=False,
             visual_only=False,
+            kinematic_only=None,
             self_collisions=False,
             prim_type=PrimType.RIGID,
             load_config=None,
@@ -89,6 +90,9 @@ class StatefulObject(BaseObject):
             visible (bool): whether to render this object or not in the stage
             fixed_base (bool): whether to fix the base of this object or not
             visual_only (bool): Whether this object should be visual only (and not collide with any other objects)
+            kinematic_only (None or bool): Whether this object should be kinematic only (and not get affected by any
+                collisions). If None, then this value will be set to True if @fixed_base is True and some other criteria
+                are satisfied, else False.
             self_collisions (bool): Whether to enable self collisions for this object
             prim_type (PrimType): Which type of prim the object is, Valid options are: {PrimType.RIGID, PrimType.CLOTH}
             load_config (None or dict): If specified, should contain keyword-mapped values that are relevant for
@@ -129,6 +133,7 @@ class StatefulObject(BaseObject):
             visible=visible,
             fixed_base=fixed_base,
             visual_only=visual_only,
+            kinematic_only=kinematic_only,
             self_collisions=self_collisions,
             prim_type=prim_type,
             load_config=load_config,
