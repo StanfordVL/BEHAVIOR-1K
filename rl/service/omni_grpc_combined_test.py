@@ -196,8 +196,6 @@ def main():
 
     env = DummyVecEnv([create_env])
 
-    import IPython; IPython.embed()
-
     # TODO: None of this stuff works: make it work by running env locally and connecting to it.
     # If we're evaluating, hide the ceilings and enable camera teleoperation so the user can easily
     # visualize the rollouts dynamically
