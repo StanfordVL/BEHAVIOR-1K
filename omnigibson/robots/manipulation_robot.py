@@ -1051,7 +1051,7 @@ class ManipulationRobot(BaseRobot):
         # Otherwise, compute the joint type. We use a fixed joint unless the link is a non-fixed link.
         # A link is non-fixed if it has any non-fixed parent joints.
         joint_type = "FixedJoint"
-        for edge in nx.edge_dfs(ag_obj.articulation_tree, ag_link, orientation="reverse"):
+        for edge in nx.edge_dfs(ag_obj.articulation_tree, ag_link.body_name, orientation="reverse"):
             joint = ag_obj.articulation_tree.edges[edge]["joint"]
             if joint.joint_type != JointType.JOINT_FIXED:
                 joint_type = "SphericalJoint"
