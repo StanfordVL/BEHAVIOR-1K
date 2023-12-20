@@ -93,7 +93,8 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
         obs_space = self._load_non_low_dim_observation_space()
 
         # Create the low dim obs space and add to the main obs space dict -- make sure we're flattening low dim obs
-        obs_space["low_dim"] = self._build_obs_box_space(shape=(self._low_dim_obs_dim,), low=-np.inf, high=np.inf, dtype=np.float64)
+        if self._low_dim_obs_dim > 0:
+            obs_space["low_dim"] = self._build_obs_box_space(shape=(self._low_dim_obs_dim,), low=-np.inf, high=np.inf, dtype=np.float64)
 
         return obs_space
 
@@ -290,7 +291,8 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
         low_dim_obs, obs = self._get_obs(env=env)
 
         # Possibly flatten low dim and add to main observation dictionary
-        obs["low_dim"] = self._flatten_low_dim_obs(obs=low_dim_obs) if flatten_low_dim else low_dim_obs
+        if self._low_dim_obs_dim > 0:
+            obs["low_dim"] = self._flatten_low_dim_obs(obs=low_dim_obs) if flatten_low_dim else low_dim_obs
 
         return obs
 
