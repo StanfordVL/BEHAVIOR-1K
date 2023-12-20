@@ -113,8 +113,7 @@ class BaseTask(GymObservable, Registerable, metaclass=ABCMeta):
 
         # Load the obs space dim
         obs = self.get_obs(env=env, flatten_low_dim=True)
-        if "low_dim" in obs:
-            self._low_dim_obs_dim = len(obs["low_dim"])
+        self._low_dim_obs_dim = len(obs["low_dim"]) if "low_dim" in obs else 0
 
         # We're now initialized
         self._loaded = True
