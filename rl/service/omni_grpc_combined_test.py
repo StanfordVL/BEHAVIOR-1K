@@ -66,13 +66,11 @@ def create_env():
                         "name": "DifferentialDriveController",
                     },
                     "arm_0": {
-                        "name": "InverseKinematicsController",
-                        "motor_type": "velocity",
-                        "command_input_limits": (np.array([-0.2, -0.2, -0.2, -np.pi, -np.pi, -np.pi]),
-                        np.array([0.2, 0.2, 0.2, np.pi, np.pi, np.pi])),
+                        "name": "JointController",
+                        "motor_type": "position",
+                        "command_input_limits": "default",
                         "command_output_limits": None,
-                        "mode": "pose_absolute_ori", 
-                        "kv": 3.0
+                        "use_delta_commands": True,
                     },
                     "gripper_0": {
                         "name": "MultiFingerGripperController",
