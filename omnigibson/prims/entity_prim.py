@@ -54,6 +54,7 @@ class EntityPrim(XFormPrim):
         self._joints = None
         self._materials = None
         self._visual_only = None
+        self._articulated = None
         self._articulation_tree = None
         self._articulation_view_direct = None
 
@@ -159,6 +160,9 @@ class EntityPrim(XFormPrim):
                         material_paths.add(mat_path)
 
         self._materials = materials
+
+        # Cache weather we are articulated or not
+        self._articulated = self.articulation_root_path is not None
 
     def update_links(self):
         """
@@ -349,7 +353,8 @@ class EntityPrim(XFormPrim):
         """
         # Note that this is not equivalent to self.n_joints > 0 because articulation root path is
         # overridden by the object classes
-        return self.articulation_root_path is not None
+        assert self._articulated is not None, "Articulation state not initialized!"
+        return self._articulated
 
     @property
     def articulation_root_path(self):
@@ -419,6 +424,10 @@ class EntityPrim(XFormPrim):
         Returns:
         int: Number of fixed joints owned by this articulation
         """
+        # If the articulation view is available, use it.
+        if self._articulation_view and self._articulation_view._metadata:
+            return sum(1 for joint_dof in self._articulation_view._metadata.joint_dof_counts if joint_dof == 0)
+
         # Manually iterate over all links and check for any joints that are not fixed joints!
         num = 0
         children = list(self.prim.GetChildren())
@@ -554,7 +563,7 @@ class EntityPrim(XFormPrim):
         """
         contacts = []
         for link in self._links.values():
-            contacts += link.contact_list()
+            contacts.extend(link.contact_list())
         return contacts
 
     def enable_gravity(self) -> None:
