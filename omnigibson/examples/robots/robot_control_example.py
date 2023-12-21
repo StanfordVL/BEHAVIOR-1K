@@ -91,7 +91,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     robot0_cfg["action_normalize"] = True
 
     # Compile config
-    cfg = dict(scene=scene_cfg, robots=[robot0_cfg])
+    cfg = dict(env=env_cfg, scene=scene_cfg, robots=[robot0_cfg])
 
     # Create the environment
     env = og.Environment(configs=cfg)
@@ -109,6 +109,10 @@ def main(random_selection=False, headless=False, short_exec=False):
     # Update the control mode of the robot
     controller_config = {component: {"name": name} for component, name in controller_choices.items()}
     robot.reload_controllers(controller_config=controller_config)
+
+    # Because the controllers have been updated, we need to update the initial state so the correct controller state
+    # is preserved
+    env.scene.update_initial_state()
 
     # Update the simulator's viewer camera's pose so it points towards the robot
     og.sim.viewer_camera.set_position_orientation(

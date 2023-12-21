@@ -9,7 +9,7 @@ from omnigibson.scene_graphs.graph_builder import SceneGraphBuilder
 from omnigibson.tasks import REGISTERED_TASKS
 from omnigibson.scenes import REGISTERED_SCENES
 from omnigibson.sensors import create_sensor
-from omnigibson.utils.gym_utils import GymObservable, recursively_generate_flat_dict
+from omnigibson.utils.gym_utils import GymObservable, recursively_generate_flat_dict, recursively_generate_compatible_dict
 from omnigibson.utils.config_utils import parse_config
 from omnigibson.utils.ui_utils import create_module_logger
 from omnigibson.utils.python_utils import assert_valid_key, merge_nested_dicts, create_class_from_registry_and_config,\
@@ -566,15 +566,36 @@ class Environment(gym.Env, GymObservable, Recreatable):
         # Grab and return observations
         obs = self.get_obs()
 
-        if self._loaded and not self.observation_space.contains(obs):
-            # Flatten obs, and print out all keys and values
-            log.error("OBSERVATION SPACE:")
-            for key, value in recursively_generate_flat_dict(dic=self.observation_space).items():
-                log.error(("obs_space", key, value.dtype, value.shape))
-            log.error("ACTUAL OBSERVATIONS:")
-            for key, value in recursively_generate_flat_dict(dic=obs).items():
-                log.error(("obs", key, value.dtype, value.shape))
-            raise ValueError("Observation space does not match returned observations!")
+        if self._loaded:
+            # Sanity check to make sure received observations match expected observation space
+            check_obs = recursively_generate_compatible_dict(dic=obs)
+            if not self.observation_space.contains(check_obs):
+                exp_obs = dict()
+                for key, value in recursively_generate_flat_dict(dic=self.observation_space).items():
+                    exp_obs[key] = ("obs_space", key, value.dtype, value.shape)
+                real_obs = dict()
+                for key, value in recursively_generate_flat_dict(dic=check_obs).items():
+                    if isinstance(value, np.ndarray):
+                        real_obs[key] = ("obs", key, value.dtype, value.shape)
+                    else:
+                        real_obs[key] = ("obs", key, type(value), "()")
+
+                exp_keys = set(exp_obs.keys())
+                real_keys = set(real_obs.keys())
+                shared_keys = exp_keys.intersection(real_keys)
+                missing_keys = exp_keys - real_keys
+                extra_keys = real_keys - exp_keys
+
+                log.error("MISSING OBSERVATION KEYS:")
+                log.error(missing_keys)
+                log.error("EXTRA OBSERVATION KEYS:")
+                log.error(extra_keys)
+                log.error("SHARED OBSERVATION KEY DTYPES AND SHAPES:")
+                for k in shared_keys:
+                    log.error(exp_obs[k])
+                    log.error(real_obs[k])
+
+                raise ValueError("Observation space does not match returned observations!")
 
         return obs, {}
 

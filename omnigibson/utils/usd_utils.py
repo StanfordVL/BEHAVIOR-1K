@@ -130,7 +130,7 @@ def get_camera_params(viewport):
         "horizontal_aperture": view_params["horizontal_aperture"],
         "view_projection_matrix": view_proj_mat,
         "resolution": {"width": view_params["width"], "height": view_params["height"]},
-        "clipping_range": view_params["clipping_range"],
+        "clipping_range": np.array(view_params["clipping_range"]),
     }
 
 
