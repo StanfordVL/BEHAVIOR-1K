@@ -323,19 +323,6 @@ class ManipulationRobot(BaseRobot):
                 new_obj_pose = new_eef_pose @ inv_original_eef_pose @ original_obj_pose
                 self._ag_obj_in_hand[arm].set_position_orientation(*T.mat2pose(hmat=new_obj_pose))
 
-    def apply_action(self, action):
-        # Run super method as normal
-        super().apply_action(action)
-
-        # Then run assisted grasping
-        if self.grasping_mode != "physical" and not self._disable_grasp_handling:
-            self._handle_assisted_grasping(action=action)
-
-        # Potentially freeze gripper joints
-        for arm in self.arm_names:
-            if self._ag_freeze_gripper[arm]:
-                self._freeze_gripper(arm)
-
     def deploy_control(self, control, control_type, indices=None, normalized=False):
         # We intercept the gripper control and replace it with the current joint position if we're freezing our gripper
         for arm in self.arm_names:
@@ -344,6 +331,15 @@ class ManipulationRobot(BaseRobot):
                     self.controllers[f"gripper_{arm}"].control_type == ControlType.POSITION else 0.0
 
         super().deploy_control(control=control, control_type=control_type, indices=indices, normalized=normalized)
+
+        # Then run assisted grasping
+        if self.grasping_mode != "physical" and not self._disable_grasp_handling:
+            self._handle_assisted_grasping()
+
+        # Potentially freeze gripper joints
+        for arm in self.arm_names:
+            if self._ag_freeze_gripper[arm]:
+                self._freeze_gripper(arm)
 
     def _release_grasp(self, arm="default"):
         """
@@ -1141,12 +1137,9 @@ class ManipulationRobot(BaseRobot):
             j_val = joint.get_state()[0][0]
             self._ag_freeze_joint_pos[arm][joint.joint_name] = j_val
 
-    def _handle_assisted_grasping(self, action):
+    def _handle_assisted_grasping(self):
         """
-        Handles assisted grasping.
-
-        Args:
-            action (n-array): gripper action to apply. >= 0 is release (open), < 0 is grasp (close).
+        Handles assisted grasping by creating or removing constraints.
         """
         # Loop over all arms
         for arm in self.arm_names:
