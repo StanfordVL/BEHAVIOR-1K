@@ -242,7 +242,7 @@ class ControllableObject(BaseObject):
             else self._create_continuous_action_space()
 
     def reset(self):
-        # Make sure simulation is playing, otherwise, we cannot reset because DC requires active running
+        # Make sure simulation is playing, otherwise, we cannot reset because physx requires active running
         # simulation in order to set joints
         assert og.sim.is_playing(), "Simulator must be playing in order to reset controllable object's joints!"
 

@@ -128,6 +128,9 @@ class BasePrim(Serializable, UniquelyNamed, Recreatable, ABC):
         # Also clear the name so we can reuse this later
         self.remove_names(include_all_owned=True)
 
+        # Make the simulator refresh its handles
+        og.sim.update_handles()
+
     @abstractmethod
     def _load(self):
         """
