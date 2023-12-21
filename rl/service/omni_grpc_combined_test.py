@@ -42,7 +42,7 @@ def create_env():
         "robots": [
             {
                 "type": "Fetch",
-                "obs_modalities": ["rgb", "proprio"],
+                "obs_modalities": ["proprio"],
                 "proprio_obs": ["joint_qpos", "joint_qvel", "eef_0_pos", "eef_0_quat", "grasp_0"],
                 "scale": 1.0,
                 "self_collisions": True,
@@ -52,15 +52,7 @@ def create_env():
                 "rigid_trunk": False,
                 "default_arm_pose": "diagonal30",
                 "default_trunk_offset": 0.365,
-                "sensor_config": {
-                    "VisionSensor": {
-                        "modalities": ["rgb"],
-                        "sensor_kwargs": {
-                            "image_width": 224,
-                            "image_height": 224
-                        }
-                    }
-                },
+                "sensor_config": {},
                 "controller_config": {
                     "base": {
                         "name": "DifferentialDriveController",
