@@ -82,9 +82,9 @@ class RigidPrim(XFormPrim):
         self._rigid_prim_view_direct = RigidPrimView(self._prim_path)
 
         # Set it to be kinematic if necessary
-        if "kinematic_only" in self._load_config and self._load_config["kinematic_only"]:
-            self.set_attribute("physics:kinematicEnabled", True)
-            self.set_attribute("physics:rigidBodyEnabled", False)
+        kinematic_only = "kinematic_only" in self._load_config and self._load_config["kinematic_only"]
+        self.set_attribute("physics:kinematicEnabled", kinematic_only)
+        self.set_attribute("physics:rigidBodyEnabled", not kinematic_only)
 
         # run super first
         super()._post_load()

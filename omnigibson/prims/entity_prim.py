@@ -242,7 +242,6 @@ class EntityPrim(XFormPrim):
         if self._articulation_view and not self.kinematic_only:
             self._n_dof = self._articulation_view.num_dof
 
-            # TODO: This still includes fixed joints for objects that also have non-fixed?
             # Additionally grab DOF info if we have non-fixed joints
             if self._n_dof > 0:
                 for i in range(self._articulation_view._metadata.joint_count):
