@@ -37,6 +37,31 @@ def recursively_generate_flat_dict(dic, prefix=None):
     return out
 
 
+def recursively_generate_compatible_dict(dic):
+    """
+    Helper function to recursively iterate through dictionary and cast values to necessary types to be compatibel with
+    Gym spaces -- in particular, the Sequence and Tuple types for np.ndarray / np.void values in @dic
+
+    Args:
+        dic (dict or gym.spaces.Dict): (Potentially nested) dictionary to convert into a flattened dictionary
+
+    Returns:
+        dict: Gym-compatible version of @dic
+    """
+    out = dict()
+    for k, v in dic.items():
+        if isinstance(v, dict):
+            out[k] = recursively_generate_compatible_dict(dic=v)
+        elif isinstance(v, np.ndarray) and len(v.dtype) > 0:
+            # Map to list of tuples
+            out[k] = list(map(tuple, v))
+        else:
+            # Preserve the key-value pair
+            out[k] = v
+
+    return out
+
+
 class GymObservable(metaclass=ABCMeta):
     """
     Simple class interface for observable objects. These objects should implement a way to grab observations,

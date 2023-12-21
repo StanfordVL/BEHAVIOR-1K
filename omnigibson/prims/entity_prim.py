@@ -121,7 +121,7 @@ class EntityPrim(XFormPrim):
 
         # Prepare the articulation view.
         if self.n_joints > 0:
-            self._articulation_view_direct = ArticulationView(self._prim_path + "/base_link")
+            self._articulation_view_direct = ArticulationView(f"{self._prim_path}/{self.root_link_name}")
 
         # Set visual only flag
         # This automatically handles setting collisions / gravity appropriately per-link
