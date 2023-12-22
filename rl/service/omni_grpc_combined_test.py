@@ -37,7 +37,7 @@ def create_env():
         "scene": {
             "type": "InteractiveTraversableScene",
             "scene_model": "Rs_int",
-            "load_object_categories": ["floors", "coffee_table"],
+            "load_object_categories": ["floors", "walls", "coffee_table"],
         },
         "robots": [
             {
