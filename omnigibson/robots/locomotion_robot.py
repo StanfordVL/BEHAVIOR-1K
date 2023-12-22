@@ -199,20 +199,20 @@ class LocomotionRobot(BaseRobot):
         return classes
     
 
-    def gen_action_from_vr_data(self, vr_data: dict) -> np.ndarray:
+    def teleop_data_to_action(self, teleop_data: dict) -> np.ndarray:
         """
         Generate action data from VR input for robot teleoperation
         NOTE: This implementation only supports DifferentialDriveController. 
         Overwrite this function if the robot is using a different base controller.
         Args:
-            vr_data (dict): dictionary containing vr_data from VRSys.step()
+            teleop_data (dict): dictionary containing teleop data from utils.teleop_utils.TeleopSystem
         Returns:
             np.ndarray: array of action data
         """
         assert isinstance(self._controllers["base"], DifferentialDriveController), "Only DifferentialDriveController is supported!"
-        if vr_data["robot_attached"]:
-            translation_offset = vr_data["button_data"][1]["axis"]["touchpad_y"]
-            rotation_offset = vr_data["button_data"][1]["axis"]["touchpad_x"]
+        if teleop_data["robot_attached"]:
+            translation_offset = teleop_data["transforms"]["base"][0]
+            rotation_offset = teleop_data["transforms"]["base"][3]
         else:
             translation_offset, rotation_offset = 0, 0
-        return np.array([translation_offset, -rotation_offset]) * 0.5
+        return np.array([translation_offset, rotation_offset])

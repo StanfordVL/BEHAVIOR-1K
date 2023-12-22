@@ -2,7 +2,7 @@
 Example script for using VR controller to teleoperate a robot.
 """
 import omnigibson as og
-from omnigibson.utils.xr_utils import VRSys
+from omnigibson.utils.teleop_utils import VRSystem
 from omnigibson.utils.ui_utils import choose_from_options
 
 ROBOTS = {
@@ -112,28 +112,28 @@ def main():
     og.sim.viewer_camera.set_position_orientation([-0.22, 0.99, 1.09], [-0.14, 0.47, 0.84, -0.23])
 
     # Start vrsys 
-    vr_robot = env.robots[0]
-    vrsys = VRSys(system="OpenXR", vr_robot=vr_robot, show_controller=True, disable_display_output=True, align_anchor_to_robot_base=True)
+    robot = env.robots[0]
+    vrsys = VRSystem(robot=robot, system="OpenXR", show_controller=True, disable_display_output=True, align_anchor_to_robot_base=True)
     vrsys.start()
     # tracker variable of whether the robot is attached to the VR system
     prev_robot_attached = False
     # main simulation loop
     for _ in range(10000):
         if og.sim.is_playing():
-            vr_data = vrsys.step()
-            if vr_data["robot_attached"] == True and prev_robot_attached == False:
+            vrsys.update()
+            if vrsys.teleop_data["robot_attached"] == True and prev_robot_attached == False:
                 # The user just pressed the grip, so snap the VR right controller to the robot's right arm
-                if vr_robot.model_name == "Tiago":
+                if robot.model_name == "Tiago":
                     # Tiago's default arm is the left arm
-                    robot_eef_position = vr_robot.links[vr_robot.eef_link_names["right"]].get_position()
+                    robot_eef_position = robot.links[robot.eef_link_names["right"]].get_position()
                 else:
-                    robot_eef_position = vr_robot.links[vr_robot.eef_link_names[vr_robot.default_arm]].get_position()
-                base_rotation = vr_robot.get_orientation()
+                    robot_eef_position = robot.links[robot.eef_link_names[robot.default_arm]].get_position()
+                base_rotation = robot.get_orientation()
                 vrsys.snap_device_to_robot_eef(robot_eef_position=robot_eef_position, base_rotation=base_rotation)
             else:
-                action = vr_robot.gen_action_from_vr_data(vr_data)
+                action = vrsys.teleop_data_to_action()
                 env.step(action)   
-            prev_robot_attached = vr_data["robot_attached"]
+            prev_robot_attached = vrsys.teleop_data["robot_attached"]
     # Shut down the environment cleanly at the end
     vrsys.stop()
     env.close()

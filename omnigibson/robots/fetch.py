@@ -503,8 +503,8 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
     def vr_rotation_offset(self):
         return {self.default_arm: euler2quat([0, np.pi / 2, np.pi])}
     
-    def gen_action_from_vr_data(self, vr_data: dict):
+    def teleop_data_to_action(self, teleop_data: dict):
         action = np.zeros(11)
-        action[:2] = TwoWheelRobot.gen_action_from_vr_data(self, vr_data)
-        action[4:] = ManipulationRobot.gen_action_from_vr_data(self, vr_data)
+        action[:2] = TwoWheelRobot.teleop_data_to_action(self, teleop_data)
+        action[4:] = ManipulationRobot.teleop_data_to_action(self, teleop_data)
         return action

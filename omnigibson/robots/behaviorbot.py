@@ -504,7 +504,7 @@ class Behaviorbot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             # Finally, increment the current index based on how many DOFs were just controlled
             cur_indices_idx += joint_dof
 
-    def gen_action_from_vr_data(self, vr_data):
+    def teleop_data_to_action(self, teleop_data: dict) -> np.ndarray:
         """
         Generates an action for the Behaviorbot to perform based on vr data dict.
 
@@ -522,7 +522,7 @@ class Behaviorbot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         # Actions are stored as 1D numpy array
         action = np.zeros(44)
         # Update body action space
-        hmd_pos, hmd_orn = vr_data["transforms"]["hmd"]
+        hmd_pos, hmd_orn = teleop_data["transforms"]["hmd"]
         if np.all(np.equal(hmd_pos, np.zeros(3))) and np.all(np.equal(hmd_orn, np.array([0, 0, 0, 1]))):
             des_body_pos, des_body_orn = self.get_position_orientation()
             des_body_rpy = R.from_quat(des_body_orn).as_euler("XYZ")
@@ -538,20 +538,20 @@ class Behaviorbot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             reset = 0
             hand_data = None
             if part_name == "head":
-                part_pos, part_orn = vr_data["transforms"]["hmd"]
+                part_pos, part_orn = teleop_data["transforms"]["hmd"]
             else:
                 hand_name, hand_index = ("left", 0) if part_name == "lh" else ("right", 1)
-                if "hand_data" in vr_data:
-                    if "raw" in vr_data["hand_data"][hand_name]:
-                        part_pos = vr_data["hand_data"][hand_name]["raw"]["pos"][0]
-                        part_orn = vr_data["hand_data"][hand_name]["raw"]["orn"][0]
-                        hand_data = vr_data["hand_data"][hand_name]["angles"]
+                if "hand_data" in teleop_data:
+                    if "raw" in teleop_data["hand_data"][hand_name]:
+                        part_pos = teleop_data["hand_data"][hand_name]["raw"]["pos"][0]
+                        part_orn = teleop_data["hand_data"][hand_name]["raw"]["orn"][0]
+                        hand_data = teleop_data["hand_data"][hand_name]["angles"]
                     else:
                         part_pos, part_orn = np.zeros(3), np.array([0, 0, 0, 1])
                 else:
-                    part_pos, part_orn = vr_data["transforms"]["controllers"][hand_index]
-                    hand_data = vr_data["button_data"][hand_index]["axis"]["trigger"]
-                    reset = vr_data["button_data"][hand_index]["press"]["grip"]
+                    part_pos, part_orn = teleop_data["transforms"]["controllers"][hand_index]
+                    hand_data = teleop_data["button_data"][hand_index]["axis"]["trigger"]
+                    reset = teleop_data["button_data"][hand_index]["press"]["grip"]
 
             if np.all(np.equal(part_pos, np.zeros(3))) and np.all(np.equal(part_orn, np.array([0, 0, 0, 1]))):
                 des_world_part_pos, des_world_part_orn = prev_local_pos, prev_local_orn

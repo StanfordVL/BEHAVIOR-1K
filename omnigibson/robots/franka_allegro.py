@@ -227,9 +227,9 @@ class FrankaAllegro(ManipulationRobot):
     def vr_rotation_offset(self):
         return {self.default_arm: T.euler2quat(np.array([0, np.pi / 2, 0]))}
 
-    def gen_action_from_vr_data(self, vr_data: dict):
+    def teleop_data_to_action(self, teleop_data: dict):
         action = np.zeros(22)
-        action_from_controller = super().gen_action_from_vr_data(vr_data)
-        action[:6] = action_from_controller[:6]
-        action[6:] = action_from_controller[6]
+        teleop_action = super().teleop_data_to_action(teleop_data)
+        action[:6] = teleop_action[:6]
+        action[6:] = teleop_action[6]
         return action
