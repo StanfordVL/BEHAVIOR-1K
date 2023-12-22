@@ -506,8 +506,15 @@ class Environment(gym.Env, GymObservable, Recreatable):
             for robot in self.robots:
                 robot.apply_action(action_dict[robot.name])
 
+            # Decide if rendering is necessary
+            visual_modalities = {"rgb", "depth", "normal", "seg_instance"}
+            should_render = any(
+                not visual_modalities.isdisjoint(robot.obs_modalities)
+                for robot in self.robots
+            )
+
             # Run simulation step
-            og.sim.step()
+            og.sim.step(render=should_render)
 
             # Grab observations
             obs = self.get_obs()
