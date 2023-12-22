@@ -781,6 +781,9 @@ class ManipulationRobot(BaseRobot):
             dist = np.linalg.norm(np.array(candidate_link.get_position()) - np.array(gripper_center_pos))
             candidate_data.append((prim_path, dist))
 
+        if not candidate_data:
+            return None
+
         candidate_data = sorted(candidate_data, key=lambda x: x[-1])
         ag_prim_path, _ = candidate_data[0]
 
