@@ -229,7 +229,6 @@ class Simulator(SimulationContext, Serializable):
         carb.settings.get_settings().set_bool("/rtx/directLighting/sampledLighting/enabled", True)
         carb.settings.get_settings().set_int("/rtx/raytracing/showLights", 1)
         carb.settings.get_settings().set_float("/rtx/sceneDb/ambientLightIntensity", 0.1)
-        carb.settings.get_settings().set_bool("/app/runLoops/main/rateLimitEnabled", False)
         # TODO: Think of better setting defaults. Below works well for indoor-only scenes, but if skybox is the only light source then this looks very bad
         # carb.settings.get_settings().set_int("/rtx/domeLight/upperLowerStrategy", 3)  # "Limited image-based"
 

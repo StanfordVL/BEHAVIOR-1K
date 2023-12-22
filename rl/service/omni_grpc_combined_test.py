@@ -3,6 +3,7 @@ import logging
 
 log = logging.getLogger(__name__)
 
+import carb
 import gymnasium as gym
 import torch as th
 import torch.nn as nn
@@ -197,6 +198,8 @@ def main():
     # Set the set
     set_random_seed(seed)
     env.reset()
+
+    carb.settings.get_settings().set_bool("/app/runLoops/main/rateLimitEnabled", False)
 
     # policy_kwargs = dict(
     #     features_extractor_class=CustomCombinedExtractor,
