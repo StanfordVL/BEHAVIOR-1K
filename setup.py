@@ -22,7 +22,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         "gym>=0.26",
-        "numpy>=1.20.0",
+        "numpy~=1.23",
         "GitPython",
         "transforms3d>=0.3.1",
         "networkx>=2.0",
