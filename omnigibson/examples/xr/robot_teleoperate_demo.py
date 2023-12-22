@@ -15,8 +15,8 @@ ROBOTS = {
 def main():
     robot_name = choose_from_options(options=ROBOTS, name="robot")
     # Create the config for generating the environment we want
-    scene_cfg = dict()
-    scene_cfg["type"] = "Scene"
+    env_cfg = {"action_timestep": 1 / 60., "physics_timestep": 1 / 120.}
+    scene_cfg = {"type": "Scene"}
     # Add the robot we want to load
     robot0_cfg = {
         "type": robot_name,
@@ -103,17 +103,17 @@ def main():
             "position": [0.6, 0.4, 0.5],
         },
     ]
-    cfg = dict(scene=scene_cfg, robots=[robot0_cfg], objects=object_cfg)
+    cfg = dict(env=env_cfg, scene=scene_cfg, robots=[robot0_cfg], objects=object_cfg)
 
     # Create the environment
-    env = og.Environment(configs=cfg, action_timestep=1/60., physics_timestep=1/240.)
+    env = og.Environment(configs=cfg)
     env.reset()
     # update viewer camera pose
     og.sim.viewer_camera.set_position_orientation([-0.22, 0.99, 1.09], [-0.14, 0.47, 0.84, -0.23])
 
     # Start vrsys 
     vr_robot = env.robots[0]
-    vrsys = VRSys(system="SteamVR", vr_robot=vr_robot, show_controller=True, disable_display_output=True, align_anchor_to_robot_base=True)
+    vrsys = VRSys(system="OpenXR", vr_robot=vr_robot, show_controller=True, disable_display_output=True, align_anchor_to_robot_base=True)
     vrsys.start()
     # tracker variable of whether the robot is attached to the VR system
     prev_robot_attached = False

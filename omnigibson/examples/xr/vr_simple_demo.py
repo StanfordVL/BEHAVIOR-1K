@@ -6,19 +6,19 @@ from omnigibson.utils.xr_utils import VRSys
 
 def main():
     # Create the config for generating the environment we want
-    scene_cfg = dict()
-    scene_cfg["type"] = "InteractiveTraversableScene"
-    scene_cfg["scene_model"] = "Rs_int"
-    robot0_cfg = dict()
-    robot0_cfg["type"] = "Behaviorbot"
-    robot0_cfg["controller_config"] = {
-        "gripper_0": {"command_input_limits": "default"},
-        "gripper_1": {"command_input_limits": "default"},
+    env_cfg = {"action_timestep": 1 / 60., "physics_timestep": 1 / 120.}
+    scene_cfg = {"type": "InteractiveTraversableScene", "scene_model": "Rs_int"}
+    robot0_cfg = {
+        "type": "Behaviorbot",
+        "controller_config": {
+            "gripper_0": {"command_input_limits": "default"},
+            "gripper_1": {"command_input_limits": "default"},
+        }
     }
-    cfg = dict(scene=scene_cfg, robots=[robot0_cfg])
+    cfg = dict(env=env_cfg, scene=scene_cfg, robots=[robot0_cfg])
 
     # Create the environment
-    env = og.Environment(configs=cfg, action_timestep=1/60., physics_timestep=1/240.)
+    env = og.Environment(configs=cfg)
     env.reset()
     # start vrsys 
     vr_robot = env.robots[0]
