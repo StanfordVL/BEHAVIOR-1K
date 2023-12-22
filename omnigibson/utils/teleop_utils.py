@@ -418,25 +418,3 @@ class SpaceMouseSystem(TeleopSystem):
 
     def update(self):
         state = self.pyspacemouse.read()
-
-
-
-"""
-(
-    {
-        'l': array([[ 1.00000e+00, -8.27610e-05, -1.05649e-04,  1.00732e-04],
-        [-8.27610e-05, -1.00000e+00, -7.99596e-05,  9.57251e-05],
-        [-1.05709e-04,  7.99298e-05, -1.00000e+00,  1.99982e-01],
-        [ 0.00000e+00,  0.00000e+00,  0.00000e+00,  1.00000e+00]]), 
-        'r': array([[ 1.00000e+00,  8.27610e-05,  1.05649e-04,  1.00732e-04],
-        [-8.27909e-05,  1.00000e+00,  7.99447e-05,  9.57251e-05],
-        [-1.05679e-04, -7.99596e-05,  1.00000e+00,  1.99982e-01],
-        [ 0.00000e+00,  0.00000e+00,  0.00000e+00,  1.00000e+00]])
-    }, 
-    {
-        'A': False, 'B': False, 'RThU': True, 'RJ': False, 'RG': False, 'RTr': False, 'X': False, 
-        'Y': False, 'LThU': True, 'LJ': False, 'LG': False, 'LTr': False, 'leftJS': (0.0, 0.0), 
-        'leftTrig': (0.0,), 'leftGrip': (0.0,), 'rightJS': (0.0, 0.0), 'rightTrig': (0.0,), 'rightGrip': (0.0,)
-    }
-)
-"""
