@@ -512,6 +512,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 not visual_modalities.isdisjoint(robot.obs_modalities)
                 for robot in self.robots
             )
+            assert not should_render, f"Why are we trying to render? Modalities: {self.robots[0].obs_modalities}"
 
             # Run simulation step
             og.sim.step(render=should_render)
