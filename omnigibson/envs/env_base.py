@@ -186,7 +186,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
         # Set the simulator settings
         # NOTE: This must be done BEFORE the scene is loaded, or else all vision sensors can't retrieve observations
-        og.sim.set_simulation_dt(physics_dt=self.physics_timestep, rendering_dt=self.action_timestep)
+        og.sim.set_simulation_dt(physics_dt=self.physics_timestep, rendering_dt=self.physics_timestep)
 
         # Create the scene from our scene config
         scene = create_class_from_registry_and_config(
