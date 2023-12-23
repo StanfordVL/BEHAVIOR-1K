@@ -89,6 +89,14 @@ class RigidPrim(XFormPrim):
         # run super first
         super()._post_load()
 
+        # Apply rigid body and mass APIs
+        if not self._prim.HasAPI(UsdPhysics.RigidBodyAPI):
+            UsdPhysics.RigidBodyAPI.Apply(self._prim)
+        if not self._prim.HasAPI(PhysxSchema.PhysxRigidBodyAPI):
+            PhysxSchema.PhysxRigidBodyAPI.Apply(self._prim)
+        if not self._prim.HasAPI(UsdPhysics.MassAPI):
+            UsdPhysics.MassAPI.Apply(self._prim)
+
         # Only create contact report api if we're not visual only
         if not self._visual_only:
             PhysxSchema.PhysxContactReportAPI(self._prim) if \
