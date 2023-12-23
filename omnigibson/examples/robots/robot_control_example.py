@@ -139,7 +139,6 @@ def main(random_selection=False, headless=False, short_exec=False):
     max_steps = -1 if not short_exec else 100
     step = 0
     while step != max_steps:
-        # from IPython import embed; embed()
         action = action_generator.get_random_action() if control_mode == "random" else action_generator.get_teleop_action()
         env.step(action=action)
         step += 1
