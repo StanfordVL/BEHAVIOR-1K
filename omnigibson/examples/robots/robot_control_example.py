@@ -120,8 +120,9 @@ def main(random_selection=False, headless=False, short_exec=False):
         orientation=np.array([0.56829048, 0.09569975, 0.13571846, 0.80589577]),
     )
 
-    # Reset environment
+    # Reset environment and robot
     env.reset()
+    robot.reset()
 
     # Create teleop controller
     action_generator = KeyboardRobotController(robot=robot)
@@ -138,6 +139,7 @@ def main(random_selection=False, headless=False, short_exec=False):
     max_steps = -1 if not short_exec else 100
     step = 0
     while step != max_steps:
+        # from IPython import embed; embed()
         action = action_generator.get_random_action() if control_mode == "random" else action_generator.get_teleop_action()
         env.step(action=action)
         step += 1

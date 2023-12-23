@@ -472,7 +472,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # Reset the states of all objects (including robots), including (non-)kinematic states and internal variables.
         assert self._initial_state is not None
         self.load_state(self._initial_state)
-        og.sim.step()
+        og.sim.step_physics()
 
     @property
     def n_floors(self):
