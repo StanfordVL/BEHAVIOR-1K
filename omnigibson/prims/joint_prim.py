@@ -387,7 +387,7 @@ class JointPrim(BasePrim):
         """
         # Only support revolute and prismatic joints for now
         assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
-        stiffnesses, _ = self._articulation_view.get_gains(joint_indices=self.dof_indices)[0]
+        stiffnesses = self._articulation_view.get_gains(joint_indices=self.dof_indices)[0]
         return stiffnesses[0][0]
 
     @stiffness.setter
@@ -412,7 +412,7 @@ class JointPrim(BasePrim):
         """
         # Only support revolute and prismatic joints for now
         assert self.is_single_dof, "Joint properties only supported for a single DOF currently!"
-        _, dampings = self._articulation_view.get_gains(joint_indices=self.dof_indices)[0]
+        dampings = self._articulation_view.get_gains(joint_indices=self.dof_indices)[1]
         return dampings[0][0]
 
     @damping.setter
