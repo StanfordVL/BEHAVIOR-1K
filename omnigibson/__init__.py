@@ -73,11 +73,10 @@ def print_save_usd_warning(_):
 def create_app():
     global app
     from omni.isaac.kit import SimulationApp
-
     # If multi_gpu is used, og.sim.render() will cause a segfault when called during on_contact callbacks,
     # e.g. when an attachment joint is being created due to contacts (create_joint calls og.sim.render() internally).
     gpu_id = None if gm.GPU_ID is None else int(gm.GPU_ID)
-    config_kwargs = {"headless": gm.HEADLESS or bool(gm.REMOTE_STREAMING), "multi_gpu": False}
+    config_kwargs = {"headless":  gm.HEADLESS or bool(gm.REMOTE_STREAMING), "multi_gpu": False}
     if gpu_id is not None:
         config_kwargs["active_gpu"] = gpu_id
         config_kwargs["physics_gpu"] = gpu_id
