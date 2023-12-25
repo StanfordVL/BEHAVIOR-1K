@@ -417,33 +417,33 @@ class VisionSensor(BaseSensor):
         # Generate the complex space types for special modalities:
         # {"bbox_2d_tight", "bbox_2d_loose", "bbox_3d", "camera"}
         bbox_3d_space = gym.spaces.Sequence(space=gym.spaces.Tuple((
-            gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=int),  # uniqueId
+            gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=np.int32),  # uniqueId
             gym.spaces.Text(min_length=1, max_length=50, charset=VALID_OMNI_CHARS),  # name
             gym.spaces.Text(min_length=1, max_length=50, charset=VALID_OMNI_CHARS),  # semanticLabel
             gym.spaces.Text(min_length=0, max_length=50, charset=VALID_OMNI_CHARS),  # metadata
             gym.spaces.Sequence(space=gym.spaces.Box(low=0, high=MAX_INSTANCE_COUNT, shape=(), dtype=np.uint)),   # instanceIds
-            gym.spaces.Box(low=0, high=MAX_CLASS_COUNT, shape=(), dtype=np.uint),  # semanticId
-            gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=float), # x_min
-            gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=float), # y_min
-            gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=float), # z_min
-            gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=float), # x_max
-            gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=float), # y_max
-            gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=float), # z_max
-            gym.spaces.Box(low=-np.inf, high=np.inf, shape=(4, 4), dtype=float), # transform
-            gym.spaces.Box(low=-np.inf, high=np.inf, shape=(8, 3), dtype=float), # corners
+            gym.spaces.Box(low=0, high=MAX_CLASS_COUNT, shape=(), dtype=np.uint32),  # semanticId
+            gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=np.int32), # x_min
+            gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=np.int32), # y_min
+            gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=np.int32), # z_min
+            gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=np.int32), # x_max
+            gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=np.int32), # y_max
+            gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=np.int32), # z_max
+            gym.spaces.Box(low=-np.inf, high=np.inf, shape=(4, 4), dtype=np.float32), # transform
+            gym.spaces.Box(low=-np.inf, high=np.inf, shape=(8, 3), dtype=np.float32), # corners
         )))
 
         bbox_2d_space = gym.spaces.Sequence(space=gym.spaces.Tuple((
-            gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=int),  # uniqueId
+            gym.spaces.Box(low=-np.inf, high=np.inf, shape=(), dtype=np.int32),  # uniqueId
             gym.spaces.Text(min_length=1, max_length=50, charset=VALID_OMNI_CHARS),  # name
             gym.spaces.Text(min_length=1, max_length=50, charset=VALID_OMNI_CHARS),  # semanticLabel
             gym.spaces.Text(min_length=0, max_length=50, charset=VALID_OMNI_CHARS),  # metadata
             gym.spaces.Sequence(space=gym.spaces.Box(low=0, high=MAX_INSTANCE_COUNT, shape=(), dtype=np.uint)), # instanceIds
-            gym.spaces.Box(low=0, high=MAX_CLASS_COUNT, shape=(), dtype=np.uint),  # semanticId
-            gym.spaces.Box(low=0, high=MAX_VIEWER_SIZE, shape=(), dtype=int),  # x_min
-            gym.spaces.Box(low=0, high=MAX_VIEWER_SIZE, shape=(), dtype=int),  # y_min
-            gym.spaces.Box(low=0, high=MAX_VIEWER_SIZE, shape=(), dtype=int),  # x_max
-            gym.spaces.Box(low=0, high=MAX_VIEWER_SIZE, shape=(), dtype=int),  # y_max
+            gym.spaces.Box(low=0, high=MAX_CLASS_COUNT, shape=(), dtype=np.uint32),  # semanticId
+            gym.spaces.Box(low=0, high=MAX_VIEWER_SIZE, shape=(), dtype=np.int32),  # x_min
+            gym.spaces.Box(low=0, high=MAX_VIEWER_SIZE, shape=(), dtype=np.int32),  # y_min
+            gym.spaces.Box(low=0, high=MAX_VIEWER_SIZE, shape=(), dtype=np.int32),  # x_max
+            gym.spaces.Box(low=0, high=MAX_VIEWER_SIZE, shape=(), dtype=np.int32),  # y_max
         )))
 
         camera_space = gym.spaces.Dict(dict(
@@ -466,7 +466,7 @@ class VisionSensor(BaseSensor):
             normal=((self.image_height, self.image_width, 3), -1.0, 1.0, np.float32),
             seg_semantic=((self.image_height, self.image_width), 0, MAX_CLASS_COUNT, np.uint32),
             seg_instance=((self.image_height, self.image_width), 0, MAX_INSTANCE_COUNT, np.uint32),
-            flow=((self.image_height, self.image_width, 3), -np.inf, np.inf, np.float32),
+            flow=((self.image_height, self.image_width, 4), -np.inf, np.inf, np.float32),
             bbox_2d_tight=bbox_2d_space,
             bbox_2d_loose=bbox_2d_space,
             bbox_3d=bbox_3d_space,

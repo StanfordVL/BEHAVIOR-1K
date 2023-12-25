@@ -348,7 +348,7 @@ class ParticleModifier(IntrinsicObjectState, LinkBasedStateMixin, UpdateStateMix
             z_offset = 0.0 if self._projection_mesh_params["type"] == "Sphere" else self._projection_mesh_params["extents"][2] / 2
 
             self.projection_mesh.set_local_pose(
-                translation=np.array([0, 0, -z_offset]),
+                position=np.array([0, 0, -z_offset]),
                 orientation=T.euler2quat([0, 0, 0]),
             )
 
