@@ -113,18 +113,13 @@ def create_app():
             # Default App: Streaming Client from the Omniverse Launcher
             enable_extension("omni.kit.livestream.native")
             print(f"Now streaming on {hostname} via Omniverse Streaming Client")
-        elif gm.REMOTE_STREAMING == "websocket":
-            # Enable WebSocket Livestream extension
-            # Default URL: http://localhost:8211/streaming/client/
-            enable_extension("omni.services.streamclient.websocket")
-            print(f"Now streaming on: http://{hostname}:8211/streaming/client")
         elif gm.REMOTE_STREAMING == "webrtc":
             # Enable WebRTC Livestream extension
             # Default URL: http://localhost:8211/streaming/webrtc-client/
             enable_extension("omni.services.streamclient.webrtc")
             print(f"Now streaming on: http://{hostname}:8211/streaming/webrtc-client?server={hostname}")
         else:
-            raise ValueError(f"Invalid REMOTE_STREAMING option {gm.REMOTE_STREAMING}. Must be one of None, native, websocket, webrtc.")
+            raise ValueError(f"Invalid REMOTE_STREAMING option {gm.REMOTE_STREAMING}. Must be one of None, native, webrtc.")
 
     # If we're headless, suppress all warnings about GLFW
     if gm.HEADLESS:
