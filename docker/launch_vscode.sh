@@ -18,6 +18,9 @@ if [ ! -d "$BASE_DIR" ]; then
     exit 1
 fi
 
+# cd into the base directory
+cd $BASE_DIR
+
 # Define the vscode-config directory
 VSCODE_CONFIG_DIR="$BASE_DIR/vscode-config"
 
@@ -39,7 +42,16 @@ if [ ! -d "$DATA_DIR" ]; then
     mkdir "$DATA_DIR" || { echo "Error creating $DATA_DIR"; exit 1; }
 fi
 
-# Step 4: Find two free ports
+# Step 4: Clone OmniGibson if necessary
+if [ ! -d "$BASE_DIR/OmniGibson" ]; then
+    git clone https://github.com/StanfordVL/OmniGibson.git $BASE_DIR/OmniGibson
+    cd $BASE_DIR/OmniGibson
+    git pull
+    git checkout og-develop
+    cd $BASE_DIR
+fi
+
+# Step 5: Find two free ports
 # Find a free port for the vscode server
 WEBRTC_PORT=$(python -c 'import socket; s=socket.socket(); s.bind(("", 0)); print(s.getsockname()[1])')
 VSCODE_PORT=$(python -c 'import socket; s=socket.socket(); s.bind(("", 0)); print(s.getsockname()[1])')
@@ -54,7 +66,7 @@ echo "Launching remote OmniGibson environment..."
 echo "To access vscode, go to http://${HOSTNAME}:${VSCODE_PORT}"
 echo "To access webrtc, go to http://${HOSTNAME}:${WEBRTC_PORT}"
 
-# Step 5: Create the container
+# Step 6: Create the container
 IMAGE_PATH="/cvgl/group/Gibson/og-docker/omnigibson-vscode.sqsh"
 GPU_ID=$(nvidia-smi -L | grep -oP '(?<=GPU-)[a-fA-F0-9\-]+' | head -n 1)
 ISAAC_CACHE_PATH="/scr-ssd/${SLURM_JOB_USER}/isaac_cache_${GPU_ID}"
@@ -107,8 +119,7 @@ enroot create --force --name ${CONTAINER_NAME} ${IMAGE_PATH}
 ENV_KWARGS="${ENV_KWARGS:1}"
 MOUNT_KWARGS="${MOUNT_KWARGS:1}"
 
-# The last line here is the command you want to run inside the container.
-# Here I'm running some unit tests.
+# Step 7: Launch the container
 enroot start \
     --root \
     --rw \
