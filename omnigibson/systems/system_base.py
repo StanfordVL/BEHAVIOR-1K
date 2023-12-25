@@ -1152,8 +1152,9 @@ def _create_system_from_metadata(system_name):
                         encrypted=True,
                         category=system_name,
                         visible=False,
-                        fixed_base=False,
+                        fixed_base=True,
                         visual_only=True,
+                        kinematic_only=True,
                         include_default_states=False,
                         abilities={},
                     )
@@ -1167,8 +1168,9 @@ def _create_system_from_metadata(system_name):
                         category=system_name,
                         radius=0.015,
                         visible=False,
-                        fixed_base=False,
+                        fixed_base=True,
                         visual_only=True,
+                        kinematic_only=True,
                         include_default_states=False,
                         abilities={},
                     )

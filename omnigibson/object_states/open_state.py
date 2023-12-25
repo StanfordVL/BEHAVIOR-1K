@@ -86,7 +86,7 @@ def _get_relevant_joints(obj):
     # 1 means the open direction corresponds to positive joint angle change and -1 means the opposite
     default_joint_directions = [1] * len(default_relevant_joints)
 
-    if not hasattr(obj, "metadata"):
+    if not hasattr(obj, "metadata") or obj.metadata is None:
         log.debug("No openable joint metadata found for object %s" % obj.name)
         return default_both_sides, default_relevant_joints, default_joint_directions
 

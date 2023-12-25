@@ -143,7 +143,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         """
         Returns:
             list of str: Keys with which to index into the object registry. These should be valid public attributes of
-                prims that we can use as unique IDs to reference prims, e.g., prim.prim_path, prim.name, prim.handle, etc.
+                prims that we can use as unique IDs to reference prims, e.g., prim.prim_path, prim.name, etc.
         """
         return ["name", "prim_path", "uuid"]
 
@@ -472,7 +472,7 @@ class Scene(Serializable, Registerable, Recreatable, ABC):
         # Reset the states of all objects (including robots), including (non-)kinematic states and internal variables.
         assert self._initial_state is not None
         self.load_state(self._initial_state)
-        og.sim.step()
+        og.sim.step_physics()
 
     @property
     def n_floors(self):
