@@ -67,6 +67,7 @@ declare -A ENVS=(
     [OMNIGIBSON_REMOTE_STREAMING]="webrtc"
     [OMNIGIBSON_WEBRTC_PORT]=${WEBRTC_PORT}
     [OMNIGIBSON_VSCODE_PORT]=${VSCODE_PORT}
+    [PASSWORD]=${USERNAME}
 )
 for env_var in "${!ENVS[@]}"; do
     # Add to env kwargs we'll pass to enroot command later
