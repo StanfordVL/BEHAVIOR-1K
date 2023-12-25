@@ -114,9 +114,9 @@ def create_app():
             print(f"Now streaming on {hostname} via Omniverse Streaming Client")
         elif gm.REMOTE_STREAMING == "webrtc":
             # Enable WebRTC Livestream extension
-            # Default URL: http://localhost:8211/streaming/webrtc-client/
+            app.set_setting("/exts/omni.services.transport.server.http/port", gm.WEBRTC_PORT)
             enable_extension("omni.services.streamclient.webrtc")
-            print(f"Now streaming on: http://{hostname}:8211/streaming/webrtc-client?server={hostname}")
+            print(f"Now streaming on: http://{hostname}:{gm.WEBRTC_PORT}/streaming/webrtc-client?server={hostname}")
         else:
             raise ValueError(f"Invalid REMOTE_STREAMING option {gm.REMOTE_STREAMING}. Must be one of None, native, webrtc.")
 

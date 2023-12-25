@@ -1,4 +1,4 @@
-FROM nvcr.io/nvidia/isaac-sim:2023.1.0-hotfix.1
+FROM nvcr.io/nvidia/isaac-sim:2023.1.1
 
 # Set up all the prerequisites.
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \

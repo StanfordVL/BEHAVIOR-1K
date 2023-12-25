@@ -35,11 +35,14 @@ RUN \
     /var/lib/apt/lists/* \
     /var/tmp/*
 
+# Remove the omnigibson source code
+RUN rm -rf /omnigibson-src
+
 # run command
 CMD /app/code-server/bin/code-server \
-                --bind-addr 0.0.0.0:${BIND_PORT} \
-                --user-data-dir /workspace/vscode-config/data \
-                --extensions-dir /workspace/vscode-config/extensions \
-                --disable-telemetry \
-                --auth password \
-                /workspace
+  --bind-addr 0.0.0.0:${OMNIGIBSON_VSCODE_PORT} \
+  --user-data-dir /workspace/vscode-config/data \
+  --extensions-dir /workspace/vscode-config/extensions \
+  --disable-telemetry \
+  --auth password \
+  /workspace
