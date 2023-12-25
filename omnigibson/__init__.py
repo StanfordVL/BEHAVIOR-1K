@@ -1,5 +1,6 @@
 import logging
 import os
+import socket
 import shutil
 import tempfile
 import atexit
@@ -75,7 +76,7 @@ def create_app():
     # If multi_gpu is used, og.sim.render() will cause a segfault when called during on_contact callbacks,
     # e.g. when an attachment joint is being created due to contacts (create_joint calls og.sim.render() internally).
     gpu_id = None if gm.GPU_ID is None else int(gm.GPU_ID)
-    config_kwargs = {"headless":  gm.HEADLESS, "multi_gpu": False}
+    config_kwargs = {"headless":  gm.HEADLESS or bool(gm.REMOTE_STREAMING), "multi_gpu": False}
     if gpu_id is not None:
         config_kwargs["active_gpu"] = gpu_id
         config_kwargs["physics_gpu"] = gpu_id
@@ -95,6 +96,29 @@ def create_app():
     # Additional import for windows
     if os.name == "nt":
         enable_extension("omni.kit.window.viewport")
+
+    # Default Livestream settings
+    if gm.REMOTE_STREAMING:
+        app.set_setting("/app/window/drawMouse", True)
+        app.set_setting("/app/livestream/proto", "ws")
+        app.set_setting("/app/livestream/websocket/framerate_limit", 120)
+        app.set_setting("/ngx/enabled", False)
+
+        hostname = socket.gethostname()
+
+        # Note: Only one livestream extension can be enabled at a time
+        if gm.REMOTE_STREAMING == "native":
+            # Enable Native Livestream extension
+            # Default App: Streaming Client from the Omniverse Launcher
+            enable_extension("omni.kit.livestream.native")
+            print(f"Now streaming on {hostname} via Omniverse Streaming Client")
+        elif gm.REMOTE_STREAMING == "webrtc":
+            # Enable WebRTC Livestream extension
+            # Default URL: http://localhost:8211/streaming/webrtc-client/
+            enable_extension("omni.services.streamclient.webrtc")
+            print(f"Now streaming on: http://{hostname}:8211/streaming/webrtc-client?server={hostname}")
+        else:
+            raise ValueError(f"Invalid REMOTE_STREAMING option {gm.REMOTE_STREAMING}. Must be one of None, native, webrtc.")
 
     # If we're headless, suppress all warnings about GLFW
     if gm.HEADLESS:

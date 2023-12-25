@@ -120,8 +120,9 @@ def main(random_selection=False, headless=False, short_exec=False):
         orientation=np.array([0.56829048, 0.09569975, 0.13571846, 0.80589577]),
     )
 
-    # Reset environment
+    # Reset environment and robot
     env.reset()
+    robot.reset()
 
     # Create teleop controller
     action_generator = KeyboardRobotController(robot=robot)

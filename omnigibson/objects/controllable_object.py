@@ -376,9 +376,8 @@ class ControllableObject(BaseObject):
                  indices are being set. In this case, the length of @control must be the same length as @indices!
             indices (None or k-array): If specified, should be k (k < n) length array of specific DOF controls to deploy.
                 Default is None, which assumes that all joints are being set.
-            normalized (bool or array of bool): Whether the inputted joint controls should be interpreted as normalized
-                values. A single bool can be specified for the entire @control, or an array can be specified for
-                individual values. Default is False, corresponding to all @control assumed to be not normalized
+            normalized (bool): Whether the inputted joint controls should be interpreted as normalized
+                values. Expects a single bool for the entire @control. Default is False.
         """
         # Run sanity check
         if indices is None:
@@ -396,11 +395,13 @@ class ControllableObject(BaseObject):
 
         # Standardize normalized input
         n_indices = len(indices)
-        normalized = normalized if isinstance(normalized, Iterable) else [normalized] * n_indices
 
         # Loop through controls and deploy
         # We have to use delicate logic to account for the edge cases where a single joint may contain > 1 DOF
         # (e.g.: spherical joint)
+        pos_vec, pos_idxs, using_pos = [], [], False
+        vel_vec, vel_idxs, using_vel = [], [], False
+        eff_vec, eff_idxs, using_eff = [], [], False
         cur_indices_idx = 0
         while cur_indices_idx != n_indices:
             # Grab the current DOF index we're controlling and find the corresponding joint
@@ -428,21 +429,36 @@ class ControllableObject(BaseObject):
                 ctrl = control[cur_ctrl_idx]
 
             # Deploy control based on type
-            ctrl_type, norm = control_type[cur_ctrl_idx], normalized[cur_ctrl_idx]       # In multi-DOF joint case all values were already checked to be the same
+            ctrl_type = control_type[cur_ctrl_idx]       # In multi-DOF joint case all values were already checked to be the same
             if ctrl_type == ControlType.EFFORT:
-                joint.set_effort(ctrl, normalized=norm)
+                eff_vec.append(ctrl)
+                eff_idxs.append(cur_ctrl_idx)
+                using_eff = True
             elif ctrl_type == ControlType.VELOCITY:
-                joint.set_vel(ctrl, normalized=norm, drive=True)
+                vel_vec.append(ctrl)
+                vel_idxs.append(cur_ctrl_idx)
+                using_vel = True
             elif ctrl_type == ControlType.POSITION:
-                joint.set_pos(ctrl, normalized=norm, drive=True)
+                pos_vec.append(ctrl)
+                pos_idxs.append(cur_ctrl_idx)
+                using_pos = True
             elif ctrl_type == ControlType.NONE:
                 # Set zero efforts
-                joint.set_effort(0, normalized=False)
+                eff_vec.append(0)
+                eff_idxs.append(cur_ctrl_idx)
+                using_eff = True
             else:
                 raise ValueError("Invalid control type specified: {}".format(ctrl_type))
-
             # Finally, increment the current index based on how many DOFs were just controlled
             cur_indices_idx += joint_dof
+            
+        # set the targets for joints
+        if using_pos:
+            self.set_joint_positions(positions=np.array(pos_vec), indices=np.array(pos_idxs), drive=True, normalized=normalized)
+        if using_vel:
+            self.set_joint_velocities(velocities=np.array(vel_vec), indices=np.array(vel_idxs), drive=True, normalized=normalized)
+        if using_eff:
+            self.set_joint_efforts(efforts=np.array(eff_vec), indices=np.array(eff_idxs), normalized=normalized)
 
     def get_control_dict(self):
         """
