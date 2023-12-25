@@ -35,8 +35,11 @@ RUN \
     /var/lib/apt/lists/* \
     /var/tmp/*
 
-# add local files
-COPY /root /
-
-# ports and volumes
-EXPOSE 8443
+# run command
+CMD /app/code-server/bin/code-server \
+                --bind-addr 0.0.0.0:${BIND_PORT} \
+                --user-data-dir /workspace/vscode-config/data \
+                --extensions-dir /workspace/vscode-config/extensions \
+                --disable-telemetry \
+                --auth password \
+                /workspace
