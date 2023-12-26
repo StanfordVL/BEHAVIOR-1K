@@ -125,7 +125,7 @@ jobs:
           labels: ${{ steps.meta-prod.outputs.labels }}
           file: docker/prod.Dockerfile
           cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-to: type=gha,mode=min
 
       - name: Update vscode image Dockerfile with prod image tag
         run: |
@@ -141,4 +141,4 @@ jobs:
           labels: ${{ steps.meta-vscode.outputs.labels }}
           file: docker/vscode.Dockerfile
           cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-to: type=gha,mode=min
