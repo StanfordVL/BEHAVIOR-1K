@@ -7,7 +7,6 @@ import atexit
 import signal
 import yaml
 import builtins
-import requests
 from termcolor import colored
 
 
@@ -105,7 +104,11 @@ def create_app():
         app.set_setting("/app/livestream/websocket/framerate_limit", 120)
         app.set_setting("/ngx/enabled", False)
 
-        ip = requests.get('https://checkip.amazonaws.com').text.strip()
+        # Find our IP address
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
 
         # Note: Only one livestream extension can be enabled at a time
         if gm.REMOTE_STREAMING == "native":
@@ -118,7 +121,8 @@ def create_app():
             app.set_setting("/exts/omni.services.transport.server.http/port", gm.HTTP_PORT)
             app.set_setting("/app/livestream/port", gm.WEBRTC_PORT)
             enable_extension("omni.services.streamclient.webrtc")
-            print(f"Now streaming on: http://{ip}:{gm.HTTP_PORT}/streaming/webrtc-client?server={ip}")
+            enable_extension("omni.kit.livestream.webrtc")
+            print(f"Now streaming on: http://{ip}:{gm.HTTP_PORT}/streaming/client?server={ip}")
         else:
             raise ValueError(f"Invalid REMOTE_STREAMING option {gm.REMOTE_STREAMING}. Must be one of None, native, webrtc.")
 
