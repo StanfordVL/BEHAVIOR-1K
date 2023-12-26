@@ -2,7 +2,6 @@ FROM stanfordvl/omnigibson:latest
 
 # environment settings
 ARG DEBIAN_FRONTEND="noninteractive"
-ENV HOME="/config"
 ENV OMNIGIBSON_REMOTE_STREAMING="webrtc"
 
 RUN \
