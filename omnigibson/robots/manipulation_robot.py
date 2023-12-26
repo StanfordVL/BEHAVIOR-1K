@@ -7,6 +7,7 @@ from omni.physx import get_physx_scene_query_interface
 from pxr import Gf
 
 import omnigibson as og
+from omnigibson.controllers import InverseKinematicsController, MultiFingerGripperController, OperationalSpaceController
 from omnigibson.macros import gm, create_module_macros
 from omnigibson.object_states import ContactBodies
 import omnigibson.utils.transform_utils as T
@@ -1457,7 +1458,7 @@ class ManipulationRobot(BaseRobot):
     def teleop_data_to_action(self, teleop_data: dict) -> np.ndarray:
         """
         Generate action data from VR input for robot teleoperation
-        NOTE: This implementation only supports InverseKinematicsController for arm and MultiFingerGripperController for gripper. 
+        NOTE: This implementation only supports IK/OSC controller for arm and MultiFingerGripperController for gripper. 
         Overwrite this function if the robot is using a different controller.
         Args:
             teleop_data (dict): dictionary containing teleop data from utils.teleop_utils.TeleopSystem
@@ -1467,18 +1468,24 @@ class ManipulationRobot(BaseRobot):
         action = np.zeros(self.n_arms * 7)
         hands = ["left", "right"] if self.n_arms == 2 else ["right"]
         for i, hand in enumerate(hands):
-            arm_name = self.arm_names[self.n_arms - i - 1]
-            cur_robot_eef_pos, cur_robot_eef_orn = self.links[self.eef_link_names[arm_name]].get_position_orientation()
-            if teleop_data["robot_attached"]:
-                target_pos, target_orn = teleop_data["transforms"][hand]
-                target_orn = T.quat_multiply(target_orn, self.vr_rotation_offset[arm_name])
-            else:
-                target_pos, target_orn = cur_robot_eef_pos, cur_robot_eef_orn
-            # get orientation relative to robot base
-            base_pos, base_orn = self.get_position_orientation()
-            rel_target_pos, rel_target_orn = T.relative_pose_transform(target_pos, target_orn, base_pos, base_orn)
-            rel_cur_pos, _ = T.relative_pose_transform(cur_robot_eef_pos, cur_robot_eef_orn, base_pos, base_orn)
-            trigger_fraction = teleop_data[f"gripper_{hand}"]
-            action[i*7 : i*7+6] = np.r_[rel_target_pos - rel_cur_pos, T.quat2axisangle(rel_target_orn)]
-            action[i*7+6] = trigger_fraction
+            assert isinstance(self._controllers[f"gripper_{i}"], MultiFingerGripperController), f"Only MultiFingerGripperController is supported for gripper {i}!"
+            assert \
+                isinstance(self._controllers[f"arm_{i}"], InverseKinematicsController) or \
+                isinstance(self._controllers[f"arm_{i}"], OperationalSpaceController), \
+                f"Only IK and OSC controllers are supported for arm {i}!"
+            if hand in teleop_data["transforms"]:
+                arm_name = self.arm_names[self.n_arms - i - 1]
+                cur_robot_eef_pos, cur_robot_eef_orn = self.links[self.eef_link_names[arm_name]].get_position_orientation()
+                if teleop_data["robot_attached"]:
+                    target_pos, target_orn = teleop_data["transforms"][hand]
+                    target_orn = T.quat_multiply(target_orn, self.vr_rotation_offset[arm_name])
+                else:
+                    target_pos, target_orn = cur_robot_eef_pos, cur_robot_eef_orn
+                # get orientation relative to robot base
+                base_pos, base_orn = self.get_position_orientation()
+                rel_target_pos, rel_target_orn = T.relative_pose_transform(target_pos, target_orn, base_pos, base_orn)
+                rel_cur_pos, _ = T.relative_pose_transform(cur_robot_eef_pos, cur_robot_eef_orn, base_pos, base_orn)
+                trigger_fraction = teleop_data[f"gripper_{hand}"]
+                action[i*7 : i*7+6] = np.r_[rel_target_pos - rel_cur_pos, T.quat2axisangle(rel_target_orn)]
+                action[i*7+6] = trigger_fraction
         return action

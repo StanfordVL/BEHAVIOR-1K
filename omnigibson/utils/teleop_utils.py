@@ -1,7 +1,9 @@
 import carb
 import numpy as np
+import time
 from importlib import import_module
-from typing import Iterable, List, Optional, Tuple
+from threading import Thread
+from typing import Iterable, Optional, Tuple
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
@@ -18,7 +20,7 @@ class TeleopSystem():
     """
     Base class for teleop systems
     """
-    def __init__(self, robot: BaseRobot) -> None:
+    def __init__(self, robot: BaseRobot, *args, **kwargs) -> None:
         """
         self.raw_data is the raw data directly obtained from the teleoperation device
             It should be in the format as follows:
@@ -42,7 +44,10 @@ class TeleopSystem():
                 ...                             # other teleop data
             }
         """
-        self.raw_data = {}
+        self.raw_data = {
+            "transforms": {},
+            "button_data": {},
+        }
         self.teleop_data = {
             "robot_attached": False,
             "transforms": {},
@@ -87,6 +92,8 @@ class VRSystem(TeleopSystem):
         enable_touchpad_movement: bool=False,
         align_anchor_to_robot_base: bool=False,
         use_hand_tracking: bool=False,
+        *args,
+        **kwargs
     ) -> None:
         """
         Initializes the VR system
@@ -256,18 +263,20 @@ class VRSystem(TeleopSystem):
             rot_offset = np.array(rot_offset).astype(np.float64)
             self.vr_profile.add_rotate_physical_world_around_device(rot_offset)
 
-    def snap_device_to_robot_eef(self, robot_eef_position: Iterable[float], base_rotation: Iterable[float], device: Optional[XRDeviceClass]=None) -> None:
+    def snap_device_to_robot_eef(
+            self, 
+            robot_eef_pos: Iterable[float], 
+            robot_eef_orn: Iterable[float], 
+            base_orn: Iterable[float]
+        ) -> None:
         """
         Snap device to the robot end effector (ManipulationRobot only)
         Args:
             robot_eef_position (Iterable[float]): the position of the robot end effector
             base_rotation (Iterable[float]): the rotation of the robot base
-            device (Optional[XRDeviceClass]): the device to snap to the robot end effector, default is the right controller
         """
-        if device is None:
-            device = self.controllers[1]
-        target_transform = self.og2xr(pos=robot_eef_position, orn=base_rotation)
-        self.vr_profile.set_physical_world_to_world_anchor_transform_to_match_xr_device(target_transform, device)
+        target_transform = self.og2xr(pos=robot_eef_pos, orn=base_orn)
+        self.vr_profile.set_physical_world_to_world_anchor_transform_to_match_xr_device(target_transform, self.controllers[1])
 
     def _update_devices(self) -> None:
         """
@@ -350,7 +359,11 @@ class VRSystem(TeleopSystem):
 
 
 class OculusReaderSystem(TeleopSystem):
-    def __init__(self, robot):
+    """
+    The origin of the oculus system is the headset position
+    x is right, y is up, z is back
+    """
+    def __init__(self, robot, *args, **kwargs):
         try:
             import oculus_reader
         except ModuleNotFoundError:
@@ -359,37 +372,48 @@ class OculusReaderSystem(TeleopSystem):
         # initialize oculus reader
         self.oculus_reader = oculus_reader.OculusReader(run=False)
         self.reset_button_pressed = False
+        self.base_movement_speed = 0.1
+        self.vr_origin = {"right": T.mat2pose(np.eye(4)), "left": T.mat2pose(np.eye(4))}
+        self.robot_origin = {"right": T.mat2pose(np.eye(4)), "left": T.mat2pose(np.eye(4))}
 
     def oc2og(self, transform):
-        pos, orn = T.mat2pose(np.array(transform).T)
-        orn = T.quat_multiply(orn, np.array([0.5, -0.5, -0.5, -0.5]))
+        pos, orn = T.mat2pose(T.pose2mat(([0, 0, 0], T.euler2quat([np.pi / 2, 0, np.pi / 2]))) @ transform @ T.pose2mat(([0, 0, 0], T.euler2quat([-np.pi / 2, np.pi / 2, 0]))))
         return pos, orn
-    
-    def og2oc(self, pos, orn):
-        orn = T.quat_multiply(np.array([-0.5, 0.5, 0.5, -0.5]), orn)
-        return T.pose2mat((pos, orn)).T.astype(np.float64)
 
     def start(self):
         self.oculus_reader.run()
+        self.data_thread = Thread(target=self._update_internal_data, daemon=True)
+        self.data_thread.start()
 
     def stop(self):
+        self.data_thread.join()
         self.oculus_reader.stop()
 
+    def _update_internal_data(self, hz: float=50.):
+        while True:
+            time.sleep(1 / hz)
+            transform, self.raw_data["button_data"] = self.oculus_reader.get_transformations_and_buttons()
+            for hand in ["left", "right"]:
+                if hand[0] in transform:
+                    self.raw_data["transforms"][hand] = self.oc2og(transform[hand[0]])
+
     def update(self):
-        # update raw data
-        self.raw_data["transforms"], self.raw_data["button_data"] = self.oculus_reader.get_transformations_and_buttons()
         # generate teleop data
         self.teleop_data["transforms"]["base"] = np.zeros(4)
         for hand in ["left", "right"]:
-            if hand[0] in self.raw_data["transforms"]:
-                self.teleop_data["transforms"][hand] = self.oc2og(self.raw_data["transforms"][hand[0]])
+            if hand in self.raw_data["transforms"]:
+                rel_pos, rel_orn = T.relative_pose_transform(*self.raw_data["transforms"][hand], *self.vr_origin[hand])
+                target_pos = self.robot_origin[hand][0] + rel_pos
+                target_orn = T.quat_multiply(self.robot_origin[hand][1], rel_orn)
+                self.teleop_data["transforms"][hand] = (target_pos, target_orn)
+            if f"{hand}Trig" in self.raw_data["button_data"]:
                 self.teleop_data[f"gripper_{hand}"] = self.raw_data["button_data"][f"{hand}Trig"][0]
         if "rightJS" in self.raw_data["button_data"]:
-            self.teleop_data["transforms"]["base"][0] = self.raw_data["button_data"]["rightJS"][1]
-            self.teleop_data["transforms"]["base"][3] = self.raw_data["button_data"]["rightJS"][0]
+            self.teleop_data["transforms"]["base"][0] = self.raw_data["button_data"]["rightJS"][1] * self.base_movement_speed
+            self.teleop_data["transforms"]["base"][3] = -self.raw_data["button_data"]["rightJS"][0] * self.base_movement_speed
         if "leftJS" in self.raw_data["button_data"]:
-            self.teleop_data["transforms"]["base"][1] = -self.raw_data["button_data"]["leftJS"][0]
-            self.teleop_data["transforms"]["base"][2] = self.raw_data["button_data"]["leftJS"][1]
+            self.teleop_data["transforms"]["base"][1] = -self.raw_data["button_data"]["leftJS"][0] * self.base_movement_speed
+            self.teleop_data["transforms"]["base"][2] = self.raw_data["button_data"]["leftJS"][1] * self.base_movement_speed
         # update robot attachment info
         if "rightGrip" in self.raw_data["button_data"] and self.raw_data["button_data"]["rightGrip"][0] >= 0.5:
             if not self.reset_button_pressed:
@@ -399,9 +423,25 @@ class OculusReaderSystem(TeleopSystem):
             self.reset_button_pressed = False
         self.teleop_data["robot_attached"] = self.robot_attached
 
+    def reset_transform_mapping(
+            self, 
+            robot_eef_pos: Iterable[float], 
+            robot_base_orn: Iterable[float], 
+            hand: str="right",
+        ) -> None:
+        """
+        Snap device to the robot end effector (ManipulationRobot only)
+        Args:
+            robot_eef_pos (Iterable[float]): the position of the robot end effector
+            robot_base_orn (Iterable[float]): the orientation of the robot base
+            hand(str): name of the hand, one of "left" or "right". Default is "right".
+        """
+        self.robot_origin[hand] = (robot_eef_pos, robot_base_orn)
+        self.vr_origin[hand] = self.raw_data["transforms"][hand]
+
 
 class SpaceMouseSystem(TeleopSystem):
-    def __init__(self, robot):
+    def __init__(self, robot, *args, **kwargs):
         try:
             self.pyspacemouse = import_module('pyspacemouse')
         except ModuleNotFoundError:

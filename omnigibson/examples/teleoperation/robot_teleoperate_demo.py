@@ -2,7 +2,7 @@
 Example script for using VR controller to teleoperate a robot.
 """
 import omnigibson as og
-from omnigibson.utils.teleop_utils import VRSystem
+from omnigibson.utils.teleop_utils import OculusReaderSystem as VRSystem
 from omnigibson.utils.ui_utils import choose_from_options
 
 ROBOTS = {
@@ -15,19 +15,18 @@ ROBOTS = {
 def main():
     robot_name = choose_from_options(options=ROBOTS, name="robot")
     # Create the config for generating the environment we want
-    env_cfg = {"action_timestep": 1 / 60., "physics_timestep": 1 / 120.}
+    env_cfg = {"action_timestep": 1 / 10., "physics_timestep": 1 / 60.}
     scene_cfg = {"type": "Scene"}
     # Add the robot we want to load
     robot0_cfg = {
         "type": robot_name,
-        "obs_modalities": ["rgb", "depth", "seg_instance", "normal", "scan", "occupancy_grid"],
+        "obs_modalities": ["rgb"],
         "action_normalize": False,
         "grasping_mode": "assisted",
         "controller_config": {
             "arm_0": {
                 "name": "InverseKinematicsController",
                 "mode": "pose_absolute_ori",
-                "motor_type": "position",
             },
             "gripper_0": {
                 "name": "MultiFingerGripperController", 
@@ -102,6 +101,14 @@ def main():
             "scale": [0.75, 0.75, 0.75],
             "position": [0.6, 0.4, 0.5],
         },
+        {
+            "type": "PrimitiveObject",
+            "primitive_type": "Cube",
+            "name": "target",  
+            "scale": [0.1, 0.1, 0.1],
+            "visual_only": True,
+            "rgba": [0.0, 1.0, 0.0, 1.0],
+        },
     ]
     cfg = dict(env=env_cfg, scene=scene_cfg, robots=[robot0_cfg], objects=object_cfg)
 
@@ -117,6 +124,8 @@ def main():
     vrsys.start()
     # tracker variable of whether the robot is attached to the VR system
     prev_robot_attached = False
+    # get the target object
+    target = env.scene.object_registry("name", "target")
     # main simulation loop
     for _ in range(10000):
         if og.sim.is_playing():
@@ -125,14 +134,17 @@ def main():
                 # The user just pressed the grip, so snap the VR right controller to the robot's right arm
                 if robot.model_name == "Tiago":
                     # Tiago's default arm is the left arm
-                    robot_eef_position = robot.links[robot.eef_link_names["right"]].get_position()
+                    robot_eef_pos = robot.links[robot.eef_link_names["right"]].get_position()
                 else:
-                    robot_eef_position = robot.links[robot.eef_link_names[robot.default_arm]].get_position()
-                base_rotation = robot.get_orientation()
-                vrsys.snap_device_to_robot_eef(robot_eef_position=robot_eef_position, base_rotation=base_rotation)
+                    robot_eef_pos = robot.links[robot.eef_link_names[robot.default_arm]].get_position()
+                base_orn = robot.get_orientation()
+                vrsys.reset_transform_mapping(robot_eef_pos=robot_eef_pos, robot_base_orn=base_orn)
             else:
                 action = vrsys.teleop_data_to_action()
-                env.step(action)   
+                env.step(action) 
+            if "right" in vrsys.teleop_data["transforms"]:
+                # update the target object's pose to the VR right controller's pose
+                target.set_position_orientation(vrsys.teleop_data["transforms"]["right"][0], vrsys.teleop_data["transforms"]["right"][1])  
             prev_robot_attached = vrsys.teleop_data["robot_attached"]
     # Shut down the environment cleanly at the end
     vrsys.stop()
