@@ -120,7 +120,7 @@ ENV_KWARGS="${ENV_KWARGS:1}"
 MOUNT_KWARGS="${MOUNT_KWARGS:1}"
 
 # Step 7: Launch the container
-enroot start \
+ENROOT_MOUNT_HOME=no enroot start \
     --root \
     --rw \
     ${ENV_KWARGS} \
