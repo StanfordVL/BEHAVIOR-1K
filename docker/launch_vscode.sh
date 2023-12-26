@@ -62,9 +62,10 @@ while [ "$WEBRTC_PORT" -eq "$VSCODE_PORT" ]; do
 done
 
 # Print HTTP link to access webrtc and vscode
+FQDN_HOSTNAME=$(hostname --fqdn)
 echo "Launching remote OmniGibson environment..."
-echo "To access vscode, go to http://${HOSTNAME}.stanford.edu:${VSCODE_PORT}"
-echo "To access webrtc, go to http://${HOSTNAME}.stanford.edu:${WEBRTC_PORT}"
+echo "To access vscode, go to http://${FQDN_HOSTNAME}:${VSCODE_PORT}"
+echo "To access webrtc, go to http://${FQDN_HOSTNAME}:${WEBRTC_PORT}"
 
 # Step 6: Create the container
 IMAGE_PATH="/cvgl/group/Gibson/og-docker/omnigibson-vscode.sqsh"
