@@ -68,9 +68,9 @@ done
 
 # Print HTTP link to access webrtc and vscode
 FQDN_HOSTNAME=$(hostname -i)  # $(curl "https://checkip.amazonaws.com")
-echo "Launching remote OmniGibson environment..."
-echo "To access vscode, go to http://${FQDN_HOSTNAME}:${VSCODE_PORT}"
-echo "To access webrtc, go to http://${FQDN_HOSTNAME}:${HTTP_PORT}/streaming/webrtc-client"
+echo "[OMNIGIBSON-VSCODE] Launching remote OmniGibson environment..."
+echo "[OMNIGIBSON-VSCODE] To access vscode, go to http://${FQDN_HOSTNAME}:${VSCODE_PORT}"
+echo "[OMNIGIBSON-VSCODE] To access webrtc, go to http://${FQDN_HOSTNAME}:${HTTP_PORT}/streaming/webrtc-client"
 
 # Step 6: Create the container
 IMAGE_PATH="/cvgl/group/Gibson/og-docker/omnigibson-vscode.sqsh"
@@ -105,7 +105,8 @@ declare -A MOUNTS=(
     [${ISAAC_CACHE_PATH}/isaac-sim/config]=/root/.nvidia-omniverse/config
     [${ISAAC_CACHE_PATH}/isaac-sim/data]=/root/.local/share/ov/data
     [${ISAAC_CACHE_PATH}/isaac-sim/documents]=/root/Documents
-    [${BASE_DIR}]=/workspace
+    [${BASE_DIR}/OmniGibson]=/omnigibson-scr
+    [${VSCODE_CONFIG_DIR}]=/vscode-config
 )
 
 MOUNT_KWARGS=""
