@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+#SBATCH --job-name=omnigibson-vscode
 #SBATCH --account=cvgl
 #SBATCH --partition=svl --qos=normal
 #SBATCH --nodes=1
