@@ -29,8 +29,9 @@ gm.HEADLESS = (os.getenv("OMNIGIBSON_HEADLESS", 'False').lower() in ('true', '1'
 # Whether to enable remote streaming. None disables it, other valid options are "native", "webrtc".
 gm.REMOTE_STREAMING = os.getenv("OMNIGIBSON_REMOTE_STREAMING", None)
 
-# What port the webrtc server should run on. This is only used if REMOTE_STREAMING is set to "webrtc"
-gm.WEBRTC_PORT = os.getenv("OMNIGIBSON_WEBRTC_PORT", 8211)
+# What port the webrtc and http servers should run on. This is only used if REMOTE_STREAMING is set to "webrtc"
+gm.HTTP_PORT = os.getenv("OMNIGIBSON_HTTP_PORT", 8211)
+gm.WEBRTC_PORT = os.getenv("OMNIGIBSON_WEBRTC_PORT", 49100)
 
 # Whether only the viewport should be shown in the GUI or not (if not, other peripherals are additionally shown)
 # CANNOT be set at runtime

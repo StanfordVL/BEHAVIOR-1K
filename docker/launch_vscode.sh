@@ -51,18 +51,23 @@ if [ ! -d "$BASE_DIR/OmniGibson" ]; then
     cd $BASE_DIR
 fi
 
-# Step 5: Find two free ports
-# Find a free port for the vscode server
+# Step 5: Find three free ports
 WEBRTC_PORT=$(python -c 'import socket; s=socket.socket(); s.bind(("", 0)); print(s.getsockname()[1])')
+HTTP_PORT=$(python -c 'import socket; s=socket.socket(); s.bind(("", 0)); print(s.getsockname()[1])')
 VSCODE_PORT=$(python -c 'import socket; s=socket.socket(); s.bind(("", 0)); print(s.getsockname()[1])')
 
 # Ensure that the two ports are different
-while [ "$WEBRTC_PORT" -eq "$VSCODE_PORT" ]; do
+while [ "$HTTP_PORT" -eq "$WEBRTC_PORT" ]; do
+    HTTP_PORT=$(python -c 'import socket; s=socket.socket(); s.bind(("", 0)); print(s.getsockname()[1])')
+done
+
+# Ensure that the three ports are different
+while [ "$VSCODE_PORT" -eq "$WEBRTC_PORT" ] || [ "$VSCODE_PORT" -eq "$HTTP_PORT" ]; do
     VSCODE_PORT=$(python -c 'import socket; s=socket.socket(); s.bind(("", 0)); print(s.getsockname()[1])')
 done
 
 # Print HTTP link to access webrtc and vscode
-FQDN_HOSTNAME=$(hostname --fqdn)
+FQDN_HOSTNAME=$(curl "https://checkip.amazonaws.com")
 echo "Launching remote OmniGibson environment..."
 echo "To access vscode, go to http://${FQDN_HOSTNAME}:${VSCODE_PORT}"
 echo "To access webrtc, go to http://${FQDN_HOSTNAME}:${WEBRTC_PORT}"
@@ -78,6 +83,7 @@ declare -A ENVS=(
     [NVIDIA_VISIBLE_DEVICES]=0
     [DISPLAY]=""
     [OMNIGIBSON_REMOTE_STREAMING]="webrtc"
+    [OMNIGIBSON_HTTP_PORT]=${HTTP_PORT}
     [OMNIGIBSON_WEBRTC_PORT]=${WEBRTC_PORT}
     [OMNIGIBSON_VSCODE_PORT]=${VSCODE_PORT}
     [PASSWORD]=${USERNAME}
