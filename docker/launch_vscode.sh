@@ -47,7 +47,7 @@ if [ ! -d "$BASE_DIR/OmniGibson" ]; then
     git clone https://github.com/StanfordVL/OmniGibson.git $BASE_DIR/OmniGibson
     cd $BASE_DIR/OmniGibson
     git pull
-    git checkout og-develop
+    git checkout vscode-docker  # TODO: Change this to og-develop before vscode-docker is merged
     cd $BASE_DIR
 fi
 
