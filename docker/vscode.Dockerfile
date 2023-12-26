@@ -38,7 +38,8 @@ RUN \
 RUN rm -rf /omnigibson-src
 
 # run command
-CMD /app/code-server/bin/code-server \
+CMD sed -i "s/49100/${OMNIGIBSON_WEBRTC_PORT}/g" /isaac-sim/extscache/omni.services.streamclient.webrtc-1.3.8/web/js/kit-player.js && \
+  /app/code-server/bin/code-server \
   --bind-addr 0.0.0.0:${OMNIGIBSON_VSCODE_PORT} \
   --user-data-dir /workspace/vscode-config/data \
   --extensions-dir /workspace/vscode-config/extensions \
