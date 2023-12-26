@@ -121,7 +121,6 @@ def create_app():
             app.set_setting("/exts/omni.services.transport.server.http/port", gm.HTTP_PORT)
             app.set_setting("/app/livestream/port", gm.WEBRTC_PORT)
             enable_extension("omni.services.streamclient.webrtc")
-            enable_extension("omni.kit.livestream.webrtc")
             print(f"Now streaming on: http://{ip}:{gm.HTTP_PORT}/streaming/client?server={ip}")
         else:
             raise ValueError(f"Invalid REMOTE_STREAMING option {gm.REMOTE_STREAMING}. Must be one of None, native, webrtc.")
