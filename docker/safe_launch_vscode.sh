@@ -5,7 +5,7 @@ set -e -o pipefail
 USERNAME=$(whoami)
 CURRENTLY_RUNNING_JOBS=$(squeue -u $USERNAME -o "%j:%i" | grep omnigibson-vscode || true)
 
-if [ [ -z "$CURRENTLY_RUNNING_JOBS" ]; ]; then
+if [ -z "$CURRENTLY_RUNNING_JOBS" ]; then
     CURRENT_JOB_IDS=$(echo -n "$CURRENTLY_RUNNING_JOBS" | sed "s/.*://g" | tr '\n' ',') 
     echo "You already have omnigibson-vscode running. First cancel those jobs by running: scancel ${CURRENT_JOB_IDS}"
     exit 1
@@ -15,7 +15,7 @@ fi
 sbatch /cvgl/group/Gibson/og-docker/launch_vscode.sh
 
 # Wait for the file to show up
-while [ ! "$(squeue -u $USERNAME -o "%j:%i" | grep omnigibson-vscode | wc -l || true)" -eq 1 ]; do
+while ! (squeue -u $USERNAME -o "%j:%i" | grep -q omnigibson-vscode)"; do
     echo "Waiting for the job to launch."
     sleep 3
 done
