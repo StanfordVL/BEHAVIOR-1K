@@ -24,7 +24,7 @@ if [ "$JOBS_AFTER_LAUNCH_COUNT" -eq 1 ]; then
 fi
 
 # Get the job id
-LAUNCHED_JOB_ID=$(echo -n "$CURRENTLY_RUNNING_JOBS" | sed "s/.*://g" | tr '\n' '')
+LAUNCHED_JOB_ID=$(echo -n "$JOBS_AFTER_LAUNCH" | sed "s/.*://g" | tr '\n' '')
 
 # Check that the output file exists
 OUTPUT_FILE="~/slurm-${LAUNCHED_JOB_ID}.out"
