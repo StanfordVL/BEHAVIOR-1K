@@ -108,7 +108,7 @@ declare -A MOUNTS=(
     [${ISAAC_CACHE_PATH}/isaac-sim/config]=/root/.nvidia-omniverse/config
     [${ISAAC_CACHE_PATH}/isaac-sim/data]=/root/.local/share/ov/data
     [${ISAAC_CACHE_PATH}/isaac-sim/documents]=/root/Documents
-    [${BASE_DIR}/OmniGibson]=/omnigibson-scr
+    [${BASE_DIR}/OmniGibson]=/omnigibson-src
     [${VSCODE_CONFIG_DIR}]=/vscode-config
 )
 
