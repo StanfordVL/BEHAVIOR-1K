@@ -74,6 +74,7 @@ FQDN_HOSTNAME=$(hostname -i)  # $(curl "https://checkip.amazonaws.com")
 echo "[OMNIGIBSON-VSCODE] Launching remote OmniGibson environment..."
 echo "[OMNIGIBSON-VSCODE] To access vscode, go to http://${FQDN_HOSTNAME}:${VSCODE_PORT}"
 echo "[OMNIGIBSON-VSCODE] To access webrtc, go to http://${FQDN_HOSTNAME}:${HTTP_PORT}/streaming/webrtc-client"
+echo ""
 
 # Step 6: Create the container
 IMAGE_PATH="/cvgl/group/Gibson/og-docker/omnigibson-vscode.sqsh"
