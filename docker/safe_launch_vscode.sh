@@ -5,7 +5,7 @@ set -e -o pipefail
 USERNAME=$(whoami)
 CURRENTLY_RUNNING_JOBS=$(squeue -u $USERNAME -o "%j:%i" | grep omnigibson-vscode || true)
 
-if [ ! -z "$CURRENTLY_RUNNING_JOBS" ]; then
+if [ -z "$CURRENTLY_RUNNING_JOBS" ]; then
     # Queue a new job for the user
     echo "Starting new job"
     sbatch /cvgl/group/Gibson/og-docker/launch_vscode.sh
