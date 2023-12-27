@@ -3,7 +3,7 @@
 # Get the user's currently running vscode job count
 USERNAME=$(whoami)
 CURRENTLY_RUNNING_JOBS=$(squeue -u $USERNAME -o "%j:%i" | grep omnigibson-vscode)
-CURRENTLY_RUNNING_JOBS_COUNT=$(echo -n $CURRENTLY_RUNNING_JOBS | wc -l)
+CURRENTLY_RUNNING_JOBS_COUNT=$(echo -n "$CURRENTLY_RUNNING_JOBS" | wc -l)
 
 if [ "$CURRENTLY_RUNNING_JOBS_COUNT" -gt 0 ]; then
     CURRENT_JOB_IDS=$(echo -n "$CURRENTLY_RUNNING_JOBS" | sed "s/.*://g" | tr '\n' ',') 
@@ -16,7 +16,7 @@ sbatch /cvgl/group/Gibson/og-docker/launch_vscode.sh
 
 # Wait for the file to show up
 JOBS_AFTER_LAUNCH=$(squeue -u $USERNAME -o "%j:%i" | grep omnigibson-vscode)
-JOBS_AFTER_LAUNCH_COUNT=$(echo -n $JOBS_AFTER_LAUNCH | wc -l)
+JOBS_AFTER_LAUNCH_COUNT=$(echo -n "$JOBS_AFTER_LAUNCH" | wc -l)
 
 if [ "$JOBS_AFTER_LAUNCH_COUNT" -eq 1 ]; then
     echo "Job could not be queued. Please contact the OmniGibson team."
