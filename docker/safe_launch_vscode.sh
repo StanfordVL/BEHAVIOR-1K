@@ -22,7 +22,7 @@ JOBS_AFTER_LAUNCH_COUNT=$(squeue -u $USERNAME -o "%j:%i" | grep omnigibson-vscod
 while [ ! "$(squeue -u $USERNAME -o "%j:%i" | grep omnigibson-vscode | wc -l || true)" -eq 1 ]; do
     echo "Waiting for the job to launch."
     sleep 3
-fi
+done
 
 # Get the job id
 LAUNCHED_JOB_ID=$(squeue -u $USERNAME -o "%j:%i" | grep omnigibson-vscode | sed "s/.*://g" | tr -d '\n')
