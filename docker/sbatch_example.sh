@@ -6,6 +6,8 @@
 #SBATCH --mem=30G
 #SBATCH --gres=gpu:2080ti:1
 
+set -e -o pipefail
+
 IMAGE_PATH="/cvgl2/u/cgokmen/omnigibson.sqsh"
 GPU_ID=$(nvidia-smi -L | grep -oP '(?<=GPU-)[a-fA-F0-9\-]+' | head -n 1)
 ISAAC_CACHE_PATH="/scr-ssd/${SLURM_JOB_USER}/isaac_cache_${GPU_ID}"

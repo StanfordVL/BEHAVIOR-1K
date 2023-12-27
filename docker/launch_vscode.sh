@@ -7,6 +7,8 @@
 #SBATCH --mem=30G
 #SBATCH --gres=gpu:2080ti:1
 
+set -e -o pipefail
+
 # Get the username
 USERNAME=$(whoami)
 

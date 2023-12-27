@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -e -o pipefail
 
 # Get the user's currently running vscode job count
 USERNAME=$(whoami)
