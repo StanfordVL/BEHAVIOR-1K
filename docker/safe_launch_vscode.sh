@@ -25,7 +25,7 @@ LAUNCHED_JOB_ID=$(squeue -u $USERNAME -o "%j:%i" | grep omnigibson-vscode | sed 
 echo "Job queued successfully. Job ID: $LAUNCHED_JOB_ID"
 
 # Check that the output file exists
-OUTPUT_FILE="~/slurm-${LAUNCHED_JOB_ID}.out"
+OUTPUT_FILE="slurm-${LAUNCHED_JOB_ID}.out"
 while [ ! -f "$OUTPUT_FILE" ]; do
     echo "Waiting for the job to start outputting."
     sleep 3
