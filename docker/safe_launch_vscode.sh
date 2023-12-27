@@ -25,7 +25,7 @@ if [ "$JOBS_AFTER_LAUNCH_COUNT" -eq 1 ]; then
 fi
 
 # Get the job id
-LAUNCHED_JOB_ID=$(echo -n "$JOBS_AFTER_LAUNCH" | sed "s/.*://g" | tr '\n' '')
+LAUNCHED_JOB_ID=$(echo -n "$JOBS_AFTER_LAUNCH" | sed "s/.*://g" | tr '\n')
 
 # Check that the output file exists
 OUTPUT_FILE="~/slurm-${LAUNCHED_JOB_ID}.out"
@@ -33,6 +33,21 @@ while [ ! -f "$OUTPUT_FILE" ]; do
     echo "Waiting for the job to launch."
     sleep 3
 done
+echo "Job launched successfully."
 
-# Use tail to output the first 3 lines of the file that contain the string OMNIGIBSON-VSCODE
-tail -f "$OUTPUT_FILE" | grep -m 3 "OMNIGIBSON-VSCODE"
+# Wait for the output file to contain the string OMNIGIBSON-VSCODE exactly 3 times
+while [ "$(grep -c "OMNIGIBSON-VSCODE" "$OUTPUT_FILE")" -lt 3 ]; do
+    echo "Waiting for the job to allocate ports."
+    sleep 3
+done
+echo "Ports allocated successfully."
+
+# Wait for the output file to contain the string "HTTP server listening"
+while [ "$(grep -q "HTTP server listening" "$OUTPUT_FILE")" ]; do
+    echo "Waiting for the job to start the HTTP server."
+    sleep 3
+done
+echo "HTTP server started successfully.\n"
+
+# Echo the OMNIGIBSON-VSCODE lines
+grep "OMNIGIBSON-VSCODE" "$OUTPUT_FILE"
