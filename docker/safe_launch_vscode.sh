@@ -44,7 +44,8 @@ while ! grep -q "HTTP server listening" "$OUTPUT_FILE"; do
     echo "Waiting for the job to start the HTTP server."
     sleep 3
 done
-echo "HTTP server started successfully.\n"
+echo "HTTP server started successfully."
+echo ""
 
 # Echo the OMNIGIBSON-VSCODE lines
 grep "OMNIGIBSON-VSCODE" "$OUTPUT_FILE"
