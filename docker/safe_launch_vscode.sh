@@ -20,7 +20,6 @@ srun \
     --cpus-per-task=8 \
     --mem=30G \
     --gres=gpu:2080ti:1 \
-    --pty \
-    /cvgl/group/Gibson/og-docker/launch_vscode.sh | grep -m 3 --line-buffered "OMNIGIBSON-VSCODE"
+    /cvgl/group/Gibson/og-docker/launch_vscode.sh | (grep -m 3 --line-buffered "OMNIGIBSON-VSCODE" && pkill -P $$ srun)
 
 echo "You may need to wait up to 1 minute for vscode to launch. The password is your username."
