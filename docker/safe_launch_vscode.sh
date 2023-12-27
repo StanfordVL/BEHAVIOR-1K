@@ -7,6 +7,7 @@ CURRENTLY_RUNNING_JOBS=$(squeue -u $USERNAME -o "%j:%i" | grep omnigibson-vscode
 
 if [ ! -z "$CURRENTLY_RUNNING_JOBS" ]; then
     # Queue a new job for the user
+    echo "Starting new job"
     sbatch /cvgl/group/Gibson/og-docker/launch_vscode.sh
 
     # Wait for the file to show up
