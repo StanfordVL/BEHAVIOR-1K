@@ -1,5 +1,6 @@
 import argparse
 import logging
+import yaml
 
 log = logging.getLogger(__name__)
 
@@ -7,7 +8,7 @@ import carb
 import gymnasium as gym
 import torch as th
 import torch.nn as nn
-import wandb
+# import wandb
 from stable_baselines3 import PPO
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.preprocessing import maybe_transpose
@@ -16,7 +17,7 @@ from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.vec_env import VecVideoRecorder, VecMonitor, VecFrameStack
 from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback, EvalCallback
 from stable_baselines3.common.vec_env import DummyVecEnv
-from wandb.integration.sb3 import WandbCallback 
+# from wandb.integration.sb3 import WandbCallback 
 
 import numpy as np
 import omnigibson as og
@@ -25,86 +26,9 @@ from omnigibson.macros import gm
 gm.USE_FLATCACHE = True
 
 def create_env():
-    DIST_COEFF = 0.1
-    GRASP_REWARD = 0.3
-
-    cfg = {
-        "env": {
-            "action_timestep": 1 / 10.,
-            "physics_timestep": 1 / 60.,
-            "flatten_obs_space": True,
-            "flatten_action_space": True,
-        },
-        "scene": {
-            "type": "InteractiveTraversableScene",
-            "scene_model": "Rs_int",
-            "load_object_categories": ["floors", "walls", "coffee_table"],
-        },
-        "robots": [
-            {
-                "type": "Fetch",
-                "obs_modalities": ["proprio"],
-                "proprio_obs": ["joint_qpos", "joint_qvel", "eef_0_pos", "eef_0_quat", "grasp_0"],
-                "scale": 1.0,
-                "self_collisions": True,
-                "action_normalize": False,
-                "action_type": "continuous",
-                "grasping_mode": "sticky",
-                "rigid_trunk": False,
-                "default_arm_pose": "diagonal30",
-                "default_trunk_offset": 0.365,
-                "sensor_config": {},
-                "controller_config": {
-                    "base": {
-                        "name": "DifferentialDriveController",
-                    },
-                    "arm_0": {
-                        "name": "JointController",
-                        "motor_type": "position",
-                        "command_input_limits": "default",
-                        "command_output_limits": None,
-                        "use_delta_commands": True,
-                    },
-                    "gripper_0": {
-                        "name": "MultiFingerGripperController",
-                        "mode": "ternary",
-                        "motor_type": "position",
-                        "command_input_limits": [-1, 1],
-                        "command_output_limits": None,
-                    },
-                    "camera": {
-                        "name": "JointController",
-                        "motor_type": "position",
-                        "command_input_limits": "default",
-                        "command_output_limits": None,
-                        "use_delta_commands": False
-                    }
-                }
-            }
-        ],
-        "task": {
-            "type": "GraspTask",
-            "obj_name": "cologne",
-            "termination_config": {
-                "max_steps": 400,
-            },
-            "reward_config": {
-                "r_dist_coeff": DIST_COEFF,
-                "r_grasp": GRASP_REWARD
-            }
-        },
-        "objects": [
-            {
-                "type": "DatasetObject",
-                "name": "cologne",
-                "category": "bottle_of_cologne",
-                "model": "lyipur",
-                "position": [-0.3, -0.8, 0.5],
-            },
-        ]
-    }
-
-    env = og.Environment(configs=cfg)
+    config_filename = "omni_grpc.yaml"
+    config = yaml.load(open(config_filename, "r"), Loader=yaml.FullLoader)
+    env = og.Environment(configs=config)
     return env
 
 class CustomCombinedExtractor(BaseFeaturesExtractor):
@@ -211,13 +135,13 @@ def main():
         "batch_size": 8,
         "total_timesteps": 10_000_000,
     }
-    run = wandb.init(
-        project="sb3",
-        config=config,
-        sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
-        monitor_gym=True,  # auto-upload the videos of agents playing the game
-        # save_code=True,  # optional
-    )
+    # run = wandb.init(
+    #     project="sb3",
+    #     config=config,
+    #     sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
+    #     monitor_gym=True,  # auto-upload the videos of agents playing the game
+    #     # save_code=True,  # optional
+    # )
     env = VecFrameStack(env, n_stack=5, channels_order="first")
     env = VecMonitor(env)
     # env = VecVideoRecorder(
@@ -226,25 +150,25 @@ def main():
     #     record_video_trigger=lambda x: x % 2000 == 0,
     #     video_length=200,
     # )
-    tensorboard_log_dir = f"runs/{run.id}"
+    # tensorboard_log_dir = f"runs/{run.id}"
     model = PPO(
         config["policy_type"],
         env,
         verbose=1,
-        tensorboard_log=tensorboard_log_dir,
+        # tensorboard_log=tensorboard_log_dir,
         # policy_kwargs=policy_kwargs,
         n_steps=config["n_steps"],
         batch_size=config["batch_size"],
         device='cuda',
     )
-    checkpoint_callback = CheckpointCallback(save_freq=1000, save_path=tensorboard_log_dir, name_prefix=prefix)
+    # checkpoint_callback = CheckpointCallback(save_freq=1000, save_path=tensorboard_log_dir, name_prefix=prefix)
     # eval_callback = EvalCallback(eval_env=env, eval_freq=1000, n_eval_episodes=20)
-    wandb_callback = WandbCallback(
-        model_save_path=tensorboard_log_dir,
-        verbose=2,
-    )
-    callback = CallbackList([wandb_callback, checkpoint_callback])
-    print(callback.callbacks)
+    # wandb_callback = WandbCallback(
+    #     model_save_path=tensorboard_log_dir,
+    #     verbose=2,
+    # )
+    # callback = CallbackList([wandb_callback, checkpoint_callback])
+    # print(callback.callbacks)
 
     log.debug(model.policy)
     log.info(f"model: {model}")
@@ -252,7 +176,7 @@ def main():
     log.info("Starting training...")
     model.learn(
         total_timesteps=10000000,
-        callback=callback,
+        # callback=callback,
     )
     log.info("Finished training!")
 

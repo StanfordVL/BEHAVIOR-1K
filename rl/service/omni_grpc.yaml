@@ -1,0 +1,65 @@
+env:
+  action_timestep: 0.1
+  physics_timestep: 0.01666666666
+  flatten_obs_space: true
+  flatten_action_space: true
+scene:
+  type: InteractiveTraversableScene
+  scene_model: Rs_int
+  load_object_categories:
+    - floors
+    - walls
+    - coffee_table
+robots:
+  - type: Fetch
+    obs_modalities:
+      - proprio
+    proprio_obs:
+      - joint_qpos
+      - joint_qvel
+      - eef_0_pos
+      - eef_0_quat
+      - grasp_0
+    scale: 1.0
+    self_collisions: true
+    action_normalize: false
+    action_type: continuous
+    grasping_mode: sticky
+    rigid_trunk: false
+    default_arm_pose: diagonal30
+    default_trunk_offset: 0.365
+    controller_config:
+      base:
+        name: DifferentialDriveController
+        command_input_limits: [-0.0001, 0.0001]
+      arm_0:
+        name: JointController
+        motor_type: position
+        command_input_limits: default
+        command_output_limits: null
+      gripper_0:
+        name: MultiFingerGripperController
+        mode: ternary
+        motor_type: position
+        command_input_limits: [-1, 1]
+        command_output_limits: null
+      camera:
+        name: JointController
+        motor_type: position
+        command_input_limits: default
+        command_output_limits: null
+        use_delta_commands: false
+task:
+  type: GraspTask
+  obj_name: cologne
+  termination_config:
+    max_steps: 400
+  reward_config:
+    r_dist_coeff: 0.1
+    r_grasp: 0.3
+objects:
+  - type: DatasetObject
+    name: cologne
+    category: bottle_of_cologne
+    model: lyipur
+    position: [-0.3, -0.8, 0.5]
