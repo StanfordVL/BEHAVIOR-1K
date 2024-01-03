@@ -2,7 +2,7 @@
 Example script for using VR controller to teleoperate a robot.
 """
 import omnigibson as og
-from omnigibson.utils.teleop_utils import OculusReaderSystem as VRSystem
+from omnigibson.objects import USDObject
 from omnigibson.utils.ui_utils import choose_from_options
 
 ROBOTS = {
@@ -11,11 +11,18 @@ ROBOTS = {
     "Tiago": "Mobile robot with two arms",
 }
 
+SYSTEMS = {
+    "SteamVR": "SteamVR with HTC VIVE through OmniverseXR plugin (default)",
+    "Oculus": "Oculus Reader with Quest 2",
+    "Spacemouse": "Spacemouse",
+}
+
 
 def main():
+    teleop_system = choose_from_options(options=SYSTEMS, name="system")
     robot_name = choose_from_options(options=ROBOTS, name="robot")
     # Create the config for generating the environment we want
-    env_cfg = {"action_timestep": 1 / 10., "physics_timestep": 1 / 60.}
+    env_cfg = {"action_timestep": 1 / 60., "physics_timestep": 1 / 180.}
     scene_cfg = {"type": "Scene"}
     # Add the robot we want to load
     robot0_cfg = {
@@ -23,10 +30,38 @@ def main():
         "obs_modalities": ["rgb"],
         "action_normalize": False,
         "grasping_mode": "assisted",
-        "controller_config": {
+    }
+    if robot_name == "Tiago":
+        robot0_cfg["controller_config"] = {
+            "arm_left": {
+                "name": "InverseKinematicsController",
+                "mode": "pose_absolute_ori",
+                "motor_type": "position"
+            },
+            "gripper_left": {
+                "name": "MultiFingerGripperController", 
+                "command_input_limits": (0.0, 1.0),
+                "mode": "smooth", 
+                "inverted": True
+            },
+            "arm_right": {
+                "name": "InverseKinematicsController",
+                "mode": "pose_absolute_ori",
+                "motor_type": "position"
+            },
+            "gripper_right": {
+                "name": "MultiFingerGripperController", 
+                "command_input_limits": (0.0, 1.0),
+                "mode": "smooth", 
+                "inverted": True
+            },
+        }
+    else:
+        robot0_cfg["controller_config"] = {
             "arm_0": {
                 "name": "InverseKinematicsController",
                 "mode": "pose_absolute_ori",
+                "motor_type": "position"
             },
             "gripper_0": {
                 "name": "MultiFingerGripperController", 
@@ -35,7 +70,6 @@ def main():
                 "inverted": True
             }
         }
-    }
     object_cfg = [
         {
             "type": "DatasetObject",
@@ -101,14 +135,6 @@ def main():
             "scale": [0.75, 0.75, 0.75],
             "position": [0.6, 0.4, 0.5],
         },
-        {
-            "type": "PrimitiveObject",
-            "primitive_type": "Cube",
-            "name": "target",  
-            "scale": [0.1, 0.1, 0.1],
-            "visual_only": True,
-            "rgba": [0.0, 1.0, 0.0, 1.0],
-        },
     ]
     cfg = dict(env=env_cfg, scene=scene_cfg, robots=[robot0_cfg], objects=object_cfg)
 
@@ -118,19 +144,31 @@ def main():
     # update viewer camera pose
     og.sim.viewer_camera.set_position_orientation([-0.22, 0.99, 1.09], [-0.14, 0.47, 0.84, -0.23])
 
-    # Start vrsys 
+    # Start teleoperation system
     robot = env.robots[0]
-    vrsys = VRSystem(robot=robot, system="OpenXR", show_controller=True, disable_display_output=True, align_anchor_to_robot_base=True)
-    vrsys.start()
+    # Import robot eef marker
+    target_markers = {}
+    for arm in robot.arm_names:
+        arm_name = "right" if arm == robot.default_arm else "left"
+        target_markers[arm_name] = USDObject(name=f"target_{arm_name}", usd_path=robot.eef_usd_path[arm], visual_only=True)
+        og.sim.import_object(target_markers[arm_name])
+
+    # Initialize teleoperation system
+    if teleop_system == "SteamVR":
+        from omnigibson.utils.teleop_utils import VRSystem as TeleopSystem
+    elif teleop_system == "Oculus":
+        from omnigibson.utils.teleop_utils import OculusReaderSystem as TeleopSystem
+    elif teleop_system == "Spacemouse":
+        from omnigibson.utils.teleop_utils import SpaceMouseSystem as TeleopSystem
+    teleop_sys = TeleopSystem(robot=robot, show_controller=True, disable_display_output=True, align_anchor_to_robot_base=True)
+    teleop_sys.start()
     # tracker variable of whether the robot is attached to the VR system
     prev_robot_attached = False
-    # get the target object
-    target = env.scene.object_registry("name", "target")
     # main simulation loop
     for _ in range(10000):
         if og.sim.is_playing():
-            vrsys.update()
-            if vrsys.teleop_data["robot_attached"] == True and prev_robot_attached == False:
+            teleop_sys.update()
+            if teleop_sys.teleop_data["robot_attached"] == True and prev_robot_attached == False:
                 # The user just pressed the grip, so snap the VR right controller to the robot's right arm
                 if robot.model_name == "Tiago":
                     # Tiago's default arm is the left arm
@@ -138,16 +176,17 @@ def main():
                 else:
                     robot_eef_pos = robot.links[robot.eef_link_names[robot.default_arm]].get_position()
                 base_orn = robot.get_orientation()
-                vrsys.reset_transform_mapping(robot_eef_pos=robot_eef_pos, robot_base_orn=base_orn)
+                teleop_sys.reset_transform_mapping(robot_eef_pos=robot_eef_pos, robot_base_orn=base_orn)
             else:
-                action = vrsys.teleop_data_to_action()
+                action = teleop_sys.teleop_data_to_action()
                 env.step(action) 
-            if "right" in vrsys.teleop_data["transforms"]:
-                # update the target object's pose to the VR right controller's pose
-                target.set_position_orientation(vrsys.teleop_data["transforms"]["right"][0], vrsys.teleop_data["transforms"]["right"][1])  
-            prev_robot_attached = vrsys.teleop_data["robot_attached"]
+            # update the target object's pose to the VR right controller's pose
+            for arm_name in target_markers:
+                if arm_name in teleop_sys.teleop_data["transforms"]:
+                    target_markers[arm_name].set_position_orientation(*teleop_sys.teleop_data["transforms"][arm_name])  
+            prev_robot_attached = teleop_sys.teleop_data["robot_attached"]
     # Shut down the environment cleanly at the end
-    vrsys.stop()
+    teleop_sys.stop()
     env.close()
 
 if __name__ == "__main__":

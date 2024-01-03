@@ -194,7 +194,11 @@ class FrankaPanda(ManipulationRobot):
         return os.path.join(gm.ASSET_PATH, "models/franka/franka_panda.urdf")
     
     @property
-    def vr_rotation_offset(self):
+    def eef_usd_path(self):
+        return {self.default_arm: os.path.join(gm.ASSET_PATH, "models/franka/franka_panda_eef.usd")}
+    
+    @property
+    def teleop_rotation_offset(self):
         return {self.default_arm: euler2quat([-np.pi, 0, 0])}
     
     @property

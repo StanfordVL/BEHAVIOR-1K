@@ -500,7 +500,11 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         }
     
     @property
-    def vr_rotation_offset(self):
+    def eef_usd_path(self):
+        return {self.default_arm: os.path.join(gm.ASSET_PATH, "models/fetch/fetch/fetch_eef.usd")}
+
+    @property
+    def teleop_rotation_offset(self):
         return {self.default_arm: euler2quat([0, np.pi / 2, np.pi])}
     
     def teleop_data_to_action(self, teleop_data: dict):

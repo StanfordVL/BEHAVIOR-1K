@@ -1448,9 +1448,17 @@ class ManipulationRobot(BaseRobot):
         return classes
     
     @property
-    def vr_rotation_offset(self):
+    def eef_usd_path(self):
         """
-        Rotational offset that will be applied for VR teleoperation
+        Returns:
+            dict(str, str): dict mapping arm name to the path to the eef usd file
+        """
+        raise NotImplementedError
+
+    @property
+    def teleop_rotation_offset(self):
+        """
+        Rotational offset that will be applied for teleoperation
         such that [0, 0, 0, 1] as action will keep the robot eef pointing at +x axis
         """
         return {arm: np.array([0, 0, 0, 1]) for arm in self.arm_names}
@@ -1468,17 +1476,18 @@ class ManipulationRobot(BaseRobot):
         action = np.zeros(self.n_arms * 7)
         hands = ["left", "right"] if self.n_arms == 2 else ["right"]
         for i, hand in enumerate(hands):
-            assert isinstance(self._controllers[f"gripper_{i}"], MultiFingerGripperController), f"Only MultiFingerGripperController is supported for gripper {i}!"
+            arm_name = self.arm_names[self.n_arms - i - 1]
+            assert isinstance(self._controllers[f"gripper_{arm_name}"], MultiFingerGripperController), \
+                f"Only MultiFingerGripperController is supported for gripper {arm_name}!"
             assert \
-                isinstance(self._controllers[f"arm_{i}"], InverseKinematicsController) or \
-                isinstance(self._controllers[f"arm_{i}"], OperationalSpaceController), \
-                f"Only IK and OSC controllers are supported for arm {i}!"
+                isinstance(self._controllers[f"arm_{arm_name}"], InverseKinematicsController) or \
+                isinstance(self._controllers[f"arm_{arm_name}"], OperationalSpaceController), \
+                f"Only IK and OSC controllers are supported for arm {arm_name}!"
             if hand in teleop_data["transforms"]:
-                arm_name = self.arm_names[self.n_arms - i - 1]
                 cur_robot_eef_pos, cur_robot_eef_orn = self.links[self.eef_link_names[arm_name]].get_position_orientation()
                 if teleop_data["robot_attached"]:
                     target_pos, target_orn = teleop_data["transforms"][hand]
-                    target_orn = T.quat_multiply(target_orn, self.vr_rotation_offset[arm_name])
+                    target_orn = T.quat_multiply(target_orn, self.teleop_rotation_offset[arm_name])
                 else:
                     target_pos, target_orn = cur_robot_eef_pos, cur_robot_eef_orn
                 # get orientation relative to robot base

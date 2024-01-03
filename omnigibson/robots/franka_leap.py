@@ -16,6 +16,7 @@ class FrankaLeap(ManipulationRobot):
         self,
         # Shared kwargs in hierarchy
         name,
+        hand="right",
         prim_path=None,
         class_id=None,
         uuid=None,
@@ -49,6 +50,7 @@ class FrankaLeap(ManipulationRobot):
         """
         Args:
             name (str): Name for the object. Names need to be unique per scene
+            hand (str): One of {"left", "right"} - which hand to use, default is right
             prim_path (None or str): global path in the stage to this object. If not specified, will automatically be
                 created at /World/<name>
             class_id (None or int): What class ID the object should be assigned in semantic segmentation rendering mode.
@@ -94,6 +96,7 @@ class FrankaLeap(ManipulationRobot):
                 for flexible compositions of various object subclasses (e.g.: Robot is USDObject + ControllableObject).
         """
 
+        self.hand = hand
         # Run super init
         super().__init__(
             prim_path=prim_path,
@@ -122,7 +125,7 @@ class FrankaLeap(ManipulationRobot):
 
     @property
     def model_name(self):
-        return "FrankaLeap"
+        return f"FrankaLeap{self.hand.capitalize()}"
 
     @property
     def discrete_action_list(self):
@@ -209,7 +212,7 @@ class FrankaLeap(ManipulationRobot):
 
     @property
     def usd_path(self):
-        return os.path.join(gm.ASSET_PATH, "models/franka/franka_leap.usd")
+        return os.path.join(gm.ASSET_PATH, f"models/franka/franka_leap_{self.hand}.usd")
     
     @property
     def robot_arm_descriptor_yamls(self):
@@ -217,10 +220,10 @@ class FrankaLeap(ManipulationRobot):
 
     @property
     def urdf_path(self):
-        return os.path.join(gm.ASSET_PATH, "models/franka/franka_leap.urdf")
+        return os.path.join(gm.ASSET_PATH, f"models/franka/franka_leap_{self.hand}.urdf")
 
     @property
-    def vr_rotation_offset(self):
+    def teleop_rotation_offset(self):
         return {self.default_arm: T.euler2quat(np.array([0, np.pi, np.pi / 2]))}
     
     def teleop_data_to_action(self, teleop_data: dict):
@@ -229,24 +232,3 @@ class FrankaLeap(ManipulationRobot):
         action[:6] = teleop_action[:6]
         action[6:] = teleop_action[6]
         return action
-
-
-class FrankaLeapLeft(FrankaLeap):
-    """
-    Franka Robot with Leap left hand
-    """
-    @property
-    def model_name(self):
-        return "FrankaLeapLeft"    
-    
-    @property
-    def usd_path(self):
-        return os.path.join(gm.ASSET_PATH, "models/franka/franka_leap_left.usd")
-    
-    @property
-    def robot_arm_descriptor_yamls(self):
-        return {self.default_arm: os.path.join(gm.ASSET_PATH, "models/franka/franka_leap_description.yaml")}
-
-    @property
-    def urdf_path(self):
-        return os.path.join(gm.ASSET_PATH, "models/franka/franka_leap_left.urdf")

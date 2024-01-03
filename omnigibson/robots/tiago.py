@@ -758,6 +758,10 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         # Note that the link we are interested in is self.base_footprint_link, not self.root_link
         return self.base_footprint_link.get_angular_velocity()
     
+    @property
+    def eef_usd_path(self):
+        return {arm: os.path.join(gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford/tiago_eef.usd") for arm in self.arm_names}
+
     def teleop_data_to_action(self, teleop_data: dict):
         action = np.zeros(19)
         action[:3] = teleop_data["transforms"]["base"][[0, 1, 3]]

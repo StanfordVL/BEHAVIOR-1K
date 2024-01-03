@@ -55,6 +55,7 @@ class TeleopSystem():
         }
         self.robot = robot
         self.robot_attached = False
+        self.base_movement_speed = 0.2
 
     def start(self) -> None:
         """
@@ -86,7 +87,7 @@ class VRSystem(TeleopSystem):
     def __init__(
         self, 
         robot: BaseRobot,
-        system: str="OpenXR",
+        system: str="SteamVR",
         show_controller: bool=False,
         disable_display_output: bool=False,
         enable_touchpad_movement: bool=False,
@@ -99,7 +100,7 @@ class VRSystem(TeleopSystem):
         Initializes the VR system
         Args:
             robot (BaseRobot): the robot that VR will control.
-            system (str): the VR system to use, one of ["OpenXR", "SteamVR"], default is "OpenXR".
+            system (str): the VR system to use, one of ["OpenXR", "SteamVR"], default is "SteamVR".
             show_controller (bool): whether to show the controller model in the scene, default is False.
             disable_display_output (bool): whether we will not display output to the VR headset (only use controller tracking), default is False.
             enable_touchpad_movement (bool): whether to enable VR system anchor movement by controller, default is False.
@@ -213,14 +214,14 @@ class VRSystem(TeleopSystem):
         self.teleop_data["transforms"]["base"] = np.zeros(4)
         if 1 in self.controllers:
             self.teleop_data["transforms"]["right"] = self.raw_data["transforms"]["controllers"][1]
-            self.teleop_data["transforms"]["base"][0] = self.raw_data["button_data"][1]["axis"]["touchpad_y"]
-            self.teleop_data["transforms"]["base"][3] = self.raw_data["button_data"][1]["axis"]["touchpad_x"]
+            self.teleop_data["transforms"]["base"][0] = self.raw_data["button_data"][1]["axis"]["touchpad_y"] * self.base_movement_speed
+            self.teleop_data["transforms"]["base"][3] = -self.raw_data["button_data"][1]["axis"]["touchpad_x"] * self.base_movement_speed
             self.teleop_data["gripper_right"] = self.raw_data["button_data"][1]["axis"]["trigger"]
         if 0 in self.controllers:
             self.teleop_data["transforms"]["left"] = self.raw_data["transforms"]["controllers"][0]
-            self.teleop_data["transforms"]["base"][1] = -self.raw_data["button_data"][0]["axis"]["touchpad_x"]
-            self.teleop_data["transforms"]["base"][2] = self.raw_data["button_data"][0]["axis"]["touchpad_y"]
-            self.teleop_data["gripper_right"] = self.raw_data["button_data"][0]["axis"]["trigger"]
+            self.teleop_data["transforms"]["base"][1] = -self.raw_data["button_data"][0]["axis"]["touchpad_x"] * self.base_movement_speed
+            self.teleop_data["transforms"]["base"][2] = self.raw_data["button_data"][0]["axis"]["touchpad_y"] * self.base_movement_speed
+            self.teleop_data["gripper_left"] = self.raw_data["button_data"][0]["axis"]["trigger"]
         # update robot attachment info
         if 1 in self.controllers and self.raw_data["button_data"][1]["press"]["grip"]:
             if not self.reset_button_pressed:
@@ -263,19 +264,18 @@ class VRSystem(TeleopSystem):
             rot_offset = np.array(rot_offset).astype(np.float64)
             self.vr_profile.add_rotate_physical_world_around_device(rot_offset)
 
-    def snap_device_to_robot_eef(
+    def reset_transform_mapping(
             self, 
             robot_eef_pos: Iterable[float], 
-            robot_eef_orn: Iterable[float], 
-            base_orn: Iterable[float]
+            robot_base_orn: Iterable[float]
         ) -> None:
         """
         Snap device to the robot end effector (ManipulationRobot only)
         Args:
             robot_eef_position (Iterable[float]): the position of the robot end effector
-            base_rotation (Iterable[float]): the rotation of the robot base
+            robot_base_orn (Iterable[float]): the rotation of the robot base
         """
-        target_transform = self.og2xr(pos=robot_eef_pos, orn=base_orn)
+        target_transform = self.og2xr(pos=robot_eef_pos, orn=robot_base_orn)
         self.vr_profile.set_physical_world_to_world_anchor_transform_to_match_xr_device(target_transform, self.controllers[1])
 
     def _update_devices(self) -> None:
@@ -372,7 +372,6 @@ class OculusReaderSystem(TeleopSystem):
         # initialize oculus reader
         self.oculus_reader = oculus_reader.OculusReader(run=False)
         self.reset_button_pressed = False
-        self.base_movement_speed = 0.1
         self.vr_origin = {"right": T.mat2pose(np.eye(4)), "left": T.mat2pose(np.eye(4))}
         self.robot_origin = {"right": T.mat2pose(np.eye(4)), "left": T.mat2pose(np.eye(4))}
 
