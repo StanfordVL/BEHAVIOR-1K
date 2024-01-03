@@ -1,6 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
-import inspect
-from multiprocessing import Queue
+from queue import Queue
 import pickle
 import threading
 from typing import Optional
