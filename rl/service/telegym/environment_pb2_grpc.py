@@ -2,7 +2,7 @@
 """Client and server classes corresponding to protobuf-defined services."""
 import grpc
 
-import telegym.environment_pb2 as environment__pb2
+import environment_pb2 as environment__pb2
 
 
 class EnvironmentServiceStub(object):
