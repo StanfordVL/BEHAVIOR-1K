@@ -5,6 +5,7 @@ import omnigibson as og
 from omnigibson.action_primitives.starter_semantic_action_primitives import PlanningContext
 from omnigibson.reward_functions.grasp_reward import GraspReward
 
+import omnigibson.utils.transform_utils as T
 from omnigibson.tasks.task_base import BaseTask
 from omnigibson.scenes.scene_base import Scene
 from omnigibson.termination_conditions.falling import Falling
@@ -153,8 +154,11 @@ class GraspTask(BaseTask):
         return joint_positions, joint_control_idx
 
     def _get_obs(self, env):
-        # No task-specific obs of any kind
-        return dict(), dict()
+        obj = env.scene.object_registry("name", self.obj_name)
+        robot = env.robots[0]
+        relative_pos, = T.relative_pose_transform(*obj.get_position_orientation(), *robot.get_position_orientation())
+
+        return {"obj_pos": relative_pos}, dict()
 
     def _load_non_low_dim_observation_space(self):
         # No non-low dim observations so we return an empty dict
