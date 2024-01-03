@@ -2,7 +2,7 @@
 """Client and server classes corresponding to protobuf-defined services."""
 import grpc
 
-import environment_pb2 as environment__pb2
+from . import environment_pb2 as environment__pb2
 
 
 class EnvironmentServiceStub(object):
