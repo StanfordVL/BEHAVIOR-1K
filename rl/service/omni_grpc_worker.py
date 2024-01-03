@@ -25,4 +25,4 @@ if __name__ == "__main__":
     local_port = s.getsockname()[1]
     s.close()
 
-    asyncio.get_event_loop().run_until_complete(main("localhost:" + str(local_port), sys.argv[1]))
+    main("localhost:" + str(local_port), sys.argv[1])
