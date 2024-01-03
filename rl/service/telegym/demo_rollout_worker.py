@@ -12,6 +12,12 @@ async def main(local_addr, learner_addr):
     await serve_env_over_grpc(env, local_addr, learner_addr)
 
 if __name__ == "__main__":
-    import sys
-    local_port = int(sys.argv[1])
-    asyncio.get_event_loop().run_until_complete(main("localhost:" + str(local_port), "localhost:50051"))
+    import sys, socket
+
+    # Obtain an unused port
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.bind(("", 0))
+    local_port = s.getsockname()[1]
+    s.close()
+
+    asyncio.get_event_loop().run_until_complete(main("localhost:" + str(local_port), sys.argv[1]))
