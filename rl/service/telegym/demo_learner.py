@@ -1,7 +1,7 @@
 from stable_baselines3 import A2C
 from stable_baselines3.common.env_util import make_vec_env
 
-from grpc_client_vec_env import GRPCClientVecEnv
+from telegym.grpc_client_vec_env import GRPCClientVecEnv
 
 import sys
 

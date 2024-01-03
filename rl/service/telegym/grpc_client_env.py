@@ -1,7 +1,7 @@
 import pickle
 import grpc
-import environment_pb2
-import environment_pb2_grpc
+import telegym.environment_pb2 as environment_pb2
+import telegym.environment_pb2_grpc as environment_pb2_grpc
 
 import gymnasium as gym
 
