@@ -156,7 +156,7 @@ class GraspTask(BaseTask):
     def _get_obs(self, env):
         obj = env.scene.object_registry("name", self.obj_name)
         robot = env.robots[0]
-        relative_pos, = T.relative_pose_transform(*obj.get_position_orientation(), *robot.get_position_orientation())
+        relative_pos, _ = T.relative_pose_transform(*obj.get_position_orientation(), *robot.get_position_orientation())
 
         return {"obj_pos": relative_pos}, dict()
 
