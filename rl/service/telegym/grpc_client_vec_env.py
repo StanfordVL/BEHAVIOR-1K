@@ -21,11 +21,14 @@ class EnvironmentRegistrationServicer(environment_pb2_grpc.EnvironmentRegistrati
         self.envs = [None] * n_workers
         self.completed = asyncio.Event()
 
-    def RegisterEnvironment(self, request, unused_context):
+    def RegisterEnvironment(self, request, context):
         for i, env in enumerate(self.envs):
             if env is None:
-                address = request.ip + ":" + str(request.port)
-                print(f"Start registration of {address}")
+                identity = context.peer().split(":")
+                assert len(identity) == 3 and identity[0] == "ipv4", f"Identity {context.peer()} isn't valid ipv4 identity"
+                ip = identity[1]
+                address = ip + ":" + str(request.port)
+                print(f"Start registration of {context.peer()}")
                 self.envs[i] = GRPCClientEnv(address)
 
                 remaining = sum(1 for x in self.envs if x is None)
