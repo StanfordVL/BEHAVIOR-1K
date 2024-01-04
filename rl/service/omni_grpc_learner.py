@@ -1,6 +1,8 @@
 import argparse
 import logging
 
+import yaml
+
 log = logging.getLogger(__name__)
 
 from telegym import GRPCClientVecEnv
@@ -97,7 +99,7 @@ def main():
     # Parse args
     parser = argparse.ArgumentParser(description="Train or evaluate a PPO agent in BEHAVIOR")
 
-    parser.add_argument("--n_envs", type=int, default=8, help="Number of parallel environments to run")
+    parser.add_argument("--n_envs", type=int, default=8, help="Number of parallel environments to wait for. 0 to run a local environment.")
 
     parser.add_argument(
         "--checkpoint",
@@ -116,7 +118,18 @@ def main():
     prefix = ''
     seed = 0
 
-    env = GRPCClientVecEnv("0.0.0.0:50051", args.n_envs)
+    # Decide whether to use a local environment or remote
+    if args.n_envs > 0:
+        env = GRPCClientVecEnv("0.0.0.0:50051", args.n_envs)
+    else:
+        import omnigibson as og
+        from omnigibson.macros import gm
+
+        gm.USE_FLATCACHE = True
+
+        config_filename = "omni_grpc.yaml"
+        config = yaml.load(open(config_filename, "r"), Loader=yaml.FullLoader)
+        env = og.Environment(configs=config)
 
     # import IPython; IPython.embed()
 
