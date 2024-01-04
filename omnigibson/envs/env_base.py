@@ -36,7 +36,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
         super().__init__()
 
         # Support gymnasium's render mode metadata
-        self.render_mode = "rgb_array"
         self.metadata = {"render.modes": ["rgb_array"]}
 
         # Initialize other placeholders that will be filled in later
@@ -74,6 +73,10 @@ class Environment(gym.Env, GymObservable, Recreatable):
           
         # Load this environment
         self.load()
+
+    @property
+    def render_mode(self):
+        return "rgb_array"
 
     def reload(self, configs, overwrite_old=True):
         """
