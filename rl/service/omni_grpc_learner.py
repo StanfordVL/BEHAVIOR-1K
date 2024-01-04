@@ -1,5 +1,6 @@
 import argparse
 import logging
+import socket
 
 import yaml
 
@@ -100,6 +101,7 @@ def main():
     parser = argparse.ArgumentParser(description="Train or evaluate a PPO agent in BEHAVIOR")
 
     parser.add_argument("--n_envs", type=int, default=8, help="Number of parallel environments to wait for. 0 to run a local environment.")
+    parser.add_argument("--port", type=int, default=None, help="The port to listen at. Defaults to a random port.")
 
     parser.add_argument(
         "--checkpoint",
@@ -120,7 +122,15 @@ def main():
 
     # Decide whether to use a local environment or remote
     if args.n_envs > 0:
-        env = GRPCClientVecEnv("0.0.0.0:50051", args.n_envs)
+        if args.port is not None:
+            local_port = int(args.port)
+        else:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.bind(("", 0))
+            local_port = s.getsockname()[1]
+            s.close()
+        print(f"Listening on port {local_port}")
+        env = GRPCClientVecEnv(f"0.0.0.0:{local_port}", args.n_envs)
     else:
         import omnigibson as og
         from omnigibson.macros import gm
