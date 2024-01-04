@@ -564,12 +564,11 @@ class Environment(gym.Env, GymObservable, Recreatable):
             return None
 
         # Render the external sensor
-        for _  in range(3):
-            og.sim.render()
+        og.sim.render()
 
         # Grab the rendered image from each of the rgb sensors, concatenate along dim 1
         rgb_images = [sensor.get_obs()["rgb"] for sensor in rgb_sensors]
-        return np.concatenate(rgb_images, axis=1)
+        return np.concatenate(rgb_images, axis=1)[:, : :3]
 
 
     def _reset_variables(self):

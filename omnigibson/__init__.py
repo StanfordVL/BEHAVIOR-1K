@@ -97,12 +97,13 @@ def create_app():
     if os.name == "nt":
         enable_extension("omni.kit.window.viewport")
 
+    app.set_setting("/ngx/enabled", False)
+
     # Default Livestream settings
     if gm.REMOTE_STREAMING:
         app.set_setting("/app/window/drawMouse", True)
         app.set_setting("/app/livestream/proto", "ws")
         app.set_setting("/app/livestream/websocket/framerate_limit", 120)
-        app.set_setting("/ngx/enabled", False)
 
         hostname = socket.gethostname()
 
