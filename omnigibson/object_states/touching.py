@@ -20,11 +20,11 @@ class Touching(KinematicsMixin, RelativeObjectState, BooleanStateMixin):
             return self._check_contact(other, self.obj)
         elif other.prim_type == PrimType.CLOTH:
             return self._check_contact(self.obj, other)
-        elif not self.obj.kinematic_only and not other.kinematic_only:
-            # Use optimized check for rigid bodies
-            return RigidContactAPI.in_contact(
-                prim_paths_a=[link.prim_path for link in self.obj.links.values()],
-                prim_paths_b=[link.prim_path for link in other.links.values()],
-            )
+        # elif not self.obj.kinematic_only and not other.kinematic_only:
+        #     # Use optimized check for rigid bodies
+        #     return RigidContactAPI.in_contact(
+        #         prim_paths_a=[link.prim_path for link in self.obj.links.values()],
+        #         prim_paths_b=[link.prim_path for link in other.links.values()],
+        #     )
         else:
             return self._check_contact(other, self.obj) and self._check_contact(self.obj, other)
