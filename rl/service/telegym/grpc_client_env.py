@@ -10,12 +10,20 @@ class GRPCClientEnv(gym.Env):
     super().__init__()
     self.url = url
     self.channel = grpc.insecure_channel(url)
-    self.stub = environment_pb2_grpc.EnvironmentServiceStub(self.channel)
+    self._stub = environment_pb2_grpc.EnvironmentServiceStub(self.channel)
     self.observation_space, self.action_space = self._get_spaces()
     self.metadata = {'render_modes': ['rgb_array']}
     self.render_mode = 'rgb_array'
 
+    self._closed = False
+
     self._step_future = None
+
+  @property
+  def stub(self):
+    # TODO: Reestablish connection if it's down.
+    assert not self._closed, "Trying to use an environment that has already been closed."
+    return self._stub
 
   def step(self, action):
     self.step_async(action)
@@ -46,6 +54,8 @@ class GRPCClientEnv(gym.Env):
   def close(self):
     request = environment_pb2.CloseRequest()
     self.stub.Close(request)
+
+    self._closed = True
     self.channel.close()
 
   def _get_spaces(self):  
