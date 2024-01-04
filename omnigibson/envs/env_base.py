@@ -8,7 +8,7 @@ from omnigibson.robots import REGISTERED_ROBOTS
 from omnigibson.scene_graphs.graph_builder import SceneGraphBuilder
 from omnigibson.tasks import REGISTERED_TASKS
 from omnigibson.scenes import REGISTERED_SCENES
-from omnigibson.sensors import create_sensor
+from omnigibson.sensors import create_sensor, VisionSensor
 from omnigibson.utils.gym_utils import GymObservable, recursively_generate_flat_dict, recursively_generate_compatible_dict
 from omnigibson.utils.config_utils import parse_config
 from omnigibson.utils.ui_utils import create_module_logger
@@ -512,7 +512,6 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 not visual_modalities.isdisjoint(robot.obs_modalities)
                 for robot in self.robots
             )
-            assert not should_render, f"Why are we trying to render? Modalities: {self.robots[0].obs_modalities}"
 
             # Run simulation step
             og.sim.step(render=should_render)
@@ -550,6 +549,28 @@ class Environment(gym.Env, GymObservable, Recreatable):
             return obs, reward, terminated, truncated, info
         except:
             raise ValueError(f"Failed to execute environment step {self._current_step} in episode {self._current_episode}")
+
+    def render(self):
+        # Only works if there is an external sensor
+        if not self.external_sensors:
+            return None
+        
+        # Get the RGB sensors
+        rgb_sensors = [
+            x for x in self.external_sensors.values()
+            if isinstance(x, VisionSensor) and (x.modalities == "all" or "rgb" in x.modalities)
+        ]
+        if not rgb_sensors:
+            return None
+
+        # Render the external sensor
+        for _  in range(3):
+            og.sim.render()
+
+        # Grab the rendered image from each of the rgb sensors, concatenate along dim 1
+        rgb_images = [sensor.get_obs()["rgb"] for sensor in rgb_sensors]
+        return np.concatenate(rgb_images, axis=1)
+
 
     def _reset_variables(self):
         """
