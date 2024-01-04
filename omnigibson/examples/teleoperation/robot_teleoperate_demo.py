@@ -4,6 +4,7 @@ Example script for using VR controller to teleoperate a robot.
 import omnigibson as og
 from omnigibson.objects import USDObject
 from omnigibson.utils.ui_utils import choose_from_options
+from omnigibson.utils.transform_utils import quat2euler
 
 ROBOTS = {
     "FrankaPanda": "Franka Emika Panda (default)",
@@ -25,50 +26,25 @@ def main():
     env_cfg = {"action_timestep": 1 / 60., "physics_timestep": 1 / 180.}
     scene_cfg = {"type": "Scene"}
     # Add the robot we want to load
-    robot0_cfg = {
+    robot_cfg = {
         "type": robot_name,
         "obs_modalities": ["rgb"],
         "action_normalize": False,
         "grasping_mode": "assisted",
     }
-    if robot_name == "Tiago":
-        robot0_cfg["controller_config"] = {
-            "arm_left": {
-                "name": "InverseKinematicsController",
-                "mode": "pose_absolute_ori",
-                "motor_type": "position"
-            },
-            "gripper_left": {
-                "name": "MultiFingerGripperController", 
-                "command_input_limits": (0.0, 1.0),
-                "mode": "smooth", 
-                "inverted": True
-            },
-            "arm_right": {
-                "name": "InverseKinematicsController",
-                "mode": "pose_absolute_ori",
-                "motor_type": "position"
-            },
-            "gripper_right": {
-                "name": "MultiFingerGripperController", 
-                "command_input_limits": (0.0, 1.0),
-                "mode": "smooth", 
-                "inverted": True
-            },
+    arms = ["left", "right"] if robot_name == "Tiago" else ["0"]
+    robot_cfg["controller_config"] = {}
+    for arm in arms:
+        robot_cfg["controller_config"][f"arm_{arm}"] = {
+            "name": "InverseKinematicsController",
+            "mode": "pose_absolute_ori",
+            "motor_type": "position"
         }
-    else:
-        robot0_cfg["controller_config"] = {
-            "arm_0": {
-                "name": "InverseKinematicsController",
-                "mode": "pose_absolute_ori",
-                "motor_type": "position"
-            },
-            "gripper_0": {
-                "name": "MultiFingerGripperController", 
-                "command_input_limits": (0.0, 1.0),
-                "mode": "smooth", 
-                "inverted": True
-            }
+        robot_cfg["controller_config"][f"gripper_{arm}"] = {
+            "name": "MultiFingerGripperController",
+            "command_input_limits": (0.0, 1.0),
+            "mode": "smooth",
+            "inverted": True
         }
     object_cfg = [
         {
@@ -136,7 +112,7 @@ def main():
             "position": [0.6, 0.4, 0.5],
         },
     ]
-    cfg = dict(env=env_cfg, scene=scene_cfg, robots=[robot0_cfg], objects=object_cfg)
+    cfg = dict(env=env_cfg, scene=scene_cfg, robots=[robot_cfg], objects=object_cfg)
 
     # Create the environment
     env = og.Environment(configs=cfg)
@@ -169,14 +145,7 @@ def main():
         if og.sim.is_playing():
             teleop_sys.update()
             if teleop_sys.teleop_data["robot_attached"] == True and prev_robot_attached == False:
-                # The user just pressed the grip, so snap the VR right controller to the robot's right arm
-                if robot.model_name == "Tiago":
-                    # Tiago's default arm is the left arm
-                    robot_eef_pos = robot.links[robot.eef_link_names["right"]].get_position()
-                else:
-                    robot_eef_pos = robot.links[robot.eef_link_names[robot.default_arm]].get_position()
-                base_orn = robot.get_orientation()
-                teleop_sys.reset_transform_mapping(robot_eef_pos=robot_eef_pos, robot_base_orn=base_orn)
+                teleop_sys.reset_transform_mapping()
             else:
                 action = teleop_sys.teleop_data_to_action()
                 env.step(action) 
