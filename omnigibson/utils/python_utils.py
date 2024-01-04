@@ -397,22 +397,18 @@ class UniquelyNamed:
         skip_ids.add(id(dic))
 
         # Loop through all values in the inputted dictionary, and check if any of the values are UniquelyNamed
-        for name, val in dic.items():
-            if id(val) not in skip_ids:
-                # No need to explicitly add val to skip objects because the methods below handle adding it
-                if isinstance(val, UniquelyNamed):
-                    val.remove_names(include_all_owned=True, skip_ids=skip_ids)
-                elif isinstance(val, dict):
-                    # Recursively iterate
-                    self._remove_names_recursively_from_dict(dic=val, skip_ids=skip_ids)
-                elif hasattr(val, "__dict__"):
-                    # Add the attribute and recursively iterate
-                    skip_ids.add(id(val))
-                    self._remove_names_recursively_from_dict(dic=val.__dict__, skip_ids=skip_ids)
-                else:
-                    # Otherwise we just add the value to skip_ids so we don't check it again
-                    skip_ids.add(id(val))
-
+        while any(id(x) not in skip_ids for x in dic.values()):
+            val = next(x for x in dic.values() if id(x) not in skip_ids)
+            skip_ids.add(id(val))
+            
+            if isinstance(val, UniquelyNamed):
+                val.remove_names(include_all_owned=True, skip_ids=skip_ids)
+            elif isinstance(val, dict):
+                # Recursively iterate
+                self._remove_names_recursively_from_dict(dic=val, skip_ids=skip_ids)
+            elif hasattr(val, "__dict__"):
+                # Add the attribute and recursively iterate
+                self._remove_names_recursively_from_dict(dic=val.__dict__, skip_ids=skip_ids)
     @property
     def name(self):
         """
