@@ -116,7 +116,7 @@ def main():
     prefix = ''
     seed = 0
 
-    env = GRPCClientVecEnv("localhost:50051", args.n_envs)
+    env = GRPCClientVecEnv("0.0.0.0:50051", args.n_envs)
 
     # import IPython; IPython.embed()
 
