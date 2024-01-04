@@ -33,7 +33,11 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 see @default_config below
         """
         # Call super first
-        super().__init__(render_mode="rgb_array")
+        super().__init__()
+
+        # Support gymnasium's render mode metadata
+        self.render_mode = "rgb_array"
+        self.metadata = {"render.modes": ["rgb_array"]}
 
         # Initialize other placeholders that will be filled in later
         self._task = None
