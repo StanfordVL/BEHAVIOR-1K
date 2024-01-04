@@ -25,6 +25,7 @@ class EnvironmentRegistrationServicer(environment_pb2_grpc.EnvironmentRegistrati
         for i, env in enumerate(self.envs):
             if env is None:
                 address = request.ip + ":" + str(request.port)
+                print(f"Start registration of {address}")
                 self.envs[i] = GRPCClientEnv(address)
 
                 remaining = sum(1 for x in self.envs if x is None)
