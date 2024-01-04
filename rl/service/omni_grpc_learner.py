@@ -16,7 +16,7 @@ from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.preprocessing import maybe_transpose
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from stable_baselines3.common.utils import set_random_seed
-from stable_baselines3.common.vec_env import VecVideoRecorder, VecMonitor, VecFrameStack
+from stable_baselines3.common.vec_env import VecVideoRecorder, VecMonitor, VecFrameStack, DummyVecEnv
 from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback, EvalCallback
 from wandb.integration.sb3 import WandbCallback 
 
@@ -129,7 +129,7 @@ def main():
 
         config_filename = "omni_grpc.yaml"
         config = yaml.load(open(config_filename, "r"), Loader=yaml.FullLoader)
-        env = og.Environment(configs=config)
+        env = DummyVecEnv([lambda: og.Environment(configs=config)])
 
     # import IPython; IPython.embed()
 
