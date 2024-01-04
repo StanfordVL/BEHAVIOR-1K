@@ -520,7 +520,7 @@ class Behaviorbot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         Total size: 44
         """
         # Actions are stored as 1D numpy array
-        action = np.zeros(44)
+        action = np.zeros(self.action_dim)
         # Update body action space
         hmd_pos, hmd_orn = teleop_data["transforms"]["hmd"]
         if np.all(np.equal(hmd_pos, np.zeros(3))) and np.all(np.equal(hmd_orn, np.array([0, 0, 0, 1]))):

@@ -763,7 +763,7 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         return {arm: os.path.join(gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford/tiago_eef.usd") for arm in self.arm_names}
 
     def teleop_data_to_action(self, teleop_data: dict):
-        action = np.zeros(19)
+        action = np.zeros(self.action_dim)
         action[:3] = teleop_data["transforms"]["base"][[0, 1, 3]]
         action[5:] = ManipulationRobot.teleop_data_to_action(self, teleop_data)
         return action

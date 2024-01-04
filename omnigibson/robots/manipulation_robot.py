@@ -1476,7 +1476,7 @@ class ManipulationRobot(BaseRobot):
         action = np.zeros(self.n_arms * 7)
         hands = ["left", "right"] if self.n_arms == 2 else ["right"]
         for i, hand in enumerate(hands):
-            arm_name = self.arm_names[self.n_arms - i - 1]
+            arm_name = self.arm_names[i]
             assert isinstance(self._controllers[f"gripper_{arm_name}"], MultiFingerGripperController), \
                 f"Only MultiFingerGripperController is supported for gripper {arm_name}!"
             assert \
@@ -1487,7 +1487,6 @@ class ManipulationRobot(BaseRobot):
                 cur_robot_eef_pos, cur_robot_eef_orn = self.links[self.eef_link_names[arm_name]].get_position_orientation()
                 if teleop_data["robot_attached"]:
                     target_pos, target_orn = teleop_data["transforms"][hand]
-                    target_orn = T.quat_multiply(target_orn, self.teleop_rotation_offset[arm_name])
                 else:
                     target_pos, target_orn = cur_robot_eef_pos, cur_robot_eef_orn
                 # get orientation relative to robot base

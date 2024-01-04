@@ -228,7 +228,7 @@ class FrankaAllegro(ManipulationRobot):
         return {self.default_arm: T.euler2quat(np.array([0, np.pi / 2, 0]))}
 
     def teleop_data_to_action(self, teleop_data: dict):
-        action = np.zeros(22)
+        action = np.zeros(self.action_dim)
         teleop_action = super().teleop_data_to_action(teleop_data)
         action[:6] = teleop_action[:6]
         action[6:] = teleop_action[6]

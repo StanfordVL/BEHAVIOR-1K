@@ -1,5 +1,5 @@
 import numpy as np
-from omnigibson.macros import create_module_macros
+from omnigibson.macros import gm, create_module_macros
 
 import omnigibson.utils.transform_utils as T
 from omnigibson.controllers import ControlType, ManipulationController
@@ -344,7 +344,8 @@ class InverseKinematicsController(ManipulationController):
             if target_joint_pos is None:
                 # Print warning that we couldn't find a valid solution, and return the current joint configuration
                 # instead so that we execute a no-op control
-                log.warning(f"Could not find valid IK configuration! Returning no-op control instead.")
+                if gm.DEBUG:
+                    log.warning(f"Could not find valid IK configuration! Returning no-op control instead.")
                 target_joint_pos = current_joint_pos
 
         # Optionally pass through smoothing filter for better stability

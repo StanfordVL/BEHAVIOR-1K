@@ -4,7 +4,6 @@ Example script for using VR controller to teleoperate a robot.
 import omnigibson as og
 from omnigibson.objects import USDObject
 from omnigibson.utils.ui_utils import choose_from_options
-from omnigibson.utils.transform_utils import quat2euler
 
 ROBOTS = {
     "FrankaPanda": "Franka Emika Panda (default)",
@@ -131,7 +130,7 @@ def main():
 
     # Initialize teleoperation system
     if teleop_system == "SteamVR":
-        from omnigibson.utils.teleop_utils import VRSystem as TeleopSystem
+        from omnigibson.utils.teleop_utils import OVXRSystem as TeleopSystem
     elif teleop_system == "Oculus":
         from omnigibson.utils.teleop_utils import OculusReaderSystem as TeleopSystem
     elif teleop_system == "Spacemouse":

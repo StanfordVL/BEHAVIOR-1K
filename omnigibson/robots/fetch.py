@@ -508,7 +508,7 @@ class Fetch(ManipulationRobot, TwoWheelRobot, ActiveCameraRobot):
         return {self.default_arm: euler2quat([0, np.pi / 2, np.pi])}
     
     def teleop_data_to_action(self, teleop_data: dict):
-        action = np.zeros(11)
+        action = np.zeros(self.action_dim)
         action[:2] = TwoWheelRobot.teleop_data_to_action(self, teleop_data)
         action[4:] = ManipulationRobot.teleop_data_to_action(self, teleop_data)
         return action
