@@ -161,14 +161,14 @@ def main():
             monitor_gym=True,  # auto-upload the videos of agents playing the game
             # save_code=True,  # optional
         )
-        env = VecFrameStack(env, n_stack=5, channels_order="first")
+        env = VecFrameStack(env, n_stack=5)
         env = VecMonitor(env)
-        # env = VecVideoRecorder(
-        #     env,
-        #     f"videos/{run.id}",
-        #     record_video_trigger=lambda x: x % 2000 == 0,
-        #     video_length=200,
-        # )
+        env = VecVideoRecorder(
+            env,
+            f"videos/{run.id}",
+            record_video_trigger=lambda x: x % 2000 == 0,
+            video_length=200,
+        )
         tensorboard_log_dir = f"runs/{run.id}"
         model = PPO(
             config["policy_type"],
@@ -181,12 +181,12 @@ def main():
             device='cuda',
         )
         checkpoint_callback = CheckpointCallback(save_freq=1000, save_path=tensorboard_log_dir, name_prefix=prefix)
-        # eval_callback = EvalCallback(eval_env=env, eval_freq=1000, n_eval_episodes=20)
+        eval_callback = EvalCallback(eval_env=env, eval_freq=1000, n_eval_episodes=20)
         wandb_callback = WandbCallback(
             model_save_path=tensorboard_log_dir,
             verbose=2,
         )
-        callback = CallbackList([wandb_callback, checkpoint_callback])
+        callback = CallbackList([wandb_callback, eval_callback, checkpoint_callback])
         print(callback.callbacks)
 
         log.debug(model.policy)
