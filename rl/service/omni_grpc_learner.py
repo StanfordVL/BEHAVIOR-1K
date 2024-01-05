@@ -172,10 +172,26 @@ def main():
 
     else:
         config = {
-            "policy_type": "MultiInputPolicy",
-            "n_steps": 30 * 10,
-            "batch_size": 8,
+            "policy_type": "MlpPolicy",
+            "n_steps": 512,
+            "batch_size": 128,
             "total_timesteps": 10_000_000,
+            "gamma": 0.99,
+            "gae_lambda": 0.9,
+            "n_epochs": 20,
+            "ent_coef": 0.0,
+            "sde_sample_freq": 4,
+            "max_grad_norm": 0.5,
+            "vf_coef": 0.5,
+            "learning_rate": 3e-5,
+            "use_sde": True,
+            "clip_range": 0.4,
+            "policy_kwargs": {
+                "log_std_init": -2,
+                "ortho_init": False,
+                "activation_fn": nn.ReLU,
+                "net_arch": {"pi": [512, 512], "vf": [512, 512]}
+            },
         }
         run = wandb.init(
             project="sb3",
