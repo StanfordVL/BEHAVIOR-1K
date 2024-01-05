@@ -50,6 +50,9 @@ class GRPCClientEnv(gym.Env):
     return pickle.loads(response.render_data)
   
   def close(self):
+    # TODO: Let's figure out what to do about this later.
+    return 
+  
     request = environment_pb2.CloseRequest()
     self.stub.Close(request)
 
