@@ -1,5 +1,5 @@
 """
-Example script for using VR controller to teleoperate a robot.
+Example script for using external devices to teleoperate a robot.
 """
 import omnigibson as og
 from omnigibson.objects import USDObject
@@ -22,7 +22,7 @@ def main():
     teleop_system = choose_from_options(options=SYSTEMS, name="system")
     robot_name = choose_from_options(options=ROBOTS, name="robot")
     # Create the config for generating the environment we want
-    env_cfg = {"action_timestep": 1 / 60., "physics_timestep": 1 / 180.}
+    env_cfg = {"action_timestep": 1 / 60., "physics_timestep": 1 / 300.}
     scene_cfg = {"type": "Scene"}
     # Add the robot we want to load
     robot_cfg = {
@@ -121,12 +121,6 @@ def main():
 
     # Start teleoperation system
     robot = env.robots[0]
-    # Import robot eef marker
-    target_markers = {}
-    for arm in robot.arm_names:
-        arm_name = "right" if arm == robot.default_arm else "left"
-        target_markers[arm_name] = USDObject(name=f"target_{arm_name}", usd_path=robot.eef_usd_path[arm], visual_only=True)
-        og.sim.import_object(target_markers[arm_name])
 
     # Initialize teleoperation system
     if teleop_system == "SteamVR":
@@ -135,7 +129,7 @@ def main():
         from omnigibson.utils.teleop_utils import OculusReaderSystem as TeleopSystem
     elif teleop_system == "Spacemouse":
         from omnigibson.utils.teleop_utils import SpaceMouseSystem as TeleopSystem
-    teleop_sys = TeleopSystem(robot=robot, show_controller=True, disable_display_output=True, align_anchor_to_robot_base=True)
+    teleop_sys = TeleopSystem(robot=robot, disable_display_output=True, align_anchor_to_robot_base=True)
     teleop_sys.start()
     # tracker variable of whether the robot is attached to the VR system
     prev_robot_attached = False
@@ -148,10 +142,6 @@ def main():
             else:
                 action = teleop_sys.teleop_data_to_action()
                 env.step(action) 
-            # update the target object's pose to the VR right controller's pose
-            for arm_name in target_markers:
-                if arm_name in teleop_sys.teleop_data["transforms"]:
-                    target_markers[arm_name].set_position_orientation(*teleop_sys.teleop_data["transforms"][arm_name])  
             prev_robot_attached = teleop_sys.teleop_data["robot_attached"]
     # Shut down the environment cleanly at the end
     teleop_sys.stop()

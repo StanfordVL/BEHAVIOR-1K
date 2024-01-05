@@ -7,6 +7,7 @@ from typing import Iterable, Optional, Tuple
 
 import omnigibson as og
 import omnigibson.utils.transform_utils as T
+from omnigibson.objects import USDObject
 from omnigibson.robots import BaseRobot, LocomotionRobot
 
 
@@ -14,7 +15,7 @@ class TeleopSystem():
     """
     Base class for teleop systems
     """
-    def __init__(self, robot: BaseRobot, *args, **kwargs) -> None:
+    def __init__(self, robot: BaseRobot, show_control_marker: bool=True, *args, **kwargs) -> None:
         """
         self.raw_data is the raw data directly obtained from the teleoperation device
             It should be in the format as follows:
@@ -58,6 +59,13 @@ class TeleopSystem():
         self.robot_arms = ["left", "right"] if self.robot.n_arms == 2 else ["right"]
         self.robot_attached = False
         self.base_movement_speed = 0.2
+        self.show_control_marker = show_control_marker
+        self.control_markers = {}
+        if show_control_marker:
+            for arm in robot.arm_names:
+                arm_name = "right" if arm == robot.default_arm else "left"
+                self.control_markers[arm_name] = USDObject(name=f"target_{arm_name}", usd_path=robot.eef_usd_path[arm], visual_only=True)
+                og.sim.import_object(self.control_markers[arm_name])
 
     def start(self) -> None:
         """
@@ -79,7 +87,16 @@ class TeleopSystem():
         raise NotImplementedError
 
     def teleop_data_to_action(self) -> np.ndarray:
+        # optionally update control marker
+        if self.show_control_marker:
+            self.update_control_marker()
         return self.robot.teleop_data_to_action(self.teleop_data)
+
+    def update_control_marker(self):
+        # update the target object's pose to the VR right controller's pose
+        for arm_name in self.control_markers:
+            if arm_name in self.teleop_data["transforms"]:
+                self.control_markers[arm_name].set_position_orientation(*self.teleop_data["transforms"][arm_name])  
 
     def reset_transform_mapping(self, arm: str="right") -> None:
         """
@@ -91,6 +108,7 @@ class TeleopSystem():
         eef_pose = self.robot.eef_links[self.robot.arm_names[self.robot_arms.index(arm)]].get_position_orientation()
         self.robot_origin[arm] = T.relative_pose_transform(*eef_pose, *robot_base_pose)
 
+
 class OVXRSystem(TeleopSystem):
     """
     VR Teleoperation System build on top of Omniverse XR extension
@@ -98,8 +116,8 @@ class OVXRSystem(TeleopSystem):
     def __init__(
         self, 
         robot: BaseRobot,
+        show_control_marker: bool=True,
         system: str="SteamVR",
-        show_controller: bool=False,
         disable_display_output: bool=False,
         enable_touchpad_movement: bool=False,
         align_anchor_to_robot_base: bool=False,
@@ -111,12 +129,13 @@ class OVXRSystem(TeleopSystem):
         Initializes the VR system
         Args:
             robot (BaseRobot): the robot that VR will control.
+            show_control_marker (bool): whether to show a control marker 
             system (str): the VR system to use, one of ["OpenXR", "SteamVR"], default is "SteamVR".
-            show_controller (bool): whether to show the controller model in the scene, default is False.
             disable_display_output (bool): whether we will not display output to the VR headset (only use controller tracking), default is False.
             enable_touchpad_movement (bool): whether to enable VR system anchor movement by controller, default is False.
             align_anchor_to_robot_base (bool): whether to align VR anchor to robot base, default is False.
             use_hand_tracking (bool): whether to use hand tracking instead of controllers, default is False.
+            show_controller (bool): whether to show the controller model in the scene, default is False.
 
         NOTE: enable_touchpad_movement and align_anchor_to_robot_base cannot be enabled at the same time. 
             The former is to enable free movement of the VR system (i.e. the user), while the latter is constraining the VR system to the robot pose.
@@ -124,11 +143,11 @@ class OVXRSystem(TeleopSystem):
         # enable xr extension
         from omni.isaac.core.utils.extensions import enable_extension
         enable_extension("omni.kit.xr.profile.vr")
-        from omni.kit.xr.core import XRCore, XRCoreEventType
+        from omni.kit.xr.core import XRDeviceClass, XRCore, XRCoreEventType
         from omni.kit.xr.ui.stage.common import XRAvatarManager
-        self.xr_device_class = import_module('omni.kit.xr.core.XRDeviceClass')
+        self.xr_device_class = XRDeviceClass
         # run super method
-        super().__init__(robot)
+        super().__init__(robot, show_control_marker)
         # get xr core and profile
         self.xr_core = XRCore.get_singleton()
         self.vr_profile = self.xr_core.get_profile("vr")
@@ -137,7 +156,7 @@ class OVXRSystem(TeleopSystem):
         self.align_anchor_to_robot_base = align_anchor_to_robot_base
         assert not (self.enable_touchpad_movement and self.align_anchor_to_robot_base), "enable_touchpad_movement and align_anchor_to_robot_base cannot be True at the same time!"
         # set avatar
-        if show_controller:
+        if self.show_control_marker:
             self.vr_profile.set_avatar(XRAvatarManager.get_singleton().create_avatar("basic_avatar", {}))
         else:
             self.vr_profile.set_avatar(XRAvatarManager.get_singleton().create_avatar("empty_avatar", {}))
@@ -231,12 +250,18 @@ class OVXRSystem(TeleopSystem):
         # generate teleop data
         self.teleop_data["transforms"]["base"] = np.zeros(4)
         if 1 in self.controllers:
-            self.teleop_data["transforms"]["right"] = self.raw_data["transforms"]["controllers"][1]
+            self.teleop_data["transforms"]["right"] = (
+                self.raw_data["transforms"]["controllers"][1][0],
+                T.quat_multiply(self.raw_data["transforms"]["controllers"][1][1], self.robot.teleop_rotation_offset[self.robot.arm_names[-1]])
+            )
             self.teleop_data["transforms"]["base"][0] = self.raw_data["button_data"][1]["axis"]["touchpad_y"] * self.base_movement_speed
             self.teleop_data["transforms"]["base"][3] = -self.raw_data["button_data"][1]["axis"]["touchpad_x"] * self.base_movement_speed
             self.teleop_data["gripper_right"] = self.raw_data["button_data"][1]["axis"]["trigger"]
         if 0 in self.controllers:
-            self.teleop_data["transforms"]["left"] = self.raw_data["transforms"]["controllers"][0]
+            self.teleop_data["transforms"]["left"] = (
+                self.raw_data["transforms"]["controllers"][0][0],
+                T.quat_multiply(self.raw_data["transforms"]["controllers"][0][1], self.robot.teleop_rotation_offset[self.robot.arm_names[0]])
+            )
             self.teleop_data["transforms"]["base"][1] = -self.raw_data["button_data"][0]["axis"]["touchpad_x"] * self.base_movement_speed
             self.teleop_data["transforms"]["base"][2] = self.raw_data["button_data"][0]["axis"]["touchpad_y"] * self.base_movement_speed
             self.teleop_data["gripper_left"] = self.raw_data["button_data"][0]["axis"]["trigger"]
@@ -282,17 +307,14 @@ class OVXRSystem(TeleopSystem):
             rot_offset = np.array(rot_offset).astype(np.float64)
             self.vr_profile.add_rotate_physical_world_around_device(rot_offset)
 
-    def reset_transform_mapping(
-            self, 
-            robot_eef_pos: Iterable[float], 
-            robot_base_orn: Iterable[float]
-        ) -> None:
+    def reset_transform_mapping(self, arm: str="right") -> None:
         """
         Snap device to the robot end effector (ManipulationRobot only)
         Args:
-            robot_eef_position (Iterable[float]): the position of the robot end effector
-            robot_base_orn (Iterable[float]): the rotation of the robot base
+            arm(str): name of the arm, one of "left" or "right". Default is "right".
         """
+        robot_base_orn = self.robot.get_orientation()
+        robot_eef_pos = self.robot.eef_links[self.robot.arm_names[self.robot_arms.index(arm)]].get_position()
         target_transform = self.og2xr(pos=robot_eef_pos, orn=robot_base_orn)
         self.vr_profile.set_physical_world_to_world_anchor_transform_to_match_xr_device(target_transform, self.controllers[1])
 
@@ -381,12 +403,12 @@ class OculusReaderSystem(TeleopSystem):
     The origin of the oculus system is the headset position
     x is right, y is up, z is back
     """
-    def __init__(self, robot, *args, **kwargs):
+    def __init__(self, robot: BaseRobot, show_control_marker: bool=True, *args, **kwargs):
         try:
             import oculus_reader
         except ModuleNotFoundError:
             raise ModuleNotFoundError("[OculusReaderSys] Please install oculus_reader (https://github.com/rail-berkeley/oculus_reader) to use OculusReaderSystem")
-        super().__init__(robot)
+        super().__init__(robot, show_control_marker)
         # initialize oculus reader
         self.oculus_reader = oculus_reader.OculusReader(run=False)
         self.reset_button_pressed = False
@@ -452,12 +474,12 @@ class OculusReaderSystem(TeleopSystem):
 
 
 class SpaceMouseSystem(TeleopSystem):
-    def __init__(self, robot: BaseRobot, *args, **kwargs):
+    def __init__(self, robot: BaseRobot, show_control_marker: bool=True, *args, **kwargs):
         try:
             self.pyspacemouse = import_module('pyspacemouse')
         except ModuleNotFoundError:
             raise ModuleNotFoundError("Please install pyspacemouse to use SpaceMouseSystem")
-        super().__init__(robot)
+        super().__init__(robot, show_control_marker)
 
         self.raw_data = None
         # robot is always attached to the space mouse system, gripper is open initially
