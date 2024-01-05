@@ -8,14 +8,12 @@ import gymnasium as gym
 class GRPCClientEnv(gym.Env):
   def __init__(self, url):
     super().__init__()
+
+    self._closed = False
     self.url = url
     self.channel = grpc.insecure_channel(url)
     self._stub = environment_pb2_grpc.EnvironmentServiceStub(self.channel)
     self.observation_space, self.action_space = self._get_spaces()
-    self.metadata = {'render_modes': ['rgb_array']}
-    self.render_mode = 'rgb_array'
-
-    self._closed = False
 
     self._step_future = None
 
