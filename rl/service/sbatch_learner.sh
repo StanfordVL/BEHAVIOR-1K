@@ -65,7 +65,7 @@ enroot start \
     ${ENV_KWARGS} \
     ${MOUNT_KWARGS} \
     ${CONTAINER_NAME} \
-    micromamba run -n omnigibson /bin/bash --login -c "source /isaac-sim/setup_conda_env.sh && pip install gymnasium grpcio grpcio-tools stable_baselines3 wandb moviepy && cd /omnigibson-src/rl/service && python omni_grpc_learner.py $1"
+    micromamba run -n omnigibson /bin/bash --login -c "source /isaac-sim/setup_conda_env.sh && pip install gymnasium grpcio grpcio-tools stable_baselines3 wandb moviepy && cd /omnigibson-src/rl/service && python omni_grpc_learner.py $1 $2"
 
 # Clean up the image if possible.
 enroot remove -f ${CONTAINER_NAME}
