@@ -110,12 +110,6 @@ def main():
         help="Absolute path to desired PPO checkpoint to load for evaluation",
     )
 
-    parser.add_argument(
-        "--eval",
-        action="store_true",
-        help="If set, will evaluate the PPO agent found from --checkpoint",
-    )
-
     args = parser.parse_args()
     prefix = ''
     seed = 0
@@ -172,7 +166,7 @@ def main():
 
     else:
         config = {
-            "policy_type": "MultiInputPolicy",
+            "policy": "MultiInputPolicy",
             "n_steps": 512,
             "batch_size": 128,
             "total_timesteps": 10_000_000,
@@ -209,25 +203,23 @@ def main():
             video_length=200,
         )
         tensorboard_log_dir = f"runs/{run.id}"
-        model = PPO(
-            config["policy_type"],
-            env,
-            verbose=1,
-            tensorboard_log=tensorboard_log_dir,
-            # policy_kwargs=policy_kwargs,
-            n_steps=config["n_steps"],
-            batch_size=config["batch_size"],
-            device='cuda',
-        )
+        if args.checkpoint is None:
+            model = PPO(
+                env=env,
+                verbose=1,
+                tensorboard_log=tensorboard_log_dir,
+                device='cuda',
+                **config,
+            )
+        else:
+            model = PPO.load(args.checkpoint, env=env)
         checkpoint_callback = CheckpointCallback(save_freq=1000, save_path=tensorboard_log_dir, name_prefix=prefix)
-        # eval_callback = EvalCallback(eval_env=env, eval_freq=1000, n_eval_episodes=20)
         wandb_callback = WandbCallback(
             model_save_path=tensorboard_log_dir,
             verbose=2,
         )
         callback = CallbackList([
             wandb_callback,
-            # eval_callback,
             checkpoint_callback,
         ])
         print(callback.callbacks)
