@@ -172,7 +172,7 @@ def main():
 
     else:
         config = {
-            "policy_type": "MlpPolicy",
+            "policy_type": "MultiInputPolicy",
             "n_steps": 512,
             "batch_size": 128,
             "total_timesteps": 10_000_000,
