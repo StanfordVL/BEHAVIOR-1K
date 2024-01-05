@@ -14,24 +14,27 @@ class GRPCClientEnv(gym.Env):
     self._stub = environment_pb2_grpc.EnvironmentServiceStub(self.channel)
     self.observation_space, self.action_space = self._get_spaces()
 
-    self._step_future = None
-
   @property
   def stub(self):
     # TODO: Reestablish connection if it's down.
     return self._stub
 
   def step(self, action):
-    self.step_async(action)
-    return self.step_wait()
+    response = self.stub.Step(environment_pb2.StepRequest(action=pickle.dumps(action)))
+    obs = pickle.loads(response.observation)
+    reward = response.reward
+    truncated = response.truncated
+    terminated = response.terminated
+    info = pickle.loads(response.info)
+    done = terminated or truncated
+    info["TimeLimit.truncated"] = truncated and not terminated
 
-  def step_async(self, action):
-    request = environment_pb2.StepRequest(action=pickle.dumps(action))
-    self._step_future = self.stub.Step.future(request)
+    reset_infos = {}
+    if done:
+      info["terminal_observation"] = obs
+      obs, reset_infos = self.reset()
 
-  def step_wait(self):
-    response = self._step_future.result()
-    return pickle.loads(response.observation), response.reward, response.terminated, response.truncated, pickle.loads(response.info)
+    return obs, reward, done, info, reset_infos
   
   def reset(self, seed=None, options=None):
     request = environment_pb2.ResetRequest()

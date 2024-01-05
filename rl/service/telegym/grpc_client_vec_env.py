@@ -1,9 +1,8 @@
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
-import threading
-import time
-from typing import Any, List, Type
+from typing import Any, List, Optional, Sequence, Type
+import warnings
 
 import gymnasium as gym
 
@@ -66,47 +65,63 @@ class GRPCClientVecEnv(DummyVecEnv):
         # Register workers
         envs = asyncio.get_event_loop().run_until_complete(_register_workers(local_addr, n_envs))
 
+        # Register multithreaded executor
+        self._executor = ThreadPoolExecutor(max_workers=n_envs)
+
         super().__init__([(lambda x=x: x) for x in envs])
 
-    def step_async(self, actions: np.ndarray) -> None:
-        for env, action in zip(self.envs, actions):
-            env.step_async(action)
-        self.waiting = True
-
     def step_wait(self) -> VecEnvStepReturn:
-        # Avoid circular imports
-        for env_idx in range(self.num_envs):
-            obs, self.buf_rews[env_idx], terminated, truncated, self.buf_infos[env_idx] = self.envs[env_idx].step_wait()
-            # convert to SB3 VecEnv api
-            self.buf_dones[env_idx] = terminated or truncated
-            # See https://github.com/openai/gym/issues/3102
-            # Gym 0.26 introduces a breaking change
-            self.buf_infos[env_idx]["TimeLimit.truncated"] = truncated and not terminated
-
-            if self.buf_dones[env_idx]:
-                # save final observation where user can get it, then reset
-                self.buf_infos[env_idx]["terminal_observation"] = obs
-                obs, self.reset_infos[env_idx] = self.envs[env_idx].reset()
+        step = lambda env_i, act_i: env_i.step(act_i)
+        for env_idx, result in enumerate(self._executor.map(step, self.envs, self.actions)):
+            obs, self.buf_rews[env_idx], self.buf_dones[env_idx], self.buf_infos[env_idx], self.reset_infos[env_idx] = result
             self._save_obs(env_idx, obs)
         return (self._obs_from_buf(), np.copy(self.buf_rews), np.copy(self.buf_dones), deepcopy(self.buf_infos))
+    
+    def reset(self):
+        reset = lambda env_i, seed_i, opts_i: env_i.reset(seed=seed_i, **opts_i)
+
+        maybe_options = [{"options": self._options[env_idx]} if self._options[env_idx] else {} for env_idx in range(self.num_envs)]
+        for env_idx, (obs, reset_info) in enumerate(self._executor.map(reset, self.envs, self._seeds, maybe_options)):
+            self.reset_infos[env_idx] = reset_info
+            self._save_obs(env_idx, obs)
+
+        self._reset_seeds()
+        self._reset_options()
+        return self._obs_from_buf()
+    
+    def get_images(self):
+        if self.render_mode != "rgb_array":
+            warnings.warn(
+                f"The render mode is {self.render_mode}, but this method assumes it is `rgb_array` to obtain images."
+            )
+            return [None for _ in self.envs]
+        render = lambda env_i: env_i.render()
+        return list(self._executor.map(render, self.envs))
 
     def get_attr(self, attr_name: str, indices: VecEnvIndices = None) -> List[Any]:
         """Return attribute from vectorized environment (see base class)."""
         target_envs = self._get_target_envs(indices)
-        return [env_i.get_attr(attr_name) for env_i in target_envs]
+        get_attr = lambda env_i: env_i.get_attr(attr_name)
+        return self._executor.map(get_attr, target_envs)
 
     def set_attr(self, attr_name: str, value: Any, indices: VecEnvIndices = None) -> None:
         """Set attribute inside vectorized environments (see base class)."""
         target_envs = self._get_target_envs(indices)
-        for env_i in target_envs:
-            env_i.set_attr(attr_name, value)
+        set_attr = lambda env_i: env_i.set_attr(attr_name, value)
+        return self._executor.map(set_attr, target_envs)
 
     def env_method(self, method_name: str, *method_args, indices: VecEnvIndices = None, **method_kwargs) -> List[Any]:
         """Call instance methods of vectorized environments."""
         target_envs = self._get_target_envs(indices)
-        return [env_i.env_method(method_name, *method_args, **method_kwargs) for env_i in target_envs]
+        env_method = lambda env_i: env_i.env_method(*method_args, **method_kwargs)
+        return self._executor.map(env_method, target_envs)
 
     def env_is_wrapped(self, wrapper_class: Type[gym.Wrapper], indices: VecEnvIndices = None) -> List[bool]:
         """Check if worker environments are wrapped with a given wrapper"""
         target_envs = self._get_target_envs(indices)
-        return [env_i.is_wrapped(wrapper_class) for env_i in target_envs]
+        is_wrapped = lambda env_i: env_i.is_wrapped(wrapper_class)
+        return self._executor.map(is_wrapped, target_envs)
+    
+    def close(self):
+        close = lambda env_i: env_i.close()
+        return self._executor.map(close, self.envs)
