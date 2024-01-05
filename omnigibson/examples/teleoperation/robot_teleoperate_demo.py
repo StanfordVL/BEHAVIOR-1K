@@ -139,6 +139,8 @@ def main():
             teleop_sys.update()
             if teleop_sys.teleop_data["robot_attached"] == True and prev_robot_attached == False:
                 teleop_sys.reset_transform_mapping()
+                if robot_name == "Tiago":
+                    teleop_sys.reset_transform_mapping("left")
             else:
                 action = teleop_sys.teleop_data_to_action()
                 env.step(action) 

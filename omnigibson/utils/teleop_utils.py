@@ -444,7 +444,7 @@ class OculusReaderSystem(TeleopSystem):
                 delta_pos, delta_orn = T.relative_pose_transform(*self.raw_data["transforms"][hand], *self.vr_origin[hand])
                 target_rel_pos = self.robot_origin[hand][0] + delta_pos
                 target_rel_orn = T.quat_multiply(delta_orn, self.robot_origin[hand][1])
-                self.teleop_data["transforms"][hand] = T.pose_transform(target_rel_pos, target_rel_orn, *robot_based_pose)
+                self.teleop_data["transforms"][hand] = T.pose_transform(*robot_based_pose, target_rel_pos, target_rel_orn)
             if f"{hand}Trig" in self.raw_data["button_data"]:
                 self.teleop_data[f"gripper_{hand}"] = self.raw_data["button_data"][f"{hand}Trig"][0]
         if "rightJS" in self.raw_data["button_data"]:
