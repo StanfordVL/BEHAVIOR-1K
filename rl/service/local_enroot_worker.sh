@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 IMAGE_PATH="/cvgl2/u/cgokmen/omnigibson.sqsh"
+ISAAC_CACHE_PATH="/scr/og-docker-data/isaac_sim"
 
 JOB_ID=$2
 GPU_ID=$(( JOB_ID % 2))
@@ -19,6 +20,15 @@ done
 
 # Define mounts to create (maps local directory to container directory)
 declare -A MOUNTS=(
+    [${ISAAC_CACHE_PATH}/kit/cache/Kit]=/isaac-sim/kit/cache/Kit
+    [${ISAAC_CACHE_PATH}/cache/ov]=/root/.cache/ov
+    [${ISAAC_CACHE_PATH}/cache/pip]=/root/.cache/pip
+    [${ISAAC_CACHE_PATH}/cache/glcache]=/root/.cache/nvidia/GLCache
+    [${ISAAC_CACHE_PATH}/cache/computecache]=/root/.nv/ComputeCache
+    [${ISAAC_CACHE_PATH}/logs]=/root/.nvidia-omniverse/logs
+    [${ISAAC_CACHE_PATH}/config]=/root/.nvidia-omniverse/config
+    [${ISAAC_CACHE_PATH}/data]=/root/.local/share/ov/data
+    [${ISAAC_CACHE_PATH}/documents]=/root/Documents
     [/scr/og-docker-data/datasets]=/data
     [/cvgl2/u/cgokmen/OmniGibson]=/omnigibson-src
 )
