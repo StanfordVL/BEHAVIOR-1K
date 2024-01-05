@@ -42,6 +42,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         # Initialize other placeholders that will be filled in later
         self._task = None
         self._external_sensors = None
+        self._external_sensors_include_in_obs = None
         self._loaded = None
         self._current_episode = 0
 
@@ -280,6 +281,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
         sensors_config = self.env_config["external_sensors"]
         if sensors_config is not None:
             self._external_sensors = dict()
+            self._external_sensors_include_in_obs = dict()
             for i, sensor_config in enumerate(sensors_config):
                 # Add a name for the object if necessary
                 if "name" not in sensor_config:
@@ -289,6 +291,8 @@ class Environment(gym.Env, GymObservable, Recreatable):
                     sensor_config["prim_path"] = f"/World/{sensor_config['name']}"
                 # Pop the desired position and orientation
                 local_position, local_orientation = sensor_config.pop("local_position", None), sensor_config.pop("local_orientation", None)
+                # Pop whether or not to include this sensor in the observation
+                include_in_obs = sensor_config.pop("include_in_obs", True)
                 # Make sure sensor exists, grab its corresponding kwargs, and create the sensor
                 sensor = create_sensor(**sensor_config)
                 # Load an initialize this sensor
@@ -296,6 +300,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 sensor.initialize()
                 sensor.set_local_pose(local_position, local_orientation)
                 self._external_sensors[sensor.name] = sensor
+                self._external_sensors_include_in_obs[sensor.name] = include_in_obs
 
         assert og.sim.is_stopped(), "Simulator must be stopped after loading external sensors!"
 
@@ -318,6 +323,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
         if self._external_sensors is not None:
             external_obs_space = dict()
             for sensor_name, sensor in self._external_sensors.items():
+                if not self._external_sensors_include_in_obs[sensor_name]:
+                    continue
+
                 # Load the sensor observation space
                 external_obs_space[sensor_name] = sensor.load_observation_space()
             obs_space["external"] = gym.spaces.Dict(external_obs_space)
@@ -443,6 +451,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
         if self._external_sensors is not None:
             external_obs = dict()
             for sensor_name, sensor in self._external_sensors.items():
+                if not self._external_sensors_include_in_obs[sensor_name]:
+                    continue
+
                 external_obs[sensor_name] = sensor.get_obs()
             obs["external"] = external_obs
 
@@ -558,12 +569,12 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
     def render(self):
         # Only works if there is an external sensor
-        if not self.external_sensors:
+        if not self._external_sensors:
             return None
         
         # Get the RGB sensors
         rgb_sensors = [
-            x for x in self.external_sensors.values()
+            x for x in self._external_sensors.values()
             if isinstance(x, VisionSensor) and (x.modalities == "all" or "rgb" in x.modalities)
         ]
         if not rgb_sensors:

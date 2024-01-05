@@ -6,6 +6,7 @@ env:
   external_sensors:
     - sensor_type: VisionSensor
       modalities: [rgb]
+      include_in_obs: False
       sensor_kwargs:
         image_height: 224
         image_width: 224
