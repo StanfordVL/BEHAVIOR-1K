@@ -63,7 +63,7 @@ WORKER_PORT=$((51000 + SLURM_ARRAY_TASK_ID))
 
 # The last line here is the command you want to run inside the container.
 # Here I'm running some unit tests.
-enroot start \
+ENROOT_MOUNT_HOME=no enroot start \
     --root \
     --rw \
     ${ENV_KWARGS} \
