@@ -1,5 +1,5 @@
 from stable_baselines3 import A2C
-from stable_baselines3.common.env_util import make_vec_env
+from stable_baselines3.common.vec_env import VecFrameStack, VecMonitor, VecVideoRecorder
 
 from telegym.grpc_client_vec_env import GRPCClientVecEnv
 
@@ -7,6 +7,15 @@ import sys
 
 n_envs = int(sys.argv[1])
 env = GRPCClientVecEnv("0.0.0.0:50051", n_envs)
+
+env = VecFrameStack(env, n_stack=5)
+env = VecMonitor(env)
+env = VecVideoRecorder(
+    env,
+    f"videos",
+    record_video_trigger=lambda x: x % 2000 == 0,
+    video_length=200,
+)
 
 model = A2C("MlpPolicy", env, verbose=1)
 model.learn(total_timesteps=10_000)
