@@ -4,11 +4,13 @@ from telegym.protos import environment_pb2
 from telegym.protos import environment_pb2_grpc
 
 import gymnasium as gym
+import asyncio
 
 class GRPCClientEnv(gym.Env):
   def __init__(self, url):
     super().__init__()
     self.url = url
+    self.channel_state = grpc.ChannelConnectivity.SHUTDOWN
     self.channel = grpc.insecure_channel(url)
     self._stub = environment_pb2_grpc.EnvironmentServiceStub(self.channel)
     self.observation_space, self.action_space = self._get_spaces()
@@ -19,10 +21,24 @@ class GRPCClientEnv(gym.Env):
 
     self._step_future = None
 
+    # def set_channel_state(state):
+    #   self.channel_state = state
+    # self.channel.subscribe(set_channel_state, try_to_connect=False)
+
   @property
   def stub(self):
-    # TODO: Reestablish connection if it's down.
-    assert not self._closed, "Trying to use an environment that has already been closed."
+    # MAX_RETRIES = 3
+    # for retry in range(MAX_RETRIES):
+    #   if self.channel_state == grpc.ChannelConnectivity.SHUTDOWN:
+    #     backoff = min(4 ** retry, 30)
+    #     asyncio.sleep(backoff)
+    #     self.channel.close()
+    #     self.channel = grpc.insecure_channel(self.url)
+    #     self._stub = environment_pb2_grpc.EnvironmentServiceStub(self.channel)
+    #   else:
+    #     break
+    # from IPython import embed; embed()
+    # assert not self._closed, "Trying to use an environment that has already been closed."
     return self._stub
 
   def step(self, action):

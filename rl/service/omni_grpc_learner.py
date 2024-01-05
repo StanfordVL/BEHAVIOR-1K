@@ -11,7 +11,7 @@ from telegym import GRPCClientVecEnv
 import gymnasium as gym
 import torch as th
 import torch.nn as nn
-import wandb
+# import wandb
 from stable_baselines3 import PPO
 from stable_baselines3.common.evaluation import evaluate_policy
 from stable_baselines3.common.preprocessing import maybe_transpose
@@ -19,7 +19,7 @@ from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.vec_env import VecVideoRecorder, VecMonitor, VecFrameStack, DummyVecEnv
 from stable_baselines3.common.callbacks import CallbackList, CheckpointCallback, EvalCallback
-from wandb.integration.sb3 import WandbCallback 
+# from wandb.integration.sb3 import WandbCallback 
 
 
 class CustomCombinedExtractor(BaseFeaturesExtractor):
@@ -177,39 +177,40 @@ def main():
             "batch_size": 8,
             "total_timesteps": 10_000_000,
         }
-        run = wandb.init(
-            project="sb3",
-            config=config,
-            sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
-            monitor_gym=True,  # auto-upload the videos of agents playing the game
-            # save_code=True,  # optional
-        )
+        # run = wandb.init(
+        #     project="sb3",
+        #     config=config,
+        #     sync_tensorboard=True,  # auto-upload sb3's tensorboard metrics
+        #     monitor_gym=True,  # auto-upload the videos of agents playing the game
+        #     # save_code=True,  # optional
+        # )
         env = VecFrameStack(env, n_stack=5)
         env = VecMonitor(env)
-        env = VecVideoRecorder(
-            env,
-            f"videos/{run.id}",
-            record_video_trigger=lambda x: x % 2000 == 0,
-            video_length=200,
-        )
-        tensorboard_log_dir = f"runs/{run.id}"
+        # env = VecVideoRecorder(
+        #     env,
+        #     f"videos/{run.id}",
+        #     record_video_trigger=lambda x: x % 2000 == 0,
+        #     video_length=200,
+        # )
+        # tensorboard_log_dir = f"runs/{run.id}"
         model = PPO(
             config["policy_type"],
             env,
             verbose=1,
-            tensorboard_log=tensorboard_log_dir,
+            # tensorboard_log=tensorboard_log_dir,
             # policy_kwargs=policy_kwargs,
             n_steps=config["n_steps"],
             batch_size=config["batch_size"],
             device='cuda',
         )
-        checkpoint_callback = CheckpointCallback(save_freq=1000, save_path=tensorboard_log_dir, name_prefix=prefix)
+        # checkpoint_callback = CheckpointCallback(save_freq=1000, save_path=tensorboard_log_dir, name_prefix=prefix)
         eval_callback = EvalCallback(eval_env=env, eval_freq=1000, n_eval_episodes=20)
-        wandb_callback = WandbCallback(
-            model_save_path=tensorboard_log_dir,
-            verbose=2,
-        )
-        callback = CallbackList([wandb_callback, eval_callback, checkpoint_callback])
+        # wandb_callback = WandbCallback(
+        #     model_save_path=tensorboard_log_dir,
+        #     verbose=2,
+        # )
+        # callback = CallbackList([wandb_callback, eval_callback, checkpoint_callback])
+        callback = CallbackList([eval_callback])
         print(callback.callbacks)
 
         log.debug(model.policy)

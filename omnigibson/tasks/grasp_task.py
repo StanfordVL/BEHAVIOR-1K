@@ -60,7 +60,7 @@ class GraspTask(BaseTask):
     
     def _reset_agent(self, env):
         if self._primitive_controller is None:
-            self._primitive_controller = StarterSemanticActionPrimitives(env)
+            self._primitive_controller = StarterSemanticActionPrimitives(env, enable_head_tracking=False)
 
         robot = env.robots[0]
         # Randomize the robots joint positions

@@ -37,6 +37,18 @@ def main(iterations):
             "physics_timestep": 1 / 60.,
             "flatten_obs_space": True,
             "flatten_action_space": True,
+            "external_sensors": [
+                {
+                    "sensor_type": "VisionSensor",
+                    "modalities": ["rgb"],
+                    "sensor_kwargs": {
+                        "image_width": 224,
+                        "image_height": 224
+                    },
+                    "local_position": [-0.5, -2.0, 1.0],
+                    "local_orientation": [0.707, 0.0, 0.0, 0.707]
+                }
+            ],   
         },
         "scene": {
             "type": "InteractiveTraversableScene",
@@ -69,21 +81,28 @@ def main(iterations):
                     "base": {
                         "name": "DifferentialDriveController",
                     },
+                    # "arm_0": {
+                    #     "name": "InverseKinematicsController",
+                    #     "motor_type": "velocity",
+                    #     "command_input_limits": (np.array([-0.2, -0.2, -0.2, -np.pi, -np.pi, -np.pi]),
+                    #     np.array([0.2, 0.2, 0.2, np.pi, np.pi, np.pi])),
+                    #     "command_output_limits": None,
+                    #     "mode": "pose_absolute_ori", 
+                    #     "kv": 3.0
+                    # },
                     "arm_0": {
-                        "name": "InverseKinematicsController",
-                        "motor_type": "velocity",
-                        "command_input_limits": (np.array([-0.2, -0.2, -0.2, -np.pi, -np.pi, -np.pi]),
-                        np.array([0.2, 0.2, 0.2, np.pi, np.pi, np.pi])),
+                        "name": "JointController",
+                        "motor_type": "position",
+                        "command_input_limits": None,
                         "command_output_limits": None,
-                        "mode": "pose_absolute_ori", 
-                        "kv": 3.0
+                        "use_delta_commands": False
                     },
                     "gripper_0": {
                         "name": "MultiFingerGripperController",
                         "motor_type": "position",
                         "command_input_limits": [-1, 1],
                         "command_output_limits": None,
-                        "use_delta_commands": True
+                        "mode": "binary"
                     },
                     "camera": {
                         "name": "JointController",
@@ -131,6 +150,7 @@ def main(iterations):
     #         timestep = 0
     #         for action in controller.apply_ref(StarterSemanticActionPrimitiveSet.GRASP, obj):
     #             obs, reward, done, truncated, info = env.step(action)
+    #             print(reward)
     #             truncated = True if timestep >= 400 else truncated
     #             timestep += 1
     #             if done or timestep >= 400:
@@ -150,9 +170,8 @@ def main(iterations):
             done = False
             env.reset()
             while not done:
-                action = env.action_space.sample()['robot0']
-                obs, reward, done, info = env.step(action)
-                truncated = True if info["episode_length"] >= 400 else False
+                action = env.action_space.sample()
+                obs, reward, terminated, truncated, info = env.step(action)
         except Exception as e:
             print("Error in iteration: ", i)
             print(e)
