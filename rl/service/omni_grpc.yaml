@@ -38,8 +38,8 @@ robots:
     default_trunk_offset: 0.365
     controller_config:
       base:
-        name: DifferentialDriveController
-        command_input_limits: [-0.0001, 0.0001]
+        name: NullJointController
+        default_command: [0, 0]
       arm_0:
         name: JointController
         motor_type: position
@@ -52,11 +52,8 @@ robots:
         command_input_limits: [-1, 1]
         command_output_limits: null
       camera:
-        name: JointController
-        motor_type: position
-        command_input_limits: default
-        command_output_limits: null
-        use_delta_commands: false
+        name: NullJointController
+        default_command: [0.0, 0.45]
 task:
   type: GraspTask
   obj_name: cologne
