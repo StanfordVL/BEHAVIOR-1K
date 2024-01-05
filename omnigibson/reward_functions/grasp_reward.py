@@ -35,38 +35,38 @@ class GraspReward(BaseRewardFunction):
         # grapsing -> not grapsing = Distance between eef and obj reward
         # grasping -> grasping = Minimizing MOI + grasp reward
 
-        reward = None
+        reward = 0.
 
         if not self.prev_grasping and not current_grasping:
             eef_pos = robot.get_eef_position(robot.default_arm)
             obj_center = self.obj.aabb_center
             dist = T.l2_distance(eef_pos, obj_center)
-            reward =  math.exp(-dist) * self.dist_coeff
+            reward += math.exp(-dist) * self.dist_coeff
 
         elif not self.prev_grasping and current_grasping:
             robot_center = robot.aabb_center
             obj_center = self.obj.aabb_center
             dist = T.l2_distance(robot_center, obj_center)
             dist_reward =  math.exp(-dist) * self.dist_coeff
-            reward = dist_reward + self.grasp_reward
+            reward += dist_reward + self.grasp_reward
         
         elif self.prev_grasping and not current_grasping:
             eef_pos = robot.get_eef_position(robot.default_arm)
             obj_center = self.obj.aabb_center
             dist = T.l2_distance(eef_pos, obj_center)
-            reward =  math.exp(-dist) * self.dist_coeff
+            reward +=  math.exp(-dist) * self.dist_coeff
         
         elif self.prev_grasping and current_grasping:
             robot_center = robot.aabb_center
             obj_center = self.obj.aabb_center
             dist = T.l2_distance(robot_center, obj_center)
             dist_reward =  math.exp(-dist) * self.dist_coeff
-            reward = dist_reward + self.grasp_reward
+            reward += dist_reward + self.grasp_reward
 
         # Overwrite reward if robot is in collision
         # The one step where it grasps the object, it is in collision and this triggers
         if detect_robot_collision_in_sim(robot, ignore_obj_in_hand=True):
-            reward = -10
+            reward += -1.
 
         self.prev_grasping = current_grasping
         return reward, {}

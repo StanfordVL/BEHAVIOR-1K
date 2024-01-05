@@ -6,6 +6,7 @@ env:
   external_sensors:
     - sensor_type: VisionSensor
       modalities: [rgb]
+      include_in_obs: False
       sensor_kwargs:
         image_height: 224
         image_width: 224
@@ -38,8 +39,8 @@ robots:
     default_trunk_offset: 0.365
     controller_config:
       base:
-        name: DifferentialDriveController
-        command_input_limits: [-0.0001, 0.0001]
+        name: NullJointController
+        default_command: [0, 0]
       arm_0:
         name: JointController
         motor_type: position
@@ -52,19 +53,16 @@ robots:
         command_input_limits: [-1, 1]
         command_output_limits: null
       camera:
-        name: JointController
-        motor_type: position
-        command_input_limits: default
-        command_output_limits: null
-        use_delta_commands: false
+        name: NullJointController
+        default_command: [0.0, 0.45]
 task:
   type: GraspTask
   obj_name: cologne
   termination_config:
     max_steps: 400
   reward_config:
-    r_dist_coeff: 0.1
-    r_grasp: 0.3
+    r_dist_coeff: 1.0
+    r_grasp: 1.0
 objects:
   - type: DatasetObject
     name: cologne
