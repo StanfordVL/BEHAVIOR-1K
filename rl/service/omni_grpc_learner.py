@@ -153,7 +153,7 @@ def main():
     #     features_extractor_class=CustomCombinedExtractor,
     # )
 
-    if args.eval:
+    if False: # args.eval:
         raise ValueError("This does not currently work.")
     
         # TODO: Reenable once this all works
