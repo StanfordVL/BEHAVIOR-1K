@@ -9,7 +9,6 @@ class GRPCClientEnv(gym.Env):
   def __init__(self, url):
     super().__init__()
 
-    self._closed = False
     self.url = url
     self.channel = grpc.insecure_channel(url)
     self._stub = environment_pb2_grpc.EnvironmentServiceStub(self.channel)
@@ -20,7 +19,6 @@ class GRPCClientEnv(gym.Env):
   @property
   def stub(self):
     # TODO: Reestablish connection if it's down.
-    assert not self._closed, "Trying to use an environment that has already been closed."
     return self._stub
 
   def step(self, action):
@@ -50,14 +48,8 @@ class GRPCClientEnv(gym.Env):
     return pickle.loads(response.render_data)
   
   def close(self):
-    # TODO: Let's figure out what to do about this later.
-    return 
-  
     request = environment_pb2.CloseRequest()
     self.stub.Close(request)
-
-    self._closed = True
-    self.channel.close()
 
   def _get_spaces(self):  
     request = environment_pb2.GetSpacesRequest()
