@@ -3,6 +3,14 @@ env:
   physics_timestep: 0.01666666666
   flatten_obs_space: true
   flatten_action_space: true
+  external_sensors:
+    - sensor_type: VisionSensor
+      modalities: [rgb]
+      sensor_kwargs:
+        image_height: 224
+        image_width: 224
+      local_position: [-0.5, -2.0, 1.0]
+      local_orientation: [0.707, 0.0, 0.0, 0.707]
 scene:
   type: InteractiveTraversableScene
   scene_model: Rs_int
