@@ -63,8 +63,8 @@ task:
   termination_config:
     max_steps: 400
   reward_config:
-    r_dist_coeff: 0.1
-    r_grasp: 0.3
+    r_dist_coeff: 1.0
+    r_grasp: 1.0
 objects:
   - type: DatasetObject
     name: cologne
