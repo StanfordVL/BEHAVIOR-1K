@@ -59,7 +59,8 @@ ENV_KWARGS="${ENV_KWARGS:1}"
 MOUNT_KWARGS="${MOUNT_KWARGS:1}"
 
 # Pick a port using the array index
-WORKER_PORT=$((51000 + SLURM_ARRAY_TASK_ID))
+BASE_PORT=$2
+WORKER_PORT=$((BASE_PORT + SLURM_ARRAY_TASK_ID))
 
 # The last line here is the command you want to run inside the container.
 # Here I'm running some unit tests.
@@ -69,7 +70,7 @@ ENROOT_MOUNT_HOME=no enroot start \
     ${ENV_KWARGS} \
     ${MOUNT_KWARGS} \
     ${CONTAINER_NAME} \
-    micromamba run -n omnigibson /bin/bash --login -c "source /isaac-sim/setup_conda_env.sh && pip install gymnasium grpcio grpcio-tools stable_baselines3 && cd /omnigibson-src/rl/service && python omni_grpc_worker.py $1"
+    micromamba run -n omnigibson /bin/bash --login -c "source /isaac-sim/setup_conda_env.sh && pip install gymnasium grpcio grpcio-tools stable_baselines3 && cd /omnigibson-src/rl/service && python omni_grpc_worker.py $1 ${WORKER_PORT}"
 
 # Clean up the image if possible.
 enroot remove -f ${CONTAINER_NAME}
