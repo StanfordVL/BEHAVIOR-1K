@@ -41,11 +41,11 @@ class GraspTask(BaseTask):
 
     def _create_termination_conditions(self):
         terminations = dict()
-        terminations["graspgoal"] = GraspGoal(
-            self.obj_name
-        )
+        # terminations["graspgoal"] = GraspGoal(
+        #     self.obj_name
+        # )
         terminations["timeout"] = Timeout(max_steps=self._termination_config["max_steps"])
-        terminations["falling"] = Falling()
+        # terminations["falling"] = Falling()
 
         return terminations
 

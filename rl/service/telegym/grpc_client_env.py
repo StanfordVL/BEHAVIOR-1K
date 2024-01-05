@@ -9,17 +9,12 @@ import asyncio
 class GRPCClientEnv(gym.Env):
   def __init__(self, url):
     super().__init__()
+
     self.url = url
     self.channel_state = grpc.ChannelConnectivity.SHUTDOWN
     self.channel = grpc.insecure_channel(url)
     self._stub = environment_pb2_grpc.EnvironmentServiceStub(self.channel)
     self.observation_space, self.action_space = self._get_spaces()
-    self.metadata = {'render_modes': ['rgb_array']}
-    self.render_mode = 'rgb_array'
-
-    self._closed = False
-
-    self._step_future = None
 
     # def set_channel_state(state):
     #   self.channel_state = state
@@ -27,6 +22,7 @@ class GRPCClientEnv(gym.Env):
 
   @property
   def stub(self):
+<<<<<<< HEAD
     # MAX_RETRIES = 3
     # for retry in range(MAX_RETRIES):
     #   if self.channel_state == grpc.ChannelConnectivity.SHUTDOWN:
@@ -39,19 +35,27 @@ class GRPCClientEnv(gym.Env):
     #     break
     # from IPython import embed; embed()
     # assert not self._closed, "Trying to use an environment that has already been closed."
+=======
+    # TODO: Reestablish connection if it's down.
+>>>>>>> 807a0e6db1b6b137e6d85c6cf4de72da90480cbe
     return self._stub
 
   def step(self, action):
-    self.step_async(action)
-    return self.step_wait()
+    response = self.stub.Step(environment_pb2.StepRequest(action=pickle.dumps(action)))
+    obs = pickle.loads(response.observation)
+    reward = response.reward
+    truncated = response.truncated
+    terminated = response.terminated
+    info = pickle.loads(response.info)
+    done = terminated or truncated
+    info["TimeLimit.truncated"] = truncated and not terminated
 
-  def step_async(self, action):
-    request = environment_pb2.StepRequest(action=pickle.dumps(action))
-    self._step_future = self.stub.Step.future(request)
+    reset_infos = {}
+    if done:
+      info["terminal_observation"] = obs
+      obs, reset_infos = self.reset()
 
-  def step_wait(self):
-    response = self._step_future.result()
-    return pickle.loads(response.observation), response.reward, response.terminated, response.truncated, pickle.loads(response.info)
+    return obs, reward, done, info, reset_infos
   
   def reset(self, seed=None, options=None):
     request = environment_pb2.ResetRequest()
@@ -70,9 +74,6 @@ class GRPCClientEnv(gym.Env):
   def close(self):
     request = environment_pb2.CloseRequest()
     self.stub.Close(request)
-
-    self._closed = True
-    self.channel.close()
 
   def _get_spaces(self):  
     request = environment_pb2.GetSpacesRequest()

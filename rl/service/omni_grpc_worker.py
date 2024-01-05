@@ -1,3 +1,4 @@
+import os
 import yaml
 import numpy as np
 import omnigibson as og
@@ -8,8 +9,9 @@ from telegym import serve_env_over_grpc
 gm.USE_FLATCACHE = True
 
 def main(local_addr, learner_addr):
-    config_filename = "omni_grpc.yaml"
-    config = yaml.load(open(config_filename, "r"), Loader=yaml.FullLoader)
+    script_dir = os.path.dirname(os.path.realpath(__file__))
+    config_path = os.path.join(script_dir, "omni_grpc.yaml")
+    config = yaml.load(open(config_path, "r"), Loader=yaml.FullLoader)
 
     env = og.Environment(configs=config)
 

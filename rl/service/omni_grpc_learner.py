@@ -110,12 +110,6 @@ def main():
         help="Absolute path to desired PPO checkpoint to load for evaluation",
     )
 
-    parser.add_argument(
-        "--eval",
-        action="store_true",
-        help="If set, will evaluate the PPO agent found from --checkpoint",
-    )
-
     args = parser.parse_args()
     prefix = ''
     seed = 0
@@ -159,7 +153,7 @@ def main():
     #     features_extractor_class=CustomCombinedExtractor,
     # )
 
-    if args.eval:
+    if False: # args.eval:
         raise ValueError("This does not currently work.")
     
         # TODO: Reenable once this all works
@@ -172,10 +166,25 @@ def main():
 
     else:
         config = {
-            "policy_type": "MultiInputPolicy",
-            "n_steps": 30 * 10,
-            "batch_size": 8,
-            "total_timesteps": 10_000_000,
+            "policy": "MultiInputPolicy",
+            "n_steps": 512,
+            "batch_size": 128,
+            "gamma": 0.99,
+            "gae_lambda": 0.9,
+            "n_epochs": 20,
+            "ent_coef": 0.0,
+            "sde_sample_freq": 4,
+            "max_grad_norm": 0.5,
+            "vf_coef": 0.5,
+            "learning_rate": 3e-5,
+            "use_sde": True,
+            "clip_range": 0.4,
+            "policy_kwargs": {
+                "log_std_init": -2,
+                "ortho_init": False,
+                "activation_fn": nn.ReLU,
+                "net_arch": {"pi": [512, 512], "vf": [512, 512]}
+            },
         }
         # run = wandb.init(
         #     project="sb3",
@@ -186,31 +195,32 @@ def main():
         # )
         env = VecFrameStack(env, n_stack=5)
         env = VecMonitor(env)
-        # env = VecVideoRecorder(
-        #     env,
-        #     f"videos/{run.id}",
-        #     record_video_trigger=lambda x: x % 2000 == 0,
-        #     video_length=200,
-        # )
-        # tensorboard_log_dir = f"runs/{run.id}"
-        model = PPO(
-            config["policy_type"],
+        env = VecVideoRecorder(
             env,
-            verbose=1,
-            # tensorboard_log=tensorboard_log_dir,
-            # policy_kwargs=policy_kwargs,
-            n_steps=config["n_steps"],
-            batch_size=config["batch_size"],
-            device='cuda',
+            f"videos/{run.id}",
+            record_video_trigger=lambda x: x % 2000 == 0,
+            video_length=200,
         )
-        # checkpoint_callback = CheckpointCallback(save_freq=1000, save_path=tensorboard_log_dir, name_prefix=prefix)
-        eval_callback = EvalCallback(eval_env=env, eval_freq=1000, n_eval_episodes=20)
-        # wandb_callback = WandbCallback(
-        #     model_save_path=tensorboard_log_dir,
-        #     verbose=2,
-        # )
-        # callback = CallbackList([wandb_callback, eval_callback, checkpoint_callback])
-        callback = CallbackList([eval_callback])
+        tensorboard_log_dir = f"runs/{run.id}"
+        if args.checkpoint is None:
+            model = PPO(
+                env=env,
+                verbose=1,
+                tensorboard_log=tensorboard_log_dir,
+                device='cuda',
+                **config,
+            )
+        else:
+            model = PPO.load(args.checkpoint, env=env)
+        checkpoint_callback = CheckpointCallback(save_freq=1000, save_path=tensorboard_log_dir, name_prefix=prefix)
+        wandb_callback = WandbCallback(
+            model_save_path=tensorboard_log_dir,
+            verbose=2,
+        )
+        callback = CallbackList([
+            wandb_callback,
+            checkpoint_callback,
+        ])
         print(callback.callbacks)
 
         log.debug(model.policy)

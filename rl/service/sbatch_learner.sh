@@ -2,10 +2,9 @@
 #SBATCH --account=cvgl
 #SBATCH --partition=svl --qos=normal
 #SBATCH --nodes=1
-#SBATCH --cpus-per-task=8
-#SBATCH --mem=30G
+#SBATCH --cpus-per-task=72
+#SBATCH --mem=200G
 #SBATCH --gres=gpu:2080ti:1
-#SBATCH --array=0-12
 
 IMAGE_PATH="/cvgl2/u/cgokmen/omnigibson.sqsh"
 GPU_ID=$(nvidia-smi -L | grep -oP '(?<=GPU-)[a-fA-F0-9\-]+' | head -n 1)
@@ -23,6 +22,9 @@ for env_var in "${!ENVS[@]}"; do
     ENV_KWARGS="${ENV_KWARGS} --env ${env_var}=${ENVS[${env_var}]}"
 done
 
+RL_PATH="/scr-ssd/${SLURM_JOB_USER}"
+mkdir -p $RL_PATH
+
 # Define mounts to create (maps local directory to container directory)
 declare -A MOUNTS=(
     [/scr-ssd/og-data-0-2-1]=/data
@@ -37,7 +39,7 @@ declare -A MOUNTS=(
     [${ISAAC_CACHE_PATH}/isaac-sim/documents]=/root/Documents
     # Feel free to include lines like the below to mount a workspace or a custom OG version
     [/cvgl2/u/cgokmen/OmniGibson]=/omnigibson-src
-    # [/cvgl2/u/cgokmen/my-project]=/my-project
+    [${RL_PATH}]=/workspace
 )
 
 MOUNT_KWARGS=""
@@ -66,7 +68,7 @@ enroot start \
     ${ENV_KWARGS} \
     ${MOUNT_KWARGS} \
     ${CONTAINER_NAME} \
-    micromamba run -n omnigibson /bin/bash --login -c "source /isaac-sim/setup_conda_env.sh && pip install gymnasium grpcio grpcio-tools stable_baselines3 wandb && cd /omnigibson-src/rl/service && wandb login 0be7eed72bf602cad10469e88354c69dc9c613af && python omni_grpc_learner.py $1"
+    micromamba run -n omnigibson /bin/bash --login -c "source /isaac-sim/setup_conda_env.sh && pip install gymnasium grpcio grpcio-tools stable_baselines3 wandb tensorboard moviepy && cd /workspace && python -u /omnigibson-src/rl/service/omni_grpc_learner.py --n_envs $1 --port $2"
 
 # Clean up the image if possible.
 enroot remove -f ${CONTAINER_NAME}

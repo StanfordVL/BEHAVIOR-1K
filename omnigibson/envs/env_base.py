@@ -33,7 +33,11 @@ class Environment(gym.Env, GymObservable, Recreatable):
                 see @default_config below
         """
         # Call super first
-        super().__init__(render_mode="rgb_array")
+        super().__init__()
+
+        # Support gymnasium's render mode metadata
+        self.render_mode = "rgb_array"
+        self.metadata = {"render.modes": ["rgb_array"]}
 
         # Initialize other placeholders that will be filled in later
         self._task = None
@@ -413,7 +417,9 @@ class Environment(gym.Env, GymObservable, Recreatable):
         """
         Clean up the environment and shut down the simulation.
         """
-        og.shutdown()
+        return
+    
+        # og.shutdown()
 
     def get_obs(self):
         """
@@ -568,7 +574,7 @@ class Environment(gym.Env, GymObservable, Recreatable):
 
         # Grab the rendered image from each of the rgb sensors, concatenate along dim 1
         rgb_images = [sensor.get_obs()["rgb"] for sensor in rgb_sensors]
-        return np.concatenate(rgb_images, axis=1)[:, : :3]
+        return np.concatenate(rgb_images, axis=1)[:, :, :3]
 
 
     def _reset_variables(self):
