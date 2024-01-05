@@ -45,7 +45,7 @@ done
 
 # Create the image if it doesn't already exist
 CONTAINER_NAME=omnigibson_${JOB_ID}
-enroot create --force --name ${CONTAINER_NAME} ${IMAGE_PATH}
+enroot create --name ${CONTAINER_NAME} ${IMAGE_PATH}
 
 # Remove leading space in string
 ENV_KWARGS="${ENV_KWARGS:1}"
