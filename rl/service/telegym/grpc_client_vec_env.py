@@ -102,26 +102,26 @@ class GRPCClientVecEnv(DummyVecEnv):
         """Return attribute from vectorized environment (see base class)."""
         target_envs = self._get_target_envs(indices)
         get_attr = lambda env_i: env_i.get_attr(attr_name)
-        return self._executor.map(get_attr, target_envs)
+        return list(self._executor.map(get_attr, target_envs))
 
     def set_attr(self, attr_name: str, value: Any, indices: VecEnvIndices = None) -> None:
         """Set attribute inside vectorized environments (see base class)."""
         target_envs = self._get_target_envs(indices)
         set_attr = lambda env_i: env_i.set_attr(attr_name, value)
-        return self._executor.map(set_attr, target_envs)
+        return list(self._executor.map(set_attr, target_envs))
 
     def env_method(self, method_name: str, *method_args, indices: VecEnvIndices = None, **method_kwargs) -> List[Any]:
         """Call instance methods of vectorized environments."""
         target_envs = self._get_target_envs(indices)
         env_method = lambda env_i: env_i.env_method(*method_args, **method_kwargs)
-        return self._executor.map(env_method, target_envs)
+        return list(self._executor.map(env_method, target_envs))
 
     def env_is_wrapped(self, wrapper_class: Type[gym.Wrapper], indices: VecEnvIndices = None) -> List[bool]:
         """Check if worker environments are wrapped with a given wrapper"""
         target_envs = self._get_target_envs(indices)
         is_wrapped = lambda env_i: env_i.is_wrapped(wrapper_class)
-        return self._executor.map(is_wrapped, target_envs)
+        return list(self._executor.map(is_wrapped, target_envs))
     
     def close(self):
         close = lambda env_i: env_i.close()
-        return self._executor.map(close, self.envs)
+        return list(self._executor.map(close, self.envs))
