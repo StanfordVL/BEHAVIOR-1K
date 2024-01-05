@@ -169,7 +169,6 @@ def main():
             "policy": "MultiInputPolicy",
             "n_steps": 512,
             "batch_size": 128,
-            "total_timesteps": 10_000_000,
             "gamma": 0.99,
             "gae_lambda": 0.9,
             "n_epochs": 20,
