@@ -3,7 +3,7 @@
 #SBATCH --partition=svl --qos=normal
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=72
-#SBATCH --mem=250G
+#SBATCH --mem=200G
 #SBATCH --gres=gpu:2080ti:1
 
 IMAGE_PATH="/cvgl2/u/cgokmen/omnigibson.sqsh"
