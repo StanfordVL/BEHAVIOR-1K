@@ -5,7 +5,7 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=30G
 #SBATCH --gres=gpu:2080ti:1
-#SBATCH --array=0-12
+#SBATCH --array=0-1
 
 IMAGE_PATH="/cvgl2/u/cgokmen/omnigibson.sqsh"
 GPU_ID=$(nvidia-smi -L | grep -oP '(?<=GPU-)[a-fA-F0-9\-]+' | head -n 1)
