@@ -14,7 +14,6 @@ from omnigibson.robots.manipulation_robot import ManipulationRobot, GraspingPoin
 from omnigibson.robots.active_camera_robot import ActiveCameraRobot
 from omnigibson.objects.usd_object import USDObject
 import omnigibson.utils.transform_utils as T
-from omnigibson.controllers.controller_base import ControlType
 
 # component suffixes for the 6-DOF arm joint names
 COMPONENT_SUFFIXES = ['x', 'y', 'z', 'rx', 'ry', 'rz']
@@ -53,7 +52,6 @@ class Behaviorbot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             uuid=None,
             scale=None,
             visible=True,
-            fixed_base=True,
             visual_only=False,
             self_collisions=True,
             load_config=None,
@@ -93,7 +91,7 @@ class Behaviorbot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             uuid=uuid,
             scale=scale,
             visible=visible,
-            fixed_base=fixed_base,
+            fixed_base=True,
             visual_only=visual_only,
             self_collisions=self_collisions,
             load_config=load_config,
@@ -109,19 +107,6 @@ class Behaviorbot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             grasping_direction="upper",
             **kwargs,
         )
-
-        # Basic parameters
-        self.use_ghost_hands = use_ghost_hands
-        self._world_base_fixed_joint_prim = None
-
-        # Activation parameters
-        self.first_frame = True
-        # whether hand or body is in contact with other objects (we need this since checking contact list is costly)
-        self.part_is_in_contact = {hand_name: False for hand_name in self.arm_names + ["body"]}
-
-        # Whether the VR system is actively hooked up to the VR agent.
-        self.vr_attached = False
-        self._vr_attachment_button_press_timestamp = None
 
         # setup eef parts
         self.parts = OrderedDict()
@@ -139,6 +124,14 @@ class Behaviorbot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             name="head", parent=self,  prim_path="eye", eef_type="head",
             offset_to_body=HEAD_TO_BODY_OFFSET, **kwargs
         )
+
+        # private fields
+        # whether to use ghost hands (visual markers to help visualize current vr hand pose)
+        self._use_ghost_hands = use_ghost_hands
+        # prim for the world_base_fixed_joint, used to reset the robot pose
+        self._world_base_fixed_joint_prim = None
+        # whether hand or body is in contact with other objects (we need this since checking contact list is costly)
+        self._part_is_in_contact = {hand_name: False for hand_name in self.arm_names + ["body"]}
 
     @property
     def usd_path(self):
@@ -332,16 +325,6 @@ class Behaviorbot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
     
     def update_controller_mode(self):
         super().update_controller_mode()
-        # overwrite robot params (e.g. damping, stiffess, max_effort) here
-        for link in self.links.values():
-            link.ccd_enabled = True
-        for arm in self.arm_names:
-            for finger_link in self.finger_links[arm]:
-                finger_link.mass = 0.02
-        self.links["base"].mass = 15
-        self.links["lh_palm"].mass = 0.3
-        self.links["rh_palm"].mass = 0.3
-        
         # set base joint properties
         for joint_name in self.base_joint_names:
             self.joints[joint_name].stiffness = 1e8
@@ -377,13 +360,7 @@ class Behaviorbot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         return self._links[self.base_footprint_link_name]
 
     def get_position_orientation(self):
-        # If the simulator is playing, return the pose of the base_footprint link frame
-        if self._dc is not None and self._dc.is_simulating():
-            return self.base_footprint_link.get_position_orientation()
-
-        # Else, return the pose of the robot frame
-        else:
-            return super().get_position_orientation()
+        return self.base_footprint_link.get_position_orientation()
 
     def set_position_orientation(self, position=None, orientation=None):
         super().set_position_orientation(position, orientation)
@@ -427,82 +404,10 @@ class Behaviorbot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         Helper function that updates the contact info for the hands and body. 
         Can be used in the future with device haptics to provide collision feedback.
         """
-        self.part_is_in_contact["body"] = len(self.links["body"].contact_list())
+        self._part_is_in_contact["body"] = len(self.links["body"].contact_list())
         for hand_name in self.arm_names:
-            self.part_is_in_contact[hand_name] = len(self.eef_links[hand_name].contact_list()) \
+            self._part_is_in_contact[hand_name] = len(self.eef_links[hand_name].contact_list()) \
                or np.any([len(finger.contact_list()) for finger in self.finger_links[hand_name]])
-    
-    def deploy_control(self, control, control_type, indices=None, normalized=False):
-        """
-        Overwrites controllable_object.deploy_control to make arm revolute joints set_target=False
-        This is needed because otherwise the hand will rotate a full circle backwards when it overshoots pi
-        """
-        # Run sanity check
-        if indices is None:
-            assert len(control) == len(control_type) == self.n_dof, (
-                "Control signals, control types, and number of DOF should all be the same!"
-                "Got {}, {}, and {} respectively.".format(len(control), len(control_type), self.n_dof)
-            )
-            # Set indices manually so that we're standardized
-            indices = np.arange(self.n_dof)
-        else:
-            assert len(control) == len(control_type) == len(indices), (
-                "Control signals, control types, and indices should all be the same!"
-                "Got {}, {}, and {} respectively.".format(len(control), len(control_type), len(indices))
-            )
-
-        # Standardize normalized input
-        n_indices = len(indices)
-        normalized = normalized if isinstance(normalized, Iterable) else [normalized] * n_indices
-
-        # Loop through controls and deploy
-        # We have to use delicate logic to account for the edge cases where a single joint may contain > 1 DOF
-        # (e.g.: spherical joint)
-        cur_indices_idx = 0
-        while cur_indices_idx != n_indices:
-            # Grab the current DOF index we're controlling and find the corresponding joint
-            joint = self._dof_to_joints[indices[cur_indices_idx]]
-            cur_ctrl_idx = indices[cur_indices_idx]
-            joint_dof = joint.n_dof
-            if joint_dof > 1:
-                # Run additional sanity checks since the joint has more than one DOF to make sure our controls,
-                # control types, and indices all match as expected
-
-                # Make sure the indices are mapped correctly
-                assert indices[cur_indices_idx + joint_dof] == cur_ctrl_idx + joint_dof, \
-                    "Got mismatched control indices for a single joint!"
-                # Check to make sure all joints, control_types, and normalized as all the same over n-DOF for the joint
-                for group_name, group in zip(
-                        ("joints", "control_types", "normalized"),
-                        (self._dof_to_joints, control_type, normalized),
-                ):
-                    assert len({group[indices[cur_indices_idx + i]] for i in range(joint_dof)}) == 1, \
-                        f"Not all {group_name} were the same when trying to deploy control for a single joint!"
-                # Assuming this all passes, we grab the control subvector, type, and normalized value accordingly
-                ctrl = control[cur_ctrl_idx: cur_ctrl_idx + joint_dof]
-            else: 
-                # Grab specific control. No need to do checks since this is a single value
-                ctrl = control[cur_ctrl_idx]
-
-            # Deploy control based on type
-            ctrl_type, norm = control_type[cur_ctrl_idx], normalized[cur_ctrl_idx]       # In multi-DOF joint case all values were already checked to be the same
-            if ctrl_type == ControlType.EFFORT:
-                joint.set_effort(ctrl, normalized=norm)
-            elif ctrl_type == ControlType.VELOCITY:
-                joint.set_vel(ctrl, normalized=norm, drive=True)
-            elif ctrl_type == ControlType.POSITION:            
-                if "rx" in joint.joint_name or "ry" in joint.joint_name or "rz" in joint.joint_name: 
-                    joint.set_pos(ctrl, normalized=norm, drive=False)
-                else:
-                    joint.set_pos(ctrl, normalized=norm, drive=True)
-            elif ctrl_type == ControlType.NONE:
-                # Do nothing
-                pass
-            else:
-                raise ValueError("Invalid control type specified: {}".format(ctrl_type))
-
-            # Finally, increment the current index based on how many DOFs were just controlled
-            cur_indices_idx += joint_dof
 
     def teleop_data_to_action(self, teleop_data: dict) -> np.ndarray:
         """
@@ -582,7 +487,7 @@ class Behaviorbot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             if reset:
                 self.parts[part_name].set_position_orientation(des_local_part_pos, des_part_rpy)
             # update ghost hand if necessary
-            if self.use_ghost_hands and part_name is not "head":
+            if self._use_ghost_hands and part_name is not "head":
                 self.parts[part_name].update_ghost_hands(des_world_part_pos, des_world_part_orn)
         return action
 
@@ -614,7 +519,7 @@ class BRPart(ABC):
     def load(self) -> None:
         self._root_link = self.parent.links[self.prim_path]
         # setup ghost hand
-        if self.eef_type == "hand" and self.parent.use_ghost_hands:
+        if self.eef_type == "hand" and self.parent._use_ghost_hands:
             gh_name = f"ghost_hand_{self.name}"
             self.ghost_hand = USDObject(
                 prim_path=f"/World/{gh_name}",
