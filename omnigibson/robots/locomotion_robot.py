@@ -205,7 +205,7 @@ class LocomotionRobot(BaseRobot):
         NOTE: This implementation only supports DifferentialDriveController. 
         Overwrite this function if the robot is using a different base controller.
         Args:
-            teleop_data (dict): dictionary containing teleop data from utils.teleop_utils.TeleopSystem
+            teleop_data (dict): dictionary containing teleop data, see utils.teleop_utils.TeleopSystem docstring for what's expected
         Returns:
             np.ndarray: array of action data
         """

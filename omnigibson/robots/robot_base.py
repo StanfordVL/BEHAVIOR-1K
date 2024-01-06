@@ -417,7 +417,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         """
         Generate action data from teleop system input
         Args:
-            teleop_data (dict): dictionary containing teleop data from utils.teleop_utils.TeleopSystem
+            teleop_data (dict): dictionary containing teleop data, see utils.teleop_utils.TeleopSystem docstring for what's expected
         Returns:
             np.ndarray: array of action data filled with update value
         """

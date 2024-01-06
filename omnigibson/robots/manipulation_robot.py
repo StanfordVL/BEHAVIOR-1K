@@ -142,8 +142,8 @@ class ManipulationRobot(BaseRobot):
                     at least two "fingers" need to touch the object.
                 If "sticky", will magnetize any object touching the gripper's fingers. In this mode, only one finger
                     needs to touch the object.
-            grasping_direction (str): One of {"lower", "upper"}. If "lower", joint lower limit is grasp, 
-                otherwise joint upper limit is grasp.
+            grasping_direction (str): One of {"lower", "upper"}. If "lower", lower limit represents a closed grasp, 
+                otherwise upper limit represents a closed grasp.
             disable_grasp_handling (bool): If True, the robot will not automatically handle assisted or sticky grasps.
                 Instead, you will need to call the grasp handling methods yourself.
             kwargs (dict): Additional keyword arguments that are used for other super() calls from subclasses, allowing
@@ -1469,7 +1469,7 @@ class ManipulationRobot(BaseRobot):
         NOTE: This implementation only supports IK/OSC controller for arm and MultiFingerGripperController for gripper. 
         Overwrite this function if the robot is using a different controller.
         Args:
-            teleop_data (dict): dictionary containing teleop data from utils.teleop_utils.TeleopSystem
+            teleop_data (dict): dictionary containing teleop data, see utils.teleop_utils.TeleopSystem docstring for what's expected
         Returns:
             np.ndarray: array of action data for arm and gripper
         """
