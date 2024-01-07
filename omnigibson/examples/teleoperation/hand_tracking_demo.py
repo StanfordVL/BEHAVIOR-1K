@@ -3,7 +3,7 @@ Example script for using hand tracking (OpenXR only) with dexterous hand.
 You can set DEBUG_MODE to True to visualize the landmarks of the hands! 
 """
 import omnigibson as og
-from omnigibson.utils.xr_utils import VRSystem
+from omnigibson.utils.teleop_utils import OVXRSystem
 
 DEBUG_MODE = True  # set to True to visualize the landmarks of the hands
 
@@ -66,7 +66,7 @@ def main():
         markers = [env.scene.object_registry("name", f"marker_{i}") for i in range(52)]
     
     # Start vrsys 
-    vrsys = VRSystem(robot=env.robots[0], use_hand_tracking=True)
+    vrsys = OVXRSystem(robot=env.robots[0], show_control_marker=False, system="OpenXR", use_hand_tracking=True)
     vrsys.start()
     # set headset position to be 1m above ground and facing +x direction
     head_init_transform = vrsys.og2xr(pos=[0, 0, 1], orn=[0, 0, 0, 1])

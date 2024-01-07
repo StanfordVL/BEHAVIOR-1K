@@ -2,7 +2,7 @@
 Example script for interacting with OmniGibson scenes with VR and Behaviorbot.
 """
 import omnigibson as og
-from omnigibson.utils.teleop_utils import VRSystem
+from omnigibson.utils.teleop_utils import OVXRSystem
 
 def main():
     # Create the config for generating the environment we want
@@ -21,7 +21,9 @@ def main():
     env = og.Environment(configs=cfg)
     env.reset()
     # start vrsys 
-    vrsys = VRSystem(robot=env.robots[0], system="SteamVR", enable_touchpad_movement=True)
+    vrsys = OVXRSystem(robot=env.robots[0], show_control_marker=False, system="OpenXR", enable_touchpad_movement=True)
+    # We want a lower movement speed for controlling with VR headset
+    vrsys.base_movement_speed = 0.03
     vrsys.start()
     # set headset position to be 1m above ground and facing +x
     head_init_transform = vrsys.og2xr(pos=[0, 0, 1], orn=[0, 0, 0, 1])

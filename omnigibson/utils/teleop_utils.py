@@ -49,7 +49,6 @@ class TeleopSystem():
         self.teleop_data = {
             "robot_attached": False,
             "transforms": {},
-            "button_data": {},
         }
         # vr_origin stores the original pose of the VR controller upon calling reset_transform_mapping
         # This is used to subtract with the current VR controller pose in each frame to get the delta pose
@@ -187,7 +186,7 @@ class OVXRSystem(TeleopSystem):
         if use_hand_tracking:
             self.raw_data["hand_data"] = {}
             self._hand_tracking_subscription = self.xr_core.get_event_stream().create_subscription_to_pop_by_type(
-                XRCoreEventType.hand_joints, self.get_hand_tracking_data, name="hand tracking"
+                XRCoreEventType.hand_joints, self._update_hand_tracking_data, name="hand tracking"
             )
 
     def xr2og(self, transform: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
@@ -245,18 +244,13 @@ class OVXRSystem(TeleopSystem):
         """
         Steps the VR system and update self.teleop_data
         """
-        # Optional move anchor
-        if self.enable_touchpad_movement:
-            self.move_anchor(pos_offset=self.compute_anchor_offset_with_controller_input())
-        if self.align_anchor_to_robot_base:
-            robot_base_pos, robot_base_orn = self.robot.get_position_orientation()
-            self.vr_profile.set_virtual_world_anchor_transform(self.og2xr(robot_base_pos, robot_base_orn[[0, 2, 1, 3]]))
         # update raw data
         self._update_devices()
         self._update_device_transforms()
         self._update_button_data()
+        # Optionally set hand tracking data
         if self.use_hand_tracking:
-            self._update_hand_tracking_data()
+            self.teleop_data["hand_data"] = self.raw_data["hand_data"]
         # generate teleop data
         self.teleop_data["transforms"]["base"] = np.zeros(4)
         # update right hand related info
@@ -277,6 +271,10 @@ class OVXRSystem(TeleopSystem):
             self.teleop_data["transforms"]["base"][1] = -self.raw_data["button_data"][0]["axis"]["touchpad_x"] * self.base_movement_speed
             self.teleop_data["transforms"]["base"][2] = self.raw_data["button_data"][0]["axis"]["touchpad_y"] * self.base_movement_speed
             self.teleop_data["gripper_left"] = self.raw_data["button_data"][0]["axis"]["trigger"]
+        # update head related info
+        self.teleop_data["transforms"]["head"] = self.raw_data["transforms"]["hmd"]       
+        # update reset info (reset occurs when tue user press both controllers' grip buttons together)
+        self.teleop_data["reset"] = self.raw_data["button_data"][0]["press"]["grip"] and self.raw_data["button_data"][1]["press"]["grip"]
         # update robot attachment info
         if 1 in self.controllers and self.raw_data["button_data"][1]["press"]["grip"]:
             if not self.reset_button_pressed:
@@ -285,6 +283,12 @@ class OVXRSystem(TeleopSystem):
         else:
             self.reset_button_pressed = False
         self.teleop_data["robot_attached"] = self.robot_attached
+        # Optionally move anchor    
+        if self.enable_touchpad_movement:
+            self.move_anchor(pos_offset=self.compute_anchor_offset_with_controller_input())
+        if self.align_anchor_to_robot_base:
+            robot_base_pos, robot_base_orn = self.robot.get_position_orientation()
+            self.vr_profile.set_virtual_world_anchor_transform(self.og2xr(robot_base_pos, robot_base_orn[[0, 2, 1, 3]]))
 
     def compute_anchor_offset_with_controller_input(self) -> np.ndarray:
         """

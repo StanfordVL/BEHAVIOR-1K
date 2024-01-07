@@ -8,7 +8,7 @@ from scipy.spatial.transform import Rotation as R
 from typing import List, Tuple, Iterable
 
 import omnigibson as og
-from omnigibson.macros import gm
+from omnigibson.macros import gm, macros
 from omnigibson.robots.locomotion_robot import LocomotionRobot
 from omnigibson.robots.manipulation_robot import ManipulationRobot, GraspingPoint
 from omnigibson.robots.active_camera_robot import ActiveCameraRobot
@@ -20,8 +20,8 @@ COMPONENT_SUFFIXES = ['x', 'y', 'z', 'rx', 'ry', 'rz']
 
 # Offset between the body and parts
 HEAD_TO_BODY_OFFSET = ([0, 0, -0.4], [0, 0, 0, 1])
-RH_TO_BODY_OFFSET = ([0, 0.15, -0.4], T.euler2quat([0, np.pi, np.pi / 2]))
-LH_TO_BODY_OFFSET = ([0, -0.15, -0.4], T.euler2quat([0, np.pi, -np.pi / 2]))
+RH_TO_BODY_OFFSET = ([0, 0.15, -0.4], T.euler2quat([0, 0, 0]))
+LH_TO_BODY_OFFSET = ([0, -0.15, -0.4], T.euler2quat([0, 0, 0]))
 
 # Hand parameters
 HAND_GHOST_HAND_APPEAR_THRESHOLD = 0.15
@@ -36,6 +36,14 @@ PALM_LINK_NAME = "palm"
 FINGER_MID_LINK_NAMES = ("Tproximal", "Iproximal", "Mproximal", "Rproximal", "Pproximal")
 FINGER_TIP_LINK_NAMES = ("Tmiddle", "Imiddle", "Mmiddle", "Rmiddle", "Pmiddle")
 THUMB_LINK_NAME = "Tmiddle"
+
+# joint parameters
+BASE_JOINT_STIFFNESS = 1e8
+BASE_JOINT_MAX_EFFORT = 7500
+ARM_JOINT_STIFFNESS = 1e6
+ARM_JOINT_MAX_EFFORT = 300
+FINGER_JOINT_STIFFNESS = 1e3
+FINGER_JOINT_MAX_EFFORT = 50
 
 
 class Behaviorbot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
@@ -327,22 +335,20 @@ class Behaviorbot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         super().update_controller_mode()
         # set base joint properties
         for joint_name in self.base_joint_names:
-            self.joints[joint_name].stiffness = 1e8
-            self.joints[joint_name].max_effort = 7500
+            self.joints[joint_name].stiffness = BASE_JOINT_STIFFNESS
+            self.joints[joint_name].max_effort = BASE_JOINT_MAX_EFFORT
 
         # set arm joint properties
         for arm in self.arm_joint_names:
             for joint_name in self.arm_joint_names[arm]:
-                self.joints[joint_name].stiffness = 1e6
-                self.joints[joint_name].damping = 1
-                self.joints[joint_name].max_effort = 300
+                self.joints[joint_name].stiffness = ARM_JOINT_STIFFNESS
+                self.joints[joint_name].max_effort = ARM_JOINT_MAX_EFFORT
 
         # set finger joint properties
         for arm in self.finger_joint_names:
             for joint_name in self.finger_joint_names[arm]:
-                self.joints[joint_name].stiffness = 1e2
-                self.joints[joint_name].damping = 1
-                self.joints[joint_name].max_effort = 5
+                self.joints[joint_name].stiffness = FINGER_JOINT_STIFFNESS
+                self.joints[joint_name].max_effort = FINGER_JOINT_MAX_EFFORT
    
     @property
     def base_footprint_link_name(self):
@@ -427,13 +433,13 @@ class Behaviorbot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         # Actions are stored as 1D numpy array
         action = np.zeros(self.action_dim)
         # Update body action space
-        hmd_pos, hmd_orn = teleop_data["transforms"]["hmd"]
-        if np.all(np.equal(hmd_pos, np.zeros(3))) and np.all(np.equal(hmd_orn, np.array([0, 0, 0, 1]))):
+        head_pos, head_orn = teleop_data["transforms"]["head"]
+        if np.all(np.equal(head_pos, np.zeros(3))) and np.all(np.equal(head_orn, np.array([0, 0, 0, 1]))):
             des_body_pos, des_body_orn = self.get_position_orientation()
             des_body_rpy = R.from_quat(des_body_orn).as_euler("XYZ")
         else:
-            des_body_pos = hmd_pos - np.array([0, 0, 0.45])
-            des_body_rpy = np.array([0, 0, R.from_quat(hmd_orn).as_euler("XYZ")[2]])
+            des_body_pos = head_pos - np.array([0, 0, 0.45])
+            des_body_rpy = np.array([0, 0, R.from_quat(head_orn).as_euler("XYZ")[2]])
             des_body_orn = T.euler2quat(des_body_rpy)
         action[self.controller_action_idx["base"]] = np.r_[des_body_pos, des_body_rpy]
         # Update action space for other VR objects
@@ -443,20 +449,20 @@ class Behaviorbot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             reset = 0
             hand_data = None
             if part_name == "head":
-                part_pos, part_orn = teleop_data["transforms"]["hmd"]
+                part_pos, part_orn = teleop_data["transforms"]["head"]
             else:
-                hand_name, hand_index = ("left", 0) if part_name == "lh" else ("right", 1)
+                hand_name = "left" if part_name == "lh" else "right"
                 if "hand_data" in teleop_data:
-                    if "raw" in teleop_data["hand_data"][hand_name]:
+                    if hand_name in teleop_data["hand_data"] and "raw" in teleop_data["hand_data"][hand_name]:
                         part_pos = teleop_data["hand_data"][hand_name]["raw"]["pos"][0]
                         part_orn = teleop_data["hand_data"][hand_name]["raw"]["orn"][0]
                         hand_data = teleop_data["hand_data"][hand_name]["angles"]
                     else:
                         part_pos, part_orn = np.zeros(3), np.array([0, 0, 0, 1])
                 else:
-                    part_pos, part_orn = teleop_data["transforms"]["controllers"][hand_index]
-                    hand_data = teleop_data["button_data"][hand_index]["axis"]["trigger"]
-                    reset = teleop_data["button_data"][hand_index]["press"]["grip"]
+                    part_pos, part_orn = teleop_data["transforms"][hand_name]
+                    hand_data = teleop_data[f"gripper_{hand_name}"]
+                    reset = teleop_data["reset"]
 
             if np.all(np.equal(part_pos, np.zeros(3))) and np.all(np.equal(part_orn, np.array([0, 0, 0, 1]))):
                 des_world_part_pos, des_world_part_orn = prev_local_pos, prev_local_orn
@@ -514,7 +520,6 @@ class BRPart(ABC):
 
         self.ghost_hand = None
         self._root_link = None
-        self._world_position_orientation = ([0, 0, 0], [0, 0, 0, 1])
 
     def load(self) -> None:
         self._root_link = self.parent.links[self.prim_path]
@@ -539,10 +544,9 @@ class BRPart(ABC):
             Tuple[Array[x, y, z], Array[x, y, z, w]]
 
         """
-        return T.relative_pose_transform(*self.world_position_orientation, *self.parent.get_position_orientation())
+        return T.relative_pose_transform(*self.get_position_orientation(), *self.parent.get_position_orientation())
 
-    @property
-    def world_position_orientation(self) -> Tuple[Iterable[float], Iterable[float]]:
+    def get_position_orientation(self) -> Tuple[Iterable[float], Iterable[float]]:
         """
         Get position and orientation in the world space
         Returns:
@@ -574,7 +578,7 @@ class BRPart(ABC):
 
         # If distance between hand and controller is greater than threshold,
         # ghost hand appears
-        dist_to_real_controller = np.linalg.norm(pos - self.world_position_orientation[0])
+        dist_to_real_controller = np.linalg.norm(pos - self.get_position_orientation()[0])
         should_visible = dist_to_real_controller > HAND_GHOST_HAND_APPEAR_THRESHOLD
 
         # Only toggle visibility if we are transition from hidden to unhidden, or the other way around
