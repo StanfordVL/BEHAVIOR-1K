@@ -1,7 +1,5 @@
 import random
 import numpy as np
-import json
-import os
 from scipy.spatial.transform import Rotation as R
 import omnigibson as og
 from omnigibson.action_primitives.starter_semantic_action_primitives import PlanningContext
@@ -36,9 +34,6 @@ class GraspTask(BaseTask):
     ):
         self.obj_name = obj_name
         self._primitive_controller = None
-        path = os.path.dirname(__file__)
-        f = open(path + "/../../rl/reset_poses.json")
-        self.reset_poses = json.load(f)
         super().__init__(termination_config=termination_config, reward_config=reward_config)
         
     def _load(self, env):
@@ -67,47 +62,37 @@ class GraspTask(BaseTask):
         if self._primitive_controller is None:
             self._primitive_controller = StarterSemanticActionPrimitives(env, enable_head_tracking=False)
 
-        # Reset the robot with primitive controller
-        ###########################################
-        # robot = env.robots[0]
-        # # Randomize the robots joint positions
-        # joint_control_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
-        # dim = len(joint_control_idx)
-        # # For Tiago
-        # if "combined" in robot.robot_arm_descriptor_yamls:
-        #     joint_combined_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx["combined"]])
-        #     initial_joint_pos = np.array(robot.get_joint_positions()[joint_combined_idx])
-        #     control_idx_in_joint_pos = np.where(np.in1d(joint_combined_idx, joint_control_idx))[0]
-        # # For Fetch
-        # else:
-        #     initial_joint_pos = np.array(robot.get_joint_positions()[joint_control_idx])
-        #     control_idx_in_joint_pos = np.arange(dim)
-
-        # with PlanningContext(self._primitive_controller.robot, self._primitive_controller.robot_copy, "original") as context:
-        #     for _ in range(MAX_JOINT_RANDOMIZATION_ATTEMPTS):
-        #         joint_pos, joint_control_idx = self._get_random_joint_position(robot)
-        #         initial_joint_pos[control_idx_in_joint_pos] = joint_pos
-        #         if not set_arm_and_detect_collision(context, initial_joint_pos):
-        #             robot.set_joint_positions(joint_pos, joint_control_idx)
-        #             og.sim.step()
-        #             break
-
-        # # Randomize the robot's 2d pose
-        # obj = env.scene.object_registry("name", self.obj_name)
-        # grasp_poses = get_grasp_poses_for_object_sticky(obj)
-        # grasp_pose, _ = random.choice(grasp_poses)
-        # sampled_pose_2d = self._primitive_controller._sample_pose_near_object(obj, pose_on_obj=grasp_pose)
-        # # sampled_pose_2d = [-0.433881, -0.210183, -2.96118]
-        # robot_pose = self._primitive_controller._get_robot_pose_from_2d_pose(sampled_pose_2d)
-        # robot.set_position_orientation(*robot_pose)
-            
-        # Reset the robot with cached reset poses
-        ###########################################
         robot = env.robots[0]
+        # Randomize the robots joint positions
         joint_control_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
-        robot_pose = random.choice(self.reset_poses)
-        robot.set_joint_positions(robot_pose['joint_pos'], joint_control_idx)
-        robot.set_position_orientation(robot_pose["base_pos"], robot_pose["base_ori"])
+        dim = len(joint_control_idx)
+        # For Tiago
+        if "combined" in robot.robot_arm_descriptor_yamls:
+            joint_combined_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx["combined"]])
+            initial_joint_pos = np.array(robot.get_joint_positions()[joint_combined_idx])
+            control_idx_in_joint_pos = np.where(np.in1d(joint_combined_idx, joint_control_idx))[0]
+        # For Fetch
+        else:
+            initial_joint_pos = np.array(robot.get_joint_positions()[joint_control_idx])
+            control_idx_in_joint_pos = np.arange(dim)
+
+        with PlanningContext(self._primitive_controller.robot, self._primitive_controller.robot_copy, "original") as context:
+            for _ in range(MAX_JOINT_RANDOMIZATION_ATTEMPTS):
+                joint_pos, joint_control_idx = self._get_random_joint_position(robot)
+                initial_joint_pos[control_idx_in_joint_pos] = joint_pos
+                if not set_arm_and_detect_collision(context, initial_joint_pos):
+                    robot.set_joint_positions(joint_pos, joint_control_idx)
+                    og.sim.step()
+                    break
+
+        # Randomize the robot's 2d pose
+        obj = env.scene.object_registry("name", self.obj_name)
+        grasp_poses = get_grasp_poses_for_object_sticky(obj)
+        grasp_pose, _ = random.choice(grasp_poses)
+        sampled_pose_2d = self._primitive_controller._sample_pose_near_object(obj, pose_on_obj=grasp_pose)
+        # sampled_pose_2d = [-0.433881, -0.210183, -2.96118]
+        robot_pose = self._primitive_controller._get_robot_pose_from_2d_pose(sampled_pose_2d)
+        robot.set_position_orientation(*robot_pose)
 
         # Settle robot
         for _ in range(10):
