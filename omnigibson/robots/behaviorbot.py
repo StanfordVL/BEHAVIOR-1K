@@ -8,42 +8,43 @@ from scipy.spatial.transform import Rotation as R
 from typing import List, Tuple, Iterable
 
 import omnigibson as og
-from omnigibson.macros import gm, macros
+from omnigibson.macros import gm, create_module_macros
 from omnigibson.robots.locomotion_robot import LocomotionRobot
 from omnigibson.robots.manipulation_robot import ManipulationRobot, GraspingPoint
 from omnigibson.robots.active_camera_robot import ActiveCameraRobot
 from omnigibson.objects.usd_object import USDObject
 import omnigibson.utils.transform_utils as T
 
+m = create_module_macros(module_path=__file__)
 # component suffixes for the 6-DOF arm joint names
-COMPONENT_SUFFIXES = ['x', 'y', 'z', 'rx', 'ry', 'rz']
+m.COMPONENT_SUFFIXES = ['x', 'y', 'z', 'rx', 'ry', 'rz']
 
 # Offset between the body and parts
-HEAD_TO_BODY_OFFSET = ([0, 0, -0.4], [0, 0, 0, 1])
-RH_TO_BODY_OFFSET = ([0, 0.15, -0.4], T.euler2quat([0, 0, 0]))
-LH_TO_BODY_OFFSET = ([0, -0.15, -0.4], T.euler2quat([0, 0, 0]))
-
+m.HEAD_TO_BODY_OFFSET = ([0, 0, -0.4], [0, 0, 0, 1])
+m.RH_TO_BODY_OFFSET = ([0, 0.15, -0.4], T.euler2quat([0, 0, 0]))
+m.LH_TO_BODY_OFFSET = ([0, -0.15, -0.4], T.euler2quat([0, 0, 0]))
+m.BODY_HEIGHT_OFFSET = 0.45
 # Hand parameters
-HAND_GHOST_HAND_APPEAR_THRESHOLD = 0.15
-THUMB_2_POS = [0, -0.02, -0.05]
-THUMB_1_POS = [0, -0.015, -0.02]
-PALM_CENTER_POS = [0, -0.04, 0.01]
-PALM_BASE_POS = [0, 0, 0.015]
-FINGER_TIP_POS = [0, -0.025, -0.055]
+m.HAND_GHOST_HAND_APPEAR_THRESHOLD = 0.15
+m.THUMB_2_POS = [0, -0.02, -0.05]
+m.THUMB_1_POS = [0, -0.015, -0.02]
+m.PALM_CENTER_POS = [0, -0.04, 0.01]
+m.PALM_BASE_POS = [0, 0, 0.015]
+m.FINGER_TIP_POS = [0, -0.025, -0.055]
 
 # Hand link index constants
-PALM_LINK_NAME = "palm"
-FINGER_MID_LINK_NAMES = ("Tproximal", "Iproximal", "Mproximal", "Rproximal", "Pproximal")
-FINGER_TIP_LINK_NAMES = ("Tmiddle", "Imiddle", "Mmiddle", "Rmiddle", "Pmiddle")
-THUMB_LINK_NAME = "Tmiddle"
+m.PALM_LINK_NAME = "palm"
+m.FINGER_MID_LINK_NAMES = ("Tproximal", "Iproximal", "Mproximal", "Rproximal", "Pproximal")
+m.FINGER_TIP_LINK_NAMES = ("Tmiddle", "Imiddle", "Mmiddle", "Rmiddle", "Pmiddle")
+m.THUMB_LINK_NAME = "Tmiddle"
 
 # joint parameters
-BASE_JOINT_STIFFNESS = 1e8
-BASE_JOINT_MAX_EFFORT = 7500
-ARM_JOINT_STIFFNESS = 1e6
-ARM_JOINT_MAX_EFFORT = 300
-FINGER_JOINT_STIFFNESS = 1e3
-FINGER_JOINT_MAX_EFFORT = 50
+m.BASE_JOINT_STIFFNESS = 1e8
+m.BASE_JOINT_MAX_EFFORT = 7500
+m.ARM_JOINT_STIFFNESS = 1e6
+m.ARM_JOINT_MAX_EFFORT = 300
+m.FINGER_JOINT_STIFFNESS = 1e3
+m.FINGER_JOINT_MAX_EFFORT = 50
 
 
 class Behaviorbot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
@@ -120,17 +121,17 @@ class Behaviorbot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         self.parts = OrderedDict()
         self.parts["lh"] = BRPart(
             name="lh", parent=self, prim_path="lh_palm", eef_type="hand",
-            offset_to_body=LH_TO_BODY_OFFSET, **kwargs
+            offset_to_body=m.LH_TO_BODY_OFFSET, **kwargs
         )
 
         self.parts["rh"] = BRPart(
             name="rh", parent=self, prim_path="rh_palm", eef_type="hand",
-            offset_to_body=RH_TO_BODY_OFFSET, **kwargs
+            offset_to_body=m.RH_TO_BODY_OFFSET, **kwargs
         )
 
         self.parts["head"] = BRPart(
             name="head", parent=self,  prim_path="eye", eef_type="head",
-            offset_to_body=HEAD_TO_BODY_OFFSET, **kwargs
+            offset_to_body=m.HEAD_TO_BODY_OFFSET, **kwargs
         )
 
         # private fields
@@ -159,40 +160,40 @@ class Behaviorbot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
     @property
     def eef_link_names(self):
-        dic = {arm: f"{arm}_{PALM_LINK_NAME}" for arm in self.arm_names}
+        dic = {arm: f"{arm}_{m.PALM_LINK_NAME}" for arm in self.arm_names}
         dic["head"] = "head"
         return dic
 
     @property
     def arm_link_names(self):
         """The head counts as a arm since it has the same 33 joint configuration"""
-        return {arm: [f"{arm}_{component}" for component in COMPONENT_SUFFIXES] for arm in self.arm_names + ['head']}
+        return {arm: [f"{arm}_{component}" for component in m.COMPONENT_SUFFIXES] for arm in self.arm_names + ['head']}
     
     @property
     def finger_link_names(self):
         return {
-            arm: [f"{arm}_{link_name}" for link_name in itertools.chain(FINGER_MID_LINK_NAMES, FINGER_TIP_LINK_NAMES)]
+            arm: [f"{arm}_{link_name}" for link_name in itertools.chain(m.FINGER_MID_LINK_NAMES, m.FINGER_TIP_LINK_NAMES)]
             for arm in self.arm_names
         }
 
     @property
     def base_joint_names(self):
-        return [f"base_{component}_joint" for component in COMPONENT_SUFFIXES]
+        return [f"base_{component}_joint" for component in m.COMPONENT_SUFFIXES]
     
     @property
     def arm_joint_names(self):
         """The head counts as a arm since it has the same 33 joint configuration"""
-        return {eef: [f"{eef}_{component}_joint" for component in COMPONENT_SUFFIXES] for eef in self.arm_names + ["head"]}
+        return {eef: [f"{eef}_{component}_joint" for component in m.COMPONENT_SUFFIXES] for eef in self.arm_names + ["head"]}
     
     @property
     def finger_joint_names(self):
         return {
             arm: (
                 # palm-to-proximal joints.
-                [f"{arm}_{to_link}__{arm}_{PALM_LINK_NAME}" for to_link in FINGER_MID_LINK_NAMES]
+                [f"{arm}_{to_link}__{arm}_{m.PALM_LINK_NAME}" for to_link in m.FINGER_MID_LINK_NAMES]
                 +
                 # proximal-to-tip joints.
-                [f"{arm}_{to_link}__{arm}_{from_link}" for from_link, to_link in zip(FINGER_MID_LINK_NAMES, FINGER_TIP_LINK_NAMES)]
+                [f"{arm}_{to_link}__{arm}_{from_link}" for from_link, to_link in zip(m.FINGER_MID_LINK_NAMES, m.FINGER_TIP_LINK_NAMES)]
             )
             for arm in self.arm_names
         }
@@ -207,7 +208,7 @@ class Behaviorbot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
     def arm_control_idx(self):
         joints = list(self.joints.keys())
         return {
-            arm: [joints.index(f"{arm}_{component}_joint") for component in COMPONENT_SUFFIXES]
+            arm: [joints.index(f"{arm}_{component}_joint") for component in m.COMPONENT_SUFFIXES]
             for arm in self.arm_names
         }
 
@@ -219,7 +220,7 @@ class Behaviorbot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
     @property
     def camera_control_idx(self):
         joints = list(self.joints.keys())
-        return [joints.index(f"head_{component}_joint") for component in COMPONENT_SUFFIXES]
+        return [joints.index(f"head_{component}_joint") for component in m.COMPONENT_SUFFIXES]
 
     @property
     def default_joint_pos(self):
@@ -335,20 +336,20 @@ class Behaviorbot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         super().update_controller_mode()
         # set base joint properties
         for joint_name in self.base_joint_names:
-            self.joints[joint_name].stiffness = BASE_JOINT_STIFFNESS
-            self.joints[joint_name].max_effort = BASE_JOINT_MAX_EFFORT
+            self.joints[joint_name].stiffness = m.BASE_JOINT_STIFFNESS
+            self.joints[joint_name].max_effort = m.BASE_JOINT_MAX_EFFORT
 
         # set arm joint properties
         for arm in self.arm_joint_names:
             for joint_name in self.arm_joint_names[arm]:
-                self.joints[joint_name].stiffness = ARM_JOINT_STIFFNESS
-                self.joints[joint_name].max_effort = ARM_JOINT_MAX_EFFORT
+                self.joints[joint_name].stiffness = m.ARM_JOINT_STIFFNESS
+                self.joints[joint_name].max_effort = m.ARM_JOINT_MAX_EFFORT
 
         # set finger joint properties
         for arm in self.finger_joint_names:
             for joint_name in self.finger_joint_names[arm]:
-                self.joints[joint_name].stiffness = FINGER_JOINT_STIFFNESS
-                self.joints[joint_name].max_effort = FINGER_JOINT_MAX_EFFORT
+                self.joints[joint_name].stiffness = m.FINGER_JOINT_STIFFNESS
+                self.joints[joint_name].max_effort = m.FINGER_JOINT_MAX_EFFORT
    
     @property
     def base_footprint_link_name(self):
@@ -382,13 +383,13 @@ class Behaviorbot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         side_coefficients = {"lh": np.array([1, -1, 1]), "rh": np.array([1, 1, 1])}
         return {
             arm: [
-                GraspingPoint(link_name=f"{arm}_{PALM_LINK_NAME}", position=PALM_BASE_POS),
-                GraspingPoint(link_name=f"{arm}_{PALM_LINK_NAME}", position=PALM_CENTER_POS * side_coefficients[arm]),
+                GraspingPoint(link_name=f"{arm}_{m.PALM_LINK_NAME}", position=m.PALM_BASE_POS),
+                GraspingPoint(link_name=f"{arm}_{m.PALM_LINK_NAME}", position=m.PALM_CENTER_POS * side_coefficients[arm]),
                 GraspingPoint(
-                    link_name=f"{arm}_{THUMB_LINK_NAME}", position=THUMB_1_POS * side_coefficients[arm]
+                    link_name=f"{arm}_{m.THUMB_LINK_NAME}", position=m.THUMB_1_POS * side_coefficients[arm]
                 ),
                 GraspingPoint(
-                    link_name=f"{arm}_{THUMB_LINK_NAME}", position=THUMB_2_POS * side_coefficients[arm]
+                    link_name=f"{arm}_{m.THUMB_LINK_NAME}", position=m.THUMB_2_POS * side_coefficients[arm]
                 ),
             ]
             for arm in self.arm_names
@@ -399,8 +400,8 @@ class Behaviorbot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         side_coefficients = {"lh": np.array([1, -1, 1]), "rh": np.array([1, 1, 1])}
         return {
             arm: [
-                GraspingPoint(link_name=f"{arm}_{finger}", position=FINGER_TIP_POS * side_coefficients[arm])
-                for finger in FINGER_TIP_LINK_NAMES
+                GraspingPoint(link_name=f"{arm}_{finger}", position=m.FINGER_TIP_POS * side_coefficients[arm])
+                for finger in m.FINGER_TIP_LINK_NAMES
             ]
             for arm in self.arm_names
         }
@@ -410,10 +411,10 @@ class Behaviorbot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         Helper function that updates the contact info for the hands and body. 
         Can be used in the future with device haptics to provide collision feedback.
         """
-        self._part_is_in_contact["body"] = len(self.links["body"].contact_list())
+        self._part_is_in_contact["body"] = len(self.links["body"].contact_list()) > 0
         for hand_name in self.arm_names:
-            self._part_is_in_contact[hand_name] = len(self.eef_links[hand_name].contact_list()) \
-               or np.any([len(finger.contact_list()) for finger in self.finger_links[hand_name]])
+            self._part_is_in_contact[hand_name] = len(self.eef_links[hand_name].contact_list()) > 0 \
+               or np.any([len(finger.contact_list()) > 0 for finger in self.finger_links[hand_name]])
 
     def teleop_data_to_action(self, teleop_data: dict) -> np.ndarray:
         """
@@ -438,7 +439,7 @@ class Behaviorbot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             des_body_pos, des_body_orn = self.get_position_orientation()
             des_body_rpy = R.from_quat(des_body_orn).as_euler("XYZ")
         else:
-            des_body_pos = head_pos - np.array([0, 0, 0.45])
+            des_body_pos = head_pos - np.array([0, 0, m.BODY_HEIGHT_OFFSET])
             des_body_rpy = np.array([0, 0, R.from_quat(head_orn).as_euler("XYZ")[2]])
             des_body_orn = T.euler2quat(des_body_rpy)
         action[self.controller_action_idx["base"]] = np.r_[des_body_pos, des_body_rpy]
@@ -579,7 +580,7 @@ class BRPart(ABC):
         # If distance between hand and controller is greater than threshold,
         # ghost hand appears
         dist_to_real_controller = np.linalg.norm(pos - self.get_position_orientation()[0])
-        should_visible = dist_to_real_controller > HAND_GHOST_HAND_APPEAR_THRESHOLD
+        should_visible = dist_to_real_controller > m.HAND_GHOST_HAND_APPEAR_THRESHOLD
 
         # Only toggle visibility if we are transition from hidden to unhidden, or the other way around
         if self.ghost_hand.visible is not should_visible:
