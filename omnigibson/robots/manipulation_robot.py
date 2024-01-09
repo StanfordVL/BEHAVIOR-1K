@@ -497,8 +497,8 @@ class ManipulationRobot(BaseRobot):
         arm_action_idx = {}
         for arm_name in self.arm_names:
             controller_idx = self.controller_order.index(f"arm_{arm_name}")
-            action_start_idx = sum([self.controllers[self.controller_order[i]].action_dim for i in range(controller_idx)])
-            arm_action_idx[arm_name] = np.arange(action_start_idx, action_start_idx + self.controllers[f"arm_{arm_name}"].action_dim)
+            action_start_idx = sum([self.controllers[self.controller_order[i]].command_dim for i in range(controller_idx)])
+            arm_action_idx[arm_name] = np.arange(action_start_idx, action_start_idx + self.controllers[f"arm_{arm_name}"].command_dim)
         return arm_action_idx
 
     @property
@@ -506,8 +506,8 @@ class ManipulationRobot(BaseRobot):
         gripper_action_idx = {}
         for arm_name in self.arm_names:
             controller_idx = self.controller_order.index(f"gripper_{arm_name}")
-            action_start_idx = sum([self.controllers[self.controller_order[i]].action_dim for i in range(controller_idx)])
-            gripper_action_idx[arm_name] = np.arange(action_start_idx, action_start_idx + self.controllers[f"gripper_{arm_name}"].action_dim)
+            action_start_idx = sum([self.controllers[self.controller_order[i]].command_dim for i in range(controller_idx)])
+            gripper_action_idx[arm_name] = np.arange(action_start_idx, action_start_idx + self.controllers[f"gripper_{arm_name}"].command_dim)
         return gripper_action_idx
 
     @property
@@ -1515,5 +1515,5 @@ class ManipulationRobot(BaseRobot):
                 # gripper action
                 assert isinstance(self._controllers[f"gripper_{arm_name}"], MultiFingerGripperController), \
                     f"Only MultiFingerGripperController is supported for gripper {arm_name}!"
-                action[self.gripper_action_idx[arm_name]] = teleop_data.gripper[hand]
+                action[self.gripper_action_idx[arm_name]] = teleop_data.grippers[hand]
         return action

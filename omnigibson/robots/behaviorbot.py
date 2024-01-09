@@ -462,7 +462,7 @@ class Behaviorbot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
                         hand_data = hand_data[:, :2].T.reshape(-1)
                     else:
                         # controller mode, map trigger fraction from [0, 1] to [-1, 1] range.
-                        hand_data = teleop_data.gripper[part_name] * 2 - 1
+                        hand_data = teleop_data.grippers[part_name] * 2 - 1
                     action[self.controller_action_idx[f"gripper_{part_name}"]] = hand_data
                     # update ghost hand if necessary
                     if self._use_ghost_hands:

@@ -10,7 +10,7 @@ from omnigibson.utils.gym_utils import GymObservable
 from omnigibson.utils.python_utils import classproperty, merge_nested_dicts
 from omnigibson.utils.vision_utils import segmentation_to_rgb
 from omnigibson.utils.constants import PrimType
-from omnigibson.utils.teleop_utils import TeleopData
+
 # Global dicts that will contain mappings
 REGISTERED_ROBOTS = dict()
 
@@ -412,7 +412,7 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         # Run super
         super().remove()
 
-    def teleop_data_to_action(self, teleop_data: TeleopData) -> np.ndarray:
+    def teleop_data_to_action(self, teleop_data):
         """
         Generate action data from teleoperation data
         Args:

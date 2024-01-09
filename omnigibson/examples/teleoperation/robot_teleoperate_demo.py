@@ -2,7 +2,6 @@
 Example script for using external devices to teleoperate a robot.
 """
 import omnigibson as og
-from omnigibson.objects import USDObject
 from omnigibson.utils.ui_utils import choose_from_options
 
 ROBOTS = {

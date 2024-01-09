@@ -4,10 +4,9 @@ import numpy as np
 from transforms3d.euler import euler2quat
 from transforms3d.quaternions import qmult, quat2mat
 
-from omnigibson.controllers import LocomotionController, DifferentialDriveController
+from omnigibson.controllers import LocomotionController
 from omnigibson.robots.robot_base import BaseRobot
 from omnigibson.utils.python_utils import classproperty
-from omnigibson.utils.teleop_utils import TeleopData
 
 
 class LocomotionRobot(BaseRobot):
@@ -186,8 +185,8 @@ class LocomotionRobot(BaseRobot):
     @property
     def base_action_idx(self):
         controller_idx = self.controller_order.index("base")
-        action_start_idx = sum([self.controllers[self.controller_order[i]].action_dim for i in range(controller_idx)])
-        return np.arange(action_start_idx, action_start_idx + self.controllers["base"].action_dim)
+        action_start_idx = sum([self.controllers[self.controller_order[i]].command_dim for i in range(controller_idx)])
+        return np.arange(action_start_idx, action_start_idx + self.controllers["base"].command_dim)
 
     @property
     @abstractmethod
@@ -204,23 +203,3 @@ class LocomotionRobot(BaseRobot):
         classes = super()._do_not_register_classes
         classes.add("LocomotionRobot")
         return classes
-
-    def teleop_data_to_action(self, teleop_data: TeleopData) -> np.ndarray:
-        """
-        Generate action data from teleoperation data
-        NOTE: This implementation only supports DifferentialDriveController. 
-        Overwrite this function if the robot is using a different base controller.
-        Args:
-            teleop_data (TeleopData): teleoperation data
-        Returns:
-            np.ndarray: array of action data
-        """
-        action = super().teleop_data_to_action(teleop_data)
-        assert isinstance(self._controllers["base"], DifferentialDriveController), "Only DifferentialDriveController is supported!"
-        if teleop_data.robot_attached:
-            translation_offset = teleop_data.transforms["base"][0]
-            rotation_offset = teleop_data.transforms["base"][3]
-        else:
-            translation_offset, rotation_offset = 0, 0
-        action[self.base_action_idx] = np.array([translation_offset, rotation_offset])
-        return action
