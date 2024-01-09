@@ -1,5 +1,6 @@
 import carb
 import numpy as np
+import omni
 import time
 from dataclasses import dataclass, field
 from importlib import import_module
@@ -39,14 +40,12 @@ class TeleopSystem:
 
     def __init__(self, robot: BaseRobot, show_control_marker: bool = True, *args, **kwargs) -> None:
         """
-        self.raw_data is the raw data directly obtained from the teleoperation device
-            It should be in the format as follows:
-            {
-                "transforms": { ... },          # device/landmark transforms
-                "button_data": { ... }.         # device button data
-                ...                             # other raw data
-            }
+        Initializes the VR system
+        Args:
+            robot (BaseRobot): the robot that will be controlled.
+            show_control_marker (bool): whether to show a visual marker that indicates the target pose of the control.
         """
+        # raw data directly obtained from the teleoperation device
         self.raw_data = {
             "transforms": {},
             "button_data": {},
@@ -119,15 +118,6 @@ class TeleopSystem:
         robot_base_pose = self.robot.get_position_orientation()
         eef_pose = self.robot.eef_links[self.robot.arm_names[self.robot_arms.index(arm)]].get_position_orientation()
         self.robot_origin[arm] = T.relative_pose_transform(*eef_pose, *robot_base_pose)
-
-
-class KeyboardSystem(TeleopSystem):
-    def __init__(self, robot: BaseRobot, show_control_marker: bool = True, *args, **kwargs) -> None:
-        super().__init__(robot, show_control_marker)
-
-    def update(self) -> None:
-        pass
-
 
 
 class OVXRSystem(TeleopSystem):
@@ -559,12 +549,12 @@ class SpaceMouseSystem(TeleopSystem):
 
         self.raw_data = None
         self.data_thread = None
-        # robot is always attached to the space mouse system, gripper is open initially
+        # robot is always attached to the space mouse system
         self.teleop_data.robot_attached = True
-        self.delta_pose = {arm: [np.zeros(3), np.array([0, 0, 0, 1])] for arm in self.robot_arms}
         # data is always valid for space mouse
         for arm in self.robot_arms:
             self.teleop_data.is_valid[arm] = True
+        self.delta_pose = {arm: [np.zeros(3), np.array([0, 0, 0, 1])] for arm in self.robot_arms}
         # tracker of which robot part we are controlling
         self.controllable_robot_parts = self.robot_arms.copy()
         if "base" in self.robot.controllers:
@@ -644,3 +634,110 @@ class SpaceMouseSystem(TeleopSystem):
                 target_rel_pos = self.robot_origin[arm][0] + self.delta_pose[arm][0]
                 target_rel_orn = T.quat_multiply(self.delta_pose[arm][1], self.robot_origin[arm][1])
                 self.teleop_data.transforms[arm] = T.pose_transform(*robot_base_pose, target_rel_pos, target_rel_orn)
+
+
+class KeyboardSystem(TeleopSystem):
+    def __init__(self, robot: BaseRobot, show_control_marker: bool = True, *args, **kwargs) -> None:
+        super().__init__(robot, show_control_marker)
+        # robot is always attached to the keyboard system, gripper is open initially
+        self.teleop_data.robot_attached = True
+        # data is always valid for keyboard
+        for arm in self.robot_arms:
+            self.raw_data["transforms"][arm] = (np.zeros(3), np.zeros(3))
+            self.teleop_data.is_valid[arm] = True
+        self.raw_data["transforms"]["base"] = np.zeros(4)
+        self.cur_control_idx = 0
+        # we want to scale down the movement speed to have better control for arms
+        self.arm_speed_scaledown = 0.01
+        self.delta_pose = {arm: [np.zeros(3), np.array([0, 0, 0, 1])] for arm in self.robot_arms}
+        
+    def start(self) -> None:
+        # start the keyboard subscriber
+        appwindow = omni.appwindow.get_default_app_window()
+        input_interface = carb.input.acquire_input_interface()
+        keyboard = appwindow.get_keyboard()
+        input_interface.subscribe_to_keyboard_events(keyboard, self._update_internal_data)   
+        for arm in self.robot_arms:
+            self.reset_transform_mapping(arm)  
+
+    def stop(self) -> None:
+        pass
+
+    def _update_internal_data(self, event) -> None:
+        hand = self.robot_arms[self.cur_control_idx]
+        if event.type == carb.input.KeyboardEventType.KEY_RELEASE:
+            for arm in self.robot_arms:
+                self.raw_data["transforms"][arm] = (np.zeros(3), np.zeros(3))
+            self.raw_data["transforms"]["base"] = np.zeros(4)
+        if event.type == carb.input.KeyboardEventType.KEY_PRESS \
+            or event.type == carb.input.KeyboardEventType.KEY_REPEAT:
+            key = event.input    
+            # update gripper state
+            if key == carb.input.KeyboardInput.KEY_4:
+                self.teleop_data.grippers[hand] = (self.teleop_data.grippers[hand] + 1) % 2            
+            # update current finger positions
+            elif key == carb.input.KeyboardInput.W:
+                self.raw_data["transforms"][hand][0][0] = self.movement_speed * self.arm_speed_scaledown
+            elif key == carb.input.KeyboardInput.S:
+                self.raw_data["transforms"][hand][0][0] = -self.movement_speed * self.arm_speed_scaledown
+            elif key == carb.input.KeyboardInput.A:
+                self.raw_data["transforms"][hand][0][1] = self.movement_speed * self.arm_speed_scaledown
+            elif key == carb.input.KeyboardInput.D:
+                self.raw_data["transforms"][hand][0][1] = -self.movement_speed * self.arm_speed_scaledown
+            elif key == carb.input.KeyboardInput.E:
+                self.raw_data["transforms"][hand][0][2] = self.movement_speed * self.arm_speed_scaledown
+            elif key == carb.input.KeyboardInput.Q:
+                self.raw_data["transforms"][hand][0][2] = -self.movement_speed * self.arm_speed_scaledown
+            elif key == carb.input.KeyboardInput.C:
+                self.raw_data["transforms"][hand][1][0] = self.movement_speed * self.arm_speed_scaledown
+            elif key == carb.input.KeyboardInput.X:
+                self.raw_data["transforms"][hand][1][0] = -self.movement_speed * self.arm_speed_scaledown
+            elif key == carb.input.KeyboardInput.T:
+                self.raw_data["transforms"][hand][1][1] = self.movement_speed * self.arm_speed_scaledown
+            elif key == carb.input.KeyboardInput.B:
+                self.raw_data["transforms"][hand][1][1] = -self.movement_speed * self.arm_speed_scaledown
+            elif key == carb.input.KeyboardInput.Z:
+                self.raw_data["transforms"][hand][1][2] = self.movement_speed * self.arm_speed_scaledown
+            elif key == carb.input.KeyboardInput.V:
+                self.raw_data["transforms"][hand][1][2] = -self.movement_speed * self.arm_speed_scaledown
+            # rotate around hands to control
+            elif key == carb.input.KeyboardInput.KEY_1:
+                self.cur_control_idx = (self.cur_control_idx - 1) % len(self.robot_arms)
+                print(f"Now controlling robot part {self.robot_arms[self.cur_control_idx]}")
+            elif key == carb.input.KeyboardInput.KEY_2:
+                self.cur_control_idx = (self.cur_control_idx + 1) % len(self.robot_arms)
+                print(f"Now controlling robot part {self.robot_arms[self.cur_control_idx]}")
+            # update base positions 
+            elif key == carb.input.KeyboardInput.I:
+                self.raw_data["transforms"]["base"][0] = self.movement_speed
+            elif key == carb.input.KeyboardInput.K:
+                self.raw_data["transforms"]["base"][0] = -self.movement_speed
+            elif key == carb.input.KeyboardInput.U:
+                self.raw_data["transforms"]["base"][1] = self.movement_speed
+            elif key == carb.input.KeyboardInput.O:
+                self.raw_data["transforms"]["base"][1] = -self.movement_speed
+            elif key == carb.input.KeyboardInput.P:
+                self.raw_data["transforms"]["base"][2] = self.movement_speed
+            elif key == carb.input.KeyboardInput.SEMICOLON:
+                self.raw_data["transforms"]["base"][2] = -self.movement_speed
+            elif key == carb.input.KeyboardInput.J:
+                self.raw_data["transforms"]["base"][3] = self.movement_speed
+            elif key == carb.input.KeyboardInput.L:
+                self.raw_data["transforms"]["base"][3] = -self.movement_speed
+        return True
+
+    def update(self) -> None:
+        # update robot base pose
+        self.teleop_data.transforms["base"] = self.raw_data["transforms"]["base"] 
+        # update robot arm poses
+        cur_arm = self.robot_arms[self.cur_control_idx]
+        self.delta_pose[cur_arm][0] += self.raw_data["transforms"][cur_arm][0]
+        self.delta_pose[cur_arm][1] = T.quat_multiply(
+            T.euler2quat(self.raw_data["transforms"][cur_arm][1]),
+            self.delta_pose[cur_arm][1]
+        )
+        robot_base_pose = self.robot.get_position_orientation()
+        for arm in self.robot_arms:
+            target_rel_pos = self.robot_origin[arm][0] + self.delta_pose[arm][0]
+            target_rel_orn = T.quat_multiply(self.delta_pose[arm][1], self.robot_origin[arm][1])
+            self.teleop_data.transforms[arm] = T.pose_transform(*robot_base_pose, target_rel_pos, target_rel_orn)

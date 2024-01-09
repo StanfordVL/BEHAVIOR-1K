@@ -11,9 +11,10 @@ ROBOTS = {
 }
 
 SYSTEMS = {
-    "SteamVR": "SteamVR with HTC VIVE through OmniverseXR plugin (default)",
+    "Keyboard": "Keyboard (default)",
+    "SteamVR": "SteamVR with HTC VIVE through OmniverseXR plugin",
     "Oculus": "Oculus Reader with Quest 2",
-    "Spacemouse": "Spacemouse",
+    "SpaceMouse": "Space Mouse",
 }
 
 
@@ -126,8 +127,10 @@ def main():
         from omnigibson.utils.teleop_utils import OVXRSystem as TeleopSystem
     elif teleop_system == "Oculus":
         from omnigibson.utils.teleop_utils import OculusReaderSystem as TeleopSystem
-    elif teleop_system == "Spacemouse":
+    elif teleop_system == "SpaceMouse":
         from omnigibson.utils.teleop_utils import SpaceMouseSystem as TeleopSystem
+    elif teleop_system == "Keyboard":
+        from omnigibson.utils.teleop_utils import KeyboardSystem as TeleopSystem
     teleop_sys = TeleopSystem(robot=robot, disable_display_output=True, align_anchor_to_robot_base=True)
     teleop_sys.start()
     # tracker variable of whether the robot is attached to the VR system
