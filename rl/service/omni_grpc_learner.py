@@ -102,7 +102,7 @@ def main():
 
     parser.add_argument("--n_envs", type=int, default=8, help="Number of parallel environments to wait for. 0 to run a local environment.")
     parser.add_argument("--port", type=int, default=None, help="The port to listen at. Defaults to a random port.")
-
+    parser.add_argument("--eval", type=bool, default=False, help="Whether to evaluate a policy instead of training. Fixes n_envs at 0.")
     parser.add_argument(
         "--checkpoint",
         type=str,
