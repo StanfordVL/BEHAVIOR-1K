@@ -8,28 +8,28 @@ import matplotlib.pyplot as plt
 import yaml
 import omnigibson as og
 from omnigibson.macros import gm
-from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitives, StarterSemanticActionPrimitiveSet
-from omnigibson.sensors.scan_sensor import ScanSensor
-from omnigibson.sensors.vision_sensor import VisionSensor
-import omnigibson.utils.transform_utils as T
-from omnigibson.objects.dataset_object import DatasetObject
-import h5py
+from omnigibson.action_primitives.starter_semantic_action_primitives import StarterSemanticActionPrimitives, StarterSemanticActionPrimitiveSet, PlanningContext
+from omnigibson.utils.grasping_planning_utils import get_grasp_poses_for_object_sticky
+from omnigibson.utils.motion_planning_utils import set_arm_and_detect_collision
 
-from PIL import Image
+import random
 from tqdm import tqdm
+import json
 
-
-def step_sim(time):
-    for _ in range(int(time*100)):
-        og.sim.step()
-
-def execute_controller(ctrl_gen, env):
-    for action in ctrl_gen:
-        env.step(action[0])
+def get_random_joint_position(robot):
+    joint_positions = []
+    joint_control_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
+    joints = np.array([joint for joint in robot.joints.values()])
+    arm_joints = joints[joint_control_idx]
+    for i, joint in enumerate(arm_joints):
+        val = random.uniform(joint.lower_limit, joint.upper_limit)
+        joint_positions.append(val)
+    return joint_positions, joint_control_idx
 
 def main(iterations):
     DIST_COEFF = 0.1
     GRASP_REWARD = 0.3
+    MAX_JOINT_RANDOMIZATION_ATTEMPTS = 50
 
     cfg = {
         "env": {
@@ -139,45 +139,62 @@ def main(iterations):
     gm.USE_GPU_DYNAMICS = True
 
     env = og.Environment(configs=cfg)
-        
-    # Testing primitives with env
-    #############################
-    # controller = env.task._primitive_controller
-    # obj = env.scene.object_registry("name", "cologne")
-    # for i in tqdm(range(int(iterations))):
-    #     try:
-    #         obs = env.reset()
-    #         timestep = 0
-    #         for action in controller.apply_ref(StarterSemanticActionPrimitiveSet.GRASP, obj):
-    #             obs, reward, done, truncated, info = env.step(action)
-    #             print(reward)
-    #             truncated = True if timestep >= 400 else truncated
-    #             timestep += 1
-    #             if done or timestep >= 400:
-    #                 for action in controller._execute_release():
-    #                     action = action[0]
-    #                     env.step(action)
-    #                 break
-    #     except Exception as e:
-    #         print("Error in iteration: ", i)
-    #         print(e)
-    #         print('--------------------')
+    primitive_controller = env.task._primitive_controller
 
-    # Testing random actions with env
-    #############################
-    for i in tqdm(range(int(iterations))):
+    robot = env.robots[0]
+    # Randomize the robots joint positions
+    joint_control_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx[robot.default_arm]])
+    dim = len(joint_control_idx)
+    # For Tiago
+    if "combined" in robot.robot_arm_descriptor_yamls:
+        joint_combined_idx = np.concatenate([robot.trunk_control_idx, robot.arm_control_idx["combined"]])
+        initial_joint_pos = np.array(robot.get_joint_positions()[joint_combined_idx])
+        control_idx_in_joint_pos = np.where(np.in1d(joint_combined_idx, joint_control_idx))[0]
+    # For Fetch
+    else:
+        initial_joint_pos = np.array(robot.get_joint_positions()[joint_control_idx])
+        control_idx_in_joint_pos = np.arange(dim)
+
+
+    saved_poses = []
+    for i in tqdm(range(iterations)):
+        selected_joint_pos = None
+        selected_base_pose = None
         try:
-            done = False
-            env.reset()
-            while not done:
-                action = env.action_space.sample()
-                obs, reward, terminated, truncated, info = env.step(action)
-                done = terminated or truncated
-                break
+            with PlanningContext(primitive_controller.robot, primitive_controller.robot_copy, "original") as context:
+                for _ in range(MAX_JOINT_RANDOMIZATION_ATTEMPTS):
+                    joint_pos, joint_control_idx = get_random_joint_position(robot)
+                    initial_joint_pos[control_idx_in_joint_pos] = joint_pos
+                    if not set_arm_and_detect_collision(context, initial_joint_pos):
+                        selected_joint_pos = joint_pos
+                        # robot.set_joint_positions(joint_pos, joint_control_idx)
+                        # og.sim.step()
+                        break
+
+            # Randomize the robot's 2d pose
+            obj = env.scene.object_registry("name", "cologne")
+            grasp_poses = get_grasp_poses_for_object_sticky(obj)
+            grasp_pose, _ = random.choice(grasp_poses)
+            sampled_pose_2d = primitive_controller._sample_pose_near_object(obj, pose_on_obj=grasp_pose)
+            # sampled_pose_2d = [-0.433881, -0.210183, -2.96118]
+            robot_pose = primitive_controller._get_robot_pose_from_2d_pose(sampled_pose_2d)
+            # robot.set_position_orientation(*robot_pose)
+            selected_base_pose = robot_pose
+
+            pose = {
+                "joint_pos": selected_joint_pos,
+                "base_pos": selected_base_pose[0].tolist(),
+                "base_ori": selected_base_pose[1].tolist()
+            }
+            saved_poses.append(pose)
+
         except Exception as e:
             print("Error in iteration: ", i)
             print(e)
             print('--------------------')
+
+    with open('reset_poses.json', 'w') as f:
+        json.dump(saved_poses, f)
 
 
 if __name__ == "__main__":
@@ -185,7 +202,7 @@ if __name__ == "__main__":
     parser.add_argument("iterations")
     
     args = parser.parse_args()
-    main(args.iterations)
+    main(int(args.iterations))
 
     # seg semantic - 224 x 224
     # seg instance - 224 x 224
