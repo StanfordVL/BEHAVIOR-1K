@@ -8,12 +8,13 @@ from scipy.spatial.transform import Rotation as R
 from typing import List, Tuple, Iterable
 
 import omnigibson as og
+import omnigibson.utils.transform_utils as T
 from omnigibson.macros import gm, create_module_macros
 from omnigibson.robots.locomotion_robot import LocomotionRobot
 from omnigibson.robots.manipulation_robot import ManipulationRobot, GraspingPoint
 from omnigibson.robots.active_camera_robot import ActiveCameraRobot
 from omnigibson.objects.usd_object import USDObject
-import omnigibson.utils.transform_utils as T
+from omnigibson.utils.teleop_utils import TeleopData
 
 m = create_module_macros(module_path=__file__)
 # component suffixes for the 6-DOF arm joint names
@@ -119,12 +120,12 @@ class Behaviorbot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
 
         # setup eef parts
         self.parts = OrderedDict()
-        self.parts["lh"] = BRPart(
+        self.parts["left"] = BRPart(
             name="lh", parent=self, prim_path="lh_palm", eef_type="hand",
             offset_to_body=m.LH_TO_BODY_OFFSET, **kwargs
         )
 
-        self.parts["rh"] = BRPart(
+        self.parts["right"] = BRPart(
             name="rh", parent=self, prim_path="rh_palm", eef_type="hand",
             offset_to_body=m.RH_TO_BODY_OFFSET, **kwargs
         )
@@ -416,7 +417,7 @@ class Behaviorbot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             self._part_is_in_contact[hand_name] = len(self.eef_links[hand_name].contact_list()) > 0 \
                or np.any([len(finger.contact_list()) > 0 for finger in self.finger_links[hand_name]])
 
-    def teleop_data_to_action(self, teleop_data: dict) -> np.ndarray:
+    def teleop_data_to_action(self, teleop_data: TeleopData) -> np.ndarray:
         """
         Generates an action for the Behaviorbot to perform based on vr data dict.
 
@@ -434,43 +435,40 @@ class Behaviorbot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
         # Actions are stored as 1D numpy array
         action = np.zeros(self.action_dim)
         # Update body action space
-        head_pos, head_orn = teleop_data["transforms"]["head"]
-        if np.all(np.equal(head_pos, np.zeros(3))) and np.all(np.equal(head_orn, np.array([0, 0, 0, 1]))):
-            des_body_pos, des_body_orn = self.get_position_orientation()
-            des_body_rpy = R.from_quat(des_body_orn).as_euler("XYZ")
-        else:
+        if teleop_data.is_valid["head"]:
+            head_pos, head_orn = teleop_data.transforms["head"]
             des_body_pos = head_pos - np.array([0, 0, m.BODY_HEIGHT_OFFSET])
             des_body_rpy = np.array([0, 0, R.from_quat(head_orn).as_euler("XYZ")[2]])
             des_body_orn = T.euler2quat(des_body_rpy)
+        else:
+            des_body_pos, des_body_orn = self.get_position_orientation()
+            des_body_rpy = R.from_quat(des_body_orn).as_euler("XYZ")
         action[self.controller_action_idx["base"]] = np.r_[des_body_pos, des_body_rpy]
         # Update action space for other VR objects
         for part_name, eef_part in self.parts.items():
             # Process local transform adjustments
-            prev_local_pos, prev_local_orn = eef_part.local_position_orientation
             reset = 0
-            hand_data = None
-            if part_name == "head":
-                part_pos, part_orn = teleop_data["transforms"]["head"]
-            else:
-                hand_name = "left" if part_name == "lh" else "right"
-                if "hand_data" in teleop_data:
-                    if hand_name in teleop_data["hand_data"] and "raw" in teleop_data["hand_data"][hand_name]:
-                        part_pos = teleop_data["hand_data"][hand_name]["raw"]["pos"][0]
-                        part_orn = teleop_data["hand_data"][hand_name]["raw"]["orn"][0]
-                        hand_data = teleop_data["hand_data"][hand_name]["angles"]
-                    else:
-                        part_pos, part_orn = np.zeros(3), np.array([0, 0, 0, 1])
-                else:
-                    part_pos, part_orn = teleop_data["transforms"][hand_name]
-                    hand_data = teleop_data[f"gripper_{hand_name}"]
-                    reset = teleop_data["reset"]
-
-            if np.all(np.equal(part_pos, np.zeros(3))) and np.all(np.equal(part_orn, np.array([0, 0, 0, 1]))):
-                des_world_part_pos, des_world_part_orn = prev_local_pos, prev_local_orn
-            else:
+            hand_data = 0
+            if teleop_data.is_valid[part_name]: 
+                part_pos, part_orn = teleop_data.transforms[part_name]
                 # apply eef rotation offset to part transform first
                 des_world_part_pos = part_pos
                 des_world_part_orn = T.quat_multiply(part_orn, eef_part.offset_to_body[1])
+                if part_name in self.arm_names:
+                    # compute gripper action
+                    if hasattr(teleop_data, "hand_data"):
+                        # hand tracking mode, compute joint rotations for each independent hand joint
+                        hand_data = teleop_data.hand_data[part_name]
+                        hand_data = hand_data[:, :2].T.reshape(-1)
+                    else:
+                        # controller mode, map trigger fraction from [0, 1] to [-1, 1] range.
+                        hand_data = teleop_data.gripper[part_name] * 2 - 1
+                    action[self.controller_action_idx[f"gripper_{part_name}"]] = hand_data
+                    # update ghost hand if necessary
+                    if self._use_ghost_hands:
+                        self.parts[part_name].update_ghost_hands(des_world_part_pos, des_world_part_orn)
+            else:
+               des_world_part_pos, des_world_part_orn = eef_part.local_position_orientation
 
             # Get local pose with respect to the new body frame
             des_local_part_pos, des_local_part_orn = T.relative_pose_transform(
@@ -483,19 +481,9 @@ class Behaviorbot(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
             des_part_rpy = R.from_quat(des_local_part_orn).as_euler("XYZ")
             controller_name = "camera" if part_name == "head" else "arm_" + part_name
             action[self.controller_action_idx[controller_name]] = np.r_[des_local_part_pos, des_part_rpy]
-            # Process trigger fraction and reset for controllers
-            if isinstance(hand_data, float):
-                # controller mode, map trigger fraction from [0, 1] to [-1, 1] range.
-                action[self.controller_action_idx[f"gripper_{part_name}"]] = hand_data * 2 - 1
-            elif hand_data is not None:
-                # hand tracking mode, compute joint rotations for each independent hand joint
-                action[self.controller_action_idx[f"gripper_{part_name}"]] = hand_data[:, :2].T.reshape(-1)
             # If we reset, teleop the robot parts to the desired pose
             if reset:
                 self.parts[part_name].set_position_orientation(des_local_part_pos, des_part_rpy)
-            # update ghost hand if necessary
-            if self._use_ghost_hands and part_name is not "head":
-                self.parts[part_name].update_ghost_hands(des_world_part_pos, des_world_part_orn)
         return action
 
 

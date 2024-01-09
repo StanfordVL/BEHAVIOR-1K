@@ -77,15 +77,16 @@ def main():
         if og.sim.is_playing():
             vrsys.update()
             if DEBUG_MODE:
-                if "left" in vrsys.raw_data["hand_data"] and "raw" in vrsys.raw_data["hand_data"]["left"]:
+                # update the 26 markers' position and orientation for each hand
+                if vrsys.teleop_data.is_valid["left"]:
                     for i in range(26):
-                        pos = vrsys.raw_data["hand_data"]["left"]["raw"]["pos"][i]
-                        orn = vrsys.raw_data["hand_data"]["left"]["raw"]["orn"][i]
+                        pos = vrsys.raw_data["hand_data"]["left"]["pos"][i]
+                        orn = vrsys.raw_data["hand_data"]["left"]["orn"][i]
                         markers[i].set_position_orientation(pos, orn)
-                if "right" in vrsys.raw_data["hand_data"] and "raw" in vrsys.raw_data["hand_data"]["right"]:
+                if vrsys.teleop_data.is_valid["right"]:
                     for i in range(26):
-                        pos = vrsys.raw_data["hand_data"]["right"]["raw"]["pos"][i]
-                        orn = vrsys.raw_data["hand_data"]["right"]["raw"]["orn"][i]
+                        pos = vrsys.raw_data["hand_data"]["right"]["pos"][i]
+                        orn = vrsys.raw_data["hand_data"]["right"]["orn"][i]
                         markers[i + 26].set_position_orientation(pos, orn)
             action = vrsys.teleop_data_to_action()
             env.step(action)                

@@ -137,14 +137,14 @@ def main():
     for _ in range(10000):
         if og.sim.is_playing():
             teleop_sys.update()
-            if teleop_sys.teleop_data["robot_attached"] == True and prev_robot_attached == False:
+            if teleop_sys.teleop_data.robot_attached and not prev_robot_attached:
                 teleop_sys.reset_transform_mapping()
                 if robot_name == "Tiago":
                     teleop_sys.reset_transform_mapping("left")
             else:
                 action = teleop_sys.teleop_data_to_action()
                 env.step(action) 
-            prev_robot_attached = teleop_sys.teleop_data["robot_attached"]
+            prev_robot_attached = teleop_sys.teleop_data.robot_attached
     # Shut down the environment cleanly at the end
     teleop_sys.stop()
     env.close()

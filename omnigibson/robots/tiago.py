@@ -763,7 +763,8 @@ class Tiago(ManipulationRobot, LocomotionRobot, ActiveCameraRobot):
     def eef_usd_path(self):
         return {arm: os.path.join(gm.ASSET_PATH, "models/tiago/tiago_dual_omnidirectional_stanford/tiago_eef.usd") for arm in self.arm_names}
 
-    def teleop_data_to_action(self, teleop_data: TeleopData):
+    def teleop_data_to_action(self, teleop_data: TeleopData) -> np.ndarray:
         action = ManipulationRobot.teleop_data_to_action(self, teleop_data)
+        # compute base movement (x, y, yaw)
         action[self.base_action_idx] = teleop_data.transforms["base"][[0, 1, 3]]
         return action

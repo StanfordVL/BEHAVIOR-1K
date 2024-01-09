@@ -1496,15 +1496,15 @@ class ManipulationRobot(BaseRobot):
         hands = ["left", "right"] if self.n_arms == 2 else ["right"]
         for i, hand in enumerate(hands):
             arm_name = self.arm_names[i]
-            if hand in teleop_data["transforms"]:
+            if teleop_data.is_valid[hand]:
                 # arm action
                 assert \
                     isinstance(self._controllers[f"arm_{arm_name}"], InverseKinematicsController) or \
                     isinstance(self._controllers[f"arm_{arm_name}"], OperationalSpaceController), \
                     f"Only IK and OSC controllers are supported for arm {arm_name}!"
                 cur_eef_pos, cur_eef_orn = self.links[self.eef_link_names[arm_name]].get_position_orientation()
-                if teleop_data["robot_attached"]:
-                    target_pos, target_orn = teleop_data["transforms"][hand]
+                if teleop_data.robot_attached:
+                    target_pos, target_orn = teleop_data.transforms[hand]
                 else:
                     target_pos, target_orn = cur_eef_pos, cur_eef_orn
                 # get orientation relative to robot base
@@ -1515,5 +1515,5 @@ class ManipulationRobot(BaseRobot):
                 # gripper action
                 assert isinstance(self._controllers[f"gripper_{arm_name}"], MultiFingerGripperController), \
                     f"Only MultiFingerGripperController is supported for gripper {arm_name}!"
-                action[self.gripper_action_idx[arm_name]] = teleop_data[f"gripper_{hand}"]
+                action[self.gripper_action_idx[arm_name]] = teleop_data.gripper[hand]
         return action
