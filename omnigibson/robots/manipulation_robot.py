@@ -22,6 +22,7 @@ from omnigibson.utils.python_utils import classproperty, assert_valid_key
 from omnigibson.utils.geometry_utils import generate_points_in_volume_checker_function
 from omnigibson.utils.constants import JointType, PrimType
 from omnigibson.utils.usd_utils import create_joint
+from omnigibson.utils.teleop_utils import TeleopData
 
 
 # Create settings for this module
@@ -490,6 +491,24 @@ class ManipulationRobot(BaseRobot):
             str: Default arm name for this robot, corresponds to the first entry in @arm_names by default
         """
         return self.arm_names[0]
+
+    @property
+    def arm_action_idx(self):
+        arm_action_idx = {}
+        for arm_name in self.arm_names:
+            controller_idx = self.controller_order.index(f"arm_{arm_name}")
+            action_start_idx = sum([self.controllers[self.controller_order[i]].action_dim for i in range(controller_idx)])
+            arm_action_idx[arm_name] = np.arange(action_start_idx, action_start_idx + self.controllers[f"arm_{arm_name}"].action_dim)
+        return arm_action_idx
+
+    @property
+    def gripper_action_idx(self):
+        gripper_action_idx = {}
+        for arm_name in self.arm_names:
+            controller_idx = self.controller_order.index(f"gripper_{arm_name}")
+            action_start_idx = sum([self.controllers[self.controller_order[i]].action_dim for i in range(controller_idx)])
+            gripper_action_idx[arm_name] = np.arange(action_start_idx, action_start_idx + self.controllers[f"gripper_{arm_name}"].action_dim)
+        return gripper_action_idx
 
     @property
     @abstractmethod
@@ -1463,37 +1482,38 @@ class ManipulationRobot(BaseRobot):
         """
         return {arm: np.array([0, 0, 0, 1]) for arm in self.arm_names}
 
-    def teleop_data_to_action(self, teleop_data: dict) -> np.ndarray:
+    def teleop_data_to_action(self, teleop_data: TeleopData) -> np.ndarray:
         """
-        Generate action data from VR input for robot teleoperation
+        Generate action data from teleoperation data
         NOTE: This implementation only supports IK/OSC controller for arm and MultiFingerGripperController for gripper. 
         Overwrite this function if the robot is using a different controller.
         Args:
-            teleop_data (dict): dictionary containing teleop data, see utils.teleop_utils.TeleopSystem docstring for what's expected
+            teleop_data (TeleopData): teleoperation data
         Returns:
             np.ndarray: array of action data for arm and gripper
         """
-        action = np.zeros(self.n_arms * 7)
+        action = super().teleop_data_to_action(teleop_data)
         hands = ["left", "right"] if self.n_arms == 2 else ["right"]
         for i, hand in enumerate(hands):
             arm_name = self.arm_names[i]
-            assert isinstance(self._controllers[f"gripper_{arm_name}"], MultiFingerGripperController), \
-                f"Only MultiFingerGripperController is supported for gripper {arm_name}!"
-            assert \
-                isinstance(self._controllers[f"arm_{arm_name}"], InverseKinematicsController) or \
-                isinstance(self._controllers[f"arm_{arm_name}"], OperationalSpaceController), \
-                f"Only IK and OSC controllers are supported for arm {arm_name}!"
             if hand in teleop_data["transforms"]:
-                cur_robot_eef_pos, cur_robot_eef_orn = self.links[self.eef_link_names[arm_name]].get_position_orientation()
+                # arm action
+                assert \
+                    isinstance(self._controllers[f"arm_{arm_name}"], InverseKinematicsController) or \
+                    isinstance(self._controllers[f"arm_{arm_name}"], OperationalSpaceController), \
+                    f"Only IK and OSC controllers are supported for arm {arm_name}!"
+                cur_eef_pos, cur_eef_orn = self.links[self.eef_link_names[arm_name]].get_position_orientation()
                 if teleop_data["robot_attached"]:
                     target_pos, target_orn = teleop_data["transforms"][hand]
                 else:
-                    target_pos, target_orn = cur_robot_eef_pos, cur_robot_eef_orn
+                    target_pos, target_orn = cur_eef_pos, cur_eef_orn
                 # get orientation relative to robot base
                 base_pos, base_orn = self.get_position_orientation()
-                rel_target_pos, rel_target_orn = T.relative_pose_transform(target_pos, target_orn, base_pos, base_orn)
-                rel_cur_pos, _ = T.relative_pose_transform(cur_robot_eef_pos, cur_robot_eef_orn, base_pos, base_orn)
-                trigger_fraction = teleop_data[f"gripper_{hand}"]
-                action[i*7 : i*7+6] = np.r_[rel_target_pos - rel_cur_pos, T.quat2axisangle(rel_target_orn)]
-                action[i*7+6] = trigger_fraction
+                rel_des_pos, rel_des_orn = T.relative_pose_transform(target_pos, target_orn, base_pos, base_orn)
+                rel_cur_pos, _ = T.relative_pose_transform(cur_eef_pos, cur_eef_orn, base_pos, base_orn)
+                action[self.arm_action_idx[arm_name]] = np.r_[rel_des_pos - rel_cur_pos, T.quat2axisangle(rel_des_orn)]
+                # gripper action
+                assert isinstance(self._controllers[f"gripper_{arm_name}"], MultiFingerGripperController), \
+                    f"Only MultiFingerGripperController is supported for gripper {arm_name}!"
+                action[self.gripper_action_idx[arm_name]] = teleop_data[f"gripper_{hand}"]
         return action
