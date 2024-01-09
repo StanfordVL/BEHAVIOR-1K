@@ -244,7 +244,7 @@ class MacroParticleSystem(BaseSystem):
     def remove_particle_by_name(cls, name):
         assert name in cls.particles, f"Got invalid name for particle to remove {name}"
         particle = cls.particles.pop(name)
-        particle.remove()
+        og.sim.remove_prim(particle)
 
     @classmethod
     def remove_particles(
