@@ -134,6 +134,9 @@ class BaseObject(EntityPrim, Registerable, metaclass=ABCMeta):
         return prim
 
     def remove(self):
+        """
+        Do NOT call this function directly to remove a prim - call og.sim.remove_prim(prim) for proper cleanup
+        """
         # Run super first
         super().remove()
 
