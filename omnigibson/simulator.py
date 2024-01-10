@@ -374,7 +374,7 @@ class Simulator(SimulationContext, Serializable):
         Remove a non-robot object from the simulator.
 
         Args:
-            obj (BaseObject): a non-robot object to load
+            obj (BaseObject): a non-robot object to remove
         """
         # Run any callbacks
         for callback in self._callbacks_on_remove_obj.values():
@@ -398,6 +398,19 @@ class Simulator(SimulationContext, Serializable):
 
         # Refresh all current rules
         TransitionRuleAPI.prune_active_rules()
+
+    def remove_prim(self, prim):
+        """
+        Remove a prim from the simulator.
+
+        Args:
+            prim (BasePrim): a prim to remove
+        """
+        # Remove prim
+        prim.remove()
+
+        # Update all handles that are now broken because prims have changed
+        self.update_handles()
 
     def _reset_variables(self):
         """

@@ -83,6 +83,14 @@ class XFormPrim(BasePrim):
         if "scale" in self._load_config and self._load_config["scale"] is not None:
             self.scale = self._load_config["scale"]
 
+    def remove(self):
+        # Remove the material prim if one exists
+        if self._material is not None:
+            self._material.remove()
+
+        # Remove the prim
+        super().remove()
+
     def _set_xform_properties(self):
         current_position, current_orientation = self.get_position_orientation()
         properties_to_remove = [
