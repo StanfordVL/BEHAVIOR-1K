@@ -192,7 +192,9 @@ class GraspTask(BaseTask):
     @classproperty
     def default_reward_config(cls):
         return {
-            "r_dist_coeff": DIST_COEFF,
-            "r_grasp": GRASP_REWARD,
+            "dist_coeff": DIST_COEFF,
+            "grasp_reward": GRASP_REWARD,
+            "eef_position_penalty_coef": 0.01,
+            "eef_orientation_penalty_coef": 0.001,
         }
 
