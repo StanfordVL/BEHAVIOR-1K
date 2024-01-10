@@ -403,6 +403,9 @@ class BaseRobot(USDObject, ControllableObject, GymObservable):
         plt.show()
 
     def remove(self):
+        """
+        Do NOT call this function directly to remove a prim - call og.sim.remove_prim(prim) for proper cleanup
+        """
         # Remove all sensors
         for sensor in self._sensors.values():
             sensor.remove()
