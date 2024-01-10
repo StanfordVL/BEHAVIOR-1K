@@ -140,10 +140,10 @@ def main():
     # TODO: None of this stuff works: make it work by running env locally and connecting to it.
     # If we're evaluating, hide the ceilings and enable camera teleoperation so the user can easily
     # visualize the rollouts dynamically
-    # if args.eval:
-    #     ceiling = env.scene.object_registry("name", "ceilings")
-    #     ceiling.visible = False
-    #     og.sim.enable_viewer_camera_teleoperation()
+    if args.eval:
+        ceiling = env.scene.object_registry("name", "ceilings")
+        ceiling.visible = False
+        og.sim.enable_viewer_camera_teleoperation()
 
     # Set the set
     set_random_seed(seed)
@@ -153,17 +153,13 @@ def main():
     #     features_extractor_class=CustomCombinedExtractor,
     # )
 
-    if False: # args.eval:
-        raise ValueError("This does not currently work.")
-    
-        # TODO: Reenable once this all works
-        # assert args.checkpoint is not None, "If evaluating a PPO policy, @checkpoint argument must be specified!"
-        # model = PPO.load(args.checkpoint)
-        # log.info("Starting evaluation...")
-        # mean_reward, std_reward = evaluate_policy(model, env, n_eval_episodes=50)
-        # log.info("Finished evaluation!")
-        # log.info(f"Mean reward: {mean_reward} +/- {std_reward:.2f}")
-
+    if args.eval:    
+        assert args.checkpoint is not None, "If evaluating a PPO policy, @checkpoint argument must be specified!"
+        model = PPO.load(args.checkpoint)
+        log.info("Starting evaluation...")
+        mean_reward, std_reward = evaluate_policy(model, env, n_eval_episodes=50)
+        log.info("Finished evaluation!")
+        log.info(f"Mean reward: {mean_reward} +/- {std_reward:.2f}")
     else:
         config = {
             "policy": "MultiInputPolicy",

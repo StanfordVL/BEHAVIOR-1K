@@ -22,7 +22,6 @@ class GRPCClientEnv(gym.Env):
 
   @property
   def stub(self):
-<<<<<<< HEAD
     # MAX_RETRIES = 3
     # for retry in range(MAX_RETRIES):
     #   if self.channel_state == grpc.ChannelConnectivity.SHUTDOWN:
@@ -35,9 +34,6 @@ class GRPCClientEnv(gym.Env):
     #     break
     # from IPython import embed; embed()
     # assert not self._closed, "Trying to use an environment that has already been closed."
-=======
-    # TODO: Reestablish connection if it's down.
->>>>>>> 807a0e6db1b6b137e6d85c6cf4de72da90480cbe
     return self._stub
 
   def step(self, action):
