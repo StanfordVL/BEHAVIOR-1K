@@ -160,6 +160,18 @@ class EntityPrim(XFormPrim):
 
         self._materials = materials
 
+    def remove(self):
+        # First remove all joints
+        for joint in self._joints.values():
+            joint.remove()
+
+        # Then links
+        for link in self._links.values():
+            link.remove()
+
+        # Finally, remove this prim
+        super().remove()
+
     def update_links(self):
         """
         Helper function to refresh owned joints. Useful for synchronizing internal data if

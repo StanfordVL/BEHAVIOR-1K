@@ -126,7 +126,7 @@ class BasePrim(Serializable, UniquelyNamed, Recreatable, ABC):
             delete_prim(self.prim_path)
 
         # Also clear the name so we can reuse this later
-        self.remove_names(include_all_owned=True)
+        self.remove_names()
 
         # Make the simulator refresh its handles
         og.sim.update_handles()
